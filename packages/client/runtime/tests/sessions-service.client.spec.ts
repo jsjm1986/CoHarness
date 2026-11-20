@@ -54,6 +54,34 @@ async function feedList(b: Bench, rows: FeedRow[]): Promise<void> {
 }
 
 describe('list store projection', () => {
+  it('publishes a recovered history restriction without activity changes and never activates it on selection or reconnect', async () => {
+    const b = bench()
+    let restricted = false
+    b.api.onList = async () => ok({ items: [{ sessionId: sid('s1'), updatedAt: 1, running: false, blank: false,
+      ...(restricted ? { executionRestriction: 'recovery-read-only' as const } : {}) }] })
+    try {
+      await b.svc.refresh()
+      const prior = b.svc.list.getSnapshot().byId[sid('s1')]
+      restricted = true
+      await b.svc.refresh()
+      expect(b.svc.list.getSnapshot().byId[sid('s1')]).not.toBe(prior)
+      expect(b.svc.list.getSnapshot().byId[sid('s1')]?.executionRestriction).toBe('recovery-read-only')
+      b.svc.open(sid('s1'))
+      b.svc.handleConnected()
+      await Promise.resolve()
+      expect(b.api.callsOf('session.activate')).toHaveLength(0)
+      expect(b.svc.isActivated(sid('s1'))).toBe(false)
+    } finally { await b.ctx.fiber.dispose() }
+  })
+  it('carries the execution restriction from prepared history before a directory row exists', async () => {
+    const b = bench()
+    try {
+      await b.svc.acceptPrepared(sid('restored'), {}, ok({ events: [], hasMore: false, executionRestriction: 'recovery-read-only' }))
+      expect(b.svc.list.getSnapshot().byId[sid('restored')]?.executionRestriction).toBe('recovery-read-only')
+      b.svc.open(sid('restored'))
+      expect(b.api.callsOf('session.activate')).toHaveLength(0)
+    } finally { await b.ctx.fiber.dispose() }
+  })
   it('projects the existing baseline activity and failure through an explicit retry', async () => {
     const b = bench()
     const first = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
@@ -177,14 +205,20 @@ describe('search', () => {
       hasMore: false,
     }))
     const signal = new AbortController().signal
+    const progress = vi.fn<NonNullable<Parameters<SessionRuntime['search']>[2]>>()
 
-    await expect(b.svc.search('needle', signal)).resolves.toEqual({
+    await expect(b.svc.search('needle', signal, progress)).resolves.toEqual({
       ok: true,
       value: {
         items: [{ sessionId: 's1', snippet: 'matching excerpt' }],
         hasMore: false,
       },
     })
+    expect(progress.mock.calls.map(([value]) => value)).toEqual([
+      { items: [], hasMore: false, targets: [{ runtime: { kind: 'personal' }, status: 'pending' }] },
+      { items: [{ sessionId: 's1', snippet: 'matching excerpt' }], hasMore: false,
+        targets: [{ runtime: { kind: 'personal' }, status: 'ready' }] },
+    ])
     expect(b.api.lastSearchSignal).toBe(signal)
     expect(b.svc.list.getSnapshot()).toBe(before)
   })
@@ -717,6 +751,28 @@ describe('slot-store scope prune hook', () => {
 })
 
 describe('catalog-addressed navigation', () => {
+  it.each([false, true])('projects the exact child restriction without activating its Agent (retained pane: %s)', async (retained) => {
+    const b = bench()
+    let release: (() => void) | undefined
+    b.api.onSubagentList = async () => ok({ entries: [{
+      kind: 'child', id: sid('child'), mode: 'continuable', label: 'Child', activity: 'inactive', hasChildren: false,
+    }] as never[], parentAvailable: false })
+    b.api.onSubagentHistory = async () => ok({ events: [], hasMore: false, executionRestriction: 'recovery-read-only' })
+    try {
+      await feedList(b, [{ id: 'root' }])
+      await b.svc.refreshSubagents(sid('root'))
+      const address = { parentSessionId: sid('root'), childSessionId: sid('child'), mode: 'continuable' as const }
+      if (retained) {
+        const reference = b.svc.retain(address, { source: 'controllerOperation' })
+        release = () =>{  reference.release() }
+        await reference.ready
+      } else b.svc.openSubagent(address)
+      await vi.waitFor(() =>{  expect(b.svc.list.getSnapshot().byId[sid('child')]?.executionRestriction).toBe('recovery-read-only') })
+      expect(b.svc.list.getSnapshot().ids).toEqual([sid('root')])
+      expect(b.api.callsOf('session.activate')).toHaveLength(0)
+      expect(b.api.callsOf('subagent.history')).toHaveLength(1)
+    } finally { release?.(); await b.ctx.fiber.dispose() }
+  })
   it('keeps projected titles in standard list rows for an addressed route', async () => {
     const b = bench()
     b.api.onSubagentList = (payload) => {

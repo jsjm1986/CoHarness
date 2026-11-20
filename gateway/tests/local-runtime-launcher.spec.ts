@@ -47,6 +47,38 @@ async function absent(pid: number): Promise<void> {
 }
 
 describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () => {
+  it.each([
+    ['checkpoint-confirmed', 3000, 'confirmed'],
+    ['checkpoint-failed', 3000, 'failed'],
+    ['checkpoint-timeout', 100, 'timeout'],
+    ['checkpoint-forged-early', 3000, 'unconfirmed'],
+    ['checkpoint-confirmed', 0, 'forced'],
+  ] as const)('reports %s with grace %s as %s after the process range exits', async (mode, graceMs, outcome) => {
+    const f = await fixture(mode), handle = await start(f)
+    const runtime = await ready(f.root)
+    const record = (await f.store.read())!
+    await vi.waitFor(async () => {
+      const response = await fetch(record.url!, { method: 'POST', headers: { authorization: `Bearer ${record.token}` },
+        body: JSON.stringify({ nonce: record.nonce, operation: 'status' }), signal: AbortSignal.timeout(3000) })
+      expect(await response.json()).toMatchObject({ checkpointReady: true })
+    }, { timeout: 5000 })
+    const recovered = f.launcher.attach(f.runtime)
+    await expect(recovered.terminate(graceMs)).resolves.toBe(outcome)
+    expect(recovered.hasExited()).toBe(true)
+    expect(() => process.kill(runtime.pid, 0)).toThrow()
+    if (outcome === 'confirmed' || outcome === 'failed') {
+      expect(await readFile(join(f.root, 'ready.json.checkpoint'), 'utf8')).toBe(`${outcome}\n`)
+    }
+    await expect(handle.terminate(0)).resolves.toBe(outcome)
+  }, 30_000)
+
+  it('leaves a legacy command exit unconfirmed even when its exit status matches a managed code', async () => {
+    const f = await fixture('legacy-colliding-exit'), handle = await start(f)
+    const runtime = await ready(f.root)
+    await expect(handle.terminate(3000)).resolves.toBe('unconfirmed')
+    expect(() => process.kill(runtime.pid, 0)).toThrow()
+  })
+
   it('keeps Gateway database and credential variables out of the actual Runtime environment', async () => {
     const f = await fixture()
     const output = join(f.root, 'environment.json')

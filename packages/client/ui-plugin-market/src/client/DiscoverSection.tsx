@@ -122,19 +122,21 @@ function EntryCard({ entry, t, face, language, labels, onOpen, onInstall, onOpen
   const date = formatDate(version.publishTimestamp, language, 'medium')
   return (
     <li className={css.card} data-market-entry={entry.name}>
-      <span className={css.icon} aria-hidden="true"><MarketIcon src={entry.icon} size={ICON} /></span>
-      <div className={css.main}>
-        <div className={css.titleRow}>
-          <button type="button" className={css.cardOpen} aria-label={t('openEntry', { name: title })} onClick={onOpen}>{title}</button>
-          {labels.filter(label => entry.metadata.labels.includes(label.id)).map(label => <Tag key={label.id}>{label.title}</Tag>)}
-        </div>
-        {entry.description === undefined ? null : <span className={css.description}>{face.resolveText(entry.description)}</span>}
-        <span className={css.meta}>
-          {entry.author === undefined
-            ? t('entryMeta', { version: version.version, date })
-            : t('entryMetaAuthor', { version: version.version, author: entry.author, date })}
+      <button type="button" className={css.cardOpen} aria-label={t('openEntry', { name: title })} onClick={onOpen}>
+        <span className={css.icon} aria-hidden="true"><MarketIcon src={entry.icon} size={ICON} /></span>
+        <span className={css.main}>
+          <span className={css.titleRow}>
+            <span className={css.cardTitle}>{title}</span>
+            {labels.filter(label => entry.metadata.labels.includes(label.id)).map(label => <Tag key={label.id}>{label.title}</Tag>)}
+          </span>
+          {entry.description === undefined ? null : <span className={css.description}>{face.resolveText(entry.description)}</span>}
+          <span className={css.meta}>
+            {entry.author === undefined
+              ? t('entryMeta', { version: version.version, date })
+              : t('entryMetaAuthor', { version: version.version, author: entry.author, date })}
+          </span>
         </span>
-      </div>
+      </button>
       <div className={css.cardEnd}>
         <EntryAction entry={entry} title={title} t={t} onInstall={onInstall} onOpenInstalled={onOpenInstalled} />
       </div>

@@ -5,7 +5,9 @@
   - img
   - searchbox "Search trajectory"
 - region "Trajectory timeline":
-  - "tooltip \"ASSISTANT {{clock}} → {{clock}} Total 5 ms · TTFT 4 ms · Decoding 1 ms\""
+  - group "Timeline overview; drag horizontally to focus events":
+    - "tooltip \"ASSISTANT {{clock}} → {{clock}} Total 5 ms · TTFT 4 ms · Decoding 1 ms\""
+  - button "Adjust timeline": Adjust
 - table:
   - rowgroup:
     - row "SYSTEM, Initial System Prompt":

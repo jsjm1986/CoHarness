@@ -67,7 +67,7 @@ export function ComputerSelector({ nodeId, onSelect }: { nodeId?: RuntimeNodeId;
           <option value="">{context === null ? t('center') : `${t('center')} · ${context.name}`}</option>
           {missingSelected ? <option value={nodeId}>{current?.name ?? t('selected', { id: nodeId.slice(0, 8) })}</option> : null}
           {items.map(item => <option key={item.nodeId} value={item.nodeId}
-            disabled={item.status === 'revoked'}>
+            disabled={item.status === 'revoked' || item.status === 'quarantined'}>
             {item.name}{item.status === 'connected' ? '' : ` · ${t(item.status)}`}
           </option>)}
         </select>

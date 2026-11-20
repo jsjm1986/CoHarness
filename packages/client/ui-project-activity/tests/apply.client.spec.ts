@@ -72,12 +72,13 @@ async function boot() {
 
 function body(fixture: Awaited<ReturnType<typeof boot>>, sessionId = 'session') {
   const actions = { loading: vi.fn(), refreshed: vi.fn(), appended: vi.fn(), failed: vi.fn(),
-    progressLoaded: vi.fn(), progressFailed: vi.fn() }
+    filtered: vi.fn(), progressLoaded: vi.fn(), progressFailed: vi.fn(), progressTracking: vi.fn() }
   const face = (fixture.registered[0]?.inject as (id: string, actions: unknown) => ActivityInjected)(sessionId, actions)
-  return { face, actions }
+  const open = (signal = new AbortController().signal) => face.attach(signal, null)
+  return { face, actions, open }
 }
 
-const readyJournal = { enabled: true, periods: [], status: { generating: false } }
+const readyJournal = { enabled: true, periods: [], status: { enabled: true, pending: 0, generating: false, canGenerate: true } }
 
 describe('ui-project-activity apply', () => {
   it('keeps a restored qualified address without an optional pool key helper', async () => {
@@ -89,6 +90,9 @@ describe('ui-project-activity apply', () => {
     const { face } = body(fixture, clientSessionKey(owner, 'journal' as SessionId))
     face.reveal('shared-session', null)
     expect(fixture.viewport.replaceActive).toHaveBeenCalledWith(clientSessionKey(owner, 'shared-session' as SessionId))
+    const older = '10000000-0000-4000-8000-000000000019' as NonNullable<SessionRuntimeTarget['runtimeId']>
+    face.reveal('shared-session', 4, older)
+    expect(fixture.viewport.reveal).toHaveBeenCalledWith(clientSessionKey({ ...owner, runtimeId: older }, 'shared-session' as SessionId), 4)
   })
 
   it('keeps unqualified standalone links and ignores queued clicks after viewport withdrawal', async () => {
@@ -102,38 +106,65 @@ describe('ui-project-activity apply', () => {
   })
 
   it('appends older pages and reports current read failures', async () => {
-    const fixture = await boot()
-    const { face, actions } = body(fixture)
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ items: [], nextBefore: 'next' }))
-    face.loadMore('older')
-    await vi.waitFor(() => { expect(actions.appended).toHaveBeenCalledWith([], 'next') })
+    const { face, actions, open } = body(await boot())
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => Response.json(
+      requestUrl(input).includes('/activity') ? { items: [], nextBefore: 'next' } : readyJournal))
+    open()
+    face.loadMore('older', null)
+    await vi.waitFor(() => { expect(actions.appended).toHaveBeenCalledWith({ items: [], nextBefore: 'next' }) })
     fetcher.mockRejectedValue(new Error('network failed'))
-    face.refresh()
+    face.refresh(null)
     await vi.waitFor(() => {
-      expect(actions.failed).toHaveBeenCalledTimes(1)
-      expect(actions.progressFailed).toHaveBeenCalledTimes(1)
+      expect(actions.failed).toHaveBeenCalledWith(false)
+      expect(actions.progressFailed).toHaveBeenCalledWith('load-failed', false)
     })
   })
 
-  it('polls admitted generation until it settles and reports a refused generation', async () => {
-    const { face, actions } = body(await boot())
+  it.each([{ started: true }, { started: false, reason: 'generating' }])('watches a submitted or already running digest with outcome %j', async (outcome) => {
+    const { face, actions, open } = body(await boot())
+    let admitted = false
     let polls = 0
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => Response.json(
-      requestUrl(input).includes('/generate') ? { started: true }
-        : { ...readyJournal, status: { generating: ++polls === 1 } }))
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = requestUrl(input)
+      if (url.includes('/activity')) return Response.json({ items: [] })
+      if (url.includes('/generate')) {
+        admitted = true
+        return Response.json(outcome)
+      }
+      return Response.json({ ...readyJournal, status: { ...readyJournal.status, generating: admitted && ++polls === 1 } })
+    })
     vi.useFakeTimers()
+    open()
+    await vi.advanceTimersByTimeAsync(0)
+    actions.progressLoaded.mockClear()
     face.generate()
-    await vi.advanceTimersByTimeAsync(5_000)
+    face.generate()
+    await vi.advanceTimersByTimeAsync(2_500)
+    expect(fetcher.mock.calls.filter(([url]) => requestUrl(url).includes('/generate'))).toHaveLength(1)
     expect(actions.progressLoaded).toHaveBeenCalledTimes(2)
+    expect(actions.progressTracking.mock.calls).toEqual([['submitting'], ['watching']])
     expect(vi.getTimerCount()).toBe(0)
-    fetcher.mockRejectedValue(new Error('generation refused'))
+    fetcher.mockRejectedValue(new Error('submission response lost'))
     face.generate()
     await vi.advanceTimersByTimeAsync(0)
-    expect(actions.progressFailed).toHaveBeenCalledTimes(1)
+    expect(actions.progressFailed).toHaveBeenCalledWith('status-unknown', false)
+  })
+
+  it('reports an unavailable route without watching a digest', async () => {
+    const { face, actions, open } = body(await boot())
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => Response.json(
+      requestUrl(input).includes('/generate') ? { started: false, reason: 'unavailable' }
+        : requestUrl(input).includes('/activity') ? { items: [] } : readyJournal))
+    open()
+    await vi.waitFor(() => { expect(actions.progressLoaded).toHaveBeenCalledTimes(1) })
+    face.generate()
+    await vi.waitFor(() => { expect(actions.progressFailed).toHaveBeenCalledWith('generate-unavailable', false) })
+    expect(actions.progressTracking).not.toHaveBeenCalledWith('watching')
+    expect(fetcher.mock.calls.filter(([url]) => requestUrl(url).endsWith('/progress'))).toHaveLength(1)
   })
 
   it('retires the old poll when a refresh finds the journal settled', async () => {
-    const { face, actions } = body(await boot())
+    const { face, actions, open } = body(await boot())
     let generating = true
     const requests: string[] = []
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -142,10 +173,10 @@ describe('ui-project-activity apply', () => {
         : { ...readyJournal, status: { generating } })
     })
     vi.useFakeTimers()
-    face.refresh()
+    open()
     await vi.advanceTimersByTimeAsync(0)
     generating = false
-    face.refresh()
+    face.refresh(null)
     await vi.advanceTimersByTimeAsync(2_500)
     expect(actions.progressLoaded).toHaveBeenCalledTimes(2)
     expect(requests.filter(path => path.includes('/progress'))).toHaveLength(2)
@@ -153,44 +184,51 @@ describe('ui-project-activity apply', () => {
   })
 
   it('does not start an old poll when publication synchronously refreshes the panel', async () => {
-    const { face, actions } = body(await boot())
+    const { face, actions, open } = body(await boot())
     let reads = 0
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => Response.json(
       requestUrl(input).includes('/activity') ? { items: [] }
         : { ...readyJournal, status: { generating: ++reads === 1 } }))
-    actions.progressLoaded.mockImplementationOnce(() => { face.refresh() })
+    actions.progressLoaded.mockImplementationOnce(() => { face.refresh(null) })
     vi.useFakeTimers()
-    face.refresh()
+    open()
     await vi.advanceTimersByTimeAsync(2_500)
     expect(reads).toBe(2)
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it.each(['activity', 'progress'] as const)('ignores a superseded %s response after its body finishes decoding', async (domain) => {
-    const { face, actions } = body(await boot())
+  it.each(['activity', 'progress'] as const)('ignores a superseded %s response after decoding', async (domain) => {
+    const { face, actions, open } = body(await boot())
     const decoded = Promise.withResolvers<unknown>()
     const response = Response.json({})
     const decode = vi.spyOn(response, 'json').mockImplementation(() => decoded.promise)
     let delayed = true
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const selected = requestUrl(input).includes('/' + domain)
       if (selected && delayed) { delayed = false; return response }
       return Response.json(requestUrl(input).includes('/activity') ? { items: [], nextBefore: 'fresh' } : readyJournal)
     })
-    face.refresh()
-    await vi.waitFor(() => { expect(decode).toHaveBeenCalledTimes(1) })
-    face.refresh()
-    await vi.waitFor(() => { expect(domain === 'activity' ? actions.refreshed : actions.progressLoaded).toHaveBeenCalledTimes(1) })
-    decoded.resolve(domain === 'activity' ? { items: [], nextBefore: 'stale' } : readyJournal)
-    await decoded.promise
-    await Promise.resolve()
-    expect(domain === 'activity' ? actions.refreshed : actions.progressLoaded).toHaveBeenCalledTimes(1)
-    expect(actions.failed).not.toHaveBeenCalled()
-    expect(actions.progressFailed).not.toHaveBeenCalled()
+    try {
+      open()
+      await vi.waitFor(() => { expect(decode).toHaveBeenCalledTimes(1) })
+      if (domain === 'activity') {
+        face.filter(8)
+        expect(actions.filtered).toHaveBeenCalledWith(8)
+        expect(requestUrl(fetcher.mock.calls.at(-1)?.[0])).toContain('member=8')
+      } else face.refresh(null)
+      const published = domain === 'activity' ? actions.refreshed : actions.progressLoaded
+      await vi.waitFor(() => { expect(published).toHaveBeenCalledTimes(1) })
+      decoded.resolve(domain === 'activity' ? { items: [], nextBefore: 'stale' } : readyJournal)
+      await decoded.promise
+      await Promise.resolve()
+      expect(published).toHaveBeenCalledTimes(1)
+      expect(actions.failed).not.toHaveBeenCalled()
+      expect(actions.progressFailed).not.toHaveBeenCalled()
+    } finally { decoded.resolve(readyJournal) }
   })
 
   it('suppresses abort failures from replaced feed and journal requests', async () => {
-    const { face, actions } = body(await boot())
+    const { face, actions, open } = body(await boot())
     const signals: AbortSignal[] = []
     let first = true
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, options) => {
@@ -198,14 +236,17 @@ describe('ui-project-activity apply', () => {
         const signal = options?.signal
         if (signal === undefined || signal === null) throw new Error('read must have an abort signal')
         signals.push(signal)
-        signal.addEventListener('abort', () => { reject(new DOMException('Request aborted', 'AbortError')) }, { once: true })
+        signal.addEventListener('abort', () => {
+          const reason: unknown = signal.reason
+          reject(reason instanceof Error ? reason : new Error('Fixture request aborted', { cause: reason }))
+        }, { once: true })
       })
       return Response.json(requestUrl(input).includes('/activity') ? { items: [] } : readyJournal)
     })
-    face.refresh()
+    open()
     expect(signals).toHaveLength(2)
     first = false
-    face.refresh()
+    face.refresh(null)
     await vi.waitFor(() => { expect(actions.progressLoaded).toHaveBeenCalledTimes(1) })
     expect(signals.every(signal => signal.aborted)).toBe(true)
     expect(actions.refreshed).toHaveBeenCalledTimes(1)
@@ -213,25 +254,104 @@ describe('ui-project-activity apply', () => {
     expect(actions.progressFailed).not.toHaveBeenCalled()
   })
 
-  it('bounds a generating journal poll without restarting its round budget', async () => {
-    const { registered, policy } = await boot()
-    policy.set('project', 'follow-user', { projectId: 9 })
-    const actions = { loading: vi.fn(), refreshed: vi.fn(), appended: vi.fn(), failed: vi.fn(),
-      progressLoaded: vi.fn(), progressFailed: vi.fn() }
-    const face = (registered[0]?.inject as (sessionId: string, actions: unknown) => ActivityInjected)('project-session', actions)
-    const requests: string[] = []
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      requests.push(requestUrl(input))
-      return Response.json(requestUrl(input).includes('/activity') ? { items: [] }
-        : { enabled: true, periods: [], status: { generating: true } })
-    })
+  it('reports stale status at the poll limit and recovers on refresh', async () => {
+    const { face, actions, open } = body(await boot())
+    let generating = true
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => Response.json(
+      requestUrl(input).includes('/activity') ? { items: [] } : { ...readyJournal, status: { ...readyJournal.status, generating } }))
     vi.useFakeTimers()
-    face.refresh()
+    open()
     await vi.advanceTimersByTimeAsync(120_000)
-    expect(requests.filter(path => path.includes('/progress'))).toHaveLength(49)
+    expect(fetcher.mock.calls.filter(([url]) => requestUrl(url).includes('/progress'))).toHaveLength(49)
+    expect(actions.progressFailed).toHaveBeenCalledWith('status-unknown', false)
+    generating = false
     await vi.advanceTimersByTimeAsync(2_500)
-    expect(requests.filter(path => path.includes('/progress'))).toHaveLength(49)
+    expect(fetcher.mock.calls.filter(([url]) => requestUrl(url).includes('/progress'))).toHaveLength(49)
     expect(vi.getTimerCount()).toBe(0)
+    face.refresh(null)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(actions.progressLoaded).toHaveBeenLastCalledWith(readyJournal)
+  })
+
+  it('reports uncertain status when the deadline expires between reads', async () => {
+    const { actions, open } = body(await boot())
+    const deadline = new AbortController()
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => Response.json(
+      requestUrl(input).includes('/activity') ? { items: [] } : { ...readyJournal, status: { generating: true } }))
+    open()
+    await vi.waitFor(() => { expect(actions.progressLoaded).toHaveBeenCalledTimes(1) })
+    deadline.abort('deadline elapsed')
+    await vi.waitFor(() => { expect(actions.progressFailed).toHaveBeenCalledWith('status-unknown', false) })
+  })
+
+  it.each([401, 403, 503])('requests that only explicit access loss clears the cached pages for HTTP %i', async (status) => {
+    const { actions, open } = body(await boot())
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(null, { status }))
+    open()
+    const denied = status === 401 || status === 403
+    await vi.waitFor(() => {
+      expect(actions.failed).toHaveBeenCalledWith(denied)
+      expect(actions.progressFailed).toHaveBeenCalledWith('load-failed', denied)
+    })
+  })
+
+  it('reports an unexpected rejected task and still drains the plugin', async () => {
+    const fixture = await boot()
+    const { actions, open } = body(fixture)
+    const failure = new Error('unavailable view store')
+    actions.loading.mockImplementationOnce(() => { throw failure })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json(readyJournal))
+    const report = vi.spyOn(console, 'error').mockImplementation(() => {})
+    open()
+    await vi.waitFor(() => { expect(report).toHaveBeenCalledWith('Project activity request failed', failure) })
+    await fixture.fiber.dispose()
+  })
+
+  it('cancels the poll when the last visible body is released', async () => {
+    const { face, actions, open } = body(await boot())
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => Response.json(
+      requestUrl(input).includes('/activity') ? { items: [] } : { ...readyJournal, status: { generating: true } }))
+    vi.useFakeTimers()
+    const close = open()
+    const other = new AbortController()
+    open(other.signal)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(actions.progressLoaded).toHaveBeenCalledTimes(1)
+    close()
+    await vi.advanceTimersByTimeAsync(2_500)
+    expect(actions.progressLoaded).toHaveBeenCalledTimes(2)
+    const beforeClose = fetcher.mock.calls.length
+    other.abort()
+    open(other.signal)()
+    face.filter(9)
+    face.refresh(null)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(fetcher).toHaveBeenCalledTimes(beforeClose)
+    expect(actions.filtered).not.toHaveBeenCalled()
+  })
+
+  it('joins a pending decode on plugin unload without publishing stale progress', async () => {
+    const fixture = await boot()
+    const { actions, open } = body(fixture)
+    const decoded = Promise.withResolvers<unknown>()
+    const response = Response.json({})
+    const decode = vi.spyOn(response, 'json').mockImplementation(() => decoded.promise)
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async input =>
+      requestUrl(input).includes('/activity') ? Response.json({ items: [] }) : response)
+    try {
+      open()
+      await vi.waitFor(() => { expect(decode).toHaveBeenCalledTimes(1) })
+      const signal = fetcher.mock.calls.find(([url]) => requestUrl(url).includes('/progress'))?.[1]?.signal
+      let disposed = false
+      const draining = fixture.fiber.dispose().then(() => { disposed = true })
+      await vi.waitFor(() => { expect(signal?.aborted).toBe(true) })
+      expect(disposed).toBe(false)
+      decoded.resolve(readyJournal)
+      await draining
+      expect(actions.progressLoaded).not.toHaveBeenCalled()
+    } finally { decoded.resolve(readyJournal) }
   })
 
   it('offers activity for the selected project Runtime even when the page opened in personal scope', async () => {
@@ -250,14 +370,13 @@ describe('ui-project-activity apply', () => {
   })
 
   it('keeps the journal and its links on the owning allocation after another project becomes active', async () => {
-    const { registered, policy, sessions, fiber } = await boot()
+    const fixture = await boot()
+    const { policy, sessions, fiber } = fixture
     const target: SessionRuntimeTarget = { kind: 'project', projectId: 9,
       runtimeId: '10000000-0000-4000-8000-000000000009' as NonNullable<SessionRuntimeTarget['runtimeId']> }
     sessions.runtimeIdentityFor.mockReturnValue(target)
     policy.set('project', 'follow-user', { projectId: 9 })
-    const actions = { loading: vi.fn(), refreshed: vi.fn(), appended: vi.fn(), failed: vi.fn(),
-      progressLoaded: vi.fn(), progressFailed: vi.fn() }
-    const face = (registered[0]?.inject as (sessionId: string, actions: unknown) => ActivityInjected)('project-session', actions)
+    const { face, open } = body(fixture, 'project-session')
     const requests: string[] = []
     const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       requests.push(requestUrl(input))
@@ -268,7 +387,7 @@ describe('ui-project-activity apply', () => {
       policy.set('project', 'follow-user', { projectId: 11 })
       face.reveal('shared-session', 7)
       expect(sessions.keyFor).toHaveBeenCalledWith('shared-session', target)
-      face.refresh()
+      open()
       await vi.waitFor(() => { expect(requests).toHaveLength(2) })
       for (const request of requests) {
         const url = new URL(request, 'http://dsh.internal')

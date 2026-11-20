@@ -24,7 +24,7 @@ export async function adminProjectBrowser({ page, primary, verifyPassive }) {
   const chooser = page.locator('select').filter({ has: page.locator(`option[value="${nodeId}"]`) })
   await chooser.selectOption(nodeId)
   await page.getByRole('link', { name: '项目', exact: true }).click()
-  await page.getByRole('button', { name: '新建项目', exact: true }).click()
+  await page.locator('header').getByRole('button', { name: '新建项目', exact: true }).click()
   await page.getByPlaceholder('例如：产品文档', { exact: true }).fill('Admin project governance')
   const read = path => page.waitForResponse(response => response.request().method() === 'GET'
     && new URL(response.url()).pathname === path, { timeout: 60000 })

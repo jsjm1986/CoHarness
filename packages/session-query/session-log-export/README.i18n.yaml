@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session-query/session-log-export/README.md
 document:
-  en: a609cf0d163276725cc04e9de87488067dd984cd
-  zh: ce0deb913add07e0981cf7ee8736958a85c6a249
+  en: fd93b63eae6d0b76f2252835d2d6a33c7beee998
+  zh: 7b8e0121f0975d24214759fea97a8711c1f0c923
 /:
   en: 3b67077a6dfacd19
   zh: e5b78d039d310dc2
@@ -12,20 +12,20 @@ document:
   en: eea87f5da57ff494
   zh: db388203522b840f
 /deepseek-ai-dsh-session-log-export/summary:
-  en: 26be400b3e9f7bb7
-  zh: b6e78f1f417a0e4e
+  en: 77c49b2a5cdc0dba
+  zh: 5aa878d119ab82df
 /deepseek-ai-dsh-session-log-export/table-of-contents:
   en: b5cf97709d330964
   zh: 8ef4439c2b4b2f7f
 /deepseek-ai-dsh-session-log-export/use-this-package:
-  en: c8e486b07b76e503
-  zh: cd36f150f5f336b0
+  en: 7f34c017d38d4453
+  zh: fed51b015218eca5
 /deepseek-ai-dsh-session-log-export/use-this-package/when-to-choose-it:
   en: 2b9dbec4877d332e
   zh: dcf6638938eedb01
 /deepseek-ai-dsh-session-log-export/use-this-package/composition:
-  en: 2fef1fe4411cc5da
-  zh: cff5dbcc4901402b
+  en: 716c5d0d9673a8ce
+  zh: cce9ca12be8a1be1
 /deepseek-ai-dsh-session-log-export/use-this-package/configuration:
   en: 377a0d8860c46f63
   zh: 9eb7698f813b2fa3
@@ -42,8 +42,8 @@ document:
   en: 7cb82a6851405f95
   zh: b8c525170d19dc6c
 /deepseek-ai-dsh-session-log-export/understand-the-implementation/design-split:
-  en: d4dd1cad3881422e
-  zh: dd0a7d65478b3960
+  en: 782fb7cf6f05e7c1
+  zh: 443964d940f94092
 /deepseek-ai-dsh-session-log-export/understand-the-implementation/download-flow:
   en: 028ea3bff05250ba
   zh: 63250c4d3369ebbd

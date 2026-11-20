@@ -111,6 +111,12 @@
   opacity: 1;
 }
 
+.divider:focus-visible::after {
+  opacity: 1;
+  outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
 .splitRow > .divider::after {
   background: linear-gradient(to bottom, transparent, var(--dsw-alias-label-caption) 50%, transparent) center / 1px 100% no-repeat;
 }
@@ -220,34 +226,16 @@
   outline: none;
 }
 
-/* A 38px row whose 30px content band sits at its bottom: the segmented
-   track ends flush with the strip's bottom edge, and the 28px add control,
-   the 28px split control, and the embedder's 28px chrome centre on the
-   band's one centre line, so chip text and control glyphs never sit at
-   different heights. The 8px above is the strip's own top margin, inside
-   its box so the hit area stays one element; the 10px at the start is the
-   track's inset from the edge, and the 6px at the end puts the last
-   control's glyph 12px from the edge. A floating panel's header is this
-   same row.
-
-   The strip never clips: the chip box below is its one shrinking part, and
-   every control after it is `flex: none`, so a narrow pane costs chips, never
-   controls. */
+/* One centered header band with room above and below the selected chip.
+   The chip box is its only shrinking part; action controls retain their size. */
 .tabStrip {
+  box-sizing: border-box;
   display: flex;
   flex: none;
   gap: 4px;
   align-items: center;
-  height: 30px;
-  /* The band's insets are published variables: a host that pins the surface
-     against window chrome (the right sidebar fullscreen under macOS traffic
-     lights) widens the inline start per pane; a host whose neighbour owns a
-     taller header (the right sidebar beside the conversation header) raises
-     the block total and the content's top inset so the rules under both
-     bands coincide. A negative resolved end inset clamps to zero. */
-  padding: var(--dsh-dockkit-strip-block-start, 8px) 6px
-    calc(var(--dsh-dockkit-strip-block, 38px) - var(--dsh-dockkit-strip-block-start, 8px) - 30px)
-    var(--dsh-dockkit-strip-inline-start, 10px);
+  height: max(var(--dsh-dockkit-strip-block, 50px), 50px);
+  padding: 8px 6px 8px var(--dsh-dockkit-strip-inline-start, 10px);
   touch-action: none;
 }
 
@@ -271,8 +259,6 @@
   padding: 3px;
   border-radius: var(--dsw-radius-card);
   background: var(--dsw-alias-interactive-bg-hover);
-  /* The scroll to a newly active chip glides rather than jumps. */
-  scroll-behavior: smooth;
   scrollbar-width: none;
   touch-action: none;
 }
@@ -340,7 +326,7 @@
   align-items: center;
   justify-content: center;
   width: 4px;
-  height: 24px;
+  height: 28px;
 }
 
 .slotCaret::before {
@@ -351,10 +337,8 @@
 }
 
 /* The chip: a 24px segment in the segmented bar's own type (500/-0.01em)
-   whose title runs to the right inset. The close control is not in the
-   flow — it sits over the title's last 14px and shows while the chip is
-   active, hovered, or holds focus — so a chip is the same width with and
-   without it and nothing shifts on hover. */
+   whose title shares the row with a reserved close-control slot, so a chip
+   keeps the same width when its close control becomes visible. */
 .tab {
   position: relative;
   display: flex;
@@ -373,6 +357,7 @@
   border-radius: var(--dsw-radius-control);
   cursor: pointer;
   touch-action: none;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -399,29 +384,17 @@
   mask-image: linear-gradient(to right, black calc(100% - 16px), transparent);
 }
 
-/* While the close shows, the title is gone under the close's circle and fades
-   out over the 16px before it: the circle spans the chip's last 21px and the
-   title ends 10px inside the chip, so the title's last 11px are under it.
-   Later than the clipped mask, so a clipped chip showing its close fades
-   under the close. A floating panel's header chip has no close, so it keeps
-   the clipped mask alone. */
-.tab:not(.floatTitle):hover .tabTitle,
-.tab:not(.floatTitle):focus-within .tabTitle,
-.tabActive .tabTitle {
-  mask-image: linear-gradient(to right, black calc(100% - 30px), transparent calc(100% - 14px));
-}
-
-/* An 18px icon button inset 3px from the chip's end, holding a 12px glyph in
-   the tertiary ink, so it sits back from the title beside it. */
+/* The close keeps its own space, including when hidden, so labels never sit
+   underneath the icon and hovering does not change the chip's width. */
 .tabClose {
-  position: absolute;
-  top: 3px;
-  right: 3px;
+  position: relative;
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
+  margin-inline-start: 8px;
   padding: 0;
   color: var(--dsw-alias-label-tertiary);
   line-height: 1;
@@ -558,6 +531,10 @@
   display: flex;
   flex-direction: column;
   min-width: 96px;
+  max-width: calc(100vw - 8px);
+  max-height: calc(var(--dsw-viewport-height, 100dvh) - 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   border: 0.5px solid var(--dsw-alias-border-l2);
 }
@@ -625,7 +602,6 @@
      whole scrim away from the content beneath it. */
   background: color-mix(in srgb, var(--dsw-alias-bg-base) 72%, transparent);
   backdrop-filter: blur(6px);
-  animation: dockScrimIn 140ms ease-out;
 }
 
 .dockHint {
@@ -680,7 +656,12 @@
   border: 1.5px dashed var(--dsw-alias-border-l2);
   border-radius: 12px;
   transition: color 120ms ease-out, background-color 120ms ease-out, border-color 120ms ease-out;
-  animation: dockHintIn 140ms ease-out;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stripTabs { scroll-behavior: smooth; }
+  .dockScrim { animation: dockScrimIn 140ms ease-out; }
+  .dockHintCard { animation: dockHintIn 140ms ease-out; }
 }
 
 /* The card under the pointer takes the accent: a tinted ground over the scrim,
@@ -779,15 +760,19 @@
 /* The panel's header is the pane strip's row (`.tabStrip` supplies the
    metrics) and the whole of it is the move grip. */
 .floatHeader {
-  cursor: move;
+  -webkit-user-select: none;
   user-select: none;
 }
 
 /* The one tab, drawn as its chip would be in a strip but never selected,
    hovered, or closable from here: the frame's controls do that. */
 .floatTitle {
-  flex: 0 1 auto;
-  cursor: inherit;
+  flex: 1 1 auto;
+  max-width: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: move;
 }
 
 .tab.floatTitle:hover {
@@ -816,6 +801,9 @@
   bottom: 0;
   width: 20px;
   height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: nwse-resize;
   touch-action: none;
 }
@@ -839,8 +827,47 @@
 }
 
 .float:hover .floatResize::after,
+.floatResize:focus-visible::after,
 .floatResize:active::after {
   opacity: 1;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .tabStrip { height: max(var(--dsh-dockkit-strip-block, 66px), 66px); }
+  .tab { min-width: 124px; height: 44px; }
+  .tabTitle { min-width: 72px; }
+  .tab:has(.tabClose) { min-width: calc(104px + var(--dsw-touch-target)); }
+  .tab:has(.tabClose) .tabTitle { min-width: 76px; }
+  .floatTitle,
+  .iconButton,
+  .addTab,
+  .tabClose,
+  .floatResize { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
+  .floatResize::after { opacity: 1; }
+  .splitRow > .divider::after { left: -12px; right: -12px; }
+  .splitColumn > .divider::after { top: -12px; bottom: -12px; }
+}
+
+@media (forced-colors: active) {
+  .float,
+  .menu { border: 1px solid CanvasText; }
+  .tabActive { outline: 1px solid CanvasText; outline-offset: -1px; }
+  .divider::before { background: CanvasText; forced-color-adjust: none; }
+  .divider::after { background: none; }
+  .divider:focus-visible::after { outline-color: Highlight; }
+  .floatResize::after { opacity: 1; border-color: ButtonText; }
+  .tabTitle { mask-image: none; }
+  .menuItem:focus-visible { outline: 2px solid Highlight; outline-offset: -2px; }
 }
 
 .floatResize:hover::after {
@@ -848,37 +875,33 @@
 }
 
 /*
- * Phone: the strip is the pushed panel's whole nav bar, so its row, chips,
- * and controls leave the desktop's 28px message-row geometry for the compact
- * family, and the long-press tab menu's items reach the shared touch target.
- * The strip's band total stays the host's `--dsh-dockkit-strip-block`: the
- * taller row comes out of its bottom padding, so the band does not grow.
+ * Phone: the strip reserves at least 66px for 44px chips, the track's 3px
+ * padding, and equal 8px block insets. A taller host band remains centered.
+ * Long-press menu items retain the shared touch target.
  */
 @media (max-width: 767px) {
   .tabStrip {
-    height: 40px;
-    padding-bottom: calc(var(--dsh-dockkit-strip-block, 38px) - var(--dsh-dockkit-strip-block-start, 8px) - 40px);
+    height: max(var(--dsh-dockkit-strip-block, 66px), 66px);
   }
 
   .tab {
-    min-width: 88px;
-    height: 32px;
+    min-width: 124px;
+    height: 44px;
     font-size: 14px;
   }
 
+  .tabTitle { min-width: 72px; }
+
   .iconButton,
   .addTab {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
   }
 
-  /* The close circle rides the chip's taller box: 5px insets centre the 22px
-     control on the 32px chip. */
+  /* Close remains separate from the title and matches other touch actions. */
   .tabClose {
-    top: 5px;
-    right: 5px;
-    width: 22px;
-    height: 22px;
+    width: 44px;
+    height: 44px;
   }
 
   /* A split can never fit a phone's pane, so the blocked control is dead
@@ -887,7 +910,9 @@
      the room rule's verdict and re-renders the control forever. Embedders
      pass `hideSplitWhenBlocked` so the measure pass keeps the verdict
      independent of the control's visibility. */
+}
 
+@media (max-width: 767px), (pointer: coarse) {
   .menu {
     min-width: 160px;
   }

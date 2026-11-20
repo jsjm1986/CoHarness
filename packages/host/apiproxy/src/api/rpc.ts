@@ -54,6 +54,8 @@ export interface RpcErrorDetailsMap {
    * process; the caller should surface the contention instead of retrying.
    */
   'session-writer-held': { sessionId: SessionId }
+  /** Restored history cannot resume its old inbox, tools or plugin composition. */
+  'recovery-read-only': { sessionId: SessionId }
   'model-unavailable': { provider: string; model: string }
   'model-forbidden': { provider: string; model: string }
   'session-conflict': { sessionId: SessionId; requestedCwd: string; existingCwd?: string }

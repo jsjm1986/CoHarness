@@ -1,6 +1,6 @@
 /** Shell launch menu owned by the terminal provider's guide entry. */
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button, IconChevronDownOutline14, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronDownOutline14, Menu, MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TerminalLaunchShells, TerminalViewIssue } from '@deepseek-ai/dsh-api-terminal-controller/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -49,12 +49,10 @@ export function TerminalGuide(props: TerminalGuideProps): ReactNode {
   }, [open, attempt, loadShells])
   const items = state.phase === 'ready'
     ? state.choices.shells.map(shell => ({ id: shell.path, label: shell.name }))
-    : state.phase === 'loading'
-      ? [{ id: 'loading', label: t('shellLoading'), disabled: true }]
-      : state.forbidden
-        // A permission denial cannot succeed on an unchanged retry, so it gets no retry item.
-        ? [{ id: 'error', label: t('forbidden'), disabled: true }]
-        : [{ id: 'error', label: t('failed', { message: state.message }), disabled: true }, { id: 'retry', label: t('retry') }]
+    : []
+  const feedback = state.phase === 'loading' ? t('shellLoading')
+    : state.phase === 'failed' ? state.forbidden ? t('forbidden') : t('failed', { message: state.message })
+      : items.length === 0 ? t('shellEmpty') : undefined
   return <div className={css.entry} data-sidebar-right-guide-entry={kind}>
     <Button variant="ghost" className={css.main} onClick={() => { tab.actions.openTab('terminal', { replaceTab: true }) }}>
       <TerminalGuideIcon size={description === undefined ? 22 : 26} className={css.icon} />
@@ -65,11 +63,10 @@ export function TerminalGuide(props: TerminalGuideProps): ReactNode {
     </Button>
     <Menu
       open={open} portal autoFocus align="end" className={css.menu}
-      items={items.length === 0 ? [{ id: 'empty', label: t('shellEmpty'), disabled: true }] : items}
+      items={items}
       selectedId={state.phase === 'ready' ? state.choices.selectedShell : undefined}
       onClose={() => { setOpen(false) }}
       onSelect={(path) => {
-        if (state.phase === 'failed') { setState({ phase: 'loading' }); setAttempt(value => value + 1); return }
         selectShell(path)
         setOpen(false)
         tab.actions.openTab('terminal', { replaceTab: true, params: { shellPath: path } })
@@ -78,6 +75,11 @@ export function TerminalGuide(props: TerminalGuideProps): ReactNode {
         onClick={() => { setState({ phase: 'loading' }); setOpen(value => !value) }}>
         <IconChevronDownOutline14 />
       </Button>}
-    />
+    >
+      {feedback !== undefined && <p className={css.feedback} role={state.phase === 'failed' ? 'status' : undefined}>{feedback}</p>}
+      {state.phase === 'failed' && !state.forbidden && <MenuItemButton onSelect={() => {
+        setState({ phase: 'loading' }); setAttempt(value => value + 1)
+      }}>{t('retry')}</MenuItemButton>}
+    </Menu>
   </div>
 }

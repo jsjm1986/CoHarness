@@ -1,13 +1,15 @@
 /** Existing Gateway authentication and APIs over real outbound HTTP/WebSocket node connections. */
+import { fork } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
 import { Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ClientRequest, createServer, type Server } from 'node:http'
+import { ClientRequest, createServer, type Agent, type Server } from 'node:http'
 import { PassThrough, Readable, type Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { fileURLToPath } from 'node:url'
 import { afterEach, expect, it, vi } from 'vitest'
 import WebSocket, { WebSocketServer } from 'ws'
 import { AuthService } from '../src/auth.ts'
@@ -18,17 +20,17 @@ import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { createGatewayServer, scopeCookie, type GatewayDeps } from '../src/server.ts'
 import { createAdminApiHandler } from '../src/admin-api.ts'
-import { GatewayRuntimeRouter, LocalRuntimeAdapter } from '../src/runtime-router.ts'
+import { GatewayRuntimeRouter, LocalRuntimeAdapter, type RuntimePlacement } from '../src/runtime-router.ts'
 import { RuntimeCatalogError, type RuntimeCatalogEntry, type RuntimeId, type RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { NodeAccessError, type NodeCredential, type NodeLease } from '../src/node-access.ts'
 import { GatewayNodeChannels } from '../src/node-channel.ts'
 import { runNodeChannel } from '../src/node-channel-client.ts'
 import { NodeDialer, type NodeDialReason } from '../src/node-dialer.ts'
-import { loadNodeChannelClientLimits, NODE_CHANNEL_PROTOCOL } from '../src/node-channel-protocol.ts'
+import { loadNodeChannelClientLimits, NODE_CHANNEL_PROTOCOL, type NodeProbeId } from '../src/node-channel-protocol.ts'
 import { GatewayNodeServices, loadNodeServiceConfig } from '../src/node-service.ts'
 import { GatewayNodeServiceProxy } from '../src/node-service-proxy.ts'
 import { NodeServiceHttpPool } from '../src/node-service-http-pool.ts'
-import { NODE_SERVICE_TARGET_HEADER, nodeServiceLocalOrigin, NodeServiceError } from '../src/node-service-stream.ts'
+import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_PROTOCOL_VERSION, NODE_SERVICE_TARGET_HEADER, nodeServiceLocalOrigin, NodeServiceError, runNodeServiceBridge } from '../src/node-service-stream.ts'
 import { testConfig } from './test-config.ts'
 
 const releases: Array<() => Promise<void>> = []
@@ -65,13 +67,63 @@ async function deadPort(): Promise<string> {
   return url
 }
 
-async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false, dialFallback = false) {
+function isolatedAgent(
+  config: { center: string; local: string; credential: NodeCredential; lease: NodeLease; maxServices: number },
+  signal: AbortSignal,
+  ready: () => void,
+): Promise<void> {
+  const compiled = process.env.HGW_TEST_NODE_SERVICE_AGENT === 'compiled'
+  const child = fork(fileURLToPath(new URL('./fixtures/node-service-compat-agent.mjs', import.meta.url)), [compiled ? 'lib' : 'src'], {
+    execArgv: compiled ? [] : ['--import', import.meta.resolve('tsx/esm')],
+    env: {
+      PATH: process.env.PATH,
+      SYSTEMROOT: process.env.SYSTEMROOT,
+      NODE_DISABLE_COMPILE_CACHE: '1',
+      TSX_DISABLE_CACHE: '1',
+      TSX_TSCONFIG_PATH: fileURLToPath(new URL('../tsconfig.run.json', import.meta.url)),
+    },
+    silent: true,
+  })
+  let stderr = '', failure: Error | undefined, forced: ReturnType<typeof setTimeout> | undefined
+  child.stderr?.on('data', bytes => { stderr = (stderr + String(bytes)).slice(-4096) })
+  child.stdout?.resume()
+  child.on('error', error => { failure = error })
+  child.on('message', message => {
+    if (message !== null && typeof message === 'object' && 'status' in message && message.status === 'channel-ready') ready()
+  })
+  const stop = () => {
+    if (child.connected) child.send('stop', error => { if (error) child.kill() })
+    forced ??= setTimeout(() => { child.kill('SIGKILL') }, 5_000)
+    forced.unref()
+  }
+  signal.addEventListener('abort', stop, { once: true })
+  return new Promise<void>((resolve, reject) => {
+    child.once('close', (code, signalCode) => {
+      signal.removeEventListener('abort', stop)
+      clearTimeout(forced)
+      if (failure !== undefined) reject(failure)
+      else if (code !== 0) reject(new Error(`Node channel fixture exited with ${String(code ?? signalCode)}. ${stderr}`))
+      else resolve()
+    })
+    child.send(config, error => {
+      if (error) { failure = error; child.kill() }
+    })
+    if (signal.aborted) stop()
+  })
+}
+
+async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false, failedDial?: 'control' | 'service',
+  mixedReleaseAgent?: 'compatible' | 'future-wire') {
   const root = await mkdtemp(join(tmpdir(), 'hgw-node-service-'))
   releases.push(() => rm(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'accounts.sqlite'))
   releases.push(async () => { db.close() })
   const centerConfig = testConfig(join(root, 'center'), { HGW_NODE_SERVICE_FORWARDING: 'on', ...overrides })
   const remoteConfig = testConfig(join(root, 'remote'))
+  if (mixedReleaseAgent !== undefined) {
+    centerConfig.releaseId = 'center-release-2'
+    remoteConfig.releaseId = 'node-release-1'
+  }
   const users = new UserService(db, centerConfig)
   const admin = await users.create({ username: 'owner', password: 'pw-12345678', role: 'admin' })
   await users.changeOwnPassword(admin.id, 'pw-12345678')
@@ -117,7 +169,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     }, pageForAccount: async () => ({ items: [environment], nextCursor: null }),
     pageForAdministrator: async () => ({ items: [environment], nextCursor: null }) }
   const channels = new GatewayNodeChannels({ authorizeChannel, authorizeAdministratorNode }, centerConfig.nodeChannel)
-  const services = new GatewayNodeServices({ authorizeChannel }, channels, centerConfig.nodeService, null)
+  const services = new GatewayNodeServices({ authorizeChannel }, channels, centerConfig.nodeService)
   const proxy = new GatewayNodeServiceProxy({ localNodeId, resolveForAccount, resolveForAdministrator, authorizeAdministratorNode,
     authorizeAccountNode: async (actor, selected) => {
       if (actor.id !== admin.id || selected !== nodeId || users.getById(actor.id)?.status !== 'active') {
@@ -126,10 +178,14 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     },
     ...(resolveOwners ? { resolvePlacement: (actor, selection) => centerRouter.placement(actor, selection), resetScopeCookie: () => scopeCookie('personal', centerConfig) } : {}),
   }, services, 5000, centerConfig.nodeService)
+  let attestationCalls = 0
   const makeDeps = (cfg: typeof centerConfig, id: RuntimeNodeId): GatewayDeps => ({
     cfg, auth: new AuthService(db, cfg), users, projects: new ProjectService(db, cfg), audit: new AuditService(db),
     instances: new InstanceManager(db, cfg), runtimeCatalog: catalog,
-    nodeServiceIdentity: { nodeId: id, organizationId: lease.organizationId, authorize: authorizeChannel },
+    nodeServiceIdentity: { nodeId: id, organizationId: lease.organizationId, authorize: (token, input) => {
+      if (id === nodeId) attestationCalls += 1
+      return authorizeChannel(token, input)
+    } },
   })
   const remoteDeps = makeDeps(remoteConfig, nodeId), centerDeps = makeDeps(centerConfig, localNodeId)
   const centerRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(centerDeps), { localNodeId, catalog })
@@ -193,22 +249,51 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
   let agent: Promise<void> | undefined
   releases.push(async () => {
     slow.resolve(); agentStop.abort()
-    await Promise.allSettled([proxy.close(), services.close(), channels.close(), agent])
+    const [, , , agentOutcome] = await Promise.allSettled([proxy.close(), services.close(), channels.close(), agent])
     for (const client of events.clients) client.terminate()
     await new Promise<void>((done, reject) => { events.close(error => { if (error) reject(error); else done() }) })
     await Promise.all([close(center), close(remote), centerDeps.instances.stopAll(), remoteDeps.instances.stopAll()])
+    if (mixedReleaseAgent !== undefined && agentOutcome.status === 'rejected') throw agentOutcome.reason
   })
   const remoteBase = await listen(remote), base = await listen(center)
   centerConfig.publicOrigins.push(base); remoteConfig.publicOrigins.push(base, remoteBase)
   const dialEvents: Array<{ origin: string; reason: NodeDialReason }> = []
-  const dialUrls = dialFallback ? [await deadPort(), base] : [base]
-  agent = runNodeChannel({ dialer: new NodeDialer(dialUrls, 60_000, (origin, reason) => { dialEvents.push({ origin, reason }) }),
-    credential, lease,
-    limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: dialFallback ? 5 : 60_000,
-    localGatewayUrl: remoteBase, maxServices: centerConfig.nodeService.maxPerNode }, agentStop.signal,
-  event => { if (event.status === 'channel-ready') ready.resolve() },
-  async () => ({ platform: 'linux', architecture: 'x64', uptimeSeconds: 1, executionReady: false }))
-  await ready.promise
+  const serviceDialEvents: Array<{ origin: string; reason: NodeDialReason }> = []
+  const dialUrls = failedDial === 'control' ? [await deadPort(), base] : [base]
+  let serviceDialer: NodeDialer | undefined
+  if (failedDial === 'service') {
+    const interrupted = createServer()
+    interrupted.on('upgrade', (_request, socket) => { socket.destroy() })
+    releases.push(() => close(interrupted))
+    serviceDialer = new NodeDialer([await listen(interrupted), base], 60_000,
+      (origin, reason) => { serviceDialEvents.push({ origin, reason }) })
+  }
+  let localGatewayUrl = remoteBase
+  if (mixedReleaseAgent === 'future-wire') {
+    const future = createServer((req, res) => {
+      if (req.url === NODE_SERVICE_IDENTITY_PATH) {
+        attestationCalls += 1
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({ protocolVersion: NODE_SERVICE_PROTOCOL_VERSION + 1,
+          nodeId, organizationId: lease.organizationId, release: remoteConfig.releaseId }))
+      } else {
+        remoteCalls += 1
+        res.end('future-wire request')
+      }
+    })
+    releases.push(() => close(future))
+    localGatewayUrl = await listen(future)
+  }
+  agent = mixedReleaseAgent === undefined
+    ? runNodeChannel({ dialer: new NodeDialer(dialUrls, 60_000, (origin, reason) => { dialEvents.push({ origin, reason }) }),
+      serviceDialer, credential, lease,
+      limits: loadNodeChannelClientLimits({})!, requestTimeoutMs: 5000, retryMs: failedDial === 'control' ? 5 : 60_000,
+      localGatewayUrl, maxServices: centerConfig.nodeService.maxPerNode }, agentStop.signal,
+    event => { if (event.status === 'channel-ready') ready.resolve() },
+    async () => ({ platform: 'linux', architecture: 'x64', uptimeSeconds: 1, executionReady: false }))
+    : isolatedAgent({ center: base, local: localGatewayUrl, credential, lease, maxServices: centerConfig.nodeService.maxPerNode },
+      agentStop.signal, ready.resolve)
+  await Promise.race([ready.promise, agent.then(() => { throw new Error('Node channel stopped before readiness') })])
   const login = async (username: string) => {
     const response = await fetch(`${base}/login`, { method: 'POST', redirect: 'manual', headers: { origin: base },
       body: new URLSearchParams({ username, password: 'pw-12345678' }) })
@@ -217,10 +302,19 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
   }
   const cookie = await login('owner')
   return { base, remoteBase, nodeId, localNodeId, environment, cookie, login, admin, users, channels, services, proxy, lease, credential, centerDeps,
-    remoteStarts, localStarts, dialEvents,
+    remoteStarts, localStarts, dialEvents, serviceDialEvents,
     slow, slowResponse, counters: () => ({ localCalls, remoteCalls }), remoteHttpConnections: () => remoteHttpSockets.size,
+    attestationCalls: () => attestationCalls,
     disableForwarding: () => { centerDeps.nodeServiceProxy = undefined },
     misbind: () => { remoteDeps.nodeServiceIdentity!.nodeId = localNodeId },
+    otherOrganization: () => { remoteDeps.nodeServiceIdentity!.organizationId = randomUUID() },
+    rejectLocalLease: () => {
+      const authorize = remoteDeps.nodeServiceIdentity!.authorize
+      remoteDeps.nodeServiceIdentity!.authorize = async (token, input) => {
+        await authorize(token, input)
+        throw new NodeAccessError(409, 'node-access/lease-lost')
+      }
+    },
     expire: () => { live = false },
     replaceChannel: async () => {
       Object.assign(lease, { connectionId: randomUUID(), epoch: String(BigInt(lease.epoch) + 1n) })
@@ -235,6 +329,53 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     },
     revoke: () => { live = false; channels.revoke(nodeId); services.revoke(nodeId) } }
 }
+
+it('forwards between different Gateway release identities over the v1 node protocol', async () => {
+  const f = await fixture({}, false, false, undefined, 'compatible')
+  const health = (base: string) => fetch(base + '/healthz/live').then(res => res.json())
+  expect(await health(f.base)).toMatchObject({ release: 'center-release-2' })
+  expect(await health(f.remoteBase)).toMatchObject({ release: 'node-release-1' })
+  const target = `${f.base}/api/echo?dshRuntime=${f.environment.id}`
+  const response = await fetch(target, { headers: { cookie: f.cookie } })
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ node: f.nodeId, runtime: f.environment.id })
+  const other = await fetch(target, { headers: { cookie: await f.login('other') } })
+  expect(other.status).toBe(404)
+  await other.arrayBuffer()
+  expect(f.attestationCalls()).toBe(1)
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
+})
+
+it.each(['future-wire', 'wrong-node', 'wrong-organization', 'stale-lease'] as const)(
+  'refuses the %s peer before forwarding an operation across releases',
+  async failure => {
+    const f = await fixture({}, false, false, undefined, failure === 'future-wire' ? failure : 'compatible')
+    if (failure === 'wrong-node') f.misbind()
+    if (failure === 'wrong-organization') f.otherOrganization()
+    if (failure === 'stale-lease') f.rejectLocalLease()
+    const response = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'node-service/unavailable' })
+    expect(f.attestationCalls()).toBe(1)
+    expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+  },
+)
+
+it('retains an explicit release requirement sent by an older center', async () => {
+  const f = await fixture({}, false, false, undefined, 'compatible')
+  await expect(runNodeServiceBridge({
+    localUrl: f.remoteBase,
+    dialer: new NodeDialer([f.base], 60_000, () => {}),
+    credential: f.credential,
+    lease: f.lease,
+    requestTimeoutMs: 5_000,
+    release: 'center-release-2',
+  }, randomUUID() as NodeProbeId, new AbortController().signal)).rejects.toMatchObject({
+    status: 409, code: 'node-service/mismatch',
+  })
+  expect(f.attestationCalls()).toBe(1)
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+})
 
 it('validates fixed local origins and service capacity before network acquisition', () => {
   expect(nodeServiceLocalOrigin('http://127.0.0.1:3010')).toBe('http://127.0.0.1:3010')
@@ -287,12 +428,31 @@ it('keeps the idle outbound control socket active independently of authority ren
 })
 
 it('dials the channel and its service streams through the next candidate after a refusal', async () => {
-  const f = await fixture({}, false, false, true)
+  const f = await fixture({}, false, false, 'control')
   expect(f.dialEvents).toEqual([{ origin: f.base, reason: 'node-dial/transport-failure' }])
   const response = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, {
     method: 'POST', headers: { cookie: f.cookie, origin: f.base, 'content-type': 'application/octet-stream' }, body: 'x',
   })
   expect(response.status).toBe(200)
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
+})
+
+it('advances only the service dial sequence after a failed stream open', async () => {
+  const f = await fixture({}, false, false, 'service')
+  const post = () => fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, {
+    method: 'POST', headers: { cookie: f.cookie, origin: f.base, 'content-type': 'application/octet-stream' }, body: 'service payload',
+  })
+  const first = await post()
+  expect(first.status).toBe(503)
+  await first.arrayBuffer()
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
+  expect(f.serviceDialEvents).toEqual([{ origin: f.base, reason: 'node-dial/transport-failure' }])
+  expect(f.dialEvents).toEqual([])
+
+  const second = await post()
+  expect(second.status).toBe(200)
+  expect(await second.json()).toMatchObject({ node: f.nodeId, runtime: f.environment.id,
+    bytes: Buffer.from('service payload').toString('base64') })
   expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
 })
 
@@ -445,6 +605,42 @@ it('forwards content-addressed browser assets to the referring Runtime without r
     expect(value.path).toBe(`${path}${path.includes('?') ? '&' : '?'}dshRuntime=${f.environment.id}`)
   }
   expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: forwarded.length })
+})
+
+it('delivers a fresh resource placement over the node channel without another ingress owner lookup', async () => {
+  const f = await fixture({}, true)
+  const placement: RuntimePlacement & { environment: RuntimeCatalogEntry } = {
+    target: 'personal', local: false, resetScope: false, environment: f.environment,
+  }
+  const resolve = vi.spyOn(f.centerDeps.runtimeRouter!, 'placement')
+  const selected = createServer((req, res) => {
+    void Promise.resolve().then(() => f.proxy.asset(req, res, f.admin, placement)).then(handled => {
+      if (!handled) res.writeHead(500).end('unexpected-local-resource')
+    }, error => {
+      if (res.headersSent) { res.destroy(); return }
+      res.writeHead(error instanceof NodeServiceError ? error.status : 500).end()
+    })
+  })
+  releases.push(() => close(selected))
+  const origin = await listen(selected)
+  const path = `/plugins/combo.js??@deepseek-ai/dsh-client-modules/client.js&rev=abcdef123456&dshRuntime=${f.environment.id}`
+  for (const method of ['GET', 'HEAD']) {
+    const response = await fetch(origin + path, { method, headers: { cookie: f.cookie } })
+    expect(response.status).toBe(200)
+    if (method === 'GET') expect(await response.json()).toMatchObject({ node: f.nodeId, runtime: f.environment.id, path })
+    else expect(await response.text()).toBe('')
+  }
+  expect(resolve).not.toHaveBeenCalled()
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 2 })
+  expect(f.localStarts).toEqual([]); expect(f.remoteStarts).toEqual([])
+  for (const [changed, status] of [[path.replace(f.environment.id, randomUUID()), 409], ['/plugins/events', 400]] as const) {
+    const response = await fetch(origin + changed, { headers: { cookie: f.cookie } })
+    expect(response.status).toBe(status); await response.arrayBuffer()
+  }
+  f.expire()
+  const refused = await fetch(origin + path, { headers: { cookie: f.cookie } })
+  expect(refused.status).toBe(503); await refused.arrayBuffer()
+  expect(f.counters().remoteCalls).toBe(2)
 })
 
 it('keeps pinning runtime-specific and unrevisioned browser resource URLs', async () => {
@@ -837,13 +1033,15 @@ it('does not replay a POST after a reused connection loses its response', async 
 
 function capacityPoolFixture(maximum: number, perNode: number, reserved?: RuntimeNodeId, held?: RuntimeNodeId, overrides: NodeJS.ProcessEnv = {}) {
   const connections = new Map<Duplex, RuntimeNodeId>(), acknowledgements = new WeakMap<Duplex, Promise<void>>()
-  const opened: RuntimeNodeId[] = [], streams: Duplex[] = [], destroyed = deferred<void>(), physicalRelease = deferred<void>()
+  const attempts: RuntimeNodeId[] = [], opened: RuntimeNodeId[] = [], streams: Duplex[] = []
+  const destroyed = deferred<void>(), physicalRelease = deferred<void>()
   const capacity = (nodeId: RuntimeNodeId): 'available' | 'node' | 'global' => {
     if ([...connections.values()].filter(id => id === nodeId).length + Number(nodeId === reserved) >= perNode) return 'node'
     return connections.size + Number(reserved !== undefined) >= maximum ? 'global' : 'available'
   }
   const pool = new NodeServiceHttpPool({ capacity,
     open: async (nodeId, signal) => {
+      attempts.push(nodeId)
       signal.throwIfAborted()
       if (capacity(nodeId) !== 'available') throw new NodeServiceError(503, 'node-service/busy')
       const stream = new PassThrough(), released = deferred<void>()
@@ -862,16 +1060,16 @@ function capacityPoolFixture(maximum: number, perNode: number, reserved?: Runtim
     released: stream => acknowledgements.get(stream)!,
   }, loadNodeServiceConfig({ HGW_NODE_SERVICE_MAX_CONNECTIONS: String(maximum), HGW_NODE_SERVICE_MAX_PER_NODE: String(perNode), ...overrides }))
   releases.push(async () => { physicalRelease.resolve(); await pool.close() })
-  return { pool, opened, streams, destroyed, physicalRelease, capacity }
+  return { pool, attempts, opened, streams, destroyed, physicalRelease, capacity }
 }
 
 it('hands a completed HTTP connection to a waiting POST without replaying it', async () => {
   const f = await fixture({ HGW_NODE_SERVICE_MAX_CONNECTIONS: '1', HGW_NODE_SERVICE_MAX_PER_NODE: '1' })
-  const entered = deferred<void>(), original = f.services.open.bind(f.services)
-  let attempts = 0
-  vi.spyOn(f.services, 'open').mockImplementation((node, signal) => {
-    if (++attempts === 2) entered.resolve()
-    return original(node, signal)
+  const entered = deferred<void>(), original = f.services.capacity.bind(f.services)
+  vi.spyOn(f.services, 'capacity').mockImplementation(node => {
+    const pressure = original(node)
+    if (pressure === 'node') entered.resolve()
+    return pressure
   })
   const first = await fetch(`${f.base}/api/slow?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })
   const second = fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, {
@@ -1022,6 +1220,84 @@ it('evicts another computer idle transport and waits for physical credit before 
   expect(f.streams[0]!.destroyed).toBe(true)
 })
 
+it('borrows a returning target connection while another computer still releases its transport credit', async () => {
+  const a = randomUUID() as RuntimeNodeId, b = randomUUID() as RuntimeNodeId
+  const f = capacityPoolFixture(2, 2, undefined, a)
+  const signal = new AbortController().signal
+  const foreign = await f.pool.acquire(a, signal)
+  const active = await f.pool.acquire(b, signal)
+  foreign.release()
+  const waiting = f.pool.acquire(b, AbortSignal.timeout(1_500))
+  void waiting.catch(() => {})
+  await f.destroyed.promise
+  active.release()
+  const returned = await waiting
+  expect(returned.agent).toBe(active.agent)
+  expect(f.capacity(b)).toBe('global')
+  expect(f.opened).toEqual([a, b])
+  returned.release()
+})
+
+it('hands a prepared conversation connection to the next action while ordinary requests occupy the other credit', async () => {
+  const node = randomUUID() as RuntimeNodeId, f = capacityPoolFixture(2, 2)
+  const owner = new AbortController()
+  const ordinary = await f.pool.acquire(node, owner.signal)
+  const creation = await f.pool.acquire(node, owner.signal, true)
+  const background = f.pool.acquire(node, owner.signal)
+  void background.catch(() => {})
+  const send = f.pool.acquire(node, owner.signal, true)
+  void send.catch(() => {})
+  let borrowed: Agent | undefined, backgroundBorrowed = false
+  void send.then(lease => { borrowed = lease.agent }, () => {})
+  void background.then(() => { backgroundBorrowed = true }, () => {})
+  try {
+    creation.release()
+    await expect.poll(() => borrowed).toBe(creation.agent)
+    expect(backgroundBorrowed).toBe(false)
+    expect(f.opened).toEqual([node, node])
+    const accepted = await send
+    ordinary.release()
+    const used = await background
+    expect(used.agent).toBe(ordinary.agent)
+    accepted.release(); used.release()
+  } finally {
+    owner.abort()
+    await Promise.allSettled([background, send])
+  }
+})
+
+it('counts acquisitions waiting for physical transport release against the pending limit', async () => {
+  const a = randomUUID() as RuntimeNodeId, b = randomUUID() as RuntimeNodeId, c = randomUUID() as RuntimeNodeId
+  const f = capacityPoolFixture(1, 1, undefined, a, { HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS: '1' })
+  const signal = new AbortController().signal
+  const foreign = await f.pool.acquire(a, signal)
+  foreign.release()
+  const waiting = f.pool.acquire(b, signal)
+  void waiting.catch(() => {})
+  await f.destroyed.promise
+  await expect(f.pool.acquire(c, AbortSignal.timeout(1_500))).rejects.toMatchObject({ code: 'node-service/busy' })
+  expect(f.opened).toEqual([a])
+  f.physicalRelease.resolve()
+  const acquired = await waiting
+  expect(f.opened).toEqual([a, b])
+  acquired.release()
+})
+
+it('hands each waiting request the released transport without rejected open attempts', async () => {
+  const node = randomUUID() as RuntimeNodeId, f = capacityPoolFixture(1, 1)
+  const signal = new AbortController().signal
+  const active = await f.pool.acquire(node, signal)
+  const order: number[] = []
+  const waiting = Array.from({ length: 8 }, (_, index) => f.pool.acquire(node, signal).then(lease => {
+    order.push(index)
+    lease.release()
+  }))
+  active.release()
+  await Promise.all(waiting)
+  expect(order).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+  expect(f.attempts).toEqual([node])
+})
+
 it('retains other computers idle transports when active target connections exhaust its per-computer limit', async () => {
   const a = randomUUID() as RuntimeNodeId, b = randomUUID() as RuntimeNodeId
   const f = capacityPoolFixture(2, 1, b), signal = new AbortController().signal
@@ -1131,7 +1407,7 @@ it('awaits cancelled connection preparation and disposes its late control reques
   let disposed = 0, closed = false
   const service = new GatewayNodeServices({ authorizeChannel: async () => lease }, {
     requestService: async () => { prepared.resolve(); await released.promise; return { lease, dispose: () => { disposed++ } } },
-  }, loadNodeServiceConfig({}), null)
+  }, loadNodeServiceConfig({}))
   releases.push(async () => { released.resolve(); await service.close() })
   const controller = new AbortController(), opening = service.open(lease.nodeId, controller.signal)
   const refused = expect(opening).rejects.toMatchObject({ code: 'node-service/cancelled' })

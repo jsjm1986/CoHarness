@@ -7,6 +7,8 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+The address field precedes the navigation controls in reading and focus order. Compact and coarse-pointer layouts put the address on its own row, use 44px action targets and 16px input text, and wrap the loopback notice. Go remains visible when the address field loses focus, so pointer submission also works in browsers that do not focus clicked buttons. Short panes scroll the toolbar, page, and notices together; the iframe retains a readable height bounded by the pane, so browser chrome cannot collapse the visited page. Address refusals and sandbox warnings use the theme’s semantic text colors.
+
 ## Summary
 
 Browse HTTP(S) pages, including loopback services, inside independent right-Sidebar tabs. The current carrier is an iframe with application-managed history in the Web application. The package never injects Electron or Node access into visited content.

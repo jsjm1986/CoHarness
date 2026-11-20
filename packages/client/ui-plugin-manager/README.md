@@ -7,6 +7,10 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+The compact shell title follows the selected plugin, bundle, row, or contributed tab using the page’s shared navigation and localized catalogs. Returning to the list restores the Plugins title.
+
+Registry options remain inside their installation dialog so its keyboard and background isolation rules also cover the address field.
+
 ## Summary
 
 Use the **Plugins** entry in the Web sidebar to manage the profile's installed bundles and the official bundles the installation ships switched off. Switch bundles and their rows on and off, install a bundle after the Host has read what the spec names, watch pnpm's output, stop a run, and enable what it added. Uninstalling asks for confirmation. A plugin that registers a configuration page is edited here, on its own page; the Settings → Plugins section keeps the read-only plugin list and links back to this page.
@@ -29,7 +33,9 @@ Profile management remains bound to the browser document’s bootstrap Runtime. 
 
 Select **Plugins** in the sidebar. The information button uses an 11px caption-colored icon in a 20px square hover area, with a 4px gap after the subtitle. It explains that this page configures official plugins and installs or manages other plugins, while **Settings → Built-in plugins** shows the built-in inventory and runtime status. Hover or focus shows the shared tooltip; clicking keeps it open until another click, Escape, Tab, or an outside click. The page reads the inventory and the bundles through `api-remotes` when first opened; a Host without a managed profile shows the page as unavailable. **Built-in plugin settings** lists the official configuration pages the Host serves by their configured order. **Experimental plugins** shows the primary optional bundles, with **More** beside its heading opening a separate page of the same title. That page lists all offered official bundles, including those on the main list, with Codex and Claude Code subagents last. Its back button returns to the main list, where **Installed plugins** remains below Experimental plugins. Bundle details return to the list they were opened from. Catalog entries keep their position after installation or removal. **Installed plugins** lists other profile bundles. Installation-carried optional bundles have no uninstall action. Experimental packages retain the **Experimental** marker on both lists. Bundle details can show a feature preview below the description, also while the bundle is disabled; **DSH badge skill** and **Voice input** show one in English or Chinese following the UI language, and a decode failure shows a short notice without blocking management. Switching on a bundle that page holds back adds it to the main list in the position that page shows it, and switching it off leaves it on that page alone; other bundles keep their place on both. A dependency without a bundle patch is not a plugin and is not listed unless the profile selects it, in which case it carries a problem tag. Global configuration remains in the Settings **Built-in plugins** section. Once the account context verifies, a caption under the subtitle names which runtime the page edits — the personal runtime in personal scope, or the project's shared runtime by name in project scope — because each runtime target keeps its own composition; it stays hidden where no collaboration context exists.
 
-The heading moves its complete action group to another line when space is insufficient. Action labels stay on one line, and the information button follows the subtitle text.
+The Plugins page fetches its code on first visit and reads the Host catalog in parallel. A script load failure offers Retry in the panel.
+
+The heading moves its complete action group to another line when space is insufficient. Action labels stay on one line, and the information button follows the subtitle text. The detail-page back button provides a 44px touch target.
 
 The Host applies its read policy before returning the catalog. A refused read answers `plugin-management/forbidden`, and the page shows its denied state and clears cached cards. A readable catalog with `manage: false` retains browsing and disables mutation controls. The **Refresh** control stays available there, so a new grant takes effect on the next read without reloading the page.
 
@@ -106,7 +112,7 @@ Another plugin adds a tab after the page's own **Installed** tab by registering 
 
 -----
 
-Built-in illustrations are optional, one 640×300 SVG per language, with both English and Chinese required. The internal map and its asset test enforce the format; packages have no preview declaration interface.
+Built-in illustrations are optional. Each uses a 640×300 SVG for English and Chinese. The browser fetches the open bundle's illustration in the current language. Package actions are available while it loads. The manager's internal map defines the available illustrations.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
@@ -121,6 +127,8 @@ Package management uses the profile's dependency records: installed bundles can 
 The Host entry exposes `pluginRegistryProbe.fastest()` through the generated Remote interface. It shares pending comparisons, expires cached results, and aborts and awaits outstanding probes on unload. Calls after unload return a rejected Promise.
 
 The browser plugin registers the `plugins` sidebar entry and its `main` panel through `ctx.slots.inject()`, so both follow late slot declaration, locale changes and teardown. The page is global and belongs to no Session. Display text comes from package metadata and the page's dictionary.
+
+The `main` registration uses a callable `SlotComponent` with the assembled page props. The component requests the catalog while loading the page body on first open and offers a retry if the body fails to load.
 
 The add control reuses `Button`, `Menu`, and `MenuItemButton`. Both installation actions call the same `openInstall` callback and use `InstallDialog` and `PluginManagerController`. The root-scoped list slot `plugins.add.actions` accepts contributed `MenuItemButton` rows after the install action; each contribution receives an `onDismiss()` callback to close the menu before starting its action.
 

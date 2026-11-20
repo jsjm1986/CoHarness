@@ -175,7 +175,7 @@ describe('GenericToolCard read body', () => {
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
   const toggleRow = (view: { container: HTMLElement }) => {
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
   }
 
   it('expands to the read card, capped tighter than the panel', () => {
@@ -228,10 +228,10 @@ describe('ReadRow keyed toolview', () => {
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
   const toggleRow = (view: { container: HTMLElement }) => {
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
   }
 
-  it('collapses to the path summary; the whole row toggles the read card', () => {
+  it('collapses to the path summary; the disclosure toggles the read card', () => {
     const view = render(<ReadRow {...rowProps(settled())} />)
     expect(view.getByText('读取')).toBeTruthy()
     // Collapsed: the path is the summary link alone, and the card is absent.

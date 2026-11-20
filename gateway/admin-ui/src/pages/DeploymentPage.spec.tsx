@@ -11,6 +11,9 @@ vi.mock('./DeploymentTopologySection.tsx', () => ({ DeploymentTopologySection: (
 vi.mock('./NodeAccessSection.tsx', () => ({ NodeAccessSection: () => null }))
 vi.mock('./NodeConfigurationSection.tsx', () => ({ NodeConfigurationSection: () => null }))
 vi.mock('./TunnelAccessSection.tsx', () => ({ TunnelAccessSection: () => null }))
+vi.mock('./NodeContentSection.tsx', () => ({ NodeContentSection: () => null }))
+vi.mock('./NodeContentMigrationSection.tsx', () => ({ NodeContentMigrationSection: () => null }))
+vi.mock('./LocalRecoveryExecutionSection.tsx', () => ({ LocalRecoveryExecutionSection: () => <p>local recovery entry</p> }))
 vi.mock('../components/RuntimeAllocationPolicyEditor.tsx', () => ({ RuntimeAllocationPolicyEditor: () => null }))
 vi.mock('../deployment-context.tsx', () => ({ useDeploymentContext: vi.fn() }))
 
@@ -71,4 +74,14 @@ it('coalesces explicit refreshes into one read after the current read settles', 
   expect(api.getDeployment).toHaveBeenCalledTimes(2)
   await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
   expect(api.getDeployment).toHaveBeenCalledTimes(2)
+})
+
+it.each(['single', 'multi'] as const)('shows the local recovery entry only in single-computer mode: %s', async mode => {
+  vi.mocked(useDeploymentContext).mockReturnValue({ value: deploymentContextSchema.parse({ ...policy, mode,
+    ...(mode === 'multi' ? { role: 'computer', primary: { ...policy.entry, origin: 'https://primary.test' } } : {}) }),
+  error: false, refresh: async () => {} })
+  render(<DeploymentPage />)
+  await act(async () => { reads[0]!.resolve({ mode: 'serving', maintenanceEpoch: '1', writeEpoch: '1', reason: null,
+    enteredAt: null, updatedAt: '2026-11-16T00:00:00Z', nodes: [], writersQuiesced: true, migrations: null, operations: [] }) })
+  expect(screen.queryByText('local recovery entry') !== null).toBe(mode === 'single')
 })

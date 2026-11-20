@@ -24,6 +24,12 @@ Queued selection locks the chosen request before conditionally debiting fresh pr
 
 The transaction acquires the node row and retires expired queued requests through `harness.lock_node_resources`. `harness.schedule_node_resources` performs stale-generation cleanup, unregistered-process checks, equal-user/project selection and fresh conditional credit debit on that same PostgreSQL connection. Migration105 installs both invoker-owned functions. The caller retains the transaction through its Runtime ownership checks, result and commit; no eligibility or pressure result becomes a reusable authorization cache. Server-local scheduling removes network waits between selection and debit while retaining the current request deadline and physical occupation.
 
+Runtime startup uses migration137’s `harness.admit_runtime_start` to retain the same node lock through exact assignment and lease checks, existing queue priority, unregistered-process checks, fresh credit debit and possible allocation. These checks run in one statement because five client round trips inside the lock can exhaust a two-second observation at 500 ms database RTT while excluding the observer that could refresh it. The caller retains transaction rollback for rejected identities and deadlines, and retains committed possible allocation after cancellation or lost acknowledgement. This changes no pressure threshold or active reservation.
+
+Runtime provider registration uses [migration 138](../../../../gateway/deploy/postgres/migrations/138_runtime_resource_registration.sql)’s `harness.register_runtime_resources` for the node lock, exact current assignment and node lease, identity-preserving upsert and next sequence. Bearer authentication remains ahead of registration. The Gateway retains `BEGIN` and `COMMIT` around the call so a stored-policy validation failure rolls back registration and expired-request cleanup. This reduces seven client exchanges to three without duplicating the policy schema in SQL. Node-lock ownership spans only the returned result and commit acknowledgement after the function finishes. A registration conflict or stale generation raises inside the function; neither publishes a partial write. A lost commit acknowledgement does not replay the transaction, and later explicit registration retains existing work and sequence.
+
+[Migration 142](../../../../gateway/deploy/postgres/migrations/142_execution_hot_path.sql) keeps model and process reservation decisions inside one statement under the same node lock. Per-owner sequence, fingerprint, queue limits and the debit of a fresh credit share that transaction. A status sample keeps the recorded origin so the Gateway can check its authorization after commit. This ordering keeps actor locks outside the resource transaction and removes the network waits between checking and spending a credit. The Gateway validates the returned durable policy before commit.
+
 Node accounting and instance activity intentionally serialize under the configured statement timeout. Transaction-local lock waiting uses that bound; an unlimited statement retains the pool lock timeout. Other clients retain their pool settings. Contention exhaustion returns503 without replaying an operation or releasing uncertain reservations.
 
 Activity admission acquires the assignment writer lock before checking account, membership, computer, ready state and generation in a fresh statement. A snapshot taken before the wait cannot authorize a withdrawn caller. Resource generation locks remain held through accounting.
@@ -43,6 +49,12 @@ Browser form failures render localized HTML; the scope API retains JSON. A manua
 ## Alternatives considered
 
 **Wait for writers before cancelling starts.** A start holds a writer count while it may wait for pressure credits whose sampler stops during shutdown. Admission cancellation must precede that wait so the accepted writer can settle; a deadline alone does not cancel it.
+
+**Extend observation freshness to absorb database round trips.** A longer interval would admit starts from older host measurements without removing the lock-held network waits. Server-local admission preserves the configured freshness interval.
+
+**Increase the provider timeout to absorb registration round trips.** A longer deadline retains the same node lock while the client performs more cross-network statements. Consolidating the database work keeps the configured request deadline and admission checks. It does not eliminate cold connection setup or guarantee a five-second registration on every network.
+
+**Commit registration before validating the returned policy.** A malformed stored policy must leave no registration or queue-cleanup effects. Retaining the caller transaction preserves this failure rule without maintaining a second policy validator in PostgreSQL.
 
 **Use per-Runtime CPU and memory limits as the node budget.** These limits are platform-specific and their aggregate can exceed host capacity. Runtime process admission applies to both launchers; it does not claim to bound the CPU or memory used inside an admitted Runtime.
 

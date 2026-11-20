@@ -1,9 +1,9 @@
 /** Private Linux project-profile preparation under the configured execution account. */
 import {
-  closeSync, constants, fchmodSync, fchownSync, fstatSync, lstatSync, mkdirSync, openSync,
+  closeSync, constants, fchmodSync, fchownSync, fstatSync, lstatSync, mkdirSync, openSync, realpathSync,
   type BigIntStats,
 } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import type { GatewayConfig } from './config.ts'
 import { runGatewayChildCommand } from './child-command.ts'
 
@@ -50,6 +50,7 @@ function prepareOwner(fd: number, owner: UnixOwner, directory: boolean): void {
  * @param systemUser - already provisioned execution account from the launch descriptor.
  * @param profile - application-owned profile name.
  * @param signal - startup cancellation, including identity lookup subprocesses.
+ * @param runtimeHome - verified retained Runtime home; a nonstandard home must already exist and is never provisioned.
  * @returns after private data is accessible to its execution account and identity-query children have closed; no account is created.
  */
 export async function prepareProjectRuntimeData(
@@ -58,6 +59,7 @@ export async function prepareProjectRuntimeData(
   systemUser: string,
   profile: string,
   signal: AbortSignal,
+  runtimeHome = join(cfg.projectRuntimesRoot, String(projectId), 'dsh'),
 ): Promise<void> {
   if (process.platform !== 'linux') throw new Error('Project Runtime account preparation requires Linux')
   const owner = await executionOwner(systemUser, cfg.readinessTimeoutMs, signal)
@@ -71,12 +73,18 @@ export async function prepareProjectRuntimeData(
     } catch (error) { closeSync(fd); throw error }
   }
   try {
-    let parent = keep(cfg.projectRuntimesRoot)
-    if (parent.identity.uid !== 0n && parent.identity.uid !== BigInt(process.getuid!())) {
+    const retainedHome=runtimeHome!==join(cfg.projectRuntimesRoot,String(projectId),'dsh')
+    if(retainedHome&&(!isAbsolute(runtimeHome)||resolve(runtimeHome)!==runtimeHome||realpathSync(runtimeHome)!==runtimeHome)){
+      throw new Error('Retained project Runtime home must be an existing canonical directory')
+    }
+    let parent = keep(retainedHome?runtimeHome:cfg.projectRuntimesRoot)
+    if (!retainedHome && parent.identity.uid !== 0n && parent.identity.uid !== BigInt(process.getuid!())) {
       throw new Error('Project Runtime root must belong to the Gateway account')
     }
-    let home: RetainedDirectory | undefined
-    for (const [index, part] of [String(projectId), 'dsh', 'profiles', profile, 'node_modules', '@deepseek-ai'].entries()) {
+    let home: RetainedDirectory | undefined=retainedHome?parent:undefined
+    if(retainedHome)prepareOwner(parent.fd,owner,true)
+    const parts=retainedHome?['profiles',profile,'node_modules','@deepseek-ai']:[String(projectId),'dsh','profiles',profile,'node_modules','@deepseek-ai']
+    for (const [index, part] of parts.entries()) {
       signal.throwIfAborted()
       const path = join('/proc/self/fd', String(parent.fd), part)
       try { mkdirSync(path, { mode: 0o700 }) } catch (error) {
@@ -84,7 +92,7 @@ export async function prepareProjectRuntimeData(
       }
       parent = keep(path)
       prepareOwner(parent.fd, owner, true)
-      if (index === 1) home = parent
+      if (!retainedHome && index === 1) home = parent
     }
     for (const name of ['managed-data.jsonl', '.env', 'directory-grants.json', 'model-governance.json', 'cordis.patch.yml']) {
       const path = join('/proc/self/fd', String(home!.fd), name)

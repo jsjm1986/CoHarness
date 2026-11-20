@@ -1,8 +1,9 @@
 /** Cold legacy JSONL restoration through the shipped Host and browser history path. */
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+
 import { expect, it } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { generationLogPath } from '@deepseek-ai/dsh-session-persistence-jsonl/src/format.ts'
@@ -14,7 +15,7 @@ const EXPECTED = fileURLToPath(new URL('./snapshots/historical-jsonl/message.exp
 
 it.each([2, 3])('opens persisted CoHarness v%s history without rewriting its original generation', async (version) => {
   const scaffold = await launchWebScaffold()
-  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
+  let browser: Awaited<ReturnType<typeof responsiveBrowser.launch>> | undefined
   try {
     const id = SessionId(`historical-jsonl-v${version}`)
     const cwd = scaffold.workspaceCwd
@@ -54,7 +55,7 @@ it.each([2, 3])('opens persisted CoHarness v%s history without rewriting its ori
     expect(JSON.stringify(history.result.value)).toContain('Historical answer preserved.')
     expect(scaffold.ctx.agents.get(id)).toBeUndefined()
 
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     const page = await newEnglishPage(browser)
     const tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

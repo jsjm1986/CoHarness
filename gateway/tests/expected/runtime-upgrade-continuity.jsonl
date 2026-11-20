@@ -1,0 +1,2 @@
+{"scenario":"incompatible-release","newAdmission":503,"code":"INSTANCE_UNAVAILABLE","message":"This Runtime process is retained and awaiting a safe upgrade. Gateway restarts can interrupt tasks. Ask an administrator to confirm a safe stopping point before stopping and restarting it.","existingWork":"completed","retainedState":"ready"}
+{"scenario":"explicit-administrator-stop","state":"stopped","automaticallyRestarted":false}

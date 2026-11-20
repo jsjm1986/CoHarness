@@ -1,0 +1,40 @@
+- main:
+  - heading "Computer access" [level=2]
+  - text: Manage connection access for organization computers.
+  - button "Refresh computers"
+  - button "Add computer"
+  - paragraph: macOS / Linux / Windows computers can enroll. Complete deployment, computer access grants and Runtime setup to work on that computer. Each project stays on its assigned computer.
+  - region "Organization computer connections":
+    - table:
+      - rowgroup:
+        - row "Computer name Connection System Last connected Actions":
+          - columnheader "Computer name"
+          - columnheader "Connection"
+          - columnheader "System"
+          - columnheader "Last connected"
+          - columnheader "Actions"
+      - rowgroup:
+        - row "source Quarantined Awaiting node report No connection recorded This computer is quarantined after disaster recovery and cannot enroll again.":
+          - cell "source"
+          - cell "Quarantined"
+          - cell "Awaiting node report"
+          - cell "No connection recorded"
+          - cell "This computer is quarantined after disaster recovery and cannot enroll again."
+        - row "target Connected Linux · x64 No connection recorded Reissue Detach Revoke access":
+          - cell "target"
+          - cell "Connected"
+          - cell "Linux · x64"
+          - cell "No connection recorded"
+          - cell "Reissue Detach Revoke access":
+            - button "Reissue"
+            - button "Detach"
+            - button "Revoke access"
+        - row "replacement Connected Linux · x64 No connection recorded Reissue Detach Revoke access":
+          - cell "replacement"
+          - cell "Connected"
+          - cell "Linux · x64"
+          - cell "No connection recorded"
+          - cell "Reissue Detach Revoke access":
+            - button "Reissue"
+            - button "Detach"
+            - button "Revoke access"

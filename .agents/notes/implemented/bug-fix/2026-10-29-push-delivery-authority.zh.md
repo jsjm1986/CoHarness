@@ -30,7 +30,9 @@ FCM 只缓存成功的凭据与客户端初始化。初始化被拒绝时只清�
 
 ## Consequences
 
-部署通过 [Gateway 配置](../../../../gateway/README.zh.md)控制尝试期限和 pending 租期。现有数据库列与设备 API 字段足以承载这些 claim 规则本身；[设备上报的送达结果回执](../feature/2026-11-19-push-delivery-outcome-receipts.zh.md)随后在其旁增加了 `provider_msg_id`、`delivered_at` 与 `opened_at`。sent 记录提供持久化去重；failed 和过期记录在再次触发通知回调时可以重试。不增加后台重试或远端恰好一次保证。
+部署通过 [Gateway 配置](../../../../gateway/README.zh.md)控制尝试期限和 pending 租期。sent 记录提供持久化去重，failed 和过期记录在再次触发通知回调时可以重试。响应丢失后，提供方是否接收仍待确认。
+
+[设备上报的送达结果回执](../feature/2026-11-19-push-delivery-outcome-receipts.zh.md)将登记设备和原接收账号绑定到精确 Runtime 与 Session。旧客户端的回执未提供 Runtime 时，只接受唯一匹配的投递。UnifiedPush HTTP 客户端要求目标 HTTPS 地址经过配置，并拒绝 HTTP 重定向。
 
 ## Verification
 

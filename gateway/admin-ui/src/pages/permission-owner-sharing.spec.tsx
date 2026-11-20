@@ -10,6 +10,7 @@ import { TerminalPermissions } from '../components/TerminalPermissions.tsx'
 
 vi.mock('../api.ts', () => ({
   listUsers: vi.fn(), listProjects: vi.fn(), listSshTargets: vi.fn(), pluginManagementOverview: vi.fn(),
+  pluginInventoryList: vi.fn(),
   getPluginPolicy: vi.fn(), getTerminalPolicy: vi.fn(), getSshPolicy: vi.fn(),
   setPluginPolicy: vi.fn(), setTerminalPolicy: vi.fn(), setSshPolicy: vi.fn(),
 }))
@@ -22,6 +23,7 @@ beforeEach(() => {
   vi.mocked(api.listProjects).mockResolvedValue([{ id: 7, name: 'Shared' } as api.Project])
   vi.mocked(api.listSshTargets).mockResolvedValue({ targets: [] })
   vi.mocked(api.pluginManagementOverview).mockResolvedValue([])
+  vi.mocked(api.pluginInventoryList).mockResolvedValue([])
   for (const read of [api.getPluginPolicy, api.getTerminalPolicy, api.getSshPolicy]) {
     vi.mocked(read).mockImplementation(async (kind, id) => ({ kind, id, enabled: false, revision: '0' }))
   }

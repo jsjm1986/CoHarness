@@ -15,7 +15,7 @@ import { INTERACTIONS_QUERY, LAUNCH_TOKEN_QUERY } from '@deepseek-ai/dsh-host-ap
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionInteractions, ConnectionRuntimeTarget, HostDescription, IApiClient, SessionId } from './api.ts'
 import { runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
-import { ConnectionController, resolveConnectionConfig, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
+import { connectionBackoffDelay, ConnectionController, resolveConnectionConfig, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
 import { FixtureApiClient } from './fixture.ts'
 import { WebApiClient } from './web-api-client.ts'
 import { DEFAULT_BROWSER_RPC_TIMEOUT_MS } from '../browser-timing.ts'
@@ -123,7 +123,7 @@ export interface ClientTransportHooks {
   /** Optional project-Provider carrier for embedded hosts. */
   createProjectModelSettingsTransport?(): ProjectModelSettingsTransport
   /** Bundle transport for hosts whose carrier owns plugin bundle bytes. */
-  loadBundle?(url: string): Promise<void>
+  loadBundle?(url: string, signal?: AbortSignal): Promise<void>
 }
 
 interface ClientTransportGlobal {
@@ -203,7 +203,12 @@ export interface ConnectionHandle {
   /** Authenticated HTML account and initial Runtime; absent for legacy, fixture, and explicit transports. */
   readonly documentIdentity?: ConnectionDocumentIdentity
   /** Resolved connection budgets reused by entry metadata reads; configurable through connection.recovery. */
-  readonly metadataTiming: { requestTimeoutMs: number; retryAfterMs: number }
+  readonly metadataTiming: {
+    requestTimeoutMs: number
+    retryAfterMs: number
+    /** Delay for a consecutive failed recovery attempt, counted from one. */
+    recoveryDelayMs?(attempt: number): number
+  }
   /** Document's configured ceiling on concurrent explicit Runtime preparations. */
   readonly entryRequestLimit?: number
   /** Forwarded-event and answer participation selected at installation. */
@@ -379,7 +384,11 @@ function createConnectionHandle(
     return { api: selected.wireApi ?? selected.api, sessionId: sharedState.originalSession(key) }
   })
   const handle: ConnectionHandle = {
-    metadataTiming: { requestTimeoutMs: bootstrapRecovery.generationReadyTimeoutMs, retryAfterMs: bootstrapRecovery.backoffMaxMs },
+    metadataTiming: {
+      requestTimeoutMs: bootstrapRecovery.generationReadyTimeoutMs,
+      retryAfterMs: bootstrapRecovery.backoffMaxMs,
+      recoveryDelayMs: attempt => connectionBackoffDelay(bootstrapRecovery, attempt),
+    },
     entryRequestLimit: bootstrapRecovery.maxConcurrentEntryRequests,
     interactions,
     ...(sharedState.documentIdentity === undefined ? {} : { documentIdentity: sharedState.documentIdentity }),
@@ -473,8 +482,18 @@ function createConnectionHandle(
       if (started) throw new Error('connection: the stream loop is already owned by another consumer')
       started = true
       let released = false
+      const resumeTarget = target ?? sharedState.documentIdentity?.runtimeTarget
+      const { onResumeMuxEnvelope, ...rest } = sinks
       const owned = new ConnectionController(api, {
-        ...sinks,
+        ...rest,
+        ...(sharedState.documentIdentity === undefined || resumeTarget === undefined || onResumeMuxEnvelope === undefined ? {} : {
+          onResumeMuxEnvelope: (envelope, next, signal) => {
+            const actual = next.runtimeTarget
+            if (released || controller !== owned || actual === undefined || targetKey(actual) !== targetKey(resumeTarget)
+              || resumeTarget.nodeId !== undefined && actual.nodeId !== resumeTarget.nodeId) return false
+            return onResumeMuxEnvelope(envelope, next, signal)
+          },
+        }),
         onConnected: (next) => {
           if (released || controller !== owned) return
           if (target === undefined && next.runtimeTarget !== undefined) handle.setBaseTarget?.(next.runtimeTarget)

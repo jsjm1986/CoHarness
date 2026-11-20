@@ -8,23 +8,35 @@
  * it recognizes 50%, 100%, and radii at or above 99px, not a radius that is
  * full-round only relative to its own box. */
 .switch {
-  box-sizing: border-box;
-  position: relative;
+  display: inline-grid;
+  place-items: center;
   flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.track {
+  display: block;
+  box-sizing: border-box;
   width: 36px;
   height: 20px;
   padding: 2px;
-  border: 0;
   border-radius: 10px;
   corner-shape: round;
   background: var(--dsw-alias-border-l3);
-  cursor: pointer;
   transition: background-color var(--dsw-motion-duration-micro, 0.16s)
     var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
-.switch[aria-checked='true'] {
+.switch[aria-checked='true'] .track {
   background: var(--dsw-alias-brand-primary);
+}
+
+.switch[aria-checked='false'] .track {
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-label-secondary);
 }
 
 .switch:disabled {
@@ -35,6 +47,13 @@
 .switch:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .switch {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
 }
 
 /* The thumb travels on the bounce ease (transitions.dev 27-toggle, MIT): the
@@ -52,9 +71,23 @@
 }
 
 .switch[aria-checked='false'] .thumb {
-  background: var(--dsw-alias-switch-thumb);
+  background: var(--dsw-alias-label-secondary);
 }
 
 .switch[aria-checked='true'] .thumb {
   transform: translateX(16px);
+}
+
+@media (forced-colors: active) {
+  .switch { forced-color-adjust: none; }
+  .track { border: 1px solid ButtonText; background: Canvas; padding: 1px; }
+  .switch[aria-checked='false'] .track { box-shadow: none; }
+  .switch[aria-checked='true'] .track { background: Highlight; }
+  .switch[aria-checked='false'] .thumb { background: ButtonText; }
+  .switch[aria-checked='true'] .thumb { background: HighlightText; }
+  .switch:disabled .track { border-color: GrayText; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track, .thumb { transition: none; }
 }

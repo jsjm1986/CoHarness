@@ -14,10 +14,12 @@ function assertNever(row: never): never {
  * Execute every row in table order.
  * @param rows - Injection table from the boot payload.
  * @param loadScript - Executes one script-src row through the page owner's asset transport.
+ * @param preloadScript - Optional browser resource hint for an upcoming script.
  */
 export async function applyIndexInjections(
   rows: readonly IndexInjection[],
   loadScript: (src: string) => Promise<void>,
+  preloadScript?: (src: string) => void,
 ): Promise<void> {
   for (const row of rows) {
     switch (row.kind) {
@@ -34,7 +36,7 @@ export async function applyIndexInjections(
         await loadScript(row.src)
         break
       case 'script-preload':
-        // Some transports cannot preload without executing; loadScript owns the actual request.
+        preloadScript?.(row.src)
         break
       case 'style': {
         const el = document.createElement('style')

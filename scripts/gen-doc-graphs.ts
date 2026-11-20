@@ -610,6 +610,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Layers the default ModelSelection through settings so direct and Host-backed Agent entry points share one state owner.',
   },
   {
+    key: 'agentExecutionAdmission',
+    pkg: 'agent',
+    title: 'Session execution admission',
+    mode: 'core',
+    consumers: ['agent-loop', 'host-apiproxy'],
+    note: 'Boot-installed restrictions refuse execution of restored Sessions while retaining detached history reads.',
+  },
+  {
     key: 'agentLoop',
     pkg: 'agent-loop',
     title: 'Concrete loop driver',

@@ -177,7 +177,7 @@ public class NativePushStatusPlugin extends Plugin {
             && getBridge() != null && eventSeq != null && !eventSeq.trim().isEmpty()) {
             PushReceiptReporter.report(getContext(), "unifiedpush",
                 CoHarnessPushService.storedEndpoint(getContext()),
-                sessionId.trim(), eventSeq.trim(), "opened");
+                runtimeId.trim(), sessionId.trim(), eventSeq.trim(), "opened");
         }
         intent.removeExtra(EXTRA_PUSH_PROVIDER);
         intent.removeExtra(EXTRA_SESSION_ID);

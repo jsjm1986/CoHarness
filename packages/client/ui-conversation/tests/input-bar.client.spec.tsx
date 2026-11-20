@@ -1610,6 +1610,64 @@ describe('strips and variants', () => {
 })
 
 describe('command launcher chrome and control seats', () => {
+  it('measures seats before clipping and restores labels when another seat leaves', async () => {
+    const observers: { callback: ResizeObserverCallback; targets: Element[] }[] = []
+    vi.stubGlobal('ResizeObserver', class {
+      targets: Element[] = []
+      constructor(callback: ResizeObserverCallback) { observers.push({ callback, targets: this.targets }) }
+      observe(target: Element) { this.targets.push(target) }
+      unobserve() {}
+      disconnect() {}
+    })
+    const frames = new Map<number, FrameRequestCallback>()
+    let sequence = 0
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.set(++sequence, callback)
+      return sequence
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => { frames.delete(id) })
+    onTestFinished(() => { vi.unstubAllGlobals() })
+    const { view, props } = bench({ leftItems: <span>Left action</span> })
+    const seat = view.container.querySelector<HTMLElement>('[data-clip-seat]')
+    const left = view.container.querySelector<HTMLElement>('[data-input-extension="left"]')
+    if (seat === null || left === null) throw new Error('The tools row must render both seats')
+    let contentWidth = 150
+    Object.defineProperties(seat, { clientWidth: { value: 100 }, scrollWidth: { get: () => contentWidth } })
+    const readLeft = vi.fn(() => {
+      expect(seat.hasAttribute('data-clipped')).toBe(false)
+      return 140
+    })
+    Object.defineProperties(left, { clientWidth: { value: 100 }, scrollWidth: { get: readLeft } })
+    const observer = observers.find(item => item.targets.includes(seat))!
+    expect(observer.targets).toContain(left)
+    const pendingBefore = frames.size
+    expect(pendingBefore).toBeGreaterThan(0)
+    observer.callback([], {} as ResizeObserver)
+    observer.callback([], {} as ResizeObserver)
+    expect(seat.hasAttribute('data-clipped')).toBe(false)
+    expect(frames.size).toBe(pendingBefore)
+    function runFrame(): void {
+      for (const [id, callback] of [...frames.entries()]) {
+        frames.delete(id)
+        callback(0)
+      }
+    }
+    runFrame()
+    expect(seat.hasAttribute('data-clipped')).toBe(true)
+    expect(left.hasAttribute('data-clipped')).toBe(true)
+    expect(readLeft).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      contentWidth = 90
+      view.rerender(<InputBar {...props} leftItems={null} />)
+    })
+    runFrame()
+    expect(seat.hasAttribute('data-clipped')).toBe(false)
+    observer.callback([], {} as ResizeObserver)
+    const pending = [...frames.keys()].at(-1)!
+    view.unmount()
+    expect(frames.has(pending)).toBe(false)
+  })
+
   it('renders the command launcher; the Access chip is absent without the permissions projection; the control seats render EMPTY without entries', () => {
     const { view, slotCalls } = bench()
     expect(view.getByLabelText('命令')).toBeTruthy()
@@ -1617,7 +1675,7 @@ describe('command launcher chrome and control seats', () => {
     expect(view.queryByLabelText(/^访问模式/)).toBeNull()
     // Every seat dispatched, nothing rendered.
     expect(slotCalls.map(c => c.key)).toEqual([
-      'conversation.input.attachments', 'conversation.input.plan', 'conversation.input.model',
+      'conversation.input.attachments', 'conversation.input.plan', 'conversation.input.model', 'conversation.input.status',
     ])
     expect(view.queryByLabelText('Plan mode')).toBeNull()
     expect(view.queryByLabelText('Model')).toBeNull()
@@ -1764,12 +1822,12 @@ describe('command launcher chrome and control seats', () => {
     expect(view.getByTestId('plan-entry')).toBeTruthy()
     expect(view.getByTestId('model-entry')).toBeTruthy()
     // The bar hands its chrome disable state to the filling entry.
-    const controls = slotCalls.filter(call => call.key !== 'conversation.input.attachments')
+    const controls = slotCalls.filter(call => call.key === 'conversation.input.plan' || call.key === 'conversation.input.model')
     expect(controls.every(c => (c.owner as { locked: boolean }).locked)).toBe(true)
     expect(attachmentOwner(slotCalls).canAcceptDrop).toBe(false)
     cleanup()
     const live = bench({ running: true })
-    const liveControls = live.slotCalls.filter(call => call.key !== 'conversation.input.attachments')
+    const liveControls = live.slotCalls.filter(call => call.key === 'conversation.input.plan' || call.key === 'conversation.input.model')
     expect(liveControls.every(c => !(c.owner as { locked: boolean }).locked)).toBe(true)
     expect(attachmentOwner(live.slotCalls).canAcceptDrop).toBe(true)
   })

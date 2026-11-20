@@ -879,6 +879,68 @@ describe('ChangesTab drawing work', () => {
 })
 
 describe('ChangesTab layout', () => {
+  it('defaults to the available diff width, preserves explicit layout choices and releases pending measurements', async () => {
+    let width = 390
+    const observed = new Map<Element, () => void>()
+    const frames = new Map<number, FrameRequestCallback>()
+    let nextFrame = 0
+    vi.stubGlobal('ResizeObserver', class {
+      readonly targets = new Set<Element>()
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe(target: Element): void {
+        this.targets.add(target)
+        observed.set(target, () => { this.callback([], this) })
+      }
+      unobserve(target: Element): void { this.targets.delete(target); observed.delete(target) }
+      disconnect(): void { for (const target of this.targets) observed.delete(target); this.targets.clear() }
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return new DOMRect(0, 0, this.hasAttribute('data-forge-changes-scroll') ? width : 0, 300)
+    })
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      const id = ++nextFrame
+      frames.set(id, callback)
+      return id
+    })
+    const cancelled = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => { frames.delete(id) })
+    const flush = (): void => {
+      const pending = [...frames.values()]
+      frames.clear()
+      act(() => { for (const callback of pending) callback(0) })
+    }
+    try {
+      const m = mount()
+      await settle()
+      const scrollport = m.view.getByRole('region', { name: `All ${LOCAL.files.length} files` })
+      const resize = observed.get(scrollport)
+      if (resize === undefined) throw new Error('Diff scrollport has no size observer')
+      const split = m.view.getByRole('button', { name: en['diff.splitAria'] })
+      expect(split.getAttribute('aria-pressed')).toBe('false')
+      width = 800
+      resize()
+      flush()
+      expect(split.getAttribute('aria-pressed')).toBe('true')
+      width = 0
+      resize()
+      flush()
+      expect(split.getAttribute('aria-pressed')).toBe('true')
+      fireEvent.click(split)
+      width = 320
+      resize()
+      flush()
+      expect(split.getAttribute('aria-pressed')).toBe('false')
+      width = 900
+      resize()
+      flush()
+      expect(split.getAttribute('aria-pressed')).toBe('false')
+      resize()
+      const pendingFrame = nextFrame
+      m.view.unmount()
+      expect(observed.has(scrollport)).toBe(false)
+      expect(cancelled).toHaveBeenCalledWith(pendingFrame)
+    } finally { cleanup(); vi.unstubAllGlobals() }
+  })
+
   it('draws lines side by side, then in one column, and wraps them by choice', async () => {
     const m = mount()
     await settle()
@@ -2197,18 +2259,21 @@ describe('ChangesTab review threads', () => {
     return { ...bound, update: { key: 'github:github.com/octo/demo#7' as ChangeRequestKey, fetchedAt, snapshot: snapshot(7) } }
   }
   const card = (m: ReturnType<typeof mount>, id: string): HTMLElement | null => m.view.container.querySelector(`[data-forge-thread="${id}"]`)
-  /** The element a thread places among the rows: its card, or side by side, the row of comment cells that holds it. */
+  /** The element a thread places among the rows: its card or its side-specific comment cell. */
   const placed = (m: ReturnType<typeof mount>, id: string): Element | null => {
     const found = card(m, id)
     return found?.closest('[data-forge-notes]') ?? found
   }
   /** Code of the row a thread follows, on the side its lines number. */
-  const following = (m: ReturnType<typeof mount>, id: string, side: 'L' | 'R' = 'R'): string | null =>
-    placed(m, id)?.previousElementSibling?.querySelector(side === 'L' ? '[data-old-line]' : '[data-new-line]')?.textContent ?? null
+  const following = (m: ReturnType<typeof mount>, id: string, side: 'L' | 'R' = 'R'): string | null => {
+    let previous = placed(m, id)?.previousElementSibling
+    while (previous?.hasAttribute('data-forge-notes')) previous = previous.previousElementSibling
+    return previous?.querySelector(side === 'L' ? '[data-old-line]' : '[data-new-line]')?.textContent ?? null
+  }
   /** The column of a side-by-side row that holds a thread: 0 for the left side, 1 for the right. */
   const column = (m: ReturnType<typeof mount>, id: string): number => {
     const found = card(m, id)!
-    return Array.from(found.closest('[data-forge-notes]')!.children).findIndex(cell => cell.contains(found))
+    return found.closest('[data-forge-notes]')!.getAttribute('data-forge-notes') === 'L' ? 0 : 1
   }
 
   it('writes to a thread at the head of its read and reads the threads again', async () => {

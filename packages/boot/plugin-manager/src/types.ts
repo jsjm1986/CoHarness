@@ -41,6 +41,18 @@ export interface PluginDesiredStateSnapshot {
   appliedRevision?: string
 }
 
+/**
+ * The profile's observed plugin inventory as the deployment's inventory store
+ * records it: the same bundle and entry projections the management reads
+ * return, reported by the runtime when its composition changes or settles.
+ */
+export interface PluginInventoryReport {
+  /** The profile's bundles exactly as `listBundles` returns them, including source specs and load errors. */
+  bundles: BundleInfo[]
+  /** The profile's runtime entries exactly as `listPlugins` returns them, including fiber phases. */
+  plugins: PluginInfo[]
+}
+
 /** The outcome of publishing the profile's observed composition to the store. */
 export type PluginDesiredStatePublish =
   | { status: 'applied'; revision: string }
@@ -82,6 +94,14 @@ export interface PluginManagementAuthorization {
    * @returns 'applied' with the new revision, or 'conflict' carrying the store's current state.
    */
   publishDesiredState?(state: PluginDesiredState, baseRevision: string): Promise<PluginDesiredStatePublish>
+  /**
+   * Publish the profile's observed inventory for administrative visibility.
+   * Present only in deployments that record per-space inventories; runtime-scoped,
+   * it never carries a caller's account. Failures surface as warnings, not errors.
+   * @param snapshot - the bundle and entry projections observed at report time.
+   * @returns after the store accepted the report.
+   */
+  reportInventory?(snapshot: PluginInventoryReport): Promise<void>
 }
 
 declare module '@deepseek-ai/dsh-typert-protocol' {

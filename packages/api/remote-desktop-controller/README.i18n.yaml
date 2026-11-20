@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/api/remote-desktop-controller/README.md
 document:
-  en: a17f65beea12d3512bebf2a1a0340524f07e0807
-  zh: 5a290afea6416eb36658ac0f8cec0b7951a1b4f8
+  en: 1ce23f48613df9658db34d7b5585ec32cacc0ba2
+  zh: af346ed749219bc59d8009c1c66b7300d714aa9a
 /:
   en: b64ef3a6a0db8be0
   zh: 02307004b44a57f0
@@ -21,8 +21,8 @@ document:
   en: c5906c9d5b64361a
   zh: 380dc288990a697a
 /deepseek-ai-dsh-api-remote-desktop-controller/authorization:
-  en: eb85945ae005e225
-  zh: c5d71b315038004c
+  en: 709c959d131fd48e
+  zh: 3767cae0c591c82d
 /deepseek-ai-dsh-api-remote-desktop-controller/client-half:
   en: 811efb4003832721
   zh: 09f8c675f0a25cb7

@@ -8,6 +8,25 @@ import type { FailedAction, ManagerNotice, PackageRow, PackageView, PluginManage
 /** The translate seat of the manager's dictionary. */
 export type Translate = PropsLocale<'pluginManager'>['t']
 
+const BUILTIN_PROFILE_BUNDLES = new Set([
+  '@deepseek-ai/dsh-base',
+  '@deepseek-ai/dsh-web-app',
+  '@deepseek-ai/dsh-headless',
+  '@deepseek-ai/dsh-sdk-app',
+  '@deepseek-ai/dsh-acp-app',
+  '@deepseek-ai/dsh-sdk-minimal',
+])
+
+/**
+ * Filter the catalog to bundles with a user-facing Plugins page.
+ * @param packages - bundles described by the Host.
+ * @returns the installed or official bundles and any unavailable bundle with a stored error.
+ */
+export function listedPackages(packages: readonly PackageView[]): readonly PackageView[] {
+  return packages.filter(pkg => !BUILTIN_PROFILE_BUNDLES.has(pkg.name)
+    && (pkg.installed || pkg.official || pkg.error !== undefined))
+}
+
 /** The registries with a name of their own, by host. */
 const REGISTRY_COPY = new Map<string, PluginManagerLocaleKey>([
   ['registry.npmmirror.com', 'registryNpmmirror'],

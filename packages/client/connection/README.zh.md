@@ -45,11 +45,13 @@ fetch 包装把原生请求拒绝标识为 `ApiTransportError`，状态为 `0`�
 <a id="host-configuration"></a>
 ## Host 配置
 
-Host 的 `rpcTimeoutMs` 配置浏览器有界 RPC 调用，默认值保留为 30000 毫秒，页面及其复用的 Runtime 连接沿用该值。自定义 API 载体保留自己的期限，由用户控制完成的调用和事件流维持原有生命周期。浏览器连接恢复仍通过 `recovery` 独立配置。
+Host 的 `rpcTimeoutMs` 配置浏览器有界 RPC 调用，默认值保留为 30000 毫秒，页面及其复用的 Runtime 连接沿用该值。自定义 API 载体保留自己的期限，由用户控制完成的调用和事件流维持原有生命周期。浏览器连接恢复仍通过 `recovery` 独立配置。 目标 handle 也向回执恢复提供配置的随机退避。
 
 `historyPageTargetBytes` 接受正整数，并设置每个完整、未压缩的 history RPC `server-response` JSON 正文以 UTF-8 字节计的目标大小。默认值为 131072 字节。分页会保留完整的 append 来源消息组，因此一个不可分割的消息组可能超过该目标。Fetch 历史响应仍打包剩余的 `assistant/chunk` 游程，并往返 `detail: 'conversation'` 的可选 `omittedSpans`；下载档见 [两档会话历史传输决策](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)。
 
 共享的一元载体默认通过 16 MiB 字节预算读取成功 JSON 响应；`AbstractApiClient` 与 `InProcessApiClient` 接受正数覆盖值，以便部署选择更小的上限。有界 reader 接受可选的 `AbortSignal`，调用方断开时会取消 response body。超限响应会在 envelope 解析前被拒绝。
+
+通用 RPC 流在调用方中止时显式取消 response reader，包括正在等待下一帧的读取。结束时移除 abort 监听，并等待正文取消完成后再释放 reader；清理同时失败时保留原始读取错误或取消原因。
 
 浏览器 connection 还会按需提供 Gateway 的账户偏好和项目 Provider 设置 transport。账户偏好请求使用同源、revision 校验和不含敏感值的响应，覆盖语言、外观与六项字体字段、忙碌 Enter、会话展示和链接打开偏好；项目模型请求覆盖项目 Provider 描述、加密凭据状态、端点发现和 mutation 应答，凭据值不会进入响应。不提供这些路由的 Host 会让 transport 保持缺失，调用方应显示明确的不可用状态，而不是回退到另一个账户的设置。
 
@@ -66,6 +68,8 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 每条浏览器下行连接使用带 head index 的队列，并限制为最多 1,024 个 frame 和 8 MiB 编码数据。消费者停滞时会关闭该 socket，让 connection generation 重新连接，而不是保留无界突发数据。
 
 `/api/events.mux` 与 `/api/events.host` 各接受一条 WebSocket upgrade，并只向浏览器发送对应的 `ServerRequest` 文本消息；客户端不会在这些 socket 上发送业务数据。任一 socket 结束都会使当前 connection generation 失败并重建两条流，连接就绪仍要求两条 socket 均已打开且 `host.describe` HTTP 调用成功。Host teardown 会终止两条 socket、中止各自的 source，并等待 source 清理完成后再返回。普通网络 GET 这些路径会返回 426，不保留 SSE（Server-Sent Events）回退；`toFetchHandler` 的 SSE 编解码只服务进程内同构载体。
+
+已认证的浏览器重连时，Mux 打开且 `host.describe` 确认仍是原 Runtime 和所属电脑后，可以提前向对话提供 Mux 帧。消费者只接收现有视图能应用的帧。Host 元数据与其他帧在连接完整就绪后按原顺序交付，连接代次结束时取消其恢复读取。
 
 `onFailure` 保留原始 `kind` 和 `error`，并为首次非预期终结附加可选 `diagnostic` 元数据：来源、固定原因分类、opening／connected 阶段、相对耗时，以及可取得的 WebSocket `closeCode`／`wasClean`。普通流 EOF 会报告不带 HTTP 状态的固定 transport error；正常 Client 取消不报告故障。重试 warning 只包含这份元数据，不包含 URL、query、关闭原因文本、错误文本、payload 或 Session ID。`clientGeneration` 仅统计当前 Controller 的连接尝试，不代表 Host 进程代次；关闭码本身不能定位 TLS、代理或服务端故障。首次故障归因的理由见[载体决策](../../../.agents/notes/implemented/architecture/2026-08-04-websocket-downlink-carrier.zh.md)。
 

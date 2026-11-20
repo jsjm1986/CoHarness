@@ -19,8 +19,8 @@ describe('createWaterfallRequest', () => {
   it('settles once: later resolutions, rejections and delegations are ignored', async () => {
     const onSettle = vi.fn()
     const request = createWaterfallRequest(1_000, undefined, onSettle)
-    request.channel.resolve(ANSWER)
-    request.channel.reject('ASK_CANCELLED')
+    await request.channel.resolve(ANSWER)
+    await request.channel.reject('ASK_CANCELLED')
     request.channel.delegate()
     await expect(request.result).resolves.toBe(ANSWER)
     expect(onSettle).toHaveBeenCalledOnce()
@@ -142,6 +142,41 @@ describe('PendingQuestion', () => {
     const card = new PendingQuestion(SID, QUESTIONS)
     expect(card.dismissal).toBe('cancel')
     await expect(card.dismiss()).rejects.toThrow(/no channel accepts a cancellation/)
+  })
+
+  it('keeps a timed-out card answerable when its timeout receipt fails', async () => {
+    const card = new PendingQuestion(SID, QUESTIONS, CALL)
+    const reply = Promise.withResolvers<undefined>()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const resolve = vi.fn()
+    card.attachWaterfall({ deadline: undefined, resolve, reject: () => reply.promise, delegate: () => {} })
+    try {
+      card.timeout()
+      expect(card.snapshot()).toMatchObject({ channel: 'waterfall', countdown: undefined })
+      reply.reject(new Error('Timeout transport unavailable'))
+      await vi.waitFor(() => { expect(warn).toHaveBeenCalledOnce() })
+      expect(card.snapshot()).toMatchObject({ channel: 'waterfall', countdown: undefined, closed: false })
+      await card.answer(ANSWER)
+      expect(resolve).toHaveBeenCalledWith(ANSWER)
+    } finally {
+      reply.resolve(undefined); card.close(); warn.mockRestore()
+    }
+  })
+
+  it('does not retire a replacement channel when an older timeout receipt arrives', async () => {
+    const card = new PendingQuestion(SID, QUESTIONS, CALL)
+    const reply = Promise.withResolvers<undefined>()
+    const replacement = { deadline: undefined, resolve: vi.fn(), reject: vi.fn(), delegate: vi.fn() }
+    card.attachWaterfall({ deadline: undefined, resolve: vi.fn(), reject: () => reply.promise, delegate: vi.fn() })
+    try {
+      card.timeout()
+      card.attachWaterfall(replacement)
+      reply.resolve(undefined)
+      await Promise.resolve()
+      await card.answer(ANSWER)
+      expect(replacement.resolve).toHaveBeenCalledWith(ANSWER)
+      expect(card.hasWaterfall()).toBe(true)
+    } finally { reply.resolve(undefined); card.close() }
   })
 
   it('turns a throwing settlement into the rejected submission', async () => {

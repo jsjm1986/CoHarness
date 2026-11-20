@@ -1,6 +1,6 @@
-/** Decorative occupant for the task-manager sidebar entry. */
+/** Task-manager sidebar glyph and compact shell title. */
 import { IconClockOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 
 /**
@@ -13,4 +13,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
  */
 export function TaskManagerIcon({ size }: PropsRuntime<'sidebar.panellist'>) {
   return <IconClockOutline16 size={size} />
+}
+
+/**
+ * Render the task page's title in the compact shell.
+ * @param props - framework runtime and task-manager locale.
+ * @returns the localized task-manager title.
+ */
+export function TaskManagerTitle({ t }: PropsRuntime<'shell.mobile.header.title'> & PropsLocale<'schedule.manager'>) {
+  return t('title')
 }

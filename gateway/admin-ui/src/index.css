@@ -158,7 +158,7 @@ body {
   min-width: 320px;
   background: var(--bg);
   color: var(--text);
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.5;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
@@ -166,7 +166,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   letter-spacing: 0;
 }
@@ -179,6 +180,8 @@ select {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
+.tableWrap:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -186,6 +189,11 @@ a:focus-visible {
 
 a {
   color: inherit;
+}
+
+/* WCAG 2.5.8 fine-pointer floor; the coarse media query raises this to 44px. */
+summary {
+  min-height: 24px;
 }
 
 .adminShell {
@@ -250,7 +258,7 @@ a {
 
 .brandCopy strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 650;
   letter-spacing: .045em;
   white-space: nowrap;
@@ -260,7 +268,7 @@ a {
 .brandCopy span {
   margin-top: 2px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   text-transform: uppercase;
 }
 
@@ -291,9 +299,11 @@ a {
   transition: background 120ms ease, color 120ms ease;
 }
 
-.sidebarNav a:hover {
-  background: var(--surface-strong);
-  color: var(--text);
+@media (hover: hover) {
+  .sidebarNav a:hover {
+    background: var(--surface-strong);
+    color: var(--text);
+  }
 }
 
 .sidebarNav a.active {
@@ -317,7 +327,7 @@ a {
   gap: 8px;
   padding: 12px;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .logoutForm {
@@ -330,9 +340,11 @@ a {
   color: var(--text-secondary);
 }
 
-.logoutButton:hover:not(:disabled) {
-  background: var(--danger-soft);
-  color: var(--danger);
+@media (hover: hover) {
+  .logoutButton:hover:not(:disabled) {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
 }
 
 .logoutButtonCompact {
@@ -396,7 +408,7 @@ a {
 }
 
 .modelGovernanceIdentity strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 650;
 }
 
@@ -406,6 +418,7 @@ a {
 
 .pageHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
@@ -413,6 +426,7 @@ a {
 }
 
 .pageHeading {
+  flex: 1 1 20rem;
   min-width: 0;
 }
 
@@ -428,7 +442,9 @@ a {
 
 .pageHeader h1 {
   margin: 0;
-  font-size: 24px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 1.5rem;
   font-weight: 650;
   line-height: 1.35;
 }
@@ -437,14 +453,14 @@ a {
   margin: 5px 0 0;
   max-width: 920px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 
 .pageMeta,
 .sectionMeta {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
   white-space: normal;
 }
 
@@ -463,6 +479,8 @@ a {
 
 .pageActions {
   flex: none;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .section {
@@ -486,7 +504,7 @@ a {
 
 .sectionHeader h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 650;
 }
 
@@ -558,8 +576,10 @@ a {
   color: var(--surface);
 }
 
-.button-primary:hover:not(:disabled) {
-  background: var(--text-secondary);
+@media (hover: hover) {
+  .button-primary:hover:not(:disabled) {
+    background: var(--text-secondary);
+  }
 }
 
 .button-secondary {
@@ -567,12 +587,16 @@ a {
   background: var(--surface);
 }
 
-.button-secondary:hover:not(:disabled) {
-  background: var(--surface-subtle);
+@media (hover: hover) {
+  .button-secondary:hover:not(:disabled) {
+    background: var(--surface-subtle);
+  }
 }
 
-.button-ghost:hover:not(:disabled) {
-  background: var(--surface-strong);
+@media (hover: hover) {
+  .button-ghost:hover:not(:disabled) {
+    background: var(--surface-strong);
+  }
 }
 
 .button-danger {
@@ -580,8 +604,10 @@ a {
   color: var(--danger-foreground);
 }
 
-.button-danger:hover:not(:disabled) {
-  background: var(--danger-hover);
+@media (hover: hover) {
+  .button-danger:hover:not(:disabled) {
+    background: var(--danger-hover);
+  }
 }
 
 .iconButton {
@@ -598,9 +624,11 @@ a {
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
-.iconButton-ghost:hover:not(:disabled) {
-  background: var(--surface-strong);
-  color: var(--text);
+@media (hover: hover) {
+  .iconButton-ghost:hover:not(:disabled) {
+    background: var(--surface-strong);
+    color: var(--text);
+  }
 }
 
 .iconButton-secondary {
@@ -608,17 +636,21 @@ a {
   background: var(--surface);
 }
 
-.iconButton-secondary:hover:not(:disabled) {
-  border-color: var(--border-strong);
-  background: var(--surface-subtle);
+@media (hover: hover) {
+  .iconButton-secondary:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background: var(--surface-subtle);
+  }
 }
 
 .iconButton-danger {
   color: var(--danger);
 }
 
-.iconButton-danger:hover:not(:disabled) {
-  background: var(--danger-soft);
+@media (hover: hover) {
+  .iconButton-danger:hover:not(:disabled) {
+    background: var(--danger-soft);
+  }
 }
 
 .spin {
@@ -639,7 +671,7 @@ a {
   border-radius: 12px;
   background: var(--surface-strong);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 550;
   white-space: nowrap;
 }
@@ -734,14 +766,14 @@ a {
 
 .emptyState strong {
   color: var(--text);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .emptyState p {
   max-width: 420px;
   margin: 5px 0 16px;
   color: var(--text-tertiary);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .field {
@@ -753,13 +785,13 @@ a {
 
 .fieldLabel {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .fieldHint {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .input,
@@ -776,9 +808,11 @@ a {
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
-.input:hover,
-.select:hover {
-  border-color: var(--text-tertiary);
+@media (hover: hover) {
+  .input:hover,
+  .select:hover {
+    border-color: var(--text-tertiary);
+  }
 }
 
 .input:focus,
@@ -803,6 +837,19 @@ a {
   min-height: 34px;
   padding-top: 4px;
   padding-bottom: 4px;
+}
+
+/* WebKit menulist selects ignore min-height; an explicit height sizes them.
+   Scoped away from coarse pointers so the 44px touch target below still wins. */
+@media not (pointer: coarse) {
+  select.input,
+  select.select {
+    height: 38px;
+  }
+
+  select.selectCompact {
+    height: 34px;
+  }
 }
 
 .formGrid {
@@ -845,13 +892,27 @@ a {
   margin: 0;
 }
 
+.nodeConfigurationHelp {
+  overflow-wrap: anywhere;
+}
+
+.nodeConfigurationActions {
+  flex-wrap: wrap;
+}
+
 .formSpanFull {
   grid-column: 1 / -1;
 }
 
 .tunnelAccess {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
+}
+
+.tunnelAccess > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .tunnelChoices {
@@ -862,6 +923,7 @@ a {
 
 .tunnelChoice {
   display: grid;
+  min-width: 0;
   gap: 10px;
   align-content: start;
   padding: 14px;
@@ -874,7 +936,7 @@ a {
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .tunnelChoice h3 svg {
@@ -899,6 +961,7 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -924,6 +987,47 @@ a {
   margin-top: 20px;
 }
 
+.peerBackupSection .formActions {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.peerBackupSection .button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  padding-block: 8px;
+}
+
+.peerBackupReviewItems {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.peerBackupReviewItems code {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.peerBackupReviewItems summary {
+  min-height: 44px;
+  padding-block: 12px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 560px) {
+  .peerBackupSection .button {
+    min-height: 44px;
+  }
+
+  .peerBackupSection .formActions .button {
+    flex: 1 1 auto;
+  }
+}
+
 .formDivider {
   height: 1px;
   margin: 20px 0;
@@ -942,12 +1046,21 @@ a {
 }
 
 .switchControl {
+  position: relative;
   display: inline-flex;
+  min-width: 0;
+  min-height: 24px;
+  max-width: 100%;
   align-items: center;
   gap: 9px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
+}
+
+.switchControl > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .switchControl input {
@@ -961,6 +1074,7 @@ a {
 .switchTrack {
   position: relative;
   display: inline-flex;
+  flex: none;
   width: 34px;
   height: 20px;
   padding: 2px;
@@ -997,11 +1111,19 @@ a {
 }
 
 .dialog {
+  --dialog-viewport: min(100dvh, var(--dialog-viewport-height, 100dvh));
+  --dialog-gutter: clamp(0px, (var(--dialog-viewport) - 128px) / 2, 16px);
+  --dialog-max-height: min(760px, calc(var(--dialog-viewport) - 2 * var(--dialog-gutter)));
+  position: fixed;
+  top: calc(var(--dialog-viewport-top, 0px) + var(--dialog-viewport) / 2);
+  bottom: auto;
   width: min(560px, calc(100% - 32px));
-  max-height: min(760px, calc(100dvh - 32px));
-  margin: auto;
+  max-height: var(--dialog-max-height);
+  margin: 0 auto;
+  transform: translateY(-50%);
   padding: 0;
   overflow: visible;
+  overscroll-behavior: contain;
   border: none;
   border-radius: var(--radius-lg);
   background: transparent;
@@ -1013,16 +1135,19 @@ a {
 }
 
 .dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
   background: rgba(15, 17, 21, 0.42);
   backdrop-filter: blur(2px);
 }
 
 .dialogSurface {
   display: flex;
-  max-height: min(760px, calc(100dvh - 32px));
+  max-height: var(--dialog-max-height);
   min-height: 0;
   flex-direction: column;
-  overflow: hidden;
+  overflow: clip;
+  overscroll-behavior: contain;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -1041,20 +1166,37 @@ a {
 
 .dialogHeader h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 650;
+}
+
+.dialogHeader > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dialogHeader > .iconButton {
+  flex: none;
 }
 
 .dialogHeader p {
   margin: 5px 0 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .dialogBody {
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
+}
+
+/* Bare Field siblings inside a dialog body need the same separation a
+   formGrid row gap gives them; without it a label's top edge abuts the
+   previous control's bottom edge. */
+.dialogBody > .field + .field {
+  margin-top: 16px;
 }
 
 .dialogFooter {
@@ -1067,6 +1209,31 @@ a {
 
 .dialogFooterDanger {
   background: var(--danger-soft);
+}
+
+.dialog[data-compact-viewport] .dialogHeader,
+.dialog[data-compact-viewport] .dialogFooter {
+  padding-block: 8px;
+}
+
+.dialog[data-short-viewport] .dialogSurface {
+  overflow-y: auto;
+}
+
+.dialog[data-short-viewport] .dialogBody {
+  flex: none;
+  overflow: visible;
+}
+
+@media (height < 192px) {
+  .dialogSurface {
+    overflow-y: auto;
+  }
+
+  .dialogBody {
+    flex: none;
+    overflow: visible;
+  }
 }
 
 .projectCreateForm {
@@ -1121,7 +1288,7 @@ a {
   min-width: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1130,7 +1297,7 @@ a {
 .managedDirectorySummary small,
 .selectedDirectory small {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .directoryBrowser {
@@ -1181,14 +1348,14 @@ a {
 }
 
 .directoryBrowserIdentity strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 650;
 }
 
 .directoryBrowserIdentity small,
 .directoryEntry small {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .directoryCurrentPath {
@@ -1197,7 +1364,7 @@ a {
   overflow: hidden;
   color: var(--text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
+  font-size: 0.6875rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1210,7 +1377,13 @@ a {
   padding: 5px 10px;
   overflow-x: auto;
   border-bottom: 1px solid var(--border);
-  scrollbar-width: thin;
+  /* The horizontal scrollbar would cover the last row of the crumb buttons;
+     scroll stays available by swipe and wheel while the bar stays hidden. */
+  scrollbar-width: none;
+}
+
+.directoryBreadcrumbs::-webkit-scrollbar {
+  display: none;
 }
 
 .directoryCrumb {
@@ -1235,14 +1408,16 @@ a {
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.directoryCrumb button:hover:not(:disabled) {
-  background: var(--surface-subtle);
-  color: var(--text);
+@media (hover: hover) {
+  .directoryCrumb button:hover:not(:disabled) {
+    background: var(--surface-subtle);
+    color: var(--text);
+  }
 }
 
 .directoryCrumb button[aria-current="location"] {
@@ -1306,8 +1481,10 @@ a {
   text-align: left;
 }
 
-.directoryEntry:hover:not(:disabled) {
-  background: var(--surface-subtle);
+@media (hover: hover) {
+  .directoryEntry:hover:not(:disabled) {
+    background: var(--surface-subtle);
+  }
 }
 
 .directoryEntry > svg:first-child {
@@ -1337,7 +1514,7 @@ a {
 }
 
 .directoryEntry strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 550;
 }
 
@@ -1362,19 +1539,22 @@ a {
 
 .directoryBrowserOptions > span {
   color: var(--warning-ink);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .tableWrap {
   width: 100%;
   overflow-x: auto;
+  /* Classic horizontal scrollbars (WebKit) paint over the scrollport's bottom
+     band; keep the last row's controls above the ~15px band. */
+  padding-bottom: 16px;
 }
 
 .dataTable {
   width: 100%;
   border-collapse: collapse;
   table-layout: auto;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .dataTable th,
@@ -1388,7 +1568,7 @@ a {
 .dataTable th {
   background: var(--surface-subtle);
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 650;
   letter-spacing: 0.025em;
   white-space: nowrap;
@@ -1398,12 +1578,29 @@ a {
   transition: background 100ms ease;
 }
 
-.dataTable tbody tr:hover {
-  background: color-mix(in srgb, var(--surface-subtle) 64%, transparent);
+@media (hover: hover) {
+  .dataTable tbody tr:hover {
+    background: color-mix(in srgb, var(--surface-subtle) 64%, transparent);
+  }
 }
 
 .dataTable tbody tr:last-child td {
   border-bottom: none;
+}
+
+.dataTable .tableTextCell {
+  min-width: 24ch;
+  max-width: 28ch;
+  overflow-wrap: anywhere;
+}
+
+.dataTable .tableActionCell {
+  white-space: nowrap;
+}
+
+.tableTextCell .identityText strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .userIdentity,
@@ -1425,13 +1622,14 @@ a {
   border-radius: var(--radius-lg);
   background: var(--accent-soft);
   color: var(--accent-ink);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .identityText,
-.modelIdentityText {
+.modelIdentityText,
+.projectIdentity > span:last-child {
   min-width: 0;
 }
 
@@ -1451,7 +1649,7 @@ a {
 .projectIdentity span,
 .muted {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .instanceBlock,
@@ -1466,12 +1664,18 @@ a {
 .pathText {
   font-family: "SF Mono", "JetBrains Mono", Consolas, "Liberation Mono", Menlo, Courier,
     "PingFang SC", "Microsoft YaHei";
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .pathText {
   overflow-wrap: anywhere;
   color: var(--text-secondary);
+}
+
+.dataTable .pathText {
+  display: block;
+  min-width: 12rem;
+  max-width: 24rem;
 }
 
 .rowActions {
@@ -1515,7 +1719,7 @@ a {
 .modelUserPicker {
   gap: 8px;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .registrationFilterPanel {
@@ -1548,7 +1752,7 @@ a {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .registrationSummary span {
@@ -1559,7 +1763,7 @@ a {
   align-items: flex-start;
   flex-direction: column;
   gap: 3px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   white-space: nowrap;
 }
 
@@ -1601,9 +1805,11 @@ a {
   text-decoration: none;
 }
 
-.iconLink:hover {
-  background: var(--surface-strong);
-  color: var(--text);
+@media (hover: hover) {
+  .iconLink:hover {
+    background: var(--surface-strong);
+    color: var(--text);
+  }
 }
 
 .iconLink svg,
@@ -1656,7 +1862,7 @@ a {
   max-width: 360px;
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1703,14 +1909,14 @@ a {
 
 .emptyDraftState strong {
   color: var(--text);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .emptyDraftState p {
   max-width: 440px;
   margin: 6px 0 0;
   color: var(--text-tertiary);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .emptyDraftTable th:first-child,
@@ -1753,14 +1959,28 @@ a {
 
 .mobileItemHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   min-width: 0;
   gap: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mobileItemHeader > * {
+  min-width: 0;
+}
+
+.mobileItem .identityText strong,
+.mobileItem .projectIdentity strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .mobileItemBody {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-wrap: anywhere;
   gap: 12px;
   margin-top: 14px;
   padding-top: 14px;
@@ -1779,7 +1999,7 @@ a {
   display: grid;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .definitionRow {
@@ -1789,7 +2009,7 @@ a {
 .definitionRow dt {
   margin: 0 0 4px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 
@@ -1807,6 +2027,7 @@ a {
 .tableLink {
   display: block;
   width: 100%;
+  min-height: 24px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1814,8 +2035,10 @@ a {
   text-align: left;
 }
 
-.tableLink:hover strong {
-  color: var(--accent-ink);
+@media (hover: hover) {
+  .tableLink:hover strong {
+    color: var(--accent-ink);
+  }
 }
 
 .pageActionGroup,
@@ -1832,7 +2055,7 @@ a {
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .checkLabel {
@@ -1840,10 +2063,16 @@ a {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  min-height: 24px;
 }
 
 .checkLabel input {
   accent-color: var(--accent);
+}
+
+.checkboxTarget {
+  justify-content: center;
+  min-width: 24px;
 }
 
 .archiveOwner {
@@ -1854,11 +2083,14 @@ a {
 .archiveOwner small,
 .archiveMobileOpen span {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .archiveMobileOpen {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  overflow-wrap: anywhere;
   width: 100%;
   gap: 4px;
   margin-top: 12px;
@@ -1870,8 +2102,10 @@ a {
   text-align: left;
 }
 
-.archiveMobileOpen:hover .codeText {
-  color: var(--accent-ink);
+@media (hover: hover) {
+  .archiveMobileOpen:hover .codeText {
+    color: var(--accent-ink);
+  }
 }
 
 .archiveDetail {
@@ -1900,14 +2134,14 @@ a {
 .archiveConversationHeader h3 {
   margin: 0;
   color: var(--text);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 650;
 }
 
 .archiveConversationHeader p {
   margin: 3px 0 0;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .archiveConversationStats {
@@ -1916,7 +2150,7 @@ a {
   align-items: center;
   gap: 6px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   white-space: nowrap;
 }
 
@@ -1960,7 +2194,7 @@ a {
   min-width: 0;
   gap: 8px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .archiveChatMessageMeta time,
@@ -2002,7 +2236,7 @@ a {
   display: block;
   margin-top: 7px;
   color: var(--warning-ink);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .archiveEventRole {
@@ -2011,9 +2245,9 @@ a {
   min-height: 20px;
   padding: 0 7px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 650;
-  line-height: 20px;
+  line-height: 1.25rem;
   white-space: nowrap;
 }
 
@@ -2047,7 +2281,7 @@ a {
   min-width: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 12px;
+  font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2070,7 +2304,7 @@ a {
   gap: 10px;
   padding: 7px 10px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   cursor: pointer;
   list-style-position: inside;
 }
@@ -2105,7 +2339,7 @@ a {
 .archiveToolResult > span,
 .archiveToolResult > small {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .archiveToolResult-error {
@@ -2121,7 +2355,7 @@ a {
 .archiveConversationHint {
   margin: 0;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .archiveSystemCard {
@@ -2141,13 +2375,13 @@ a {
 
 .archiveSystemCard strong {
   color: var(--text);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .archiveSystemCard > div > span {
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .archiveSystemCard-warning {
@@ -2175,16 +2409,16 @@ a {
 }
 
 .archiveRawDetails > summary {
-  min-height: 42px;
+  min-height: 44px;
   padding: 9px 12px;
   color: var(--text);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .archiveRawCount {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 400;
 }
 
@@ -2231,7 +2465,7 @@ a {
 .archiveDescendants h3 {
   margin: 0;
   color: var(--text);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .archiveDescendants ul {
@@ -2255,7 +2489,7 @@ a {
 
 .archiveDescendants li span {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .archiveDescendants li strong,
@@ -2268,7 +2502,7 @@ a {
 
 .archiveDescendants li code {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .documentIdentity {
@@ -2276,7 +2510,8 @@ a {
   grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
   gap: 2px 8px;
-  min-width: 0;
+  min-width: 14rem;
+  max-width: 24rem;
 }
 
 .documentIdentity svg {
@@ -2294,7 +2529,7 @@ a {
 .documentIdentity small {
   color: var(--text-tertiary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .inputWithIcon {
@@ -2341,7 +2576,7 @@ a {
   align-items: center;
   gap: 7px;
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .documentDetail h3 svg {
@@ -2414,12 +2649,14 @@ a {
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
-.segmented button:hover:not(:disabled) {
-  color: var(--text);
+@media (hover: hover) {
+  .segmented button:hover:not(:disabled) {
+    color: var(--text);
+  }
 }
 
 .segmented button[aria-pressed="true"] {
@@ -2449,14 +2686,18 @@ a {
 .breadcrumb {
   display: inline-flex;
   align-items: center;
+  min-inline-size: 24px;
+  min-block-size: 24px;
   gap: 6px;
   margin-bottom: 12px;
   color: var(--text-secondary);
   text-decoration: none;
 }
 
-.breadcrumb:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .breadcrumb:hover {
+    color: var(--text);
+  }
 }
 
 .breadcrumb svg {
@@ -2471,6 +2712,12 @@ a {
   color: var(--text);
   font-weight: 650;
   text-decoration: none;
+  max-width: 28rem;
+  overflow-wrap: anywhere;
+}
+
+.dataTable .projectLink {
+  min-width: 12rem;
 }
 
 .projectOriginCell {
@@ -2481,7 +2728,7 @@ a {
 
 .projectOriginCell > span:last-child {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .projectMetadata {
@@ -2491,12 +2738,12 @@ a {
   gap: 8px 16px;
   margin: 10px 0 20px;
   color: var(--text-tertiary);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .projectConfigurationSummary {
   display: grid;
-  grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 16px;
   padding: 16px;
   background: var(--surface-subtle);
@@ -2509,22 +2756,27 @@ a {
   display: grid;
   align-content: start;
   gap: 5px;
+  overflow-wrap: anywhere;
+}
+
+.projectConfigurationSummary .formActions {
+  flex-wrap: wrap;
 }
 
 .projectConfigurationSummary strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .projectConfigurationSummary p {
   margin: 0;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
 .definitionLabel {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -2540,8 +2792,10 @@ a {
   overflow-wrap: anywhere;
 }
 
-.projectLink:hover {
-  color: var(--accent-ink);
+@media (hover: hover) {
+  .projectLink:hover {
+    color: var(--accent-ink);
+  }
 }
 
 .projectLink svg {
@@ -2556,6 +2810,8 @@ a {
 .projectUsageToolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: 8px;
 }
 
@@ -2593,7 +2849,7 @@ a {
 .projectUsagePanel h3,
 .projectUsagePanelHeading h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 650;
 }
 
@@ -2607,7 +2863,7 @@ a {
 
 .projectUsagePanelHeading span {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .projectUsageDefinitions {
@@ -2621,7 +2877,7 @@ a {
 .quotaEffectiveNote {
   margin: 12px 0 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -2655,7 +2911,7 @@ a {
   border-radius: 999px;
   background: var(--surface-subtle);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2670,7 +2926,7 @@ a {
 .projectQuotaSource legend {
   margin-bottom: 8px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -2693,8 +2949,10 @@ a {
   transition: border-color 120ms ease, background 120ms ease;
 }
 
-.quotaSourceOption:hover {
-  border-color: var(--text-tertiary);
+@media (hover: hover) {
+  .quotaSourceOption:hover {
+    border-color: var(--text-tertiary);
+  }
 }
 
 .quotaSourceOption[data-selected="true"] {
@@ -2718,14 +2976,14 @@ a {
 }
 
 .quotaSourceOption strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 650;
 }
 
 .quotaSourceOption small {
   margin-top: 3px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .projectQuotaEditors,
@@ -2738,7 +2996,7 @@ a {
   border-bottom: 1px solid var(--border);
   background: var(--warning-soft);
   color: var(--warning-ink);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .priceGrid {
@@ -2753,7 +3011,7 @@ a {
   gap: 4px 10px;
   min-width: 220px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .priceSummary > span {
@@ -2814,7 +3072,7 @@ a {
 .sectionHint {
   margin: 0 16px 14px;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .metric {
@@ -2832,7 +3090,7 @@ a {
 .metric span {
   display: block;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 
@@ -2840,7 +3098,7 @@ a {
   display: block;
   margin-top: 5px;
   overflow: hidden;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
@@ -2856,12 +3114,13 @@ a {
   align-items: center;
   gap: 8px;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
   white-space: nowrap;
 }
 
 .monthPicker .input {
-  width: 148px;
+  width: 200px;
+  max-width: 100%;
   min-height: 36px;
 }
 
@@ -2877,7 +3136,7 @@ a {
   align-items: center;
   gap: 8px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .quotaTrack {
@@ -2923,7 +3182,7 @@ a {
 
 .quotaEditor legend {
   padding: 0 5px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 650;
 }
 
@@ -2933,7 +3192,7 @@ a {
   border-radius: var(--radius-md);
   background: var(--surface-subtle);
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .filterGrid {
@@ -2962,8 +3221,27 @@ a {
   gap: 8px;
 }
 
+.auditFilterPanel {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.auditFilterPanel .filterGrid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+
+.auditFilterPanel .filterActions {
+  justify-content: flex-end;
+}
+
 .auditAction {
+  display: block;
   min-width: 170px;
+}
+
+.auditTable .definitionGrid {
+  min-width: 16rem;
+  max-width: 24rem;
 }
 
 .auditAction strong {
@@ -2981,7 +3259,7 @@ a {
 
 .auditTime {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   white-space: nowrap;
 }
 
@@ -2990,7 +3268,7 @@ a {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .dangerZone {
@@ -3013,14 +3291,16 @@ a {
 .dangerZone p {
   margin: 3px 0 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1360px) {
   .registrationFilters {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
 
+@media (max-width: 1200px) {
   .filterPanel {
     align-items: stretch;
     flex-direction: column;
@@ -3049,7 +3329,25 @@ a {
   }
 }
 
+@media (min-width: 841px) and (max-height: 420px) {
+  .sidebar {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .sidebarNav {
+    flex: none;
+    overflow: visible;
+  }
+}
+
 @media (max-width: 840px) {
+  html {
+    /* Scroll-into-view landings (caret, focus, DOM APIs) must clear the fixed
+       mobile navigation instead of parking content underneath it. */
+    scroll-padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 8px);
+  }
+
   .adminShell {
     display: block;
     padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
@@ -3108,8 +3406,8 @@ a {
     gap: 3px;
     border-radius: var(--radius-lg);
     color: var(--text-tertiary);
-    font-size: 11px;
-    line-height: 16px;
+    font-size: 0.6875rem;
+    line-height: 1rem;
     font-weight: 600;
     text-decoration: none;
     border: 0;
@@ -3150,7 +3448,7 @@ a {
   }
 
   .pageHeader h1 {
-    font-size: 22px;
+    font-size: 1.375rem;
   }
 
   .pageHeader p {
@@ -3276,6 +3574,11 @@ a {
 
   .pageHeader {
     align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .pageHeading {
+    flex: 1 1 14rem;
   }
 
   .pageHeader:has(.modelPageToolbar),
@@ -3303,7 +3606,7 @@ a {
   }
 
   .pageActions {
-    max-width: 58%;
+    max-width: 100%;
   }
 
   .pageHeader:has(.modelPageToolbar) .pageActions {
@@ -3317,6 +3620,14 @@ a {
 
   .projectDetailPage .pageActions {
     max-width: none;
+  }
+
+  .projectDetailPage .pageHeader {
+    gap: 12px;
+  }
+
+  .projectDetailPage .pageHeading {
+    flex-basis: 100%;
   }
 
   .projectConfigurationSummary {
@@ -3340,16 +3651,8 @@ a {
   }
 
   .pageToolbar {
-    align-items: flex-end;
-    flex-direction: column;
-  }
-
-  .pageToolbar .monthPicker > span {
-    display: none;
-  }
-
-  .pageToolbar .monthPicker .input {
-    width: 132px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .projectUsageSection .sectionHeader {
@@ -3368,7 +3671,8 @@ a {
   }
 
   .projectUsageToolbar .monthPicker {
-    flex: 1;
+    flex: 1 1 180px;
+    min-width: 0;
   }
 
   .projectUsageToolbar .monthPicker .input {
@@ -3465,12 +3769,9 @@ a {
   }
 
   .dialog {
+    --dialog-gutter: clamp(0px, (var(--dialog-viewport) - 128px) / 2, 8px);
+    --dialog-max-height: calc(var(--dialog-viewport) - 2 * var(--dialog-gutter));
     width: calc(100% - 16px);
-    max-height: calc(100dvh - 16px);
-  }
-
-  .dialogSurface {
-    max-height: calc(100dvh - 16px);
   }
 
   .dialogHeader,
@@ -3548,13 +3849,23 @@ a {
 @media (pointer: coarse) {
   .button,
   .input,
+  .monthPicker .input,
   .select,
+  .selectCompact,
   .iconButton,
-  .iconLink {
+  .iconLink,
+  .sidebarNav a,
+  .directoryCrumb button,
+  .switchControl {
     min-height: 44px;
   }
 
-  .iconButton {
+  .directoryCrumb button {
+    min-width: 44px;
+  }
+
+  .iconButton,
+  .compactActions .iconButton {
     width: 44px;
     height: 44px;
   }
@@ -3564,19 +3875,42 @@ a {
     height: 44px;
   }
 
-  .compactActions .iconButton {
-    width: 40px;
-    height: 40px;
-    min-height: 40px;
+  .input,
+  .select,
+  .selectCompact {
+    font-size: 1rem;
   }
 
-  .input,
-  .select {
-    font-size: 16px;
+  select.input,
+  .select,
+  .selectCompact {
+    height: 44px;
   }
 
   .segmented button {
-    min-height: 38px;
+    min-height: 44px;
+  }
+
+  .button,
+  .switchControl,
+  .checkLabel,
+  .tableLink,
+  .archiveMobileOpen,
+  .userLink,
+  .breadcrumb,
+  .tunnelUrl a,
+  .linkButton,
+  summary {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* These summaries carry their own compact min-height that outranks the
+     plain `summary` selector above, so repeat the touch target explicitly. */
+  .archiveInlineDetails summary,
+  .archiveRawDetails > summary,
+  .archiveRawEvent > summary {
+    min-height: 44px;
   }
 }
 
@@ -3595,6 +3929,14 @@ a {
   max-width: 22rem;
   overflow-wrap: anywhere;
   white-space: normal;
+}
+
+.dataTable .runtimeComputer {
+  max-width: 24ch;
+}
+
+.runtimeComputer button {
+  max-width: 24ch;
 }
 
 .computerPermissions .qualificationHead {
@@ -3619,12 +3961,31 @@ a {
   margin-top: var(--dsw-space-3);
 }
 
+.runtimePolicyActions {
+  flex-wrap: wrap;
+}
+
 .runtimePolicyActions > .muted {
+  flex: 1 0 auto;
   margin-inline-end: auto;
 }
 
 .runtimeMobileList {
   padding-inline: 0;
+}
+
+.runtimeActions {
+  flex-wrap: wrap;
+}
+
+.runtimeActions .button,
+.runtimePolicyActions .button {
+  flex-shrink: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  padding-block: 8px;
 }
 
 .runtimeAssignmentId {
@@ -3760,15 +4121,26 @@ a {
 .backLink {
   display: inline-flex;
   align-items: center;
+  min-inline-size: 24px;
+  min-block-size: 24px;
   gap: 6px;
   margin-bottom: 4px;
   color: var(--text-tertiary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-decoration: none;
 }
 
-.backLink:hover {
-  color: var(--accent-ink);
+@media (pointer: coarse) {
+  .backLink {
+    min-inline-size: var(--dsw-touch-target);
+    min-block-size: var(--dsw-touch-target);
+  }
+}
+
+@media (hover: hover) {
+  .backLink:hover {
+    color: var(--accent-ink);
+  }
 }
 
 .backLink svg {
@@ -3782,14 +4154,34 @@ a {
   text-decoration: none;
 }
 
-.userLink:hover .identityText strong {
-  color: var(--accent-ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+.userLink {
+  display: block;
+  min-width: min(18ch, 100%);
+  max-width: 32ch;
 }
 
-.projectLink:hover {
-  color: var(--accent-ink);
+.userLink .identityText strong,
+.userLink .identityText span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dataTable .userLink {
+  min-width: 24ch;
+}
+
+@media (hover: hover) {
+  .userLink:hover .identityText strong {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+@media (hover: hover) {
+  .projectLink:hover {
+    color: var(--accent-ink);
+  }
 }
 
 .pageBadges {
@@ -3870,7 +4262,7 @@ a {
 .matrixGroup td {
   padding-top: 14px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 650;
   letter-spacing: 0.03em;
 }
@@ -3882,11 +4274,11 @@ a {
 }
 
 .matrixName .muted {
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .matrixModule {
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .matrixAdvanced {
@@ -3896,17 +4288,24 @@ a {
 .matrixAdvanced summary {
   cursor: pointer;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .inlineFields {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: 8px;
   margin-top: 10px;
 }
 
+.inlineFields > .field {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
 .inlineFields .input {
-  max-width: 220px;
+  max-width: 100%;
 }
 
 .buttonRow {
@@ -3962,12 +4361,144 @@ a {
 }
 
 .draftBarText {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .draftBarActions {
   display: inline-flex;
   gap: 8px;
+}
+
+/* Cross-space plugin inventory cards. */
+.spaceFilter {
+  max-width: 320px;
+  margin-bottom: 12px;
+}
+
+.spaceList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spaceCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.spaceCard > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+.spaceCard > summary::-webkit-details-marker {
+  display: none;
+}
+
+.spaceCard > summary::before {
+  content: '▸';
+  color: var(--text-tertiary);
+  font-size: 0.6875rem;
+  flex: none;
+}
+
+.spaceCard[open] > summary::before {
+  content: '▾';
+}
+
+.spaceCardTitle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.spaceCardSummary {
+  flex: 1;
+  min-width: 140px;
+}
+
+.spaceCardTime {
+  font-size: 0.75rem;
+}
+
+.spaceCardBody {
+  border-top: 1px solid var(--border);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.spaceBundle {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 10px 12px;
+  background: var(--surface-subtle);
+}
+
+.spaceBundleHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.spaceBundleSub {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.spaceBundleRows {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.spaceBundleRows > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+
+.spaceRowTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.spaceRowDim {
+  opacity: 0.6;
+}
+
+.spaceEntries > summary {
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.spaceEntries > ul {
+  margin-top: 8px;
+  padding-left: 4px;
 }
 
 .pluginAdvanced {
@@ -3979,7 +4510,7 @@ a {
 .pluginAdvanced > summary {
   cursor: pointer;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 650;
   letter-spacing: 0.03em;
   padding: 4px 0;
@@ -4013,7 +4544,7 @@ a {
 
 .configFieldLabel {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .configFieldLabel .muted {
@@ -4042,12 +4573,12 @@ a {
 
 .configFieldMeta {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .configFieldInvalid {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--danger);
 }
 
@@ -4056,15 +4587,34 @@ a {
   background: none;
   padding: 0;
   color: var(--accent-ink);
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 
-.linkButton:hover:not(:disabled) {
-  color: var(--accent-hover);
+@media (hover: hover) {
+  .linkButton:hover:not(:disabled) {
+    color: var(--accent-hover);
+  }
 }
 
 .linkButton:disabled {
   color: var(--text-tertiary);
   cursor: default;
+}
+
+/* Recovery has no ordinary Admin navigation or deployment bootstrap. */
+.governanceRecoveryPage { width: min(100%, 1100px); margin: 0 auto; padding: var(--dsw-space-6); }
+.governanceRecoveryPage .detailBlock,
+.governanceRecoveryPage .statusRow,
+.governanceRecoveryPage pre,
+.governanceRecoveryPage code { min-width: 0; overflow-wrap: anywhere; }
+.governanceRecoveryPage pre { white-space: pre-wrap; }
+.governanceRecoveryPage .statusRow { flex-wrap: wrap; }
+.governanceRecoveryDomains { display: grid; gap: var(--dsw-space-3); }
+.governanceRecoveryPage .button { white-space: normal; height: auto; min-height: var(--dsw-touch-target); padding-block: 8px; }
+.governanceRecoveryPage summary { min-height: 44px; padding-block: 10px; }
+@media (max-width: 640px) {
+  .governanceRecoveryPage { padding: var(--dsw-space-3); }
+  .governanceRecoveryPage .checkLabel { min-height: 44px; }
+  .governanceRecoveryPage .formActions { flex-wrap: wrap; }
 }

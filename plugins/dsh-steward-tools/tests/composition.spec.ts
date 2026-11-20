@@ -1,5 +1,6 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
@@ -25,7 +26,7 @@ describe('dsh-steward-tools composition', () => {
     })
     const batch = await ctx.tools.execute({
       calls: [{
-        type: 'tool-call', id: 'dry-run-plan', name: 'steward_query',
+        type: 'tool-call', id: ToolCallId('dry-run-plan'), name: 'steward_query',
         arguments: JSON.stringify({ sql: 'UPDATE projects SET active = false', dry_run: true, row_limit: 1 }),
       }],
       signal: new AbortController().signal,

@@ -45,6 +45,7 @@ import type { DocumentStoreCompletion } from '@deepseek-ai/dsh-userdoc-gateway/s
 import type { DocumentStoreRequest } from '@deepseek-ai/dsh-userdoc-gateway/protocol'
 import { DOCUMENT_PERMISSION_DENIED_CODE, DOCUMENT_STORE_UNAVAILABLE_CODE, DOCUMENT_TARGET_CONFLICT_CODE, UserDocError, userDocErrorStatus } from '@deepseek-ai/dsh-userdoc'
 import { DocumentCatalogError, type DocumentCatalogSubject, type DocumentCatalogActor } from './document-catalog.ts'
+import { DocumentProjectionDelivery } from './document-projection-delivery.ts'
 import type { GatewayComputerAccess } from './computer-access.ts'
 import type { RuntimeNodeId } from './runtime-catalog.ts'
 import type { createDocumentCatalogHandlers, RuntimeDocumentCatalogSyncHandler } from './document-catalog.ts'
@@ -149,11 +150,12 @@ async function withDocumentWriter<T>(
   return result
 }
 
-/** One scope's engine plus the stable host object catalog queues key on. */
+/** One scope's engine and delivery queues, retained together until accepted work settles. */
 interface LocalDocumentEntry {
   readonly engine: LocalUserDocFs
   readonly http: UserDocHttpScope
   readonly authority: AsyncLocalStorage<LocalDocumentAuthority>
+  readonly projection: DocumentProjectionDelivery
 }
 
 interface CachedLocalDocumentEntry {
@@ -511,13 +513,14 @@ class LocalDocumentEntrySet {
         })
       }catch(error){await engine.dispose();throw error}
     }
-    const entry: LocalDocumentEntry = { engine, http: new UserDocHttpScope(host), authority }
+    const entry: LocalDocumentEntry = { engine, http: new UserDocHttpScope(host), authority, projection: new DocumentProjectionDelivery() }
     return entry
   }
 
   private async close(entry: LocalDocumentEntry): Promise<void> {
     const errors: unknown[] = []
     try { await entry.http.dispose() } catch (error) { errors.push(error) }
+    await entry.projection.close()
     try { await entry.engine.dispose() } catch (error) { errors.push(error) }
     if (errors.length > 0) throw new AggregateError(errors, 'Document scope shutdown failed.')
   }
@@ -910,17 +913,19 @@ export class LocalDocumentBroker {
   }
 
   private async flushProjection(authorized: Pick<AuthorizedLocalScope, 'entry' | 'authority'>): Promise<void> {
-    const identities = authorized.entry.engine.identities
-    if (identities === undefined || this.deps.catalog === undefined) {
-      throw new UserDocError('Document identity projection is unavailable.', DOCUMENT_STORE_UNAVAILABLE_CODE)
-    }
-    if (!await identities.hasPendingProjection()) return
     const store = authorized.entry.authority.getStore() ?? authorized.authority
-    if (this.deps.writes !== undefined && store.writer?.active !== true) {
-      return withDocumentWriter(authorized.entry.authority, this.deps.writes, store, false,
-        () => this.commitProjection(authorized, identities))
-    }
-    return this.commitProjection(authorized, identities)
+    return authorized.entry.projection.run(async () => {
+      const identities = authorized.entry.engine.identities
+      if (identities === undefined || this.deps.catalog === undefined) {
+        throw new UserDocError('Document identity projection is unavailable.', DOCUMENT_STORE_UNAVAILABLE_CODE)
+      }
+      if (!await identities.hasPendingProjection()) return
+      if (this.deps.writes !== undefined && store.writer?.active !== true) {
+        return withDocumentWriter(authorized.entry.authority, this.deps.writes, store, false,
+          () => this.commitProjection(authorized, identities))
+      }
+      return this.commitProjection(authorized, identities)
+    })
   }
 
   private async commitProjection(

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-23-mobile-responsive-presentation.md
 document:
-  en: 4a4f889c9302d43c0aa680fb9cfdd00d0fd2c5da
-  zh: 684b667dcad2aee44c05db4d36cb2ed2d946952f
+  en: 42ad74fa598aadc48c7d133ba74f5002ef2ac323
+  zh: 5eca2a51241c369bc2cfc99fe3ac2d77036a8544
 /agent-note-mobile-responsive-presentation-for-the-web-workbench:
   en: bf14baafe5d32d45
   zh: c4bd3a47d2a9cf80
@@ -12,11 +12,11 @@ document:
   en: 1e08bcc8e80cd872
   zh: 37925942099eca7f
 /agent-note-mobile-responsive-presentation-for-the-web-workbench/decision:
-  en: 60b430d92b33dd68
-  zh: c0c60142c1329eec
+  en: 7aa6abc0d712185d
+  zh: a025fdb784f7c597
 /agent-note-mobile-responsive-presentation-for-the-web-workbench/alternatives-considered:
-  en: 2dabb5a744dd18bc
-  zh: 58b5409e3d5ffd5d
+  en: c73e131f82330f75
+  zh: fcab3f0164c95095
 /agent-note-mobile-responsive-presentation-for-the-web-workbench/consequences:
   en: 59c2c02890aee3eb
   zh: abb6df3e2d62fcb1
@@ -24,5 +24,5 @@ document:
   en: d5ccfa2fb9c5bbf7
   zh: 9f554c44cff2069a
 /agent-note-mobile-responsive-presentation-for-the-web-workbench/implementation-evidence:
-  en: 9fc9dce7827ff993
-  zh: 92ad7a07401687fe
+  en: e011aa29e5f189a9
+  zh: 490c5e813fb8db51

@@ -8,7 +8,7 @@
 
 .readOnly {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--dsw-alias-label-tertiary);
 }
@@ -20,8 +20,8 @@
   border-radius: 999px;
   corner-shape: round;
   padding: 1px var(--dsw-space-2);
-  font-size: 11px;
-  line-height: 17px;
+  font-size: 0.6875rem;
+  line-height: 1.0625rem;
   font-weight: 500;
   white-space: nowrap;
   background: var(--dsw-alias-bg-module-platform);
@@ -30,6 +30,7 @@
 
 .footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: var(--dsw-space-2);
@@ -41,7 +42,7 @@
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--dsw-alias-state-error-primary);
 }
@@ -53,7 +54,7 @@
   border-radius: var(--dsw-radius-md);
   padding: 5px 14px;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
   cursor: pointer;
 }
@@ -84,4 +85,12 @@
 .save:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .discard,
+  .save {
+    min-height: var(--dsw-touch-target);
+    min-width: var(--dsw-touch-target);
+  }
 }

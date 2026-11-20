@@ -395,32 +395,34 @@ export function ChangeRequestCard({ entry, expanded, onToggle, now, actions, loc
             </div>
           )}
         </div>
-        <Tooltip label={t('change.view')} side="top">
-          <button type="button" className={css.iconButton} aria-label={t('change.view')} onClick={() => { actions.openLink(url) }}>
-            <IconRightUpOutline16 size={14} />
-          </button>
-        </Tooltip>
-        <Tooltip label={t('change.copy')} side="top">
-          <button type="button" className={css.iconButton} aria-label={t('change.copy')} onClick={() => { actions.copyLink(url) }}>
-            <IconCopyOutline16 size={14} />
-          </button>
-        </Tooltip>
-        {remove !== undefined && (
-          <Tooltip label={t('change.remove')} side="top">
-            <button type="button" className={css.iconButton} aria-label={t('change.removeAria', { name })} onClick={() => { remove(entry) }}>
-              <IconCloseOutline16 size={14} />
+        <div className={css.headActions}>
+          <Tooltip label={t('change.view')} side="top">
+            <button type="button" className={css.iconButton} aria-label={t('change.view')} onClick={() => { actions.openLink(url) }}>
+              <IconRightUpOutline16 size={14} />
             </button>
           </Tooltip>
-        )}
-        <button
-          type="button"
-          className={css.iconButton}
-          aria-expanded={expanded}
-          aria-label={t(expanded ? 'change.collapse' : 'change.expand', { name })}
-          onClick={onToggle}
-        >
-          <IconChevronDownOutline14 size={12} className={clsx(css.chevron, expanded && css.chevronOpen)} />
-        </button>
+          <Tooltip label={t('change.copy')} side="top">
+            <button type="button" className={css.iconButton} aria-label={t('change.copy')} onClick={() => { actions.copyLink(url) }}>
+              <IconCopyOutline16 size={14} />
+            </button>
+          </Tooltip>
+          {remove !== undefined && (
+            <Tooltip label={t('change.remove')} side="top">
+              <button type="button" className={css.iconButton} aria-label={t('change.removeAria', { name })} onClick={() => { remove(entry) }}>
+                <IconCloseOutline16 size={14} />
+              </button>
+            </Tooltip>
+          )}
+          <button
+            type="button"
+            className={css.iconButton}
+            aria-expanded={expanded}
+            aria-label={t(expanded ? 'change.collapse' : 'change.expand', { name })}
+            onClick={onToggle}
+          >
+            <IconChevronDownOutline14 size={12} className={clsx(css.chevron, expanded && css.chevronOpen)} />
+          </button>
+        </div>
       </div>
       {notice !== undefined && (
         <div className={css.notice}>

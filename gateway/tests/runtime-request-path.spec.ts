@@ -1,9 +1,57 @@
 /** Preserve the module loader's opaque query while removing Gateway-only selection. */
 import { expect, it } from 'vitest'
-import { isExplicitScopeRequest, pinRuntimeRequestPath, runtimeRequestPath } from '../src/runtime-request-path.ts'
+import { isExplicitScopeRequest, isImmutableRuntimeAssetRequest, isRuntimeAssetRequest, pinRuntimeRequestPath, runtimeRequestPath } from '../src/runtime-request-path.ts'
 import type { RuntimeId } from '../src/runtime-catalog.ts'
 
 const runtime = '10000000-0000-4000-8000-000000000001' as RuntimeId
+
+it.each([
+  '/plugins/combo.js??@deepseek-ai/dsh-client-runtime/client.js&rev=012345abcdef',
+  '/plugins/combo.js??@deepseek-ai/dsh-client-runtime/client.js.map,fixture/client.js.map&rev=012345abcdef',
+  `/plugins/@deepseek-ai/dsh-client-runtime/client.lazy-chunk.js?rev=${'a'.repeat(64)}`,
+  '/plugins/fixture/client.lazy.js.map?rev=012345abcdef',
+  '/assets/index-abcdEF12.js',
+  '/assets/index-abcdEF12.css.map',
+])('admits only GET and HEAD for the immutable resource protocol %s', path => {
+  for (const selected of [path, pinRuntimeRequestPath(path, runtime) + '&dshTarget=personal']) {
+    expect(isImmutableRuntimeAssetRequest('GET', selected)).toBe(true)
+    expect(isImmutableRuntimeAssetRequest('HEAD', selected)).toBe(true)
+    expect(isImmutableRuntimeAssetRequest('POST', selected)).toBe(false)
+  }
+})
+
+it.each([
+  '/', '/favicon.svg', '/plugins/events?rev=012345abcdef', '/api/session.list?rev=012345abcdef',
+  '/plugins/combo.js', '/plugins/combo.js??fixture/client.js&rev=',
+  '/plugins/combo.js??fixture/client.js&rev=012345abcdef&rev=012345abcdef',
+  '/plugins/combo.js??fixture/client.js&rev=012345abcdef&extra=1',
+  '/plugins/combo.js??fixture/settings.js&rev=012345abcdef',
+  '/plugins/combo.js??../client.js&rev=012345abcdef',
+  '/plugins/combo.js??fixture/client.js,fixture/client.js.map&rev=012345abcdef',
+  '/plugins/combo.js??fixture/client.js&rev=not-a-revision',
+  '/plugins/fixture/client.js?rev=012345abcdef',
+  '/plugins/fixture/client.lazy.js?rev=012345abcdef&extra=1',
+  '/plugins/fixture/client.lazy.js?rev=012345abcdef&rev=012345abcdef',
+  '/assets/index.js', '/assets/index-abcdEF12.js?extra=1', '/assets/path/index-abcdEF12.js',
+])('keeps nonimmutable or malformed resource requests out of read-only admission: %s', path => {
+  expect(isImmutableRuntimeAssetRequest('GET', path)).toBe(false)
+  expect(isImmutableRuntimeAssetRequest('HEAD', path)).toBe(false)
+})
+
+it.each(['/assets/index-12345678.js', '/favicon.svg', '/plugins/combo.js', '/plugins/runtime/client.js', '/plugins/runtime/client.css.map'])(
+  'treats %s as observation-only browser resource traffic', pathname => {
+    expect(isRuntimeAssetRequest('GET', pathname)).toBe(true)
+    expect(isRuntimeAssetRequest('HEAD', pathname)).toBe(true)
+    expect(isRuntimeAssetRequest('POST', pathname)).toBe(false)
+  },
+)
+
+it.each(['/', '/plugins/events', '/plugins/runtime/settings', '/api/prepare/v1/session.create', '/api/events.mux'])(
+  'keeps %s on its existing operation route', pathname => {
+    expect(isRuntimeAssetRequest('GET', pathname)).toBe(false)
+    expect(isRuntimeAssetRequest(undefined, pathname)).toBe(false)
+  },
+)
 
 it.each(['/plugins/@deepseek-ai/dsh-client-runtime/client.js??entry=a%2Fb&rev=one%20two', '/assets/a.js?x=%2f&empty=', '/api/session.list'])('preserves the original bytes of %s through node forwarding', path => {
   expect(runtimeRequestPath(pinRuntimeRequestPath(path, runtime))).toBe(path)

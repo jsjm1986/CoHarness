@@ -3,12 +3,22 @@ import { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TranslationError } from '@deepseek-ai/dsh-experimental-translator'
+import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { TranslationProvider, TranslationRequest } from '@deepseek-ai/dsh-experimental-translator/types'
 import type { CotTranslationPreferences } from '../src/preferences.ts'
 import CotTranslationController from '../src/index.ts'
 
 const roots: Context[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(ctx => ctx.fiber.dispose())) })
+
+class PreferenceSettings extends SettingsProvider {
+  readonly values: Record<string, unknown> = {}
+  get writable(): boolean { return true }
+  protected async load(): Promise<Record<string, unknown>> { return this.values }
+  protected async persist(namespace: SettingsNamespace, value: Record<string, unknown>): Promise<void> {
+    this.values[namespace] = value
+  }
+}
 
 function fixture(preferences: Partial<CotTranslationPreferences> = {}) {
   const ctx = new Context(); roots.push(ctx)
@@ -22,6 +32,21 @@ function fixture(preferences: Partial<CotTranslationPreferences> = {}) {
   const controller = new CotTranslationController(ctx, config)
   return { ctx, controller, resolve, translate, availableProviders, resolveAgent, config }
 }
+
+it('publishes editable preferences and uses saved routing while the settings provider is attached', async () => {
+  const b = fixture({ provider: 'bing' })
+  const provider = b.ctx.plugin(PreferenceSettings)
+  await provider
+  const ns = settingsNamespace('cot-translation')
+  await vi.waitFor(() => { expect(b.ctx.settings.describe().find(entry => entry.ns === ns)?.value).toEqual({ provider: 'bing', targetLanguage: 'auto' }) })
+  await b.ctx.settings.update(ns, { provider: 'google', targetLanguage: 'ja' })
+  expect((await b.controller.limits(new AbortController().signal)).preferences).toEqual({ provider: 'google', targetLanguage: 'ja' })
+  await expect(b.controller.translate({ ...scoped, provider: 'bing' }, new AbortController().signal)).rejects.toMatchObject({ code: 'cotTranslation/failed' })
+  await b.controller.translate({ ...scoped, provider: 'google', targetLanguage: 'ja' }, new AbortController().signal)
+  expect(b.resolve).toHaveBeenLastCalledWith({ ...scoped, provider: 'google', targetLanguage: 'ja' })
+  await provider.dispose()
+  expect((await b.controller.limits(new AbortController().signal)).preferences).toEqual({ provider: 'bing', targetLanguage: 'auto' })
+})
 
 it('exposes configured limits without translating and uses explicit provider and target', async () => {
   const b = fixture({ provider: 'google' }), request = {

@@ -5,10 +5,11 @@
  * reaches the Host log.
  */
 
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import { chromium, type Browser, type Page } from 'playwright'
+import { type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
@@ -36,7 +37,7 @@ describe('web e2e: Session draft initialization', () => {
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ extraInstallAnchors: [join(FIXTURE, 'package.json')] })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     await scaffold.ctx.loader.create({ name: '@fixture/draft-init' })
   }, 120_000)
 

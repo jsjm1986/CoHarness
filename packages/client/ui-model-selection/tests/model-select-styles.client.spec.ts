@@ -27,7 +27,7 @@ describe('ModelSelect.module.css', () => {
   })
 
   it('collapses the trigger to its glyph on the compact phone row', () => {
-    const scope = String.raw`:global\(\[data-viewport='compact'\]\)\s*\.`
+    const scope = String.raw`:global\(:is\(\[data-viewport='compact'\], \[data-composer-tool-layout='compact'\]\)\)\s*\.`
     expect(css).toMatch(new RegExp(`${scope}triggerLabel,\\s*${scope}triggerEffort,\\s*${scope}chevron\\s*\\{[^}]*display:\\s*none`, 'u'))
     expect(css).toMatch(new RegExp(`${scope}triggerGlyph\\s*\\{[^}]*display:\\s*inline-flex`, 'u'))
   })

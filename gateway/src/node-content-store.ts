@@ -303,10 +303,10 @@ export class NodeContentStore {
 
   /** Retain the matching local visibility decision only for the final live organization check.
    * @param binding - exact governing placement. @param revision - ACL revision of the original content snapshot.
-   * @param finish - fresh, bounded account/project authorization before issuing data.
+   * @param finish - fresh account/project authorization and optional Session checks on the retained local transaction before issuing data.
    * @param generation - credential's Runtime generation when applicable. @returns the confirmed operation result.
    */
-  async confirmCollaborationRead<T>(binding:NodeContentBinding,revision:string,finish:()=>Promise<T>,generation?:number):Promise<T> {
+  async confirmCollaborationRead<T>(binding:NodeContentBinding,revision:string,finish:(local:PoolClient)=>Promise<T>,generation?:number):Promise<T> {
     return transaction(this.options.pool,async tx=>{
       await this.verify(tx)
       const current=await tx.query(`SELECT FROM node_content.spaces s JOIN node_content.conversation_acl_versions v
@@ -316,7 +316,7 @@ export class NodeContentStore {
           AND NOT EXISTS(SELECT FROM node_content.recovery_candidates r WHERE r.organization_id=s.organization_id AND r.runtime_id=s.runtime_id AND r.phase<>'active')
         FOR SHARE OF v NOWAIT`,[...this.parameters(binding),revision,generation??null])
       if(current.rowCount!==1) throw new NodeContentUnavailable('The conversation permissions changed while reading. Retry with current access.')
-      return finish()
+      return finish(tx)
     }).catch(storageFailure)
   }
 

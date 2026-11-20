@@ -1,0 +1,31 @@
+- tabpanel "自定义":
+  - text: 自定义提供方 Provider ID
+  - textbox "Provider ID":
+    - /placeholder: acme-gateway
+    - text: mobile-draft
+  - paragraph: 支持任意非空提供方名称；凭据会使用单独的安全引用名保存。
+  - text: 显示名称
+  - textbox "显示名称":
+    - /placeholder: mobile-draft
+    - text: 手机旋转保留草稿 Mobile provider draft
+  - text: API 地址
+  - textbox "API 地址":
+    - /placeholder: https://gateway.example/v1
+    - text: https://example.invalid/v1
+  - text: API 协议
+  - combobox "API 协议":
+    - option "OpenAI Chat Completions" [selected]
+    - option "OpenAI Responses"
+    - option "Anthropic Messages"
+    - option "google-generative-ai"
+  - text: API 密钥
+  - textbox "API 密钥":
+    - /placeholder: 输入 API 密钥
+  - region "模型目录":
+    - text: 模型目录
+    - button "获取可用模型"
+    - paragraph: 模型选择器中将不显示任何模型；目录外 ID 仍可直接发送。
+    - button "添加模型"
+  - paragraph: 自定义提供方至少需要一个模型。
+  - button "取消"
+  - button "创建提供方" [disabled]

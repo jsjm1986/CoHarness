@@ -24,6 +24,8 @@ The install dialog put a spec straight into `pnpm add` and showed pnpm's termina
 
 **Blocked install scripts are approved from the failed screen.** When pnpm leaves a dependency's scripts undecided, the failed run reports the pending `allowBuilds` keys ([the manager's approval](2026-09-14-current-profile-plugin-management.md) keeps them durable across rollback), and the failed screen shows them with **Allow these scripts and retry** in place of plain retry; the store runs the same checked subject again with `approvedBuilds`, and the installed screen names what was allowed. `pnpm-workspace.yaml` is not among the restored files for this reason. Without pending names the failure falls back to the manual instruction.
 
+Registry options portal into the installation dialog that owns their trigger. Keeping them inside that dialog preserves modal keyboard ownership and prevents background isolation from making the address field inert, including when retained installation state opens the options immediately.
+
 ## Alternatives considered
 
 **Validate specs on the client.** Rejected: the rules are pnpm's, the registry's, and the profile's, and the client cannot import the Host package that owns them.

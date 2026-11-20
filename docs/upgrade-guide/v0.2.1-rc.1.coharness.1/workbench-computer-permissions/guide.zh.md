@@ -15,6 +15,8 @@ description: "个人账户目录记录要求其自身 Runtime 所属电脑的权
 
 「全部空间」搜索本标签页已载入且有权访问的个人及项目对话。选择具体的个人 Runtime 或项目可以继续分页搜索。账号 Runtime 目录支持用 `projectId` 精确查找尚未出现在已载入分页中的项目。新窗格使用所选 Runtime 确认的创建回执和工作区，单独打开已有对话时重新验证访问权限。
 
+客户端从中心的 `/account/api/workbench/context` 读取账号及项目成员信息。该接口校验原 Runtime 与入口范围，不转发到引导电脑，也不启动 Runtime。浏览器资源与 Gateway 必须一起升级，旧 Gateway 不提供此接口。侧栏内容搜索按已连接电脑独立报告，其他电脑尚未返回或不可用时仍保留快速返回的结果。
+
 ## 迁移
 
 1. 一起升级完整 Gateway 和 Runtime 包。应用 PostgreSQL 迁移 `104_personal_conversation_catalog.sql`，它添加可空的个人对话元数据，不改变 Session 代际、文件或 Runtime 身份。已运行的个人 Runtime 在重启后发布摘要，已停止的 Runtime 在明确启动时发布。读取选择器不会启动它们。

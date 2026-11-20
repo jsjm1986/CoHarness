@@ -46,8 +46,30 @@
   white-space: nowrap;
 }
 
-:global([data-viewport='compact']) .summary,
+:global([data-viewport='compact']) .headerRow {
+  align-items: flex-start;
+  padding-block: var(--dsw-space-1);
+}
+
+:global([data-viewport='compact']) .leading {
+  margin-top: var(--dsw-space-1);
+}
+
+:global([data-viewport='compact']) .headerContent {
+  flex-wrap: wrap;
+}
+
 :global([data-viewport='compact']) .source {
+  flex: 1 1 0;
+}
+
+:global([data-viewport='compact']) .summarySep {
+  display: none;
+}
+
+:global([data-viewport='compact']) .summary {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
   white-space: normal;
 }
 
@@ -68,4 +90,8 @@
 
 .toolChanges {
   white-space: nowrap;
+}
+
+:global([data-viewport='compact']) .body {
+  font: var(--dsw-mobile-font-code);
 }

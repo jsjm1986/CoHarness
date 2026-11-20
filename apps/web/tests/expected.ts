@@ -1,6 +1,7 @@
 /** Browser expected-output comparison shared by Host and Gateway compositions. */
 import { existsSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { expect } from 'vitest'
 
 /** Snapshot mode for the lane, from $DSH_SNAPSHOT (same vocabulary as the other snapshot suites). */
@@ -28,6 +29,7 @@ export function webSnapshotMode(): WebSnapshotMode {
 export async function compareOrRefreshGolden(goldenPath: string, actual: string, mode: WebSnapshotMode): Promise<void> {
   const payload = `${actual}\n`
   if (mode === 'refresh') {
+    await mkdir(dirname(goldenPath), { recursive: true })
     await writeFile(goldenPath, payload)
     return
   }

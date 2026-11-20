@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-20-web-plugin-startup-isolation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-20-web-plugin-startup-isolation.md
+document:
+  en: 6004c4a44a53555297eaba6b107c89b12cea1abe
+  zh: e69cd9a07476580927e6df5c5dbb5895cf779ff6
+/agent-note-keep-independent-web-plugins-out-of-application-startup:
+  en: 9a62b039022afc3f
+  zh: e4b6e0a4498603b4
+/agent-note-keep-independent-web-plugins-out-of-application-startup/problem:
+  en: 1e1a341364ab5d0d
+  zh: 6112e444d6796fdc
+/agent-note-keep-independent-web-plugins-out-of-application-startup/decision:
+  en: ebc36d42e86063e3
+  zh: 37d089e461e1f53a
+/agent-note-keep-independent-web-plugins-out-of-application-startup/alternatives-considered:
+  en: 1804149359323ede
+  zh: e616085a3642df33
+/agent-note-keep-independent-web-plugins-out-of-application-startup/consequences:
+  en: df33678105dcc13b
+  zh: 532ab3ec7ed30105

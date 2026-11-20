@@ -4,12 +4,14 @@
  * @module @deepseek-ai/dsh-client-web/src/mount
  */
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 /**
  * Mount the UI renderer into `container` through a dependency fiber on
  * `uiRenderer`: the mount effect installs when the service is provided and
- * reinstalls when it is replaced.
+ * reinstalls when it is replaced. The same fiber schedules optional
+ * entries in a later browser task and cancels dispatch if disposed first.
  * @param ctx - booted root Context.
  * @param container - application mount point.
  * @returns resolves once the dependency fiber exists; with `uiRenderer`
@@ -19,6 +21,15 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 export async function mountClient(ctx: Context, container: HTMLElement): Promise<void> {
   const mounted = ctx.inject(['uiRenderer'], (scope) => {
     scope.effect(() => scope.uiRenderer.mount(container), 'web boot: application mount')
+    const entries = ctx.get('modules')?.entries
+    if (entries !== undefined) {
+      scope.effect(() => {
+        const timer = setTimeout(() => {
+          void entries.startOptional().catch((error: unknown) => { ctx.logger.warn(error) })
+        }, 0)
+        return () => { clearTimeout(timer) }
+      }, 'web boot: optional entries after renderer mount')
+    }
   })
   await mounted
 }

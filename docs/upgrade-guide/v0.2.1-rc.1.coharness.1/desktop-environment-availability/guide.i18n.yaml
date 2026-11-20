@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/desktop-environment-availability/guide.md
 document:
-  en: 673d45e18ba52f4c894d72333c7c4691569fe71d
-  zh: da3eef7c68e31de5abef082d554c5e01333fa008
+  en: cb9c99cd664f3ecbb90b8ed40fda48429b625ff3
+  zh: ed2392a41039148863913fdb10ee70aef1639829
 /:
   en: 6ff69cbcc572f505
   zh: 88ab182e7ea077c7
@@ -12,8 +12,8 @@ document:
   en: 4003f146037215da
   zh: fe3ac36fbbdbda36
 /desktop-environment-availability/change:
-  en: fc6638cbfe62324f
-  zh: e688deb3b3ae3b16
+  en: fcb366f5d6759052
+  zh: 21444d9555ba9c0b
 /desktop-environment-availability/migration:
-  en: e09c68563710fda2
-  zh: d0211dfad9ec8607
+  en: 9d7e08f159f5f0c5
+  zh: 8914c61be67e2c4f

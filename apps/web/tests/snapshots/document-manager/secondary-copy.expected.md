@@ -1,7 +1,7 @@
 - heading "Copy Document Snapshots" [level=2]
 - button "Close":
   - img
-- paragraph: "Copy 1 documents to:"
+- paragraph: "Documents to copy: 1"
 - list "Documents in this operation":
   - listitem: brief.txt 21 B
 - radiogroup "Target scope":

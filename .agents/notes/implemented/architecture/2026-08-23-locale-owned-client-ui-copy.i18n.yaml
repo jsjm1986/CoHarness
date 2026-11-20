@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.md
 document:
-  en: bc4d8efbce1f246f712e3afe6af40d1518e8cb17
-  zh: ce996a4aafc392e739bec2eccd8714cfeff7d8e9
+  en: bd7203e6319d23eac7ee9a74b2e6790007279073
+  zh: a3dc0e6468b2f63faa28ae3a6c67abd5a4d82e4c
 /agent-note-locale-owned-client-ui-copy:
   en: 048ebc19d489b40d
   zh: 681d1c4167f0101f
@@ -12,8 +12,8 @@ document:
   en: b007d31d9998b878
   zh: 857921e0d57288f9
 /agent-note-locale-owned-client-ui-copy/decision:
-  en: 8a5e0abec93fcb91
-  zh: bf9fe95e48fc7eb6
+  en: ad0db6137cb8e8cf
+  zh: 1e97e7e5019a7e0d
 /agent-note-locale-owned-client-ui-copy/verification:
   en: bc9daa07456e8496
   zh: 9edeae0d970cc6b2

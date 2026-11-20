@@ -5,6 +5,8 @@ import type { FocusEventHandler, MouseEventHandler, ReactElement, Ref } from 're
 import { createPortal } from 'react-dom'
 import { ShortcutKeys } from './ShortcutKeys.tsx'
 import { useDismissOnOutsidePointer } from './useDismissOnOutsidePointer.ts'
+import { usePointerGrace } from './pointer-grace.ts'
+import { observeComposition } from './keyboard-composition.ts'
 import css from './Tooltip.module.css'
 // Tooltips take the wide answer — any key returns to the keyboard. Focus rings read the
 // narrower `data-input-modality` attribute the same module publishes.
@@ -56,7 +58,8 @@ type TooltipLabel = string | (() => string)
  * @param props.children - a single anchor element; its own ref (callback or object) is forwarded alongside the tooltip's.
  * @returns the cloned anchor plus a fixed-position bubble, optionally portaled to the body.
  * The bubble stays hidden until ResizeObserver supplies its size for viewport fitting; clicking the
- * anchor dismisses the bubble unless openOnClick is enabled, and focus arriving after a pointer
+ * anchor dismisses the bubble unless openOnClick is enabled. Escape dismisses every tooltip;
+ * hover can cross into the bubble, and keyboard focus keeps it visible. Focus arriving after a pointer
  * interaction (a closing menu refocusing its trigger) never raises it.
  */
 export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center', delayMs = 0, focusDelayMs = 0, gap = 8, disabled = false, portal = false, maxWidth, openOnClick = false, children }: { label: TooltipLabel; shortcutKeys?: readonly string[] | undefined; side?: TooltipSide; align?: 'center' | 'end'; delayMs?: number; focusDelayMs?: number; gap?: number; disabled?: boolean; portal?: boolean; maxWidth?: number; openOnClick?: boolean; children: ReactElement<AnchorProps> }) {
@@ -86,7 +89,7 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Hover and focus are independent triggers: the bubble hides only after
   // BOTH clear (hovering away from a focused anchor must not drop it).
-  const triggers = useRef({ hover: false, focus: false })
+  const triggers = useRef({ hover: false, focus: false, bubble: false })
 
   // A nested tooltip's bubble owns the pointer position, so this tooltip
   // withdraws its own while a descendant shows one; the state below is set by
@@ -156,7 +159,7 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
     if (pinned && (disabled || !openOnClick)) setPinned(false)
     if (disabled) {
       cancelShow()
-      triggers.current = { hover: false, focus: false }
+      triggers.current = { hover: false, focus: false, bubble: false }
       setPos(null)
     }
     return cancelShow
@@ -167,6 +170,7 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
     const el = anchor.current
     /* v8 ignore next -- the ref is attached by event time: events fire on the cloned anchor. */
     if (el === null) return
+    el.dispatchEvent(new Event('dsh-tooltip-open', { bubbles: true }))
     const r = el.getBoundingClientRect()
     setPos({
       x: side === 'right' ? r.right + 10 : side === 'left' ? r.left - 10 : align === 'end' ? r.right : r.left + r.width / 2,
@@ -193,24 +197,38 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
   }, [announce])
   const hide = () => {
     cancelShow()
-    if (!triggers.current.hover && !triggers.current.focus && !pinned) withdraw()
+    if (!triggers.current.hover && !triggers.current.focus && !triggers.current.bubble && !pinned) withdraw()
   }
+  const { arm: armClose, cancel: cancelClose } = usePointerGrace(hide)
   const dismiss = useCallback(() => {
     cancelShow()
-    triggers.current = { hover: false, focus: false }
+    cancelClose()
+    triggers.current = { hover: false, focus: false, bubble: false }
     withdraw()
-  }, [cancelShow, withdraw])
+  }, [cancelClose, cancelShow, withdraw])
+  useEffect(() => {
+    const element = anchor.current
+    if (!visible || element === null) return
+    const document = element.ownerDocument
+    const onOtherTooltip = (event: Event) => {
+      if (event.target instanceof Node && !element.contains(event.target)) dismiss()
+    }
+    document.addEventListener('dsh-tooltip-open', onOtherTooltip, true)
+    return () => { document.removeEventListener('dsh-tooltip-open', onOtherTooltip, true) }
+  }, [dismiss, visible])
   useDismissOnOutsidePointer(anchor, openOnClick && visible, dismiss, bubble)
   useEffect(() => {
-    if (!openOnClick || !visible) return
+    if (!visible || suppressed) return
+    const composition = observeComposition(document)
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' && event.key !== 'Tab') return
+      if (composition.guards(event) || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) return
+      if (event.key !== 'Escape' && !(openOnClick && event.key === 'Tab')) return
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation() }
       dismiss()
     }
     document.addEventListener('keydown', onKeyDown, true)
-    return () => { document.removeEventListener('keydown', onKeyDown, true) }
-  }, [dismiss, openOnClick, visible])
+    return () => { composition.dispose(); document.removeEventListener('keydown', onKeyDown, true) }
+  }, [dismiss, openOnClick, suppressed, visible])
 
   const content = visible && !suppressed && (
     <span
@@ -224,6 +242,8 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
       data-has-shortcut={shortcutKeys?.length ? true : undefined}
       style={{ left: pos.x, top: y, visibility: 'hidden', ...maxWidth === undefined ? {} : { maxWidth } }}
       role="tooltip"
+      onMouseEnter={() => { triggers.current.bubble = true; cancelClose() }}
+      onMouseLeave={() => { triggers.current.bubble = false; armClose() }}
       aria-label={shortcutKeys?.length ? [resolvedLabel, shortcutKeys.join(' ')].filter(Boolean).join(' ') : undefined}
     >
       {resolvedLabel && <span className={css.label}>{resolvedLabel}</span>}
@@ -247,10 +267,11 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
              matchMedia is absent in jsdom, where tests drive hover directly. */
           if (typeof window.matchMedia === 'function'
             && !window.matchMedia('(hover: hover)').matches) return
+          cancelClose()
           triggers.current.hover = true
           showAfterDelay(delayMs)
         },
-        onMouseLeave: (e) => { children.props.onMouseLeave?.(e); triggers.current.hover = false; cancelShow(); if (!pinned) withdraw() },
+        onMouseLeave: (e) => { children.props.onMouseLeave?.(e); triggers.current.hover = false; cancelShow(); if (visible) armClose() },
         // Activating an ordinary action dismisses the bubble: it often changes
         // what the anchor now does (pin → unpin), and the click leaves the
         // anchor focused, which would otherwise pin the relabelled bubble up.

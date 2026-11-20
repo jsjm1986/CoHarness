@@ -37,6 +37,8 @@ export interface Receipt { inputId: string; actors: Array<{ userId: number }>; p
 export async function createExecutionFixture(pool: Pool, options: {
   executionWatchHeartbeatMs?: number
   executionWatchAuthorizationTimeoutMs?: number
+  executionWriteEpoch?: bigint
+  performanceEnabled?: boolean
   /** Enable multi-computer topology and establish a control lease before starting managed fixture Runtimes. */
   nodeConnection?: { id: string; epoch: number }
   resourceBudget?: NodeResourceBudgetConfig
@@ -112,6 +114,8 @@ export async function createExecutionFixture(pool: Pool, options: {
   const documents = createDocumentCatalogHandlers(new PostgresDocumentCatalogService({ ...context, pool: options.documentCatalogPool ?? pool }))
   const handler = createRuntimeApiHandler({ context, instances, conversations: conversationStore, principals,
     accessMonitor: scopeAccessMonitor(accessMonitor, context.nodeId as RuntimeNodeId), desktops,
+    executionWriteEpoch: options.executionWriteEpoch,
+    performanceEnabled: options.performanceEnabled,
     documentCatalogOverview: documents.overview, documentCatalogHistory: documents.history,
     documentCatalogAuthorize: documents.authorize, documentCatalogSync: documents.sync, documentCatalogPurge: documents.purge,
     resourceBudget,
@@ -176,5 +180,5 @@ export async function createExecutionFixture(pool: Pool, options: {
   }
   return { base, context, project, other, personal, peerPersonal, admin, member, peer, principals, headers, dispose,
     publicKey: key.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
-    conversations, accessMonitor, desktops, instances, resourceBudget, call, session, admit, enter, organizationId }
+    conversations, accessMonitor, desktops, instances, resourceBudget, handler, call, session, admit, enter, organizationId }
 }

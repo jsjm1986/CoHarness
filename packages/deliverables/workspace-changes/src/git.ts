@@ -1,6 +1,6 @@
 /** Git working-tree snapshots, tree diffs, and ignore checks through the subprocess capability. */
-import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { join, relative, resolve } from 'node:path'
+import { copyFile, lstat, mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
+import { dirname, join, relative, resolve } from 'node:path'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { parseNumstat, type NumstatEntry } from './numstat.ts'
 import { canonicalPath, isInside, toPosix } from './paths.ts'
@@ -128,6 +128,39 @@ export interface GitWorkspace {
 /** Whether a filesystem error names a missing path. */
 function isMissing(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENOENT'
+}
+
+/**
+ * Verify that local Git discovery can be omitted for this turn.
+ * @param cwd - absolute directory in the Host filesystem.
+ * @param signal - cancellation owned by the turn recorder.
+ * @returns true when the canonical ancestry contains no worktree or bare repository marker and the environment
+ *   supplies no Git overrides. An inaccessible or ambiguous path leaves discovery to Git.
+ */
+export async function canSkipLocalGitDiscovery(cwd: string, signal: AbortSignal): Promise<boolean> {
+  signal.throwIfAborted()
+  if (Object.keys(process.env).some(key => (process.platform === 'win32' ? key.toUpperCase() : key).startsWith('GIT_'))) return false
+  try {
+    let directory = await realpath(cwd)
+    for (;;) {
+      signal.throwIfAborted()
+      const entry = await lstat(directory)
+      signal.throwIfAborted()
+      if (!entry.isDirectory()) return false
+      for (const marker of ['.git', 'HEAD']) {
+        const missing = await lstat(join(directory, marker)).then(() => false, isMissing)
+        signal.throwIfAborted()
+        if (!missing) return false
+      }
+      const parent = dirname(directory)
+      if (parent === directory) return true
+      directory = parent
+    }
+  } catch {
+    // Failed filesystem observations leave Git responsible for discovery and its diagnostics.
+    signal.throwIfAborted()
+    return false
+  }
 }
 
 /**

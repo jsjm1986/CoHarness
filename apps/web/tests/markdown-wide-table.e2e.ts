@@ -18,9 +18,11 @@
 // Zero model calls: the transcript is a closed turn assembled through the
 // Session API and seeded cold; a stray stream would fail loud with
 // NO_ADAPTER.
+import { responsiveBrowser } from './responsive-browser.ts'
+import { auditWorkflowState, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
@@ -210,6 +212,8 @@ interface TableStop {
   width: number
   /** The transcript query container's content-box width (the `100cqw` axis). */
   transcript: number
+  /** Inline allowance for the transcript scrollbar, including the themed gutter. */
+  scrollbar: number
   tables: TableReading[]
 }
 
@@ -301,7 +305,7 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
     scaffold = await launchWebScaffold({})
     await seedSession(scaffold, wideTableFixture(), SEED_ID)
     // The geometry assertions include the space occupied by native scrollbars.
-    browser = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] })
+    browser = await responsiveBrowser.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] })
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -341,16 +345,19 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
   const settleAt = async (width: number): Promise<Omit<TableStop, 'width'>> => {
     await page.setViewportSize({ width, height: 900 })
     await awaitTableLayout(page, expectedViewportClass(width))
-    const transcript = await page.evaluate(() => {
+    const { transcript, scrollbar } = await page.evaluate(() => {
       const container = [...document.querySelectorAll<HTMLElement>('[class*="scroll"]')]
         .find(e => getComputedStyle(e).containerType === 'inline-size')
       if (container === undefined) throw new Error('no inline-size transcript container')
       const styles = getComputedStyle(container)
-      return container.clientWidth
-        - Number.parseFloat(styles.paddingLeft) - Number.parseFloat(styles.paddingRight)
+      const themedGutter = Number.parseFloat(styles.getPropertyValue('--dsh-scrollbar-width')) || 0
+      return {
+        transcript: container.clientWidth - Number.parseFloat(styles.paddingLeft) - Number.parseFloat(styles.paddingRight),
+        scrollbar: Math.max(container.offsetWidth - container.clientWidth, themedGutter),
+      }
     })
     const tables = await readTables(page)
-    return { transcript, tables }
+    return { transcript, scrollbar, tables }
   }
 
   /** Sweep once; every assertion reads the same measurement. */
@@ -393,10 +400,9 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
         expect(wide!.paddingLeft, `lead at ${String(stop.width)}`).toBeGreaterThan(0)
         expect(Math.abs(wide!.tableLeft - fill!.tableLeft), `alignment at ${String(stop.width)}`).toBeLessThan(1.5)
       } else {
-        // Below the message column there is no spare width: the breakout
-        // clamps to neutral and the wrapper stays the column's width.
-        expect(Math.abs(wide!.clientWidth - columnWidth), `neutral at ${String(stop.width)}`).toBeLessThan(1.5)
-        expect(wide!.paddingLeft, `no lead at ${String(stop.width)}`).toBeLessThan(1.5)
+        // Fractional layout and the scroll container's gutter account for any remaining width difference.
+        expect(Math.abs(wide!.clientWidth - columnWidth), `neutral at ${String(stop.width)}`).toBeLessThan(stop.scrollbar + 1.5)
+        expect(Math.abs(wide!.tableLeft - fill!.tableLeft), `aligned at ${String(stop.width)}`).toBeLessThan(1.5)
       }
     }
     // Wrap-first engaged for real: the filling tables grow taller as the
@@ -580,6 +586,34 @@ describe('web e2e: markdown tables fill the column, wide ones break out and scro
     await compareOrRefreshGolden(GEOMETRY_EXPECTED, renderGeometry(stops, wrapTighter), MODE)
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
+
+  it.skipIf(!workflowMatrixEnabled)('keeps every table form reachable across touch layouts', async () => {
+    const touchPage = await newWorkflowPage(browser)
+    const touchTripwire = watchConsole(touchPage)
+    try {
+      await touchPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await touchPage.locator('[role="treeitem"]').first().click()
+      await touchPage.locator('[role="treeitem"]').nth(1).click()
+      await touchPage.getByText(TAIL_MARKER, { exact: true }).waitFor()
+      for (const [marker, state] of [[FILL_MARKER, 'ordinary-table'], [WIDE_MARKER, 'wide-scrollable-table'],
+        [LONG_CELL_MARKER, 'long-cell-table'], [SHORT_MARKER, 'short-table']] as const) {
+        const table = touchPage.locator('[class*="tableScroll"]').filter({ hasText: marker })
+        await auditWorkflowState(touchPage, 'markdown', state, table, [], async () => {
+          await table.scrollIntoViewIfNeeded()
+          if (marker === WIDE_MARKER) {
+            await table.evaluate((element) => { element.scrollLeft = 0 })
+            await table.focus()
+            await touchPage.keyboard.press('ArrowRight')
+            await expect.poll(() => table.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+          } else {
+            expect(await table.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
+          }
+        })
+      }
+      expect(touchTripwire.pageErrors).toEqual([])
+    } catch (error) { await saveFailureShot(touchPage, 'markdown-tables-responsive'); throw error }
+    finally { await touchPage.close() }
+  }, 180_000)
 
   it('commits exactly the fixtures it reads', async () => {
     // No model calls, so no replay log: the golden is the whole inventory.

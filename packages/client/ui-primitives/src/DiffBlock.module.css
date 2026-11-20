@@ -74,7 +74,8 @@
 
 .expand {
   display: block;
-  width: 100%;
+  justify-self: start;
+  width: max-content;
   padding: 0 18px;
   border: none;
   background: transparent;

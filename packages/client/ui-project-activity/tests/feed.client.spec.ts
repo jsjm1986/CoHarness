@@ -5,9 +5,11 @@ import {
   convTone,
   feedMembers,
   groupItems,
+  hasReadableProgress,
   relativeDayLabel,
   timeLabel,
   type ActivityItem,
+  type ProgressEntry,
 } from '../src/client/feed.ts'
 
 beforeEach(() => {
@@ -134,6 +136,25 @@ describe('feedMembers', () => {
     ])
     expect(members).toEqual([{ userId: 7, label: 'Lin' }, { userId: 8, label: 'Zhou' }])
   })
+
+  it('keeps the current roster and adds former members from visible history', () => {
+    const roster = [{ userId: 7, label: 'Lin Wu' }, { userId: 8, label: 'Zhou' }]
+    const history = [
+      item({ kind: 'message', occurredAt: 'a', actorUserId: 7, actorLabel: 'Lin' }),
+      item({ kind: 'answer', occurredAt: 'b', actorUserId: 9, actorLabel: 'Ada' }),
+    ]
+    expect(feedMembers(history, roster)).toEqual([...roster, { userId: 9, label: 'Ada' }])
+  })
+})
+
+it('opens progress only when the project has a readable summary or a published week', () => {
+  const empty = { enabled: false, periods: [],
+    status: { enabled: false, pending: 1, generating: false, canGenerate: false } }
+  const period: ProgressEntry = { id: 'week', kind: 'period', activityCount: 1, generatedAt: '2026-10-17T10:00:00Z',
+    content: { sections: { decided: [], done: [], doing: [], blocked: [] } } }
+  expect(hasReadableProgress(empty)).toBe(false)
+  expect(hasReadableProgress({ ...empty, periods: [period] })).toBe(true)
+  expect(hasReadableProgress({ ...empty, current: { ...period, kind: 'current', content: { ...period.content, summary: 'Progress' } } })).toBe(true)
 })
 
 describe('convTone', () => {

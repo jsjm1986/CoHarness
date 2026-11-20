@@ -57,6 +57,7 @@ const inventory = z
     watermark: z.string(),
     hasFileSnapshot: z.boolean(),
     sourceOnlyFileWitnesses: z.boolean().optional(),
+    hasExecutionPolicies: z.boolean().optional(),
     tables: z
       .array(
         z
@@ -121,6 +122,7 @@ export async function stagePeerProject(
     point.organizationId !== op.organizationId ||
     point.scopeId !== op.projectId ||
     point.sourceNodeId !== op.sourceNode ||
+    point.targetNodeId !== op.repositoryNode ||
     point.writerEpoch !== op.oldEpoch ||
     point.watermark !== op.revision ||
     point.manifestDigest !== op.digest ||

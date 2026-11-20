@@ -1,0 +1,13 @@
+- heading "Choose upload scope" [level=2]
+- button "Close":
+  - img
+- paragraph: Files upload to the root of this scope
+- img
+- textbox "Search document scopes"
+- group "Document scopes":
+  - button "Personal documents Editable · Files upload to the root of this scope":
+    - strong: Personal documents
+    - text: Editable · Files upload to the root of this scope
+  - button "Isolated research Editable · Files upload to the root of this scope":
+    - strong: Isolated research
+    - text: Editable · Files upload to the root of this scope

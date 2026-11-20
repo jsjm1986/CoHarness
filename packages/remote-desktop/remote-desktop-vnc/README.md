@@ -28,17 +28,21 @@ Install this provider when the harness serves human remote-desktop access to mac
 <a id="configuration"></a>
 ## Configuration
 
+Initialization runs in Cordis’s service lifecycle. The provider becomes available only after its grant store, audit log and configured endpoint file load successfully; permission and parsing failures remain startup errors. Disable the plugin entry explicitly when no VNC service is required. Local graphical-session discovery does not disable configured external endpoints.
+
 | Field | Semantics |
 |---|---|
 | `endpoints` | `{ nodeId, desktop?, host, port, username?, passwordRef? }` rows; duplicate target keys fail at load. `passwordRef` binds a credential-store reference (see [Managed credentials](#managed-credentials)); `username` is the login name password-authenticated servers need. |
 | `endpointsFile` | `{endpoints: [...]}` JSON maintained by the deployment's administration surface; replaces the inline list and reloads on change. A malformed write keeps failing loudly on each call until a valid file lands. |
 | `grantsFile` | JSONL grant-store path, rewritten atomically per mutation and reloaded when an external writer replaces it; `':memory:'` selects a volatile store. A malformed line fails loudly while the last good rows stay in effect. |
 | `recordingDir` | Directory receiving `<sessionId>.rfb` raw stream captures for grants flagged `recording`; empty disables it and a flagged `serveStream` fails. |
-| `streamPath` | Pathname the stream mount serves; clients append `?token=`; default `/remote-desktop/stream`. |
+| `streamPath` | Pathname the stream mount serves; clients append `?token=`; default `/api/remote-desktop/stream`. |
 | `attachTokenTtlMs` | Attach-token validity window; default `60000`. |
 | `auditFile` | Append-only JSONL audit path; `':memory:'` selects a volatile window. |
 | `auditCapacity` | Audit events retained for `audit()` queries and reloaded from the file tail; default `1024`. |
 | `probeTimeoutMs` | `status` endpoint-probe timeout; default `3000`. |
+
+Provider disposal rejects new operations, cancels pending attachments, in-flight connections and handshakes, and awaits owned streams, recordings and queued audit appends. A transport returned after cancellation is closed before any RFB pump can start. Grant writes admitted before disposal finish under the existing commit and audit rules.
 
 <a id="attachment-flow"></a>
 ## Attachment flow
@@ -56,6 +60,8 @@ An endpoint that carries `passwordRef` switches the stream into credential-manag
 ## View-only enforcement
 
 `RfbClientFilter` parses the client→server direction: the version preamble, security selection, authentication response, and `ClientInit` pass through, then framed messages are forwarded only for `SetPixelFormat`, `SetEncodings`, and `FramebufferUpdateRequest`. `KeyEvent`, `PointerEvent`, and `ClientCutText` are consumed and counted; unknown message types and unframeable security types fail closed by tearing the connection down.
+
+Message numbers follow [RFC 6143 §7.5](https://www.rfc-editor.org/rfc/rfc6143.html#section-7.5): `SetPixelFormat` (0), `SetEncodings` (2), and `FramebufferUpdateRequest` (3) pass; `KeyEvent` (4), `PointerEvent` (5), and `ClientCutText` (6) are dropped. Frames retain their classification across arbitrary socket chunk boundaries.
 
 **Runtime invariant:** No companion is published. Grant, session, and audit truth live in the capability's stores and log; the provider keeps only per-connection transport state, exercised directly in `tests/`.
 

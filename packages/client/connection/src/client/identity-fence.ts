@@ -72,7 +72,7 @@ export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string
     } finally { signal.removeEventListener('abort', abort) }
   }
   const scopeSensitive = (url: URL): boolean => url.pathname === '/api' || url.pathname.startsWith('/api/')
-    || ['/account/api/context', '/account/api/workbench/catalog', '/account/api/usage', '/account/api/activity'].includes(url.pathname)
+    || ['/account/api/context', '/account/api/workbench/context', '/account/api/workbench/catalog', '/account/api/usage', '/account/api/activity'].includes(url.pathname)
   const pinRuntime = (url: URL, target?: ClientRuntimeTarget): void => {
     if (!scopeSensitive(url) || url.searchParams.has('dshRuntime') || url.searchParams.has('dshTarget')
       || url.pathname.startsWith('/api/documents') && url.searchParams.has('dshNode')) return

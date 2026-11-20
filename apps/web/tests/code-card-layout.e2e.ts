@@ -1,6 +1,7 @@
 /** Browser geometry for read offsets and horizontally scrolled diff fills. */
+import { expectViewportFit, responsiveBrowser } from './responsive-browser.ts'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -74,7 +75,7 @@ describe('web e2e: code-card layout', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
     await seedSession(scaffold, layoutFixture(), 'code-card-layout')
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -88,7 +89,7 @@ describe('web e2e: code-card layout', () => {
     await page.getByText('CODE_LAYOUT_DONE', { exact: true }).waitFor()
     await expandTurnProcesses(page)
     for (const row of await page.locator('[data-variant="read"], [data-variant="edit"]').all()) {
-      await row.locator('[data-expandable]').click()
+      await row.getByRole('button', { expanded: false }).click()
     }
     await page.locator('[data-read]').nth(1).waitFor()
     await page.locator('[data-diff]').waitFor()
@@ -97,6 +98,37 @@ describe('web e2e: code-card layout', () => {
   afterAll(async () => {
     try { await browser?.close() } finally { await scaffold?.close() }
   })
+
+  it('keeps code actions reachable on wide touch screens and with forced colors', async () => {
+    const touch = await browser.newPage({ viewport: { width: 1024, height: 768 }, hasTouch: true, locale: 'en-US' })
+    try {
+      await touch.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await touch.getByRole('treeitem').first().click()
+      await touch.getByRole('treeitem').nth(1).click()
+      await touch.getByText('CODE_LAYOUT_DONE', { exact: true }).waitFor()
+      await expandTurnProcesses(touch)
+      await touch.locator('[data-variant="read"]').first().getByRole('button', { expanded: false }).tap()
+      const card = touch.locator('[data-read]').first()
+      const wrap = card.getByRole('button', { name: 'Wrap lines', exact: true })
+      const copy = card.getByRole('button', { name: 'Copy', exact: true })
+      for (const control of [wrap, copy]) {
+        const box = await control.boundingBox()
+        expect(box?.width).toBeGreaterThanOrEqual(44)
+        expect(box?.height).toBeGreaterThanOrEqual(44)
+      }
+      await wrap.tap()
+      expect(await wrap.getAttribute('aria-pressed')).toBe('true')
+      await touch.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
+      await touch.keyboard.press('Tab')
+      await wrap.focus()
+      expect(await wrap.evaluate(node => getComputedStyle(node).outlineStyle)).toBe('solid')
+      await touch.setViewportSize({ width: 320, height: 568 })
+      await expectViewportFit(touch, card, [wrap, copy])
+    } catch (error) {
+      await saveFailureShot(touch, 'code-card-wide-touch')
+      throw error
+    } finally { await touch.close() }
+  }, 60_000)
 
   it.each(OFFSETS)('keeps offset %i line numbers clear of aligned source in both wrap modes', async (offset) => {
     onTestFailed(() => saveFailureShot(page, `code-card-offset-${offset}`))

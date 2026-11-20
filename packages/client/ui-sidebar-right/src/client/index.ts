@@ -38,7 +38,7 @@ import { ToolBody } from './tabs/tool/ToolBody.tsx'
 import { ToolDetailsTitle } from './tabs/tool/ToolDetailsTitle.tsx'
 import { GuideBody, type GuideInjected } from './tabs/guide/GuideBody.tsx'
 import { GuideTitle } from './tabs/guide/GuideTitle.tsx'
-import { ExpandButton } from './shell/ExpandButton.tsx'
+import { ExpandButton, MobileExpandButton } from './shell/ExpandButton.tsx'
 import { AUTO_FULLSCREEN_BELOW, RightbarSeat, type SidebarRightInjected } from './shell/SidebarRight.tsx'
 import { closeWithPaneFocus, openWithPaneFocus } from './shell/close-focus.ts'
 import { RightbarRoot, type RightbarRootInjected } from './shell/RightbarRoot.tsx'
@@ -343,6 +343,16 @@ export function apply(ctx: ClientContext): void {
       store,
       inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
     }, ExpandButton))
+    const disposeMobileExpand = ctx.slots.inject('shell.mobile.header.actions', () => ctx.slots.register({
+      name: 'shell.mobile.header.actions',
+      id: 'right-sidebar',
+      locale: NS,
+      store,
+      inject: sessionId => ({
+        focus: () => { layout.focusRightbar(sessionId) },
+        hooks: { shortcuts: ctx.shortcuts.catalog, viewport: viewport.snapshot },
+      }),
+    }, MobileExpandButton))
 
     // Stage two for the guide: it declares the chain child it hosts and reads
     // the registry's entry boxes, which an ordinary type has no reason to do.
@@ -375,6 +385,7 @@ export function apply(ctx: ClientContext): void {
       disposeTool()
       disposeGuideTitle()
       disposeGuide()
+      disposeMobileExpand()
       disposeExpand()
       disposeSeat()
       for (const dispose of disposeTypes.reverse()) dispose()

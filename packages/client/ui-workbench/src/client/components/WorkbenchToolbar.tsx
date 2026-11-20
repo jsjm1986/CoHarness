@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { HostObservable, PropsHooks, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   Button, IconChevronDownOutline14, IconCopyOutline16, IconEditOutline16, IconFolderOpenOutline16, IconLogoutOutline16,
-  IconPlusOutline16, IconSplitPanesOutline16, IconTrashOutline16, IconWarningOutline16, Menu, Modal, relativeTime, StateDot,
+  IconPlusOutline16, IconSplitPanesOutline16, IconTrashOutline16, IconWarningOutline16, Menu, Modal, relativeTime, StateDot, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkbenchLayoutPreset } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { AddPaneResult, ConversationViewportMode, DeploymentContextSnapshot, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
@@ -363,7 +363,7 @@ export function WorkbenchToolbar({
   return (
     <div className={css.toolbar} data-workbench-toolbar="" data-inline={inline || undefined} data-tabbed={tabbed || undefined}>
       <div className={css.toolbarTitle}>
-        <Menu open={workbenchMenuOpen} onClose={() => { actions.closeWorkbenchMenu() }} onSelect={(id) => {
+        <Menu className={css.workbenchMenu} open={workbenchMenuOpen} onClose={() => { actions.closeWorkbenchMenu() }} onSelect={(id) => {
           actions.closeWorkbenchMenu()
           if (id === '__new') { setWorkbenchName(''); setWorkbenchDialog('create') }
           else if (id === '__rename') { setWorkbenchName(currentWorkbench?.()?.name ?? ''); setWorkbenchDialog('rename') }
@@ -440,9 +440,11 @@ export function WorkbenchToolbar({
           </button>
         )}
         {viewport.mode === 'workbench' && (
-          <Button size="toolbar" variant="soft" className={css.addConversation} disabled={viewport.pendingIdentity === true} icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
-            {t('add')}
-          </Button>
+          <Tooltip label={t('add')} side="bottom" portal>
+            <Button size="toolbar" variant="soft" className={css.addConversation} aria-label={t('add')} disabled={viewport.pendingIdentity === true} icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
+              <span className={css.addLabel}>{t('add')}</span>
+            </Button>
+          </Tooltip>
         )}
       </div>
       {viewport.pendingIdentity === true && (
@@ -601,7 +603,7 @@ export function WorkbenchToolbar({
             ? deployment.showComputer ? 'chooseComputer' : 'choosePersonalRuntime' : 'chooseWorkspace')}</span>
           {pending && <Button variant="outline" size="sm" onClick={cancelPending}>{t('cancelPending')}</Button>}
           <Button variant="primary" size="sm" disabled={viewport.pendingIdentity === true || !creatableScope || pending || full}
-            onClick={create}>{t(pending ? 'creating' : 'create')}</Button>
+            onClick={create}>{t(pending ? 'processing' : 'create')}</Button>
         </div>
       </Modal>
       <Modal open={restoreOpen && legacyRestore !== undefined} onClose={closeRestore}

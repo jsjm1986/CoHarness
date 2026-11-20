@@ -20,6 +20,10 @@ interface ChatStorePersistence {
   readDraft(this: void, value: unknown): ChatStoreState['draft']
   /** Restore the materialized composer when its verified storage ownership changes. */
   restoreDraft?(sessionId: SessionId, draft: ChatStoreState['draft']): void
+  /** Keep this document's input in memory while its previous owner is being reverified. */
+  retainDuringRenewal?(sessionId: SessionId, owner: NodeDraftOwner): boolean
+  /** Authorize a persistence change for the same Session on the verified entry computer. */
+  isEntryDraftOwner?(sessionId: SessionId, owner: NodeDraftOwner): boolean
 }
 
 const callId = z.string().min(1)
@@ -69,6 +73,12 @@ function parseDraft(text: string, read: ChatStorePersistence['readDraft']): Chat
     throw new Error('Unsupported saved draft')
   }
   return read(encoded.draft)
+}
+
+function sameDraftOwner(left: NodeDraftOwner | 'pending' | undefined, right: NodeDraftOwner | 'pending' | undefined): boolean {
+  if (left === right) return true
+  return typeof left === 'object' && typeof right === 'object' && left.accountId === right.accountId
+    && left.sessionId === right.sessionId && left.target.runtimeId === right.target.runtimeId && left.target.nodeId === right.target.nodeId
 }
 
 function legacyCopies(key: string): { storage: Storage; key: string; raw: string }[] {
@@ -171,7 +181,9 @@ export function createChatStore(persistence?: ChatStorePersistence): ChatStoreHa
     let node: NodeDraft | undefined
     let restoring = false
     let disposed = false
-    const restore = (notify = false): void => {
+    let editedHere = false
+    let renewal: { key: string; owner: NodeDraftOwner; draft: ChatStoreState['draft'] } | undefined
+    const restore = (notify = false, tabDraft?: ChatStoreState['draft']): void => {
       restoring = true
       try {
         node?.dispose()
@@ -179,14 +191,19 @@ export function createChatStore(persistence?: ChatStorePersistence): ChatStoreHa
         writers.delete(id)
         changed()
         if (owner === 'pending') {
-          instance.store.set(initialState())
-          if (notify) persistence.restoreDraft?.(id, '')
+          instance.store.set({ ...initialState(), draft: renewal?.draft ?? '' })
+          if (notify && renewal === undefined) persistence.restoreDraft?.(id, '')
           return
         }
         const previous = key === undefined ? initialState() : readState(key, persistence.readDraft)
+        if (tabDraft !== undefined) previous.draft = tabDraft
+        editedHere = false
         if (owner !== undefined && key !== undefined) {
           const previousInput = privateInputs.get(key)
-          if (previousInput !== undefined) previous.draft = previousInput
+          if (previousInput !== undefined) {
+            previous.draft = previousInput
+            editedHere = true
+          }
           const copies = legacyCopies(key)
           const original = serializeDraft(previous.draft)
           node = new NodeDraft(owner, key, (text) => {
@@ -224,10 +241,22 @@ export function createChatStore(persistence?: ChatStorePersistence): ChatStoreHa
       }
     }
     restore()
+    let observedDraft = instance.getSnapshot().draft
+    let encodedDraft = serializeDraft(observedDraft)
     const stopStore = instance.subscribe(() => {
+      const draft = instance.getSnapshot().draft
+      if (draft !== observedDraft) {
+        const encoded = serializeDraft(draft)
+        if (!restoring && encoded !== encodedDraft) {
+          editedHere = true
+          if (renewal !== undefined) renewal.draft = draft
+        }
+        observedDraft = draft
+        encodedDraft = encoded
+      }
       if (restoring || key === undefined || currentKey() !== key) return
       if (owner === 'pending') return
-      if (node !== undefined) { node.write(serializeDraft(instance.getSnapshot().draft)); return }
+      if (node !== undefined) { node.write(encodedDraft); return }
       const encoded = JSON.stringify(instance.getSnapshot())
       try { globalThis.sessionStorage.setItem(`${key}.tab.v1`, encoded) }
       catch { /* The current tab retains its input; navigation checks the saved copy. */ }
@@ -239,21 +268,47 @@ export function createChatStore(persistence?: ChatStorePersistence): ChatStoreHa
       const next = currentKey()
       const nextForget = persistence.key(scopeKey as SessionId, 'forget')
       const nextOwner = persistence.nodeOwner?.(id)
-      const category = (value: typeof owner) => value === undefined ? 'local' : value === 'pending' ? 'pending' : value.accountId
-      if (next === key && nextForget === forgetKey && category(nextOwner) === category(owner)) return
-      if (key !== undefined && node?.unsynchronized) {
+      if (next === key && nextForget === forgetKey && sameDraftOwner(owner, nextOwner)
+        && (renewal === undefined || persistence.retainDuringRenewal?.(id, renewal.owner) === true)) return
+      const priorNodeOwner = typeof owner === 'object' ? owner : renewal?.owner
+      let tabDraft: ChatStoreState['draft'] | undefined
+      if (next !== undefined && nextOwner === undefined && next === (renewal?.key ?? key)
+        && priorNodeOwner !== undefined && persistence.isEntryDraftOwner?.(id, priorNodeOwner) === true) {
+        tabDraft = instance.getSnapshot().draft
+        privateInputs.delete(next)
+        suspendedDrafts.delete(next)
+      }
+      if (next !== undefined && next === key && owner === undefined && typeof nextOwner === 'object'
+        && persistence.isEntryDraftOwner?.(id, nextOwner) === true) {
+        privateInputs.set(next, instance.getSnapshot().draft)
+      }
+      if (nextOwner === 'pending' && editedHere && key !== undefined && typeof owner === 'object'
+        && persistence.retainDuringRenewal?.(id, owner) === true) {
+        renewal = { key, owner, draft: instance.getSnapshot().draft }
+        suspendedDrafts.add(key)
+      } else if (renewal !== undefined && (nextOwner !== 'pending' || persistence.retainDuringRenewal?.(id, renewal.owner) !== true)) {
+        if (next === renewal.key && sameDraftOwner(renewal.owner, nextOwner)) privateInputs.set(next, renewal.draft)
+        else {
+          privateInputs.delete(renewal.key)
+          suspendedDrafts.delete(renewal.key)
+        }
+        renewal = undefined
+      }
+      if (tabDraft === undefined && key !== undefined && node?.unsynchronized) {
         privateInputs.set(key, instance.getSnapshot().draft)
         suspendedDrafts.add(key)
       }
       owner = nextOwner
       key = next
       forgetKey = nextForget
-      restore(true)
+      restore(true, tabDraft)
     })
     const dispose = (): void => {
       disposed = true
       node?.dispose()
       writers.delete(id)
+      if (renewal !== undefined) suspendedDrafts.delete(renewal.key)
+      renewal = undefined
       for (const stored of privateInputs.keys()) suspendedDrafts.delete(stored)
       privateInputs.clear()
       changed()

@@ -15,8 +15,11 @@ Native and executable Cua Driver providers use `desktopMode: auto` by default. W
 
 Managed runtimes also load the read-only `gateway-execution/desktop-availability` plugin when no driver is configured. Launch readiness waits for its metadata, and `host.describe.computerUseUnavailableReason` lets matching clients explain the limitation during connection recovery. This metadata grants no desktop authority; a registered provider determines its own availability.
 
+Managed VNC access has a separate node setting, `HGW_REMOTE_DESKTOP=on|off`, defaulting to `on`. Setting `off` excludes desktop files from new Runtime profiles and preserves authenticated unavailable responses. Provider startup now reports store-read failures through Cordis initialization.
+
 ## Migration
 
 1. Update the Gateway, Runtime and Web client together. Consumers of `DesktopStatus` handle the unavailable reply before reading confirmation fields. Verify that typed `host.describe` clients preserve the optional `computerUseUnavailableReason` field after decoding.
 2. Keep `desktopMode: auto` for ordinary local desktops and headless servers. Set `disabled` to turn off this provider's desktop tools. For a prepared desktop outside session discovery, or an executable wrapper connected to a remote desktop, explicitly set `enabled`; existing OS and managed-user authorization still apply.
 3. Open the selected computer's Admin deployment or desktop configuration. Confirm the desktop notice matches that computer, then check the user's desktop dialog. A headless server shows an explanation and no confirmation button; files, terminals and configured headless browsers remain available under their own permissions.
+4. On a node without configured VNC endpoints, set `HGW_REMOTE_DESKTOP=off` in its deployment configuration before starting new Runtimes. Keep `on` for local or external VNC endpoints. Apply through quiesced maintenance; do not interrupt running tasks or expand access to Gateway-private files. Verify that ordinary conversations start and desktop connections report unavailable. Existing saved node configurations inherit the bootstrap value, or `on` when absent.

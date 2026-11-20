@@ -307,6 +307,38 @@ describe('ui-workspace apply', () => {
       await b.ctx.fiber.dispose()
     }
   })
+
+  it('keeps a pending intent create alive when the caller view signal dies', async () => {
+    const b = await bench()
+    declare(b.slots, 'sidebar.workspaces')
+    let perform: ((intent: never, editing: AbortSignal, transferred: () => void) => Promise<void>) | undefined
+    b.ctx.provide('conversationIntents', {
+      begin: (_target: unknown, prepare: typeof perform) => { perform = prepare; return 'intent-1' },
+      snapshot: { getSnapshot: () => ({}) },
+    } as never)
+    b.createRuntimeSession.mockImplementation(() => new Promise(() => {}))
+    try {
+      await b.ctx.plugin({ inject: [...inject], apply }).await()
+      const browser = faceOf(b.slots.entries('sidebar.workspaces')[0]!) as WorkspaceBrowserInjected
+      const target = { kind: 'personal' as const, runtimeId: 'computer-b' as never }
+      // The caller's view lifetime ends when `selectPanel` hands the surface
+      // to the intent: the create it launched is owned by `editing`, not the
+      // dead view.
+      const caller = new AbortController()
+      await browser.startRuntimeSession!(target, undefined, caller.signal)
+      const editing = new AbortController()
+      const running = perform!(undefined as never, editing.signal, () => {})
+      running.catch(() => {})
+      await Promise.resolve()
+      caller.abort()
+      const active = (b.createRuntimeSession.mock.calls[0] as unknown[])[2] as AbortSignal
+      expect(active.aborted).toBe(false)
+      editing.abort()
+      expect(active.aborted).toBe(true)
+    } finally {
+      await b.ctx.fiber.dispose()
+    }
+  })
   it('declares the services it drives', () => {
     expect(inject).toEqual(['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport', 'shortcuts', 'layout'])
   })
@@ -719,7 +751,10 @@ describe('ui-workspace apply', () => {
       items: [{ sessionId: 'session', snippet: 'match' }],
       hasMore: false,
     })
-    expect(b.search).toHaveBeenCalledWith('match', signal)
+    expect(b.search).toHaveBeenCalledWith('match', signal, undefined)
+    const progress = vi.fn()
+    await browser.searchSessions('progress', signal, progress)
+    expect(b.search).toHaveBeenLastCalledWith('progress', signal, progress)
     expect(browser.searchResultLimit).toBe(20)
     await browser.renameWorkspace('ws' as never, 'renamed')
     expect(b.rename).toHaveBeenCalledWith('ws', 'renamed')

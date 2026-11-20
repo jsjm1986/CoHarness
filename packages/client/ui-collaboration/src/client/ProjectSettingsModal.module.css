@@ -1,6 +1,6 @@
 .dialogBody { display: flex; padding: 0; overflow: hidden; }
 .layout { display: flex; flex: 1; min-width: 0; min-height: 0; }
-.navigation { display: flex; flex: none; flex-direction: column; gap: var(--dsw-space-1); width: 180px; padding: var(--dsw-space-4) var(--dsw-space-3); border-right: 0.5px solid var(--dsw-alias-border-l2); }
+.navigation { display: flex; flex: none; flex-direction: column; gap: var(--dsw-space-1); width: 180px; padding: var(--dsw-space-4) var(--dsw-space-3); overflow-y: auto; border-right: 0.5px solid var(--dsw-alias-border-l2); }
 .navigation button { display: flex; align-items: center; gap: var(--dsw-space-2); min-height: 40px; padding: var(--dsw-space-2) var(--dsw-space-3); border: 0; border-radius: var(--dsw-radius-md); color: var(--dsw-alias-label-secondary); background: transparent; text-align: left; font: inherit; font-size: 13px; cursor: pointer; }
 .navigation button[aria-current] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); font-weight: 500; }
 .navigation button:disabled, .categoryLinks button:disabled { cursor: wait; }

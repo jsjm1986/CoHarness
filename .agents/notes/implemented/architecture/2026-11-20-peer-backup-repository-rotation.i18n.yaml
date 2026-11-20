@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-20-peer-backup-repository-rotation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-20-peer-backup-repository-rotation.md
+document:
+  en: de16b8335eeb79d1cfdff05ebdbb17f55c59b4f0
+  zh: b714f0f5e8071c9210d90ec7456304b35ae122ba
+/agent-note-verified-peer-backup-repository-retirement:
+  en: 2b0ee8c2f2c543ec
+  zh: c4d97dd3a3163957
+/agent-note-verified-peer-backup-repository-retirement/problem:
+  en: e1ba77ef3df290ec
+  zh: f8639fe908925ba1
+/agent-note-verified-peer-backup-repository-retirement/decision:
+  en: 39f9987085177433
+  zh: 0ea4749e94c85c16
+/agent-note-verified-peer-backup-repository-retirement/alternatives-considered:
+  en: 9b3ee0727c9ee65e
+  zh: b7c357212788da73
+/agent-note-verified-peer-backup-repository-retirement/consequences:
+  en: fc606f504eddcf43
+  zh: ba3f252b53fae6f1
+/agent-note-verified-peer-backup-repository-retirement/verification:
+  en: fbeb13235a993f45
+  zh: 31428bf3e967b8f8

@@ -586,6 +586,7 @@ function CatalogDropdown({
   }
 
   const scheduleHoverOpen = (): void => {
+    if (!window.matchMedia('(hover: hover)').matches) return
     cancelHoverOpen()
     cancelHoverClose()
     if (open) return
@@ -596,6 +597,7 @@ function CatalogDropdown({
   }
 
   const scheduleHoverClose = (): void => {
+    if (!window.matchMedia('(hover: hover)').matches) return
     cancelHoverOpen()
     cancelHoverClose()
     hoverCloseTimer.current = setTimeout(() => {
@@ -723,17 +725,28 @@ function CatalogDropdown({
 
   return (
     <div
-      className={`${css.root} ${variant === 'switcher' ? css.switcherRoot : ''}`}
+      className={`${css.root} ${variant === 'switcher' ? css.switcherRoot : ''} ${ancestorSwitcher ? css.ancestorRoot : ''}`}
       ref={rootRef}
       onKeyDown={navigate}
       onMouseEnter={scheduleHoverOpen}
       onMouseLeave={scheduleHoverClose}
     >
+      {ancestorSwitcher && (
+        <button
+          type="button"
+          className={`${css.switcherTrigger} ${css.ancestorSwitcherTrigger}`}
+          onClick={() => {
+            cancelHoverOpen()
+            if (open) changeOpen(false)
+            openTitle()
+          }}
+        ><span className={css.switcherTitle}>{switcherDisplayTitle}</span></button>
+      )}
       <button
         ref={triggerRef}
         type="button"
         className={variant === 'switcher'
-          ? `${css.switcherTrigger} ${ancestorSwitcher ? css.ancestorSwitcherTrigger : ''}`
+          ? `${css.switcherTrigger} ${ancestorSwitcher ? `${css.ancestorSwitcherTrigger} ${css.ancestorMenuTrigger}` : ''}`
           : css.trigger}
         aria-haspopup="tree"
         aria-expanded={open}
@@ -743,13 +756,7 @@ function CatalogDropdown({
             descendants.runningCount > 0 ? runningCountKey : totalCountKey,
             { count: descendants.runningCount > 0 ? descendants.runningCount : descendantCount },
           )}
-        onClick={openTitle === undefined
-          ? undefined
-          : () => {
-            cancelHoverOpen()
-            if (open) changeOpen(false)
-            openTitle()
-          }}
+        onClick={() => { changeOpen(!open) }}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowDown') return
           event.preventDefault()
@@ -758,7 +765,7 @@ function CatalogDropdown({
         }}
       >
         {variant === 'switcher'
-          ? <span className={css.switcherTitle}>{switcherDisplayTitle}</span>
+          ? ancestorSwitcher ? null : <span className={css.switcherTitle}>{switcherDisplayTitle}</span>
           : (
             <>
               {descendants.runningCount > 0 && (

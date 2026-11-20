@@ -1,6 +1,7 @@
 /** A refused send reports its error before response cleanup and preserves the editable draft. */
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
@@ -24,7 +25,7 @@ it('keeps the draft and removes an unadmitted echo while HTTP refusal cleanup is
   onTestFinished(() => scaffold.close())
   const events: SessionEvent[] = []
   scaffold.ctx.on('session/event', (_session, event) => { events.push(event) })
-  const browser = await chromium.launch()
+  const browser = await responsiveBrowser.launch()
   onTestFinished(() => browser.close())
   const page = await newEnglishPage(browser)
   const console = watchConsole(page)

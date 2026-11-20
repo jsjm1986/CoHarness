@@ -266,12 +266,15 @@ describe('HTML bootstrap facade', () => {
       .toThrow('create called after module-system boot')
   })
 
-  it('preloads every application combo', () => {
+  it('preloads required application combos and leaves optional combos for after mount', () => {
     const graph = bootGraph()
     const secondId = '@fixture/second-application-combo'
     const secondUrl = comboUrl([secondId], 'app-2')
     graph.entries.push({ id: secondId, url: comboUrl([secondId], 'row-2'), rev: 'row-2' })
     graph.batches.push({ phase: 'application', url: secondUrl, rev: 'app-2', entries: [secondId] })
+    const optionalId = '@fixture/optional'
+    graph.entries.push({ id: optionalId, url: comboUrl([optionalId], 'row-3'), rev: 'row-3', optional: true })
+    graph.batches.push({ phase: 'application', url: comboUrl([optionalId], 'app-3'), rev: 'app-3', entries: [optionalId] })
     expect(bootInjections(graph).flatMap(row => row.kind === 'script-preload' ? [row.src] : []))
       .toEqual([APPLICATION_URL, secondUrl])
   })
@@ -488,6 +491,40 @@ describe('client bundle activation', () => {
     mkdirSync(dirname(clientPath), { recursive: true })
     writeFileSync(clientPath, 'module.exports = {}\n')
     expect(construct([currentName]).graph().entries.map(entry => entry.id)).toEqual([currentName])
+  })
+
+  it('separates optional responses after promoting dependencies used by required packages', () => {
+    const extra = '@fixture/extra'
+    const dependency = '@fixture/dependency'
+    const provider = '@fixture/provider'
+    const chat = '@fixture/chat'
+    writeBuiltPackage(extra, { optional: true })
+    writeBuiltPackage(dependency, { optional: true, inject: [provider] })
+    writeBuiltPackage(provider, { optional: true })
+    writeBuiltPackage(chat, { external: [`${dependency}/client`] })
+    const composed = construct([extra, provider, dependency, chat]).graph()
+
+    expect(composed.entries.filter(row => row.optional).map(row => row.id)).toEqual([extra])
+    expect(composed.batches.map(batch => batch.entries)).toEqual([[provider, dependency, chat], [extra]])
+    expect(bootInjections(composed).flatMap(row => row.kind === 'script-preload' ? [row.src] : []))
+      .toEqual([composed.batches[0]?.url])
+  })
+
+  it('leaves a missing optional bundle out of the graph and stops when it supplies a required package', () => {
+    const extra = '@fixture/absent-extra'
+    const chat = '@fixture/chat'
+    const path = writePackage(extra, { dsh: { client: { platform: 'web', optional: true } } })
+    writeBuiltPackage(chat)
+    expect(construct([extra, chat]).graph().entries.map(row => row.id)).toEqual([chat])
+
+    writeBuiltPackage(chat, { inject: [extra] })
+    expect(() => construct([extra, chat])).toThrow(path)
+  })
+
+  it('rejects an invalid client optional declaration', () => {
+    const name = '@fixture/bad-optional'
+    writeBuiltPackage(name, { optional: 'yes' })
+    expect(() => construct([name])).toThrow(`${name} dsh.client.optional must be a boolean`)
   })
 
   it('groups missing bundles under one source-build instruction with a package/path list', () => {

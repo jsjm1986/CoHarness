@@ -36,6 +36,7 @@ public final class PushReceiptReporter {
             return;
         }
         String sessionId = extras.optString("sessionId", "").trim();
+        String runtimeId = extras.optString("runtimeId", "").trim();
         String eventSeq = extras.optString("eventSeq", "").trim();
         if (sessionId.isEmpty() || eventSeq.isEmpty()) return;
         String token;
@@ -44,17 +45,18 @@ public final class PushReceiptReporter {
         } catch (RuntimeException error) {
             token = "";
         }
-        report(context, "jpush", token == null ? "" : token.trim(), sessionId, eventSeq, kind);
+        report(context, "jpush", token == null ? "" : token.trim(), runtimeId, sessionId, eventSeq, kind);
     }
 
     /** Post one outcome receipt; empty token or malformed sequence drops silently. */
     public static void report(Context context, String provider, String token,
-        String sessionId, String eventSeq, String kind) {
+        String runtimeId, String sessionId, String eventSeq, String kind) {
         if (!BuildConfig.NATIVE_PUSH_ENABLED || context == null || token.isEmpty()) return;
         JSONObject payload = new JSONObject();
         try {
             payload.put("provider", provider);
             payload.put("token", token);
+            if (!runtimeId.isEmpty()) payload.put("runtimeId", runtimeId);
             payload.put("sessionId", sessionId);
             payload.put("eventSeq", Long.parseLong(eventSeq));
             payload.put("kind", kind);
@@ -75,6 +77,7 @@ public final class PushReceiptReporter {
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL(endpoint).openConnection();
+            connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(5_000);
             connection.setReadTimeout(5_000);
             connection.setRequestMethod("POST");

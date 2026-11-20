@@ -1,0 +1,5 @@
+A single-attempt client refuses pending startup; it creates no conversation.
+Cold preparation crosses the outbound channel beyond one request deadline and retains one accepted start, operation and exact target.
+The owning Web profile creates the requested Session in its default Workspace and returns authorized history.
+A second independent creation remains a different Session and uses one hot request.
+Stopped and replaced generations reject the old continuation without another start or Session mutation.

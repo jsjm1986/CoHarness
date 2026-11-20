@@ -213,6 +213,11 @@
   color: var(--dsw-alias-label-caption);
 }
 
+.searchInput:not(:disabled)::placeholder {
+  color: var(--dsw-alias-label-secondary);
+  opacity: 1;
+}
+
 .searchInput::-webkit-search-cancel-button {
   width: 12px;
   height: 12px;

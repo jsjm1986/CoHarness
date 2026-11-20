@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-17-peer-backup-source-space.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-peer-backup-source-space.md
+document:
+  en: 1fe43ca93f14256ce2cfc4caa53a06db29bc8c42
+  zh: a2c1e3f301fd286269378c3d7b35de64d4e95275
+/agent-note-preserve-source-disk-space-during-online-backups:
+  en: 42f4811e7e31ab3b
+  zh: 286faf7eece84318
+/agent-note-preserve-source-disk-space-during-online-backups/problem:
+  en: cf495be4ad0cad7f
+  zh: 6a88ea16f854085f
+/agent-note-preserve-source-disk-space-during-online-backups/decision:
+  en: ed780737d10c24ee
+  zh: 73d6ca9deb0a6d34
+/agent-note-preserve-source-disk-space-during-online-backups/alternatives-considered:
+  en: 523d36faff9d42f4
+  zh: 68031f6c4dce6703
+/agent-note-preserve-source-disk-space-during-online-backups/consequences:
+  en: 383792932b3d5642
+  zh: e874d3dd71e6f930

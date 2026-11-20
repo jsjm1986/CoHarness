@@ -3,11 +3,17 @@ import { addAbortListener } from 'node:events'
 import { Context, type Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-api-remotes/session-controller'
 import { TranslationError } from '@deepseek-ai/dsh-experimental-translator'
 import type { TranslationRequest, TranslationSpec } from '@deepseek-ai/dsh-experimental-translator/types'
 import { LANGUAGE_PREFERENCE_PATTERN, PROVIDER_PREFERENCES } from './preferences.ts'
 import type { CotTranslationPreferences, CotTranslationSnapshot } from './types.ts'
+
+const preferencesSchema: z<CotTranslationPreferences> = z.object({
+  provider: z.union(PROVIDER_PREFERENCES).default('bing'),
+  targetLanguage: z.string().pattern(LANGUAGE_PREFERENCE_PATTERN).default('auto'),
+})
 
 /** Live preferences presented on the bundle's Plugins page. */
 export interface Config {
@@ -32,8 +38,20 @@ export default class CotTranslationController extends TypertRemoteService {
     targetLanguage: z.string().pattern(LANGUAGE_PREFERENCE_PATTERN).default('auto').volatile(),
   })
 
-  constructor(ctx: Context, private readonly config: Config) {
+  private preferences: () => CotTranslationPreferences
+
+  constructor(ctx: Context, config: Config) {
     super(ctx, 'cotTranslation', { namespace: 'cotTranslation' })
+    const entry = {
+      get provider() { return config.provider.get() },
+      get targetLanguage() { return config.targetLanguage.get() },
+    }
+    this.preferences = () => entry
+    installSettingsSection(ctx, settingsNamespace('cot-translation'), preferencesSchema, entry, {
+      label: { en: 'Reasoning translation', zh: '思考翻译' },
+      setSource: (source) => { this.preferences = source },
+      onChange: () => { /* Requests and limits read the accepted preferences directly. */ },
+    })
   }
 
   /**
@@ -47,7 +65,7 @@ export default class CotTranslationController extends TypertRemoteService {
     const availableProviders = await this.ctx.translator.availableProviders(signal)
     signal.throwIfAborted()
     return { maxTextChars: this.ctx.translator.maxTextChars,
-      preferences: { provider: this.config.provider.get(), targetLanguage: this.config.targetLanguage.get() }, availableProviders }
+      preferences: this.preferences(), availableProviders }
   }
 
   /**
@@ -87,10 +105,9 @@ export default class CotTranslationController extends TypertRemoteService {
   }
 
   private resolveSelected(request: TranslationRequest): TranslationSpec {
-    const accepted = this.config.provider.get()
+    const { provider: accepted, targetLanguage } = this.preferences()
     const provider = request.provider ?? accepted
     if (provider !== accepted) throw new Error('Translation provider is not selected')
-    const targetLanguage = this.config.targetLanguage.get()
     if (targetLanguage !== 'auto' && request.targetLanguage !== targetLanguage) throw new Error('Translation language is not selected')
     return this.ctx.translator.resolve({ ...request, provider })
   }

@@ -59,7 +59,7 @@ describe('ScheduleDeleteToast', () => {
   it('shows the success banner for a confirmed deletion and dismisses once done', () => {
     vi.useFakeTimers()
     const { dismiss } = mount({ kind: 'deleted', seq: 1 })
-    expect(screen.getByRole('alert').textContent).toBe(en['toast.deleted'])
+    expect(screen.getByRole('status').textContent).toBe(en['toast.deleted'])
     act(() => { vi.runAllTimers() })
     expect(dismiss).toHaveBeenCalledOnce()
   })

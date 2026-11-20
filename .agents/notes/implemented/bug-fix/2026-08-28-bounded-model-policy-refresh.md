@@ -10,7 +10,9 @@ Changing an organization model provider, model, credential, or quota refreshed e
 
 ## Decision
 
-The Gateway enumerates users and projects once, then projects those detached rows with four bounded workers per subject class. The refresh path calls the projection writer directly instead of performing a second `getById` lookup. Startup and retry refreshes use the same bounded pass. A failed pass waits for all workers to settle, reports the first failure, and keeps the existing retry task and lazy durable-revision check responsible for eventual convergence.
+The Gateway enumerates users and projects once per full pass, then projects the returned rows with up to four workers per subject class. The refresh path reuses the enumerated rows and the writer resolves current policy at admission. The HTTP listener can bind once authoritative startup checks pass because exact Runtime preparation and forwarding enforce current policy independently of the file scan.
+
+The Gateway starts one owned reconciliation after binding and after maintenance reopens writes. It retries failed Runtime projections using fresh storage and policy reads, with catalog and owner lookup failures tracked at their own scope. The existing write admission checks maintenance again before each projection. Shutdown cancels pending retry delays and drains active work before releasing its services. [Coalesced triggers](2026-10-23-model-policy-refresh-coalescing.md) request another full scan.
 
 ## Alternatives considered
 
@@ -22,8 +24,10 @@ The Gateway enumerates users and projects once, then projects those detached row
 
 ## Consequences
 
-Bulk refresh wall time is bounded by four concurrent projection operations per class, while the database and filesystem no longer receive an unbounded burst. A refresh still visits every active subject and can take time proportional to catalog size; transient failures may leave some files at the prior revision until the retry or next runtime use repairs them. Individual user/project mutations retain their direct synchronous projection path.
+Bulk refresh issues up to four concurrent projection operations per class. A full pass still visits every active subject and can take time proportional to catalog size. A damaged policy path can leave one Runtime temporarily unavailable while other Runtimes and the Gateway continue serving. Exhausted retries log the owner or Runtime identity and error code. Individual user and project mutations retain their direct projection path.
+
+The existing administrator performance endpoint reads the node-local reconciliation snapshot. Progress remains visible while a pass waits. The latest settled round exposes the total issue count and a bounded sample of retrying or failed targets. The response and terminal logs use catalog coordinates and an allowlisted error code. Diagnosis reads no Runtime files.
 
 ## Verification
 
-Gateway model-governance integration coverage verifies that a complete refresh uses the enumerated user row without a per-id lookup and writes the expected policy. Gateway typecheck and focused model-governance tests pass.
+Gateway model-governance integration coverage verifies catalog row reuse, HTTP readiness with an outstanding scan, current policy enforcement for a requested Runtime, and isolated recovery after a policy file failure. The fixtures also verify maintenance admission, shutdown drainage, authenticated progress and capped diagnostics that strip private error data.

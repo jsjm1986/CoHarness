@@ -37,14 +37,15 @@ async function bench(initial: WebBootGraph, factories: Record<string, ClientBund
     mode: 'queue', pendingQueue: [], load: () => {},
     create: options => createClientModuleSystem(target, { id: 'bootstrap', exports: { inject: ['loader'], apply: provideModules } }, options),
   }
-  let arrival: (url: string) => Promise<void> = async () => {}
+  let arrival: (url: string, signal?: AbortSignal) => Promise<void> = async () => {}
   const modules = target.create({
     boot: initial, staticModules: {},
-    loadBundle: async (url) => {
+    loadBundle: async (url, signal) => {
       fetched.push(url)
       const ids = url === 'batch' ? initial.entries.map(row => row.id).filter(id => id !== 'bootstrap') : [url.split('??')[1]!.split('/client.js')[0]!]
       const registrations = ids.map(id => ({ id, factory: factories[id]! }))
-      await arrival(url)
+      await arrival(url, signal)
+      signal?.throwIfAborted()
       for (const registration of registrations) target.load(registration)
     },
   })
@@ -81,6 +82,170 @@ function visible(id: string, effects: { mounted: number; disposed: number; hits:
 }
 
 describe('client manifest entries', () => {
+  it('starts optional entries independently after release and retries their fetch and apply failures', async () => {
+    const required = row('chat')
+    const unavailable = row('extra', '0', { optional: true })
+    const healthy = row('healthy', '0', { optional: true })
+    const extraBatch = 'plugins/combo.js??extra/client.js&rev=batch'
+    const initial: WebBootGraph = {
+      rev: 'graph', entries: [required, unavailable, healthy],
+      batches: [
+        { phase: 'application', entries: ['chat'], url: required.url, rev: '0' },
+        { phase: 'application', entries: ['extra'], url: extraBatch, rev: 'batch' },
+        { phase: 'application', entries: ['healthy'], url: healthy.url, rev: '0' },
+      ],
+    }
+    const releaseDownload = deferred()
+    const activated = vi.fn()
+    const chat = { mounted: 0, disposed: 0, hits: 0 }
+    let applyBroken = true
+    const b = await bench(initial, {
+      chat: visible('chat', chat),
+      extra: () => ({ apply() { if (applyBroken) throw new Error('optional apply unavailable') } }),
+      healthy: () => ({ apply: activated }),
+    })
+    b.arrival(async (url) => {
+      if (url !== extraBatch && url !== unavailable.url) return
+      await releaseDownload.promise
+      throw new Error('optional download unavailable')
+    })
+
+    expect(b.fetched).toEqual([required.url])
+    const loading = b.modules.entries.startOptional()
+    try {
+      await vi.waitFor(() => {
+        expect(b.fetched).toContain(extraBatch)
+        expect(activated).toHaveBeenCalledOnce()
+      })
+      expect(chat).toEqual({ mounted: 1, disposed: 0, hits: 0 })
+    } finally {
+      releaseDownload.resolve()
+    }
+    await loading
+    expect(b.fetched.filter(url => url === extraBatch || url === unavailable.url))
+      .toEqual([extraBatch, extraBatch, unavailable.url])
+    const downloadFailures = b.modules.entries.state.getSnapshot().failures
+    expect(downloadFailures.map(failure => failure.id)).toEqual(['extra'])
+    expect(downloadFailures[0]?.message).toContain('optional download unavailable')
+
+    b.arrival(async () => {})
+    await b.modules.entries.retry()
+    const applyFailures = b.modules.entries.state.getSnapshot().failures
+    expect(applyFailures.map(failure => failure.id)).toEqual(['extra'])
+    expect(applyFailures[0]?.message).toContain('optional apply unavailable')
+    applyBroken = false
+    await b.modules.entries.retry()
+    await b.modules.entries.startOptional()
+    expect(b.modules.entries.state.getSnapshot()).toEqual({ syncing: false, failures: [] })
+    expect(chat).toEqual({ mounted: 1, disposed: 0, hits: 0 })
+  })
+
+  it('keeps optional rows deferred across Host graph changes until mount releases them', async () => {
+    const b = await bench(graph(row('chat')), {
+      chat: () => ({ apply() {} }),
+      extra: () => ({ apply() {} }),
+    })
+    const extra = row('extra', '0', { optional: true })
+    await b.modules.entries.sync(graph(row('chat'), extra))
+    await b.modules.entries.reload(extra.id, '1')
+    expect(b.fetched).toEqual(['batch'])
+
+    await b.modules.entries.startOptional()
+    expect(b.fetched).toEqual(['batch', extra.url.replace('rev=0', 'rev=1')])
+    await b.modules.entries.sync(graph(row('chat')))
+    expect([...b.ctx.loader.entries()].map(entry => entry.options.name)).toEqual(['chat'])
+  })
+
+  it('applies required graph and rebuild changes while reporting optional failures independently', async () => {
+    const chat = row('chat')
+    const stalled = row('extra', '0', { optional: true })
+    const bad = row('bad', '0', { optional: true })
+    const added = row('added')
+    const arrive = deferred()
+    const held = deferred()
+    const activateChat = vi.fn(), activateAdded = vi.fn()
+    const roster = [chat, stalled, bad]
+    const b = await bench({
+      rev: 'initial', entries: roster,
+      batches: roster.map(entry => ({ phase: 'application', url: entry.url, rev: entry.rev, entries: [entry.id] })),
+    }, {
+      chat: () => ({ apply: activateChat }),
+      extra: () => ({ apply() {} }),
+      bad: () => ({ apply() { throw new Error('optional activation unavailable') } }),
+      added: () => ({ apply: activateAdded }),
+    })
+    const signals: AbortSignal[] = []
+    b.arrival(async (url, signal) => {
+      if (url !== stalled.url) return
+      signals.push(signal!)
+      held.resolve()
+      await arrive.promise
+    })
+    const optional = b.modules.entries.startOptional()
+    try {
+      await held.promise
+      await vi.waitFor(() => {
+        const state = b.modules.entries.state.getSnapshot()
+        expect(state).toMatchObject({ syncing: false, failures: [{ id: 'bad' }] })
+        expect(state.failures[0]?.message).toContain('optional activation unavailable')
+      })
+      await b.modules.entries.sync(graph(chat, added, stalled, bad))
+      expect(activateAdded).toHaveBeenCalledOnce()
+      expect(signals[0]?.aborted).toBe(true)
+      expect(signals[1]?.aborted).toBe(false)
+      await b.modules.entries.reload(chat.id, 'r1')
+      expect(activateChat).toHaveBeenCalledTimes(2)
+    } finally {
+      arrive.resolve()
+      await optional
+    }
+  })
+
+  it('finishes teardown and rejects late optional arrivals when the transport is stalled', async () => {
+    const extra = row('extra', '0', { optional: true })
+    const arrived = deferred(), held = deferred(), finished = deferred()
+    const activate = vi.fn()
+    const b = await bench({
+      rev: 'initial', entries: [extra],
+      batches: [{ phase: 'application', url: extra.url, rev: extra.rev, entries: [extra.id] }],
+    }, { extra: () => ({ apply: activate }) })
+    let lifetime: AbortSignal | undefined
+    b.arrival(async (_url, signal) => {
+      lifetime = signal
+      held.resolve()
+      await arrived.promise
+      finished.resolve()
+    })
+    const optional = b.modules.entries.startOptional()
+    try {
+      await held.promise
+      await b.ctx.fiber.dispose()
+      await optional
+      expect(lifetime?.aborted).toBe(true)
+      expect(activate).not.toHaveBeenCalled()
+    } finally {
+      arrived.resolve()
+      await finished.promise
+      await optional
+    }
+    expect(b.modules.loadCache.has(extra.id)).toBe(false)
+  })
+
+  it('loads a newly enabled optional plugin when mount released an all-required roster', async () => {
+    const chat = row('chat')
+    const extra = row('extra', '0', { optional: true })
+    const b = await bench(graph(chat), {
+      chat: () => ({ apply() {} }),
+      extra: () => ({ apply() {} }),
+    })
+    await b.modules.entries.startOptional()
+    expect(b.fetched).toEqual(['batch'])
+
+    await b.modules.entries.sync(graph(chat, extra))
+    expect(b.fetched).toEqual(['batch', extra.url])
+    await vi.waitFor(() =>{  expect([...b.ctx.loader.entries()].map(entry => entry.options.name)).toEqual(['chat', 'extra']) })
+  })
+
   it('withdraws an old chunk table when a rebuilt frame supplies only a replacement owner revision', async () => {
     const b = await bench(graph(row('pet', '0', { chunks: { 'client.lazy.js': 'a'.repeat(64) } })), {
       pet: () => ({ apply() {} }),

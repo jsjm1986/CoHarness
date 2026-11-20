@@ -1,0 +1,18 @@
+- button "Back"
+- navigation "Document path":
+  - button "Root folder"
+  - img
+  - button "u01-upload-success" [disabled]
+- group "Document actions":
+  - button "Upload Document":
+    - img
+    - text: Upload Document
+  - button "More actions · Filtered":
+    - img
+    - text: Filtered
+- list "Document Manager":
+  - listitem:
+    - checkbox "u01-a.txt"
+    - button "Preview u01-a.txt": u01-a.txt Text · 48 B · 2026-10-24
+    - 'button "More actions: u01-a.txt"':
+      - img

@@ -72,6 +72,7 @@
 
 .button {
   display: inline-flex;
+  min-height: 24px;
   align-items: center;
   gap: 4px;
   margin: 0 2px;
@@ -88,6 +89,10 @@
 .button:hover,
 .button:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .button { min-height: var(--dsw-touch-target, 44px); min-width: var(--dsw-touch-target, 44px); }
 }
 
 .button:disabled {

@@ -99,15 +99,17 @@ export function WorkspaceFileBrowser({
       {pending && <p role="status">{labels.loading}</p>}
       {error !== undefined && <p role="alert">{error}</p>}
       {!pending && error === undefined && entries.length === 0 && <p>{labels.empty}</p>}
-      <div role="tree" className={css.fileBrowserList}>
+      <ul role="list" className={css.fileBrowserList}>
         {visibleEntries.map(entry => (
-          <button key={entry.path} type="button" role="treeitem" className={css.fileBrowserEntry}
-            onClick={() => { show(entry) }} aria-label={`${entry.type === 'directory' ? labels.directory : ''}${entry.name}`}>
-            <span aria-hidden="true">{entry.type === 'directory' ? '▸' : '·'}</span><span>{entry.name}</span>
-            {entry.type === 'file' && entry.bytes !== undefined && <small>{entry.bytes.toLocaleString()} B</small>}
-          </button>
+          <li key={entry.path}>
+            <button type="button" className={css.fileBrowserEntry}
+              onClick={() => { show(entry) }} aria-label={`${entry.type === 'directory' ? labels.directory : ''}${entry.name}`}>
+              <span aria-hidden="true">{entry.type === 'directory' ? '▸' : '·'}</span><span>{entry.name}</span>
+              {entry.type === 'file' && entry.bytes !== undefined && <small>{entry.bytes.toLocaleString()} B</small>}
+            </button>
+          </li>
         ))}
-      </div>
+      </ul>
       {truncated && <p role="status">{labels.truncated}</p>}
     </Modal>
   )

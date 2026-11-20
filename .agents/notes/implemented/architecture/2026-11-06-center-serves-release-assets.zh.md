@@ -16,7 +16,7 @@ center 改为从自己的 release 副本直接应答 release 自带的静态文�
 
 缓存语义按文件区分。basename 带有 Vite 的 `-<8+ 位哈希>.<扩展名>` 标记的文件是按内容寻址的，得到 `private, max-age=31536000, immutable`；其他文件 —— `favicon.svg`、未哈希的名字 —— 不带 `cache-control` 下发，与 Runtime 端 `frontend-static` 对非内容寻址文件的行为一致。`private` 保留：字节仍属各账户私有，只有浏览器在跨 Runtime URL 间共享，任何 CDN 或共享缓存都不得存储。`br`/`gzip` 变体镜像 `packages/host/webserver` 的 `precompressed.ts`（quality 9 / level 1、首次读取后台调度、仅记录已落定变体并以 identity 兜底、`vary: accept-encoding`），因为 Runtime 路径会对同一份字节压缩，center 不得回退传输体积。
 
-保持 Runtime 作用域的是所有跨 Runtime 并不逐字节相同的内容。全部 `/plugins/*` 维持现有路径：combo 与 `client.*.js` chunk 由各 Runtime 按其组装状态合成，Runtime 安装的插件没有可供服务的 release 文件，`/plugins/events` 是必须到达其所属 Runtime 的实时 HMR 通道。这些 URL 仍由 Referer 钉选重定向（`302` + `?dshRuntime=`），可共享的插件 URL 也仍在 Referer 的 Runtime 下静默转发。release 自带但 center 的 dist 中不存在的名字 —— 包括路径穿越尝试 —— 走同一条回退路径。
+插件 combo 与 `client.*.js` 分块仍由 Runtime 持有，因为模块注册表按各自组合生成它们；安装插件没有发布文件，`/plugins/events` 是实时 HMR 通道。严格限定的带修订资源使用[只读资源准入](2026-11-17-runtime-immutable-resource-admission.zh.md)，在显式或引用页面的 Runtime 下静默转发。未版本化资源和事件保留 Referer 钉选重定向。center 的 dist 未命中的名称落入对应 Runtime 路由；入口不运行第二套 bundle 合成器。
 
 ## Alternatives considered
 
@@ -28,7 +28,7 @@ center 改为从自己的 release 副本直接应答 release 自带的静态文�
 
 ## Consequences
 
-浏览器在任意多个 Runtime 上加载同一 release，每份带哈希的 bundle 只下载一次，且无论本地还是远程 Runtime 都不再位于资源路径上。首次命中的成本是每个文件一次 stat 加一次读取，Brotli/gzip 变体按文件代在 libuv 线程池上各构建一次。凡是 release dist 未命中的请求（安装的插件、events、缺失的名字、非 GET 方法）与今天的行为逐字节一致。这条回退同时约束了正确性：没有构建产物 dist 的部署会原样保留 Referer 钉选转发。
+浏览器在任意多个 Runtime 上加载同一 release，每份带哈希的 bundle 只下载一次，且无论本地还是远程 Runtime 都不再位于资源路径上。首次命中的成本是每个文件一次 stat 加一次读取，Brotli/gzip 变体按文件代在 libuv 线程池上各构建一次。release dist 未命中的请求仍由 Runtime 持有，包括安装的插件、事件、缺失名称与非 GET 方法。没有构建产物 dist 的部署使用经过认证的 Runtime 路由，不会发布替代字节。
 
 ## Testing
 

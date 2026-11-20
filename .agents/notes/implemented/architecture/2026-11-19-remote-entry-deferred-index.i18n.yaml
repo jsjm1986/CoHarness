@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-19-remote-entry-deferred-index.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-19-remote-entry-deferred-index.md
+document:
+  en: 5883c0fac92f5b06bbd4df76e847727260540d89
+  zh: f45b8e0bddad6dfb9050c9a0667711a1788cf03f
+/agent-note-deferred-remote-runtime-entry:
+  en: e794545b4082d9e7
+  zh: 1fd3181b7be60934
+/agent-note-deferred-remote-runtime-entry/problem:
+  en: 47f65f32817feb63
+  zh: 1c74910482f48793
+/agent-note-deferred-remote-runtime-entry/decision:
+  en: e984a1c11571d779
+  zh: bd79179f82120795
+/agent-note-deferred-remote-runtime-entry/alternatives-considered:
+  en: 26abab91ee5f4348
+  zh: 154b0cbef00cced2
+/agent-note-deferred-remote-runtime-entry/consequences:
+  en: 3bf09b24820a9c7a
+  zh: 21da956b60c32144
+/agent-note-deferred-remote-runtime-entry/verification:
+  en: 34b270dd999b009e
+  zh: 6e57fb55e515780f

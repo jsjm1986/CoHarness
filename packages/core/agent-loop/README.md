@@ -20,6 +20,7 @@ Idle permanent removal uses the factory-owned `tryDisposeIdle()` operation. It c
 ## Table of Contents
 
 - [Service: `AgentLoop` (ctx key: `agentLoop`)](#service-agentloop-ctx-key-agentloop)
+  - [Planned shutdown](#planned-shutdown)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -30,6 +31,8 @@ Idle permanent removal uses the factory-owned `tryDisposeIdle()` operation. It c
 ## Service: `AgentLoop` (ctx key: `agentLoop`)
 
 ### Public API
+
+The driver checks the root-owned [execution admission](../agent/README.md#create-or-resume-an-agent) before preparing or loading a Session. Restored historical identities cannot consume retained inbox messages through configured or programmatic Agents; fresh identities follow the ordinary loop and permission checks.
 
 Creation and resume are one rollback-covered transaction: construct a private session, concrete agent, and scoped context; await optional setup; enter both registries; announce `session/created` then await `agent/created`; and only then start the driver. Setup receives the full scoped `Context` as trusted same-process composition code and must not drive the unpublished agent. Ordinary typed identity and option inputs are borrowed under their readonly contract, while seed events and session metadata are validated and snapshotted because they cross the durable session boundary. An optional `AbortSignal` cancels only load/setup/publication and is detached before the returned handle becomes visible.
 
@@ -112,6 +115,13 @@ Everything that goes beyond "call the model, run the tools, repeat" belongs to p
 - Persistence: eager write-behind from `session/event`; `session/flush` is an explicit observation barrier
 - UI: `session/event` (assistant token stream, boundaries, tool activity) + `agent/*` control events (`agent/status`, `agent/created`/`agent/disposed`)
 
+<a id="planned-shutdown"></a>
+### Planned shutdown
+
+The managed launcher calls `ctx.agentLoop.stopForShutdown()` before unloading the profile. The factory closes creation, resume, and new inbox submissions, aborts active turns and maintenance, and waits for Agent scope cleanup. Admitted human input in either inbox stays in the log and waits for a future wake after resume. Scope owners can still withdraw their pending synthetic messages during cleanup.
+
+Each Agent then seals its Session log, flushes it with persistence still mounted, and verifies the final event sequence from storage before closing the write handle. An open turn or step, failed checkpoint, or missing required tail rejects the stop. The managed launcher also treats error records from unloading fibers as cleanup failures. An empty Session can remain unmaterialized. The checkpoint also permits an unused browser draft to retain its lazy storage behavior when it has never opened a turn and has no pending input.
+
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -160,7 +170,7 @@ Append-only; each synthetic result follows the reusable request prefix and does 
 ## Known Limitations and Deferred Work
 
 - **Classification is unary** — calls whose safety depends on comparing siblings or resources must remain exclusive ([rationale](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.md)).
-- **Root shutdown persistence** — shutting down the root context with an active Agent can leave its final `turn/end` in memory but absent from the persisted log. Agent teardown completing does not guarantee that this event was saved.
+- **Direct root disposal** may leave the final `turn/end` of an active Agent in memory when sibling persistence listeners unload first.
 - **Config labels are fresh by default** — omitting `sessionId` creates a fresh `${id}-session-<uuid>` on every startup; exact resume-or-create behavior requires an explicit stable `sessionId`, while `resumeSessionId` requires existing persisted history.
 - **Config agents have no per-agent persona field or setup hook** — they use the deployment persona; scoped persona/tool composition is available only through the programmatic `ctx.agents.create()` / `resume()` factory options.
 - **No built-in turn budget** — tool calls or steering continue the current turn; a policy that bounds runaway turns must cancel from an existing lifecycle extension point such as `agent/turn-stopping`.

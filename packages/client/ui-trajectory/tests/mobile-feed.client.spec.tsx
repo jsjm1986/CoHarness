@@ -34,7 +34,7 @@ const item = (over: Partial<TrajectoryMobileFeedItem> = {}): TrajectoryMobileFee
   ...over,
 })
 
-function mount(items: readonly TrajectoryMobileFeedItem[] = [item()]) {
+function mount(items: readonly TrajectoryMobileFeedItem[] = [item()], selectedIndex: number | null = null, logicalCount = items.length) {
   const onRecordSelect = vi.fn()
   const onRequestSelect = vi.fn()
   const onToggleTurn = vi.fn()
@@ -43,14 +43,14 @@ function mount(items: readonly TrajectoryMobileFeedItem[] = [item()]) {
     <TrajectoryMobileFeed
       t={t}
       items={items}
-      logicalCount={items.length}
+      logicalCount={logicalCount}
       scrollReady
       virtualTop={0}
       virtualBottom={0}
       historyLoading={false}
       olderBusy={false}
       hasOlderRecords={false}
-      selectedIndex={null}
+      selectedIndex={selectedIndex}
       timelineFocusIndexes={null}
       onRecordSelect={onRecordSelect}
       onRequestSelect={onRequestSelect}
@@ -79,6 +79,17 @@ describe('TrajectoryMobileFeed', () => {
     expect(b.onRecordSelect).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: /TOOL, bash/ }))
     expect(b.onRecordSelect).toHaveBeenCalledWith(1)
+  })
+
+  it('exposes virtual positions on list items and selection on their action buttons', () => {
+    mount([item({ position: 19 })], 1, 100)
+    const list = screen.getByRole('list', { name: 'Trajectory events' })
+    const row = screen.getByRole('listitem')
+    expect(list.hasAttribute('aria-setsize')).toBe(false)
+    expect(row.getAttribute('aria-setsize')).toBe('100')
+    expect(row.getAttribute('aria-posinset')).toBe('20')
+    expect(row.hasAttribute('aria-selected')).toBe(false)
+    expect(screen.getByRole('button', { name: /TOOL, bash/, pressed: true })).toBeTruthy()
   })
 
   it('uses the compact fold row action and exposes running/error metadata', () => {

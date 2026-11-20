@@ -3,9 +3,10 @@ import type { AdministratorResponse } from './admin-response.ts'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import type { UserRow } from './auth.ts'
-import type { RuntimeSubject, RuntimeTarget } from './instances.ts'
+import type { RuntimeStopReceipt, RuntimeSubject, RuntimeTarget } from './instances.ts'
 import type { GatewayDeps } from './server.ts'
 import { RuntimeManagementError } from './runtime-management.ts'
+import { RUNTIME_SHUTDOWN_OUTCOME_HEADER } from './runtime-shutdown.ts'
 
 const controls = /^\/admin\/api\/runtimes\/([^/]+)\/(start|stop|restart|retire)$/u
 const personal = /^\/admin\/api\/users\/([1-9][0-9]*)\/runtimes$/u
@@ -94,22 +95,26 @@ export async function runtimeManagementApi(deps: Pick<GatewayDeps, 'runtimeManag
   if (environment.node.id !== deps.nodeServiceIdentity?.nodeId) throw new RuntimeManagementError(503, 'runtime-management/unavailable')
   const target: RuntimeTarget = { kind: environment.owner.kind === 'personal' ? 'user' : 'project', id: environment.owner.id, runtimeId: environment.id }
   const action = selectedControl![2]!
-  const record = (generation: number) => deps.audit.write({ userId: actor.id, action: `admin.instances.${action}`,
-    detail: JSON.stringify({ target, runtimeId: environment.id, nodeId: environment.node.id, generation }),
+  const record = (generation: number, stopped?: RuntimeStopReceipt) => deps.audit.write({ userId: actor.id, action: `admin.instances.${action}`,
+    detail: JSON.stringify({ target, runtimeId: environment.id, nodeId: environment.node.id, generation,
+      stoppedGeneration: stopped?.generation, shutdownOutcome: stopped?.shutdownOutcome }),
     methodPath: `${method} ${pathname}`, status: 200, ip: req.socket.remoteAddress ?? '' })
+  let stopped: RuntimeStopReceipt | undefined
   if (action !== 'start') {
     const parsed = generation.safeParse(body(input))
     if (!parsed.success || action === 'retire' && target.kind !== 'user') throw new RuntimeManagementError(400, 'runtime-management/invalid-request')
-    await deps.instances.withStopped(target, async lease => {
+    stopped = await deps.instances.withStopped(target, async (lease, receipt) => {
       if (action === 'retire') {
         if (lease === undefined) throw new RuntimeManagementError(503, 'runtime-management/unavailable')
         await service.retire(actor, target.id, lease)
       }
+      return receipt
     }, actor.id, parsed.data.generation, action === 'retire' ? 'destructive' : 'control')
     if (action === 'retire') { await reply.json(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, retired: true, dataRetained: true }); return true }
     if (action === 'stop') {
-      await record(parsed.data.generation)
-      await reply.json(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, generation: parsed.data.generation, observedState: 'stopped' }); return true
+      await record(stopped.generation, stopped)
+      await reply.json(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, observedState: 'stopped', ...stopped },
+        { [RUNTIME_SHUTDOWN_OUTCOME_HEADER]: stopped.shutdownOutcome }); return true
     }
   } else if (!z.object({}).strict().safeParse(body(input)).success) throw new RuntimeManagementError(400, 'runtime-management/invalid-request')
   let subject: RuntimeSubject
@@ -123,7 +128,9 @@ export async function runtimeManagementApi(deps: Pick<GatewayDeps, 'runtimeManag
     subject = { kind: 'project', id: owner.id, name: owner.name, path: owner.path, runtimeId: target.runtimeId, steward: owner.kind === 'steward' }
   }
   const running = await deps.instances.ensureRunning(subject, 'explicit', actor.id)
-  await record(running.generation)
-  await reply.json(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, generation: running.generation, observedState: 'ready' })
+  await record(running.generation, stopped)
+  await reply.json(200, { runtimeId: target.runtimeId, nodeId: environment.node.id, generation: running.generation, observedState: 'ready',
+    stoppedGeneration: stopped?.generation, shutdownOutcome: stopped?.shutdownOutcome },
+  stopped === undefined ? undefined : { [RUNTIME_SHUTDOWN_OUTCOME_HEADER]: stopped.shutdownOutcome })
   return true
 }

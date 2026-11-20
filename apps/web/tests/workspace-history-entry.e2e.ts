@@ -4,11 +4,12 @@
  * control always mints a fresh Session+Agent and leaves the Workspace's blank
  * member parked for reconnection. Keyless replay; no model turn.
  */
+import { responsiveBrowser, responsiveMobileEmulation } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, BrowserContext, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-workspace'
@@ -81,7 +82,7 @@ describe('web e2e: Workspace history-first entry', () => {
     const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
     await workspace.attachSession(history)
     await workspace.attachSession(blank)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
   }, 120_000)
 
   afterAll(async () => {
@@ -97,7 +98,7 @@ describe('web e2e: Workspace history-first entry', () => {
     const page = await browser.newPage({
       viewport,
       locale: 'en-US',
-      ...(compact ? { hasTouch: true, isMobile: true } : {}),
+      ...(compact ? { hasTouch: true, isMobile: responsiveMobileEmulation } : {}),
     })
     const tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -222,7 +223,7 @@ describe('web e2e: Workspace history-first entry', () => {
       viewport: { width: 390, height: 844 },
       locale: 'en-US',
       hasTouch: true,
-      isMobile: true,
+      isMobile: responsiveMobileEmulation,
     })
     const page = await compactContext.newPage()
     const tripwire = watchConsole(page)

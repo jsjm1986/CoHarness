@@ -1,4 +1,4 @@
-# Agent Note: 期望态 Runtime 协调器与有界回温
+# Agent Note：按期望状态恢复 Runtime
 
 Status: implemented
 
@@ -6,31 +6,28 @@ Status: implemented
 
 ## Problem
 
-停止的本地 Runtime 过去只能由用户请求拉起：升级排空把幸存者写成 `stopped`、空闲收割停掉安静的 Runtime、崩溃的 supervisor 被发布为 `failed`——但没有任何机制重启它们。部署后每次"打开界面就干等"都是一次懒冷启动，而持续崩溃循环的 Runtime(实测某项目行 generation 达 11228)可以无限烧启动次数。
+前台活动不是 Runtime 的运行义务。常驻插件或每月定时任务可以在数周没有浏览器访问后仍然需要运行。只恢复近期活跃实例，会让这些任务在进程故障后长期休眠。
 
 ## Decision
 
-`InstanceManager.reconcile()` 在启动后约 15s 首次运行、之后每 60s 经既有 `fencedTask` 单飞执行，对持久行集执行两项职责：
+`instances.desired_state` 保存持久运行意图。启动将其设为 `running`。基础设施 `shutdown` 和 `failed` 转换在确认终止后仍保留该意图。显式 `manual`、`idle` 和 `access-change` 停止将其设为 `stopped`，并优先于后续基础设施清理。停止失败时保持观测状态 `stopping` 和容量占用，直到监督器确认终止。
 
-- **探测**：对每个仍为 `ready` 的收养驻留租约，检查已跟踪进程(`isAlive`/`hasExited`）或经 `liveEndpoint` 重连。确认死亡的进程在按 runtime 串行的车道上、针对**观测到的** generation 以 `failed` 原因停止——竞争中的替代启动不会被取消或终止；资源注册缺失(`unregistered`）**不**视为死亡，探测只在有确证时动作。行仍为 `starting` 且已超 `HGW_READINESS_TIMEOUT_MS` 的收养租约按同法结算：该截止即启动承诺自身的预算，过期的 `starting` generation 不可能再发布 `ready`——它只在启动路径本身死于半途时存在（Windows 节点实测：supervisor 在 Gateway 重启窗口内 exit-0，行留在 `starting`、收养的租约以 `RuntimeStartBlockedError` 永久挡住后续启动）。启动若死于 supervisor 认领 owner 证据之前，则不存在任何被监督进程，该边界直接结算行并释放租约。
-- **回温**:`InstanceRepository.warmTargets(cutoff)` 返回本节点 `stopped` 行中 `stop_reason` 为基础设施停止(`shutdown`、`failed`）且 `last_activity_at` 落在 `HGW_RECONCILE_WARM_WINDOW_MS`（默认 7 天）内的行，最近活跃优先。每个目标经 `startRequest(subject, 'passive', undefined, { recordActivity: false })` 重启——走完整准入、容量与策略路径，subject 由 `warmSubject()` 依据 `repository.owner` 重建最小集合——但 `beginStart` 不触碰 `last_activity_at`，无人值守的回温无法自行续期回温窗口。
+`InstanceManager.reconcile()` 检查现有代次，并通过正常鉴权、容量和进程代次准入恢复仍有运行意图的基础设施停机实例。近期使用的历史基础设施停机记录仍可在 `HGW_RECONCILE_WARM_WINDOW_MS`（默认七天）内恢复。该窗口不会使持久运行意图过期。从未启动的分配、显式停止和空闲停止都被排除。
 
-`manual`、`access-change` 与 `idle` 停止永不复活：前两条是硬语义线，`idle` 是收割器按 on-demand 策略下的裁决——回温它会对抗当初停掉它的策略。`reconcileRecovery` 映射施加连续失败退避：确认死亡与启动失败计数，拒绝（`blocked`、容量 `cancelled`）只顺延一个基础间隔；重试延迟从 `HGW_RECONCILE_BACKOFF_BASE_MS`(60s）起按失败翻倍、封顶 `HGW_RECONCILE_BACKOFF_MAX_MS`(30m)；持续 `HGW_RECONCILE_STABLE_MS`(10m）保持 ready 则清除连败记录。`HGW_RECONCILE=off` 可整体关闭。
+自动恢复不会更新前台活动时间。连续失败退避范围由 `HGW_RECONCILE_BACKOFF_BASE_MS` 和 `HGW_RECONCILE_BACKOFF_MAX_MS` 控制，持续就绪达到 `HGW_RECONCILE_STABLE_MS` 后清除失败记录。`HGW_RECONCILE=off` 关闭自动恢复。协调器不会终止存活的不兼容版本；升级准入由[存活进程策略](2026-11-11-runtime-survivor-retention.zh.md)负责。
 
 ## Alternatives considered
 
-**supervisor 层 respawn**(launchd/systemd 式进程重启）。否决：respawn 绕过 gateway 准入、容量栅栏与 generation 栅栏；reconciler 复用普通启动管线，使复活的 Runtime 与用户启动的完全等价。
+**启动每个已分配 Runtime。** 否决：只读目录和未使用的个人分配不能消耗进程。
 
-**回温所有停止行**。否决：长期冷置的 Runtime 会在 boot 时空烧启动槽。活跃窗口把回温集限定在可能被使用的空间；显式 `manual` 作为硬语义线不被触碰。
+**只看近期前台活动。** 否决：后台运行义务比浏览器活动持续更久。时间窗口仅用于没有保留运行意图的历史记录。
 
-**每 boot 尝试次数上限**。否决：绝对的每 boot 计数会把一个偶发失败的 Runtime 永久饿到下次部署，且把未消耗 generation 的拒绝也计入。按失败归因的指数退避在无终态的前提下约束重试频率，持续 ready 的观测证明恢复后清除记录。
+**新增持久恢复标记。** 否决：`desired_state` 已经表达所需持久意图，第二个字段可能与显式停止决定冲突。
+
+**仅让监督器重新派生。** 否决：这会绕过当前 Gateway 鉴权、配额和代次准入。
 
 ## Consequences
 
-部署重启现在自愈：签名排空→`stopped` 行带 `stop_reason='shutdown'`→首轮 reconcile 无用户干预回温至 `ready`。崩溃恢复从"等下次进入"变成 ~60s 内自动完成，崩溃循环进入几何级重试而非无限空转或硬性的每 boot 终止——历史失控行在退避饱和后至多每 30 分钟重试一次。回温后无人使用的 Runtime 保持原 `last_activity_at`，空闲收割只会恰一次把它收为 `idle`，此后直到真实使用前都保持停止。回温启动与用户请求共用同一准入 FIFO，批量回温可能瞬时占满 `maxStarting` 槽；交互启动不被抢占，但可能排在进行中的回温准入之后。
+常驻工作和定时任务可独立于最后一次浏览器访问恢复，前提是 Runtime 已被启动且没有显式停止或撤权。定时任务仍依赖运行中的 Host，此机制不引入外部定时服务。按需 Runtime 在运行义务结束后继续通过已鉴权的空闲检查回收。恢复与交互请求共享有界启动容量。
 
-## Verification
-
-- `instances.spec.ts`:`shutdown` 停止行回温至 `ready` 而 `manual`/`access-change`/`idle` 保持 `stopped`；真实 `FAKE_DSH` 子进程经 `/exit` 杀死被发布 `failed` 再回温 `ready`；死亡的收养幸存者经探测发布 `failed`；对已被竞争启动替换 generation 的行探测不终止任何进程；超过就绪时限的 `starting` generation 被结算 `failed` 而未到期者留给其自身启动；回温启动不触碰 `last_activity_at`；连续启动失败几何退避、持续 ready 观测清除连败。
-- `config.spec.ts`：默认 `enabled/7d/60s/30m/10m`,`HGW_RECONCILE=off`，非法值拒绝。
-- 生产 mac-mini r56（退避改造前的构建）：启动签名排空→首轮 reconcile 记录 `{ failed: 0, warmed: 5, budgeted: 0 }`,6 行（admin 个人、mac-mini steward、项目 Runtime）无人值守到达 `ready`；两个崩溃循环行在第 2–3 轮重试（generation 24→25→26、11229→11230→11231）后停止重试。退避所闸控的排空→回温路径未变。
+SQLite schema 11 为旧测试／本地存储提供相同期望状态语义，保留活跃记录的运行意图，让已停止分配保持停止。PostgreSQL 使用已有期望状态列。测试覆盖长期运行义务、未使用分配、终止失败、停止优先级及活动时间不变。

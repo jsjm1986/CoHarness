@@ -12,7 +12,9 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { holdInert } from '@deepseek-ai/dsh-client-ui-primitives'
 import { AppFrame } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import type { AppFrameProps } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import { SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from '@deepseek-ai/dsh-client-ui-layout/src/client/columns.ts'
@@ -59,12 +61,13 @@ function mountFrame() {
   // Key-echo locale stub: aria-labels assert against raw keys.
   const t = ((key: string) => key) as AppFrameProps['t']
   const slotCalls: { key: string; props: unknown }[] = []
-  const renderSlot = ((key: string, owner: object) => {
+  const renderSlot = ((key: string, owner: object, options?: { entryKey?: string; fallback?: ReactNode }) => {
     slotCalls.push({ key, props: owner })
     if (key === 'sidebar') return <div data-testid="sidebar-content" />
     if (key === 'main') return <div data-testid="center-content" />
     if (key === 'rightbar') return <div data-testid="details-content" />
     if (key === 'conversation.empty') return <div data-testid="empty-content" />
+    if (key === 'shell.mobile.header.title') return options?.entryKey === 'plugins' ? 'Plugins' : options?.fallback
     return <div data-testid="other-content" />
   }) as AppFrameProps['renderSlot']
   const useSessions = ((sel: (s: SessionListState) => unknown) => {
@@ -127,6 +130,13 @@ function drag(handle: Element, fromX: number, toX: number): void {
   act(() => { handle.dispatchEvent(up) })
 }
 
+function touch(target: Element, type: string, points: readonly { clientX: number; clientY: number }[] = [], cancelable = true): Event {
+  const event = new Event(type, { bubbles: true, cancelable })
+  Object.defineProperty(event, 'touches', { value: points })
+  act(() => { target.dispatchEvent(event) })
+  return event
+}
+
 beforeEach(() => {
   frameWidth = 1920
   frameHeight = 1080
@@ -165,6 +175,19 @@ afterEach(() => {
 })
 
 describe('AppFrame', () => {
+  it('shows the selected global page title and restores the conversation title on return', () => {
+    frameWidth = 390
+    const { container, instance } = mountFrame()
+    const title = container.querySelector('[data-mobile-page-title]')!
+    expect(title.textContent).toBe('Test')
+    act(() => { instance.actions.selectPanel('plugins' as MainPanelId) })
+    expect(title.textContent).toBe('Plugins')
+    act(() => { instance.actions.selectPanel('untitled-panel' as MainPanelId) })
+    expect(title.textContent).toBe('app.title')
+    act(() => { instance.actions.selectPanel(null) })
+    expect(title.textContent).toBe('Test')
+  })
+
   it('renders three tracks from store state', () => {
     const { frame } = mountFrame()
     expect(tracks(frame)).toEqual([280, 0])
@@ -477,6 +500,141 @@ describe('AppFrame — compact drawer and overlay details', () => {
     expect(drawer.hasAttribute('data-open')).toBe(false)
   })
 
+  it('keeps a tap on an edge control when the finger moves slightly', () => {
+    frameWidth = 390
+    const { frame, instance, getByTestId } = mountFrame()
+    const button = document.createElement('button')
+    button.textContent = 'Copy'
+    const copied = vi.fn()
+    button.addEventListener('click', copied)
+    getByTestId('center-content').append(button)
+    expect(frame.querySelector('[class*="edgeZone"]')).toBeNull()
+    expect(touch(button, 'touchstart', [{ clientX: 13, clientY: 332 }]).defaultPrevented).toBe(false)
+    expect(touch(button, 'touchmove', [{ clientX: 15, clientY: 333 }]).defaultPrevented).toBe(false)
+    expect(touch(button, 'touchend').defaultPrevented).toBe(false)
+    button.click()
+    expect(copied).toHaveBeenCalledOnce()
+    expect(instance.getSnapshot().narrowExpanded).toBe(false)
+  })
+
+  it('opens from an edge gesture on content and closes from the drawer', () => {
+    frameWidth = 390
+    const { frame, instance, getByTestId } = mountFrame()
+    const content = getByTestId('center-content')
+    const drawer = getByTestId('sidebar-content').parentElement!
+    touch(content, 'touchstart', [{ clientX: 13, clientY: 200 }])
+    expect(touch(content, 'touchmove', [{ clientX: 180, clientY: 204 }]).defaultPrevented).toBe(true)
+    expect(drawer.style.transform).not.toBe('')
+    touch(content, 'touchend')
+    expect(instance.getSnapshot().narrowExpanded).toBe(true)
+    expect(drawer.hasAttribute('data-open')).toBe(true)
+    touch(drawer, 'touchstart', [{ clientX: 180, clientY: 200 }])
+    expect(touch(drawer, 'touchmove', [{ clientX: 20, clientY: 204 }]).defaultPrevented).toBe(true)
+    touch(drawer, 'touchend')
+    expect(instance.getSnapshot().narrowExpanded).toBe(false)
+    expect(frame.querySelector('[class*="topbarToggle"]')?.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it.each(['open', 'close'] as const)('reserves the first small %s move before showing drawer movement', (kind) => {
+    frameWidth = 390
+    const { frame, instance, getByTestId } = mountFrame()
+    const drawer = getByTestId('sidebar-content').parentElement!
+    if (kind === 'close') act(() => { instance.actions.toggleSidebar() })
+    const target = kind === 'open' ? getByTestId('center-content') : drawer
+    const x0 = kind === 'open' ? 12 : 180
+    const direction = kind === 'open' ? 1 : -1
+    touch(target, 'touchstart', [{ clientX: x0, clientY: 200 }])
+    expect(touch(target, 'touchmove', [{ clientX: x0, clientY: 200 }]).defaultPrevented).toBe(false)
+    for (const distance of [8.22, 10.26, 12]) {
+      expect(touch(target, 'touchmove', [{ clientX: x0 + direction * distance, clientY: 200 }]).defaultPrevented).toBe(true)
+      expect(drawer.style.transform).toBe('')
+      expect(instance.getSnapshot().narrowExpanded).toBe(kind === 'close')
+    }
+    touch(target, 'touchmove', [{ clientX: x0 + direction * 14.38, clientY: 200 }])
+    expect(drawer.style.transform).not.toBe('')
+    touch(target, 'touchmove', [{ clientX: x0 + direction * 150, clientY: 200 }])
+    touch(target, 'touchend')
+    expect(instance.getSnapshot().narrowExpanded).toBe(kind === 'open')
+    expect(frame.querySelector('[class*="topbarToggle"]')?.getAttribute('aria-expanded')).toBe(String(kind === 'open'))
+  })
+
+  it.each(['open', 'close'] as const)('keeps the starting drawer state when a reserved %s move ends below the visual threshold', (kind) => {
+    frameWidth = 390
+    const { instance, getByTestId } = mountFrame()
+    const drawer = getByTestId('sidebar-content').parentElement!
+    if (kind === 'close') act(() => { instance.actions.toggleSidebar() })
+    const target = kind === 'open' ? getByTestId('center-content') : drawer
+    const x0 = kind === 'open' ? 12 : 180
+    touch(target, 'touchstart', [{ clientX: x0, clientY: 200 }])
+    const clientX = x0 + (kind === 'open' ? 8.22 : -8.22)
+    expect(touch(target, 'touchmove', [{ clientX, clientY: 200 }]).defaultPrevented).toBe(true)
+    touch(target, 'touchend')
+    expect(instance.getSnapshot().narrowExpanded).toBe(kind === 'close')
+    expect(drawer.style.transform).toBe('')
+    expect(drawer.style.visibility).toBe('')
+  })
+
+  it.each([{ dx: 2, dy: 8 }, { dx: -8, dy: 0 }])('leaves a small initial native move $dx/$dy with its content', ({ dx, dy }) => {
+    frameWidth = 390
+    const { instance, getByTestId } = mountFrame()
+    const content = getByTestId('center-content')
+    touch(content, 'touchstart', [{ clientX: 12, clientY: 200 }])
+    expect(touch(content, 'touchmove', [{ clientX: 12 + dx, clientY: 200 + dy }]).defaultPrevented).toBe(false)
+    expect(touch(content, 'touchmove', [{ clientX: 180, clientY: 204 }]).defaultPrevented).toBe(false)
+    touch(content, 'touchend')
+    expect(instance.getSnapshot().narrowExpanded).toBe(false)
+  })
+
+  it.each(['uncancellable', 'multiple touches', 'touchcancel'] as const)('abandons reserved input after %s', (reason) => {
+    frameWidth = 390
+    const { instance, getByTestId } = mountFrame()
+    const content = getByTestId('center-content')
+    const drawer = getByTestId('sidebar-content').parentElement!
+    touch(content, 'touchstart', [{ clientX: 12, clientY: 200 }])
+    expect(touch(content, 'touchmove', [{ clientX: 20.22, clientY: 200 }]).defaultPrevented).toBe(true)
+    if (reason === 'uncancellable') touch(content, 'touchmove', [{ clientX: 22.26, clientY: 200 }], false)
+    else if (reason === 'multiple touches') {
+      touch(content, 'touchmove', [{ clientX: 22.26, clientY: 200 }, { clientX: 40, clientY: 200 }])
+    } else touch(content, 'touchcancel')
+    expect(touch(content, 'touchmove', [{ clientX: 180, clientY: 204 }]).defaultPrevented).toBe(false)
+    touch(content, 'touchend')
+    expect(instance.getSnapshot().narrowExpanded).toBe(false)
+    expect(drawer.style.transform).toBe('')
+  })
+
+  it('leaves non-edge horizontal gestures and edge vertical scrolling to their content', () => {
+    frameWidth = 390
+    const { instance, getByTestId } = mountFrame()
+    const content = getByTestId('center-content')
+    touch(content, 'touchstart', [{ clientX: 100, clientY: 200 }])
+    expect(touch(content, 'touchmove', [{ clientX: 250, clientY: 200 }]).defaultPrevented).toBe(false)
+    touch(content, 'touchend')
+    touch(content, 'touchstart', [{ clientX: 13, clientY: 200 }])
+    expect(touch(content, 'touchmove', [{ clientX: 14, clientY: 250 }]).defaultPrevented).toBe(false)
+    expect(touch(content, 'touchmove', [{ clientX: 200, clientY: 260 }]).defaultPrevented).toBe(false)
+    touch(content, 'touchend')
+    expect(instance.getSnapshot().narrowExpanded).toBe(false)
+  })
+
+  it('measures the edge from the embedded frame and cancels without committing a swipe', () => {
+    frameWidth = 390
+    const { frame, instance, getByTestId, unmount } = mountFrame()
+    vi.spyOn(frame, 'getBoundingClientRect').mockReturnValue(new DOMRect(120, 0, 390, 844))
+    const content = getByTestId('center-content')
+    const drawer = getByTestId('sidebar-content').parentElement!
+    touch(content, 'touchstart', [{ clientX: 125, clientY: 200 }])
+    expect(touch(content, 'touchmove', [{ clientX: 300, clientY: 204 }]).defaultPrevented).toBe(true)
+    touch(content, 'touchcancel')
+    expect(instance.getSnapshot().narrowExpanded).toBe(false)
+    expect(drawer.style.transform).toBe('')
+    touch(content, 'touchstart', [{ clientX: 125, clientY: 200 }])
+    touch(content, 'touchmove', [{ clientX: 300, clientY: 204 }])
+    unmount()
+    expect(drawer.style.transform).toBe('')
+    expect(touch(content, 'touchmove', [{ clientX: 350, clientY: 204 }]).defaultPrevented).toBe(false)
+    expect(instance.getSnapshot().narrowExpanded).toBe(false)
+  })
+
   it('Escape closes the drawer and restores focus to the topbar toggle', () => {
     frameWidth = 390
     const { frame } = mountFrame()
@@ -486,6 +644,31 @@ describe('AppFrame — compact drawer and overlay details', () => {
     act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(toggle)
+  })
+
+  it('isolates a closed compact drawer and releases only its own inert hold across resize and unmount', () => {
+    frameWidth = 390
+    const { frame, unmount, getByTestId } = mountFrame()
+    const sidebar = getByTestId('sidebar-content')
+    const drawer = sidebar.parentElement!
+    expect(drawer.inert).toBe(true)
+    const releaseOverlay = holdInert(drawer)
+    const toggle = frame.querySelector<HTMLButtonElement>('[class*="topbarToggle"]')!
+    act(() => { toggle.click() })
+    expect(drawer.inert).toBe(true)
+    releaseOverlay()
+    expect(drawer.inert).toBe(false)
+    act(() => { toggle.click() })
+    expect(drawer.inert).toBe(true)
+    frameWidth = 1920
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(drawer.inert).toBe(false)
+    expect(getByTestId('sidebar-content')).toBe(sidebar)
+    frameWidth = 390
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(drawer.inert).toBe(true)
+    unmount()
+    expect(drawer.inert).toBe(false)
   })
 
   it('session navigation dismisses the open drawer', () => {
@@ -526,9 +709,10 @@ describe('AppFrame — compact drawer and overlay details', () => {
     expect(instance.getSnapshot().narrowExpanded).toBe(false)
   })
 
-  it('widening out of compact re-seats the sidebar into the column and drops the topbar', () => {
+  it('keeps the sidebar mounted across compact and wide modes while replacing the topbar', () => {
     frameWidth = 390
-    const { frame } = mountFrame()
+    const { frame, getByTestId } = mountFrame()
+    const sidebar = getByTestId('sidebar-content')
     expect(frame.querySelector('[class*="topbar"]')).not.toBeNull()
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
@@ -536,6 +720,11 @@ describe('AppFrame — compact drawer and overlay details', () => {
     expect(frame.querySelector('[class*="topbar"]')).toBeNull()
     expect(frame.querySelector('[class*="drawer"]')).toBeNull()
     expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0])
+    expect(getByTestId('sidebar-content')).toBe(sidebar)
+    frameWidth = 390
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(frame.getAttribute('data-viewport')).toBe('compact')
+    expect(getByTestId('sidebar-content')).toBe(sidebar)
   })
 })
 

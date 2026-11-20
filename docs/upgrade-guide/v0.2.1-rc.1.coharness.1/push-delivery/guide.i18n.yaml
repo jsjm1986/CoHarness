@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/push-delivery/guide.md
 document:
-  en: b130a02cebc5a799e4cda44451c244619cb974c5
-  zh: 606be81a21a12f4ed288fd7ec92d0ddb21383144
+  en: 7ad56d08166381d72e9592925ed020a4e6ff4dd7
+  zh: db4a4997fccb98d310b95f6b3202175f3efef3e8
 /:
   en: 2b98637c137e37e5
   zh: 3e52202e1c555985
@@ -15,5 +15,5 @@ document:
   en: 2ec822f2153b027c
   zh: 0ffbab233f615be3
 /upgrade-completion-notification-admission/migration:
-  en: 0881bf99429d3e51
-  zh: 41eb3bfffec2ff5f
+  en: 4e938f5dc3c2f49a
+  zh: effbaea9db950a9b

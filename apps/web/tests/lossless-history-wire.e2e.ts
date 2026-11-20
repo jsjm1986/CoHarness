@@ -4,9 +4,10 @@
 // page already paginates. Direct API callers that omit `detail` still receive
 // every event.
 
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page, Response as PlaywrightResponse } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { DEFAULT_HISTORY_PAGE_TARGET_BYTES, RpcId } from '@deepseek-ai/dsh-host-apiproxy'
 import { clientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -609,7 +610,7 @@ describe('web e2e: lossless history wire pagination', () => {
     // cold read writes the row back, as the fuller read ladder does.
     const seededLog = await scaffold.ctx.sessionPersistence.load(SessionId(SEED_ID))
     scaffold.ctx.get('sessionProjectionCache')?.coldSnapshot(seededLog.meta, seededLog.inheritedEventCount, seededLog.events)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     observeHistoryPages(page, historyReads)

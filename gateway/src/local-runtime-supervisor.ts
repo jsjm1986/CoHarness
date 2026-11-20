@@ -10,6 +10,7 @@ import { LOCAL_BOOTSTRAP_BYTES, localBootstrapSchema, localKernelBootId } from '
 import { RuntimeLog } from './runtime-log.ts'
 import { localLinuxRuntimeCommand, stopLocalLinuxRuntime } from './local-runtime-linux.ts'
 import { assignRuntimeKillJob, win32CurrentProcessCreationMs, type Win32RuntimeJob } from './local-runtime-win32-job.ts'
+import { runtimeCheckpointOutcome, signalShutdownOutcome, type RuntimeCheckpointOutcome } from './runtime-shutdown.ts'
 
 const CONTROL_BYTES = 4096
 let started = false
@@ -57,8 +58,29 @@ async function supervise(input: unknown): Promise<void> {
 
   let forceWork: Promise<void> | undefined
   let killJob: Win32RuntimeJob | undefined
-  function killOwnedGroup(): void {
+  let checkpointReady = false
+  let checkpointRequested: 'ipc' | 'signal' | undefined
+  let checkpoint: RuntimeCheckpointOutcome | undefined
+
+  function exitedRuntimeCheckpoint(): RuntimeCheckpointOutcome | undefined {
+    const code = child?.exitCode
+    if (code === null || code === undefined) return undefined
+    if (checkpointRequested === 'signal' && checkpointReady) return signalShutdownOutcome(code)
+    if (checkpointRequested === 'ipc') {
+      if (code === 83) return 'forced'
+      if (checkpoint !== 'confirmed' || code === 0) return checkpoint
+    }
+    return undefined
+  }
+
+  function killOwnedGroup(fallback?: RuntimeCheckpointOutcome): void {
     forceWork ??= (async () => {
+      const outcome = exitedRuntimeCheckpoint() ?? fallback
+      if (outcome !== undefined && record.phase === 'stopping') {
+        try { await lease.recordShutdownOutcome(outcome) } catch (error) {
+          console.error('[gateway] local Runtime shutdown receipt unavailable', { generation: record.identity.generation, error })
+        }
+      }
       if (record.nativeRange === 'linux-slice') await stopLocalLinuxRuntime(record, spec.controlTimeoutMs)
       if (process.platform === 'win32') {
         // The kill-on-close Job ends the whole tree atomically; taskkill /T
@@ -75,6 +97,13 @@ async function supervise(input: unknown): Promise<void> {
     })()
     void forceWork.catch(() => process.exit(1))
   }
+
+  function signalRuntime(runtime: ChildProcess): void {
+    if (process.platform !== 'win32' && runtime.exitCode === null && runtime.signalCode === null && runtime.kill('SIGTERM')) {
+      checkpointRequested = 'signal'
+    }
+  }
+
   function stop(graceMs: number): void {
     if (stopWork !== undefined) return
     stopping = true
@@ -85,15 +114,22 @@ async function supervise(input: unknown): Promise<void> {
       if (record.phase === 'starting' || record.phase === 'running' || record.phase === 'uncertain') {
         record = await lease.publish({ ...record, phase: 'stopping' })
       }
-      if (process.platform === 'win32') {
-        // No graceful signal exists on Windows; honour the grace window, then force.
-        if (child === undefined || child.exitCode !== null || child.signalCode !== null) { await log.close(); killOwnedGroup() }
-        else setTimeout(killOwnedGroup, graceMs)
+      const runtime = child
+      if (runtime === undefined) { await log.close(); killOwnedGroup(); return }
+      if (runtime.exitCode !== null || runtime.signalCode !== null) {
+        setTimeout(() => killOwnedGroup(), graceMs)
         return
       }
-      process.kill(-process.pid, 'SIGTERM')
-      setTimeout(killOwnedGroup, graceMs)
-      if (child === undefined) { await log.close(); killOwnedGroup() }
+      if (graceMs === 0) {
+        killOwnedGroup('forced')
+        return
+      }
+      if (checkpointReady && runtime.connected) {
+        checkpointRequested = 'ipc'
+        runtime.send({ kind: 'dsh-runtime-stop' }, error => { if (error !== null) signalRuntime(runtime) })
+      } else signalRuntime(runtime)
+      setTimeout(() => killOwnedGroup(runtime.exitCode === null && runtime.signalCode === null
+        ? checkpointRequested === undefined ? 'forced' : 'timeout' : undefined), graceMs)
     })()
     void stopWork.catch(() => process.exit(1))
   }
@@ -122,7 +158,7 @@ async function supervise(input: unknown): Promise<void> {
       response.writeHead(400).end(); return
     }
     response.writeHead(200, { 'content-type': 'application/json', connection: 'close' }).end(JSON.stringify({
-      nonce: record.nonce, phase: record.phase, runtimeAlive,
+      nonce: record.nonce, phase: record.phase, runtimeAlive, checkpointReady,
     }))
     if (message.operation === 'stop') stop(Number(message.graceMs))
   }
@@ -147,12 +183,23 @@ async function supervise(input: unknown): Promise<void> {
     child = spawn(command[0]!, command.slice(1), {
       cwd: spec.cwd, env: spec.env, detached: false,
       stdio: process.platform === 'win32'
-        ? ['ignore', 'pipe', 'pipe', 'pipe']
-        : ['ignore', 'pipe', 'pipe', 'pipe', lease.fd],
+        ? ['ignore', 'pipe', 'pipe', 'pipe', 'ipc']
+        : ['ignore', 'pipe', 'pipe', 'pipe', lease.fd, 'ipc'],
     })
     child.stdout!.pipe(log, { end: false }); child.stderr!.pipe(log, { end: false })
+    child.on('message', (message: unknown) => {
+      if (message === null || typeof message !== 'object' || !('kind' in message)) return
+      if (message.kind === 'dsh-runtime-stop-ready') checkpointReady = true
+      if (message.kind === 'dsh-runtime-stopped' && checkpointRequested === 'ipc' && checkpoint === undefined && 'outcome' in message) {
+        checkpoint = runtimeCheckpointOutcome(message.outcome)
+      }
+    })
     child.once('exit', () => { runtimeAlive = false; stop(0) })
-    child.once('close', () => { void log.close().then(killOwnedGroup, killOwnedGroup) })
+    child.once('close', () => {
+      void Promise.resolve(stopWork).then(() => log.close()).finally(() => killOwnedGroup()).catch(() => {
+        // The owner still kills its process range when closing the log or recording stop intent fails.
+      })
+    })
     const spawned = child
     const spawnReady = new Promise<void>((resolve, reject) => { spawned.once('spawn', resolve); spawned.once('error', reject) })
       .then(() => {

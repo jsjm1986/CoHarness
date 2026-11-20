@@ -19,7 +19,7 @@ export function FilesTitle({ useTabInfo }: PropsRuntime<'sidebar.right.pane.tab.
   return (
     <>
       <FileTypeIcon kind="folder" size={16} className={css.titleIcon} />
-      {tab.title}
+      <span>{tab.title}</span>
     </>
   )
 }

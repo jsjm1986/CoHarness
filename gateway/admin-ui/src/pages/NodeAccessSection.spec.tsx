@@ -68,6 +68,17 @@ it('allows onboarding independently of a pending directory read and shows connec
   expect(screen.queryByRole('button', { name: '运行任务' })).toBeNull()
 })
 
+it('keeps an isolated computer visible without actions that can restore its identity', async () => {
+  const isolated = nodeAccessEntrySchema.parse({ ...node, status: 'quarantined', executionReady: false })
+  vi.mocked(api.listNodeAccess).mockResolvedValue({ items: [isolated], nextCursor: null })
+  render(<NodeAccessSection />)
+  await screen.findByText(node.name, { exact: true })
+  expect(screen.getByText('已隔离', { exact: true })).not.toBeNull()
+  expect(screen.getByText('该电脑因灾难恢复已隔离，不能重新接入。')).not.toBeNull()
+  for (const name of ['重新签发', '退出接入', '撤销接入']) expect(screen.queryByRole('button', { name })).toBeNull()
+  expect(screen.getByRole('button', { name: '添加电脑' })).not.toBeNull()
+})
+
 it('validates the name, masks a one-time code and removes it when its dialog closes', async () => {
   const copy = vi.fn().mockResolvedValue(undefined)
   const previous = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
@@ -96,15 +107,18 @@ it('validates the name, masks a one-time code and removes it when its dialog clo
   expect([...storageValues.values()].some(value => value.includes(receipt.token))).toBe(false)
 })
 
-it('keeps a stale-revision refusal in the confirmation and never substitutes the refreshed revision', async () => {
-  vi.mocked(api.reissueNodeEnrollment).mockRejectedValue(new api.AdminRequestError(409, 'node-access/revision-conflict'))
+it.each([
+  ['node-access/revision-conflict', '该电脑的接入信息已变化。请关闭窗口，刷新列表后再操作。'],
+  ['node-access/quarantined', '该电脑因灾难恢复已隔离，不能重新接入。'],
+])('keeps %s in the confirmation without issuing or retrying an enrollment', async (code, message) => {
+  vi.mocked(api.reissueNodeEnrollment).mockRejectedValue(new api.AdminRequestError(409, code))
   render(<NodeAccessSection />)
   await screen.findByText(node.name, { exact: true })
   fireEvent.click(screen.getByRole('button', { name: '重新签发' }))
   const dialog = screen.getByRole('dialog', { name: '为 设计电脑 重新签发接入码' })
   expect(api.reissueNodeEnrollment).not.toHaveBeenCalled()
   fireEvent.click(within(dialog).getByRole('button', { name: '签发接入码' }))
-  expect(await within(dialog).findByText('该电脑的接入信息已变化。请关闭窗口，刷新列表后再操作。')).not.toBeNull()
+  expect(await within(dialog).findByText(message)).not.toBeNull()
   expect(api.reissueNodeEnrollment).toHaveBeenCalledExactlyOnceWith(node, expect.any(String))
   expect(screen.getByText(node.name, { exact: true })).not.toBeNull()
   expect(screen.queryByLabelText('接入码', { exact: true })).toBeNull()

@@ -25,9 +25,9 @@ Register macOS, Linux and Windows x64 or arm64 computers and connect their exist
 
 ## Run an agent
 
-Use the same built workspace release as the center. From `gateway/`, `npm run node:agent` runs the source entry; `node lib/node-agent-main.js` runs the compiled entry after `npm run build`. Set the center URL, state file and first-run enrollment token using the variables below. HTTPS is required except for loopback HTTP during local verification; redirects and credential-bearing URLs are refused.
+Use an agent that supports the center's control protocol. From `gateway/`, `npm run node:agent` runs the source entry. Run `node lib/node-agent-main.js` after `npm run build` to use the compiled entry. Set the center URL, state file and first-run enrollment token using the variables below. Use HTTPS except for loopback HTTP during local verification. Redirects and credential-bearing URLs are refused.
 
-The agent flushes a generated credential to its private file before exchanging the ticket, then removes the saved ticket after successful enrollment. Later starts use the saved credential at the same center origin. `SIGINT` and `SIGTERM` cancel network requests and retry waits, then attempt release within the request timeout. Logs contain public identities, connection state and actionable failure codes, excluding credentials.
+The agent creates missing credential directories on first start and flushes a generated credential to its private file before exchanging the ticket, then removes the saved ticket after successful enrollment. Later starts use the saved credential at the same center origin. `SIGINT` and `SIGTERM` cancel network requests and retry waits, then attempt release within the request timeout. Logs contain public identities, connection state and actionable failure codes, excluding credentials.
 
 The control socket sends WebSocket Ping frames at the authenticated lease’s heartbeat interval. These frames keep an idle network connection active; they renew neither the database lease nor Runtime execution authority.
 
@@ -77,7 +77,9 @@ On enrolled computers, migration081 binds each started Runtime generation to its
 
 ## Existing Gateway services
 
-Deploy the same built project on the managed computer. Its existing Gateway uses the same organization database and credential-encryption keys, with its own compute-node registration, local paths, instance manager, launchers, supervisors and plugin profiles. Configure each local Gateway to accept the center's browser origin. The local Gateway retains its normal deployment credentials; the separate node-agent process receives only its enrollment credential and a fixed loopback Gateway origin. This bridge does not import an independent deployment or synchronize its users and files.
+Deploy a compatible built Gateway on the managed computer. It uses the same organization database and credential-encryption keys, with its own compute-node registration, local paths, instance manager, launchers, supervisors and plugin profiles. Configure each local Gateway to accept the center's browser origin. The local Gateway retains its normal deployment credentials. The separate node-agent process receives its enrollment credential and a fixed loopback Gateway origin. Account records come from the shared organization database, and each computer keeps its local files.
+
+Compatible Gateways can forward between different release directories. The agent checks the local Gateway's node and organization identities, live lease and service protocol version. The center and agent use the `dsh-node-service-v1` WebSocket subprotocol for the binary stream. Upgrade the center first to enable mixed releases. Older centers can still require a matching release. Keep application APIs and the shared database schema compatible throughout the rollout. See the [service protocol decision](../../../.agents/notes/implemented/architecture/2026-11-20-node-service-wire-compatibility.md).
 
 With multi-computer mode enabled at the primary and `HGW_NODE_LOCAL_GATEWAY_URL` configured for the agent, API requests with an authorized `dshRuntime` select that environment's computer. Administrator API requests may explicitly select `dshNode=<node UUID>`; current administrator authority is rechecked. The destination repeats existing browser-session, origin, account and business authorization. A target-node header is checked before its handlers run. The browser uses the center origin throughout.
 
@@ -89,7 +91,9 @@ The existing Admin shell has a computer selector. `/admin/computers/<node UUID>/
 
 While owned HTTP borrowers or retiring transports occupy the service limit, new HTTP requests wait for a reusable connection in a bounded queue. The queue permits 256 pending requests and waits up to 60000 ms by default; cancellation and shutdown withdraw pending borrowers without sending their requests. Queued POSTs are forwarded once after acquisition, and destination authorization remains current. Capacity occupied only by unrelated active streams still refuses admission.
 
-HTTP service connections use a bounded idle pool per computer; each connection serves one request at a time. Browser WebSockets keep exclusive outbound streams. Every connection belongs to the enrolled node, connection UUID and lease epoch. The agent authenticates the local Gateway identity and required release when opening a stream, and the primary rechecks the node credential and lease whenever an idle connection is borrowed. Both Gateways retain their per-request account, computer, project and Runtime authorization. Bodies and responses stream with backpressure; binary frames and global/per-node connection capacity remain bounded. Cancelling a request closes its own connection. Revocation, channel replacement and shutdown close affected streams, and detachment drains idle connections before checking active work. Forwarded operations are never replayed. A lost node credential reports service unavailability rather than invalidating the browser login.
+HTTP service connections use a bounded idle pool per computer, with one request per connection at a time. Browser WebSockets keep exclusive outbound streams. Every connection belongs to the enrolled node, connection UUID and lease epoch. The primary rechecks the node credential and lease whenever an idle connection is borrowed. Both Gateways retain their per-request account, computer, project and Runtime authorization. Bodies and responses stream with backpressure. Binary frames and global and per-node connection capacity remain bounded. Cancelling a request closes its own connection. Revocation, channel replacement and shutdown close affected streams, and detachment drains idle connections before checking active work. Forwarded operations are never replayed. A lost node credential reports service unavailability while the browser session stays signed in.
+
+The destination Gateway forwards Runtime responses with its own HTTP framing and connection lifetime. A complete response can return its node-service connection to the pool even when the local Runtime closes its upstream connection. The primary's bounded operation samples report a successful acquisition as `nodeTransport: opened` or `nodeTransport: reused`. See [HTTP connection reuse](../../../.agents/notes/implemented/architecture/2026-11-02-node-service-http-reuse.md).
 
 New organizations use single-computer mode; primary configuration and explicit attachment follow the [deployment reference](../deployment-topology/README.md). Directory availability labels retain the default execution restriction. An uncertain transport result does not prove that an operation failed or that a process stopped. Existing process ownership, resource drainage, operation receipts and backup coverage retain their owners.
 
@@ -166,6 +170,7 @@ Node settings are resolved before file or network acquisition.
 |---|---|---|
 | `HGW_NODE_CENTER_URL` | Required | HTTPS origin; loopback HTTP is accepted locally |
 | `HGW_NODE_CENTER_DIAL_URLS` | `HGW_NODE_CENTER_URL` | Comma-separated ordered origins the agent dials instead; each follows the center-URL rule |
+| `HGW_NODE_SERVICE_DIAL_URLS` | Shared center dial sequence | Optional ordered origins for new service streams. The list follows the center-URL rule and has independent failover. |
 | `HGW_NODE_AGENT_STATE_FILE` | `~/.dsh-node/access.json` | Credential file private to its owning account (mode 0600 on macOS/Linux, an ACL limited to the file owner plus SYSTEM and Administrators on Windows) |
 | `HGW_NODE_ENROLLMENT_TOKEN` | Required for a new state file | Administrator ticket; enrolled records use their saved credential |
 | `HGW_NODE_AGENT_REQUEST_TIMEOUT_MS` | 10000 | Network request and shutdown-release timeout |
@@ -180,6 +185,10 @@ Node settings are resolved before file or network acquisition.
 
 `HGW_NODE_CENTER_DIAL_URLS` names the transport, never the identity. Every listed origin must reach the same center: the credential file still binds `HGW_NODE_CENTER_URL`, and enrollment, identity and state checks do not move. The list covers deployments where the public origin is not the node's best route — an SSH reverse tunnel to loopback (`http://127.0.0.1:<port>`), a LAN address, a mesh overlay, then the public origin last. An attempt that gets no HTTP response — a refused connection, a timeout, a socket that dies before `open` — moves dialing to the next entry; any HTTP response, including a refusal, counts as reaching a center and never triggers failover. An in-flight attempt is never replayed to another origin; only the next fresh attempt sees the change.
 
+With `HGW_NODE_SERVICE_DIAL_URLS`, fresh HTTP and streaming service connections use their own dial sequence. Both sequences reach the enrolled center, and every service connection presents the same credential and exact node lease. A service dial failure changes the next service attempt only. Compare request latency and disconnects on sustained authenticated connections before choosing the preferred origin.
+
+For an SSH reverse tunnel, bind the listener to loopback on the node and verify the SSH host key. From the node, compare `/healthz/ready` and established WebSocket round trips on both paths. Confirm the same Gateway release and use the more consistent path first. Apply the setting in a maintenance window after confirming that the node's Runtime work can stop. Verify the agent's enrolled identity and measure a forwarded conversation operation.
+
 <a id="recovery"></a>
 
 ## Recovery
@@ -190,7 +199,9 @@ An interrupted successful response retries with the same saved credential and pr
 
 A lost enrollment response can be recovered using the saved candidate credential and original ticket while it remains valid. An expired ticket or revoked credential requires administrator reissuance and a new private state-file path; preserve the old file for diagnosis. Origin mismatch, invalid state or unsafe file permissions stop startup. Unconfirmed release reports `stopped-lease-uncertain` and exits with failure; the center expires the lease without further heartbeats.
 
-Connection leases are separate from maintenance writer acknowledgements. Enrolled compute nodes start offline. Connectivity alone never activates runtime routing, releases process allocations or certifies stopped writers. Node metadata mutations honor the center maintenance and restore write-epoch checks; directory reads remain available. Full multi-node backup/restore retains its existing refusal. Metadata reads never contact nodes, enumerate files or start runtimes.
+During ordinary maintenance, an already managed computer can renew, reconnect or release its authenticated control lease. The Gateway locks the current maintenance mode and its startup write epoch through the lease transaction. Pending attachment, enrollment, detached or revoked credentials, restoring mode, governance recovery review and Gateway shutdown remain refused. Maintenance control lease bookkeeping does not count as a business writer and never acknowledges stopped Runtime processes. Serving connect can promote pending attachment: it retains a business writer and locks serving mode through commit, excluding a concurrent maintenance transition. Existing business write and execution admission remain closed. See [maintenance control admission](../../../.agents/notes/implemented/bug-fix/2026-11-17-node-maintenance-control.md).
+
+Connection leases are separate from maintenance writer acknowledgements. Enrolled compute nodes start offline. Connectivity alone never activates runtime routing, releases process allocations or certifies stopped writers. Enrollment and attachment changes honor the center maintenance and restore write-epoch checks; directory reads remain available. Full multi-node backup/restore retains its existing refusal. Metadata reads never contact nodes, enumerate files or start runtimes.
 
 <a id="verification"></a>
 
@@ -199,6 +210,8 @@ Connection leases are separate from maintenance writer acknowledgements. Enrolle
 With `HGW_TEST_DATABASE_URL` selecting a disposable test database, `npm run test:postgres` includes an authenticated Gateway transcript and two independent source node processes. `npm run test:built-node-agent` builds and repeats the process scenario under plain Node. The scenarios cover simultaneous connections, independent stop, credential revocation, the real Admin client’s issue/reissue/revoke flow, and zero runtime launches. Loopback verification does not establish public-ingress, cross-computer or Windows runtime acceptance.
 
 `npm run test:built-node-service` uses two independent compiled Gateway processes, a compiled node-agent process, PostgreSQL and the shipped Web profile. Its recorded transcript verifies one center login, the existing remote Admin API, runtime startup on the selected computer, a real workspace event over the runtime WebSocket, and unavailable-node refusal without a center replacement. It requires built workspace artifacts and the same disposable database setting. Package tests also cover bounded binary transfer, partial HTTP delivery, node identity mismatch, independent control capacity, revocation and cancelled acquisition teardown.
+
+The package test `tests/node-service.spec.ts` exercises different Gateway release identities with a separate agent process. Set `HGW_TEST_NODE_SERVICE_AGENT=compiled` to run those cases with the retained agent in `gateway/lib/`, including an earlier v1 build.
 
 ## Dev Note
 

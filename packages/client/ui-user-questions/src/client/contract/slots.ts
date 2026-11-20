@@ -25,10 +25,9 @@ type QuestionItem = AskUserQuestionItem
 type QuestionOption = NonNullable<QuestionItem['options']>[number]
 
 /* jscpd:ignore-start -- Question and Approval intentionally own independent pending-settlement lifecycles. */
-function settlePendingComposer(settle: () => void, failureMessage: string): Promise<void> {
+function settlePendingComposer(settle: () => void | Promise<void>, failureMessage: string): Promise<void> {
   try {
-    settle()
-    return Promise.resolve()
+    return Promise.resolve(settle())
   } catch (error) {
     return Promise.reject(error instanceof Error
       ? error
@@ -120,10 +119,10 @@ function questionError(code: QuestionRejectionCode): Error {
 export interface QuestionWaterfallChannel {
   /** Client-clock deadline in epoch milliseconds; absent for a blocking question. */
   readonly deadline: number | undefined
-  /** Resolve the Host waterfall with the whole answer batch. */
-  resolve(answer: QuestionAnswer): void
-  /** Reject the Host waterfall with a wire-preserved code. */
-  reject(code: Exclude<QuestionRejectionCode, 'ASK_ABORTED'>): void
+  /** Resolve the Host waterfall; an asynchronous carrier resolves only after an accepted receipt. */
+  resolve(answer: QuestionAnswer): void | Promise<void>
+  /** Reject the Host waterfall; transport failures reject without retiring the answer channel. */
+  reject(code: Exclude<QuestionRejectionCode, 'ASK_ABORTED'>): void | Promise<void>
   /** Hand the request to the next waterfall listener. */
   delegate(): void
 }
@@ -489,16 +488,19 @@ export class PendingQuestion {
     this.publish()
   }
 
-  /** Local countdown reached zero: settle the waterfall with `ASK_TIMED_OUT`, keep the card. */
+  /** End a local countdown; an unconfirmed timeout keeps the stopped card answerable. */
   timeout(): void {
     if (this.#held || this.#engaged || this.#focused) return
     const channel = this.#waterfall
     if (channel === undefined) return
-    this.#waterfall = undefined
     this.#timedWait = false
     this.#deadline = undefined
-    channel.reject('ASK_TIMED_OUT')
     this.publish()
+    void settlePendingComposer(() => channel.reject('ASK_TIMED_OUT'), 'pending question timeout failed')
+      .then(() => { this.detachWaterfall(channel) })
+      .catch((error: unknown) => {
+        console.warn('[ui-user-questions] Question timeout was not confirmed; check the current question state.', error)
+      })
   }
 
   /** Hand a live waterfall to the next listener when this presentation domain unloads. */
@@ -515,13 +517,14 @@ export class PendingQuestion {
 
   /**
    * Submit the whole answer batch through the live waterfall, or through the
-   * Remote path once the question is continued.
+   * Remote path once the question is continued. Transport failures keep the
+   * pending channel and draft available for an explicit retry.
    * @param answer - complete structured answer batch.
    */
   answer(answer: QuestionAnswer): Promise<void> {
     const waterfall = this.#waterfall
     if (waterfall !== undefined) {
-      return settlePendingComposer(() => { waterfall.resolve(answer) }, 'pending question settlement failed')
+      return settlePendingComposer(() => waterfall.resolve(answer), 'pending question settlement failed')
     }
     const rpc = this.#rpc
     if (this.#state === 'continued' && rpc !== undefined) {
@@ -544,7 +547,7 @@ export class PendingQuestion {
     }
     const waterfall = this.#waterfall
     if (waterfall === undefined) return Promise.reject(new Error('no channel accepts a cancellation yet'))
-    return settlePendingComposer(() => { waterfall.reject('ASK_CANCELLED') }, 'pending question cancellation failed')
+    return settlePendingComposer(() => waterfall.reject('ASK_CANCELLED'), 'pending question cancellation failed')
   }
 }
 

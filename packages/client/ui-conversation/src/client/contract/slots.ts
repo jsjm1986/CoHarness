@@ -369,6 +369,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * a model here.
      */
     'conversation.input.model': { kind: 'single'; scope: 'session'; owner: InputControlOwnerProps }
+    /** A session status trigger beside the composer tools, moved below the card after the context meter when compact space runs out. */
+    'conversation.input.status': { kind: 'single'; scope: 'session'; owner: {} }
   }
 
   /**
@@ -802,6 +804,8 @@ export interface ComposerBarOwnerProps {
 export interface ComposerBarInjected {
   /** The InputBar-exclusive keyboard/DOM command face (private plane); absent with the session. */
   keyboard: ComposerKeyboard | undefined
+  /** Report the first painted editable textarea; omitted after readiness and without a session. */
+  onFirstEditablePaint?: () => void
   /** Create previews and append image ids to the session input. */
   addImages: ((files: readonly File[]) => string | null) | undefined
   /** Start document uploads and append document ids to the session input. */
@@ -870,7 +874,7 @@ export interface InputControlOwnerProps {
 export type ComposerBarProps =
   PropsRuntime<'conversation.composer.bar'>
   & PropsRenderSlots<
-    'conversation.input.attachments' | 'conversation.input.plan' | 'conversation.input.model'
+    'conversation.input.attachments' | 'conversation.input.plan' | 'conversation.input.model' | 'conversation.input.status'
   >
   & InjectFace<ComposerBarInjected>
   & PropsLocale<'conversation'>

@@ -36,4 +36,4 @@ CSP `sandbox` 指令仍不带许可项。Chromium 的[原生 PDF 测试](https:/
 
 ## 影响
 
-文档库的原生 PDF iframe 可以从同源加载，无关上传格式保留原有限制。直接下载保持 attachment，不引入页面级文档缓存。浏览器保留原生 PDF 能力与错误处理；嵌入式 PDF 支持仍属于浏览器行为，不新增应用渲染器。
+文档库的原生 PDF iframe 可以从同源加载，无关上传格式保留原有限制。直接下载保持 attachment，不引入页面级文档缓存。支持内嵌 PDF 的浏览器保留原生能力与错误处理；不支持时，通过[文档预览 Factory](../architecture/2026-09-08-document-preview-operations.zh.md)使用已有的工作台 PDF 渲染器，并保持同一已认证内容 URL 和响应限制。

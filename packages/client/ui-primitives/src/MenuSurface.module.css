@@ -16,16 +16,20 @@
   isolation: isolate;
 }
 
-/* Filtering only the background keeps nested menus and fixed overlays free of
- * an ancestor backdrop root or a new fixed-position containing block. */
 .material {
   position: absolute;
   inset: 0;
   z-index: -1;
   border-radius: inherit;
+  background: var(--dsw-alias-bg-base);
+  pointer-events: none;
+}
+
+/* Native vibrancy needs a separate filtered background so fixed descendants
+ * keep their viewport containing block. Web menus use an opaque reading surface. */
+:global(html[data-platform='darwin']) .material {
   background: var(--dsw-menu-surface-fill);
   backdrop-filter: var(--dsw-menu-backdrop-filter);
-  pointer-events: none;
 }
 
 .backing {
@@ -46,4 +50,10 @@
   z-index: -1;
   background: var(--dsw-alias-bg-base);
   pointer-events: none;
+}
+
+@media (forced-colors: active) {
+  .surface { border: 1px solid CanvasText; }
+  .material,
+  :global(html[data-platform='darwin']) .material { background: Canvas; backdrop-filter: none; }
 }

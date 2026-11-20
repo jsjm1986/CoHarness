@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write scripts/existing-deployment-latency/README.md
+document:
+  en: 705b83655a21068258a878c1eb5b4fc72fb0d892
+  zh: cc812c4152a0eb11da2b3412d7b7fc87fac8b2b4
+/:
+  en: 9790c6db87582caa
+  zh: 65d71276b9e56c6a
+/existing-qa-deployment-latency-sampling:
+  en: a0a9c69d86f566da
+  zh: 13afc452bf29c2c9
+/existing-qa-deployment-latency-sampling/summary:
+  en: 5f66acea4b041d5d
+  zh: 87c263bb0864a7ac
+/existing-qa-deployment-latency-sampling/contents:
+  en: b5a6de01ebf0bc62
+  zh: c1870efc3d15277a
+/existing-qa-deployment-latency-sampling/configuration:
+  en: 57b86c323f86c461
+  zh: f8825cb52df4c126
+/existing-qa-deployment-latency-sampling/invocation-and-effects:
+  en: 4fbcf2a36d7d161d
+  zh: fe2f0fc2b42c7b6e
+/existing-qa-deployment-latency-sampling/reading-measurements:
+  en: 6053d7bb48520f1a
+  zh: 9bf3fe941e0af46f
+/existing-qa-deployment-latency-sampling/dev-note:
+  en: cbadaa9137a728e4
+  zh: 0610f26eec27ab12

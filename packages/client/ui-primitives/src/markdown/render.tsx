@@ -29,6 +29,7 @@ import { CodeBlock } from './CodeBlock.tsx'
 import { HoverCard } from '../HoverCard.tsx'
 import { ImageLightbox } from '../ImageLightbox.tsx'
 import { ImagePreview } from '../ImagePreview.tsx'
+import { focusWithoutRing } from '../focus.ts'
 import type { CodeToolbarLabels } from '../CodeToolbar.tsx'
 import { renderTexToReact } from './katex.tsx'
 import type { PositionedBlock } from './incremental.ts'
@@ -646,7 +647,7 @@ function LoadedMarkdownImage({ src, alt, destination, preview }: {
   return <>
     <button type="button" className={css.imageButton} title={preview.labels.open}
       aria-label={alt ? `${preview.labels.open}: ${alt}` : preview.labels.open}
-      onClick={() => { setOpen(true) }}>{img}</button>
+      onClick={(event) => { focusWithoutRing(event.currentTarget); setOpen(true) }}>{img}</button>
     {open && <ImageLightbox src={src} alt={alt} labels={preview.labels} onClose={close} />}
   </>
 }

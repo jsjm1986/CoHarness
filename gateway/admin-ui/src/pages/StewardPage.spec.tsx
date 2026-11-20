@@ -107,7 +107,8 @@ describe('StewardPage', () => {
 
   it('surfaces an overview load failure', async () => {
     vi.mocked(api.getStewardOverview).mockRejectedValue(new Error('network unreachable'))
-    render(<MemoryRouter><StewardPage /></MemoryRouter>)
-    expect(await screen.findByText('network unreachable')).toBeTruthy()
+    const view = render(<MemoryRouter><StewardPage /></MemoryRouter>)
+    expect((await screen.findByRole('alert')).textContent).toBe('network unreachable')
+    expect(view.container.querySelector('dialog[open]')).toBeNull()
   })
 })

@@ -7,21 +7,23 @@
 // chunks, the composer wait is real, and the answer click is the test's own
 // gesture (the ONE place a drive step legitimately reacts to model content:
 // the turn cannot complete without it, in record and replay alike).
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Locator, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { TIMED_WAIT_PARAMETER } from '@deepseek-ai/dsh-user-questions'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  assertFixtureInventory, captureStableAria, fixtureUserPrompts,
   launchWebScaffold, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
-  expandTurnProcesses,
+  expandTurnProcesses, acknowledgeReloadConnectionLoss,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden as compareOrRefreshGolden, newWorkflowPage as newEnglishPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/question-composer', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
@@ -263,7 +265,7 @@ interface SeededTranscript {
 async function openSeededTranscript(fixtureText: string, seedId: string): Promise<SeededTranscript> {
   const scaffold = await launchWebScaffold({})
   await seedSession(scaffold, fixtureText, seedId)
-  const browser = await chromium.launch()
+  const browser = await responsiveBrowser.launch()
   const page = await newEnglishPage(browser)
   const tripwire = watchConsole(page)
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -288,7 +290,7 @@ describe('web e2e: resident question composer round trip', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold(MODE === 'record' ? {} : { replayFixture: FIXTURE, paceMs: 15 })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -311,7 +313,7 @@ describe('web e2e: resident question composer round trip', () => {
     }
     const input = page.locator('textarea').first()
     await input.waitFor({ timeout: 10_000 })
-    const settled = scaffold.whenTurnSettled(MODE === 'record' ? 180_000 : 30_000)
+    const settled = scaffold.whenTurnSettled(MODE === 'record' || workflowMatrixEnabled ? 180_000 : 30_000)
     await input.fill(PROMPT)
     await input.press('Enter')
 
@@ -337,13 +339,7 @@ describe('web e2e: resident question composer round trip', () => {
       await compareOrRefreshGolden(SIDEBAR_EXPECTED, sidebar, MODE)
     }
 
-    // Squeezed card: the option rows are the capped card's scroll content, so
-    // shrinking the seat must push overflow into the option list, never
-    // collapse a row below the height its own copy needs — a collapsed row
-    // paints its centered copy outside the row box, over the title and the
-    // neighbouring rows. Measured on the live composer at seat heights that
-    // force the cap, then restored for the answer gesture below. Replay only:
-    // record mode must reach the recording write below, not abort on layout.
+    // A capped card preserves row height while its list or complete surface scrolls.
     if (MODE !== 'record') {
       const original = page.viewportSize() ?? { width: 1680, height: 1000 }
       for (const height of [520, 440, 380]) {
@@ -359,15 +355,13 @@ describe('web e2e: resident question composer round trip', () => {
             const inner = child.getBoundingClientRect()
             return Math.max(box.top - inner.top, inner.bottom - box.bottom)
           })))
-          const list = card.querySelector<HTMLElement>('[data-question-scroll]')
+          const scrollports = [card, ...card.querySelectorAll<HTMLElement>('*')]
           return {
             rows: rows.length,
             spill: Math.max(...spill),
-            // Wrapped option text is what overflows a collapsed row, and a
-            // scrolling list proves the seat is genuinely capped. Without both,
-            // the spill assertion would hold vacuously.
             wrappedRows: rows.filter(row => row.getBoundingClientRect().height > 42).length,
-            scrolls: list === null ? false : list.scrollHeight > list.clientHeight,
+            scrolls: scrollports.some(node => /^(auto|scroll)$/.test(getComputedStyle(node).overflowY)
+              && node.scrollHeight > node.clientHeight),
           }
         })
         expect(squeeze.rows).toBeGreaterThan(0)
@@ -379,6 +373,7 @@ describe('web e2e: resident question composer round trip', () => {
       await page.setViewportSize(original)
     }
 
+    await auditWorkflowState(page, 'user-question', 'pending-multiselect', composer)
     const blue = composer.getByRole('checkbox', { name: 'Blue' })
     await blue.click()
     const custom = composer.getByRole('textbox')
@@ -417,6 +412,7 @@ describe('web e2e: resident question composer round trip', () => {
       const snapshot = await captureStableAria(page, '[data-question-key]', scaffold.workspaceCwd)
       await compareOrRefreshGolden(COMPOSED_EXPECTED, snapshot, MODE)
     }
+    await auditWorkflowState(page, 'user-question', 'selection-and-custom-restored', composer)
     await custom.press('Enter')
 
     const sessionId = await settled
@@ -457,6 +453,7 @@ describe('web e2e: resident question composer round trip', () => {
     expect(await page.getByRole('button', { name: 'View answers', exact: true }).count()).toBe(0)
     const expanded = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(ANSWERED_EXPANDED_EXPECTED, expanded, MODE)
+    await auditWorkflowState(page, 'user-question', 'answered-expanded', page.locator('[class*="centerCol"]'))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 200_000)
@@ -477,35 +474,48 @@ describe('web e2e: resident question composer round trip', () => {
       questions: [{ id: 'free', header: 'More', question: 'Anything else?' }],
     })
 
-    const composer = page.locator('[data-question-key]')
-    await composer.waitFor({ timeout: 30_000 })
-    // The card enters with a scale animation; layout read mid-flight measures
-    // the from-frame, so wait for the entrance to settle before geometry.
-    await composer.evaluate(async (element) => {
-      await Promise.all(element.getAnimations({ subtree: true })
-        .map(animation => animation.finished.catch(() => undefined)))
-    })
-    const field = composer.getByRole('textbox')
-    // The empty field reserves its two lines AND the textarea fills that frame:
-    // a reserved box the control does not fill leaves a strip that looks like
-    // the field but takes no click.
-    expect(await field.evaluate((el) => {
-      const frame = el.parentElement as HTMLElement
-      const style = getComputedStyle(frame)
-      const inner = frame.getBoundingClientRect().height
-        - parseFloat(style.borderTopWidth) - parseFloat(style.borderBottomWidth)
-      return {
-        reserved: Math.round(frame.getBoundingClientRect().height),
-        fills: Math.abs(el.getBoundingClientRect().height - inner) < 0.5,
-      }
-    })).toEqual({ reserved: 64, fills: true })
-    // The same cap the inline shape stops at — the assertion a border-box cap fails.
-    expect(await capMetrics(field)).toEqual({ textLines: CAP_LINES, scrolls: true })
+    try {
+      const composer = page.locator('[data-question-key]')
+      await composer.waitFor({ timeout: 30_000 })
+      // The card enters with a scale animation; layout read mid-flight measures
+      // the from-frame, so wait for the entrance to settle before geometry.
+      await composer.evaluate(async (element) => {
+        await Promise.all(element.getAnimations({ subtree: true })
+          .map(animation => animation.finished.catch(() => undefined)))
+      })
+      const field = composer.getByRole('textbox')
+      // The empty field reserves its two lines AND the textarea fills that frame:
+      // a reserved box the control does not fill leaves a strip that looks like
+      // the field but takes no click.
+      expect(await field.evaluate((el) => {
+        const frame = el.parentElement as HTMLElement
+        const style = getComputedStyle(frame)
+        const inner = frame.getBoundingClientRect().height
+          - parseFloat(style.borderTopWidth) - parseFloat(style.borderBottomWidth)
+        return {
+          reserved: Math.round(frame.getBoundingClientRect().height),
+          fills: Math.abs(el.getBoundingClientRect().height - inner) < 0.5,
+        }
+      })).toEqual({ reserved: 64, fills: true })
+      // The same cap the inline shape stops at — the assertion a border-box cap fails.
+      expect(await capMetrics(field)).toEqual({ textLines: CAP_LINES, scrolls: true })
+      await auditWorkflowState(page, 'user-question', 'optionless-long-draft', composer, [field], async () => {
+        const bounds = await field.evaluate((element) => {
+          const box = element.getBoundingClientRect()
+          const body = element.closest('[data-question-scroll]')!.getBoundingClientRect()
+          return { height: box.height, clipped: Math.max(body.top - box.top, box.bottom - body.bottom) }
+        })
+        expect(bounds.height).toBeGreaterThan(24)
+        expect(bounds.clipped).toBeLessThanOrEqual(1)
+      })
 
-    // Settle the wait so teardown is not racing a pending question.
-    await composer.getByRole('button', { name: 'Skip' }).click()
-    expect(await asked).toEqual({ answers: [{ id: 'free', selected: [] }] })
-    await expect.poll(() => page.locator('[data-question-key]').count(), { timeout: 10_000 }).toBe(0)
+    } finally {
+      // Settle the real interaction even when a layout assertion fails.
+      const composer = page.locator('[data-question-key]')
+      if (await composer.count() > 0) await composer.getByRole('button', { name: 'Skip' }).click()
+      expect(await asked).toEqual({ answers: [{ id: 'free', selected: [] }] })
+      await expect.poll(() => composer.count(), { timeout: 10_000 }).toBe(0)
+    }
   }, 60_000)
 
 })
@@ -547,6 +557,7 @@ describe.skipIf(MODE === 'record')('web e2e: cancelled question transcript', () 
       scaffold.workspaceCwd,
     )).split(CANCELLED_SEED_ID).join('{{seededId}}')
     await compareOrRefreshGolden(CANCELLED_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(cancelledPage, 'user-question', 'cancelled-expanded', cancelledPage.locator('[class*="centerCol"]'))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 60_000)
@@ -576,7 +587,9 @@ describe.skipIf(MODE === 'record')('web e2e: queued question reply', () => {
     await page.getByRole('button', { name: 'View answers', exact: true }).waitFor()
     expect(await page.locator('[data-question-key]').count()).toBe(0)
 
+    const reloadWarningStart = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })
+    acknowledgeReloadConnectionLoss(tripwire, reloadWarningStart)
     await expandTurnProcesses(page)
     await row.waitFor()
     await page.getByRole('button', { name: 'View answers', exact: true }).waitFor()
@@ -587,6 +600,7 @@ describe.skipIf(MODE === 'record')('web e2e: queued question reply', () => {
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(QUEUED_SEED_ID).join('{{seededId}}')
     await compareOrRefreshGolden(QUEUED_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'user-question', 'queued-readonly-after-reload', page.locator('[class*="centerCol"]'))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 60_000)
@@ -666,6 +680,7 @@ describe.skipIf(MODE === 'record')('web e2e: late-answered question transcript',
       scaffold.workspaceCwd,
     )).split(LATE_ANSWERED_SEED_ID).join('{{seededId}}')
     await compareOrRefreshGolden(LATE_ANSWERED_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(latePage, 'user-question', 'late-answer-readonly', review)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 60_000)

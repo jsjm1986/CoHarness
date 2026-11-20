@@ -17,7 +17,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { precompressBody, selectVariant } from '@deepseek-ai/dsh-host-webserver'
+import { precompressBody, renderIndexInjections, selectVariant } from '@deepseek-ai/dsh-host-webserver'
 import type { PrecompressedBody } from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
 
@@ -181,7 +181,18 @@ export function apply(ctx: Context, config: Config): void {
       return
     }
     /* v8 ignore next -- node:http always sets url on server requests */
-    const rawPath = new URL(req.url ?? '/', 'http://x').pathname
+    const url = new URL(req.url ?? '/', 'http://x')
+    const rawPath = url.pathname
+    if (req.method === 'GET' && rawPath === '/' && url.searchParams.get('dshBootstrap') === '1') {
+      if (!ctx.connection.authorizeIndex(req, res)) return
+      const rows = ctx.webServer.collectIndexInjections(req)
+      const html = renderIndexInjections(await readFile(distIndex, 'utf8'), rows)
+      const transformed = ctx.webServer.applyIndexTaps(html)
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+      res.end(JSON.stringify(transformed !== html ? { version: 1, kind: 'full-index' }
+        : { version: 1, kind: 'injections', rows }))
+      return
+    }
     await serveStatic(
       decodeURIComponent(rawPath),
       res,

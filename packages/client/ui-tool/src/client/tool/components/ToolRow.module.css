@@ -9,8 +9,8 @@
 .row {
   position: relative;
   overflow: hidden;
-  /* 28px target row (min-height so DisclosureRow's compact touch row still
-     wins via its viewport-qualified rule). */
+  /* 28px target row on fine pointers; the touch floor below re-declares
+     DisclosureRow's coarse rule because a plain class beats it on load order. */
   min-height: 28px;
 }
 
@@ -173,6 +173,23 @@
   opacity: 1;
   min-width: var(--dsw-touch-target);
   min-height: var(--dsw-touch-target);
+}
+
+@media (pointer: coarse) {
+  .row { min-height: var(--dsw-touch-target); }
+
+  .fileLink { min-block-size: var(--dsw-touch-target); }
+
+  button.leading {
+    min-inline-size: var(--dsw-touch-target);
+    min-block-size: var(--dsw-touch-target);
+  }
+
+  .inspectButton {
+    opacity: 1;
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
 }
 
 :global([data-viewport='compact']) .summary,

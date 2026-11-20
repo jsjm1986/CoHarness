@@ -16,7 +16,7 @@ import { CollaborationDeniedError } from '../src/collaboration.ts'
 import { BackupError } from '../src/postgres/backup-service.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
-import { InstanceManager, RuntimeStartBlockedError, type RuntimeTargetInput } from '../src/instances.ts'
+import { InstanceManager, RuntimeStartBlockedError, type RuntimeStopLease, type RuntimeStopReceipt, type RuntimeTargetInput } from '../src/instances.ts'
 import { RuntimeCapacityError } from '../src/runtime-capacity.ts'
 import { RuntimeAccountError } from '../src/launcher.ts'
 import { NodeResourceBudgetError } from '../src/node-resource-budget.ts'
@@ -68,13 +68,14 @@ async function setup(
   const stop = instances.stop.bind(instances)
   instances.stop = async (target, reason, administratorUserId) => {
     stoppedTargets.push(target)
-    if (typeof target !== 'number' && target.kind === 'project') return
-    await stop(target, reason, administratorUserId)
+    if (typeof target !== 'number' && target.kind === 'project') return { generation: 1, shutdownOutcome: 'unconfirmed' }
+    return stop(target, reason, administratorUserId)
   }
   const withStopped = instances.withStopped.bind(instances)
-  instances.withStopped = async <T>(target: RuntimeTargetInput, operation: () => Promise<T>, projectActorUserId?: number): Promise<T> => {
+  instances.withStopped = async <T>(target: RuntimeTargetInput,
+    operation: (lease: RuntimeStopLease | undefined, receipt: RuntimeStopReceipt) => Promise<T>, projectActorUserId?: number): Promise<T> => {
     stoppedTargets.push(target)
-    if (typeof target !== 'number' && target.kind === 'project') return operation()
+    if (typeof target !== 'number' && target.kind === 'project') return operation(undefined, { generation: 1, shutdownOutcome: 'unconfirmed' })
     return withStopped(target, operation, projectActorUserId)
   }
   let now = Date.now()
@@ -1289,7 +1290,7 @@ it('admin plugin routes preserve target identity, stream bytes and deny ordinary
   deps.pluginManagement = { target, async *invoke(admin, input, signal) {
     expect(admin.role).toBe('admin'); expect(signal.aborted).toBe(false); invoked.push(input)
     yield bytes
-  }, async state() { throw new Error('not wired in this test') }, async overview() { throw new Error('not wired in this test') }, async saveState() { throw new Error('not wired in this test') } }
+  }, async state() { throw new Error('not wired in this test') }, async overview() { throw new Error('not wired in this test') }, async inventory() { throw new Error('not wired in this test') }, async saveState() { throw new Error('not wired in this test') } }
   const bound = await fetch(`${base}/admin/api/plugins/target?kind=user&id=3`, { headers: { cookie } })
   expect(await bound.json()).toEqual(binding)
   const response = await fetch(`${base}/admin/api/plugins/invoke`, { method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify(invocation) })

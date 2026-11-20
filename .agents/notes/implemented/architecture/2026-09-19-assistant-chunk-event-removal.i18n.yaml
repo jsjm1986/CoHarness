@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-assistant-chunk-event-removal.md
 document:
-  en: 40b7a9d920cfdf81d2ad0b519e74fa1ccda5f8d2
-  zh: 43de21d23ca1623b9f409db849b294ac7e29151f
+  en: 79ffdb0bc07bd0d2de2df958ecc66b527d07764c
+  zh: 301b98ce6bd7ad0f74a3059df4fe642618a6c42b
 /agent-note-remove-the-assistant-chunk-session-event:
   en: 12e40470f8f2516c
   zh: a1372f02acb78428
@@ -12,8 +12,8 @@ document:
   en: 36b7b7b13947d559
   zh: b7efef3687b25f96
 /agent-note-remove-the-assistant-chunk-session-event/decision:
-  en: 5322b5557c531258
-  zh: 1b7f53d18af1d7e5
+  en: 6817bf1e516016e1
+  zh: cdda5d17cbaccbf3
 /agent-note-remove-the-assistant-chunk-session-event/alternatives-considered:
   en: 68a3b50ad3170580
   zh: 9fb6fab02b655650

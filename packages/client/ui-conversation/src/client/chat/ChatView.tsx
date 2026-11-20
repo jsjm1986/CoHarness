@@ -47,6 +47,29 @@ function scrollerOf(from: HTMLElement): HTMLElement {
   return (from.closest('[data-conversation-scroll]')) ?? from
 }
 
+/** The final composer starts the followed tail when its full height cannot fit.
+ * Measure its flow extent independently of the deferred sticky/flow CSS update. */
+function oversizedComposerTop(scrollport: HTMLElement): number | null {
+  const composer = scrollport.querySelector<HTMLElement>(':scope > [data-composer-seat]')
+  if (composer === null || scrollport.clientHeight <= 0 || composer.offsetHeight < scrollport.clientHeight) return null
+  return Math.max(0, scrollport.scrollHeight - composer.offsetHeight)
+}
+
+/** Follow the composer, then reveal its focused draft through enclosing short panes. */
+function followTail(scrollport: HTMLElement): void {
+  const composerTop = oversizedComposerTop(scrollport)
+  scrollport.scrollTop = composerTop ?? scrollport.scrollHeight
+  if (composerTop === null) return
+  scrollport.querySelector<HTMLTextAreaElement>(':scope > [data-composer-seat] textarea:focus')
+    ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
+}
+
+/** Reader positions throughout an oversized composer remain at the followed tail. */
+function isAtTail(scrollport: HTMLElement): boolean {
+  const target = oversizedComposerTop(scrollport) ?? Math.max(0, scrollport.scrollHeight - scrollport.clientHeight)
+  return target - scrollport.scrollTop <= FOLLOW_THRESHOLD + 1
+}
+
 interface PagingAnchor {
   /** Stable node/call identity, independent of boundary-spanning group keys. */
   key: string
@@ -626,7 +649,7 @@ export function ChatView({
   const toBottom = (el: HTMLElement): void => {
     anchorRef.current = null
     restoredAnchorRef.current = null
-    el.scrollTop = el.scrollHeight
+    followTail(el)
     observedTopRef.current = el.scrollTop
     atBottomRef.current = true
     setAtBottom(true)
@@ -663,7 +686,7 @@ export function ChatView({
         const row = anchorElement(local, saved.anchorKey)
         if (row !== null) el.scrollTop += flowTop(row, el) - saved.anchorTop
         observedTopRef.current = el.scrollTop
-        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
+        const isAtBottom = isAtTail(el)
         atBottomRef.current = isAtBottom
         setAtBottom(isAtBottom)
         if (!isAtBottom && row !== null) {
@@ -796,7 +819,13 @@ export function ChatView({
     // clamps, scroll anchoring) never reach observedTop, so inheriting a stale
     // `false` ref would strand a floor-landed reader unpinned with the
     // back-to-bottom button stuck on.
-    const isAtBottom = floor - el.scrollTop <= FOLLOW_THRESHOLD + 1
+    const composerTop = oversizedComposerTop(el)
+    const isAtBottom = (composerTop ?? floor) - el.scrollTop <= FOLLOW_THRESHOLD + 1
+    // A queued scroll event can reach the old position after the tail reflows.
+    if (!movedByReader && !isAtBottom && atBottomRef.current) {
+      toBottom(el)
+      return
+    }
     if (!movedByReader && isAtBottom) {
       // A follow write delivered its own scroll event (every stream publication
       // while pinned): the reader is at the tail, so the tail row names the
@@ -810,7 +839,11 @@ export function ChatView({
         chatScroll.save(null)
       }
       setAtBottom(true)
-      toBottom(el)
+      if (composerTop === null) toBottom(el)
+      else {
+        atBottomRef.current = true
+        observedTopRef.current = el.scrollTop
+      }
       return
     }
     atBottomRef.current = isAtBottom
@@ -846,7 +879,7 @@ export function ChatView({
     if (local === null) return
     const el = scrollerOf(local)
     if (atBottomRef.current) {
-      el.scrollTop = el.scrollHeight
+      followTail(el)
       observedTopRef.current = el.scrollTop
       chatScroll.save(null)
       return
@@ -862,7 +895,7 @@ export function ChatView({
     if (Math.abs(delta) <= 0.5) return
     el.scrollTop += delta
     observedTopRef.current = el.scrollTop
-    if (el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1) {
+    if (isAtTail(el)) {
       toBottom(el)
       return
     }
@@ -879,6 +912,7 @@ export function ChatView({
     const composer = scrollport.querySelector<HTMLElement>('[data-composer-seat]')
     const observer = new ResizeObserver(() => { resizeScrollRef.current?.() })
     observer.observe(column)
+    observer.observe(scrollport)
     if (composer !== null) observer.observe(composer)
     return () => { observer.disconnect() }
   }, [])
@@ -912,7 +946,7 @@ export function ChatView({
         restoredAnchorRef.current = null
         el.scrollTop = Math.max(0, el.scrollTop + flowTop(row, el) - 24)
         observedTopRef.current = el.scrollTop
-        atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
+        atBottomRef.current = isAtTail(el)
         setAtBottom(atBottomRef.current)
         setActiveTurn(target.turn)
         const position = atBottomRef.current ? null : scrollPosition(local, el)

@@ -177,6 +177,39 @@ describe('web e2e: settings modal and General preferences', () => {
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
+  it('keeps font inputs touch-sized on narrow screens and focused in forced colors', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-phone-inputs'))
+    await page.getByRole('button', { name: '设置', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '设置' })
+    const fonts = dialog.getByRole('group', { name: '更多字体设置', exact: true })
+    await fonts.getByRole('button', { name: '更多字体设置', exact: true }).click()
+    const field = fonts.getByRole('textbox', { name: '代码字体', exact: true })
+    await field.waitFor({ timeout: 5_000 })
+    try {
+      for (const width of [320, 390, 767]) {
+        await page.setViewportSize({ width, height: 844 })
+        await page.locator('[data-viewport="compact"]').waitFor({ timeout: 5_000 })
+        await field.waitFor({ timeout: 5_000 })
+        await expect.poll(() => field.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44)
+        expect(await field.evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(16)
+        const bounds = await field.boundingBox()
+        expect(bounds).not.toBeNull()
+        expect(bounds!.x).toBeGreaterThanOrEqual(0)
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width)
+      }
+      await page.emulateMedia({ forcedColors: 'active' })
+      await field.focus()
+      expect(await field.evaluate(element => getComputedStyle(element.parentElement!).outlineStyle)).toBe('solid')
+      expect(await field.evaluate(element => Number.parseFloat(getComputedStyle(element.parentElement!).outlineWidth)))
+        .toBeGreaterThanOrEqual(2)
+    } finally {
+      await page.emulateMedia({ forcedColors: 'none' })
+      await page.setViewportSize({ width: 1680, height: 1000 })
+      await page.keyboard.press('Escape')
+      await dialog.waitFor({ state: 'hidden' })
+    }
+  })
+
   it('uses the persisted dark preference while plugins are still loading', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-boot-theme'))
     await page.emulateMedia({ colorScheme: 'light' })

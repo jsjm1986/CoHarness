@@ -11,6 +11,8 @@ SPA dist server for the Web shell: a function plugin (config `{distIndex}`) that
 
 The fallback seat is single-owner (a second claim throws) and effect-scoped: disposing the plugin's fiber releases the seat, after which the unclaimed webserver answers 404.
 
+An authenticated `GET /?dshBootstrap=1` returns the structured index rows for a deferred Gateway entry. If raw index transforms change the rendered document, the response signals the normal HTML route so those transforms keep their native rendering semantics. Both bootstrap responses are private and use `no-store`.
+
 ## Summary
 
 Serve the built Web shell to browsers from its configured distribution directory. The root and configured index path render the bootstrapped index; existing assets are served directly, while missing or non-file paths return 404, traversal returns 403, and unsupported methods return 405. Index access requires a valid process token or browser cookie, but static assets remain public. Only one instance can handle unmatched routes at a time; a second activation fails, and unloading the active instance makes unmatched requests return 404.

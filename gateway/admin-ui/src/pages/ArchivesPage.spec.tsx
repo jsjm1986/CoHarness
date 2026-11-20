@@ -32,6 +32,13 @@ const emptyCandidates: api.EmptyDraftCandidate[] = [
   { rootSessionId: 'draft-personal', runtime: { kind: 'user', id: 1, runtimeId: draftRuntimeB }, creator: null, project: null, createdAt: Date.UTC(2026, 7, 24), updatedAt: Date.UTC(2026, 7, 25), eventCount: 0 },
 ]
 
+function archiveRows(count: number): api.ConversationArchiveRow[] {
+  return Array.from({ length: count }, (_, index): api.ConversationArchiveRow => ({
+    ...row, archiveId: parseConversationArchiveId(
+      `22000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`)!,
+  }))
+}
+
 describe('ArchivesPage', () => {
   afterEach(() => { cleanup(); vi.useRealTimers() })
 
@@ -348,6 +355,32 @@ describe('ArchivesPage', () => {
     expect(api.getArchive).toHaveBeenNthCalledWith(1, row.archiveId)
     expect(api.getArchive).toHaveBeenNthCalledWith(2, other.archiveId)
     expect(api.exportArchive).toHaveBeenLastCalledWith(other.archiveId)
+  })
+
+  it('pages through archive offsets only while a full page was returned', async () => {
+    vi.mocked(api.listArchives)
+      .mockResolvedValueOnce(archiveRows(50))
+      .mockResolvedValueOnce(archiveRows(20))
+      .mockResolvedValueOnce(archiveRows(50))
+    render(<ArchivesPage />)
+    const directions = () => ({
+      prev: screen.getByRole('button', { name: '上一页' }) as HTMLButtonElement,
+      next: screen.getByRole('button', { name: '下一页' }) as HTMLButtonElement,
+    })
+    await screen.findAllByText('第 1 页')
+    expect(directions().prev.disabled).toBe(true)
+    expect(directions().next.disabled).toBe(false)
+
+    fireEvent.click(directions().next)
+    await screen.findAllByText('第 2 页')
+    expect(api.listArchives).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 50, limit: 50 }))
+    expect(directions().prev.disabled).toBe(false)
+    expect(directions().next.disabled).toBe(true)
+
+    fireEvent.click(directions().prev)
+    await screen.findAllByText('第 1 页')
+    expect(api.listArchives).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 }))
+    expect(directions().next.disabled).toBe(false)
   })
 
 })

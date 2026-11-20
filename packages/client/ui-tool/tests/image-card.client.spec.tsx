@@ -288,7 +288,7 @@ describe('ReadImageRow keyed toolview', () => {
   } as unknown as Parameters<typeof ReadImageRow>[0])
 
   const toggleRow = (view: { container: HTMLElement }) => {
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
   }
 
   it('classifies read_image into the read family so the row keeps its promises', () => {

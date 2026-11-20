@@ -92,6 +92,14 @@ export class VncAuditLog {
   }
 
   /**
+   * Finish all queued appends after the owner has stopped recording new events.
+   * @returns after each accepted append has persisted or reported its existing warning.
+   */
+  async drain(): Promise<void> {
+    await this.writeChain
+  }
+
+  /**
    * Record one event: update the window, then queue its durable append.
    * @param event - the committed lifecycle event.
    */

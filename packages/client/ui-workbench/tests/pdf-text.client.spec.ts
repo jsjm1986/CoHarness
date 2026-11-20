@@ -17,8 +17,18 @@ import { pdfTextRenderer } from '../src/client/pdf/text.ts'
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
-it('aligns selectable text to the displayed width and removes its observer and DOM on cancellation', async () => {
+it('aligns selectable text initially, coalesces observed sizes, and releases pending alignment on cancellation', async () => {
   let resize: ResizeObserverCallback | undefined
+  const frames = new Map<number, FrameRequestCallback>()
+  let nextFrame = 0
+  const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+    const id = ++nextFrame
+    frames.set(id, callback)
+    return id
+  })
+  const cancelFrame = vi.fn((id: number) => { frames.delete(id) })
+  vi.stubGlobal('requestAnimationFrame', requestFrame)
+  vi.stubGlobal('cancelAnimationFrame', cancelFrame)
   const observe = vi.fn()
   const disconnect = vi.fn()
   vi.stubGlobal('ResizeObserver', class {
@@ -41,8 +51,20 @@ it('aligns selectable text to the displayed width and removes its observer and D
   expect((host.firstElementChild as HTMLElement).style.scale).toBe('0.5')
   width = 100
   resize!([], {} as ResizeObserver)
-  expect((host.firstElementChild as HTMLElement).style.scale).toBe('0.25')
+  width = 120
+  resize!([], {} as ResizeObserver)
+  expect(requestFrame).toHaveBeenCalledOnce()
+  expect((host.firstElementChild as HTMLElement).style.scale).toBe('0.5')
+  const align = frames.get(1)!
+  frames.delete(1)
+  align(0)
+  expect((host.firstElementChild as HTMLElement).style.scale).toBe('0.3')
+  width = 160
+  resize!([], {} as ResizeObserver)
+  expect(frames.size).toBe(1)
   task.cancel()
+  expect(cancelFrame).toHaveBeenCalledWith(2)
+  expect(frames.size).toBe(0)
   expect(disconnect).toHaveBeenCalledOnce()
   expect(api.cancel).toHaveBeenCalledOnce()
   expect(host.childElementCount).toBe(0)

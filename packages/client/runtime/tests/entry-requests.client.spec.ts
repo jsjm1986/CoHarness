@@ -105,7 +105,7 @@ it('loads separate personal pages concurrently after a legacy computer omits the
   vi.stubGlobal('fetch', vi.fn(async (path: string) => {
     const url = new URL(path, 'https://harness.invalid')
     if (url.pathname === '/account/api/runtimes') return Response.json(catalog)
-    if (url.pathname === '/account/api/context') return Response.json({ user: { id: 7, displayName: 'Me' }, projects: [], environment: { id: runtimeId } })
+    if (url.pathname === '/account/api/workbench/context') return Response.json({ user: { id: 7, displayName: 'Me' }, projects: [], environment: { id: runtimeId } })
     served.push(url.searchParams.get('include') ?? url.searchParams.get('kind')!)
     if (hold) await gate.promise
     return Response.json({ runtimeId, items: [], workspaces: [], nextCursor: null })

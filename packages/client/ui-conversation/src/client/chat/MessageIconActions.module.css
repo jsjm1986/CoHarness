@@ -150,21 +150,19 @@
   }
 }
 
-/* 40px targets, not the full 44px touch target: one icon row must hold copy,
-   vote, branch and clock controls on a 360px transcript (same compromise the
-   compact composer toolbar already makes). */
+/* Compact actions wrap while preserving their full touch targets. */
 :global([data-viewport='compact']) .actions {
   height: auto;
-  min-height: 36px;
+  min-height: var(--dsw-touch-target);
   flex-wrap: wrap;
   gap: var(--dsw-space-1);
 }
 
 :global([data-viewport='compact']) .action {
   flex: none;
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
+  width: var(--dsw-touch-target);
+  min-width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
 }
 
 :global([data-viewport='compact']) .action svg {

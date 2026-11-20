@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-client-ui-tool` 是 dsh Web 客户端的 Client 工具展示插件：它渲染对话中的每一次工具调用。`ui-conversation` 通过 `conversation.chat.node` 的匹配 key 分发每个已排序的 `tool-call` Conversation Node；本包渲染其中的 root 及其 PTC dispatch 子调用，并把每个原子调用通过 keyed slot `tool.call.toolview` 分发。没有注册的工具名称使用通用卡片。业务 UI 包只注册 wire 工具名称和原子视图——它们不配对会话事件、不重建 transcript（文本记录），也不拥有 root/subcall 拓扑，因为运行时仍对 call/result 配对、生命周期与递归 `subCalls` 投影拥有最终决定权。
+`dsh-client-ui-tool` 是 dsh Web 客户端的 Client 工具展示插件：它渲染对话中的每一次工具调用。`ui-conversation` 通过 `conversation.chat.node` 的匹配 key 分发每个已排序的 `tool-call` Conversation Node；本包渲染其中的 root 及其 PTC dispatch 子调用，并把每个原子调用通过 keyed slot `tool.call.toolview` 分发。没有注册的工具名称使用通用卡片。业务 UI 包只注册 wire 工具名称和原子视图——它们不配对会话事件、不重建 transcript（文本记录），也不拥有 root/subcall 拓扑，因为运行时仍对 call/result 配对、生命周期与递归 `subCalls` 投影拥有最终决定权。工具回执的行内和侧栏详情使用主题语义文字色。
 
 ## 目录
 
@@ -29,7 +29,11 @@ kind: "package-reference"
 
 工具调用在对话中显示为卡片：一个根调用树带其嵌套子调用，每个原子调用由所属视图渲染。所有生命周期状态都保留工具的普通业务图标；失败与中断仍通过冻结调用／结果状态、无障碍状态文本和失败摘要明确表达。用户可通过宿主回调打开文件或检查调用。折叠的 `web_fetch` 行把其 http(s) URL 显示为链接，在新浏览器标签页中打开。
 
+包含文件或网址入口的行提供独立的展开按钮，便于键盘和触屏用户分别打开链接或展开输出。
+
 共享工具行和 Bash 行的失败、停止摘要在悬停时仍保留错误色和警告色；只有不处于这两种状态的摘要会在悬停时加深。
+
+Bash 卡片在不支持悬停的设备上始终显示检查操作，在粗指针设备上提供适合触摸的点击区域。桌面上，卡片内的键盘焦点也会显示这些操作。运行中的扫光使用合成器变换，并在请求减少动态效果时保持静态；文本运行状态始终可用。
 
 派发前，模型已给出名称的调用显示为不可展开的一行，使用工具自己的图标与标题。通用行显示为`工具调用 · <工具名>`。准备阶段不提供完整参数、文件链接、结果或依赖参数的交互。write/edit 的摘要显示「正在准备内容 NKB」；N 为 `Math.ceil(raw.length / 1024)`，是原始参数字符串长度的整数近似值，不是文件字节数。`tool/call` 才启用既有调用展示；参数块结束本身不代表开始执行。
 

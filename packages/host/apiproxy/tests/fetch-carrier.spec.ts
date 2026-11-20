@@ -6,7 +6,7 @@ import type { ResponseValue } from '../src/api/rpc-map.ts'
 import type { ClientResponse, RpcMessage, RpcReceipt, RpcRequest } from '../src/api/rpc.ts'
 import { RpcId } from '../src/api/rpc.ts'
 import { toFetchHandler } from '../src/fetch/handler.ts'
-import { AbstractApiClient, ApiTransportError, ApiResponseTooLargeError, InProcessApiClient, readApiResponseText } from '../src/fetch/client.ts'
+import { AbstractApiClient, ApiTransportError, ApiResponseTooLargeError, InProcessApiClient, readApiResponseBytes, readApiResponseText } from '../src/fetch/client.ts'
 
 const SCRIPTED_HISTORY_PAGE = {
   events: [
@@ -507,6 +507,36 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     await expect(readApiResponseText({
       text: async () => 'fixture',
     } as unknown as Response, 7)).resolves.toBe('fixture')
+  })
+
+  it('reads binary responses without decoding or changing their byte values', async () => {
+    const bytes = await readApiResponseBytes(new Response(Uint8Array.of(0, 255, 128, 65)), 4)
+    expect(bytes).toEqual(Uint8Array.of(0, 255, 128, 65))
+    expect(bytes.buffer).toBeInstanceOf(ArrayBuffer)
+    await expect(readApiResponseBytes(new Response(null), 4)).resolves.toEqual(new Uint8Array(0))
+  })
+
+  it.each([true, false])('cancels an oversized binary response with declared length %s', async (declared) => {
+    const cancel = vi.fn()
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(Uint8Array.of(1, 2, 3, 4, 5)) }, cancel,
+    })
+    const response = new Response(body, declared ? { headers: { 'content-length': '5' } } : undefined)
+    await expect(readApiResponseBytes(response, 4)).rejects.toBeInstanceOf(ApiResponseTooLargeError)
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
+  it('cancels a binary body read while the next chunk is pending', async () => {
+    const cancel = vi.fn()
+    const reading = Promise.withResolvers<undefined>()
+    const body = new ReadableStream<Uint8Array>({ pull() { reading.resolve(undefined) }, cancel })
+    const lifetime = new AbortController()
+    const result = readApiResponseBytes(new Response(body), 4, lifetime.signal)
+    const aborted = expect(result).rejects.toMatchObject({ name: 'AbortError' })
+    await reading.promise
+    lifetime.abort()
+    await aborted
+    expect(cancel).toHaveBeenCalledOnce()
   })
 
   it('rejects an oversized text response before returning its body', async () => {

@@ -441,11 +441,17 @@ export class WorkspaceRuntime implements IWorkspaces {
     for (const id of sessions.ids) {
       const summary = sessions.byId[id]
       if (summary !== undefined && summary.blank && summary.cwd === workspace.path
+        && summary.executionRestriction !== 'recovery-read-only'
         && workspace.sessionIds.includes(summary.id)
         && !archived.includes(summary.id)) reusableSessionIds.push(summary.id)
     }
     const active = this.activeDrafts.get(workspaceId)
-    const draft = active !== undefined && (active.workspacePath === undefined || active.workspacePath === workspace.path)
+    const target = this.runtimeForWorkspace(workspaceId)
+    const activeKey = active === undefined ? undefined : target === undefined
+      ? this.sessions.keyFor?.(active.sessionId) ?? active.sessionId
+      : clientSessionKey(target, active.sessionId)
+    const draft = active !== undefined && (activeKey === undefined || sessions.byId[activeKey]?.executionRestriction !== 'recovery-read-only')
+      && (active.workspacePath === undefined || active.workspacePath === workspace.path)
       ? active
       : { draftId: newDraftId(), sessionId: newDraftSessionId(), workspacePath: workspace.path }
     this.activeDrafts.set(workspaceId, draft)
@@ -606,7 +612,8 @@ export class WorkspaceRuntime implements IWorkspaces {
         // have left the Agent cold, and a preset deleted since must not
         // strand the restore — the reuse arm degrades it to the default.
         const summary = sessions.byId[current]
-        const owner = summary === undefined || !summary.blank || workspace.archivedSessionIds.includes(current)
+        const owner = summary === undefined || !summary.blank || summary.executionRestriction === 'recovery-read-only'
+          || workspace.archivedSessionIds.includes(current)
           ? undefined
           : workspace.items.find(item => item.path === summary.cwd && item.sessionIds.includes(current))
         if (owner === undefined || summary === undefined) {
@@ -654,7 +661,7 @@ export class WorkspaceRuntime implements IWorkspaces {
           }
           if (snapshot.current === undefined) this.sessions.open(sessionId, { activate: false })
           setState('done')
-        })
+        }, { preferPreparedHistory: true })
       }).catch((reason: unknown) => {
         if (disposed || navigation.aborted) return
         failedBaseline = { workspaces: this.manager.getSnapshot(), sessions: this.sessions.list.getSnapshot() }

@@ -112,8 +112,11 @@ function RenameForm({ request, renameSession, onSettle, t }: {
         onCompositionStart={() => { composingRef.current = true }}
         onCompositionEnd={() => { composingRef.current = false }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !composingRef.current) {
+          if (e.key === 'Enter') {
             e.preventDefault()
+            // Safari can deliver compositionend before the confirming Enter.
+            if (composingRef.current || e.nativeEvent.isComposing
+              || Reflect.get(e.nativeEvent, 'keyCode') === 229) return
             confirm()
           }
         }}

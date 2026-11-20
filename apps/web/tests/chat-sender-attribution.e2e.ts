@@ -1,8 +1,9 @@
 /** Project participant names on Chat bubbles through the shipped Web composition. */
 
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
@@ -151,7 +152,7 @@ describe('web e2e: Chat labels project senders on bubbles', () => {
     if (MODE === 'record') throw new Error('chat-sender-attribution is a keyless assembled snapshot')
     scaffold = await launchWebScaffold({})
     await seedSession(scaffold, buildSeed(), SEED_ID)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

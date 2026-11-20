@@ -27,6 +27,8 @@ English | [中文](README.zh.md)
 
 Add `dsh-mcp-client` when the model should call tools from an external MCP server as if they were native. Give each server a unique name and transport. The official SDK selects the 2026-07-28 protocol when available and falls back to supported legacy revisions. Choose stdio for a local program and Streamable HTTP for a service; stdio negotiation starts a temporary probe process before the serving process.
 
+A disaster-recovered runtime connects or probes only MCP targets individually approved in its [sealed execution review](../../boot/app-boot/README.md#previewing-the-effective-configuration). The check runs before credential resolution or process creation, including reconnects. Transport, name, command, arguments, environment references, working directory, URL or header changes require another review. Ordinary runtimes retain their configured connection policy.
+
 ### Minimal configuration
 
 Add one entry per server; nothing else is required. After the harness starts, the server's tools appear in the model's tool list.

@@ -1,10 +1,6 @@
 /**
- * Sidebar shell stylesheet contract, asserted against
- * SidebarRight.module.css on disk. The panel publishes the docked strip's
- * band as the conversation header's 52px so the rules under both headers
- * draw on one line, and the panel body clips docked hosts to the card's
- * corners while floating panes still escape. jsdom cannot render, so the
- * contract lives here as text assertions.
+ * Static checks for the Sidebar's preferred desktop strip height and
+ * clipping rules. Dockkit owns centered padding and the touch height floor.
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -31,10 +27,9 @@ function declarationsFor(selector: string): Map<string, string> {
 }
 
 describe('sidebar shell header contract', () => {
-  it("publishes the strip band as the conversation header's 52px", () => {
+  it('publishes a preferred 52px desktop strip band', () => {
     const panel = declarationsFor('.panel')
     expect(panel.get('--dsh-dockkit-strip-block')).toBe('52px')
-    expect(panel.get('--dsh-dockkit-strip-block-start')).toBe('var(--dsw-space-3)')
   })
 
   it('clips the push presentation body to the card corners without trapping floats', () => {

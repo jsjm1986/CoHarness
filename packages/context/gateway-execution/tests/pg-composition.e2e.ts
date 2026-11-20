@@ -233,7 +233,7 @@ class ScriptedModel extends LlmAdapter {
 
 async function composition(
   credential: GatewayRuntimeCredential, goals = false, jobsAndAuto = false, drafts = false, plans = false, compacts = false,
-  questions = false,
+  questions = false, modelTimings = false,
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-execution-pg-'))
   cleanup.push(() => rm(directory, { recursive: true, force: true }))
@@ -242,7 +242,9 @@ async function composition(
   vi.stubEnv('DSH_GATEWAY_CREDENTIAL_FILE', credentialFile)
   vi.stubEnv('DSH_GATEWAY_CREDENTIAL_FD', undefined)
   const configFile = join(directory, 'cordis.yml')
-  const config = await readFile(new URL('./fixtures/postgres.cordis.yml', import.meta.url), 'utf8')
+  const baseConfig = await readFile(new URL('./fixtures/postgres.cordis.yml', import.meta.url), 'utf8')
+  const runtimeEntry = "- name: '@deepseek-ai/dsh-gateway-runtime'\n"
+  const config = modelTimings ? baseConfig.replace(runtimeEntry, runtimeEntry + '  config:\n    modelTimings: true\n') : baseConfig
   await writeFile(configFile, config + (jobsAndAuto
     ? "- name: '@deepseek-ai/dsh-jobs-local'\n- name: '@deepseek-ai/dsh-tool-jobs'\n- name: '@deepseek-ai/dsh-experimental-auto-review'\n" : '') + (goals ? "- name: '@deepseek-ai/dsh-goal'\n- name: '@deepseek-ai/dsh-goal-round-driver'\n" : '') + (drafts
     ? "- name: '@deepseek-ai/dsh-collaboration-gateway'\n- name: '@deepseek-ai/dsh-session-persistence-gateway'\n" : '') + (plans
@@ -964,7 +966,8 @@ describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execut
   }, 30_000)
 
   it('runs a qualified new request after an ordinary historical participant without weakening inherited denial', async () => {
-    const server = await gateway(), world = await composition(server.credential)
+    const output = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const server = await gateway(), world = await composition(server.credential, false, false, false, false, false, false, true)
     const { ctx, model } = world
     const sessionId = SessionId(String(await server.command('session')))
     const handle = await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })
@@ -995,6 +998,33 @@ describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execut
     await expect(transcript).toMatchFileSnapshot('./snapshots/current-request.txt')
     const accepted = agent.session.snapshotEvents().filter(event => event.type === 'gateway/execution')
     expect(accepted.some(event => event.data.kind === 'accepted' && event.data.state.scopeId !== undefined)).toBe(true)
+    const measurements = (kind: string): unknown[] => {
+      const prefix = `[${kind}] `
+      return output.mock.calls.flatMap<unknown>(([line]) => {
+        if (typeof line !== 'string' || !line.startsWith(prefix)) return []
+        const measurement: unknown = JSON.parse(line.slice(prefix.length))
+        return [measurement]
+      })
+    }
+    const duration: unknown = expect.any(Number)
+    const inputs = measurements('model-input-timing')
+    expect(inputs).toHaveLength(2)
+    expect(inputs[0]).toMatchObject({
+      inboxWaitMs: duration, claimToEnterMs: duration, inheritanceMs: duration,
+      enterRpcMs: duration, requestAuthorizationMs: duration, afterAuthorizationToStreamMs: duration,
+    })
+    const resources = measurements('model-resource-timing')
+    expect(resources).toHaveLength(4)
+    expect(resources[0]).toMatchObject({
+      outcome: 'granted', originMs: duration, registrationWaitMs: duration,
+      submitCalls: 1, statusCalls: 1, gatewaySamples: 2, gatewayHandlerBearerMs: duration, gatewayAuthorityMs: duration,
+      gatewayTransactionMs: duration,
+    })
+    const privateFields = /"(?:(?:session|runtime|request|user)Id|text|prompt|path|scopeId|authorization|token)"\s*:/u
+    expect(JSON.stringify([...inputs, ...resources])).not.toMatch(privateFields)
+    expect(measurements('model-attempt-timing')).toContainEqual(expect.objectContaining({
+      outcome: 'first-text', afterLastAuthorizationMs: duration,
+    }))
   }, 30_000)
 
   it('rejects mixed-actor tools, retains child restrictions, and cancels active work on revocation', async () => {

@@ -25,6 +25,8 @@ export interface SessionsPortSummary {
   id: SessionId
   /** No-visible-content bit (blank sessions are reused by Workspace reconnect instead of minting another). */
   blank: boolean
+  /** Recovered history remains readable but cannot be reused for execution. */
+  executionRestriction?: 'recovery-read-only'
   /** Highest visible-content event sequence known to the Host or live stream. */
   visibleContentSeq?: number
   /** Durable subagent origin; Workspace entry never selects these as the default conversation. */

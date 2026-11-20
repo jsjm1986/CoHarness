@@ -36,7 +36,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Entry } from '@deepseek-ai/cordis-plugin-loader'
 import { precompressBody, selectVariant } from '@deepseek-ai/dsh-host-webserver'
 import type { IndexInjection, PrecompressedBody } from '@deepseek-ai/dsh-host-webserver'
-import { exactPackageSpecifier, parseDshClient, stripClientSuffix } from './client/manifest.ts'
+import { exactPackageSpecifier, parseDshClient, requiredBootIds, stripClientSuffix } from './client/manifest.ts'
 import type { WebBootBatch, WebBootBatchPhase, WebBootEntry, WebBootGraph, WebBootRelease } from './client/manifest.ts'
 
 export { stripClientSuffix } from './client/manifest.ts'
@@ -47,9 +47,9 @@ export type {
 /** Startup transport grouping; module application keeps the declared graph order. */
 export interface Config {
   /**
-   * Package sets transported separately from ungrouped application entries.
-   * Omission keeps one URL-bounded application sequence. Inactive packages contribute nothing;
-   * active members retain their graph order, and bootstrap packages cannot be grouped here.
+   * Groups of required application packages delivered in their own URL-bounded sequences.
+   * Ungrouped required packages share a sequence. Active members retain graph order.
+   * Bootstrap packages cannot be listed. Each optional package has its own response.
    */
   applicationBatchGroups?: string[][]
 }
@@ -67,6 +67,7 @@ interface WebBootRowFields {
   /** Module specifiers the package requests from the module table. */
   external: string[]
   immediately: boolean
+  optional: boolean
 }
 
 /** Filesystem baseline captured before a client artifact snapshot is read. */
@@ -526,6 +527,7 @@ function graphRow(id: string, rev: string, fields: WebBootRowFields, chunks?: Re
     ...(chunks === undefined ? {} : { chunks }),
     ...(fields.inject !== undefined ? { inject: fields.inject } : {}),
     ...(fields.immediately ? { immediately: true } : {}),
+    ...(fields.optional ? { optional: true } : {}),
     ...(fields.external.length > 0 ? { external: fields.external } : {}),
   }
 }
@@ -582,7 +584,7 @@ const PARSER_PRELOAD_IDS = [CLIENT_MODULES_ID, '@deepseek-ai/dsh-client-runtime'
 
 /**
  * The boot protocol as index injection rows. The inline registration queue
- * precedes the application-batch preload and the blocking bootstrap batch. Its
+ * precedes required application preloads and the blocking bootstrap batch. Its
  * `create()` method materializes the modules
  * bundle, delegates construction to that bundle, and leaves the same facade
  * in live-registration mode. The graph global follows before the shell reads
@@ -616,7 +618,8 @@ window.__ModuleLoader__={
 }
 })()`
   const bootstrap = graph.batches.filter(batch => batch.phase === 'bootstrap')
-  const application = graph.batches.filter(batch => batch.phase === 'application')
+  const optional = new Set(graph.entries.filter(row => row.optional === true).map(row => row.id))
+  const application = graph.batches.filter(batch => batch.phase === 'application' && !batch.entries.some(id => optional.has(id)))
   const rows: IndexInjection[] = [{ kind: 'script', placement: 'head', text: queue }]
   for (const batch of application) {
     rows.push({ kind: 'script-preload', src: batch.url })
@@ -697,9 +700,7 @@ export class ClientModuleRegistry extends Service {
     this.composed = this.compose()
     const failures: Error[] = []
     this.flush(err => failures.push(err))
-    if (failures.length > 0) {
-      throw new ClientPackageCompositionError(failures)
-    }
+    if (failures.length > 0) this.reportCompositionFailures(failures)
 
     const registerWebCarrier = (webCtx: Context): void => {
       webCtx.effect(
@@ -711,6 +712,18 @@ export class ClientModuleRegistry extends Service {
     ctx.on('webserver/index-inject', (table) => {
       table.push(...bootInjections(this.composed))
     })
+  }
+
+  /** Keep a missing optional artifact out of the graph while retaining the Host's startup audit for required packages. */
+  private reportCompositionFailures(failures: Error[]): void {
+    const declarations = [...this.sources.values()].map(({ packageName, meta }) => ({ id: packageName, ...meta }))
+    const required = requiredBootIds(declarations, PARSER_PRELOAD_IDS)
+    const blocking = failures.filter((error) => {
+      if (!(error instanceof MissingClientBundleError) || required.has(error.packageName)) return true
+      this.ctx.logger.warn(error)
+      return false
+    })
+    if (blocking.length > 0) throw new ClientPackageCompositionError(blocking)
   }
 
   /**
@@ -816,7 +829,13 @@ export class ClientModuleRegistry extends Service {
   }
 
   private compose(): WebBootGraph {
-    const entries = orderByModuleGraph([...this.table.values()].map(record => record.entry))
+    const declared = orderByModuleGraph([...this.table.values()].map(record => record.entry))
+    const required = requiredBootIds(declared, PARSER_PRELOAD_IDS)
+    const entries = declared.map((row) => {
+      if (row.optional !== true || !required.has(row.id)) return row
+      const { optional: _declared, ...promoted } = row
+      return promoted
+    })
     const bootstrap = PARSER_PRELOAD_IDS
       .map(id => this.table.get(id))
       .filter((record): record is WebPluginRecord => record !== undefined)
@@ -829,8 +848,14 @@ export class ClientModuleRegistry extends Service {
     for (const records of partitionComboRecords(bootstrap)) {
       artifacts.push(buildBatch('bootstrap', records, this.readSourceMap))
     }
-    for (const group of applicationRecordGroups(application, this.applicationBatchGroups)) {
+    for (const group of applicationRecordGroups(application.filter(record => required.has(record.entry.id)), this.applicationBatchGroups)) {
       for (const records of partitionComboRecords(group)) {
+        artifacts.push(buildBatch('application', records, this.readSourceMap))
+      }
+    }
+    for (const record of application) {
+      if (required.has(record.entry.id)) continue
+      for (const records of partitionComboRecords([record])) {
         artifacts.push(buildBatch('application', records, this.readSourceMap))
       }
     }
@@ -916,6 +941,7 @@ export class ClientModuleRegistry extends Service {
       ...(decl.inject !== undefined ? { inject: decl.inject } : {}),
       external: decl.external ?? [],
       immediately: decl.immediately === true,
+      optional: decl.optional === true,
     }
     const resolved = { packageName, meta }
     this.pkgMeta.set(sourceKey, resolved)

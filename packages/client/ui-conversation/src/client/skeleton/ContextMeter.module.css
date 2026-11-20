@@ -155,34 +155,29 @@
   color: var(--dsw-alias-label-primary);
 }
 
-/* Very narrow composer rows (a workbench pane near its minimum width) drop
-   the meter outright: the same reading stays available in the footer stats
-   and the panel it opens. Compact phones keep the seat via the reset below. */
-@container (max-width: 340px) {
-  .root {
-    display: none;
-  }
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trigger {
+  box-sizing: border-box;
+  inline-size: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
+  justify-content: center;
+  align-content: center;
+  flex-wrap: wrap;
+  gap: 1px 3px;
+  padding: 0;
+  line-height: 1.1;
 }
 
-:global([data-viewport='compact']) .root {
-  display: inline-flex;
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trigger svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
 }
 
-/* Same 40px hit-target height family as the compact composer's other
-   controls; the narrowest phones step down with them. */
-:global([data-viewport='compact']) .trigger {
-  min-height: 40px;
-}
-
-@media (max-width: 359px) {
-  :global([data-viewport='compact']) .trigger {
-    min-height: 36px;
-  }
-}
-
-:global([data-viewport='compact']) .trigger svg {
-  width: var(--dsw-mobile-icon-secondary);
-  height: var(--dsw-mobile-icon-secondary);
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) :global([data-composer-footer]) .trigger {
+  inline-size: auto;
+  min-inline-size: calc(var(--dsw-touch-target) + var(--dsw-space-2));
+  flex-wrap: nowrap;
+  padding-inline: var(--dsw-space-1);
 }
 
 :global([data-viewport='compact']) .panel {

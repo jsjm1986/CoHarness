@@ -76,6 +76,17 @@ it.each(['0', '-1', '1.5', '2147483648'])('refuses invalid preferred-retry timin
   expect(() => loadNodeAgentConfig({ HGW_NODE_CENTER_URL: 'https://example.invalid', HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS: value })).toThrow()
 })
 
+it('validates an independent service dial list without selecting a different center identity', () => {
+  const env = { HGW_NODE_CENTER_URL: 'https://center.example', HGW_NODE_CENTER_DIAL_URLS: 'http://127.0.0.1:4040' }
+  expect(loadNodeAgentConfig(env).serviceDialUrls).toBeUndefined()
+  expect(loadNodeAgentConfig({ ...env, HGW_NODE_SERVICE_DIAL_URLS: 'https://center.example,http://127.0.0.1:4040' }))
+    .toMatchObject({ centerUrl: 'https://center.example', centerDialUrls: ['http://127.0.0.1:4040'],
+      serviceDialUrls: ['https://center.example', 'http://127.0.0.1:4040'] })
+  for (const value of ['', 'http://192.168.1.2', 'https://center.example/path', 'https://center.example,https://CENTER.example']) {
+    expect(() => loadNodeAgentConfig({ ...env, HGW_NODE_SERVICE_DIAL_URLS: value })).toThrowError(/HGW_NODE_SERVICE_DIAL_URLS/u)
+  }
+})
+
 it('defaults the preferred-retry window to sixty seconds', () => {
   expect(loadNodeAgentConfig({ HGW_NODE_CENTER_URL: 'https://example.invalid' }).dialPreferredRetryMs).toBe(60_000)
   expect(loadNodeAgentConfig({ HGW_NODE_CENTER_URL: 'https://example.invalid', HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS: '5000' }).dialPreferredRetryMs).toBe(5000)

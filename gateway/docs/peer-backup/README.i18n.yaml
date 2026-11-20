@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/docs/peer-backup/README.md
 document:
-  en: eedb47eb428a0667d8890341311f6882ac3d0231
-  zh: 2bfdf9142fd60330f4d9e8fc545dd97b7b246ba8
+  en: 986f19a879e4f809153e58a17e3497c19b18314d
+  zh: 42e2bbfcf297c0ea7eb373a3c0992aa86a2b4140
 /:
   en: e768d8cac8185627
   zh: 9f7dd5a651d67f36
@@ -15,23 +15,35 @@ document:
   en: b3a7c40bdd746793
   zh: 3c9d092e54923cd0
 /encrypted-computer-backups/contents:
-  en: ad2ccae6a14bf1ea
-  zh: beb4ae5f57db88b0
+  en: ad377540f3f250c0
+  zh: 4bfa0a775b4df195
 /encrypted-computer-backups/provision-computers:
   en: f13ce4a861ff8c33
   zh: 7418bd752d4a3f01
 /encrypted-computer-backups/read-protection-status:
-  en: f0fb651079fa0be6
-  zh: a3529f62e0f438c2
+  en: c6927be701f3d2c4
+  zh: ade2c5e9a9843f8b
+/encrypted-computer-backups/rotate-a-repository:
+  en: fddb12fee0d71a53
+  zh: 3e10b83a03c74499
 /encrypted-computer-backups/verify-recovery:
-  en: 182fabc4bd4552bf
-  zh: eacb4a9b69d22394
+  en: 7856f20a514cc9aa
+  zh: 0f2b9411f2f74f43
 /encrypted-computer-backups/replace-a-project-computer:
-  en: d413b063d3a89622
-  zh: 9d3aaf822d74b27d
+  en: 58004b95cc4d2330
+  zh: 433d62c688a80c80
+/encrypted-computer-backups/replace-a-project-computer/recover-data-after-source-loss:
+  en: 828f0f2fbbb0f09c
+  zh: 5fcee58753c01eb5
+/encrypted-computer-backups/replace-a-project-computer/replace-a-personal-computer:
+  en: 3431e223fb4afeb3
+  zh: c163f50fed98df40
+/encrypted-computer-backups/rebuild-organization-governance:
+  en: 412640554fc021d3
+  zh: eb08621fd241f011
 /encrypted-computer-backups/snapshot-providers:
-  en: 2e745d83f49256c3
-  zh: 288989d43371ea7f
+  en: 3280287c812459bd
+  zh: 6f65b3791bf36f83
 /encrypted-computer-backups/dev-note:
-  en: a2a8afdaac83eb93
-  zh: d6215e9e68fc81e5
+  en: d798bd642e1f85f3
+  zh: ec8ad847193d68e6

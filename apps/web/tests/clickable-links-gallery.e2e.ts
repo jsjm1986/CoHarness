@@ -16,9 +16,10 @@
 // Image thumbnails and subagent rows stay out: the first needs real attachment
 // bytes (image-display.expected.e2e.ts owns that route) and the second needs a
 // child session (subagent-conversation owns it).
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Locator, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -312,7 +313,7 @@ describe('web e2e: clickable links gallery', () => {
     scaffold = await launchWebScaffold({ extraOverlayPath: OVERLAY })
     imageUrl = new URL('/favicon.svg', scaffold.baseUrl).toString()
     await seedSession(scaffold, galleryFixture(imageUrl), SEED_ID)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     await page.context().route(/https?:\/\/docs\.example\.test\/.*/u, async route => route.fulfill({
       contentType: 'text/html',
@@ -387,16 +388,16 @@ describe('web e2e: clickable links gallery', () => {
     // right-edge clicks expand the card itself.
     for (const row of [
       /^Web search clickable link styles/,
-      /^Web fetch /,
-      /^Read docs\/guide\.md/,
-      /^Edit src\/tokens\.css/,
+      /^Web fetch$/,
+      /^Read$/,
+      /^Edit$/,
       /^Grep linkColor/,
       /Run the lint gate|pnpm run lint/,
     ]) {
       const toggle = page.getByRole('button', { name: row }).first()
       await toggle.waitFor({ timeout: 10_000 })
       const box = await toggle.boundingBox()
-      await toggle.click(box === null ? {} : { position: { x: box.width - 8, y: box.height / 2 } })
+      await toggle.click(box === null || box.width < 24 ? {} : { position: { x: box.width - 8, y: box.height / 2 } })
     }
     // Both generic rows (the unclassified str_replace_editor and the unknown
     // design_tokens_sync) expand to their IN/OUT surfaces.

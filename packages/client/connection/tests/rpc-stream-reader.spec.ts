@@ -68,3 +68,40 @@ it('preserves cancellation before opening, during connection and while reading',
 it('surfaces a cleanup failure after an otherwise clean end', async () => {
   await expect(collect(readRpcStream(async () => response([encode(end)], () => { throw new Error('close failed') }), url, message, signal()))).rejects.toThrow('close failed')
 })
+
+it('cancels a parked body itself and waits for its cleanup before releasing the reader', async () => {
+  const caller = new AbortController()
+  const reading = Promise.withResolvers<undefined>()
+  const cancelling = Promise.withResolvers<undefined>()
+  const cleaned = Promise.withResolvers<undefined>()
+  const cancel = vi.fn(() => { cancelling.resolve(undefined); return cleaned.promise })
+  const body = new ReadableStream<Uint8Array>({ pull() { reading.resolve(undefined) }, cancel }, { highWaterMark: 0 })
+  const result = collect(readRpcStream(async () => new Response(body,
+    { headers: { 'content-type': 'application/x-ndjson' } }), url, message, caller.signal))
+  const settled = result.then(value => ({ value }), (error: unknown) => ({ error }))
+  await reading.promise
+  const reason = new Error('pane closed')
+  caller.abort(reason)
+  await cancelling.promise
+  expect(body.locked).toBe(true)
+  expect(cancel).toHaveBeenCalledTimes(1)
+  cleaned.resolve(undefined)
+  expect(await settled).toEqual({ error: reason })
+  expect(body.locked).toBe(false)
+  expect(cancel).toHaveBeenCalledTimes(1)
+})
+
+it.each([end, { ...end, rpcId: 'wrong' }])('removes its body-abort listener after completion or decoding failure: %j', async (frame) => {
+  const added = vi.spyOn(AbortSignal.prototype, 'addEventListener')
+  const removed = vi.spyOn(AbortSignal.prototype, 'removeEventListener')
+  const body = response([encode(frame)])
+  try {
+    const pending = collect(readRpcStream(async () => body, url, message, signal()))
+    if (frame.rpcId === message.rpcId) await expect(pending).resolves.toEqual([])
+    else await expect(pending).rejects.toThrow('correlation mismatch')
+    const listener = added.mock.calls.find(([type]) => type === 'abort')?.[1]
+    expect(listener).toBeTypeOf('function')
+    expect(removed).toHaveBeenCalledWith('abort', listener)
+    expect(body.body?.locked).toBe(false)
+  } finally { added.mockRestore(); removed.mockRestore() }
+})

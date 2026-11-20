@@ -28,3 +28,18 @@
 .frame[data-document-zoom-mode="fixed"] .surface {
   width: calc(var(--document-zoom-width) * var(--document-zoom));
 }
+
+@media (hover: none), (pointer: coarse) {
+  .frame {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .scrollport {
+    flex: 1;
+    min-block-size: 0;
+    block-size: auto;
+  }
+
+  .revealZone { display: none; }
+}

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/node-content/README.md
 document:
-  en: a035f61c34e33c451383b9ce25a69c78357cde79
-  zh: 3ed2fd5fd7c7bdf43ab031b117140acfdf27a0d0
+  en: 33735a8e2d860fa14aeba4624dca596ee7d7e90b
+  zh: d4e1b683fe42035e772e7ee9370117fb0ddaf909
 /postgresql-storage-for-one-project-computer:
   en: 3bc3cbdb3cd88dc1
   zh: ce4b4edb374d5c0c
@@ -21,14 +21,14 @@ document:
   en: 4fe4f548e33cb714
   zh: 82454ed54fb23764
 /postgresql-storage-for-one-project-computer/check-a-mac-project-volume:
-  en: 6353fc1e7f291500
-  zh: c8a0373b9530d9a3
+  en: da4101dce2457af2
+  zh: efc32c1fa29b2723
 /postgresql-storage-for-one-project-computer/verify-the-isolated-database-path:
-  en: 823bcd194016d5e7
-  zh: e25960f72b91e159
+  en: 301f469e183d2260
+  zh: a95667f816bbd569
 /postgresql-storage-for-one-project-computer/organization-wide-project-names:
-  en: 819f29504ee1b072
-  zh: a185eaca81aa99e2
+  en: b3fd62b1f414330c
+  zh: e9cd6d825144a34a
 /postgresql-storage-for-one-project-computer/move-an-existing-project:
   en: 8d7e260c3b28aee2
   zh: 184f4aa064fac76e

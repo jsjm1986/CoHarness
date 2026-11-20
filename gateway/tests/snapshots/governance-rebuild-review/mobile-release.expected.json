@@ -1,0 +1,10 @@
+{
+  "title": "Restore organization management",
+  "states": [
+    "Only the recovery administrator can use this page. Other accounts, computer enrollment and old Runtime execution remain suspended."
+  ],
+  "form": "- heading \"Current review\" [level=2]\n- heading \"Open management\" [level=3]\n- paragraph: Open reviewed accounts and ordinary configuration only. Unreviewed accounts remain disabled, computers need new credentials and Runtime execution restrictions remain in force.\n- checkbox \"Browser and Runtime login credentials\"\n- text: Browser and Runtime login credentials\n- checkbox \"Computer enrollment credentials\"\n- text: Computer enrollment credentials\n- checkbox \"Organization model connections\"\n- text: Organization model connections\n- checkbox \"Plugin enablement configuration\"\n- text: Plugin enablement configuration\n- checkbox \"SSH and Webhook connections\"\n- text: SSH and Webhook connections\n- checkbox \"Computer-local paths\"\n- text: Computer-local paths\n- checkbox \"Public access configuration\"\n- text: Public access configuration\n- checkbox \"Old pending work and desktop leases\"\n- text: Old pending work and desktop leases\n- checkbox \"Business data on each computer\"\n- text: Business data on each computer\n- checkbox \"Content-bearing audit detail\"\n- text: Content-bearing audit detail\n- checkbox \"Computer, project, model and plugin grants\"\n- text: Computer, project, model and plugin grants\n- checkbox \"Organization administrator roles\"\n- text: Organization administrator roles\n- checkbox \"I understand these domains remain unrestored and require separate action after management opens\"\n- text: I understand these domains remain unrestored and require separate action after management opens\n- button \"Confirm review\" [disabled]\n- button \"Cancel editing\"",
+  "ordinaryAdmin": 0,
+  "sourceRestoreButton": 0,
+  "oldWorkNotice": 1
+}

@@ -1,6 +1,6 @@
 /** Create a user's declared document directory without allowing filesystem aliases to claim another owner. */
-import { chownSync, lstatSync, mkdirSync, type Stats } from 'node:fs'
-import { join } from 'node:path'
+import { chownSync, lstatSync, mkdirSync, realpathSync, type Stats } from 'node:fs'
+import { isAbsolute, join, resolve } from 'node:path'
 import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import type { GatewayConfig } from './config.ts'
 import { personalRuntimeLayout, type PersonalRuntimeStorage } from './runtime-layout.ts'
@@ -17,10 +17,15 @@ function directory(path: string, recursive = false, owner?: Pick<Stats, 'uid' | 
  * Prepare the managed profile's parent directories under the Runtime's existing local owner.
  * @param dshHome - already prepared private Runtime directory.
  * @param profile - trusted application profile name.
+ * @param existingHome - require an existing canonical retained home without creating it.
  * @returns the profile's package scope for shipped policy providers.
  */
-export function prepareRuntimeProfileDirectory(dshHome: string, profile: string): string {
-  directory(dshHome, true)
+export function prepareRuntimeProfileDirectory(dshHome: string, profile: string, existingHome = false): string {
+  if(existingHome){
+    if(!isAbsolute(dshHome)||resolve(dshHome)!==dshHome||realpathSync(dshHome)!==dshHome||!lstatSync(dshHome).isDirectory()){
+      throw new Error('Retained Runtime home must be an existing canonical directory')
+    }
+  }else directory(dshHome, true)
   const owner = lstatSync(dshHome)
   let path = dshHome
   for (const part of ['profiles', profile, 'node_modules', '@deepseek-ai']) {
@@ -34,13 +39,24 @@ export function prepareRuntimeProfileDirectory(dshHome: string, profile: string)
  * @param cfg - deployment-owned user root.
  * @param username - validated username whose unique database row has been inserted.
  * @param storage - persisted Runtime selection; omission prepares the existing personal space.
- * @param homePath - this computer's persisted working directory; omission uses its existing managed user layout.
+ * @param homePath - this computer's absolute working directory; omission uses its existing managed user layout. Relative paths are refused before any directory is created.
+ * @param existingAccountHome - require the previously verified account root to exist; additional Runtime directories still use their normal allocation layout.
  * @returns after inventory registration and directory creation; failures retain diagnostic files without deleting data.
  */
-export function prepareUserData(cfg: GatewayConfig, username: string, storage: PersonalRuntimeStorage = {}, homePath = join(cfg.usersRoot, username, 'home')): void {
-  directory(cfg.usersRoot, true)
+export function prepareUserData(cfg: GatewayConfig, username: string, storage: PersonalRuntimeStorage = {}, homePath = join(cfg.usersRoot, username, 'home'), existingAccountHome = false): void {
+  if (!isAbsolute(homePath)) throw new Error('User home must be an absolute local path')
+  const requireHome = () => {
+    const entry = lstatSync(homePath, { throwIfNoEntry: false })
+    if (!entry?.isDirectory() || entry.isSymbolicLink() || realpathSync(homePath) !== homePath) {
+      throw new Error('Retained account home must be an existing canonical directory')
+    }
+  }
+  if (existingAccountHome) requireHome()
+  if (!existingAccountHome || cfg.usersRoot !== homePath) directory(cfg.usersRoot, true)
   const parent = join(cfg.usersRoot, username), home = homePath
-  directory(parent); directory(home, true)
+  if (!existingAccountHome || parent !== homePath) directory(parent)
+  if (existingAccountHome) requireHome()
+  else directory(home, true)
   const owner = lstatSync(parent)
   if (storage.storageLayout === 'isolated') {
     const runtimes = join(parent, 'runtimes')

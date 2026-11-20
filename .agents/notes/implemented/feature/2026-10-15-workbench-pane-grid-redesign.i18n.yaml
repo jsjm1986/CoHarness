@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-15-workbench-pane-grid-redesign.md
 document:
-  en: ed0bb4d5d818e8dd5d9bad3f007bf08710e2a876
-  zh: d1b1fd5bffb89d351c90d995a646fdfb01fb4e37
+  en: 400671d95af765e33e05d6e750919adab0bad698
+  zh: fbf12bcfdc6d6786fbf6f23c6c06868913ab250d
 /agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder:
   en: f483764b328d5518
   zh: 16f3488618c01649
@@ -12,8 +12,8 @@ document:
   en: efbeeeb033e8e99b
   zh: db68e29c197d06ec
 /agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/decision:
-  en: 15aad0bd7035fddc
-  zh: f184ee85551eafc1
+  en: f8bd8c56607c0a73
+  zh: 53ccc154564d812b
 /agent-note-workbench-pane-grid-redesign-identity-collapse-strips-and-reorder/alternatives-considered:
   en: 70fc10092f8f3d97
   zh: d653f718cd68c1ee

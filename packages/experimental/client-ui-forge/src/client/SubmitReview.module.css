@@ -3,7 +3,10 @@
 .content { min-height: 0; overflow-y: auto; }
 .form { display: flex; flex-direction: column; gap: 16px; min-width: 0; font: var(--dsw-font-xs-13); font-family: Inter, var(--dsw-font-family); }
 .count { color: var(--dsw-alias-label-secondary); }
-.input { min-height: 112px; }
+.summary .input {
+  min-height: var(--dsw-touch-target);
+  height: clamp(var(--dsw-touch-target), calc(var(--dsw-viewport-height, 100dvh) * 0.2), 112px);
+}
 .summary { display: flex; flex-direction: column; gap: 8px; }
 .hint { color: var(--dsw-alias-label-secondary); }
 .decisions { display: flex; flex-wrap: wrap; gap: 8px 20px; }
@@ -14,6 +17,10 @@
 .error { color: var(--dsw-alias-state-error-primary); overflow-wrap: anywhere; }
 .reconcile { display: flex; flex-wrap: wrap; gap: 8px; }
 .discard { margin-inline-end: auto; }
+@media (pointer: coarse), (max-width: 767px) {
+  .decisions label { min-height: var(--dsw-touch-target, 44px); }
+}
+
 .confirm {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px;
   border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-md);

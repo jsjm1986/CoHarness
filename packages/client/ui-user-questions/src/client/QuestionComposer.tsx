@@ -14,13 +14,8 @@ import type { QuestionDraftAnswer, QuestionDraftProgress } from './draft-store.t
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
 import css from './QuestionComposer.module.css'
 
-/**
- * Displayed feedback: validation feedback is stored as a dictionary KEY and
- * translated at render, so already-shown feedback follows a locale switch;
- * runtime failure messages (finished strings from the wire) pass through
- * verbatim.
- */
-type Feedback = { key: 'error.incomplete' | 'error.unanswered' | 'error.unavailable' | 'error.resubmit' | 'status.sent' } | { text: string }
+/** Feedback follows locale changes; original transport errors belong in diagnostics. */
+type Feedback = { key: 'error.incomplete' | 'error.unanswered' | 'error.unavailable' | 'error.resubmit' | 'error.submit' | 'error.dismiss' | 'status.sent' }
 
 /** A removed card can remain mounted until the composer seat updates. */
 const REMOVED_CARD: QuestionCardSnapshot = {
@@ -313,7 +308,8 @@ function QuestionFlow({ pending, active, t, useStore, useQuestionCard, actions }
       .catch((cause: unknown) => {
         sentVia.current = null
         setBusy(null)
-        setError({ text: cause instanceof Error ? cause.message : String(cause) })
+        console.warn('[ui-user-questions] Question cancellation was not confirmed.', cause)
+        setError({ key: 'error.dismiss' })
       })
   }
 
@@ -379,12 +375,16 @@ function QuestionFlow({ pending, active, t, useStore, useQuestionCard, actions }
         sentVia.current = null
         setBusy(null)
         setError(null)
-        void pending.dismiss().catch(() => { setError({ key: 'status.sent' }) })
+        void pending.dismiss().catch((cause: unknown) => {
+          console.warn('[ui-user-questions] The accepted answer panel could not close.', cause)
+          setError({ key: 'status.sent' })
+        })
       })
       .catch((cause: unknown) => {
         sentVia.current = null
         setBusy(null)
-        setError({ text: cause instanceof Error ? cause.message : String(cause) })
+        console.warn('[ui-user-questions] Question submission was not confirmed.', cause)
+        setError({ key: 'error.submit' })
       })
   }
 
@@ -610,7 +610,7 @@ function QuestionFlow({ pending, active, t, useStore, useQuestionCard, actions }
                 </button>
               </div>
               <div className={css.feedback} role="status">
-                {error === null ? null : 'key' in error ? t(error.key) : error.text}
+                {error === null ? null : t(error.key)}
               </div>
               {/* A review card has nothing to send: the pager alone walks the record. */}
               {review === undefined && (

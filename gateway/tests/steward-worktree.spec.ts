@@ -44,6 +44,9 @@ it('refuses cancellation before directory preparation', async () => {
 
 it('creates the provisioning branch once and preserves existing worktree edits', async () => {
   const config = await repository(await directory()), signal = new AbortController().signal
+  vi.stubEnv('GIT_CONFIG_COUNT', '1')
+  vi.stubEnv('GIT_CONFIG_KEY_0', 'dsh.fixture-sentinel')
+  vi.stubEnv('GIT_CONFIG_VALUE_0', 'parent-only')
   await prepareStewardWorktree(config, signal)
   expect((await config.git(['symbolic-ref', '--short', 'HEAD'], config.workspacePath)).stdout.trim()).toBe('steward-workspace')
   await writeFile(join(config.workspacePath, 'README.md'), 'uncommitted workspace edits\n')

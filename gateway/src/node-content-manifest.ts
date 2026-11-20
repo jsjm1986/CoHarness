@@ -4,6 +4,9 @@ import { readFile,readdir } from 'node:fs/promises'
 import { join,resolve } from 'node:path'
 import type { Queryable } from './postgres/database.ts'
 
+/** PostgreSQL advisory lock shared by node content migration and release verification. */
+export const NODE_CONTENT_MIGRATION_LOCK_KEY = 1397703491
+
 /** @param directory - migration directory (defaults to the installed release). @returns ordered SQL and its digest. */
 export async function nodeContentMigrations(directory=resolve(import.meta.dirname,'../deploy/node-content/migrations')) {
   const names = (await readdir(directory)).filter(name => /^\d{3}_[a-z0-9_]+\.sql$/u.test(name)).sort()

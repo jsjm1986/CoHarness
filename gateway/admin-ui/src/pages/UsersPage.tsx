@@ -47,7 +47,12 @@ import {
 import { adminLanguage, translateCopy } from '../language.ts'
 import { zh as usersZh, en as usersEn } from './users.copy.ts'
 
-export function UsersPage() {
+/**
+ * Show the computer-scoped user list and its administration actions.
+ * @param props - optional preparation effect for a likely next page, started after the list is ready.
+ * @returns user list, loading and error states, and administration dialogs.
+ */
+export function UsersPage({ prepareNextPage }: { prepareNextPage?: () => (() => void) | undefined }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: usersZh, en: usersEn }), [])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,6 +78,9 @@ export function UsersPage() {
   }, [])
 
   useEffect(() => { void reload(true) }, [reload])
+  useEffect(() => {
+    if (!loading && error === '') return prepareNextPage?.()
+  }, [loading, error, prepareNextPage])
 
   async function run(key: string, action: () => Promise<void>): Promise<boolean> {
     setPending(key)
@@ -143,7 +151,7 @@ export function UsersPage() {
           />
         ) : (
           <>
-            <div className="tableWrap desktopOnly">
+            <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionTitle')} tabIndex={0}>
               <table className="dataTable">
                 <thead>
                   <tr>

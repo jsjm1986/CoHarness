@@ -14,7 +14,7 @@ Gateway 为每个已准入的 mux/host 事件 socket 持有一份登记。原始
 
 续租同步[持久访问监控](2026-09-22-cross-gateway-access-invalidation.zh.md)，无锁且不写入地读取当前登录资格，检查当前项目权限，复核 Runtime bearer generation，再次同步后才签发。同批次内，具有相同登录会话与目标的两个 socket 共用资格读取；结果不保留到请求之外。身份、角色或 scope 权限变化会拒绝续租，而不是静默修改保留的权限。新期限受现有登录期限、配置的 principal TTL 和固定 30 秒上限约束。普通登录验证器仍单独维护活动与滑动过期行为。
 
-Runtime 本地池只持有一份有界在途批次，并向保留的协作权限暴露经过验证的 principal 句柄。每份替代签名都必须保持相同身份、权限、scope 和 generation，具有有效签名、更晚的到期时间及新 nonce。验证完成前，上一份签名的到期计时器始终保持活动。Gateway 与 Runtime 都持有到期计时器；socket 关闭、监控中断、服务销毁、拒绝、到期和 generation 替换都不能被晚到响应逆转。丢失响应不会增加 Runtime 有效期。 取消会立即退役权限，但池必须等待实际传输和响应 body reader 结束，才能接纳另一批或完成销毁。[Connection 认证决策](2026-10-01-browser-auth-web-transport.zh.md) 仍拥有初始浏览器准入；续租既不授予执行权限，也不扩大 Inspector 访问。
+Runtime 本地池只持有一份有界在途批次，并向保留的协作权限暴露经过验证的 principal 句柄。每份替代签名都必须保持相同身份、权限、scope 和 generation，具有有效签名、更晚的到期时间及新 nonce。验证完成前，上一份签名的到期计时器始终保持活动。Gateway 与 Runtime 都持有到期计时器；socket 关闭、监控中断、服务销毁、拒绝、到期和 generation 替换都不能被晚到响应逆转。续租暂时不可用时，仅在最近一次签名仍有效时重试。bearer 校验暂时失败返回 HTTP 503，确定拒绝则结束登记。取消会立即退役权限，但池必须等待实际传输和响应 body reader 结束，才能接纳另一批或完成销毁。[Connection 认证决策](2026-10-01-browser-auth-web-transport.zh.md) 仍拥有初始浏览器准入；续租既不授予执行权限，也不扩大 Inspector 访问。
 
 ## 已考虑的替代方案
 
@@ -38,6 +38,6 @@ Runtime 本地池只持有一份有界在途批次，并向保留的协作权限
 
 [真实 Loader 测试](../../../../packages/context/gateway-runtime/tests/stream-principal-admission.host.spec.ts) 在私有临时端口启动 Connection、Web server、frontend-static 和 GatewayRuntime，开启两条实际 WebSocket 载体，并经私有 HTTP 传输续租至初始签名期限之后，同时原 HTTP 断言收到 401。禁用用例不发送续租。既有 [API Proxy 到期测试](../../../../packages/host/apiproxy/tests/api-proxy-collaboration.spec.ts) 保留，并增加两条流的当前期限测试。这些是确定性的协议与生命周期检查，不能证明部署容量或实测端到端加速。
 
-同一可运行 Loader 流程由[无密钥应用快照](../../../../scripts/event-principal-renewal.snapshot.ts)重放；其记录包含启用与禁用载体，不包含令牌、断言字节或时钟值。
+[无密钥应用快照](../../../../scripts/event-principal-renewal.snapshot.ts)重放 Loader 流程。它记录两种启用的传输在私有续租返回 HTTP 503 后恢复，以及 HTTP 和禁用续租的传输按固定期限到期。
 
 [原生 HTTP 销毁回归](../../../../packages/context/gateway-runtime/tests/stream-principal-io.host.spec.ts)观察生产续租闭包读取不完整的分块 JSON 响应。池销毁只有在真实续租和 reader 取消都完成后才返回；恢复仅等待竞速结果的实现会使该断言失败。Node 25 上 reader 取消已在续租 Promise 前完成，因此共享 body reader helper 保持不变。

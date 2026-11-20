@@ -1,4 +1,4 @@
-/** Private append-only restic object repository. All SQLite I/O runs off the Gateway event loop. */
+/** Private restic object store with transactional append, usage accounting and owner-only retirement. */
 import { createHash } from 'node:crypto'
 import { statfsSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -7,7 +7,7 @@ import { parentPort, workerData } from 'node:worker_threads'
 
 interface Request {
   id: number
-  operation: 'list' | 'head' | 'get' | 'put' | 'unlock' | 'confirm' | 'point' | 'usage' | 'close'
+  operation: 'list' | 'head' | 'get' | 'put' | 'unlock' | 'confirm' | 'point' | 'usage' | 'capacity' | 'retire' | 'close'
   repository: string
   kind: string
   name: string
@@ -34,11 +34,15 @@ db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=F
   ) WITHOUT ROWID;
   CREATE TABLE IF NOT EXISTS usage (
     repository TEXT PRIMARY KEY, bytes INTEGER NOT NULL, count INTEGER NOT NULL
+  ) WITHOUT ROWID;
+  CREATE TABLE IF NOT EXISTS retired_repositories (
+    repository TEXT PRIMARY KEY
   ) WITHOUT ROWID;`)
 const info = db.prepare('SELECT size,digest FROM objects WHERE repository=? AND kind=? AND name=?')
 const point = db.prepare('SELECT digest,data FROM points WHERE repository=? AND name=?')
 const usage = db.prepare('SELECT bytes,count FROM usage WHERE repository=?')
 const total = db.prepare('SELECT COALESCE(sum(bytes),0) bytes FROM usage')
+const retired = db.prepare('SELECT 1 FROM retired_repositories WHERE repository=?')
 const charge = db.prepare(`INSERT INTO usage(repository,bytes,count) VALUES(?,?,1)
   ON CONFLICT(repository) DO UPDATE SET bytes=bytes+excluded.bytes,count=count+1`)
 
@@ -49,6 +53,7 @@ function write(request: Request): number {
   if (request.operation === 'put' && kind !== 'config' && digest !== name) return 422
   db.exec('BEGIN IMMEDIATE')
   try {
+    if (retired.get(repository)) return 410
     const isPoint = request.operation === 'confirm'
     const existing = isPoint ? point.get(repository, name) : info.get(repository, kind, name)
     if (existing) return existing.digest === digest ? 200 : 409
@@ -73,36 +78,80 @@ function write(request: Request): number {
   }
 }
 
+function capacity(repository: string, quota: number) {
+  const occupied = usage.get(repository)
+  const used = Number(occupied?.bytes ?? 0), receiverUsed = Number(total.get()?.bytes ?? 0)
+  const disk = statfsSync(dirname(settings.file), { bigint: true })
+  const headroom = Number((disk.bavail * disk.bsize - BigInt(settings.reserve)) / 3n)
+  const remainingObjects = Math.max(0, settings.objectLimit - Number(occupied?.count ?? 0))
+  const limits = [
+    { reason: 'policy-quota', bytes: quota - used },
+    { reason: 'receiver-capacity', bytes: settings.capacity - receiverUsed },
+    { reason: 'disk-reserve', bytes: headroom },
+  ]
+  const limiting = limits.reduce((left, right) => left.bytes <= right.bytes ? left : right)
+  return { used, remaining: remainingObjects && limiting.bytes>=4096 ? limiting.bytes : 0,
+    reason: remainingObjects ? limiting.reason : 'object-limit', receiverUsed, receiverLimit: settings.capacity, remainingObjects }
+}
+
+function retire(repository: string): boolean {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.prepare('INSERT OR IGNORE INTO retired_repositories VALUES(?)').run(repository)
+    // Keep the reclaim transaction bounded by the receiver's maximum object size.
+    const removed = db.prepare(`DELETE FROM objects WHERE repository=? AND (kind,name) IN (
+      SELECT kind,name FROM objects WHERE repository=? ORDER BY kind,name LIMIT 8) RETURNING charge`).all(repository, repository)
+    const receipts = db.prepare(`DELETE FROM points WHERE repository=? AND name IN (
+      SELECT name FROM points WHERE repository=? ORDER BY name LIMIT 8) RETURNING max(4096,length(data)) charge`).all(repository, repository)
+    const count = removed.length + receipts.length
+    if (count) {
+      const bytes = [...removed, ...receipts].reduce((sum, row) => sum + Number(row.charge), 0)
+      db.prepare('UPDATE usage SET bytes=bytes-?,count=count-? WHERE repository=?').run(bytes, count, repository)
+    }
+    const complete = !db.prepare('SELECT 1 FROM objects WHERE repository=? UNION ALL SELECT 1 FROM points WHERE repository=? LIMIT 1')
+      .get(repository, repository)
+    if (complete) db.prepare('DELETE FROM usage WHERE repository=?').run(repository)
+    db.exec('COMMIT')
+    return complete
+  } finally {
+    if (db.isTransaction) db.exec('ROLLBACK')
+  }
+}
+
 function execute(r: Request): unknown {
   switch (r.operation) {
     case 'put':
     case 'confirm':
       return write(r)
+    case 'capacity':
+      return capacity(r.repository, r.quota)
+    case 'retire':
+      return retire(r.repository)
     case 'usage': {
-      const used = Number(usage.get(r.repository)?.bytes ?? 0)
-      const available = settings.capacity - Number(total.get()?.bytes ?? 0)
-      const disk = statfsSync(dirname(settings.file), { bigint: true })
-      const headroom = Number((disk.bavail * disk.bsize - BigInt(settings.reserve)) / 3n)
-      return { used, remaining: Math.max(0, Math.min(r.quota - used, available, headroom)) }
+      const { used, remaining } = capacity(r.repository, r.quota)
+      return { used, remaining }
     }
     case 'head':
-      return info.get(r.repository, r.kind, r.name) ?? null
+      return retired.get(r.repository) ? null : info.get(r.repository, r.kind, r.name) ?? null
     case 'list':
+      if (retired.get(r.repository)) return []
       return db
         .prepare('SELECT name,size FROM objects WHERE repository=? AND kind=? ORDER BY name')
         .all(r.repository, r.kind)
     case 'get':
+      if (retired.get(r.repository)) return null
       return (
         db
           .prepare('SELECT substr(data,?,?) bytes FROM objects WHERE repository=? AND kind=? AND name=?')
           .get((r.start ?? 0) + 1, r.length ?? settings.capacity, r.repository, r.kind, r.name)?.bytes ?? null
       )
     case 'point':
-      return point.get(r.repository, r.name)?.data ?? null
+      return retired.get(r.repository) ? null : point.get(r.repository, r.name)?.data ?? null
     case 'unlock': {
       if (r.kind !== 'locks') return 403
       db.exec('BEGIN IMMEDIATE')
       try {
+        if (retired.get(r.repository)) return 410
         const row = db
           .prepare("DELETE FROM objects WHERE repository=? AND kind='locks' AND name=? RETURNING charge")
           .get(r.repository, r.name)

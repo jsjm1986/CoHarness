@@ -526,14 +526,31 @@ describe('Modal', () => {
     expect(screen.getByRole('button', { name: 'Configure later' })).toBeDefined()
     expect(screen.getByText('Name it.')).toBeDefined()
     expect(screen.getByText('Name it.').parentElement?.className).toContain('scrolling-content')
+    const content = dialog.querySelector('[data-modal-content]')
+    expect(content?.contains(screen.getByRole('heading', { name: 'Create new workspace' }))).toBe(false)
+    expect(content?.contains(screen.getByRole('button', { name: 'Configure later' }))).toBe(false)
+    expect(content?.contains(screen.getByRole('textbox', { name: 'name' }))).toBe(true)
+    expect(content?.contains(screen.getByRole('button', { name: 'Create' }))).toBe(false)
     fireEvent.keyDown(document, { key: 'a' })
     expect(onClose).not.toHaveBeenCalled()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
     // Mask is the presentation sibling behind the dialog.
-    const mask = document.querySelector('[aria-hidden="true"]') as HTMLElement
+    const mask = dialog.parentElement?.querySelector('[aria-hidden="true"]') as HTMLElement
     fireEvent.click(mask)
     expect(onClose).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves a headless caller in charge of its heading, scrolling and dismissal controls', () => {
+    const onClose = vi.fn()
+    render(<Modal open headless onClose={onClose} title="Owned page">
+      <h2>Owned heading</h2><button type="button" onClick={onClose}>Leave page</button>
+    </Modal>)
+    const dialog = screen.getByRole('dialog', { name: 'Owned page' })
+    expect(dialog.querySelector('[data-modal-header], [data-modal-content]')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Owned heading' }).parentElement).toBe(dialog)
+    fireEvent.click(screen.getByRole('button', { name: 'Leave page' }))
+    expect(onClose).toHaveBeenCalledOnce()
   })
 })
 

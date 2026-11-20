@@ -1,0 +1,40 @@
+- button "Discover"
+- heading "Workspace notes with a deliberately long localized plugin title" [level=3]
+- text: 1.0.0 @fixture/responsive-market-00
+- button "Install Workspace notes with a deliberately long localized plugin title": Install
+- paragraph: A readable description explains the capability before installation. A readable description explains the capability before installation. A readable description explains the capability before installation.
+- heading "Source" [level=4]
+- term: Author
+- definition: Local acceptance publisher
+- term: Homepage
+- definition:
+  - link "{{publisher}}/about/extension/0":
+    - /url: {{publisher}}/about/extension/0
+- term: Source code
+- definition:
+  - link "https://example.invalid/acceptance/extensions":
+    - /url: https://example.invalid/acceptance/extensions
+  - code: packages/extension-0
+- term: Package
+- definition:
+  - code: "@fixture/responsive-market-00@1.0.0"
+- term: Registry
+- definition:
+  - code: {{publisher}}/registry/
+- term: Published
+- definition: November 15, 2023
+- term: Category
+- definition: Developer tools
+- term: Labels
+- definition: Local workflow Reviewed source
+- term: Plugin market
+- definition: Private acceptance market
+- heading "Versions" [level=4]
+- list "Versions of Workspace notes with a deliberately long localized plugin title":
+  - listitem: 2.0.0-beta.1 Prerelease Incompatible This version is not compatible with the running DSH 0.2.1-rc.1.coharness.1; it requires DSH >=999.0.0.
+  - listitem:
+    - text: 1.0.0 Recommended Nov 15, 2023
+    - button "Install Workspace notes with a deliberately long localized plugin title 1.0.0": Install
+  - listitem:
+    - text: 0.9.0 Nov 15, 2023
+    - button "Install Workspace notes with a deliberately long localized plugin title 0.9.0": Install

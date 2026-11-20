@@ -6,6 +6,7 @@ import type { ConversationViewportSnapshot, SessionReference } from '@deepseek-a
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '../contract/slots.ts'
 import type { SidebarSessionViewSnapshot } from '../session-views.ts'
+import { followsCurrentSession } from '../session-selection.ts'
 import css from './SidebarRight.module.css'
 
 /** Root-only retained Session targets and their committed mount lifetimes. */
@@ -49,9 +50,7 @@ export function RightbarRoot({
   const views = useViews(value => value)
   const current = useSessions(sessions => sessions.current)
   const viewport = useViewport(value => value)
-  const followsCurrent = viewport.mode !== 'workbench'
-    || (viewport.pendingIdentity !== true && viewport.activePaneId === current)
-  const target = targetSessionId ?? (followsCurrent ? current : undefined)
+  const target = targetSessionId ?? (followsCurrentSession(viewport, current) ? current : undefined)
   useLayoutEffect(() => { selectView(target) }, [selectView, target])
   return <>{views.map(view => (
     <SessionView

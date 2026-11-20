@@ -1,0 +1,9 @@
+- dialog "Installed":
+  - button "Close":
+    - img
+  - status: Installed
+  - paragraph: Locally published installation acceptance bundle
+  - paragraph: Version 1.0.0
+  - paragraph: "@fixture/market-success@1.0.0"
+  - button "Show install details"
+  - button "Enable now"

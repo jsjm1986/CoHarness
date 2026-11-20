@@ -12,6 +12,8 @@ English | [中文](2026-11-09-personal-directory-revisit-coalescing.zh.md)
 
 Each drop point coalesces into one deferred pass. `focus` records `revisitQueued` when a revisit is in flight and runs once more after it settles; `restoreSelection` records `retryQueued` for `retry` arrivals during `restoreWork` and re-enters after that flight settles. Coalescing still bounds work to one extra pass per drain — unlike `refresh`, whose in-flight `work` is *shared* because an already-running request's result satisfies the caller, an event-triggered revisit must re-read after the event, since the in-flight result predates the state change the event announced. `attempt.signal.aborted` remains a permanent stop: a superseded navigation correctly kills the saved-selection attempt.
 
+Explicit environment refresh and retry use the same entry-owned invalidation as `focus` and `online`. They clear the shared metadata directory before rereading governance state, so a ready cached snapshot cannot satisfy a request for current availability. Callers await the entire coalesced sequence, including the subsequent read requested during an earlier one. Disposal cancels that sequence and prevents a queued pass from acquiring new work. Other browser documents keep their independent directory owners.
+
 ## Alternatives considered
 
 **Run the event's pass concurrently.** Rejected: parallel revisits double catalog traffic and order badly against the in-flight request's own republish.
@@ -25,3 +27,5 @@ An `online`/`focus` event can no longer be lost while a revisit is in flight, an
 ## Verification
 
 `personal-directory.client.spec.ts` parks the first `ensureSession` open on a gate, fires a refresh retry mid-flight, and observes the queued second open committing the saved session. `personal-navigation-resume.e2e.ts` covers the full browser path: intent draft retained offline, `online`, card hides, input lands in the original conversation.
+
+The [environment-refresh browser scenario](../../../../apps/web/tests/personal-directory-refresh.e2e.ts) records the selected environment becoming unavailable and recovering through the actual refresh and retry controls without focus events or Runtime preparation. The directory tests cover cached availability, independent owners, concurrent refresh completion and disposal during an outstanding read.

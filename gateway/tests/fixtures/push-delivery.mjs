@@ -83,6 +83,17 @@ async function personalComputerPermissions() {
       console.log(JSON.stringify({ scenario, secondComputerAllowed: secondAllowed, outgoingCalls: received.length - before, claimed: rows.length }))
     }
     await complete('personal-source-current', rootId, 0, 1)
+    const receipt = { provider: 'jpush', token: 'creator-registration', runtimeId, sessionId: rootId, eventSeq: 0, kind: 'opened' }
+    const wrongOwner = await service.recordReceipt(other.publicId, receipt)
+    const opened = await service.recordReceipt(creator.publicId, receipt)
+    const repeated = await service.recordReceipt(creator.publicId, receipt)
+    const delivery = (await service.listDevices(creator.publicId)).devices[0].lastDelivery
+    assert.equal(delivery.sessionId, rootId)
+    assert.equal(wrongOwner, 'missing')
+    assert.equal(opened, 'recorded')
+    assert.equal(repeated, 'recorded')
+    assert.ok(delivery.deliveredAt && delivery.openedAt)
+    console.log(JSON.stringify({ scenario: 'device-delivery-receipt', wrongOwner, opened, repeated, delivered: true }))
     await complete('personal-child-current', childId, 0, 1)
     await pool.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE organization_id=$1 AND node_id=$2 AND user_id=$3', [organizationId, source, creator.id])
     await complete('personal-source-revoked', rootId, 1, 0)

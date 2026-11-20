@@ -15,6 +15,8 @@ import { openPeerVssSnapshot } from './peer-vss-snapshot.ts'
 import { PeerBackupError } from './peer-backup-repository.ts'
 import type { PeerProjectFileSnapshots } from './peer-backup-project-export.ts'
 import { verifiedPeerFileRoots,type PeerFileRootMap } from './peer-snapshot-roots.ts'
+import { nativeRuntimeProfileData } from './peer-runtime-profile.ts'
+import { watchPeerSourcePaths, type PeerSourceWrites } from './peer-backup-source-space.ts'
 
 const absolute=z.string().min(1).max(4096).refine(isAbsolute)
 const identity=z.object({version:z.literal(1),organizationId:z.uuid(),nodeId:z.uuid(),commandTimeoutMs:z.number().int().positive().max(2147483647).optional()})
@@ -54,7 +56,7 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
     } finally {await handle.close()}
   }
 
-  async acquire(b:NodeContentBinding,revision:string,signal:AbortSignal,maxEntries:number) {
+  async acquire(b:NodeContentBinding,revision:string,signal:AbortSignal,maxEntries:number,sourceSpace?:PeerSourceWrites) {
     const selected=await this.selected(b)
     await this.files.verify(b)
     const project=(await this.context.pool.query<{public_id:string;origin:ProjectOrigin}>(`SELECT p.public_id::text,p.origin FROM harness.projects p JOIN harness.project_content_placement b
@@ -87,11 +89,19 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
       {role:'userdoc-objects',owner:'gateway-documents/'+u+'/files',kind:'directory',logicalRoot:docs.filesRoot},
     ]
     const capturedAt=new Date().toISOString()
-    const snapshot=selected.provider==='btrfs'?await openPeerBtrfsSnapshot(selected.source,selected.directory,selected.timeout,signal):
-      await openPeerVssSnapshot(selected.source,selected.volume,selected.directory,selected.timeout,signal)
+    const unwatch=await watchPeerSourcePaths(sourceSpace,[selected.source,selected.directory])
+    const snapshot=await (selected.provider==='btrfs'?openPeerBtrfsSnapshot(selected.source,selected.directory,selected.timeout,signal):
+      openPeerVssSnapshot(selected.source,selected.volume,selected.directory,selected.timeout,signal)).catch(error=>{unwatch();throw error})
+    const release=async()=>{try{await snapshot.release()}finally{unwatch()}}
     try {
+      await sourceSpace?.check(selected.source)
       const checked='verifiedPath' in snapshot?snapshot.verifiedPath:undefined
       const gaps=new Set<string>()
+      if(within(selected.source,home)){
+        const profile=await nativeRuntimeProfileData(home,path=>snapshot.map(path),maxEntries,signal)
+        for(const gap of profile.gaps)gaps.add(gap)
+        for(const row of profile.roots)inputs.push({role:'plugin',owner:row.owner,kind:row.kind,logicalRoot:row.path})
+      }else gaps.add('runtime:outside-snapshot')
       const manifest=join(home,'managed-data.jsonl')
       if(!within(selected.source,manifest))gaps.add('runtime:outside-snapshot')
       else {
@@ -136,8 +146,8 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
         volumeId:b.volumeId,writerEpoch:b.writerEpoch,revision,documentRootId:space.root_id,provider:selected.provider,
         ...('devices' in snapshot?{devices:snapshot.devices}:{}),roots}
       return {revision,capturedAt,roots:roots.map(r=>({owner:r.owner,kind:r.kind,path:r.snapshotRoot})),logicalRoots:map,
-        verifiedVssPath:checked,confirm:snapshot.confirm,gaps:[...gaps],release:snapshot.release}
-    } catch(error){await snapshot.release();throw error}
+        verifiedVssPath:checked,confirm:async()=>{await sourceSpace?.check(selected.source);await snapshot.confirm()},gaps:[...gaps],release}
+    } catch(error){await release();throw error}
   }
 
   async validate(binding:Parameters<PeerProjectFileSnapshots['validate']>[0],payload:string,signal:AbortSignal){

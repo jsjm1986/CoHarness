@@ -11,6 +11,7 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { WorktreeReclamation } from './archive.ts'
 import { PREPARE_DIRECTORY } from './directory.ts'
 import { generatedWorktreeName } from './name.ts'
@@ -96,6 +97,7 @@ export class WorktreeService extends Service {
   })
 
   private readonly config: ResolvedConfig
+  private retainOnArchive: () => boolean
   private readonly lifetime = new AbortController()
   private readonly pending = new Set<Promise<unknown>>()
   private readonly checkouts = new Map<string, Promise<void>>()
@@ -104,6 +106,13 @@ export class WorktreeService extends Service {
   constructor(ctx: Context, config: Config) {
     super(ctx, 'worktrees')
     this.config = config as ResolvedConfig
+    const entry = { get retainOnArchive() { return config.retainOnArchive.get() } }
+    this.retainOnArchive = () => entry.retainOnArchive
+    installSettingsSection(ctx, settingsNamespace('worktree'), z.object({ retainOnArchive: z.boolean().default(false) }), entry, {
+      label: { en: 'Worktree cleanup', zh: '工作树清理' },
+      setSource: (source) => { this.retainOnArchive = () => source().retainOnArchive },
+      onChange: () => { /* Each archive reads the accepted preference before scheduling cleanup. */ },
+    })
     if (!relativePath(this.config.directory)) throw new Error('worktree: directory must be a relative directory without dot segments')
     if (!relativePath(`${this.config.namePrefix}name`) || this.config.namePrefix.startsWith('-')) {
       throw new Error('worktree: namePrefix must produce a relative branch name')
@@ -130,7 +139,7 @@ export class WorktreeService extends Service {
     // them the service only creates and restores, as a headless profile composes it.
     this.ctx.inject(['workspaceRegistry', 'sessionQuery', 'sessions', 'workingDirectory', 'sandboxPolicy'], (scope) => {
       const reclamation = new WorktreeReclamation(scope, {
-        retainOnArchive: () => this.config.retainOnArchive.get(),
+        retainOnArchive: () => this.retainOnArchive(),
         exclusiveCheckout: (path, body) => this.exclusiveCheckout(path, body),
         removeCheckout: (session, request, signal, admit) => this.removeCheckout(session, request, signal, admit),
         projectionState: session => this.ctx.sessionProjections.stateOf(session, 'worktree'),

@@ -75,12 +75,12 @@ async function accountFixture(name: string) {
   await target.route(url => url.origin === owner.origin && url.pathname === '/api/host.describe', async (route) => {
     const response = await route.fetch()
     const body = await response.json() as {
-      result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'personal' } } } | { ok: false }
+      result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'personal'; runtimeId?: string } } } | { ok: false }
     }
     expect(body.result.ok).toBe(true)
     if (body.result.ok) {
       body.result.value.executionAuthorityRequired = true
-      body.result.value.runtimeTarget = { kind: 'personal' }
+      body.result.value.runtimeTarget = { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' }
     }
     await route.fulfill({ response, json: body })
     descriptions++
@@ -95,22 +95,22 @@ async function accountFixture(name: string) {
     if (route.request().failure() !== null) return
     await route.fulfill({ headers: { 'x-dsh-principal-id': '1' }, json: {
       user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
-      scope: { kind: 'personal' }, projects: [],
+      scope: { kind: 'personal' }, projects: [], environment: { id: '10000000-0000-4000-8000-000000000001', nodeId: '20000000-0000-4000-8000-000000000001' },
     } })
   })
   await target.route(url => url.origin === owner.origin && url.pathname === '/account/api/workbench/catalog', async (route) => {
     await route.fulfill({ headers: { 'x-dsh-principal-id': '1' }, json: {
-      personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: { kind: 'personal' }, projects: [],
-      items: [{ sessionId, runtime: { kind: 'personal' }, visibility: 'personal', title: 'Saved preview fixture',
+      personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' }, projects: [],
+      items: [{ sessionId, runtime: { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' }, visibility: 'personal', title: 'Saved preview fixture',
         creatorUserId: 1, creatorDisplayName: 'Fixture', updatedAt: 1, blank: false, canWrite: true }],
     } })
   })
   await target.addInitScript((id) => {
     if (window !== window.top) return
     Object.assign(window, {
-      __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal' } },
+      __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' } },
     })
-    localStorage.setItem('dsh.sessions.current.v2.1.personal', JSON.stringify({ sessionId: id }))
+    sessionStorage.setItem('dsh.sessions.current.v3.1.10000000-0000-4000-8000-000000000001.personal', JSON.stringify({ sessionId: id }))
     const probe: LayoutReadProbe = { phase: 'idle', held: 0, released: 0 }
     Object.assign(window, { __accountLayoutReads: probe })
     const getItem = Object.getOwnPropertyDescriptor(Storage.prototype, 'getItem')!.value as Storage['getItem']
@@ -182,10 +182,10 @@ it.skipIf(MODE === 'record')('reads no saved private layout before reconnect acc
   await target.getByRole('button', { name: 'Open saved preview', exact: true }).click()
   await snapshotPreview(target, host)
   await target.evaluate((id) => {
-    const scope = JSON.stringify(['account:1', ['personal'], id])
+    const scope = JSON.stringify(['account:1', ['runtime', '10000000-0000-4000-8000-000000000001'], id])
     const saved = localStorage.getItem(`dsh.sidebar-right.v1.${scope}`)
     if (saved === null || !saved.includes('readiness.md')) throw new Error('The real preview did not save its account-owned layout')
-    const otherScope = JSON.stringify(['account:2', ['personal'], id])
+    const otherScope = JSON.stringify(['account:2', ['runtime', '10000000-0000-4000-8000-000000000001'], id])
     localStorage.setItem(`dsh.sidebar-right.v1.${otherScope}`,
       saved.replaceAll('account:1', 'account:2').replaceAll('readiness.md', 'other-account.md'))
     const probe = (window as unknown as { __accountLayoutReads: LayoutReadProbe }).__accountLayoutReads

@@ -215,6 +215,11 @@
   color: var(--dsw-alias-label-caption);
 }
 
+.modalInput:not(:disabled)::placeholder {
+  color: var(--dsw-alias-label-secondary);
+  opacity: 1;
+}
+
 .modalInput:disabled {
   color: var(--dsw-alias-label-dimmed);
 }
@@ -244,6 +249,12 @@
 :global([data-viewport='compact']) .headlineText {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+@media (pointer: coarse) {
+  .workspace {
+    min-height: var(--dsw-touch-target);
+  }
 }
 
 :global([data-viewport='compact']) .workspace {

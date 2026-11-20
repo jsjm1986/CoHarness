@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
 import { privateFileState } from './node-private-file.ts'
-import { validatePeerControl } from './peer-backup-control-export.ts'
+import { validateGovernanceBackup } from './peer-governance-backup.ts'
 import { exportOfflinePeerRepository } from './peer-backup-offline.ts'
 import { validatePeerPersonal, restorePeerPersonalFiles } from './peer-backup-personal.ts'
 import { validatePeerProject } from './peer-backup-project-export.ts'
@@ -76,12 +76,14 @@ export async function rehearseOfflinePeer(configFile: string, signal: AbortSigna
     signal,
   })
   try {
-    const validate = { project: validatePeerProject, personal: validatePeerPersonal, governance: validatePeerControl }[
+    const validate = { project: validatePeerProject, personal: validatePeerPersonal, governance: validateGovernanceBackup }[
       config.kind
     ]
     const validator: Pick<PeerBackupExporter, 'validate'> = config.snapshotExecutable
       ? new PeerSnapshotOwner(config.snapshotExecutable, config.kind, config.timeoutMs, limits)
-      : { validate: (binding, metadata, directory, lifetime) => validate(binding, metadata, directory, lifetime, limits) }
+      : { validate: (binding, metadata, directory, lifetime, space) => config.kind==='personal'
+        ? validatePeerPersonal(binding, metadata, directory, lifetime, limits, space)
+        : validate(binding, metadata, directory, lifetime, limits) }
     const drill = await engine.drillOffline(temporary.point, temporary.repository, config.passwordFile, validator, signal)
     let personalFilesDirectory:string|undefined
     if(config.kind==='personal'&&!config.snapshotExecutable){
@@ -89,7 +91,7 @@ export async function rehearseOfflinePeer(configFile: string, signal: AbortSigna
       try {
         const raw=await readFile(join(drill.directory,'checkpoint.json'),'utf8')
         const checkpoint=z.object({capture:peerCaptureSchema}).parse(JSON.parse(raw))
-        if(await restorePeerPersonalFiles(drill.point,checkpoint.capture,drill.directory,destination,limits,signal))personalFilesDirectory=destination
+        if(await restorePeerPersonalFiles(drill.point,checkpoint.capture,drill.directory,destination,limits,signal,drill.space))personalFilesDirectory=destination
       } catch(error){await drill.dispose();throw error}
     }
     return {

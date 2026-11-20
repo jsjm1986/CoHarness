@@ -5,6 +5,11 @@
 }
 
 @media (max-width: 767px) {
+  .confirmationOverlay {
+    /* A Session settings sheet remains mounted beneath its confirmation. */
+    z-index: 1092;
+  }
+
   .confirmation {
     width: 100%;
     max-height: calc(var(--dsw-viewport-height, 100vh) - 48px);

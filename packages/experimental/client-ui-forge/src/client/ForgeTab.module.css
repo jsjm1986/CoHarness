@@ -230,7 +230,10 @@
 }
 
 /* The buttons center on the title's first line. */
-.changeHead > .iconButton {
+.headActions {
+  display: flex;
+  flex: none;
+  gap: 2px;
   margin-top: -3px;
 }
 
@@ -624,4 +627,91 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .iconButton,
+  .checkout .checkoutCopy {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+
+  .checkout {
+    flex-wrap: wrap;
+  }
+
+  .checkoutName {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+
+  .checkoutNote {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .checkout .checkoutCopy {
+    margin: 0;
+  }
+
+  .changeHead {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr);
+    gap: var(--dsw-space-2);
+  }
+
+  .changeHead > .glyph {
+    margin: calc((var(--dsw-touch-target) - 16px) / 2) 0 0;
+  }
+
+  .headActions {
+    grid-column: 2;
+    flex-wrap: wrap;
+    min-width: 0;
+    margin-top: 0;
+  }
+
+  .changeTitle {
+    display: flex;
+    align-items: center;
+    min-height: var(--dsw-touch-target);
+  }
+
+  .meta {
+    flex-wrap: wrap;
+  }
+
+  .notice {
+    flex-wrap: wrap;
+  }
+
+  .notice > span {
+    flex: 1 1 12ch;
+    overflow-wrap: anywhere;
+  }
+
+  .rowButton {
+    min-height: var(--dsw-touch-target);
+  }
+
+  .issuesRow .rowValue {
+    grid-column: 2 / -1;
+  }
+
+  .issuesRow .ellipsis {
+    overflow: visible;
+    white-space: normal;
+  }
+
+  .footer {
+    flex-wrap: wrap;
+  }
+
+  .primaryAction {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+    max-width: 100%;
+    padding-block: var(--dsw-space-2);
+    overflow-wrap: anywhere;
+  }
 }

@@ -2,20 +2,26 @@
    metrics follow the Installed tab of the Plugins page. */
 
 .section {
+  container: dsh-plugin-market / inline-size;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-inline-size: 0;
 }
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
+.toolbar > * {
+  max-inline-size: 100%;
+}
+
 .marketButton {
-  max-width: 240px;
-  margin-left: -8px;
+  max-inline-size: min(100%, 15rem);
   font-weight: 500;
 }
 
@@ -25,9 +31,13 @@
   white-space: nowrap;
 }
 
-.search {
-  flex: 1;
-  min-width: 120px;
+.toolbar > .search {
+  flex: 1 1 12rem;
+  min-inline-size: min(100%, 10rem);
+}
+
+@container dsh-plugin-market (inline-size < 32rem) {
+  .toolbar > .search { flex-basis: 100%; }
 }
 
 .categories {
@@ -40,20 +50,20 @@
 .muted,
 .meta {
   margin: 0;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   color: var(--dsw-alias-label-tertiary);
 }
 
 .meta {
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   overflow-wrap: anywhere;
 }
 
 .strong {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -63,8 +73,8 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   color: var(--dsw-alias-state-error-primary);
 }
 
@@ -82,8 +92,8 @@
   padding: 10px 12px;
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-state-warn-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   color: var(--dsw-alias-label-secondary);
 }
 
@@ -148,36 +158,33 @@
   min-width: 0;
 }
 
-/* The title button covers the whole card, so the card opens the entry; the action stays above it. */
 .cardOpen {
-  max-width: 100%;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: inherit;
+  min-inline-size: 0;
+  min-block-size: var(--dsw-touch-target);
   padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
+}
+
+.cardTitle {
+  max-inline-size: 100%;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cardOpen::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: var(--dsw-radius-xl);
-}
-
 .cardOpen:focus-visible {
-  outline: none;
-}
-
-.cardOpen:focus-visible::after {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
@@ -185,8 +192,8 @@
 .description {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
   color: var(--dsw-alias-label-tertiary);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
@@ -199,6 +206,13 @@
   flex: none;
   align-items: center;
   gap: 8px;
+}
+
+@container dsh-plugin-market (inline-size < 22rem) {
+  .card { gap: 10px; }
+  .cardTitle { white-space: normal; overflow-wrap: anywhere; }
+  .cardEnd { max-inline-size: 45%; }
+  .cardEnd button { white-space: normal; overflow-wrap: anywhere; }
 }
 
 .blocked {
@@ -221,8 +235,8 @@
 
 .emptyTitle {
   margin: 8px 0 0;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   font-weight: 500;
 }
 
@@ -246,7 +260,7 @@
   background: none;
   color: var(--dsw-alias-label-tertiary);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 0.78125rem;
   cursor: pointer;
 }
 
@@ -257,6 +271,10 @@
 .crumb:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .crumb { min-height: var(--dsw-touch-target); }
 }
 
 .crumbIcon {
@@ -271,15 +289,15 @@
 
 .detailTitle {
   margin: 0;
-  font-size: 20px;
-  line-height: 28px;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
   font-weight: 500;
 }
 
 .detailDescription {
   margin: 0;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   color: var(--dsw-alias-label-secondary);
   overflow-wrap: anywhere;
 }
@@ -293,8 +311,8 @@
 
 .sectionTitle {
   margin: 0;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   font-weight: 500;
 }
 
@@ -314,16 +332,16 @@
 
 .facts dt {
   flex: none;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   color: var(--dsw-alias-label-secondary);
 }
 
 .facts dd {
   min-width: 0;
   margin: 0;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   text-align: end;
   overflow-wrap: anywhere;
 }
@@ -334,7 +352,7 @@
   background: var(--dsw-alias-bg-module-platform);
   box-decoration-break: clone;
   font-family: var(--ds-font-family-code);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .tags {
@@ -373,8 +391,8 @@
 }
 
 .sourceError {
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   color: var(--dsw-alias-state-error-primary);
   overflow-wrap: anywhere;
 }

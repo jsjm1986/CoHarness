@@ -1,0 +1,4 @@
+- menu:
+  - menuitem "Close"
+  - menuitem "Move tab earlier"
+  - menuitem "Float tab"

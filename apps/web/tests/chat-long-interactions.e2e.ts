@@ -2,11 +2,12 @@
 // renderer: wheel input only navigates to the semantic target; assertions pin
 // content identity and interaction routing rather than scroll geometry or
 // mounted row counts.
+import { responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { ReplayEntry, ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay'
@@ -158,7 +159,7 @@ describe('web e2e: long Chat interaction contract', () => {
     // exactly as the fuller read ladder does for an opened session.
     const seededLog = await scaffold.ctx.sessionPersistence.load(SessionId(SESSION_ID))
     scaffold.ctx.get('sessionProjectionCache')?.coldSnapshot(seededLog.meta, seededLog.inheritedEventCount, seededLog.events)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser, 900)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -180,6 +181,7 @@ describe('web e2e: long Chat interaction contract', () => {
 
   it.skipIf(MODE === 'record')('keeps heterogeneous rows and their actions bound to exact semantic identities', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-chat-long-interactions'))
+    await expect.poll(() => scaffold.ctx.agents.get(SessionId(SESSION_ID)) !== undefined, { timeout: 15_000 }).toBe(true)
     const source = scaffold.ctx.agents.get(SessionId(SESSION_ID))
     if (source === undefined) throw new Error('seeded long-history agent is not attached')
 
@@ -255,7 +257,7 @@ describe('web e2e: long Chat interaction contract', () => {
     const turnTailRow = page.locator(`[data-chat-anchor-key="${turnTailKey(BRANCH_TURN)}"]`)
     expect(await userRow.textContent()).toContain(branchUserMarker)
     expect(await assistantRow.textContent()).toContain(branchAssistantMarker)
-    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.context().grantPermissions(responsiveBrowserName === 'webkit' ? ['clipboard-read'] : ['clipboard-read', 'clipboard-write'])
     await userRow.hover()
     await userRow.getByRole('button', { name: 'Copy', exact: true }).click()
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 5_000 })

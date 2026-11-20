@@ -20,7 +20,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  CoHarnessMascot, IconNewChatOutline16, IconPanelLeftOutline16, Tooltip,
+  CoHarnessMascot, focusWithoutRing, holdInert, IconNewChatOutline16, IconPanelLeftOutline16, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
@@ -118,6 +118,26 @@ export function SidebarRoot({
   // leaves. A pointer that returns within that window cancels the pending
   // hide rather than restarting from a hidden bar.
   const column = useRef<HTMLDivElement>(null)
+  const fadingFocus = useRef<HTMLElement | null>(null)
+  const fading = collapsed && wide
+  useLayoutEffect(() => {
+    const element = column.current
+    if (element === null) return
+    if (fading) {
+      const active = element.ownerDocument.activeElement
+      fadingFocus.current = active instanceof HTMLElement && element.contains(active) ? active : null
+      return holdInert(element)
+    }
+    const previous = fadingFocus.current
+    fadingFocus.current = null
+    // A native inert subtree can lose focus to the body during the fade.
+    // Restore only that displaced focus; navigation outside remains intact.
+    if (previous === null || element.ownerDocument.activeElement !== element.ownerDocument.body) return
+    const target = previous.isConnected ? previous : element.querySelector('button')
+    if (target !== null && target.closest('[inert], [aria-hidden="true"]') === null) {
+      focusWithoutRing(target, { preventScroll: true })
+    }
+  }, [fading])
   const [pointerInside, setPointerInside] = useState(false)
   const lingerTimer = useRef<number | undefined>(undefined)
   const armLinger = (): void => {
@@ -156,22 +176,22 @@ export function SidebarRoot({
     }
   }, [pointerInside])
 
-  // The column publishes the browsing region's box as inherited custom
-  // properties so an overlay mounted deeper in the tree (the scope control's
-  // push page in the foot) can align to the region without a measurement
-  // handoff. Region height follows every chrome change above or below it
-  // (the seat is flex:1), so one ResizeObserver covers both values.
+  // The scope control aligns to the browsing region's post-layout box.
   const region = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const seat = region.current
     const rootEl = column.current
     if (seat === null || rootEl === null) return
-    const publish = (): void => {
-      rootEl.style.setProperty('--dsh-sidebar-region-top', `${seat.offsetTop}px`)
-      rootEl.style.setProperty('--dsh-sidebar-region-height', `${seat.offsetHeight}px`)
-    }
-    publish()
-    const observer = new ResizeObserver(publish)
+    const observer = new ResizeObserver(() => {
+      const top = `${seat.offsetTop}px`
+      const height = `${seat.offsetHeight}px`
+      if (rootEl.style.getPropertyValue('--dsh-sidebar-region-top') !== top) {
+        rootEl.style.setProperty('--dsh-sidebar-region-top', top)
+      }
+      if (rootEl.style.getPropertyValue('--dsh-sidebar-region-height') !== height) {
+        rootEl.style.setProperty('--dsh-sidebar-region-height', height)
+      }
+    })
     observer.observe(seat)
     return () => { observer.disconnect() }
   }, [])
@@ -182,7 +202,7 @@ export function SidebarRoot({
       data-sidebar-root=""
       className={clsx(
         css.root, !wide && css.collapsed, !wide && everWide.current && css.railIn,
-        collapsed && wide && css.fading, !pointerInside && css.quietBars,
+        fading && css.fading, !pointerInside && css.quietBars,
       )}
       style={wide ? { width: collapsed ? lastWideWidth.current : width } : undefined}
       onPointerEnter={() => {

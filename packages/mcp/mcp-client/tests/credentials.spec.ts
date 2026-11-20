@@ -3,17 +3,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import { Config, probeServer } from '@deepseek-ai/dsh-mcp-client'
+import { Config, probeServer, type StreamableHttpConfig } from '@deepseek-ai/dsh-mcp-client'
 import { McpTemplateBinding } from '@deepseek-ai/dsh-mcp-client/src/credentials.ts'
 import { TestCredentials } from './credential-fixture.ts'
 import { startHttpMcpFixture } from './http-fixture.ts'
+import { installRecoveryPolicy, recoveryMcpConnection } from '@deepseek-ai/dsh-app-boot'
+import { startConnection, resolveReconnectPolicy } from '../src/connection.ts'
+import { McpStatusCell } from '../src/status.ts'
 
 const ref = credentialRef('MCP_TOKEN')
 const url = 'https://mcp.invalid/fixture'
 
-function httpConfig(): Config {
-  return Config({ transport: 'streamable-http', serverName: 'binding', url,
+function httpConfig(): StreamableHttpConfig {
+  const config = Config({ transport: 'streamable-http', serverName: 'binding', url,
     headers: { Authorization: 'Bearer ${credential:MCP_TOKEN}' }, expandTemplates: true })
+  if (config.transport !== 'streamable-http') throw new Error('HTTP fixture requires its declared transport')
+  return config
 }
 
 describe('McpTemplateBinding', () => {
@@ -93,5 +98,26 @@ describe('McpTemplateBinding', () => {
     } finally {
       await server.close()
     }
+  })
+
+  it('permits only the reviewed recovery target before probe or startup can resolve credentials', async () => {
+    const server = await startHttpMcpFixture()
+    try {
+      const config: StreamableHttpConfig = { ...httpConfig(), url: server.url }
+      const denied = Config({ ...config, serverName: 'unreviewed' })
+      installRecoveryPolicy(ctx, { version: 1, mode: 'new-conversations-only', operationId: 'operation', pointId: 'point', runtimeId: 'runtime', nodeId: 'node',
+        writerEpoch: '2', reviewRevision: '00000000-0000-4000-8000-000000000001', oldSessionIds: [], approvedItems: [], compositionDigest: 'fixture',
+        composition: { version: 1, rows: [], connections: [recoveryMcpConnection(config)] } }, () => {})
+      const resolve = vi.spyOn(provider, 'resolve')
+      await expect(probeServer(ctx, denied)).rejects.toThrow('execution review')
+      // Admission precedes status ownership or transport construction.
+      expect(() => startConnection(ctx, denied, resolveReconnectPolicy(undefined, 'test'), new McpStatusCell(() => {}))).toThrow('execution review')
+      expect(resolve).not.toHaveBeenCalled()
+      expect(server.authorization).toHaveLength(0)
+      expect(await probeServer(ctx, config)).toMatchObject({ ok: true, toolNames: ['ping'], closeConfirmed: true })
+      const acceptedRequests = server.authorization.length
+      await expect(probeServer(ctx, Config({ ...config, headers: { Authorization: 'changed' } }))).rejects.toThrow('execution review')
+      expect(server.authorization).toHaveLength(acceptedRequests)
+    } finally { await server.close() }
   })
 })

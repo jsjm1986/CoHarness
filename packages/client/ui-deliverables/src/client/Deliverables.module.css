@@ -16,7 +16,7 @@
 .details { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
 .fileName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; line-height: 20px; }
 .description { overflow: hidden; color: var(--dsw-alias-label-tertiary); font-size: 10px; font-weight: 400; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
-.description[data-error='true'] { color: var(--dsw-alias-state-error-primary); }
+.description[data-error='true'] { color: var(--dsw-alias-state-error-label); }
 .previewHint { display: none; }
 .file:hover .secondaryText { display: none; }
 .file:hover .previewHint { display: inline; }

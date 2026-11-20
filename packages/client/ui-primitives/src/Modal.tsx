@@ -20,11 +20,13 @@ interface ModalBaseProps {
   children?: ReactNode
   footer?: ReactNode
   className?: string
+  overlayClassName?: string
   contentClassName?: string
   shortcutModal?: string
   onKeyDownCapture?: KeyboardEventHandler<HTMLDivElement>
   backdropBlur?: boolean
   mobilePresentation?: 'sheet' | 'page'
+  pinShortChrome?: boolean
 }
 
 type ModalProps = ModalBaseProps & (
@@ -43,17 +45,19 @@ type ModalProps = ModalBaseProps & (
  * @param props.children - dialog body; mark its initial-focus control with
  * data-modal-autofocus instead of React autoFocus to preserve return focus.
  * @param props.footer - action row (Cancel / Create).
- * @param props.contentClassName - optional class for a scrollable content region.
+ * @param props.overlayClassName - optional class for the body-portaled mask and dialog layer.
+ * @param props.contentClassName - optional class for the description and body; the default title and footer remain outside this region.
  * @param props.backdropBlur - disable when the caller already blurs the page; defaults to true.
  * @param props.mobilePresentation - sheets support pull-down dismissal; full-screen pages use explicit navigation.
+ * @param props.pinShortChrome - keep the default header and footer outside the scrollport on short viewports that have room.
  * @param props.shortcutModal - command scope allowed by shortcut owners; unnamed
  * dialogs block application commands unless their owner allows the "other" scope.
  * @param props.onKeyDownCapture - handle a nested dialog's keys before the document Escape listeners.
  * @returns null when closed; otherwise the overlay tree.
  */
 export function Modal({
-  open, onClose, title, closeLabel, description, children, footer, className, contentClassName,
-  onKeyDownCapture, headless = false, backdropBlur = true, shortcutModal, mobilePresentation = 'sheet',
+  open, onClose, title, closeLabel, description, children, footer, className, overlayClassName, contentClassName,
+  onKeyDownCapture, headless = false, backdropBlur = true, shortcutModal, mobilePresentation = 'sheet', pinShortChrome = false,
 }: ModalProps) {
   const dialog = useRef<HTMLDivElement>(null)
   useModalLayer(dialog, open, onClose)
@@ -69,12 +73,13 @@ export function Modal({
   if (!open) return null
 
   return createPortal((
-    <div className={css.root} role="presentation" onKeyDownCapture={onKeyDownCapture}>
+    <div className={clsx(css.root, !headless && css.withChrome, overlayClassName)} role="presentation" onKeyDownCapture={onKeyDownCapture}>
       <div className={css.mask} style={backdropBlur ? undefined : { backdropFilter: 'none' }} aria-hidden="true" onClick={onClose} />
       <div
         ref={dialog}
         tabIndex={-1}
         data-shortcut-modal={shortcutModal}
+        data-modal-pin-chrome={pinShortChrome || undefined}
         className={clsx(css.dialog, className)}
         role="dialog"
         aria-modal="true"
@@ -84,13 +89,13 @@ export function Modal({
           ? children
           : (
             <>
-              <div className={clsx(css.content, contentClassName)}>
-                <div className={css.header}>
-                  <h2 className={css.title}>{title}</h2>
-                  <button type="button" className={css.close} aria-label={closeLabel} onClick={onClose}>
-                    <IconCloseOutline16 size={14} />
-                  </button>
-                </div>
+              <div className={css.header} data-modal-header>
+                <h2 className={css.title}>{title}</h2>
+                <button type="button" className={css.close} aria-label={closeLabel} onClick={onClose}>
+                  <IconCloseOutline16 size={14} />
+                </button>
+              </div>
+              <div className={clsx(css.content, contentClassName)} data-modal-content>
                 {description !== undefined && description !== '' && (
                   <p className={css.description}>{description}</p>
                 )}

@@ -459,6 +459,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // host.openPath. Pin the capability so every host replays the recorded
     // desktop behavior; a scenario overlay can still win.
     { id: 'api-gateway', config: { nativeOpen: true } },
+    // The browser fixture owns a disposable document store and its disk budget.
+    { id: 'userdoc-local', config: { uploadMinFreeBytes: 0 } },
     ...extraOverlayPatches,
     // The roster's `roots` is an assembly fact AppCLIEntry resolves and patches
     // in, exactly like `distIndex` on the webserver row — the shipped preset

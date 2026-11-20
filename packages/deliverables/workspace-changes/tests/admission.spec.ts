@@ -1,5 +1,5 @@
 /** Review maintenance precedes admitted model input and retains its process permits through exit. */
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context, Service } from '@deepseek-ai/cordis'
@@ -7,11 +7,11 @@ import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import * as WorkspaceChanges from '../src/index.ts'
 import { PosixRecorderExecution } from '../src/execution.ts'
 import { GitRunner } from '../src/git.ts'
-import { changes, endTurn, git, settle, startTurn, toolCall } from './support.ts'
+import { changes, endTurn, git, mutate, settle, startTurn, toolCall } from './support.ts'
 
 type Request = Parameters<Context['resourceBudget']['acquire']>[0]
 
@@ -37,7 +37,11 @@ class PreInputBudget extends Service {
 
 const cleanups: Array<() => Promise<unknown>> = []
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
+  try {
+    for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
+  } finally {
+    vi.unstubAllEnvs()
+  }
 })
 
 async function setup() {
@@ -53,6 +57,37 @@ async function setup() {
   await ctx.plugin(LocalFileSystem)
   return { ctx, root, budget: ctx.resourceBudget as PreInputBudget }
 }
+
+it('captures file-tool edits without a Git process until an ancestor becomes a repository', async () => {
+  for (const key of Object.keys(process.env)) {
+    if (key.toUpperCase().startsWith('GIT_')) vi.stubEnv(key, undefined)
+  }
+  const { ctx, root, budget } = await setup()
+  const cwd = join(root, 'workspace')
+  await mkdir(cwd)
+  await ctx.plugin(WorkspaceChanges, { storageRoot: join(root, '.reviews') } as WorkspaceChanges.Config)
+  const session = ctx.sessions.create(SessionId('plain-then-repository'), { meta: { cwd } })
+  startTurn(session, 1)
+  await settle(ctx, session)
+  await mutate(ctx, session, 1, 'write', { file_path: 'result.txt', content: 'first\n' },
+    () => writeFile(join(cwd, 'result.txt'), 'first\n'))
+  endTurn(session, 1)
+  await settle(ctx, session)
+  expect((await changes(ctx, session))[0]?.files.map(file => file.path)).toEqual(['result.txt'])
+  expect(budget.requests).toEqual([])
+
+  git(root, 'init', '-q', '-b', 'main')
+  startTurn(session, 2)
+  await settle(ctx, session)
+  await writeFile(join(cwd, 'shell.txt'), 'second\n')
+  toolCall(session, 2, 'bash', { command: 'write shell.txt' })
+  endTurn(session, 2)
+  await settle(ctx, session)
+  expect((await changes(ctx, session)).at(-1)?.files.map(file => file.path)).toEqual(['shell.txt'])
+  expect(budget.requests.length).toBeGreaterThan(0)
+  expect(budget.requests.every(request => request.origin === 'infrastructure')).toBe(true)
+  expect(budget.active).toBe(0)
+})
 
 it('records the first turn before input admission without admitting an ordinary process', async () => {
   const { ctx, root, budget } = await setup()

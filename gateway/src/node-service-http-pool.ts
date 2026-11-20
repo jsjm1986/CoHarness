@@ -1,4 +1,5 @@
 /** Bounded HTTP keep-alive ownership over independent node-service streams. */
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { Agent } from 'node:http'
 import { performance } from 'node:perf_hooks'
 import type { Socket } from 'node:net'
@@ -6,6 +7,7 @@ import type { Duplex } from 'node:stream'
 import type { RuntimeNodeId } from './runtime-catalog.ts'
 import type { GatewayNodeServices, NodeServiceConfig } from './node-service.ts'
 import { NodeServiceError } from './node-service-stream.ts'
+import { operationPhase, timeOperation } from './operation-timing.ts'
 
 /**
  * Supply HTTP Agent socket operations using this service stream's own WebSocket transport.
@@ -38,15 +40,29 @@ interface Entry {
   nodeId: RuntimeNodeId
   owner: AbortController
   busy: boolean
+  interactive: boolean
   stream?: Duplex
   agent?: Agent
   idle?: ReturnType<typeof setTimeout>
-  closed?: Promise<void>
+}
+
+interface Acquisition {
+  revision: number
+  operation: Promise<NodeServiceHttpLease>
+}
+
+interface PendingAcquisition {
+  nodeId: RuntimeNodeId
+  interactive: boolean
+  grant(): void
+  reject(error: NodeServiceError): void
 }
 
 /** A request exclusively borrows one HTTP/1 connection; release follows complete response consumption. */
 export interface NodeServiceHttpLease {
   agent: Agent
+  /** This request borrowed an existing idle transport. */
+  reused: boolean
   /** Return a completely consumed response connection to its bounded idle owner. */
   release(): void
   /** Close this request's connection after cancellation, refusal or incomplete response. */
@@ -61,7 +77,7 @@ export class NodeServiceHttpPool {
   private closed = false
   private closing?: Promise<void>
   private revision = 0
-  private readonly waiters = new Set<() => void>()
+  private readonly waiters = new Set<PendingAcquisition>()
 
   /**
    * @param services - existing global/per-computer connection admission and lease owner.
@@ -74,95 +90,141 @@ export class NodeServiceHttpPool {
    * Borrow a matching idle connection or open one without replaying an HTTP request.
    * @param nodeId - currently authorized exact computer.
    * @param signal - request cancellation; it owns only its borrowed or opening connection.
+   * @param interactive - retain one eligible transport for prepared conversation operations on this node.
    * @returns an exclusive request lease.
    */
-  acquire(nodeId: RuntimeNodeId, signal: AbortSignal): Promise<NodeServiceHttpLease> {
-    const operation = this.acquireOrWait(nodeId, signal)
+  acquire(nodeId: RuntimeNodeId, signal: AbortSignal, interactive = false): Promise<NodeServiceHttpLease> {
+    const operation = this.acquireOrWait(nodeId, signal, interactive)
     this.openings.add(operation)
     void operation.then(() => { this.openings.delete(operation) }, () => { this.openings.delete(operation) })
     return operation
   }
 
-  private async acquireOrWait(nodeId: RuntimeNodeId, signal: AbortSignal): Promise<NodeServiceHttpLease> {
+  private async acquireOrWait(nodeId: RuntimeNodeId, signal: AbortSignal, interactive: boolean): Promise<NodeServiceHttpLease> {
     let deadline: number | undefined
+    let busyRevision: number | undefined
     for (;;) {
+      if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
+      if (signal.aborted) throw new NodeServiceError(409, 'node-service/cancelled')
       if (deadline !== undefined && performance.now() >= deadline) throw new NodeServiceError(504, 'node-service/timeout')
-      const observed = this.revision
-      try { return await this.acquireNow(nodeId, signal) } catch (error) {
-        if (!(error instanceof NodeServiceError) || error.code !== 'node-service/busy') throw error
-        if (signal.aborted) throw new NodeServiceError(409, 'node-service/cancelled')
-        if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
-        if (observed !== this.revision) continue
-        const pressure = this.services.capacity(nodeId)
-        const releasable = [...this.entries, ...this.transports.keys()].some(entry =>
-          (entry.busy || entry.owner.signal.aborted) && (pressure === 'global' || entry.nodeId === nodeId))
-        if (!releasable) throw error
+      this.dispatch()
+      let grant = busyRevision === this.revision ? undefined : this.tryAcquire(nodeId, signal, interactive)
+      if (grant === undefined) {
         deadline ??= performance.now() + this.config.httpQueueTimeoutMs
-        await this.waitForChange(observed, signal, deadline)
+        grant = await this.waitForGrant(nodeId, signal, interactive, deadline, busyRevision)
+      }
+      try { return await grant.operation } catch (error) {
+        if (!(error instanceof NodeServiceError) || error.code !== 'node-service/busy') throw error
+        busyRevision = grant.revision
       }
     }
   }
 
   private changed(): void {
     this.revision++
-    for (const wake of [...this.waiters]) wake()
+    this.dispatch()
   }
 
-  private waitForChange(observed: number, signal: AbortSignal, deadline: number): Promise<void> {
-    if (observed !== this.revision) return Promise.resolve()
+  private dispatch(): void {
+    if (this.closed) {
+      for (const waiter of this.waiters) waiter.reject(new NodeServiceError(503, 'node-service/closed'))
+      return
+    }
+    for (const waiter of this.waiters) if (waiter.interactive) waiter.grant()
+    for (const waiter of this.waiters) if (!waiter.interactive) waiter.grant()
+    if (this.waiters.size === 0 || [...this.transports.keys()].some(entry => !this.entries.has(entry))) return
+    for (const waiter of this.waiters) {
+      if (this.services.capacity(waiter.nodeId) !== 'global') continue
+      const idle = [...this.entries].filter(entry => !entry.busy && this.transports.has(entry))
+      const evict = idle.find(entry => !entry.interactive) ?? idle[0]
+      if (evict !== undefined) this.destroy(evict)
+      break
+    }
+  }
+
+  private waitForGrant(nodeId: RuntimeNodeId, signal: AbortSignal, interactive: boolean, deadline: number, busyRevision?: number): Promise<Acquisition> {
+    const pressure = this.services.capacity(nodeId)
+    const releasable = [...this.entries, ...this.transports.keys()].some(entry =>
+      pressure === 'global' || entry.nodeId === nodeId && (interactive || !entry.interactive) && (entry.busy || entry.owner.signal.aborted))
+    if (!releasable) return Promise.reject(new NodeServiceError(503, 'node-service/busy'))
     if (this.waiters.size >= this.config.httpMaxPendingRequests) return Promise.reject(new NodeServiceError(503, 'node-service/busy'))
     const remaining = deadline - performance.now()
     if (remaining <= 0) return Promise.reject(new NodeServiceError(504, 'node-service/timeout'))
-    return new Promise<void>((resolve, reject) => {
-      const finish = (error?: NodeServiceError): void => {
-        this.waiters.delete(wake); clearTimeout(timer); signal.removeEventListener('abort', cancel)
-        if (error === undefined) resolve()
-        else reject(error)
+    const stopWaiting = operationPhase('nodeQueue')
+    return new Promise<Acquisition>((resolve, reject) => {
+      const finish = (): void => {
+        this.waiters.delete(waiter); clearTimeout(timer); signal.removeEventListener('abort', cancel)
+        stopWaiting()
       }
-      const wake = (): void => { finish() }
-      const cancel = (): void => { finish(new NodeServiceError(409, 'node-service/cancelled')) }
-      const timer = setTimeout(() => { finish(new NodeServiceError(504, 'node-service/timeout')) }, remaining)
+      const waiter: PendingAcquisition = {
+        nodeId, interactive,
+        grant: AsyncLocalStorage.bind(() => {
+          if (signal.aborted) { cancel(); return }
+          if (performance.now() >= deadline) { waiter.reject(new NodeServiceError(504, 'node-service/timeout')); return }
+          if (busyRevision === this.revision) return
+          const grant = this.tryAcquire(nodeId, signal, interactive)
+          if (grant !== undefined) { finish(); resolve(grant) }
+        }),
+        reject: error => { finish(); reject(error) },
+      }
+      const cancel = (): void => { waiter.reject(new NodeServiceError(409, 'node-service/cancelled')) }
+      const timer = setTimeout(() => { waiter.reject(new NodeServiceError(504, 'node-service/timeout')) }, remaining)
       timer.unref()
-      this.waiters.add(wake)
+      this.waiters.add(waiter)
       signal.addEventListener('abort', cancel, { once: true })
       if (signal.aborted) cancel()
+      else this.dispatch()
     })
   }
 
-  private async acquireNow(nodeId: RuntimeNodeId, signal: AbortSignal): Promise<NodeServiceHttpLease> {
-    if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
-    if (signal.aborted) throw new NodeServiceError(409, 'node-service/cancelled')
+  private tryAcquire(nodeId: RuntimeNodeId, signal: AbortSignal, interactive: boolean): Acquisition | undefined {
+    const revision = this.revision
+    let reserved: Entry | undefined, ordinary: Entry | undefined
     for (const entry of this.entries) {
-      if (entry.busy || entry.nodeId !== nodeId) continue
-      if (entry.stream?.destroyed || entry.stream?.writableEnded) { this.destroy(entry); continue }
-      clearTimeout(entry.idle); entry.idle = undefined; entry.busy = true
-      const cancel = (): void => { this.destroy(entry) }
-      signal.addEventListener('abort', cancel, { once: true })
-      try {
-        if (entry.stream === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
-        await this.services.revalidate(entry.stream)
-        if (this.closed || signal.aborted || entry.owner.signal.aborted || entry.stream.destroyed) {
-          throw new NodeServiceError(409, 'node-service/cancelled')
-        }
-        return this.borrow(entry)
-      } catch (error) { this.destroy(entry); throw error }
-      finally { signal.removeEventListener('abort', cancel) }
+      if (entry.nodeId !== nodeId) continue
+      if (!entry.busy && (entry.stream?.destroyed || entry.stream?.writableEnded)) { this.destroy(entry); continue }
+      if (entry.interactive) { reserved = entry; continue }
+      if (!entry.busy && ordinary === undefined) ordinary = entry
     }
-    await this.makeRoom(nodeId, signal)
-    if (this.closed || signal.aborted) throw new NodeServiceError(409, 'node-service/cancelled')
-    const entry: Entry = { nodeId, owner: new AbortController(), busy: true }
+    const available = interactive && reserved?.busy === false ? reserved : ordinary
+    const reserve = interactive && reserved === undefined && this.config.maxPerNode > 1 && this.config.maxConnections > 1
+    if (available !== undefined) {
+      if (reserve) available.interactive = true
+      return { revision, operation: this.reuse(available, signal) }
+    }
+    if (this.services.capacity(nodeId) === 'available') return { revision, operation: this.open(nodeId, signal, reserve) }
+  }
+
+  private async reuse(entry: Entry, signal: AbortSignal): Promise<NodeServiceHttpLease> {
+    clearTimeout(entry.idle); entry.idle = undefined; entry.busy = true
+    const cancel = (): void => { this.destroy(entry) }
+    signal.addEventListener('abort', cancel, { once: true })
+    try {
+      const stream = entry.stream
+      if (stream === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
+      await timeOperation('nodeLeaseCheck', () => this.services.revalidate(stream))
+      if (this.closed || signal.aborted || entry.owner.signal.aborted || stream.destroyed) {
+        throw new NodeServiceError(409, 'node-service/cancelled')
+      }
+      return this.borrow(entry, true)
+    } catch (error) { this.destroy(entry); throw error }
+    finally { signal.removeEventListener('abort', cancel) }
+  }
+
+  private async open(nodeId: RuntimeNodeId, signal: AbortSignal, interactive: boolean): Promise<NodeServiceHttpLease> {
+    const entry: Entry = { nodeId, owner: new AbortController(), busy: true, interactive }
     this.entries.add(entry)
     const cancel = (): void => { this.destroy(entry) }
     signal.addEventListener('abort', cancel, { once: true })
     try {
-      const stream = await this.services.open(nodeId, entry.owner.signal)
+      const stream = await timeOperation('nodeServiceOpen', () => this.services.open(nodeId, entry.owner.signal))
       entry.stream = stream
-      entry.closed = stream.closed ? Promise.resolve() : new Promise<void>(resolve => {
+      const streamClosed = stream.closed ? Promise.resolve() : new Promise<void>(resolve => {
         stream.once('close', () => { this.destroy(entry); resolve() })
       })
-      entry.closed = Promise.all([entry.closed, this.services.released(stream)]).then(() => {})
-      this.transports.set(entry, entry.closed)
-      void entry.closed.then(() => { this.transports.delete(entry); this.changed() })
+      const closed = Promise.all([streamClosed, this.services.released(stream)]).then(() => {})
+      this.transports.set(entry, closed)
+      void closed.then(() => { this.transports.delete(entry); this.changed() })
       const agent = new Agent({ keepAlive: true, maxSockets: 1, maxFreeSockets: 1,
         timeout: this.config.httpIdleTimeoutMs })
       agent.createConnection = () => stream
@@ -170,50 +232,32 @@ export class NodeServiceHttpPool {
       if (this.closed || signal.aborted || entry.owner.signal.aborted || stream.destroyed) {
         throw new NodeServiceError(409, 'node-service/cancelled')
       }
-      return this.borrow(entry)
+      return this.borrow(entry, false)
     } catch (error) {
       this.destroy(entry)
+      if (entry.stream === undefined) this.dispatch()
       throw error
-    } finally { signal.removeEventListener('abort', cancel) }
-  }
-
-  private async makeRoom(nodeId: RuntimeNodeId, signal: AbortSignal): Promise<void> {
-    for (;;) {
-      const pressure = this.services.capacity(nodeId)
-      if (pressure === 'available') return
-      const selected = [...this.transports].find(([entry]) => !entry.busy && (pressure === 'global' || entry.nodeId === nodeId))
-      if (selected === undefined) return
-      const [idle, closed] = selected
-      this.destroy(idle)
-      let abort: () => void = () => {}
-      try {
-        await new Promise<void>((resolve, reject) => {
-          abort = () => { reject(new NodeServiceError(409, 'node-service/cancelled')) }
-          signal.addEventListener('abort', abort, { once: true })
-          if (signal.aborted) abort()
-          else void closed.then(resolve, reject)
-        })
-      } finally { signal.removeEventListener('abort', abort) }
     }
+    finally { signal.removeEventListener('abort', cancel) }
   }
 
-  private borrow(entry: Entry): NodeServiceHttpLease {
+  private borrow(entry: Entry, reused: boolean): NodeServiceHttpLease {
     const agent = entry.agent
     if (agent === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
     let released = false
-    return { agent, destroy: () => { if (released) return; released = true; this.destroy(entry) }, release: () => {
+    return { agent, reused, destroy: () => { if (released) return; released = true; this.destroy(entry) }, release: () => {
       if (released) return
       released = true; entry.busy = false
       if (this.closed || entry.stream?.destroyed || entry.stream?.writableEnded) { this.destroy(entry); return }
       entry.idle = setTimeout(() => { this.destroy(entry) }, this.config.httpIdleTimeoutMs)
       entry.idle.unref()
-      this.trimIdle(entry.nodeId)
       this.changed()
+      this.trimIdle(entry.nodeId)
     } }
   }
 
   private trimIdle(nodeId: RuntimeNodeId): void {
-    const idle = [...this.entries].filter(entry => !entry.busy)
+    const idle = [...this.entries].filter(entry => !entry.busy).sort((a, b) => Number(a.interactive) - Number(b.interactive))
     const own = idle.filter(entry => entry.nodeId === nodeId)
     for (const entry of own.slice(0, Math.max(0, own.length - this.config.httpMaxIdlePerNode))) this.destroy(entry)
     const remaining = idle.filter(entry => this.entries.has(entry))
@@ -221,12 +265,11 @@ export class NodeServiceHttpPool {
   }
 
   private destroy(entry: Entry): void {
-    const present = this.entries.delete(entry)
+    this.entries.delete(entry)
     clearTimeout(entry.idle); entry.idle = undefined
     entry.owner.abort()
     entry.stream?.destroy()
     entry.agent?.destroy()
-    if (present && entry.stream !== undefined) this.changed()
   }
 
   /**

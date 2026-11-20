@@ -73,6 +73,27 @@ it('aborts and drains a parked producer when the consumer closes', async () => {
   await drained.promise
 })
 
+it('aborts a pending read and waits for the remote producer to drain', async () => {
+  const drained = Promise.withResolvers<undefined>()
+  const f = await fixture(async function* (_endpoint, _payload, signal) {
+    try {
+      yield { ok: true, value: 'attached' }
+      await new Promise<void>((resolve) => {
+        if (signal.aborted) resolve()
+        else signal.addEventListener('abort', () => { resolve() }, { once: true })
+      })
+    } finally { drained.resolve(undefined) }
+  })
+  const caller = new AbortController()
+  const stream = f.rpc.stream('/api', 'terminal/follow', {}, caller.signal)
+  expect(await stream.next()).toEqual({ done: false, value: { ok: true, value: 'attached' } })
+  const pending = stream.next()
+  caller.abort(new Error('panel disposed'))
+  await expect(pending).rejects.toThrow('panel disposed')
+  await drained.promise
+  expect(f.failures).toEqual([])
+})
+
 it('rejects bad envelopes before dispatch and refuses new streams after disposal', async () => {
   let called = false
   const f = await fixture(async function* () { called = true; yield { ok: true, value: 1 } })

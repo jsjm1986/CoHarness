@@ -19,11 +19,29 @@ class Adapter extends LlmAdapter {
 /** Hold one turn until cancellation and report the state seen by scope cleanup. */
 export function apply(ctx, config) {
   ctx.llm.registerAdapter(['shutdown-fixture'], new Adapter())
+  const release = Promise.withResolvers()
+  if (config.planned) {
+    ctx.effect(() => ctx.provide('resourceBudget', {
+      async acquire(request) {
+        if (request.kind !== 'process' || request.origin !== 'infrastructure') throw new Error('Unexpected execution in shutdown fixture.')
+        const signal = request.signal ?? new AbortController().signal
+        return { signal, async release() {}, async uncertain() {} }
+      },
+    }))
+    ctx.effect(() => {
+      const receive = (message) => {
+        if (message === 'release-fixture-turn') release.resolve()
+        if (message === 'signal-fixture-stop') process.emit('SIGTERM')
+      }
+      process.on('message', receive)
+      return () => process.off('message', receive)
+    })
+  }
   const exit = ctx.appExit
   ctx.effect(() => ctx.appReady.onReady(() => {
-    void start(ctx, config).catch(error => { console.error(error); exit(1) })
+    void start(ctx, config, release.promise).catch(error => { console.error(error); exit(1) })
   }))
-  if (process.platform === 'win32') {
+  if (process.platform === 'win32' && !config.planned) {
     const timer = setInterval(() => {
       if (!existsSync(config.interrupt)) return
       clearInterval(timer)
@@ -33,7 +51,7 @@ export function apply(ctx, config) {
   }
 }
 
-async function start(ctx, config) {
+async function start(ctx, config, released) {
   const { agent } = await ctx.agents.create({
     sessionId: 'shutdown-fixture',
     agentOptions: { provider: 'shutdown-fixture', model: 'shutdown-fixture' },
@@ -59,6 +77,7 @@ async function start(ctx, config) {
       cancelled: events.filter(event => event.type === 'agent/inbox/spliced' && event.data.outcome === 'canceled'),
     }))
   })
+  if (config.scopeFails) agent.ctx.effect(() => () => { throw new Error('shutdown fixture scope cleanup failed') })
   const message = text => createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
   if (config.running) {
     const entered = Promise.withResolvers()
@@ -67,6 +86,10 @@ async function start(ctx, config) {
       signal.addEventListener('abort', () => { aborted.resolve() }, { once: true })
       entered.resolve()
       await aborted.promise
+      if (config.planned) {
+        process.send?.({ kind: 'shutdown-fixture-aborted' })
+        await released
+      }
       await setImmediate()
       return next()
     })
@@ -75,9 +98,15 @@ async function start(ctx, config) {
   }
   agent.send(message('pending step'), 'next-step', false)
   agent.send(message('pending turn'), 'next-turn', false)
+  if (config.checkpointFails) {
+    ctx.on('session/flush', (session) => {
+      if (session === agent.session) throw new Error('shutdown fixture checkpoint failed')
+    })
+  }
   if (config.cancelFirst) {
     controller.abort()
     await agent.whenIdle()
   }
-  console.log('agent-shutdown: ready')
+  if (config.planned) process.send?.({ kind: 'shutdown-fixture-ready' })
+  else console.log('agent-shutdown: ready')
 }

@@ -12,6 +12,8 @@ Web GUI 以一条真实组装链交付——chromium 页面 → client 插件 bu
 
 `pnpm run test:web` 携带 `apps/web/tests/` 下的无密钥、确定性浏览器 e2e 车道：录制的会话日志 fixture 经 `@deepseek-ai/dsh-llm-replay` 对真实进程内 web 组合回放；用户可见状态使用规范化的 aria 预期输出，持久化的世界状态则使用进程内断言。配套的产品约定包括 `dsh-llm-replay` 的节奏控制、消费检查与已校验的索引式覆写 patch；跨包的 `dsh-llm` 失败通过自有数据属性保留经校验的提供方信息；已交付的 web 组合挂载 `llm-retry`，以处理瞬态模型失败。
 
+[插件市场浏览器场景](../../../../apps/web/tests/plugin-market-responsive.e2e.ts)在子进程中启动 CLI 构建产物。启动器和 HMR 共享同一个 app-boot 模块实例，因此从仓库安装插件时，可以重新装配启动该 Profile 的根 Include。
+
 ### Scaffold：`apps/web/tests/scaffold.ts`
 
 一个普通的共享 fixture 模块（[测试政策认可的形态](../../../../docs/testing.zh.md)），不是包：值得门禁把守的逻辑——回放推导、会话解析、日志脱敏、持久化——都在已受门禁的包 `dsh-llm-replay`、`dsh-acp-snapshot`、`dsh-session-persistence-jsonl` 中；剩下的只是启动接线和浏览器胶水，而驱动 chromium 的源码在无浏览器的覆盖率 runner 上无法诚实保持逐文件 100% 覆盖率。

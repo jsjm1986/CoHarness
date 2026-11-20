@@ -77,8 +77,8 @@ function sessionDotState(list: SessionListState, id: SessionId): StateDotState |
 
 /**
  * Renders Session header chrome above the resident conversation scrollport.
- * The corner seat stays mounted on a blank Session so its navigation
- * occupant remains reachable; title, tabs, and utilities wait for content.
+ * Wider layouts retain corner navigation on a blank Session. Compact layouts
+ * use the shell's topbar; title, tabs, and utilities wait for content.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
  * @returns the corner-only blank-session header or visible title and tabs.
  */
@@ -211,11 +211,13 @@ export function ConversationSessionHeader({
                 ))}
               </div>
             )}
-            <div className={css.headerActions}>
-              {renderSlot('conversation.session.header.actions', { compact })}
-            </div>
-            <div className={css.headerUtilities}>
-              {renderSlot('conversation.session.header.utilities', { compact })}
+            <div className={css.headerTools}>
+              <div className={css.headerActions}>
+                {renderSlot('conversation.session.header.actions', { compact })}
+              </div>
+              <div className={css.headerUtilities}>
+                {renderSlot('conversation.session.header.utilities', { compact })}
+              </div>
             </div>
             <div className={css.headerCorner} data-conversation-header-corner="">
               {renderSlot('conversation.session.header.corner', {})}

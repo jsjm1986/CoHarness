@@ -18,6 +18,7 @@ import type { ClientRequest, RpcError, RpcRequest, RpcResponse, ServerResponse }
 import { RpcId, serverRequestJson } from '../api/rpc.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import { clientRequestSchema, clientResponseSchema } from '../api/rpc.schema.ts'
+import type { PromptAdmissionObserver, PromptAdmissionPhase } from '../api/sessions.ts'
 import {
   sessionActivateRequestSchema,
   sessionAttachmentRequestSchema,
@@ -98,7 +99,8 @@ async function closeFrameStream(frames: AsyncIterable<unknown>, reason?: unknown
 type UnaryRoutes = {
   [K in keyof RpcMethodMap]: {
     schema: z.ZodType<Wire<RequestPayload<K>>>
-    invoke(api: ApiProxy, request: RpcRequest<RequestPayload<K>>, signal: AbortSignal): Promise<RpcResponse<ResponseValue<K>>>
+    invoke(api: ApiProxy, request: RpcRequest<RequestPayload<K>>, signal: AbortSignal,
+      observe?: PromptAdmissionObserver): Promise<RpcResponse<ResponseValue<K>>>
   }
 }
 
@@ -113,7 +115,7 @@ const UNARY_ROUTES: UnaryRoutes = {
   'session.rename': { schema: sessionRenameRequestSchema, invoke: (api, r) => api.sessions.rename(r) },
   'session.fork': { schema: sessionForkRequestSchema, invoke: (api, r) => api.sessions.fork(r) },
   'session.promptStatus': { schema: sessionPromptStatusRequestSchema, invoke: (api, r, signal) => api.sessions.promptStatus(r, signal) },
-  'session.prompt': { schema: sessionPromptRequestSchema, invoke: (api, r) => api.sessions.prompt(r) },
+  'session.prompt': { schema: sessionPromptRequestSchema, invoke: (api, r, _signal, observe) => api.sessions.prompt(r, observe) },
   'session.attachment': { schema: sessionAttachmentRequestSchema, invoke: (api, r) => api.sessions.attachment(r) },
   'session.updateQueue': { schema: sessionUpdateQueueRequestSchema, invoke: (api, r) => api.sessions.updateQueue(r) },
   'session.cancel': { schema: sessionCancelRequestSchema, invoke: (api, r) => api.sessions.cancel(r) },
@@ -222,6 +224,7 @@ async function handleUnary<K extends keyof RpcMethodMap>(
   signal: AbortSignal,
   historyPageTargetBytes: number,
   prepared = false,
+  observe?: PromptAdmissionObserver,
 ): Promise<Response> {
   const route = UNARY_ROUTES[method]
   const payload = route.schema.safeParse(message.payload)
@@ -235,7 +238,7 @@ async function handleUnary<K extends keyof RpcMethodMap>(
     return errorResponse(message.rpcId, { code: 'bad-request', message: 'A prepared tail requires a reserved Session and workspace', details: { issues: [] } })
   }
   try {
-    const response = await route.invoke(api, { rpcId: message.rpcId, payload: payload.data }, signal)
+    const response = await route.invoke(api, { rpcId: message.rpcId, payload: payload.data }, signal, observe)
     if (initial && response.result.ok) {
       return await preparedCreateResponse(api, response.rpcId, response.result.value as ResponseValue<'session.create'>,
         creation, signal, historyPageTargetBytes)
@@ -526,14 +529,20 @@ export function toFetchHandler(
       }
       if (prepared || durable || status) {
         const start = performance.now()
+        const trace = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(req.headers.get('x-dsh-operation-id') ?? '')
+        const admission: Partial<Record<PromptAdmissionPhase, number>> = {}
+        const observe: PromptAdmissionObserver | undefined = trace && durable && method === 'session.prompt'
+          ? (phase, elapsed) => { admission[phase] = Math.round(((admission[phase] ?? 0) + elapsed) * 100) / 100 }
+          : undefined
         let timed = message
         if ((durable && method === 'session.prompt' || prepared && method === 'session.history') &&
           typeof message.payload === 'object' && message.payload !== null && !Array.isArray(message.payload)) {
           timed = { ...message, payload: { ...message.payload, ...(durable ? { durable: true } : { onlyActive: true }) } }
         }
-        const result = await handleUnary(api, method, timed, req.signal, historyPageTargetBytes, prepared)
-        if (/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(req.headers.get('x-dsh-operation-id') ?? '')) {
+        const result = await handleUnary(api, method, timed, req.signal, historyPageTargetBytes, prepared, observe)
+        if (trace) {
           result.headers.set('x-dsh-host-duration-ms', (performance.now() - start).toFixed(2))
+          if (observe !== undefined) result.headers.set('x-dsh-host-admission-ms', JSON.stringify(admission))
         }
         return result
       }

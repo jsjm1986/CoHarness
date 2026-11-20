@@ -33,7 +33,7 @@ export function ScheduleTaskTabTitle({ sessionId, useTabInfo, useCatalog, taskBi
   return (
     <>
       <IconClockOutline16 size={16} className={css.tabTitleIcon} />
-      {record === undefined ? t('detail.label') : taskName(record)}
+      <span>{record === undefined ? t('detail.label') : taskName(record)}</span>
     </>
   )
 }

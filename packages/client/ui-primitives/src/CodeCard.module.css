@@ -80,7 +80,7 @@
   overflow-x: auto;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767px), (pointer: coarse) {
   /* Keep the 44px action targets without adding the desktop header padding on
      top of it. The header is one compact toolbar row on a phone. */
   .card {
@@ -95,5 +95,15 @@
   .action {
     min-width: var(--dsw-touch-target);
     min-height: var(--dsw-touch-target);
+  }
+}
+
+@media (forced-colors: active) {
+  .card {
+    outline: 1px solid CanvasText;
+  }
+
+  .action:focus-visible {
+    outline: 2px solid Highlight;
   }
 }

@@ -151,6 +151,9 @@ try {
     console.log(`migration_current=${plan.current}`)
     console.log(`migration_pending=${plan.pending.map(m => m.name).join(',') || 'none'}`)
     if (plan.drifted.length > 0) console.log(`migration_drifted=${plan.drifted.join(',')}`)
+    if (plan.relocations !== undefined) {
+      console.log(`migration_relocations=${plan.relocations.map(({ from, to }) => `${from}->${to}`).join(',')}`)
+    }
     if (maintenance !== undefined) {
       for (const op of await maintenance.listOperations(10)) {
         console.log(`operation=${op.kind} status=${op.status} at=${op.createdAt}${op.error === null ? '' : ` error=${op.error}`}`)
@@ -163,6 +166,7 @@ try {
     if (maintenance === undefined) throw new Error('organization is not provisioned')
     printState(await maintenance.exitMaintenance(null))
   } else if (verb === 'apply' && command.length === 1) {
+    let reconcilePushLedger = maintenance === undefined
     if (maintenance !== undefined) {
       const state = await maintenance.state()
       if (state.mode === 'restoring') throw new MaintenanceError(409, 'restore-in-progress')
@@ -170,15 +174,17 @@ try {
         console.error('warning: applying outside a maintenance window; run `pg:deploy maintenance enter` first for coordinated upgrades')
       } else if (!state.writersQuiesced) {
         throw new MaintenanceError(409, 'writers-not-quiesced')
+      } else {
+        reconcilePushLedger = true
       }
       if (state.mode === 'maintenance' && flags.graceMs > 0) await delay(flags.graceMs)
     }
     const operation = maintenance === undefined ? undefined
       : await maintenance.logOperation('apply', 'running', null, {})
     try {
-      const result = await runMigrations(pool, cfg.deployMigrationsDir)
+      const result = await runMigrations(pool, cfg.deployMigrationsDir, { reconcilePushLedger })
       if (maintenance !== undefined && operation !== undefined) {
-        await maintenance.finishOperation(operation, 'completed', { applied: result.applied, current: result.current })
+        await maintenance.finishOperation(operation, 'completed', { ...result })
       }
       console.log(JSON.stringify(result))
     } catch (error) {

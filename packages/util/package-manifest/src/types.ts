@@ -81,10 +81,12 @@ export interface DshProfileManifest {
 export interface DshClientManifest {
   /** Client platform identifier; the Web consumer selects `web`. */
   platform: string
-  /** Informational package-name dependencies, not Cordis service injection. */
+  /** Package dependencies for factory arrival and startup classification. */
   inject?: string[]
-  /** Boot phase-one registration barrier; absent means the shared application batch. */
+  /** Prefetch this required entry's factory before plugin activation. */
   immediately?: boolean
+  /** Allow the browser to mount this entry after startup when the required graph does not depend on it. */
+  optional?: boolean
   /**
    * Exact module-table requests beyond the implicit client baseline, including
    * subpaths such as `<pkg>/client`; absent means baseline externals only.

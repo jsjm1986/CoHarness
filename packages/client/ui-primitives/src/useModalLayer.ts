@@ -4,8 +4,14 @@ import type { RefObject } from 'react'
 import { observeComposition } from './keyboard-composition.ts'
 import { focusWithoutRing } from './focus.ts'
 import { modalSelector } from './dialog-focus.ts'
+import { holdInert } from './inert.ts'
 
-const layers = new WeakMap<Document, { element: HTMLElement; close: () => void }[]>()
+interface ModalLayer {
+  element: HTMLElement
+  close: () => void
+  previous: Element | null
+}
+const layers = new WeakMap<Document, ModalLayer[]>()
 
 /**
  * Request closure of the foreground registered modal using its current onClose callback.
@@ -32,7 +38,7 @@ export function isBehindModal(anchor: HTMLElement | null): boolean {
 const focusable = 'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]'
 
 /**
- * Give only the top modal Escape and Tab ownership, then restore its previous focus.
+ * Isolate background siblings, give the top modal Escape and Tab ownership, and restore previous focus.
  * Automatic entry and return focus omit outlines; keyboard traversal retains its indicators.
  * Controls mounted with the dialog use data-modal-autofocus for initial focus;
  * React autoFocus runs before this layer can capture the invoking control.
@@ -52,8 +58,19 @@ export function useModalLayer(dialog: RefObject<HTMLElement | null>, open: boole
     const previous = document.activeElement
     const stack = layers.get(document) ?? []
     layers.set(document, stack)
-    const layer = { element, close: () => { close.current() } }
+    const layer: ModalLayer = { element, close: () => { close.current() }, previous }
     stack.push(layer)
+    const releaseBackground: (() => void)[] = []
+    let branch: HTMLElement = element.parentElement?.getAttribute('role') === 'presentation' ? element.parentElement : element
+    while (branch.parentElement !== null) {
+      for (const sibling of branch.parentElement.children) {
+        if (sibling === branch || !(sibling instanceof HTMLElement)
+          || sibling.matches('script, style, link, [data-modal-backdrop], [data-menu-backing]')) continue
+        releaseBackground.push(holdInert(sibling))
+      }
+      if (branch.parentElement === document.body) break
+      branch = branch.parentElement
+    }
     const initial = element.querySelector<HTMLElement>('[data-modal-autofocus]')
       ?? element.querySelector<HTMLElement>(focusable) ?? element
     if (!element.contains(document.activeElement)) focusWithoutRing(initial)
@@ -70,7 +87,8 @@ export function useModalLayer(dialog: RefObject<HTMLElement | null>, open: boole
       const menu = document.activeElement?.closest('[role="menu"]')
       if (menu != null && !element.contains(menu)) return
       const items = [...element.querySelectorAll<HTMLElement>(focusable)]
-        .filter(item => !item.closest('[inert], [hidden]'))
+        .filter(item => !item.closest('[inert], [hidden]') && getComputedStyle(item).display !== 'none'
+          && getComputedStyle(item).visibility !== 'hidden')
       const first = items[0] ?? element
       const last = items.at(-1) ?? element
       const atEdge = event.shiftKey ? document.activeElement === first : document.activeElement === last
@@ -84,11 +102,18 @@ export function useModalLayer(dialog: RefObject<HTMLElement | null>, open: boole
     return () => {
       composition.dispose()
       const wasTop = stack.at(-1) === layer
+      for (const remaining of stack) {
+        if (remaining !== layer && remaining.previous !== null && element.contains(remaining.previous)) {
+          remaining.previous = layer.previous
+        }
+      }
       stack.splice(stack.indexOf(layer), 1)
       document.removeEventListener('keydown', keydown)
+      for (const release of releaseBackground.reverse()) release()
       if (stack.length === 0) layers.delete(document)
       if (wasTop) {
-        const target = previous instanceof HTMLElement && previous.isConnected ? previous : stack.at(-1)?.element
+        const target = layer.previous instanceof HTMLElement && layer.previous.isConnected
+          ? layer.previous : stack.at(-1)?.element
         if (target !== undefined) focusWithoutRing(target)
       }
     }

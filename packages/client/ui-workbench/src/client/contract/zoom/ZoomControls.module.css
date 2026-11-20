@@ -36,9 +36,26 @@
 
 @media (hover: none), (pointer: coarse) {
   .panel {
+    position: static;
+    flex: none;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding: var(--dsw-space-1) var(--dsw-space-2);
+    border: 0;
+    border-block-start: 0.5px solid var(--dsw-alias-border-l3);
+    border-radius: 0;
+    box-shadow: none;
     opacity: 1;
     pointer-events: auto;
-    transform: translate(-50%, 0) scale(1);
+    transform: none;
+    transition: none;
+    will-change: auto;
+  }
+
+  .zoomButton,
+  .percent {
+    min-inline-size: 44px;
+    min-block-size: 44px;
   }
 }
 

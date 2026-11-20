@@ -48,6 +48,14 @@ export interface GatewayForwardClaims {
   nonce: string
 }
 
+/** A signature verified with previously published key bytes pending current issuer and Session admission. */
+export interface GatewayForwardSessionCandidate {
+  readonly claims: GatewayForwardClaims
+  readonly issuerPublicKey: string
+  /** @returns whether the nonce was consumed while the assertion was still live. */
+  consume(): boolean
+}
+
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown> : undefined

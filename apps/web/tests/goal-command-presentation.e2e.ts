@@ -1,18 +1,20 @@
 // Web e2e: /goal opts its command input into the human transcript while the
 // command remains log-only. The shipped composition runs with no model adapter,
 // so an accidental turn fails loud in addition to the event-level assertions.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-commands/types'
 import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria,
-  compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode,
+  launchWebScaffold, watchConsole, webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { compareWorkflowGolden, auditWorkflowState, newWorkflowPage } from './workflow-responsive-state.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/goal-command-presentation', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL(
@@ -30,8 +32,8 @@ describe('web e2e: /goal human transcript presentation', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold()
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { events.push(event) })
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -103,7 +105,8 @@ describe('web e2e: /goal human transcript presentation', () => {
     // The command result can arrive before Lexical clears the submitted claim.
     await expect.poll(() => input.textContent(), { timeout: 10_000 }).toBe('')
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(UI_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'goal', 'no-goal-command', page.locator('[class*="centerCol"]'))
   }, 60_000)
 
   it('reloads the same bubble and result from the persisted command lifecycle', async () => {
@@ -127,6 +130,7 @@ describe('web e2e: /goal human transcript presentation', () => {
     expect(persisted.some(event => event.type === 'turn/start')).toBe(false)
     expect(persisted.some(event => event.type === 'step/start')).toBe(false)
     expect(persisted.some(event => event.type === 'request/header')).toBe(false)
+    await auditWorkflowState(page, 'goal', 'persisted-command', page.locator('[class*="centerCol"]'))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])

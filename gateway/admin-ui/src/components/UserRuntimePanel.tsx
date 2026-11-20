@@ -76,9 +76,9 @@ export function UserRuntimePanel({ userId, onChanged }: { userId: number; onChan
     </div>
     {!loading && page !== null && items.length === 0 ? <EmptyState title={t(cursor === undefined ? 'noAllocations' : 'noPageAllocations')} detail={t(cursor === undefined ? showComputer ? 'noAllocationsDetail' : 'localNoAllocations' : 'noPageAllocationsDetail')} /> : null}
     {page === null || items.length === 0 ? null : <div aria-busy={loading || busy}>
-      <div className="tableWrap desktopOnly"><table className="dataTable"><thead><tr>{showComputer && <th>{t('computer')}</th>}<th>{t('identity')}</th><th>{t('state')}</th><th>{t('actions')}</th></tr></thead>
+      <div className="tableWrap desktopOnly" role="region" aria-label={t('title')} tabIndex={0}><table className="dataTable"><thead><tr>{showComputer && <th>{t('computer')}</th>}<th>{t('identity')}</th><th>{t('state')}</th><th>{t('actions')}</th></tr></thead>
       <tbody>{items.map(runtime => <tr key={runtime.id}>
-        {showComputer && <td><ComputerBadge label={t('computer')} name={runtime.node.name} details={[{ label: t('identity'), value: runtime.id }, { label: t('generation'), value: String(runtime.generation) }]} /></td>}
+        {showComputer && <td className="runtimeComputer"><ComputerBadge label={t('computer')} name={runtime.node.name} details={[{ label: t('identity'), value: runtime.id }, { label: t('generation'), value: String(runtime.generation) }]} /></td>}
         <td className="terminalIdentity">{runtime.id}</td><td><InstanceState state={runtime.observedState} /></td>
         <td>{controls(runtime)}</td>
       </tr>)}</tbody></table></div>

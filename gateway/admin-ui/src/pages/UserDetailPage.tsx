@@ -363,7 +363,7 @@ function UserModelAccess({ userId, role }: { userId: number; role: UserRole }) {
         <EmptyState title={t('modelsEmptyTitle')} detail={t('modelsEmptyDetail')} />
       ) : (
         <>
-          <div className="tableWrap desktopOnly">
+          <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionModels')} tabIndex={0}>
             <table className="dataTable">
               <thead>
                 <tr><th>{t('colModel')}</th><th>{t('colRoleDefault')}</th><th>{t('userOverride')}</th><th>{t('colEffective')}</th></tr>
@@ -476,6 +476,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
 
   async function onRemove() {
     if (removeTarget === null) return
+    setError('')
     setPendingKey(`member:${removeTarget.projectId}`)
     try {
       await removeMember(removeTarget.projectId, userId)
@@ -520,7 +521,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
             ? t('membershipsHintAdmin')
             : t('membershipsHintUser')}
         </p>
-        <ErrorBanner message={error} />
+        <ErrorBanner message={removeTarget === null ? error : ''} />
       </div>
       {loading ? <LoadingState label={t('loadingMemberships')} /> : (
         <>
@@ -528,14 +529,14 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
             <EmptyState title={t('membershipsEmptyTitle')} detail={t('membershipsEmptyDetail')} />
           ) : (
             <>
-              <div className="tableWrap desktopOnly">
+              <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionMemberships')} tabIndex={0}>
                 <table className="dataTable">
                   <thead><tr><th>{t('colProject')}</th><th>{t('colPath')}</th><th>{t('permission')}</th><th aria-label={t('colActions')} /></tr></thead>
                   <tbody>
                     {memberships.map(row => (
                       <tr key={row.projectId}>
                         <td><Link className="projectLink" to={`/projects/${row.projectId}`}>{row.name}</Link></td>
-                        <td><span className="codeText">{row.path}</span></td>
+                        <td><span className="pathText">{row.path}</span></td>
                         <td>
                           <select
                             className="select selectCompact"
@@ -548,7 +549,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
                             <option value="ro">{t('modeReadOnly')}</option>
                           </select>
                         </td>
-                        <td><div className="rowActions"><IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => setRemoveTarget(row)} /></div></td>
+                        <td><div className="rowActions"><IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => { setError(''); setRemoveTarget(row) }} /></div></td>
                       </tr>
                     ))}
                   </tbody>
@@ -559,7 +560,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
                   <article className="mobileItem" key={row.projectId}>
                     <div className="mobileItemHeader">
                       <Link className="projectLink" to={`/projects/${row.projectId}`}><strong>{row.name}</strong></Link>
-                      <IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => setRemoveTarget(row)} />
+                      <IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => { setError(''); setRemoveTarget(row) }} />
                     </div>
                     <div className="mobileItemBody">
                       <span className="codeText">{row.path}</span>
@@ -603,6 +604,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
         title={t('removeTitle')}
         description={t('removeDescription', { name: removeTarget?.name ?? '' })}
         confirmLabel={t('removeConfirm')}
+        error={error}
         pending={pendingKey.startsWith('member:')}
         onClose={() => { if (!pendingKey.startsWith('member:')) setRemoveTarget(null) }}
         onConfirm={() => void onRemove()}

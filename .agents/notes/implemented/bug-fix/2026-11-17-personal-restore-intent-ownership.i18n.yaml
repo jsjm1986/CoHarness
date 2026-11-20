@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-17-personal-restore-intent-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-personal-restore-intent-ownership.md
+document:
+  en: 31b3320a47816974b2c202718333562af401e97c
+  zh: d2b85c6fd576611cb41794688682addde8a3da57
+/agent-note-personal-recovery-owns-its-pending-editor:
+  en: 69757a70a3e92557
+  zh: 2246962f8ce9be55
+/agent-note-personal-recovery-owns-its-pending-editor/problem:
+  en: 3830d1baabdada4e
+  zh: 3f2a7991bf077783
+/agent-note-personal-recovery-owns-its-pending-editor/decision:
+  en: d4507f6bcc8b3cc1
+  zh: 9823a8ed717ab5fe
+/agent-note-personal-recovery-owns-its-pending-editor/alternatives-considered:
+  en: 3c45a8791061683a
+  zh: 6a7b22ac6327b669
+/agent-note-personal-recovery-owns-its-pending-editor/consequences:
+  en: ea9affdb20aa3fdc
+  zh: eb23b1fa48d4e6fc

@@ -27,6 +27,8 @@ kind: "package-reference"
 
 当模型需要像调用原生工具一样调用外部 MCP 服务器时，添加 `dsh-mcp-client`。为每台服务器指定唯一名称和传输方式。官方 SDK 优先选择可用的 2026-07-28 协议，并回退到支持的旧版协议。本地程序使用 stdio，远端服务使用 Streamable HTTP；stdio 协商会先启动临时探测进程，再启动实际服务进程。
 
+灾难恢复后的 Runtime 仅连接或探测在[密封执行审核](../../boot/app-boot/README.zh.md#previewing-the-effective-configuration)中逐项批准的 MCP 目标。检查发生在凭据解析或进程创建之前，也覆盖重新连接。传输、名称、命令、参数、环境引用、工作目录、URL 或请求头变化后须重新审核。普通 Runtime 保持配置的连接策略。
+
 <a id="minimal-configuration"></a>
 ### 最小配置
 

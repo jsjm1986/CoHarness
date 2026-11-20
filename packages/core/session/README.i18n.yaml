@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/session/README.md
 document:
-  en: 8de88973c7b5432e28aa3d5e0f833fcdb72f3e71
-  zh: e0478aea536f6443a414dcd72cbfd8541566aa18
+  en: f9ba2cecef9ad935920c2183d932c08103f60f56
+  zh: 1a644c9e43892c74ca3a0f5daefec5342cd99f92
 /:
   en: 1c8be05e4c02cbd0
   zh: 61495d48365178df
@@ -27,8 +27,8 @@ document:
   en: f9b1ca96aa30e56e
   zh: 27eec0fd054f643b
 /dsh-session/service-sessionstore-ctx-key-sessions/public-api:
-  en: e071dc5d911fde36
-  zh: 9349467848dd927f
+  en: 2f305357954b125d
+  zh: 133ffb121edd69f2
 /dsh-session/service-sessionstore-ctx-key-sessions/public-api/advanced-ordered-teardown-lifecycle-primitives:
   en: 7b9c4b4c811c8fc1
   zh: c86261fafc4ba806

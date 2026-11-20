@@ -15,42 +15,41 @@
   - text: "Completed in {{duration}}"
   - img
 - button "Wrote files, called tools, searched code, etc."
-- button "Write site/report.html +1 -0":
+- button "Write":
   - img
   - img
-  - text: Write
-  - button "site/report.html"
-  - text: +1 -0
-- button "Write a/style.css +1 -0":
+- text: Write
+- button "site/report.html"
+- text: +1 -0
+- button "Write":
   - img
   - img
-  - text: Write
-  - button "a/style.css"
-  - text: +1 -0
-- button "Write b/style.css +1 -0":
+- text: Write
+- button "a/style.css"
+- text: +1 -0
+- button "Write":
   - img
   - img
-  - text: Write
-  - button "b/style.css"
-  - text: +1 -0
-- button "Write site/index.html +1 -0":
+- text: Write
+- button "b/style.css"
+- text: +1 -0
+- button "Write":
   - img
   - img
-  - text: Write
-  - button "site/index.html"
-  - text: +1 -0
-- button "Write site/app.js +1 -0":
+- text: Write
+- button "site/index.html"
+- text: +1 -0
+- button "Write":
   - img
   - img
-  - text: Write
-  - button "site/app.js"
-  - text: +1 -0
-- button "Edit src/tokens.css +1 -1" [expanded]:
+- text: Write
+- button "site/app.js"
+- text: +1 -0
+- button "Edit" [expanded]:
   - img
-  - text: Edit
-  - button "src/tokens.css"
-  - text: +1 -1
-- text: css
+- text: Edit
+- button "src/tokens.css"
+- text: +1 -1 css
 - button "Wrap lines"
 - button "Copy":
   - img
@@ -71,10 +70,10 @@
 - 'button "Write permission denied: c/broken.css"':
   - img
   - text: "Write permission denied: c/broken.css"
-- button "Read docs/guide.md" [expanded]:
+- button "Read" [expanded]:
   - img
-  - text: Read
-  - button "docs/guide.md"
+- text: Read
+- button "docs/guide.md"
 - text: Code block docs/guide.md
 - button "Wrap lines"
 - button "Copy":
@@ -136,11 +135,11 @@
 - button "Inspect":
   - img
   - text: Inspect
-- button "Web fetch https://docs.example.test/tokens" [expanded]:
+- button "Web fetch" [expanded]:
   - img
-  - text: Web fetch
-  - link "https://docs.example.test/tokens":
-    - /url: https://docs.example.test/tokens
+- text: Web fetch
+- link "https://docs.example.test/tokens":
+  - /url: https://docs.example.test/tokens
 - link "https://docs.example.test/tokens":
   - /url: https://docs.example.test/tokens
 - text: HTTP 200
@@ -241,8 +240,8 @@
   - img
 - button "Send message" [disabled]
 - group "Session statistics":
-  - button "1 turns · 2 steps":
+  - button "1 turn · 2 steps":
     - img
-    - text: 1 turns · 2 steps
+    - text: 1 turn · 2 steps
 - separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

@@ -186,6 +186,15 @@ readDesiredState?(): Promise<PluginDesiredStateSnapshot>
  * @returns 'applied' with the new revision, or 'conflict' carrying the store's current state.
  */
 publishDesiredState?(state: PluginDesiredState, baseRevision: string): Promise<PluginDesiredStatePublish>
+
+/**
+ * Publish the profile's observed inventory for administrative visibility.
+ * Present only in deployments that record per-space inventories; runtime-scoped,
+ * it never carries a caller's account. Failures surface as warnings, not errors.
+ * @param snapshot - the bundle and entry projections observed at report time.
+ * @returns after the store accepted the report.
+ */
+reportInventory?(snapshot: PluginInventoryReport): Promise<void>
 ```
 
 Source: [`packages/boot/plugin-manager/src/types.ts`](../../packages/boot/plugin-manager/src/types.ts)

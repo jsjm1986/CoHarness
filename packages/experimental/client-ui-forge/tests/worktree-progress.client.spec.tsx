@@ -82,6 +82,10 @@ describe('WorktreeProgress visibility', () => {
     ['while the Session works in the worktree it created', ready({ directory: '/work/repo-dsh', worktree: worktree({ created: created() }) })],
     ['for a removal the panel reports without the worktree record', ready({ worktree: worktree({ missing: { branchExists: true } }) })],
     ['for a failed attempt no message waits after', requested('main', { failure: failure() })],
+    ['as soon as the request is withdrawn', ready({ worktree: worktree({ waiting: 'creation' }) })],
+    ['as soon as the creation is recorded', requested('main', {
+      creation: creation(), created: created(), waiting: 'creation',
+    })],
   ])('renders nothing %s', (_label, state) => {
     expect(card(state).view.container.innerHTML).toBe('')
   })

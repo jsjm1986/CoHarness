@@ -19,6 +19,19 @@ export interface DocumentOverviewSource {
   id: string
   read(offset: number, limit: number, signal?: AbortSignal): Promise<DocumentOverviewPage>
 }
+
+/** Bounded, globally ordered metadata from a fixed set of index sources. */
+export interface MergedDocumentOverview extends DocumentOverviewPage {
+  readonly version: 1
+  readonly totalDocuments: number
+  readonly partial?: true
+  readonly unavailableNodes?: readonly string[]
+  readonly nextCursor?: string
+}
+
+/** Publish provisional first-page rows while the rest of the index reads continue. */
+export type DocumentOverviewProgress = (page: MergedDocumentOverview, pending: number) => Promise<void>
+
 const continuation = z
   .object({
     v: z.literal(1),
@@ -26,6 +39,7 @@ const continuation = z
     positions: z
       .array(z.tuple([z.string().max(64), z.number().int().nonnegative(), z.string().max(128).nullable()]))
       .max(4096),
+    excluded: z.array(z.uuid()).max(4096).optional(),
   })
   .strict()
 const zero = (): DocumentCatalogMetrics => ({
@@ -107,14 +121,23 @@ export function readDocumentNodePage(value: unknown, nodeId: string, limit: numb
   return page
 }
 
-/** The browser cursor contains per-source positions. Unavailable computers do not advance or fabricate totals. */
+/** Merge source prefixes, and keep cursor positions fixed until a complete page can be published.
+ * @param owner - verified organization, account and entry computer.
+ * @param options - bounded query, sort and optional prior-page continuation.
+ * @param sources - currently authorized index readers, with the entry computer first.
+ * @param concurrency - maximum simultaneous reads for this request.
+ * @param signal - lifetime of the browser request.
+ * @param progress - optional publisher for authorized, provisional first-page rows.
+ * @returns a page ordered across all participating sources.
+ */
 export async function mergeDocumentOverview(
   owner: { organizationId: string; userId: number; entryNodeId: string },
   options: DocumentCatalogOverviewOptions,
   sources: readonly DocumentOverviewSource[],
   concurrency: number,
   signal?: AbortSignal,
-) {
+  progress?: DocumentOverviewProgress,
+): Promise<MergedDocumentOverview> {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1 || sources.length > 4096) {
     throw new DocumentCatalogError(
       'DOCUMENT_SCOPE_UNAVAILABLE',
@@ -140,39 +163,67 @@ export async function mergeDocumentOverview(
     )
     .digest('base64url')
   const offsets = new Map<string, { offset: number; revision: string | null }>()
+  const excluded = new Set<string>()
   if (options.cursor) {
     if (options.cursor.length > 512 * 1024) invalid()
     try {
       const previous = continuation.parse(JSON.parse(Buffer.from(options.cursor, 'base64url').toString('utf8')))
       if (previous.query !== query) invalid()
+      const ids = new Set(sources.map(source => source.id))
       for (const [id, offset, revision] of previous.positions) {
-        if (offsets.has(id)) invalid()
+        if (!ids.has(id) || offsets.has(id)) invalid()
         offsets.set(id, { offset, revision })
+      }
+      for (const id of previous.excluded ?? []) {
+        if (!ids.has(id) || offsets.has(id) || excluded.has(id)) invalid()
+        excluded.add(id)
       }
     } catch {
       invalid()
     }
   }
-  const documents: Array<{ source: string; row: DocumentCatalogRow }> = []
+  let visible: Array<{ source: string; row: DocumentCatalogRow }> = []
   const counts = new Map<string, number>(),
-    unavailableNodes: string[] = []
+    unavailableNodes = [...excluded]
   const metrics = zero()
   let totalDocuments = 0
   let next = 0
+  const selected = sources.filter(source => !excluded.has(source.id))
+  const publishPartial = progress !== undefined && options.cursor === undefined
+  let pending = selected.length
+  let wake: (() => void) | undefined
+  const changed = (): void => { const notify = wake; wake = undefined; notify?.() }
+  const lifetime = new AbortController()
+  const readSignal = signal === undefined ? lifetime.signal : AbortSignal.any([signal, lifetime.signal])
+  const desc = sort.endsWith('desc')
+  const order = (left: DocumentCatalogRow, right: DocumentCatalogRow) => {
+    const cmp = sort.startsWith('size')
+      ? left.bytes - right.bytes
+      : sort.startsWith('name')
+        ? Buffer.compare(Buffer.from(left.name.toLowerCase()), Buffer.from(right.name.toLowerCase()))
+        : left.modifiedAt - right.modifiedAt
+    return (desc ? -cmp : cmp) || Buffer.compare(Buffer.from(left.catalogId), Buffer.from(right.catalogId))
+  }
   const reader = async () => {
-    while (next < sources.length) {
-      signal?.throwIfAborted()
-      const source = sources[next++]!,
+    while (next < selected.length) {
+      readSignal.throwIfAborted()
+      const source = selected[next++]!,
         position = offsets.get(source.id)
       let page: DocumentOverviewPage
       try {
-        page = await source.read(position?.offset ?? 0, limit, signal)
+        page = await source.read(position?.offset ?? 0, limit, readSignal)
       } catch (error) {
-        signal?.throwIfAborted()
+        readSignal.throwIfAborted()
         if (source.id === 'legacy' || (error instanceof DocumentCatalogError && error.status < 500)) throw error
+        if (progress !== undefined && options.cursor !== undefined) {
+          throw new DocumentCatalogError('DOCUMENT_SCOPE_UNAVAILABLE', 503, 'A computer required for this page is unavailable.')
+        }
         unavailableNodes.push(source.id)
+        pending--
+        if (publishPartial) changed()
         continue
       }
+      readSignal.throwIfAborted()
       if (position?.revision && page.revision !== position.revision) invalid()
       const count = page.totalDocuments ?? page.documents.length
       if (!Number.isSafeInteger(count) || count < 0 || page.documents.length > limit) invalid()
@@ -184,35 +235,53 @@ export async function mergeDocumentOverview(
         if (!Number.isSafeInteger(combined) || combined < 0) invalid()
         Object.assign(metrics, { [key]: combined })
       }
-      documents.push(...page.documents.map((row) => ({ source: source.id, row })))
+      const candidates = [...visible, ...page.documents.map((row) => ({ source: source.id, row }))]
+      candidates.sort((a, b) => order(a.row, b.row) || a.source.localeCompare(b.source, 'en'))
+      visible = candidates.slice(0, limit)
+      pending--
+      if (publishPartial) changed()
     }
   }
-  await Promise.all(Array.from({ length: Math.min(concurrency, sources.length) }, reader))
-  const desc = sort.endsWith('desc')
-  const order = (left: DocumentCatalogRow, right: DocumentCatalogRow) => {
-    const cmp = sort.startsWith('size')
-      ? left.bytes - right.bytes
-      : sort.startsWith('name')
-        ? Buffer.compare(Buffer.from(left.name.toLowerCase()), Buffer.from(right.name.toLowerCase()))
-        : left.modifiedAt - right.modifiedAt
-    return (desc ? -cmp : cmp) || Buffer.compare(Buffer.from(left.catalogId), Buffer.from(right.catalogId))
+  const snapshot = (complete: boolean): MergedDocumentOverview => {
+    const missing = [...unavailableNodes].sort()
+    if (complete) for (const item of visible) offsets.get(item.source)!.offset++
+    const more = complete && [...counts].some(([id, count]) => offsets.get(id)!.offset < count)
+    return {
+      version: 1,
+      documents: visible.map((item) => item.row),
+      metrics: { ...metrics },
+      totalDocuments,
+      ...(missing.length ? { partial: true, unavailableNodes: missing } : {}),
+      ...(more && visible.length
+        ? {
+            nextCursor: Buffer.from(
+              JSON.stringify({ v: 1, query, positions: [...offsets].map(([id, x]) => [id, x.offset, x.revision]),
+                ...(missing.length && (progress !== undefined || excluded.size) ? { excluded: missing } : {}) }),
+            ).toString('base64url'),
+          }
+        : {}),
+    }
   }
-  documents.sort((a, b) => order(a.row, b.row) || a.source.localeCompare(b.source, 'en'))
-  const visible = documents.slice(0, limit)
-  for (const item of visible) offsets.get(item.source)!.offset++
-  const more = [...counts].some(([id, count]) => offsets.get(id)!.offset < count)
-  return {
-    version: 1 as const,
-    documents: visible.map((item) => item.row),
-    metrics,
-    totalDocuments,
-    ...(unavailableNodes.length ? { partial: true, unavailableNodes: unavailableNodes.sort() } : {}),
-    ...(more && visible.length
-      ? {
-          nextCursor: Buffer.from(
-            JSON.stringify({ v: 1, query, positions: [...offsets].map(([id, x]) => [id, x.offset, x.revision]) }),
-          ).toString('base64url'),
-        }
-      : {}),
+  let finished = false
+  const reads = Promise.all(Array.from({ length: Math.min(concurrency, selected.length) }, reader))
+  const completion = reads.then(() => { finished = true; changed() }, () => { finished = true; changed() })
+  try {
+    let publishedPending = pending
+    let published: string | undefined
+    while (publishPartial && !finished && pending > 0) {
+      if (counts.size > 0 && pending < publishedPending) {
+        publishedPending = pending
+        const keys = visible.map(item => `${item.source}:${item.row.catalogId}`).join(',')
+        if (keys === published) continue
+        published = keys
+        await progress(snapshot(false), pending)
+      } else await new Promise<void>(resolve => { wake = resolve })
+    }
+    await reads
+    readSignal.throwIfAborted()
+    return snapshot(true)
+  } finally {
+    lifetime.abort()
+    await completion
   }
 }

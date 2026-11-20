@@ -475,10 +475,12 @@ describe('ui-schedule browser half', () => {
       children: {
         main: { kind: 'keyed', scope: 'root' },
         'sidebar.panellist': { kind: 'list', scope: 'root' },
+        'shell.mobile.header.title': { kind: 'keyed', scope: 'root' },
       },
     } as never, Empty)
     const entry = ctx.slots.entries('main')[0]!
     expect(entry.options.key).toBe('schedules')
+    expect(ctx.slots.entries('shell.mobile.header.title')[0]?.options.key).toBe('schedules')
     const panel = ctx.slots.entries('sidebar.panellist')[0]!
     expect(panel.options.id).toBe('schedules')
     ctx.locale.setLocale('en')

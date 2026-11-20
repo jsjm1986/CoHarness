@@ -1,8 +1,9 @@
 /** Real HTTP failures preserve an authorized Markdown body without an automatic retry or an extra doomed read. */
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Page } from 'playwright'
+import { type Browser, type Page } from 'playwright'
 import { afterEach, expect, it, onTestFailed } from 'vitest'
 import {
   captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession,
@@ -45,7 +46,7 @@ it.skipIf(MODE === 'record').each([
   const sessionId = await seedSession(host, seed, `preview-request-failure-${viewport.name}`)
   const workspace = await host.ctx.workspaceRegistry.create(host.workspaceCwd)
   await workspace.attachSession(sessionId)
-  browser = await chromium.launch()
+  browser = await responsiveBrowser.launch()
   page = await browser.newPage({ locale: viewport.locale, viewport: { width: viewport.width, height: viewport.height } })
   const target = page
   const tripwire = watchConsole(target)

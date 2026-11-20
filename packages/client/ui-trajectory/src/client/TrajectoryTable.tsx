@@ -16,6 +16,7 @@ import {
   JsonTree,
   MarkdownText,
   Tooltip,
+  useModalLayer,
   writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { JsonTreeLabels, MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -55,6 +56,12 @@ const HISTORY_LOAD_ROW_HEIGHT_PX = 30
 const VIRTUALIZATION_THRESHOLD = 100
 const VIRTUAL_OVERSCAN_ROWS = 12
 const VIRTUAL_INITIAL_VIEWPORT_HEIGHT_PX = 600
+
+function navigationScrollBehavior(): ScrollBehavior {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 'auto'
+    : 'smooth'
+}
 
 const KIND_LABEL_KEY: Record<TrajectoryCellKind, TrajectoryKey> = {
   system: 'kind.system',
@@ -248,6 +255,7 @@ function jsonTreeLabels(t: TrajectoryTranslate): JsonTreeLabels {
     copyValue: t('copy.value'),
     copyJson: t('copy.json'),
     copyPath: t('copy.path'),
+    copyOptions: t('copy.options'),
     copyPrettyJson: t('copy.prettyJson'),
     copyCompactJson: t('copy.compactJson'),
     copied: t('copied'),
@@ -1889,7 +1897,10 @@ function ProgramOutput({ record, onOpen, t }: {
   onOpen?: () => void
   t: TrajectoryTranslate
 }) {
-  const output = record.cell.outputDetail
+  const errorText = record.cell.isError === true
+    ? record.cell.outputBlocks?.filter(block => block.type === 'text').map(block => block.content).join('\n')
+    : undefined
+  const output = errorText || record.cell.outputDetail
   const json = output === undefined || record.cell.isError === true ? undefined : parseJsonContainer(output)
   const actions = output === undefined ? undefined : (
     <span className={css.programActions}>
@@ -1951,10 +1962,7 @@ function OverviewSection({
         </button>
         {actions}
       </h3>
-      <div
-        className={`${css.overviewPreview} ${css.summaryScrollRegion}`}
-        data-summary-scroll-region=""
-      >
+      <div className={css.overviewPreview}>
         {children}
       </div>
     </section>
@@ -2003,9 +2011,7 @@ export function TrajectoryTable({
   const [detailsWidth, setDetailsWidth] = useState<number | null>(null)
   const [toolRequestOffset, setToolRequestOffset] = useState<number | null>(null)
   const detailsResizeDrag = useRef<DetailsResizeDrag | null>(null)
-  const detailsCloseRef = useRef<HTMLButtonElement | null>(null)
-  const inspectorTriggerRef = useRef<HTMLElement | null>(null)
-  const detailsWasOpen = useRef(false)
+  const detailsRef = useRef<HTMLElement>(null)
   const appliedRecordSelection = useRef<TrajectoryTableProps['recordSelection']>(null)
   const appliedRecordFocus = useRef<TrajectoryTableProps['recordFocus']>(null)
   const tabHistory = useRef<Set<DetailTab>>(new Set(['overview']))
@@ -2105,6 +2111,7 @@ export function TrajectoryTable({
     return indexes
   }, [projectedVirtualRows])
   const virtualItems = virtualizationEnabled ? rowVirtualizer.getVirtualItems() : []
+  const virtualExtent = virtualizationEnabled ? rowVirtualizer.getTotalSize() + virtualScrollMargin : undefined
   const virtualTop = Math.max(0, (virtualItems[0]?.start ?? 0) - virtualScrollMargin)
   const virtualBottom = virtualItems.length === 0
     ? 0
@@ -2172,26 +2179,6 @@ export function TrajectoryTable({
   const detailsOpen = selectedRequest !== null
     || promptSelected
     || (selected !== undefined && selectedState !== undefined)
-  useEffect(() => {
-    if (!compact || detailsOpen === detailsWasOpen.current) return
-    detailsWasOpen.current = detailsOpen
-    if (detailsOpen) {
-      detailsCloseRef.current?.focus({ preventScroll: true })
-    } else {
-      inspectorTriggerRef.current?.focus({ preventScroll: true })
-      inspectorTriggerRef.current = null
-    }
-  }, [compact, detailsOpen])
-  useEffect(() => {
-    if (!compact || !detailsOpen) return
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
-      event.preventDefault()
-      clearInspectorSelection()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => { document.removeEventListener('keydown', onKeyDown) }
-  }, [compact, detailsOpen])
   const selectedRequestRecordTemplates = useMemo(() => selectedRequest === null
     ? []
     : allRecords.filter(record =>
@@ -2305,12 +2292,7 @@ export function TrajectoryTable({
     setSelectedRequest(null)
   }
 
-  const rememberInspectorTrigger = useCallback(() => {
-    const active = document.activeElement
-    if (active instanceof HTMLElement && rootRef.current?.contains(active)) {
-      inspectorTriggerRef.current = active
-    }
-  }, [])
+  useModalLayer(detailsRef, compact && detailsOpen, clearInspectorSelection)
 
   const clearAllSelections = () => {
     clearInspectorSelection()
@@ -2318,7 +2300,6 @@ export function TrajectoryTable({
   }
 
   const selectRecord = useCallback((index: number) => {
-    rememberInspectorTrigger()
     setCodeWrappingOnOpen(wrapLines)
     const record = allRecords.find(candidate => candidate.cell.index === index)
     onRecordSelect?.(index)
@@ -2329,7 +2310,7 @@ export function TrajectoryTable({
     const available = new Set(tabs.map(tab => tab.id))
     const recent = [...tabHistory.current].reverse().find(tab => available.has(tab))
     setActiveTab(recent ?? tabs[0]?.id ?? 'overview')
-  }, [allRecords, onRecordSelect, rememberInspectorTrigger, wrapLines])
+  }, [allRecords, onRecordSelect, wrapLines])
   useEffect(() => {
     if (
       recordSelection === null
@@ -2355,7 +2336,6 @@ export function TrajectoryTable({
     request: SelectedRequest,
     tab: 'overview' | 'timing' = 'overview',
   ) => {
-    rememberInspectorTrigger()
     setSelectedRecordId(null)
     setSelectedRequest(request)
     activateTab(tab)
@@ -2409,7 +2389,7 @@ export function TrajectoryTable({
       if (virtualIndex === undefined) return
       pendingScrollRecordId.current = null
       followsTableTail.current = false
-      rowVirtualizer.scrollToIndex(virtualIndex, { behavior: 'smooth', align: 'center' })
+      rowVirtualizer.scrollToIndex(virtualIndex, { behavior: navigationScrollBehavior(), align: 'center' })
       return
     }
     pendingScrollRecordId.current = null
@@ -2420,7 +2400,7 @@ export function TrajectoryTable({
       : rootRef.current?.querySelector<HTMLElement>(`[data-record-index="${recordIndex}"]`)
     /* v8 ignore next -- jsdom lacks scrollIntoView; browsers always have it. */
     if (row !== undefined && row !== null && typeof row.scrollIntoView === 'function') {
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      row.scrollIntoView({ behavior: navigationScrollBehavior(), block: 'center' })
     }
   }, [records, rowVirtualizer, virtualIndexByRecordId, virtualizationEnabled])
   useEffect(() => {
@@ -2452,7 +2432,7 @@ export function TrajectoryTable({
       if (target !== undefined && typeof target.scrollIntoView === 'function') {
         followsTableTail.current = false
         target.scrollIntoView({
-          behavior: 'smooth',
+          behavior: navigationScrollBehavior(),
           block: focusHeight > ledger.clientHeight ? 'start' : 'center',
         })
       }
@@ -2478,7 +2458,7 @@ export function TrajectoryTable({
         : focusedVirtualIndexes[Math.floor((focusedVirtualIndexes.length - 1) / 2)]
           ?? firstVirtual,
       {
-        behavior: 'smooth',
+        behavior: navigationScrollBehavior(),
         align: focusHeight > paneHeight ? 'start' : 'center',
       },
     )
@@ -2587,6 +2567,7 @@ export function TrajectoryTable({
             </span>
           </div>
         )}
+        {!compact && virtualExtent !== undefined && <div aria-hidden="true" style={{ blockSize: virtualExtent }} />}
         {compact ? (
           <TrajectoryMobileFeed
             t={t}
@@ -2612,6 +2593,7 @@ export function TrajectoryTable({
         ) : (
           <table
             className={css.table}
+            data-virtualized={virtualizationEnabled || undefined}
             data-scroll-ready={tableScrollReady || undefined}
             aria-rowcount={records.length + historyRowOffset}
           >
@@ -2941,6 +2923,7 @@ export function TrajectoryTable({
         <>
           <div
             className={css.detailsBackdrop}
+            data-modal-backdrop=""
             aria-hidden="true"
             onPointerDown={(event) => {
               event.stopPropagation()
@@ -2948,15 +2931,18 @@ export function TrajectoryTable({
             }}
           />
           <aside
+            ref={detailsRef}
+            tabIndex={compact ? -1 : undefined}
             className={css.details}
             data-trajectory-details
             role={compact ? 'dialog' : 'complementary'}
             aria-modal={compact ? true : undefined}
             aria-label={t('details.event')}
-            style={detailsWidth === null ? undefined : { width: detailsWidth }}
+            style={compact || detailsWidth === null ? undefined : { width: detailsWidth }}
           >
             <div
               className={css.detailsResizeHandle}
+              hidden={compact}
               role="separator"
               aria-label={t('details.resize')}
               aria-controls="trajectory-detail-panel"
@@ -3082,7 +3068,7 @@ export function TrajectoryTable({
               </div>
               <button
                 type="button"
-                ref={detailsCloseRef}
+                data-modal-autofocus=""
                 className={css.close}
                 aria-label={t('details.close')}
                 onClick={clearInspectorSelection}
@@ -3109,21 +3095,19 @@ export function TrajectoryTable({
             <div
               id="trajectory-detail-panel"
               className={activeTab === 'overview'
-                ? `${css.detailBody} ${css.detailBodySummary}`
+                ? `${css.detailBody} ${css.detailBodySummary} ${css.summaryScrollRegion}`
                 : selectedProgram !== undefined && (activeTab === 'input' || activeTab === 'output')
                   ? `${css.detailBody} ${css.detailBodyProgram}`
                   : css.detailBody}
               role="tabpanel"
               aria-labelledby={`trajectory-detail-${activeTab}`}
+              data-summary-scroll-region={activeTab === 'overview' ? '' : undefined}
             >
               {selectedRequest !== null
               && selectedRequestState !== undefined
               && activeTab === 'overview' && (
                 <>
-                  <dl
-                    className={`${css.overview} ${css.summaryScrollRegion}`}
-                    data-summary-scroll-region=""
-                  >
+                  <dl className={css.overview}>
                     <div>
                       <dt>{t('details.status')}</dt>
                       <dd className={selectedRequestState === 'error' ? css.error : undefined}>
@@ -3222,7 +3206,7 @@ export function TrajectoryTable({
                       </div>
                     )}
                   </dl>
-                  <div className={css.overviewSections}>
+                  <div>
                     {selectedRequestOptions !== undefined && (
                       <OverviewSection label={t('tab.options')} onOpen={() => { activateTab('options') }}>
                         <RequestOptions options={selectedRequestOptions} preview t={t} />
@@ -3287,10 +3271,7 @@ export function TrajectoryTable({
               && selectedState !== undefined
               && activeTab === 'overview' && (
                 <>
-                  <dl
-                    className={`${css.overview} ${css.summaryScrollRegion}`}
-                    data-summary-scroll-region=""
-                  >
+                  <dl className={css.overview}>
                     <div>
                       <dt>{t('details.status')}</dt>
                       <dd className={selectedState === 'error' ? css.error : undefined}>
@@ -3307,10 +3288,7 @@ export function TrajectoryTable({
                     </div>
                   </dl>
                   {selected.cell.outputDetail !== undefined && (
-                    <div
-                      className={`${css.compactedSummary} ${css.summaryScrollRegion}`}
-                      data-summary-scroll-region=""
-                    >
+                    <div className={css.compactedSummary}>
                       <MarkdownRecordContent
                         record={selected}
                         rendered
@@ -3333,10 +3311,7 @@ export function TrajectoryTable({
                   {selectedProgram !== undefined && selectedProgram.description !== '' && (
                     <p className={css.programDescription}>{selectedProgram.description}</p>
                   )}
-                  <dl
-                    className={`${css.overview} ${css.summaryScrollRegion}`}
-                    data-summary-scroll-region=""
-                  >
+                  <dl className={css.overview}>
                     {selected.cell.messageSource !== undefined && (
                       <div>
                         <dt>{t('details.source')}</dt>
@@ -3423,7 +3398,7 @@ export function TrajectoryTable({
                       </div>
                     )}
                   </dl>
-                  <div className={css.overviewSections}>
+                  <div>
                     {selectedProgram !== undefined
                       ? (
                         <>

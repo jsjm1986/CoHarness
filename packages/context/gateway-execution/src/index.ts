@@ -63,6 +63,30 @@ interface RequiredScope {
   capabilities: Set<ExecutionCapability>
 }
 
+interface InboxTiming {
+  insertedAt: number
+  inserted: number
+  claimed?: number
+}
+
+interface AdmittedInput {
+  inputId: ExecutionInputId
+  hash: string
+  timing?: InboxTiming | undefined
+}
+
+interface ModelInputTiming {
+  turn: number
+  step: number
+  inbox?: InboxTiming | undefined
+  enterStartedAt: number
+  enterStarted: number
+  inheritanceMs: number
+  enterRpcMs: number
+  accepted: number
+  request?: { started: number; authorized: number }
+}
+
 /** Watch updates observed during one permission request, including an idle owner. */
 interface PendingAuthorization {
   readonly users: Set<number>
@@ -89,7 +113,7 @@ export class GatewayExecution extends ExecutionAuthority {
   private readonly currentStep = new WeakMap<Agent, ExecutionState>()
   private readonly registration = new Map<SessionId, Promise<void>>()
   private readonly inherited = new WeakMap<Session, ExecutionInheritance>()
-  private readonly admitted = new WeakMap<Agent, Map<string, { inputId: ExecutionInputId; hash: string }>>()
+  private readonly admitted = new WeakMap<Agent, Map<string, AdmittedInput>>()
   private readonly required = new Map<Agent, Set<ExecutionCapability>>()
   private readonly scopeRequirements = new WeakMap<Agent, Map<string, RequiredScope>>()
   private readonly grants = new WeakMap<Agent, Map<ExecutionCapability, string>>()
@@ -141,6 +165,7 @@ export class GatewayExecution extends ExecutionAuthority {
       // composition is shared, so publish and read ride the runtime credential.
       readDesiredState: policy.readDesiredState?.bind(policy),
       publishDesiredState: policy.publishDesiredState?.bind(policy),
+      reportInventory: policy.reportInventory?.bind(policy),
       // Install sources are deployment policy, uniform for every caller.
       authorizeInstall: policy.authorizeInstall?.bind(policy),
     })
@@ -215,11 +240,45 @@ export class GatewayExecution extends ExecutionAuthority {
       agent.session.append('gateway/continuation', {
         key: `goal:${change.goal.id}:${String(change.goal.revision)}`, scope })
     }, { prepend: true })
+    const timings = ctx.gatewayRuntime.modelTimings ? {
+      inbox: new WeakMap<UserMessage, InboxTiming>(),
+      input: new WeakMap<Agent, ModelInputTiming>(),
+    } : undefined
+    if (timings !== undefined) {
+      ctx.on('agent/inbox/inserted', ({ message }) => {
+        if (executionInputOf(message) !== undefined) timings.inbox.set(message, { insertedAt: Date.now(), inserted: performance.now() })
+      })
+      ctx.on('agent/inbox/claimed', ({ message }) => {
+        const timing = timings.inbox.get(message)
+        if (timing !== undefined) timing.claimed = performance.now()
+      })
+      ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+        if (frame.type !== 'start') return
+        const timing = timings.input.get(agent)
+        if (timing === undefined || timing.turn !== frame.turn || timing.step !== frame.step || timing.request === undefined) return
+        timings.input.delete(agent)
+        const { inbox, enterStartedAt, enterStarted, inheritanceMs, enterRpcMs, accepted, request } = timing
+        const round = (ms: number): number => Math.round(ms * 100) / 100
+        const streamStartedAt = Date.now(), streamStarted = performance.now()
+        try {
+          console.info(`[model-input-timing] ${JSON.stringify({
+            enterStartedAt, streamStartedAt, elapsedMs: round(streamStarted - (inbox?.inserted ?? enterStarted)),
+            ...(inbox?.claimed === undefined ? {} : { inboxAt: inbox.insertedAt, inboxWaitMs: round(inbox.claimed - inbox.inserted),
+              claimToEnterMs: round(enterStarted - inbox.claimed) }),
+            inheritanceMs: round(inheritanceMs), enterRpcMs: round(enterRpcMs), enterToAcceptedMs: round(accepted - enterStarted),
+            acceptedToRequestMs: round(request.started - accepted), requestAuthorizationMs: round(request.authorized - request.started),
+            afterAuthorizationToStreamMs: round(streamStarted - request.authorized),
+          })}`)
+        } catch { /* Diagnostic output cannot interrupt the assistant stream. */ }
+      })
+    }
     ctx.on('agent/pre-step', async ({ agent, messages }, next) => {
-      const originals = new Map<string, { inputId: ExecutionInputId; hash: string }>()
+      const originals = new Map<string, AdmittedInput>()
       for (const message of messages) {
         const inputId = executionInputOf(message)
-        if (inputId !== undefined) originals.set(message.id, { inputId, hash: inputDigest(message.content) })
+        if (inputId !== undefined) originals.set(message.id, {
+          inputId, hash: inputDigest(message.content), timing: timings?.inbox.get(message),
+        })
       }
       const decision = await next()
       // Trusted context plugins may render references in the admitted content;
@@ -237,15 +296,19 @@ export class GatewayExecution extends ExecutionAuthority {
       }
       return decision
     }, { prepend: true })
-    ctx.on('agent/message-entered', async ({ agent, event, turn, signal }) => {
+    ctx.on('agent/message-entered', async ({ agent, event, turn, step, signal }) => {
+      const inputId = executionInputOf(event.data)
+      const enterStarted = timings === undefined || inputId === undefined ? undefined : performance.now()
+      const enterStartedAt = enterStarted === undefined ? 0 : Date.now()
       await this.restoreInheritance(agent.session, signal)
+      const inheritanceMs = enterStarted === undefined ? 0 : performance.now() - enterStarted
       if (this.admittedTurns.get(agent) !== turn) {
         this.admittedTurns.set(agent, turn)
         this.currentStep.delete(agent)
       }
-      const inputId = executionInputOf(event.data)
       const source = event.data.source as unknown as Record<string, unknown>
       let state: ExecutionState | undefined
+      let modelInput: Omit<ModelInputTiming, 'accepted'> | undefined
       if (inputId !== undefined) {
         const original = this.admitted.get(agent)?.get(event.data.id)
         if (original?.inputId !== inputId) throw this.denied('execute', 'The admitted input has no verified request identity.')
@@ -254,11 +317,17 @@ export class GatewayExecution extends ExecutionAuthority {
           currentScopeId = this.mirror(agent.session).state.scopeId
           if (currentScopeId === undefined) throw this.denied('execute', 'The delegated execution scope is unavailable.')
         }
+        const beforeRpc = enterStarted === undefined ? 0 : performance.now()
         state = executionState(await this.post('/enter', {
           sessionId: agent.id, inputId, messageId: event.data.id, contentHash: original.hash,
           currentScopeId: currentScopeId ?? null,
           unverifiedHistory: false,
         }, undefined, signal))
+        if (enterStarted !== undefined) {
+          modelInput = {
+            turn, step, inbox: original.timing, enterStartedAt, enterStarted, inheritanceMs, enterRpcMs: performance.now() - beforeRpc,
+          }
+        }
       } else if (source.gatewayExecutionScope !== undefined) {
         const captured = this.resolvedScope(executionScope(source.gatewayExecutionScope))
         const own = captured.parentSessionId === agent.id ? captured
@@ -279,8 +348,9 @@ export class GatewayExecution extends ExecutionAuthority {
         this.currentStep.set(agent, state)
         this.record(agent.session, state)
       }
+      if (modelInput !== undefined) timings?.input.set(agent, { ...modelInput, accepted: performance.now() })
     })
-    ctx.on('agent/request', async ({ agent, signal }, next) => {
+    ctx.on('agent/request', async ({ agent, turn, step, signal }, next) => {
       if (this.admittedTurns.has(agent) && !this.currentStep.has(agent)) {
         const unknown = executionState(await this.post('/combine', { sessionId: agent.id, scopeIds: [], unverified: true }, undefined, signal))
         this.currentStep.set(agent, unknown)
@@ -288,7 +358,10 @@ export class GatewayExecution extends ExecutionAuthority {
       }
       const scope = this.capture(agent)
       return this.runCaptured(agent, scope, async () => {
+        const timing = timings?.input.get(agent)
+        const started = timing !== undefined && timing.turn === turn && timing.step === step ? performance.now() : undefined
         await this.authorize(this.capabilityFor(agent), agent, signal)
+        if (timing !== undefined && started !== undefined) timing.request = { started, authorized: performance.now() }
         return next()
       })
     })

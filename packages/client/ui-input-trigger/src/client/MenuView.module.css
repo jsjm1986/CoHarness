@@ -5,6 +5,7 @@
  * trailing dimmed description. */
 
 .menu {
+  box-sizing: border-box;
   position: absolute;
   bottom: calc(100% + 4px);
   left: 0;
@@ -83,16 +84,16 @@
   font-family: inherit;
 }
 
-.item.active .drillHintText,
-.item.active .drillHint {
+.item:where(.active) .drillHintText,
+.item:where(.active) .drillHint {
   display: inline-flex;
 }
 
 .drill {
   display: inline-grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  min-width: 24px;
+  min-height: 24px;
   border-radius: 4px;
   color: var(--dsw-alias-label-caption);
 }
@@ -124,6 +125,10 @@
   align-items: center;
   justify-content: center;
   color: var(--dsw-alias-label-tertiary);
+}
+
+.itemContent {
+  display: contents;
 }
 
 .itemName {
@@ -162,7 +167,7 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* Pending-source row: same cell metrics, dimmed label. */
+/* Pending-source feedback keeps the candidate row's spacing. */
 .loading {
   display: flex;
   align-items: center;
@@ -170,7 +175,7 @@
   padding: var(--dsw-space-2) 10px;
   font-size: 14px;
   line-height: 22px;
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* Breadcrumb header pinned above the scrolling candidate list. */
@@ -187,6 +192,8 @@
 
 .crumb {
   flex: 0 1 auto;
+  min-width: 24px;
+  min-height: 24px;
   max-width: 40%;
   overflow: hidden;
   padding: 2px 6px;
@@ -234,29 +241,32 @@
   min-height: var(--dsw-touch-target);
 }
 
-:global([data-viewport='compact']) .itemName {
-  max-width: none;
-  flex: none;
-}
-
-:global([data-viewport='compact']) .itemDescription {
-  flex: 1 1 auto;
+:global([data-viewport='compact']) .itemContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1;
 }
 
-@media (max-width: 359px) {
-  :global([data-viewport='compact']) .itemDescription {
-    display: none;
-  }
+:global([data-viewport='compact']) .itemName,
+:global([data-viewport='compact']) .itemAlias,
+:global([data-viewport='compact']) .itemDescription {
+  flex: none;
+  min-width: 0;
+  max-width: none;
+}
 
-  :global([data-viewport='compact']) .itemName {
-    flex: 1 1 auto;
-    max-width: none;
-    font: var(--dsw-mobile-font-body);
-  }
+:global([data-viewport='compact']) .itemName {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font: var(--dsw-mobile-font-body);
+}
+
+:global([data-viewport='compact']) .itemAlias,
+:global([data-viewport='compact']) .itemDescription {
+  font: var(--dsw-mobile-font-secondary);
 }
 
 :global([data-viewport='compact']) .menu {
@@ -289,6 +299,28 @@
 
 @keyframes mobile-trigger-sheet-in {
   from { opacity: 0; transform: translateY(10px); }
+}
+
+@media (pointer: coarse) {
+  .item, .crumb, .drill { min-height: var(--dsw-touch-target); }
+  .crumb, .drill { min-width: var(--dsw-touch-target); }
+  .item .drillHintText, .item .drillHint { display: none; }
+}
+
+/* A short window has insufficient room above the composer inside its scrollport. */
+@media (min-width: 768px) and (max-height: 480px) {
+  .menu {
+    position: fixed;
+    right: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-right));
+    bottom: var(--dsw-mobile-sheet-bottom);
+    left: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-left));
+    width: min(537px, calc(100% - 2 * var(--dsw-mobile-sheet-edge)));
+    min-width: 0;
+    max-width: none;
+    margin-inline: auto;
+    border-radius: var(--dsw-mobile-sheet-radius);
+    z-index: 1091;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

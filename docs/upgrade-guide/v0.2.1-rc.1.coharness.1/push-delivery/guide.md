@@ -17,6 +17,7 @@ An unconfigured provider records failure and preserves its registration. A later
 
 ## Migration
 
-1. Upgrade the complete Gateway build. Device API fields and database schemas need no migration. Confirm a personal Session's notification stops after its source computer permission is withdrawn, even when another computer remains allowed; account-wide device registration remains available.
+1. Upgrade the complete Gateway build with migrations 144 and 145. Leave the applied migration names and checksums intact. Confirm that revoking the source computer's permission stops its personal Session notifications while account-wide device registration remains available.
 2. Optionally set positive `HGW_PUSH_DELIVERY_TIMEOUT_MS` (default `30000`) and `HGW_PUSH_DELIVERY_LEASE_MS` (default `120000`). The lease must exceed the timeout; invalid values fail startup.
 3. Allow for remote acceptance before a lost response: a later retry may duplicate a notification. Failed and expired claims require another callback; no background worker is added. See [delivery ownership](../../../../.agents/notes/implemented/bug-fix/2026-10-29-push-delivery-authority.md).
+4. Update receipt clients to pass the notification's `runtimeId`. An older receipt without `runtimeId` succeeds only when one delivery matches. Set `HGW_UP_ENDPOINT_ALLOWLIST` if the deployment uses UnifiedPush.

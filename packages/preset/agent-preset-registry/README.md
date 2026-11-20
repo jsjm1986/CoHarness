@@ -149,11 +149,13 @@ The default is read per resolution rather than snapshotted, so a hot-reloaded do
 <a id="what-a-mount-rejects"></a>
 ## What a mount rejects
 
+A disaster-recovery permission applies before imports for both file-backed and declared presets. File presets use an immutable in-memory tree while this permission is active; editing a file cannot add execution permission. Unapproved rows remain disabled, and changed approved package bytes reject mounting. The [app-boot recovery inspection](../../boot/app-boot/README.md#previewing-the-effective-configuration) owns the sealed composition rules.
+
 A directly-plugged subtree is absent from `ctx.loader.entries()`, so no boot audit covers it. `mount()` therefore proves the result usable itself, and rejects three things.
 
 **An unscoped target.** Mounting into a context that carries no agent scope would register the preset's tools globally, for every agent in the process.
 
-**A row that never became usable.** The loader already rejects a row whose module failed to import or whose plugin threw; what remains is a row still waiting for a service the composition never supplies, which the audit names.
+**A row that never became usable.** The audit reports failed imports, configuration and plugin activation. A file preset waiting for Host services first waits for the Host Loader's in-flight initialization, then checks its rows again; a service still missing after initialization rejects the mount. Disposing the owning scope or subtree during initialization also rejects publication. A successful standing mount is reused without repeating this wait.
 
 **A row that published a service into the root realm.** Such a service is process-global, so the second preset publishing the same name collides with the first, and a host reader would resolve one preset's instance for every session. A preset that genuinely owns a service puts it behind an `isolate` realm — entry-local realms keep two presets' same-named services apart exactly as they once kept two sessions' apart — or the service belongs in the host composition instead.
 

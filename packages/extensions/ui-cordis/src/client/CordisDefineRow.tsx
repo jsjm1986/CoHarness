@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react'
 import {
-  CodeBlock, DisclosureRow, IconCodeOutline16, IconInspectOutline12,
+  CodeBlock, DisclosureRow, IconCodeOutline16, IconInspectOutline12, SegmentedControl,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -115,40 +115,35 @@ function StartedCordisDefineRow({
         <div className={css.bodyWrap}>
           {hasSource && activeCode !== null && (
             <section className={css.sourceCard}>
-              <div className={css.sourceTabs} role="tablist" aria-label={t('body.source')}>
-                {(['client', 'host'] as const).map((source) => {
-                  const available = source === 'client' ? card.clientCode !== null : card.hostCode !== null
-                  return (
-                    <button
-                      key={source}
-                      id={`${sourcePanelId}-${source}`}
-                      type="button"
-                      role="tab"
-                      aria-controls={sourcePanelId}
-                      aria-selected={activeSource === source}
-                      className={activeSource === source ? `${css.sourceTab} ${css.sourceTabActive}` : css.sourceTab}
-                      disabled={!available}
-                      onClick={() => { setSelectedSource(source) }}
-                    >
-                      {t(source === 'client' ? 'body.clientCode' : 'body.hostCode')}
-                    </button>
-                  )
-                })}
-              </div>
-              <div
+              <SegmentedControl<SourceTab>
                 id={sourcePanelId}
-                className={css.sourcePanel}
-                role="tabpanel"
-                aria-labelledby={`${sourcePanelId}-${activeSource}`}
-              >
-                <CodeBlock
-                  code={activeCode}
-                  lang="javascript"
-                  copyLabel={t('body.copy')}
-                  copiedLabel={t('body.copied')}
-                  className={css.sourceCode}
-                />
-              </div>
+                className={css.sourceTabs}
+                label={t('body.source')}
+                value={activeSource}
+                onChange={setSelectedSource}
+                options={[
+                  { value: 'client', label: t('body.clientCode'), disabled: card.clientCode === null },
+                  { value: 'host', label: t('body.hostCode'), disabled: card.hostCode === null },
+                ]}
+              />
+              {(['client', 'host'] as const).map(source => (
+                <div
+                  key={source}
+                  id={`${sourcePanelId}-${source}-panel`}
+                  className={css.sourcePanel}
+                  role="tabpanel"
+                  aria-labelledby={`${sourcePanelId}-${source}`}
+                  hidden={source !== activeSource}
+                >
+                  {source === activeSource && <CodeBlock
+                    code={activeCode}
+                    lang="javascript"
+                    copyLabel={t('body.copy')}
+                    copiedLabel={t('body.copied')}
+                    className={css.sourceCode}
+                  />}
+                </div>
+              ))}
             </section>
           )}
           {card.output !== null && (

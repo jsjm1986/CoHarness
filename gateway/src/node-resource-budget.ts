@@ -4,7 +4,8 @@ import { setTimeout as delay } from 'node:timers/promises'
 import type { Pool, PoolClient } from 'pg'
 import type { ResourceKind, ResourceOperationId } from '@deepseek-ai/dsh-resource-budget/types'
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import { resourcePolicySchema, type ResourceStatus } from '@deepseek-ai/dsh-resource-budget/wire'
+import { resourcePolicySchema, resourceStatusSchema, type ResourceStatus } from '@deepseek-ai/dsh-resource-budget/wire'
+import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 import type { RuntimeTarget } from './instances.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
@@ -80,30 +81,30 @@ export class NodeResourceBudgetError extends Error {
   }
 }
 
-interface Row {
-  runtime_kind: 'user' | 'project' | 'gateway'
-  runtime_public_id: string
-  generation: string
+interface AdmissionRow {
   sequence: string
   operation_id: ResourceOperationId | null
-  kind: ResourceKind
   actor_public_id: string
-  project_public_id: string
   session_id: string | null
   scope_id: string | null
   origin_kind: NonNullable<NodeResourceRequest['origin']> | null
   principal_admin: boolean
-  fingerprint: string
   state: 'queued' | 'active' | 'uncertain'
-  user_turn: string
-  project_turn: string
-  queued_bytes: number
-  wait_ms: number
+}
+
+interface RuntimeStartAdmission {
+  state: 'waiting' | 'admitted' | 'stale-generation' | 'timeout'
+  limits: unknown
 }
 
 const NODE = 'organization_id=$1 AND node_id=$2'
 const OWNER = `${NODE} AND runtime_kind=$3 AND runtime_public_id=$4 AND generation=$5`
 const REQUEST = `${OWNER} AND sequence=$6`
+const admissionErrors = new Map<string, NodeResourceBudgetError['reason']>([
+  ['P4201', 'stale-generation'], ['P4202', 'request-conflict'], ['P4203', 'unregistered'],
+  ['P4204', 'sequence-gap'], ['P4205', 'operation-conflict'],
+  ['P4206', 'owner-mismatch'],
+])
 
 /** PostgreSQL owns reservations; no Gateway-local timer or lease expiry can release running work. */
 export class NodeResourceBudget {
@@ -161,34 +162,29 @@ export class NodeResourceBudget {
     const started = performance.now()
     for (;;) {
       if (signal.aborted) throw new RuntimeCapacityError('cancelled')
-      const result = await this.lock(async (client, limits) => {
-        const args = [this.organizationId, this.nodeId, target.kind, target.id, generation, target.runtimeId ?? null]
-        const current = await client.query<{ id: string; allocation_state: string }>(`SELECT i.id,i.allocation_state FROM harness.instances i
-          LEFT JOIN harness.users u ON u.id=i.user_id LEFT JOIN harness.projects p ON p.id=i.project_id
-          WHERE i.organization_id=$1 AND i.assigned_node_id=$2
-            AND CASE WHEN i.user_id IS NULL THEN 'project' ELSE 'user' END=$3
-            AND COALESCE(u.public_id,p.public_id)=$4 AND i.generation=$5
-            AND ($6::uuid IS NULL OR i.runtime_id=$6)
-            AND i.observed_state='starting' AND i.desired_state='running'
-            AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
-          FOR UPDATE OF i`, args)
-        const allocation = current.rows[0]
-        if (allocation === undefined || (allocation.allocation_state !== 'not-started' && allocation.allocation_state !== 'waiting')) {
-          throw new NodeResourceBudgetError(409, 'stale-generation', 'Runtime allocation is no longer pending')
-        }
-        await client.query("UPDATE harness.instances SET allocation_state='waiting',updated_at=now() WHERE id=$1", [allocation.id])
-        await this.schedule(client)
-        if (performance.now() - started >= limits.maxWaitMs) throw new RuntimeCapacityError('timeout')
-        if (await this.unregistered(client) !== 0) {
-          return { admitted: false, sampleMs: limits.sampleMs, maxWaitMs: limits.maxWaitMs }
-        }
-        const credit = await client.query(`UPDATE harness.node_resource_state SET credits=credits-1,
-          runtime_starts_admitted=runtime_starts_admitted+1 WHERE ${NODE} AND credits>0 AND valid_until>clock_timestamp()
-          RETURNING node_id`, [this.organizationId, this.nodeId])
-        if (credit.rowCount !== 1) return { admitted: false, sampleMs: limits.sampleMs, maxWaitMs: limits.maxWaitMs }
-        await client.query("UPDATE harness.instances SET allocation_state='possible',updated_at=now() WHERE id=$1", [allocation.id])
-        return { admitted: true, sampleMs: limits.sampleMs, maxWaitMs: limits.maxWaitMs }
-      })
+      let result: { admitted: boolean; sampleMs: number; maxWaitMs: number }
+      try {
+        result = await transaction(this.pool, async client => {
+          const response = await client.query<RuntimeStartAdmission>(
+            'SELECT * FROM harness.admit_runtime_start($1,$2,$3,$4,$5,$6,$7::jsonb,$8)',
+            [this.organizationId, this.nodeId, target.kind, target.id, generation, target.runtimeId ?? null,
+              JSON.stringify(this.config), performance.now() - started],
+          )
+          const admission = response.rows[0]!
+          const limits = resourceLimits.parse(admission.limits)
+          switch (admission.state) {
+            case 'stale-generation': throw new NodeResourceBudgetError(409, 'stale-generation', 'Runtime allocation is no longer pending')
+            case 'timeout': throw new RuntimeCapacityError('timeout')
+            case 'waiting': case 'admitted': return {
+              admitted: admission.state === 'admitted', sampleMs: limits.sampleMs, maxWaitMs: limits.maxWaitMs,
+            }
+            default: return assertNever(admission.state)
+          }
+        })
+      } catch (error) {
+        if (!isDatabaseContentionError(error)) throw error
+        throw new NodeResourceBudgetError(503, 'database-busy', 'Resource accounting is busy. Retry after the current operation settles.', { cause: error })
+      }
       if (signal.aborted) throw new RuntimeCapacityError('cancelled')
       if (performance.now() - started >= result.maxWaitMs) throw new RuntimeCapacityError('timeout')
       if (result.admitted) return
@@ -203,22 +199,33 @@ export class NodeResourceBudget {
 
   /**
    * Register the current Runtime generation before it can claim any execution budget.
+   * Stored-policy validation and registration share one transaction.
    * @param subject - authenticated Runtime belonging to this node.
    * @returns the next serial registration sequence; active reservations remain intact.
    */
   async register(subject: RuntimeCredentialSubject): Promise<{ nextSequence: number; policy: NodeResourceBudgetConfig }> {
-    return this.lock(async (client, limits) => {
-      const runtimeId = (await this.current(client, subject))!
-      await client.query(`INSERT INTO harness.node_resource_runtimes
-        (organization_id,node_id,runtime_kind,runtime_public_id,generation,runtime_id) VALUES($1,$2,$3,$4,$5,$6)
-        ON CONFLICT(organization_id,node_id,runtime_kind,runtime_public_id,generation) DO UPDATE SET runtime_id=excluded.runtime_id
-          WHERE harness.node_resource_runtimes.runtime_id IS NULL OR harness.node_resource_runtimes.runtime_id=excluded.runtime_id`,
-      [...this.owner(subject), runtimeId])
-      const result = await client.query<{ last_sequence: string }>(`SELECT last_sequence::text FROM harness.node_resource_runtimes
-        WHERE ${OWNER} AND runtime_id=$6`, [...this.owner(subject), runtimeId])
-      if (result.rows[0] === undefined) throw new NodeResourceBudgetError(409, 'stale-generation', 'Runtime resource registration belongs to another environment')
-      return { nextSequence: Number(result.rows[0]!.last_sequence) + 1, policy: limits }
-    })
+    const owner = this.owner(subject)
+    try {
+      return await transaction(this.pool, async client => {
+        const result = await client.query<{ next_sequence: string; limits: unknown }>(
+          'SELECT * FROM harness.register_runtime_resources($1,$2,$3,$4,$5,$6,$7::jsonb)',
+          [...owner, subject.target.runtimeId ?? null, JSON.stringify(this.config)],
+        )
+        const row = result.rows[0]!
+        return { nextSequence: Number(row.next_sequence), policy: resourceLimits.parse(row.limits) }
+      })
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === '55000' && 'constraint' in error) {
+        if (error.constraint === 'node_resource_registration_generation') {
+          throw new NodeResourceBudgetError(409, 'stale-generation', 'resource Runtime generation is no longer current', { cause: error })
+        }
+        if (error.constraint === 'node_resource_registration_identity') {
+          throw new NodeResourceBudgetError(409, 'stale-generation', 'Runtime resource registration belongs to another environment', { cause: error })
+        }
+      }
+      if (!isDatabaseContentionError(error)) throw error
+      throw new NodeResourceBudgetError(503, 'database-busy', 'Resource accounting is busy. Retry after the current operation settles.', { cause: error })
+    }
   }
 
   /**
@@ -286,64 +293,19 @@ export class NodeResourceBudget {
    */
   async request(subject: ResourceOwner, request: NodeResourceRequest): Promise<NodeResourceStatus> {
     if ('ownerId' in subject && request.kind !== 'model') throw new Error('Gateway process ownership supports model requests only')
-    return this.lock(async (client, limits) => {
-      const runtimeId = await this.current(client, subject)
-      const owner = this.owner(subject)
-      const key = [...owner, request.sequence]
-      const fingerprint = createHash('sha256').update(JSON.stringify([request.requestId, request.kind, request.actorId,
-        request.projectId, request.sessionId ?? null, request.scopeId ?? null, request.origin ?? null, request.administrative ?? false])).digest('hex')
-      const previous = await client.query<Row>(`SELECT * FROM harness.node_resource_requests WHERE ${REQUEST}`, [...key])
-      if (previous.rows[0] !== undefined) {
-        if (previous.rows[0].fingerprint !== fingerprint) throw new NodeResourceBudgetError(409, 'request-conflict', 'resource request conflicts with its first registration')
-        await this.schedule(client)
-        return this.read(client, key, request.requestId)
-      }
-      const counter = await client.query<{ last_sequence: string }>(`SELECT last_sequence::text FROM harness.node_resource_runtimes WHERE ${OWNER}`, owner)
-      const last = counter.rows[0]?.last_sequence
-      if (last === undefined) throw new NodeResourceBudgetError(409, 'unregistered', 'resource Runtime is not registered')
-      if (request.sequence <= Number(last)) return { state: 'closed' }
-      if (request.sequence !== Number(last) + 1) throw new NodeResourceBudgetError(409, 'sequence-gap', 'resource registration sequence is not contiguous')
-      const duplicate = await client.query(`SELECT 1 FROM harness.node_resource_requests WHERE ${OWNER} AND operation_id=$6::uuid`,
-        [...owner, request.requestId])
-      if (duplicate.rowCount !== 0) throw new NodeResourceBudgetError(409, 'operation-conflict', 'resource operation is already registered at another sequence')
-      await client.query(`UPDATE harness.node_resource_runtimes SET last_sequence=$6 WHERE ${OWNER}`, key)
-      await this.schedule(client)
-      const legacy = await this.unregistered(client)
-      const existing = await this.rows(client)
-      const waiting = existing.filter(row => row.state === 'queued')
-      const occupied = existing.filter(row => row.kind === request.kind && row.state !== 'queued')
-      const immediate = legacy === 0 && !waiting.some(row => row.kind === request.kind) && await this.hasCredits(client)
-      if (!immediate) {
-        // A nested producer cannot wait for the same exhausted resource class while retaining its parent.
-        if ('target' in subject && request.sessionId !== undefined && !await this.hasCredits(client)) {
-          const ancestors = await client.query<{ session_id: string }>(`WITH RECURSIVE chain AS (
-            SELECT session_id,parent_session_id FROM harness.execution_sessions WHERE organization_id=$1 AND runtime_kind=$2 AND runtime_public_id=$3 AND session_id=$4 AND runtime_id=$5
-            UNION ALL SELECT p.session_id,p.parent_session_id FROM harness.execution_sessions p JOIN chain c ON p.session_id=c.parent_session_id
-              WHERE p.organization_id=$1 AND p.runtime_kind=$2 AND p.runtime_public_id=$3 AND p.runtime_id=$5
-          ) SELECT session_id FROM chain`, [this.organizationId, subject.target.kind, subject.target.id, request.sessionId, runtimeId])
-          const ids = new Set(ancestors.rows.map(row => row.session_id))
-          if (occupied.some(row => row.runtime_kind === subject.target.kind && Number(row.runtime_public_id) === subject.target.id
-            && Number(row.generation) === subject.generation && row.session_id !== null && ids.has(row.session_id))) {
-            return this.refuse(client, 'nested-capacity')
-          }
-        }
-        if (waiting.length >= limits.maxQueued) return this.refuse(client, 'queue-full')
-        if (waiting.filter(row => Number(row.actor_public_id) === request.actorId).length >= limits.maxQueuedPerUser) return this.refuse(client, 'user-queue-full')
-        if (request.projectId !== 0 && waiting.filter(row => Number(row.project_public_id) === request.projectId).length >= limits.maxQueuedPerProject) return this.refuse(client, 'project-queue-full')
-      }
-      const bytes = Buffer.byteLength(JSON.stringify({ ...request, owner: this.owner(subject) }))
-      if (existing.reduce((total, row) => total + row.queued_bytes, 0) + bytes > limits.maxQueuedBytes) return this.refuse(client, 'queue-bytes')
-      const turn = await this.turn(client)
-      const sameUser = waiting.find(row => Number(row.actor_public_id) === request.actorId)
-      const sameProject = waiting.find(row => Number(row.actor_public_id) === request.actorId && Number(row.project_public_id) === request.projectId)
-      await client.query(`INSERT INTO harness.node_resource_requests
-        (organization_id,node_id,runtime_kind,runtime_public_id,generation,sequence,operation_id,kind,actor_public_id,project_public_id,session_id,fingerprint,state,user_turn,project_turn,queued_bytes,deadline,scope_id,origin_kind,principal_admin)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'queued',$13,$14,$15,clock_timestamp()+$16*interval '1 millisecond',$17,$18,$19)`,
-      [...key, request.requestId, request.kind, request.actorId, request.projectId, request.sessionId ?? null, fingerprint,
-        sameUser?.user_turn ?? turn, sameProject?.project_turn ?? turn, bytes, limits.maxWaitMs,
-        request.scopeId ?? null, request.origin ?? null, request.administrative ?? false])
-      await this.schedule(client)
-      return this.read(client, key, request.requestId)
+    const owner = this.owner(subject)
+    const fingerprint = createHash('sha256').update(JSON.stringify([request.requestId, request.kind, request.actorId,
+      request.projectId, request.sessionId ?? null, request.scopeId ?? null, request.origin ?? null, request.administrative ?? false])).digest('hex')
+    const bytes = Buffer.byteLength(JSON.stringify({ ...request, owner }))
+    return this.admissionTransaction(async client => {
+      const { rows: [row] } = await client.query<{ limits: unknown; state: string; refusal: string | null }>(
+        'SELECT * FROM harness.request_node_resource($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)',
+        [...owner, ...this.exactOwner(subject), JSON.stringify(this.config), request.sequence, request.requestId,
+          request.kind, request.actorId, request.projectId, request.sessionId ?? null, fingerprint, bytes,
+          request.scopeId ?? null, request.origin ?? null, request.administrative ?? false],
+      )
+      resourceLimits.parse(row!.limits)
+      return resourceStatusSchema.parse(row!.refusal === null ? { state: row!.state } : { state: row!.state, reason: row!.refusal })
     })
   }
 
@@ -354,11 +316,8 @@ export class NodeResourceBudget {
    * @returns durable state, or closed after completion, cancellation or queue expiry.
    */
   async status(subject: ResourceOwner, operation: Pick<NodeResourceRequest, 'sequence' | 'requestId'>): Promise<NodeResourceStatus> {
-    return this.lock(async client => {
-      await this.current(client, subject)
-      await this.schedule(client)
-      return this.read(client, [...this.owner(subject), operation.sequence], operation.requestId)
-    })
+    const [admission] = await this.admissions(subject, [operation])
+    return admission!.status
   }
 
   /**
@@ -377,16 +336,14 @@ export class NodeResourceBudget {
    * @param operations - exact caller-owned operation references.
    * @returns same-order records; legacy origins remain absent and cannot authorize dispatch.
    */
-  async admissions(subject: RuntimeCredentialSubject, operations: readonly Pick<NodeResourceRequest, 'sequence' | 'requestId'>[]): Promise<NodeResourceAdmission[]> {
-    return this.lock(async client => {
-      await this.current(client, subject)
-      await this.schedule(client)
-      const rows = await client.query<Pick<Row, 'sequence' | 'operation_id' | 'state' | 'origin_kind' | 'session_id' | 'scope_id'
-        | 'actor_public_id' | 'principal_admin'>>(`SELECT sequence::text,operation_id::text,state,origin_kind,session_id,scope_id::text,
-          actor_public_id::text,principal_admin
-        FROM harness.node_resource_requests WHERE ${OWNER} AND sequence=ANY($6::bigint[])`,
-      [...this.owner(subject), operations.map(operation => operation.sequence)])
-      const states = new Map(rows.rows.map(row => [Number(row.sequence), row]))
+  async admissions(subject: ResourceOwner, operations: readonly Pick<NodeResourceRequest, 'sequence' | 'requestId'>[]): Promise<NodeResourceAdmission[]> {
+    return this.admissionTransaction(async client => {
+      const { rows: [row] } = await client.query<{ limits: unknown; admissions: AdmissionRow[] }>(
+        'SELECT * FROM harness.read_node_resource_admissions($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)',
+        [...this.owner(subject), ...this.exactOwner(subject), JSON.stringify(this.config), operations.map(operation => operation.sequence)],
+      )
+      resourceLimits.parse(row!.limits)
+      const states = new Map(row!.admissions.map(row => [Number(row.sequence), row]))
       return operations.map(operation => {
         const row = states.get(operation.sequence)
         if (row !== undefined && row.operation_id !== operation.requestId) throw new NodeResourceBudgetError(409, 'owner-mismatch', 'resource operation does not own this sequence')
@@ -416,7 +373,6 @@ export class NodeResourceBudget {
    */
   async finish(subject: ResourceOwner, operation: Pick<NodeResourceRequest, 'sequence' | 'requestId'>, outcome: 'quiescent' | 'not-started' | 'uncertain'): Promise<void> {
     await this.lock(async client => {
-      await this.current(client, subject, true)
       const { sequence, requestId } = operation
       const owner = this.owner(subject), key = [...owner, sequence]
       const counter = await client.query<{ last_sequence: string }>(`SELECT last_sequence::text FROM harness.node_resource_runtimes WHERE ${OWNER}`, owner)
@@ -431,6 +387,8 @@ export class NodeResourceBudget {
         if (removed.rowCount !== 0) await client.query(`UPDATE harness.node_resource_state SET ${outcome === 'not-started' ? 'cancelled=cancelled+1' : 'completed=completed+1'} WHERE ${NODE}`, [this.organizationId, this.nodeId])
       }
       await this.schedule(client)
+      // Keep the ownership row locked only through commit. Browser admission also needs this row.
+      await this.current(client, subject)
     })
   }
 
@@ -494,24 +452,13 @@ export class NodeResourceBudget {
     return [this.organizationId, this.nodeId, subject.target.kind, subject.target.id, subject.generation]
   }
 
-  private async current(client: PoolClient, subject: ResourceOwner, cleanup = false): Promise<RuntimeId | undefined> {
-    const owner = this.owner(subject)
-    if ('ownerId' in subject) {
-      const result = await client.query(`SELECT 1 FROM harness.node_resource_gateways WHERE ${NODE} AND owner_id=$3 AND generation=$4
-        AND ($5::boolean OR harness.node_execution_available($1,$2)) FOR SHARE`,
-      [this.organizationId, this.nodeId, subject.ownerId, subject.generation, cleanup])
-      if (result.rowCount !== 1) throw new NodeResourceBudgetError(409, 'stale-generation', 'Gateway resource owner is no longer current')
-      return
-    }
-    const result = await client.query<{ runtime_id: RuntimeId }>(`SELECT i.runtime_id FROM harness.instances i
-      LEFT JOIN harness.users u ON u.id=i.user_id LEFT JOIN harness.projects p ON p.id=i.project_id
-      WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND CASE WHEN i.user_id IS NULL THEN 'project' ELSE 'user' END=$3
-        AND COALESCE(u.public_id,p.public_id)=$4 AND i.generation=$5 AND i.observed_state=ANY($6::text[])
-        AND ($7::uuid IS NULL OR i.runtime_id=$7)
-        AND ($8::boolean OR harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch))
-      FOR SHARE OF i`, [...owner, cleanup ? ['starting', 'ready', 'stopping'] : ['starting', 'ready'], subject.target.runtimeId ?? null, cleanup])
-    if (result.rowCount !== 1) throw new NodeResourceBudgetError(409, 'stale-generation', 'resource Runtime generation is no longer current')
-    return result.rows[0]!.runtime_id
+  private exactOwner(subject: ResourceOwner): [RuntimeId | null, GatewayResourceOwnerId | null] {
+    return 'ownerId' in subject ? [null, subject.ownerId] : [subject.target.runtimeId ?? null, null]
+  }
+
+  private async current(client: PoolClient, subject: ResourceOwner): Promise<void> {
+    await client.query('SELECT harness.lock_current_node_resource_owner($1,$2,$3,$4,$5,$6,$7,true)',
+      [...this.owner(subject), ...this.exactOwner(subject)])
   }
 
   private async stoppedRuntime(client: PoolClient, target: RuntimeTarget, generation: number): Promise<RuntimeId> {
@@ -539,31 +486,32 @@ export class NodeResourceBudget {
         return work(client, limits)
       }, undefined, { lockWait: 'statement' })
     } catch (error) {
-      if (!isDatabaseContentionError(error)) throw error
-      throw new NodeResourceBudgetError(503, 'database-busy', 'Resource accounting is busy. Retry after the current operation settles.', { cause: error })
+      this.admissionError(error)
     }
   }
 
-  private async rows(client: PoolClient): Promise<Row[]> {
-    return (await client.query<Row>(`SELECT *,GREATEST(0,EXTRACT(EPOCH FROM clock_timestamp()-created_at)*1000)::float8 wait_ms
-      FROM harness.node_resource_requests WHERE ${NODE}`, [this.organizationId, this.nodeId])).rows
+  private async admissionTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+    try {
+      return await transaction(this.pool, work)
+    } catch (error) {
+      this.admissionError(error)
+    }
   }
 
-  private async turn(client: PoolClient): Promise<string> {
-    const result = await client.query<{ next_turn: string }>(`UPDATE harness.node_resource_state SET next_turn=next_turn+1 WHERE ${NODE} RETURNING next_turn::text`, [this.organizationId, this.nodeId])
-    return result.rows[0]!.next_turn
+  private admissionError(error: unknown): never {
+    if (error instanceof Error && 'code' in error && typeof error.code === 'string') {
+      const reason = admissionErrors.get(error.code)
+      if (reason !== undefined) throw new NodeResourceBudgetError(409, reason, error.message, { cause: error })
+    }
+    if (!isDatabaseContentionError(error)) throw error
+    throw new NodeResourceBudgetError(503, 'database-busy', 'Resource accounting is busy. Retry after the current operation settles.', { cause: error })
   }
 
   private async read(client: PoolClient, key: readonly unknown[], requestId: ResourceOperationId): Promise<NodeResourceStatus> {
-    const result = await client.query<Pick<Row, 'state' | 'operation_id'>>(`SELECT state,operation_id::text FROM harness.node_resource_requests WHERE ${REQUEST}`, [...key])
+    const result = await client.query<Pick<AdmissionRow, 'state' | 'operation_id'>>(`SELECT state,operation_id::text FROM harness.node_resource_requests WHERE ${REQUEST}`, [...key])
     const row = result.rows[0]
     if (row !== undefined && row.operation_id !== requestId) throw new NodeResourceBudgetError(409, 'owner-mismatch', 'resource operation does not own this sequence')
     return { state: row?.state ?? 'closed' }
-  }
-
-  private async refuse(client: PoolClient, reason: Extract<NodeResourceStatus, { state: 'refused' }>['reason']): Promise<NodeResourceStatus> {
-    await client.query(`UPDATE harness.node_resource_state SET rejected=rejected+1 WHERE ${NODE}`, [this.organizationId, this.nodeId])
-    return { state: 'refused', reason }
   }
 
   private async unregistered(database: Pick<Pool, 'query'> | PoolClient): Promise<number> {
@@ -575,12 +523,6 @@ export class NodeResourceBudget {
           AND r.runtime_kind=CASE WHEN i.user_id IS NULL THEN 'project' ELSE 'user' END AND r.runtime_public_id=COALESCE(u.public_id,p.public_id)
           AND r.generation=i.generation AND r.runtime_id=i.runtime_id)`, [this.organizationId, this.nodeId])
     return Number(result.rows[0]!.count)
-  }
-
-  private async hasCredits(client: PoolClient): Promise<boolean> {
-    const result = await client.query<{ ready: boolean }>(`SELECT credits>0 AND valid_until>clock_timestamp()
-      AND harness.node_execution_available($1,$2) ready FROM harness.node_resource_state WHERE ${NODE}`, [this.organizationId, this.nodeId])
-    return result.rows[0]!.ready
   }
 
   private async schedule(client: PoolClient): Promise<void> {

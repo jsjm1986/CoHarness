@@ -23,6 +23,8 @@ For an active project, `ProjectModelsBridge` adapts Gateway model settings and c
 
 Disposal refuses new transport operations and stops mirror publication. Every disposal call waits for all retained reads and admitted credential, discovery, and settings operations to settle. Settings and credential writes already admitted to transport are not cancelled by bridge disposal: their real acknowledgement is awaited, while obsolete publication and follow-up refresh are suppressed. Compatibility update/replace calls recheck lifetime after their namespace read and before writing.
 
+On a deferred remote entry, the first-run model discovery waits for the conversation's Workspace baseline to settle. The Models panel can load its own data as soon as the user opens it.
+
 ## Summary
 
 `dsh-client-ui-settings-models` is the Models settings page of the dsh web client: users configure API keys (stored write-only under the profile's credential reference), edit each provider's model list, and hand-declare custom pi-ai routes, with provider rows and one editor card at a time. The page joins the provider directory, the settings document, and the credential descriptions into one shared snapshot, so a row's state stays consistent across all three. It also walks first-run users through two ordered dialogs — a versioned internal-testing notice and the conditional official-DeepSeek credential step.
@@ -38,6 +40,8 @@ Disposal refuses new transport operations and stops mirror publication. Every di
 
 <a id="model-list-and-endpoint-interrogation"></a>
 ## Model list and endpoint interrogation
+
+Provider inputs, selects, and text buttons grow with enlarged text. Touch and narrow-screen controls, including model discovery actions, use a minimum 44px target, and editable fields use at least 16px text to avoid automatic focus zoom on mobile Safari.
 
 Provider, credential and model-setting invalidations belong to the bootstrap Runtime configured by this page. Updates on another computer do not reload these Host forms.
 

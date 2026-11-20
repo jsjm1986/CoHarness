@@ -30,10 +30,11 @@
 // Zero model calls: a fresh workspace's blank session already carries a live
 // composer, and the scenario only types into it. A stray stream would fail loud
 // with NO_ADAPTER.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
   assertFixtureInventory, compareOrRefreshGolden, launchWebScaffold, watchConsole,
@@ -253,7 +254,7 @@ describe('web e2e: composer draft scrolling', () => {
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

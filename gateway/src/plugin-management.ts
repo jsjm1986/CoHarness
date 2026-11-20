@@ -6,6 +6,7 @@ import type { UserRow } from './auth.ts'
 import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
 import { INSTANCE_PROFILE, parseDesiredState, PluginStateError, type PluginDesiredState, type PluginStateOverviewRow } from './plugin-state.ts'
+import type { PluginInventorySpaceRow } from './plugin-inventory.ts'
 import { PluginStateMetaResolver, type PluginStateMetaIndex } from './plugin-meta.ts'
 import type { GatewayDeps } from './server.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
@@ -55,7 +56,7 @@ export class GatewayPluginManagement {
 
   private readonly meta: PluginStateMetaResolver
 
-  constructor(private readonly deps: Pick<GatewayDeps, 'users' | 'projects' | 'instances' | 'cfg' | 'pluginState'>,
+  constructor(private readonly deps: Pick<GatewayDeps, 'users' | 'projects' | 'instances' | 'cfg' | 'pluginState' | 'pluginInventory'>,
     private readonly signer: GatewayPrincipalSigner, private readonly nodeId: string) {
     // The release layout keeps workspace packages beside gateway/; a stubbed
     // config still resolves them from this module's own location.
@@ -131,6 +132,23 @@ export class GatewayPluginManagement {
     await this.administrator(admin)
     const store = this.deps.pluginState
     if (store === undefined) throw new PluginManagementError(503, 'plugin state store unavailable')
+    const rows = await store.list()
+    await this.administrator(admin)
+    return rows
+  }
+
+  /**
+   * Every space's last reported plugin inventory joined with its saved
+   * desired composition — the administrator's cross-space map of what is
+   * actually loaded. Read-only and target-free, so steward and file-driven
+   * spaces appear alongside managed ones.
+   * @param admin - current authenticated administrator.
+   * @returns one row per instance on this node.
+   */
+  async inventory(admin: UserRow): Promise<PluginInventorySpaceRow[]> {
+    await this.administrator(admin)
+    const store = this.deps.pluginInventory
+    if (store === undefined) throw new PluginManagementError(503, 'plugin inventory store unavailable')
     const rows = await store.list()
     await this.administrator(admin)
     return rows

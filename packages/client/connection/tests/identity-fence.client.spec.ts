@@ -256,6 +256,8 @@ it('waits for decoded runtime identity and pins the old page even when a differe
     await fence.fetch(`${ORIGIN}/account/api/context`)
     url = requestedUrl(fetcher.mock.calls.at(-1)?.[0])
     expect(url.searchParams.get('dshTarget')).toBe('project:9')
+    await fence.fetch(`${ORIGIN}/account/api/workbench/context`)
+    expect(requestedUrl(fetcher.mock.calls.at(-1)?.[0]).searchParams.get('dshTarget')).toBe('project:9')
     await fence.fetch(`${ORIGIN}/account/api/scope`, { method: 'POST' })
     expect(fetcher.mock.calls.at(-1)?.[0]).toBe(`${ORIGIN}/account/api/scope`)
     const socket = await fence.socketUrl(new URL('/api/events.mux', ORIGIN), new AbortController().signal)

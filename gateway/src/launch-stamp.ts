@@ -6,16 +6,13 @@
  * that change nothing observable produce identical stamps.
  */
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { delimiter, dirname, isAbsolute, join } from 'node:path'
 import type { GatewayConfig } from './config.ts'
+import { readReleaseRuntimeDigest, runtimeDependencyDigest, runtimeTreeDigest } from './runtime-dependency-fingerprint.ts'
 
-const LAUNCH_STAMP_FORMAT = 1
-/** Workspace source roots whose emitted code reaches the Runtime import graph. */
-const CLOSURE_ROOTS = ['apps', 'packages', 'vendor', 'plugins']
-/** Dependency-resolution files hashed as the third-party code proxy. */
-const LOCK_FILES = ['pnpm-lock.yaml', 'pnpm-workspace.yaml']
+const LAUNCH_STAMP_FORMAT = 2
 /** Administrator-guard patch living beside the member patch inside the guard package. */
 export const ADMIN_GUARD_PATCH_FILENAME = 'cordis.admin.patch.yml'
 
@@ -91,24 +88,6 @@ const variantKey = (variant: LaunchVariant): string =>
 
 const hashFile = (path: string): string => createHash('sha256').update(readFileSync(path)).digest('hex')
 
-/** Digest a directory tree as `relative-path\0content` entries in sorted order; missing roots contribute nothing. */
-function directoryDigest(root: string, hash: ReturnType<typeof createHash>, prefix = ''): void {
-  let entries
-  try { entries = readdirSync(root, { withFileTypes: true }) } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
-    throw error
-  }
-  entries.sort((a, b) => a.name.localeCompare(b.name))
-  for (const entry of entries) {
-    const path = join(root, entry.name)
-    const name = prefix === '' ? entry.name : `${prefix}/${entry.name}`
-    if (entry.name === 'node_modules' || entry.isSymbolicLink()) continue
-    if (entry.isDirectory()) { directoryDigest(path, hash, name); continue }
-    if (!entry.isFile()) continue
-    hash.update(name); hash.update('\0'); hash.update(readFileSync(path)); hash.update('\0')
-  }
-}
-
 /** Digest one file, or the literal marker when absent. */
 function fileDigest(path: string): string {
   try { return hashFile(path) } catch (error) {
@@ -117,27 +96,82 @@ function fileDigest(path: string): string {
   }
 }
 
-/** The supervisor module this build's launcher spawns, resolved like the launcher does. */
-function supervisorDigest(): string {
-  for (const name of ['local-runtime-supervisor.js', 'local-runtime-supervisor.ts']) {
-    const path = fileURLToPath(new URL(`./${name}`, import.meta.url))
-    if (existsSync(path)) return fileDigest(path)
+/** The local owner and the modules used to start, identify, and terminate its process range. */
+function supervisorDigest(cfg: GatewayConfig): string | undefined {
+  if (cfg.launcher !== 'local') return undefined
+  const extension = import.meta.url.endsWith('.ts') ? 'ts' : 'js'
+  const modules = ['local-runtime-supervisor', 'local-runtime-protocol', 'local-runtime-owner', 'local-runtime-owner-win32-acl',
+    'local-runtime-control', 'local-runtime-linux', 'local-runtime-win32-job', 'runtime-shutdown', 'runtime-log',
+    'node-private-file', 'child-command', 'child-environment']
+  return createHash('sha256').update(JSON.stringify(modules.map(name =>
+    [name, fileDigest(fileURLToPath(new URL(`./${name}.${extension}`, import.meta.url)))],
+  ))).digest('hex')
+}
+
+function packageContaining(entry: string): string | undefined {
+  if (!isAbsolute(entry) || !existsSync(entry)) return undefined
+  for (let path = dirname(realpathSync(entry)); ; path = dirname(path)) {
+    if (existsSync(join(path, 'package.json'))) return path
+    if (path === dirname(path)) return undefined
   }
-  return '<absent>'
+}
+
+function preloadAt(command: readonly string[], index: number): boolean {
+  return ['--import', '--require', '-r'].includes(command[index - 1] ?? '')
+}
+
+function configuredCli(command: readonly string[]): string | undefined {
+  const executable = command[0]
+  const direct = executable === 'dsh'
+    ? (process.env.PATH ?? '').split(delimiter).filter(Boolean).map(path => join(path, executable)).find(existsSync)
+    : executable
+  for (const entry of [direct, command[1]]) {
+    const root = entry === undefined ? undefined : packageContaining(entry)
+    if (root === undefined) continue
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { name?: string }
+    if (manifest.name === '@deepseek-ai/dsh') return root
+  }
+  return undefined
+}
+
+function codeDigest(cfg: GatewayConfig): string | undefined {
+  if (cfg.releaseRoot !== undefined) {
+    const recorded = readReleaseRuntimeDigest(cfg.releaseRoot)
+    if (recorded !== undefined) return recorded
+  }
+  const workspaceCli = join(cfg.dshRepoRoot, 'apps', 'cli')
+  const configured = cfg.releaseRoot === undefined ? configuredCli(cfg.dshCommand) : undefined
+  const external = configured !== undefined && (!existsSync(workspaceCli) || realpathSync(workspaceCli) !== configured)
+  const cli = external ? configured : workspaceCli
+  if (!existsSync(join(cli, 'package.json')) && cfg.releaseRoot === undefined) return undefined
+  const source = cfg.releaseRoot === undefined && !external && !cfg.dshCommand.includes(join(cli, 'lib', 'bin.js'))
+  const roots = [cli]
+  const web = join(cfg.dshRepoRoot, 'apps', 'web')
+  if (cfg.releaseRoot !== undefined || !external && existsSync(join(web, 'package.json'))) roots.push(web)
+  for (const [index, argument] of cfg.dshCommand.entries()) {
+    if (!preloadAt(cfg.dshCommand, index)) continue
+    const preload = packageContaining(argument)
+    if (preload !== undefined) roots.push(preload)
+  }
+  return runtimeDependencyDigest(roots, source, cfg.releaseRoot)
 }
 
 /**
- * Normalize `dshCommand` into a path-independent signature: the node binary is
- * represented by `process.version`, the entry script (`argv[1]`) by its content
- * digest, and every later element by its literal argv text. Arguments after the
- * entry script are launch data, not code — hashing them by content would make
- * the stamp depend on files a Runtime creates or removes during its own
- * lifetime.
+ * Use the shipped CLI path within the installation. Preserve custom argv and
+ * include bytes for an explicit executable, entry script, or runtime preload.
  */
-function commandSignature(dshCommand: string[]): string[] {
-  return dshCommand.map((element, index) =>
-    element === process.execPath ? `node:${process.version}`
-      : index === 1 && existsSync(element) && statSync(element).isFile() ? `sha256:${fileDigest(element)}` : element)
+function commandSignature(cfg: GatewayConfig): string[] {
+  const cli = join(cfg.dshRepoRoot, 'apps', 'cli')
+  const commands = new Map([[join(cli, 'lib', 'bin.js'), 'apps/cli/lib/bin.js'], [join(cli, 'src', 'bin.ts'), 'apps/cli/src/bin.ts']])
+  return cfg.dshCommand.map((element, index) => {
+    if (index === 0 && element === process.execPath) return `node:${process.version}`
+    const shipped = commands.get(element)
+    if (shipped !== undefined) return `${shipped}:${fileDigest(element)}`
+    if ((index <= 1 || preloadAt(cfg.dshCommand, index)) && isAbsolute(element) && statSync(element, { throwIfNoEntry: false })?.isFile()) {
+      return `sha256:${fileDigest(element)}`
+    }
+    return element
+  })
 }
 
 /**
@@ -156,9 +190,17 @@ export function policyPatchText(cfg: GatewayConfig, variant: LaunchVariant): str
   }
   let patchText = readFileSync(governancePatch, 'utf8').trimEnd() + '\n'
   const readinessPlugins = ['model-governance', 'gateway-execution', 'desktop-availability', ...(cfg.guardPatch === '' ? [] : ['directory-guard'])]
-  patchText += `- id: gateway-runtime\n  config:\n    requiredPlugins: ${JSON.stringify(readinessPlugins)}\n`
+  patchText += `- id: gateway-runtime\n  config:\n    requiredPlugins: ${JSON.stringify(readinessPlugins)}\n    modelTimings: ${String(cfg.performanceEnabled)}\n`
   patchText += `- id: gateway-resource-budget\n  config:\n    requestTimeoutMs: ${String(cfg.runtimeRequestTimeoutMs)}\n    cleanupTimeoutMs: ${String(cfg.runtimeCleanupTimeoutMs)}\n`
-  patchText += `- id: connection\n  config:\n    rpcTimeoutMs: ${String(cfg.runtimeBrowserRpcTimeoutMs)}\n    recovery:\n      streamOpenTimeoutMs: ${String(cfg.runtimeBrowserStreamTimeoutMs)}\n      generationReadyTimeoutMs: ${String(cfg.runtimeBrowserReadyTimeoutMs)}\n`
+  // Cordis replaces the connection config as a whole for each patch row.
+  patchText += `- id: connection
+  config:
+    serverTiming: ${String(cfg.performanceEnabled)}
+    rpcTimeoutMs: ${String(cfg.runtimeBrowserRpcTimeoutMs)}
+    recovery:
+      streamOpenTimeoutMs: ${String(cfg.runtimeBrowserStreamTimeoutMs)}
+      generationReadyTimeoutMs: ${String(cfg.runtimeBrowserReadyTimeoutMs)}
+`
   const guardPatch = cfg.guardPatch
   if (guardPatch !== '') {
     if (!existsSync(guardPatch)) {
@@ -182,29 +224,31 @@ export function policyPatchText(cfg: GatewayConfig, variant: LaunchVariant): str
   }
   patchText += '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
   patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
-  patchText += `- id: connection\n  config:\n    serverTiming: ${String(cfg.performanceEnabled)}\n`
   if (cfg.officeFontMetadataCacheDirectory !== undefined) {
     patchText += `- id: office-kit\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(cfg.officeFontMetadataCacheDirectory)}\n`
   }
   patchText += "- insert:\n    - id: desktop-availability\n      name: '@deepseek-ai/dsh-gateway-execution/desktop-availability'\n"
   // Remote-desktop providers share the gateway's administration files so
   // grants and endpoints managed in /admin take effect in every runtime.
-  patchText += `- id: remote-desktop-vnc
+  if (cfg.remoteDesktopEnabled) patchText += `- id: remote-desktop-vnc
   config:
     endpointsFile: ${JSON.stringify(join(cfg.remoteDesktopDir, 'endpoints.json'))}
     grantsFile: ${JSON.stringify(join(cfg.remoteDesktopDir, 'grants.jsonl'))}
     auditFile: ${JSON.stringify(join(cfg.remoteDesktopDir, 'audit.jsonl'))}
     recordingDir: ${JSON.stringify(join(cfg.remoteDesktopDir, 'recordings'))}
 `
+  else patchText += '- id: remote-desktop-vnc\n  disabled: true\n- id: remote-desktop-stream\n  disabled: true\n'
   if (cfg.desktopId !== undefined) patchText += managedDesktopPatch(cfg, cfg.desktopId)
   return patchText
 }
 
 /** Package content copied by `mountPolicyBundles`: manifest plus the shipped `lib` tree. */
-function policyPackageDigest(packageDir: string): { manifest: string; lib: string } {
-  const lib = createHash('sha256')
-  directoryDigest(join(packageDir, 'lib'), lib)
-  return { manifest: fileDigest(join(packageDir, 'package.json')), lib: lib.digest('hex') }
+function policyPackageDigest(packageDir: string): { manifest: string; lib: string; locale: string } {
+  return {
+    manifest: fileDigest(join(packageDir, 'package.json')),
+    lib: runtimeTreeDigest(join(packageDir, 'lib')),
+    locale: runtimeTreeDigest(join(packageDir, 'locale')),
+  }
 }
 
 /** The launch stamps one build mints: the compatible set plus per-variant recording. */
@@ -232,18 +276,16 @@ export interface LaunchStampSet {
 export function computeLaunchStamps(
   cfg: GatewayConfig, principalPublicKey: string, profile: string,
 ): LaunchStampSet {
-  const code = createHash('sha256')
-  for (const root of CLOSURE_ROOTS) directoryDigest(join(cfg.dshRepoRoot, root), code)
-  for (const file of LOCK_FILES) code.update(fileDigest(join(cfg.dshRepoRoot, file)))
   const guardPatch = cfg.guardPatch
   const inputs = {
     format: LAUNCH_STAMP_FORMAT,
-    code: code.digest('hex'),
-    supervisor: supervisorDigest(),
-    command: commandSignature(cfg.dshCommand),
+    code: codeDigest(cfg),
+    sourceResolution: cfg.releaseRoot === undefined ? fileDigest(join(cfg.dshRepoRoot, 'tsconfig.base.json')) : undefined,
+    supervisor: supervisorDigest(cfg),
+    command: commandSignature(cfg),
     launcher: cfg.launcher,
     execPath: process.execPath,
-    node: process.version,
+    node: [process.version, process.platform, process.arch],
     profile,
     credential: {
       version: 1,
@@ -253,7 +295,6 @@ export function computeLaunchStamps(
     defaultEnv: cfg.defaultEnvFile === '' ? '' : fileDigest(cfg.defaultEnvFile),
     governancePackage: policyPackageDigest(cfg.modelGovernancePackage),
     guardPackage: guardPatch === '' ? '<off>' : policyPackageDigest(dirname(guardPatch)),
-    stewardPackage: policyPackageDigest(cfg.steward.toolsPackage),
     desktopDriverPackage: cfg.desktopId === undefined ? '<none>' : policyPackageDigest(cfg.desktopDriverPackage),
   }
   const base = createHash('sha256').update(JSON.stringify(inputs)).digest('hex')
@@ -264,6 +305,7 @@ export function computeLaunchStamps(
     const key = variantKey(variant)
     try {
       const stamp = createHash('sha256').update(base).update('\0').update(JSON.stringify(variant))
+        .update('\0').update(variant.steward ? JSON.stringify(policyPackageDigest(cfg.steward.toolsPackage)) : '')
         .update('\0').update(policyPatchText(cfg, variant)).digest('hex')
       stamps.add(stamp)
       stamped.set(key, stamp)

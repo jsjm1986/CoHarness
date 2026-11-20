@@ -62,7 +62,7 @@ public final class CoHarnessPushService extends PushService {
         if (sessionId.isEmpty() || !runtimeId.matches(UUID_REGEX)) return;
         String endpoint = storedEndpoint(context);
         if (!endpoint.isEmpty() && !eventSeq.isEmpty()) {
-            PushReceiptReporter.report(context, "unifiedpush", endpoint, sessionId, eventSeq, "arrived");
+            PushReceiptReporter.report(context, "unifiedpush", endpoint, runtimeId, sessionId, eventSeq, "arrived");
         }
         String title = payload.optString("title", "").trim();
         String body = payload.optString("body", "").trim();
@@ -79,13 +79,15 @@ public final class CoHarnessPushService extends PushService {
                 CHANNEL_ID, "AI 回复", NotificationManager.IMPORTANCE_HIGH);
             manager.createNotificationChannel(channel);
         }
+        String conversation = runtimeId + "/" + sessionId;
         Intent launch = new Intent(context, MainActivity.class)
+            .setAction(BuildConfig.APPLICATION_ID + ".OPEN_PUSH." + conversation)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
             .putExtra(NativePushStatusPlugin.EXTRA_SESSION_ID, sessionId)
             .putExtra(NativePushStatusPlugin.EXTRA_RUNTIME_ID, runtimeId)
             .putExtra(NativePushStatusPlugin.EXTRA_PUSH_PROVIDER, "unifiedpush");
         if (!eventSeq.isEmpty()) launch.putExtra(NativePushStatusPlugin.EXTRA_EVENT_SEQ, eventSeq);
-        PendingIntent content = PendingIntent.getActivity(context, sessionId.hashCode(), launch,
+        PendingIntent content = PendingIntent.getActivity(context, 0, launch,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -95,7 +97,7 @@ public final class CoHarnessPushService extends PushService {
             .setContentIntent(content)
             .setPriority(NotificationCompat.PRIORITY_HIGH);
         try {
-            manager.notify(sessionId.hashCode(), builder.build());
+            manager.notify(conversation, 0, builder.build());
         } catch (SecurityException error) {
             Log.w(TAG, "notification permission missing; dropping UnifiedPush notification", error);
         }

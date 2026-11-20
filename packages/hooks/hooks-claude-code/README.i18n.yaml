@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/hooks/hooks-claude-code/README.md
 document:
-  en: 4d03ef03b5052269d8c326f83e610e75dffae29e
-  zh: e61b191684de27cb382c896e3a1e4513edb75b2a
+  en: 5cf99d9c5714fdae19d05bef46b69e9513e500ef
+  zh: 3c75454c5d62189494ec229e61b4695ff0f5b2f6
 /:
   en: ccc724007b5c1ec9
   zh: 61495d48365178df
@@ -18,8 +18,8 @@ document:
   en: 93e4646f288f7b04
   zh: 2ccbbcb65e14d93a
 /deepseek-ai-dsh-hooks-claude-code/config:
-  en: a018b41f5f90a280
-  zh: ca65ce8361e53fb9
+  en: b06491e1237e8977
+  zh: ebcdecd73502d188
 /deepseek-ai-dsh-hooks-claude-code/hook-points-typed-decisions:
   en: 343c23ee3799e587
   zh: 91df37c437f5ad92

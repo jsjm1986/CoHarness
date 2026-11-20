@@ -528,14 +528,13 @@ describe('Gateway local document broker', () => {
   })
 
   it('retains an accepted mutation catalog write while it waits behind an older listing', async () => {
-    const admission = writerAdmission(), entered = barrier(), mutationEntered = barrier(), release = barrier()
+    const admission = writerAdmission(), entered = barrier(), release = barrier()
     const { broker, catalog, user, homePath } = fixture({ writes: admission.writes })
     await broker.listDocuments(user, { kind: 'personal' }, new URLSearchParams(), undefined)
     await vi.waitFor(() => { expect(admission.active).toBe(0) })
     writeFileSync(join(homePath, 'documents', 'owned.txt'), 'owned payload')
     catalog.delivery.mockImplementation(async () => {
       if (catalog.delivery.mock.calls.length === 1) entered.resolve(undefined)
-      else mutationEntered.resolve(undefined)
       await release.promise
     })
     try {
@@ -543,8 +542,7 @@ describe('Gateway local document broker', () => {
       await entered.promise
       const mutation = Promise.allSettled([broker.serveScope({ user, scope: { kind: 'personal' }, operation: 'trash',
         request: fakeRequest('POST', '/api/documents/trash?id=owned.txt'), signal: new AbortController().signal })])
-      await mutationEntered.promise
-      expect(admission.active).toBe(2)
+      await vi.waitFor(() => { expect(admission.active).toBe(2) })
       admission.setOpen(false)
       release.resolve(undefined)
       expect((await mutation)[0]).toMatchObject({ status: 'fulfilled', value: { status: 200 } })

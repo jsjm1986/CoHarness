@@ -12,6 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@deepseek-ai/dsh-user-approval/types'
 import { defineTool, type PreToolDecision, type ToolExecution } from '@deepseek-ai/dsh-tools'
 import { isReadOnly, statementPreview } from './query.ts'
 

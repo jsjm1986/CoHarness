@@ -35,7 +35,7 @@ it('loads Desktop inline and hover previews through the file route after streami
   trigger.focus()
   fireEvent.click(trigger)
   expect(screen.getByRole('dialog').querySelector('img')?.getAttribute('src')).toBe(src)
-  fireEvent.keyDown(window, { key: 'Escape' })
+  fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(document.activeElement).toBe(trigger)
   const link = screen.getByRole('button', { name: '打开图片' })

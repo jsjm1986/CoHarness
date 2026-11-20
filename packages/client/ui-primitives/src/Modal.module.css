@@ -1,7 +1,9 @@
 /* Full-viewport layer (figma Mask + Dialog 451:18655): mask + centered card. */
 .root {
+  box-sizing: border-box;
   position: fixed;
   inset: 0;
+  height: var(--dsw-viewport-height, 100%);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -22,8 +24,9 @@
 
 /* Dialog card: window radius, elevation-prominent, layer-2 fill, pb 24. The
    card tops out at the padded viewport box; a taller body scrolls inside
-   `.content` while the footer stays pinned. */
+   `.content` while the default header and footer stay pinned. */
 .dialog {
+  box-sizing: border-box;
   position: relative;
   z-index: 1;
   display: flex;
@@ -50,6 +53,18 @@
   outline: none;
 }
 
+.withChrome {
+  container: modal-viewport / size;
+}
+
+.withChrome .dialog {
+  gap: 0;
+}
+
+.withChrome .footer {
+  margin-top: var(--dsw-space-5);
+}
+
 /* The scrollable region every Modal consumer sizes through contentClassName:
  * it must shrink below its content and scroll rather than clip into the
  * pinned footer (the compact sheet binds the same contract through
@@ -65,6 +80,7 @@
 /* Header row (figma Title row): pad l24/t22/r14/b12, SPACE_BETWEEN —
  * title left, close button right. */
 .header {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -73,9 +89,11 @@
 }
 
 .title {
+  min-width: 0;
+  overflow-wrap: anywhere;
   margin: 0;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 1rem;
+  line-height: 1.5rem;
   font-weight: 500; /* figma wt510, rendered 500 */
   color: var(--dsw-alias-label-primary);
 }
@@ -99,8 +117,10 @@
       var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
-.close:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .close:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 /* Compact viewports (below the 768 medium boundary, docs/web-styling.md):
@@ -135,9 +155,8 @@
     opacity: 0.7;
   }
 
-  .title {
-    min-width: 0;
-    overflow-wrap: anywhere;
+  .withChrome .dialog::before {
+    margin-bottom: var(--dsw-space-5);
   }
 
   .close {
@@ -186,10 +205,11 @@
 .description {
   margin: 0;
   padding: 0 var(--dsw-space-6);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   font-weight: 400;
   color: var(--dsw-alias-label-primary);
+  overflow-wrap: anywhere;
 }
 
 .body {
@@ -207,4 +227,76 @@
   justify-content: flex-end;
   gap: var(--dsw-space-2);
   padding: 0 var(--dsw-space-6);
+}
+
+/* Keep dismissal visible without spending the short reading area on spacing. */
+@media (max-height: 480px) {
+  .withChrome .dialog {
+    padding-bottom: calc(var(--dsw-space-2) + var(--dsw-safe-bottom));
+  }
+
+  .withChrome .dialog::before {
+    margin-bottom: var(--dsw-space-2);
+  }
+
+  .withChrome .header {
+    padding-block: var(--dsw-space-1);
+  }
+
+  .withChrome .body,
+  .withChrome .footer {
+    margin-top: var(--dsw-space-2);
+  }
+}
+
+@media (min-width: 768px) and (max-height: 480px) {
+  .root.withChrome {
+    padding-block: var(--dsw-space-2);
+  }
+}
+
+/* The keyboard can leave less room than the title and action rows together;
+   pinned chrome also needs ~300px (header + footer + gaps + a 44px content
+   strip), so below 320px the card itself becomes the scroll surface. */
+@container modal-viewport (max-height: 320px) {
+  .withChrome .dialog {
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Classic scrollbars (WebKit) cover the right band of the scrollport;
+       keep header/footer controls clear of it. */
+    scrollbar-gutter: stable;
+  }
+
+  .withChrome .header {
+    /* Overlay scrollbars ignore scrollbar-gutter and still paint over the
+       scrollport's right ~16px; keep the close control left of that band. */
+    padding-right: var(--dsw-space-6);
+  }
+
+  .withChrome .content {
+    flex: none;
+    overflow-y: visible;
+  }
+}
+
+@container modal-viewport (180px <= height <= 320px) {
+  .withChrome .dialog[data-modal-pin-chrome] {
+    overflow: hidden;
+    scrollbar-gutter: auto;
+    padding-block-end: var(--dsw-space-2);
+  }
+
+  .withChrome .dialog[data-modal-pin-chrome] .header {
+    padding-block: var(--dsw-space-1);
+  }
+
+  .withChrome .dialog[data-modal-pin-chrome] .content {
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
+
+  .withChrome .dialog[data-modal-pin-chrome] .footer {
+    margin-block-start: var(--dsw-space-2);
+  }
 }

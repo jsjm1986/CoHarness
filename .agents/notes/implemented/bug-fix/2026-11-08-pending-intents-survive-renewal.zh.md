@@ -12,6 +12,8 @@ Status: implemented
 
 [runtime/src/client/index.ts](../../../../packages/client/runtime/src/client/index.ts) 只在*另一个已验证*身份到达时才清空 pending intents,[personal-directory.ts](../../../../packages/client/runtime/src/client/personal-directory.ts) 对其 account lifetime 适用同一规则：两者在单纯吊销（`next === undefined`）期间都保留最后已验证身份，因为那是未验证窗口而非账号变更。intent 文本是用户自己输入的本地内容，不是拉取的私有数据，因此在再验证挂起期间保持可编辑；其 prepare 信号内嵌 `accountLifetime` 的 pending restore 也不会在途中被中止；[ui-conversation 的 viewport](../../../../packages/client/ui-conversation/src/client/viewport.ts) 对导航挤兑适用同一规则：单纯吊销会清空私有持久化作用域，但绝不调用 `sessions.beginNavigation()`，因此挂起输入的 navigation 信号挺过整个窗口。[ui-workspace](../../../../packages/client/ui-workspace/src/client/index.ts) 的 prepare 中止集只保留 `editing`(intent 自己的 controller——真实用户导航时 `hide`/`clear` 仍然取消）加上 fiber lifetime 与调用方信号；`beginNavigation()` 被移除，因为挤兑是视图事实而非 intent 死亡——`commitOpen` 的转移检查已决定 intent 是否仍拥有落点。同一 [index.ts](../../../../packages/client/runtime/src/client/index.ts) 中的 `GatewayEntryRequests` 订阅把同一规则应用两次：`verifiedAccountId` 发布只在另一个**已定义**身份到达时才作废 entry 请求，`deploymentContext` 版本发布只在另一个已定义版本到达时才作废——上下文未验证时不存在可被取代的部署版本，此时撤走在途工作是续约伪影而非授权丢失。真实的账号切换仍然会清空（`7 → undefined → 8`），而 identity fence 的 `onPrincipalChange` 在真实主体变更时会销毁整棵 fiber。
 
+已验证的编辑器在重新核验归属期间以本页内存保留本页编辑的内容。草稿写入器暂停，只有原账号、会话、Runtime 和电脑相符时才恢复写入。消息受理后可以在新写入器启动前清空暂存输入。电脑归属变化或账号确认退出时会清理暂存草稿。
+
 配套的目录修复：远端 workbench 目录只在已验证的多机模式下才是权威（[WorkbenchToolbar.tsx](../../../../packages/client/ui-workbench/src/client/components/WorkbenchToolbar.tsx)）。单节点界面根本没有 `/account/api` 路由，所以当 `readCatalog` 存在但部署上下文尚未验证 `mode === 'multi'` 时，本地 session 存储就是选择器的完整数据源；把选择器指向不存在的 gateway 会让它永远为空。
 
 ## 已考虑的替代方案

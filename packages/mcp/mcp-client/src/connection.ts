@@ -15,6 +15,7 @@
  * @module
  */
 
+import { assertRecoveryMcpConnection } from '@deepseek-ai/dsh-app-boot'
 import { Client } from '@modelcontextprotocol/client'
 import type { Context } from '@deepseek-ai/cordis'
 import { assertNever, deepEqualJson, type JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -129,6 +130,7 @@ export interface ConnectionHandle extends ServerContext {
  * @returns Handle with a `ready` promise for startup-await and a `dispose` for teardown.
  */
 export function startConnection(ctx: Context, config: Config, policy: ResolvedReconnectPolicy, status: McpStatusCell): ConnectionHandle {
+  assertRecoveryMcpConnection(ctx, config)
   const processes = config.transport === 'stdio' ? new McpProcessOwner(ctx, config) : undefined
   const label = `mcp-client(${config.serverName})`
   const binding = new McpTemplateBinding(ctx, config)
@@ -315,6 +317,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       }
     }
     try {
+      assertRecoveryMcpConnection(ctx, config)
       const startedAt = Date.now()
       const remaining = (): number | undefined => config.startupTimeoutMs === undefined ? undefined
         : config.startupTimeoutMs - (Date.now() - startedAt)

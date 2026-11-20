@@ -101,6 +101,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'agentExecutionAdmission',
+    summary: 'Admission supplied before plugin composition and retained for the root Context lifetime.',
+    description: 'Admission supplied before plugin composition and retained for the root Context lifetime.',
+    methods: [
+      {
+        signature: 'restriction(sessionId: SessionId): AgentExecutionRestriction | undefined',
+        description: 'Inspect execution eligibility without loading or attaching the Session.',
+        parameters: [{ name: 'sessionId', description: 'exact durable identity.' }],
+        returns: 'the reason execution is prohibited, or undefined when it is allowed.',
+      },
+    ],
+  },
+  {
     key: 'agentLoop',
     summary: 'Concrete agent factory and driver service.',
     description: 'Concrete agent factory and driver service.',
@@ -109,6 +122,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'readonly config: ResolvedConfig',
         description: 'Validated configuration owned by the agent-loop service.',
         parameters: [],
+      },
+      {
+        signature: 'stopForShutdown(): Promise<void>',
+        description: 'Stop Agent work while Session persistence is still mounted. Close every inbox and factory entry point, abort active activities, and retain accepted pending input. A failed durability checkpoint rejects the stop.',
+        parameters: [],
+        returns: 'the completion of all Agent teardowns and Session checkpoints.',
       },
       {
         signature: 'async create(id: SessionId, options: AgentOptions = {}, meta: Pick<SessionHeader, \'cwd\'> = {}): Promise<Agent>',
@@ -320,7 +339,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'reserveRemoval(ids: readonly SessionId[]): Disposable',
-        description: 'Hold Session identities while an owner releases resources and removes durable data. Existing factory work and overlapping removals refuse the reservation.',
+        description: 'Hold Session identities while an owner releases resources and removes durable data. Planned shutdown, existing factory work, and overlapping removals refuse the reservation.',
         parameters: [{ name: 'ids', description: 'exact identities whose creation and resource admission must remain closed.' }],
         returns: 'a caller-owned reservation, released after the whole removal operation settles.',
       },
@@ -650,6 +669,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Press a button of the band\'s current drawing: runs the mod\'s `onPress` and redraws.',
         parameters: [{ name: 'agent', description: 'the session\'s agent, resolved by the Gateway.' }, { name: 'generation', description: 'the drawing the Client saw.' }, { name: 'actionId', description: 'the button\'s action id in that drawing.' }],
         returns: 'the snapshot after the press.',
+        throws: ['the callback\'s failure after redrawing any state it changed; its effects are not rolled back.'],
       },
       {
         signature: 'async add(definition: ModDefinition): Promise<() => Promise<void>>',
@@ -1709,8 +1729,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
+        signature: 'readonly nodeId: GatewayRuntimeCredential[\'nodeId\']',
+        description: 'Registered computer of this process, when supplied by the launcher.',
+        parameters: [],
+      },
+      {
         signature: 'readonly organization: string',
         description: 'Gateway organization bound to this runtime.',
+        parameters: [],
+      },
+      {
+        signature: 'readonly modelTimings: boolean',
+        description: 'Whether managed model phases may emit metadata-only timing samples.',
         parameters: [],
       },
       {
@@ -2511,6 +2541,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'state', description: 'the managed rows and bundle selection the profile files now hold.' }, { name: 'baseRevision', description: 'the store revision the publisher last saw.' }],
         returns: '\'applied\' with the new revision, or \'conflict\' carrying the store\'s current state.',
       },
+      {
+        signature: 'reportInventory?(snapshot: PluginInventoryReport): Promise<void>',
+        description: 'Publish the profile\'s observed inventory for administrative visibility. Present only in deployments that record per-space inventories; runtime-scoped, it never carries a caller\'s account. Failures surface as warnings, not errors.',
+        parameters: [{ name: 'snapshot', description: 'the bundle and entry projections observed at report time.' }],
+        returns: 'after the store accepted the report.',
+      },
     ],
   },
   {
@@ -2888,7 +2924,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: '@Remote async listGrants( agent: Agent, request: { principal?: string; includeRevoked?: boolean; attachable?: boolean }, signal: AbortSignal, ): Promise<RemoteDesktopGrantView[]>',
         description: 'Grants visible to the caller: administrators see all; others see only rows for their own principal (the service enforces the same scoping). `attachable` restricts to grants the caller may attach under now, matched against the caller\'s Session for session-scoped rows.',
         parameters: [{ name: 'agent', description: 'caller\'s Session address; supplies session-scope matching.' }, { name: 'request', description: 'optional principal, revoked-row, and attachable filters.' }, { name: 'signal', description: 'request cancellation.' }],
-        returns: 'matching grants, newest administration first.',
+        returns: 'matching grants, newest administration first; empty when no desktop provider is enabled.',
       },
       {
         signature: '@Remote async grant(agent: Agent, request: RemoteDesktopGrantInputView, signal: AbortSignal): Promise<RemoteDesktopGrantView>',
@@ -3562,6 +3598,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'session', description: 'the session whose buffered events must reach durable storage.' }],
         returns: 'whether at least one durability listener participated, after every listener has settled successfully.',
         throws: ['the first registered listener failure after every listener settles.'],
+      },
+      {
+        signature: 'sealForShutdown(session: Session): SessionLogOffset',
+        description: 'Close publication on an exact live Session after its producers have settled. The attachment remains available for the final durability checkpoint.',
+        parameters: [{ name: 'session', description: 'the Session whose owner is completing planned shutdown.' }],
+        returns: 'the stable length of its final event prefix.',
+        throws: ['if the Session is detached or publication is in progress.'],
       },
       {
         signature: 'get(id: SessionId): Session | undefined',
@@ -4984,6 +5027,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the disposer removing the route.',
       },
       {
+        signature: 'registerRequestGuard(guard: WebRequestGuard): () => void',
+        description: 'Qualify HTTP requests before named routes and the fallback; upgrades retain their own admission. Guards run synchronously in registration order, so removal cannot race an unfinished guard.',
+        parameters: [{ name: 'guard', description: 'returns true to continue dispatch, or false after taking response ownership.' }],
+        returns: 'the disposer removing this guard.',
+      },
+      {
         signature: 'registerUpgrade(route: WebUpgradeRoute): () => void',
         description: 'Register an exact-path HTTP upgrade route. Duplicate paths throw because one socket can have only one protocol owner.',
         parameters: [{ name: 'route', description: 'pathname and handler owning negotiation plus socket use.' }],
@@ -5644,6 +5693,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'options', description: 'child model input with parent-owned execution metadata.' }, { name: 'next', description: 'child stream, including its own durable checkpoint and cleanup.' }],
   },
   {
+    name: 'llm/model-attempt-timing',
+    mode: 'emit',
+    signature: '\'llm/model-attempt-timing\'(sample: ModelAttemptTiming): void',
+    summary: 'Observe one physical model attempt through its first visible text or closure.',
+    description: 'Observe one physical model attempt through its first visible text or closure.',
+    parameters: [{ name: 'sample', description: 'wall-clock start, outcome, counts and elapsed times in milliseconds.' }],
+  },
+  {
     name: 'llm/orchestration',
     mode: 'waterfall',
     signature: '\'llm/orchestration\'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>',
@@ -6138,6 +6195,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'AgentCancelCause',
     declaration: 'export type AgentCancelCause = {\n    readonly kind: \'user\';\n} | {\n    readonly kind: \'parent\';\n} | {\n    readonly kind: \'hook\';\n    readonly reason: string;\n} | {\n    readonly kind: \'disposed\';\n};',
+  },
+  {
+    name: 'AgentExecutionRestriction',
+    declaration: 'export interface AgentExecutionRestriction {\n    readonly code: \'recovery-read-only\';\n    readonly message: string;\n}',
   },
   {
     name: 'AgentFactory',
@@ -7357,7 +7418,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GatewayPrincipalClaims',
-    declaration: 'export interface GatewayPrincipalClaims {\n    version: 1;\n    issuer: \'harness-gateway\';\n    audience: \'dsh-runtime\';\n    organization: string;\n    user: {\n        id: number;\n        username: string;\n        displayName: string;\n        role: \'admin\' | \'user\';\n    };\n    scope: GatewayPrincipalScope;\n    runtime: GatewayRuntimeIdentity;\n    issuedAt: number;\n    expiresAt: number;\n    nonce: string;\n    purpose?: \'archive-read\' | \'document-admin\' | \'terminal-admin\' | \'plugin-admin\' | \'webhook-dispatch\';\n}',
+    declaration: 'export interface GatewayPrincipalClaims {\n    version: 1;\n    issuer: \'harness-gateway\';\n    audience: \'dsh-runtime\';\n    organization: string;\n    user: {\n        id: number;\n        username: string;\n        displayName: string;\n        role: \'admin\' | \'user\';\n    };\n    scope: GatewayPrincipalScope;\n    runtime: GatewayRuntimeIdentity;\n    issuedAt: number;\n    expiresAt: number;\n    nonce: string;\n    purpose?: \'archive-read\' | \'document-admin\' | \'terminal-admin\' | \'plugin-admin\' | \'webhook-dispatch\' | \'runtime-asset\';\n    asset?: {\n        method: \'GET\' | \'HEAD\';\n        path: string;\n    };\n}',
   },
   {
     name: 'GatewayPrincipalScope',
@@ -7366,6 +7427,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'GatewayRequestPrincipal',
     declaration: 'export interface GatewayRequestPrincipal {\n    assertion: string;\n    claims: GatewayPrincipalClaims;\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'GatewayRuntimeCredential',
+    declaration: 'export interface GatewayRuntimeCredential {\n    version: 1;\n    gatewayUrl: string;\n    organization: string;\n    runtime: GatewayRuntimeIdentity;\n    nodeId?: Branded<\'RuntimeNodeId\'>;\n    token: string;\n    principalPublicKey: string;\n    streamPrincipalRenewal?: StreamPrincipalRenewalConfig;\n}',
   },
   {
     name: 'GatewayRuntimeIdentity',
@@ -8116,6 +8181,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ModelAccessTarget {\n    provider: string;\n    model: string;\n}',
   },
   {
+    name: 'ModelAttemptTiming',
+    declaration: 'export interface ModelAttemptTiming {\n    startedAt: number;\n    outcome: \'first-text\' | \'closed\';\n    elapsedMs: number;\n    adapterPreparationMs: number;\n    resourceWaitMs: number;\n    initialAuthorizationMs: number;\n    adapterDispatchPreparationMs: number;\n    dispatchAuthorizationMs: number;\n    adapterCallbacks: number;\n    afterLastAuthorizationMs: number;\n}',
+  },
+  {
     name: 'ModelMessageSource',
     declaration: 'export interface ModelMessageSource extends AssistantProviderMetadata {\n    kind: \'model\';\n}',
   },
@@ -8378,6 +8447,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PluginInventoryEntry',
     declaration: 'export interface PluginInventoryEntry {\n    readonly entryId: PluginEntryId;\n    readonly moduleName: string;\n    readonly meta?: PluginLocalizedMeta;\n    readonly enabled: boolean;\n    readonly fiberPhase: PluginFiberPhase;\n}',
+  },
+  {
+    name: 'PluginInventoryReport',
+    declaration: 'export interface PluginInventoryReport {\n    bundles: BundleInfo[];\n    plugins: PluginInfo[];\n}',
   },
   {
     name: 'PluginLocalizedMeta',
@@ -9736,6 +9809,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type StreamChunk = {\n    type: \'block-start\';\n    index: number;\n    blockType: ContentBlockType;\n} | {\n    type: \'text-delta\';\n    index: number;\n    text: string;\n} | {\n    type: \'reasoning-delta\';\n    index: number;\n    text: string;\n} | {\n    type: \'tool-call-delta\';\n    index: number;\n    id: ToolCallId;\n    name?: string;\n    argumentsDelta: string;\n} | {\n    type: \'block-end\';\n    index: number;\n    block: ContentBlock;\n} | {\n    type: \'usage\';\n    usage: TokenUsage;\n    credentialSource?: string;\n} | {\n    type: \'finish\';\n    reason: FinishReason;\n    replayState?: ReplayEnvelope;\n};',
   },
   {
+    name: 'StreamPrincipalRenewalConfig',
+    declaration: 'export interface StreamPrincipalRenewalConfig {\n    enabled: true;\n    intervalMs: number;\n    requestTimeoutMs: number;\n    maxBatchSize: number;\n}',
+  },
+  {
     name: 'SubagentCapabilities',
     declaration: 'export interface SubagentCapabilities {\n    readonly agentOptions: boolean;\n    readonly agentPreset: boolean;\n    readonly outputSchema: boolean;\n    readonly depthLimit: boolean;\n}',
   },
@@ -10561,7 +10638,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WebBootEntry',
-    declaration: 'export interface WebBootEntry {\n    id: string;\n    url: string;\n    rev: string;\n    chunks?: Record<string, string>;\n    inject?: string[];\n    immediately?: boolean;\n    external?: string[];\n}',
+    declaration: 'export interface WebBootEntry {\n    id: string;\n    url: string;\n    rev: string;\n    chunks?: Record<string, string>;\n    inject?: string[];\n    immediately?: boolean;\n    optional?: boolean;\n    external?: string[];\n}',
   },
   {
     name: 'WebBootGraph',
@@ -10622,6 +10699,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebhookSourceId',
     declaration: 'export type WebhookSourceId = Branded<\'WebhookSourceId\'>;',
+  },
+  {
+    name: 'WebRequestGuard',
+    declaration: 'export type WebRequestGuard = (request: IncomingMessage, response: ServerResponse) => boolean;',
   },
   {
     name: 'WebResultView',

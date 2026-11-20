@@ -2496,7 +2496,7 @@ One of:
 
 SHA-256: `1e788d9e90f320b51cba113f9dbed35cae28a903fec07a9cd4c52605d2a0c0dd`
 
-Sources: [`packages/attachment/userdoc/src/types.ts:469`](../packages/attachment/userdoc/src/types.ts)
+Sources: [`packages/attachment/userdoc/src/types.ts:472`](../packages/attachment/userdoc/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -2509,7 +2509,7 @@ Sources: [`packages/attachment/userdoc/src/types.ts:469`](../packages/attachment
 
 SHA-256: `275a4fcdb1adac21ee846fc5b6dcd16c6808a3969c53ca22008c6b076f729dfe`
 
-Sources: [`packages/attachment/userdoc/src/types.ts:470`](../packages/attachment/userdoc/src/types.ts)
+Sources: [`packages/attachment/userdoc/src/types.ts:473`](../packages/attachment/userdoc/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7108,7 +7108,7 @@ Sources: [`packages/attachment/userdoc/src/types.ts:12`](../packages/attachment/
 
 SHA-256: `6ac1c7d714001a06351d7d757961ef80283e57dcb27943feff64563ba5793716`
 
-Sources: [`packages/attachment/userdoc/src/types.ts:473`](../packages/attachment/userdoc/src/types.ts)
+Sources: [`packages/attachment/userdoc/src/types.ts:476`](../packages/attachment/userdoc/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7121,7 +7121,7 @@ Sources: [`packages/attachment/userdoc/src/types.ts:473`](../packages/attachment
 
 SHA-256: `c26f1a79f347ec7b53d88296f7f94ab1cdb173556ee93db6c57734e171839491`
 
-Sources: [`packages/attachment/userdoc/src/types.ts:468`](../packages/attachment/userdoc/src/types.ts)
+Sources: [`packages/attachment/userdoc/src/types.ts:471`](../packages/attachment/userdoc/src/types.ts)
 
 One of:
 
@@ -7906,7 +7906,7 @@ Sources: [`packages/host/apiproxy/src/api/sessions.ts:22`](../packages/host/apip
 
 SHA-256: `f09e5e7acf5ff5ccd193ff2eeec015fa2ff7c29d98bc465f8c3302058d47e29b`
 
-Sources: [`packages/host/apiproxy/src/api/sessions.ts:190`](../packages/host/apiproxy/src/api/sessions.ts)
+Sources: [`packages/host/apiproxy/src/api/sessions.ts:192`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | Property | Presence | Type |
 |---|---|---|

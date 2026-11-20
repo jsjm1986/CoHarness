@@ -298,6 +298,7 @@
    MUST share font, line-height, padding and wrapping rules or heights diverge. */
 .grow {
   position: relative;
+  min-height: var(--dsw-space-6);
 }
 
 /* Decoration backdrop: same metrics as the transparent-text textarea. It owns
@@ -399,11 +400,16 @@
      (768 against 776) — worth 2 to 5 wrapped lines on a long draft. */
 }
 
-/* figma 34:10434: #ADB2B8 light / #81858C dark — the caption pair exactly. */
 .input::placeholder {
   color: var(--dsw-alias-label-caption);
   -webkit-text-fill-color: var(--dsw-alias-label-caption);
   user-select: none;
+}
+
+.input:not(:disabled)::placeholder {
+  color: var(--dsw-alias-label-secondary);
+  -webkit-text-fill-color: var(--dsw-alias-label-secondary);
+  opacity: 1;
 }
 
 /* The backdrop owns disabled draft color; the textarea remains caret-only so
@@ -433,9 +439,6 @@
    (figma Input_Bottom chrome). */
 .row {
   display: flex;
-  /* The toolbar never takes a second line: controls degrade by the row's own
-     inline-size (icon tiers, then the context meter hides) and extension
-     items clip rather than wrap. */
   flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
@@ -466,7 +469,7 @@
   flex: 0 1 auto;
   gap: var(--dsw-space-1);
   /* The row never wraps; contributed items are the first thing to clip when
-     the line runs out of width. ExtensionItems publishes `data-clipped` on
+     the line runs out of width. The toolbar sets `data-clipped` on
      the lane while its content overflows; items mark their secondary text
      with `data-clip-label` so the shared rule below drops it whole rather
      than letting the lane slice mid-glyph. */
@@ -478,6 +481,46 @@
    empty lane must not claim row width. */
 .extensionItems:has(> :not(:empty)) {
   min-width: 24px;
+}
+
+.extensionItems:empty,
+.extensionItems:has(> :global([data-slot]):only-child:empty),
+.toolbarStatus:not(:has(button)) {
+  display: none;
+}
+
+.statusHome,
+:global([data-composer-status]),
+.statusFooter {
+  display: contents;
+}
+
+.footerStatuses {
+  display: none;
+}
+
+.statusFooter:has(> .footerStatuses button),
+.footerStatuses:has(button) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0 var(--dsw-space-1);
+}
+
+.statusFooter:has(> .footerStatuses button) {
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
+  padding-top: 2px;
+}
+
+.statusFooter:has(> .footerStatuses button) :global([data-composer-stats]) {
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+  row-gap: 0;
 }
 
 /* Shared degrade contract: while a clip seat (`data-clip-seat`) clips,
@@ -643,6 +686,8 @@
   display: grid;
   place-items: center;
   flex: none;
+  position: relative;
+  inset-block-start: -2px;
   width: 32px;
   height: 32px;
   border: none;
@@ -657,18 +702,14 @@
     var(--dsw-motion-ease-standard, ease),
     transform var(--dsw-motion-duration-fast)
     var(--dsw-motion-ease-emphasized, ease);
-  /* Opts out of the row's 2px downward shift (.row top pad): the send circle
-     keeps its original seat while the smaller chips sit lower. Transform, not
-     margin, so flex centering math is untouched. */
-  transform: translateY(-2px);
 }
 
 .primary:enabled:active {
-  transform: translateY(-2px) scale(0.94);
+  transform: scale(0.94);
 }
 
 .primary:disabled {
-  background: var(--dsw-alias-interactive-bg-active);
+  background-color: var(--dsw-alias-interactive-bg-active);
   color: var(--dsw-alias-label-secondary);
   cursor: default;
 }
@@ -776,49 +817,69 @@
   flex-wrap: wrap;
 }
 
-/* Compact docked card: shave the desktop 16/12 padding to a phone rhythm;
-   the bottom sits above the stats strip, which needs no extra card gap. */
 :global([data-viewport='compact']) .root {
+  padding-inline: max(var(--dsw-space-2), var(--dsw-safe-left, 0px)) max(var(--dsw-space-2), var(--dsw-safe-right, 0px));
   padding-bottom: var(--dsw-space-1);
 }
 
-:global([data-viewport='compact']) .row {
-  /* The compact toolbar holds one icon line at every width; extension items
-     scroll inside their own lane instead of pushing the row taller. */
-  flex-wrap: nowrap;
+:global([data-viewport='compact']) .card {
+  gap: 6px;
+  padding: 6px var(--dsw-space-2) var(--dsw-space-2);
+  border-radius: var(--dsw-mobile-card-radius);
 }
 
-:global([data-viewport='compact']) .tools {
-  flex: 0 0 auto;
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .row {
+  flex-wrap: wrap;
+  /* The trailing group's auto margin takes the spare width between groups. */
+  column-gap: 0;
+  row-gap: var(--dsw-space-1);
+  padding: 0 0 4px;
 }
 
-:global([data-viewport='compact']) .extensionItems {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .tools,
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trailing {
+  gap: min(var(--dsw-space-1), var(--composer-tool-gap, 0px));
+}
+
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .tools,
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trailing {
+  flex: none;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .modes,
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .toolbarStatus:has(button) {
+  display: contents;
+}
+
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .extensionItems {
+  flex: none;
   max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-:global([data-viewport='compact']) .extensionItems::-webkit-scrollbar {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .extensionItems::-webkit-scrollbar {
   display: none;
 }
 
-:global([data-viewport='compact']) .trailing {
-  flex: 1 1 0;
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trailing {
   justify-content: flex-end;
 }
 
-:global([data-viewport='compact']) .add,
-:global([data-viewport='compact']) .primary,
-:global([data-viewport='compact']) .documentAction {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .add,
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .primary,
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .documentAction {
   width: var(--dsw-touch-target);
   height: var(--dsw-touch-target);
 }
 
-:global([data-viewport='compact']) .primary {
-  transform: none;
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .primary {
+  inset-block-start: 0;
 }
 
-:global([data-viewport='compact']) .select {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .select {
   height: var(--dsw-touch-target);
 }
 
@@ -829,11 +890,14 @@
 }
 
 :global([data-viewport-short]) .row {
-  gap: var(--dsw-space-2);
   padding-bottom: 4px;
 }
 
 @media (pointer: coarse) {
+  .grow {
+    min-height: var(--dsw-touch-target);
+  }
+
   /* Focus-zoom guard for non-compact coarse surfaces (tablet layouts). */
   .input {
     font-size: 16px;
@@ -845,88 +909,45 @@
   }
 
   .primary {
+    --primary-face-limit: var(--dsw-touch-target);
+    --primary-face-size: var(--primary-face-limit);
+    box-sizing: border-box;
     width: var(--dsw-touch-target);
     height: var(--dsw-touch-target);
+    inset-block-start: 0;
+    /* Space inside the target keeps the toolbar geometry fixed as the circle contracts. */
+    padding: calc((var(--dsw-touch-target) - var(--primary-face-size)) / 2);
+    background-clip: content-box;
+  }
+
+  @supports (width: 1cqi) {
+    .primary {
+      --primary-face-size: clamp(36px, 20px + 6cqi, var(--primary-face-limit));
+    }
+  }
+
+  .primary:enabled:active {
     transform: none;
+    padding: calc((var(--dsw-touch-target) - var(--primary-face-size) * 0.94) / 2);
   }
 }
 
-/* Compact controls keep the model and send group separate from extensions.
-   Extension feedback can wrap below the left controls without covering it. */
-@media (max-width: 767px) {
-  :global([data-viewport='compact']) .card {
-    gap: 6px;
-    padding: 6px var(--dsw-space-3) var(--dsw-space-2);
-    border-radius: var(--dsw-mobile-card-radius);
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 320px) {
+  .primary {
+    --primary-face-limit: 38px;
   }
+}
 
+@media (max-width: 767px) {
   /* Mobile Safari zooms on focus for inputs below 16px — keep the draft text
      at 16px so typing never triggers it. */
   :global([data-viewport='compact']) .input {
     font-size: 16px;
   }
 
-  :global([data-viewport='compact']) .row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: var(--dsw-space-1);
-    padding: 0 0 4px;
-  }
-
-  :global([data-viewport='compact']) .tools {
-    min-width: 0;
-    flex-wrap: wrap;
-    gap: var(--dsw-space-1);
-    overflow: visible;
-  }
-
-  :global([data-viewport='compact']) .tools .extensionItems:has(> :not(:empty)) {
-    flex: 1 1 100%;
-    overflow: visible;
-  }
-
-  :global([data-viewport='compact']) .modes {
-    min-width: 0;
-    gap: var(--dsw-space-1);
-    overflow: hidden;
-  }
-
-  :global([data-viewport='compact']) .trailing {
-    min-width: 0;
-    flex: 0 1 auto;
-    gap: var(--dsw-space-1);
-    margin-left: 0;
-  }
-
-  :global([data-viewport='compact']) .trailing [data-model-select] {
-    flex: 0 0 auto;
-  }
-
   :global([data-viewport='compact']) .add svg,
   :global([data-viewport='compact']) .primary svg {
     width: var(--dsw-mobile-icon-secondary);
     height: var(--dsw-mobile-icon-secondary);
-  }
-}
-
-/* The narrowest phones keep the same single icon row; every control steps
-   down to 36px so attach, access, model, meter, and send still fit a 320px
-   card. The tools column may shrink but never yields a second row. */
-@media (max-width: 359px) {
-  :global([data-viewport='compact']) .row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: 2px;
-  }
-
-  :global([data-viewport='compact']) .tools {
-    min-width: 0;
-  }
-
-  :global([data-viewport='compact']) .add,
-  :global([data-viewport='compact']) .primary,
-  :global([data-viewport='compact']) .documentAction {
-    width: 36px;
-    height: 36px;
   }
 }

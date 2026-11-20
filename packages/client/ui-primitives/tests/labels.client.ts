@@ -57,6 +57,7 @@ export const terminalBlockLabels: TerminalBlockLabels = {
 export const jsonTreeLabels: JsonTreeLabels = {
   copyValue: 'Copy value', copyJson: 'Copy JSON', copyPath: 'Copy property path',
   copyPrettyJson: 'Copy pretty JSON', copyCompactJson: 'Copy compact JSON',
+  copyOptions: 'Copy options',
   copied: 'Copied', copyFailed: 'Copy failed',
   collapseNode: 'Collapse JSON node', expandNode: 'Expand JSON node',
   copyButtonTitle: action => `${action}; right-click for copy options`,

@@ -507,6 +507,38 @@ describe('WorkspaceRuntime', () => {
     await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe('s-fresh-2')
   })
 
+  it.each([false, true])('connectWorkspace leaves recovered blanks unchanged with a parked reservation: %s', async (reserved) => {
+    const storage = new Map<string, string>(reserved ? [['dsh.workspace.drafts.v1', JSON.stringify({
+      alpha: { draftId: 'recovered-draft', sessionId: 's-blank', workspacePath: '/w/alpha' },
+    })]] : [])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+      removeItem: (key: string) => { storage.delete(key) },
+    })
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { persistSelection: false })
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = async () => ok({ items: [workspace('alpha', [sid('s-blank')])] })
+    api.onList = async () => ok({ items: [{ sessionId: sid('s-blank'), updatedAt: 1, running: false,
+      blank: true, cwd: '/w/alpha', executionRestriction: 'recovery-read-only' }] })
+    api.onCreate = async payload => ok({ sessionId: callField(payload, 'sessionId') as SessionId })
+    try {
+      await Promise.all([workspaces.refresh(), sessions.refresh()])
+      const fresh = await workspaces.connectWorkspace(wid('alpha'))
+      expect(fresh).not.toBe('s-blank')
+      const calls = api.callsOf('session.create')
+      expect(calls).toHaveLength(1)
+      expect(calls[0]).toMatchObject({ workspaceId: 'alpha', sessionId: fresh })
+      const draftId = callField(calls[0], 'draftId')
+      expect(typeof draftId).toBe('string')
+      expect(draftId).not.toBe('recovered-draft')
+      expect(sessions.list.getSnapshot().byId[sid('s-blank')]).toMatchObject({ executionRestriction: 'recovery-read-only' })
+    } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
+  })
+
   it('connectWorkspace forwards agentPreset on reuse and fresh arms', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
@@ -1589,6 +1621,23 @@ describe('startInitialSelection', () => {
     }])
     expect(b.sessions.list.getSnapshot().current).toBe('s-blank')
     stop()
+  })
+
+  it('keeps a recovered saved blank readable without recreating or activating its Agent', async () => {
+    const b = bench()
+    b.api.onList = async () => ok({ items: [{ sessionId: sid('s-blank'), updatedAt: 1, running: false,
+      blank: true, cwd: '/w/alpha', executionRestriction: 'recovery-read-only' }] })
+    b.api.onWorkspaceList = async () => ok({ items: [workspace('alpha', [sid('s-blank')])] })
+    await b.sessions.refresh()
+    b.sessions.open(sid('s-blank'))
+    const stop = b.workspaces.startInitialSelection()
+    try {
+      await b.workspaces.refresh()
+      await vi.waitFor(() =>{  expect(b.workspaces.list.getSnapshot().initialSelectionPending).not.toBe(true) })
+      expect(b.api.callsOf('session.create')).toEqual([])
+      expect(b.api.callsOf('session.activate')).toEqual([])
+      expect(b.sessions.list.getSnapshot().current).toBe('s-blank')
+    } finally { stop(); await b.ctx.fiber.dispose() }
   })
 
   it('restores a saved blank under the default once its recorded preset is undeclared', async () => {

@@ -499,6 +499,7 @@ interface SessionEntry {
   readonly appendAdmissions: ReadonlySet<SessionAppendAdmission>
   announcement: 'pending' | 'dispatching' | 'complete' | 'failed'
   appending: boolean
+  sealed: boolean
   detachRequested: boolean
   detach(): void
 }
@@ -1078,6 +1079,7 @@ export class Session {
     if (entry !== undefined && entry.announcement !== 'complete') {
       throw new Error(`session "${this.id}" cannot append before session/created completes`)
     }
+    if (entry?.sealed) throw new Error(`session "${this.id}" is sealed for shutdown`)
     if (entry?.appending) {
       throw new Error('session append cannot reenter while another append is being published')
     }
@@ -1471,6 +1473,7 @@ export class SessionStore extends Service {
       appendAdmissions: this.appendAdmissions,
       announcement: 'pending',
       appending: false,
+      sealed: false,
       detachRequested: false,
       detach: () => { this.detachEntered(entry) },
     }
@@ -1584,6 +1587,22 @@ export class SessionStore extends Service {
     const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
     if (failure !== undefined) throw failure.reason
     return callbacks.length > 0
+  }
+
+  /**
+   * Close publication on an exact live Session after its producers have settled.
+   * The attachment remains available for the final durability checkpoint.
+   * @param session - the Session whose owner is completing planned shutdown.
+   * @returns the stable length of its final event prefix.
+   * @throws if the Session is detached or publication is in progress.
+   */
+  sealForShutdown(session: Session): SessionLogOffset {
+    const entry = this.liveEntryFor(session)
+    if (entry.appending || entry.announcement === 'dispatching') {
+      throw new Error(`session "${session.id}" cannot seal during publication`)
+    }
+    entry.sealed = true
+    return session.seq
   }
 
   /** Return the exact live entry; detached/prepared objects reject. */

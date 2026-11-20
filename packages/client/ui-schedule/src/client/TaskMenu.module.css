@@ -31,8 +31,8 @@
   top: calc(100% + 4px);
   left: 0;
   z-index: 100;
-  min-width: 144px;
-  max-width: 360px;
+  min-width: min(144px, calc(100vw - 24px));
+  max-width: min(360px, calc(100vw - 24px));
 }
 
 /* Portal mode: fixed in the viewport, coordinates supplied inline from the
@@ -54,7 +54,7 @@
 /* Viewport fit: the card stops 12px short of the viewport's top/bottom edges
  * (the hook's margin) and taller content scrolls inside .viewport. */
 .scrollable {
-  max-height: calc(100vh - 12px - max(12px, var(--dsh-frame-overlay-top, 12px)));
+  max-height: calc(100dvh - 12px - max(12px, var(--dsh-frame-overlay-top, 12px)));
 }
 
 .viewport {
@@ -65,6 +65,7 @@
 
 .scrollable .viewport {
   overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 /* Owner controls pinned above the scrolling rows; l2 hairline (l1 is
@@ -97,8 +98,10 @@
   text-align: left;
 }
 
-.item:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .item:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 /* Arrow navigation moves real focus, so the row the keyboard is on carries the
@@ -158,8 +161,10 @@
   color: var(--dsw-alias-state-error-primary);
 }
 
-.danger:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover-danger);
+@media (hover: hover) {
+  .danger:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover-danger);
+  }
 }
 
 .danger:focus-visible:not(:disabled) {
@@ -186,4 +191,15 @@
 /* Two data separators in a row draw one line. */
 .separator + .separator {
   display: none;
+}
+
+@media (pointer: coarse) {
+  .item { min-height: var(--dsw-touch-target); }
+}
+
+@media (forced-colors: active) {
+  .item:focus-visible:not(:disabled) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }

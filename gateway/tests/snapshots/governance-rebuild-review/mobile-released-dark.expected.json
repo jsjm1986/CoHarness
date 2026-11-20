@@ -1,0 +1,10 @@
+{
+  "title": "Restore organization management",
+  "states": [
+    "Management is open. Accounts receive only reviewed login access; computers need fresh enrollment and Runtimes need separate review."
+  ],
+  "form": null,
+  "ordinaryAdmin": 1,
+  "sourceRestoreButton": 0,
+  "oldWorkNotice": 1
+}

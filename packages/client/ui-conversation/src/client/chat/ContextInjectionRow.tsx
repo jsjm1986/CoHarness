@@ -52,6 +52,9 @@ export function ContextInjectionRow({ content, source, producer, form, useDisclo
   return (
     <DisclosureRow
       className={css.root}
+      rowClassName={css.headerRow}
+      contentLayoutClassName={css.headerContent}
+      leadingClassName={css.leading}
       icon={producer.role === 'recall'
         ? <span data-context-recall-icon><ReferenceIcon kind="session" /></span>
         : <IconBrowseOutline16 size={14} />}
@@ -73,7 +76,7 @@ export function ContextInjectionRow({ content, source, producer, form, useDisclo
           <span className={css.source} data-context-source>{producer.label}</span>
           {summary !== null && (
             <>
-              <span className={css.sep} aria-hidden />
+              <span className={`${css.sep} ${css.summarySep}`} aria-hidden />
               <span className={css.summary} data-context-summary>{summary}</span>
             </>
           )}

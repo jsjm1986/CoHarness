@@ -1,0 +1,20 @@
+- textbox "Message COHARNESS"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "0% of context used": 0%
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turn · 1 step · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turn · 1 step{{throughput}} tok/s"
+  - button "18 tok · Cache hit 0%":
+    - img
+    - text: 18 tokCache hit 0%

@@ -178,6 +178,50 @@ describe('apply', () => {
     }
   })
 
+  it.each(['answer', 'dismiss'] as const)('awaits the %s receipt, preserves a refused wait and permits an explicit retry', async (operation) => {
+    const b = await bench()
+    const reply = Promise.withResolvers<RpcReceipt>()
+    const { wait, respond } = wireWait()
+    respond.mockImplementationOnce(() => reply.promise)
+    try {
+      b.setPending([wait])
+      await b.flush()
+      const card = b.session.publishInteraction.mock.calls[0]?.[0] as PendingQuestion
+      const submit = () => operation === 'answer' ? card.answer(ANSWER) : card.dismiss()
+      let settled = false
+      const pending = submit()
+      void pending.then(() => { settled = true }, () => { settled = true })
+      await Promise.resolve()
+      expect(settled).toBe(false)
+      const refused = expect(pending).rejects.toThrow('Question connection unavailable')
+      reply.reject(new Error('Question connection unavailable'))
+      await refused
+      expect(card.snapshot()).toMatchObject({ channel: 'waterfall', closed: false })
+      await expect(submit()).resolves.toBeUndefined()
+      expect(respond).toHaveBeenCalledTimes(2)
+      b.setPending([])
+      await b.flush()
+    } finally {
+      reply.resolve({ accepted: true })
+      await b.fiber.dispose()
+    }
+  })
+
+  it.each(['answer', 'dismiss'] as const)('rejects a refused %s receipt without retiring the question', async (operation) => {
+    const b = await bench()
+    try {
+      const { wait, respond } = wireWait()
+      respond.mockResolvedValueOnce({ accepted: false, reason: 'not-pending' })
+      b.setPending([wait])
+      await b.flush()
+      const card = b.session.publishInteraction.mock.calls[0]?.[0] as PendingQuestion
+      await expect(operation === 'answer' ? card.answer(ANSWER) : card.dismiss()).rejects.toBeInstanceOf(Error)
+      expect(card.snapshot()).toMatchObject({ channel: 'waterfall', closed: false })
+      b.setPending([])
+      await b.flush()
+    } finally { await b.fiber.dispose() }
+  })
+
   it('opens the Remote claim stream once for a timed wait and anchors the deadline', async () => {
     const b = await bench()
     try {

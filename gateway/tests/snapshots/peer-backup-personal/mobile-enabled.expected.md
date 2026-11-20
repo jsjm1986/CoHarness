@@ -1,0 +1,61 @@
+- strong: Personal Runtime disaster recovery
+- paragraph: Replacement owns the recovered data
+- paragraph: Personal data is restored on the replacement. Create a backup policy for this Runtime and its account documents.
+- button "Protect the replacement"
+- status: Restored schedules remain paused. Enabling new conversations does not redeliver old tasks. Keep source delivery records and external outcomes for review.
+- region "Recovered execution permissions":
+  - strong: Recovered execution permissions
+  - status: New conversations are enabled; historical conversations remain read-only.
+  - paragraph: Preserving 2 historical conversations for reading. They cannot resume execution.
+  - paragraph: Previous inbox work and schedules remain paused and do not resume with new conversations.
+  - group: Suspended connection and environment settings (5)
+  - button "Recheck execution configuration"
+  - strong: Plugins and external connections
+  - paragraph: Review supported items individually. Unapproved items remain disabled. Configuration review requires a stopped Runtime and never stops tasks automatically.
+  - strong: "@deepseek-ai/dsh-plugin-package-inventory-deepseek"
+  - text: Ready for review
+  - paragraph: Plugin
+  - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+  - group: Inspect reviewed versions
+  - button "Review @deepseek-ai/dsh-plugin-package-inventory-deepseek"
+  - strong: "@deepseek-ai/dsh-session-telemetry-otel"
+  - text: Ready for review
+  - paragraph: Plugin
+  - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+  - group: Inspect reviewed versions
+  - button "Review @deepseek-ai/dsh-session-telemetry-otel"
+  - strong: "@deepseek-ai/dsh-remote-desktop-vnc"
+  - text: Ready for review
+  - paragraph: External connection
+  - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+  - group: Inspect reviewed versions
+  - button "Review @deepseek-ai/dsh-remote-desktop-vnc"
+  - strong: "@deepseek-ai/dsh-remote-desktop-stream"
+  - text: Ready for review
+  - paragraph: External connection
+  - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+  - group: Inspect reviewed versions
+  - button "Review @deepseek-ai/dsh-remote-desktop-stream"
+  - strong: "@deepseek-ai/dsh-api-remote-desktop-controller"
+  - text: Ready for review
+  - paragraph: External connection
+  - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+  - group: Inspect reviewed versions
+  - button "Review @deepseek-ai/dsh-api-remote-desktop-controller"
+  - strong: "@deepseek-ai/dsh-client-ui-remote-desktop"
+  - text: Ready for review
+  - paragraph: External connection
+  - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+  - group: Inspect reviewed versions
+  - button "Review @deepseek-ai/dsh-client-ui-remote-desktop"
+  - strong: "@deepseek-ai/dsh-tool-schedule"
+  - text: Ready for review
+  - paragraph: Plugin
+  - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+  - group: Inspect reviewed versions
+  - button "Review @deepseek-ai/dsh-tool-schedule"
+  - group: Items kept disabled (11)
+  - group: Approved or configured inactive components (216)
+  - button "Refresh execution review"
+- paragraph: "Isolation evidence recorded: fixture/personal-source-isolation"
+- button "Refresh takeover status"

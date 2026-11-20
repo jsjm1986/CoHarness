@@ -1,15 +1,17 @@
 /** Real file edits and browser rendering share exact or bounded replacement counts. */
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage } from './workflow-responsive-state.ts'
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Page } from 'playwright'
+import { type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, expandTurnProcesses,
+  assertFixtureInventory, captureStableAria,  expandTurnProcesses,
   fixtureUserPrompts, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
 
 const MODE = webSnapshotMode()
 const EXACT_DIR = fileURLToPath(new URL('./snapshots/diff-context', import.meta.url))
@@ -58,8 +60,8 @@ describe.skipIf(MODE === 'record').each(CASES)('web e2e: $name', (scenario) => {
     await mkdir(workspace, { recursive: true })
     await writeFile(join(workspace, scenario.file), scenario.before)
     await writeFile(join(workspace, 'untouched.txt'), UNTOUCHED)
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
@@ -101,16 +103,17 @@ describe.skipIf(MODE === 'record').each(CASES)('web e2e: $name', (scenario) => {
     await page.getByText('DONE', { exact: true }).waitFor()
     await expandTurnProcesses(page)
     const edit = page.locator('[data-tool="edit"]')
-    const disclosure = edit.locator('[data-expandable]')
+    const disclosure = edit.getByRole('button', { name: 'Edit', exact: true })
     await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('false')
-    expect(await disclosure.textContent()).toContain(scenario.totals)
+    expect(await edit.textContent()).toContain(scenario.totals)
     expect(await edit.locator('[data-diff]').count()).toBe(0)
-    await disclosure.getByText('Edit', { exact: true }).click()
+    await disclosure.click()
     await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('true')
     const card = edit.locator('[data-diff]')
     await card.waitFor()
     expect(await card.getByText(scenario.shared, { exact: true }).count()).toBe(1)
     expect(await card.textContent()).toContain(`${scenario.totals} · 1 file`)
+    await auditWorkflowState(page, 'tool-cards', `${scenario.name}-collapsed-diff`, card)
     const snapshot = await captureStableAria(page, '[data-tool="edit"]', scaffold.workspaceCwd)
 
     if (scenario.bounded) {
@@ -125,14 +128,15 @@ describe.skipIf(MODE === 'record').each(CASES)('web e2e: $name', (scenario) => {
       expect(await card.locator('[class*="_add_"]').allTextContents()).toEqual(['mode=RELEASE'])
     }
     expect(await card.textContent()).toContain(`${scenario.totals} · 1 file`)
-    await disclosure.getByText('Edit', { exact: true }).click()
+    await auditWorkflowState(page, 'tool-cards', `${scenario.name}-complete-diff`, card)
+    await disclosure.click()
     await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('false')
     expect(await edit.locator('[data-diff]').count()).toBe(0)
-    expect(await disclosure.textContent()).toContain(scenario.totals)
+    expect(await edit.textContent()).toContain(scenario.totals)
     await assertFixtureInventory(scenario.snapshotDir, scenario.inventory)
     if (!scenario.bounded) await assertFixtureInventory(EXACT_OVERRIDE_DIR, ['replay.override.json'])
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-    await compareOrRefreshGolden(join(scenario.snapshotDir, 'ui.expected.md'), snapshot, MODE)
+    await compareWorkflowGolden(join(scenario.snapshotDir, 'ui.expected.md'), snapshot, MODE)
   })
 })

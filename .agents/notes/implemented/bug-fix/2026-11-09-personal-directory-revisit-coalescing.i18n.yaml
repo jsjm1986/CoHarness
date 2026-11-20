@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-09-personal-directory-revisit-coalescing.md
 document:
-  en: fbd35c8876e2e1a15f0b504676de8abea3e159f5
-  zh: c40e699049ef6cbbf168d7099138293cefd4eaba
+  en: 5633937779547fc058170c9b4f376ab188b2496a
+  zh: e188e01115b45479ca3d9625d1167185e62a703f
 /agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them:
   en: add008bc62784a9b
   zh: 1418ee5bdd17f001
@@ -12,8 +12,8 @@ document:
   en: 8a82aba8123b8af7
   zh: 24e95892208310a0
 /agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them/decision:
-  en: d54912496948783f
-  zh: 3a794cf8811fd3be
+  en: c80f8a614001fe2e
+  zh: dad5835379a5f0ea
 /agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them/alternatives-considered:
   en: 7d43c593c3f70ffa
   zh: f84edfad7a972ea5
@@ -21,5 +21,5 @@ document:
   en: 6308853415f1f6b2
   zh: b6c7dede0536879f
 /agent-note-coalesce-directory-revisit-and-restore-retry-events-instead-of-dropping-them/verification:
-  en: a5c1f09726512eb4
-  zh: f468361011f9719c
+  en: 883e00a314af4716
+  zh: 4242cdfa20f32f43

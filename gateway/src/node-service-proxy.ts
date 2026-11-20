@@ -1,10 +1,10 @@
-import { operationPhase, timeOperation } from './operation-timing.ts'
+import { forwardingMarks, operationPhase, recordNodeTransport, timeOperation } from './operation-timing.ts'
 import { createHash } from 'node:crypto'
 /** Forward existing authenticated Gateway operations to their owning computer. */
 import { Agent, request, STATUS_CODES, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { isExplicitScopeRequest, isExplicitSessionRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
 import type { UserRow } from './auth.ts'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
 import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
@@ -17,6 +17,7 @@ import { FORWARDED_PRINCIPAL_HEADER } from './forwarded-principal.ts'
 import type { GatewayNodeServices } from './node-service.ts'
 import type { NodeServiceConfig } from './node-service.ts'
 import { NodeServiceHttpPool } from './node-service-http-pool.ts'
+import { httpConnectionFields } from './http-connection-fields.ts'
 
 /** Organization directory and current Admin authority; paths remain owned by the selected Gateway. */
 export interface NodeServiceProxyDirectory {
@@ -40,6 +41,15 @@ interface Target { nodeId: RuntimeNodeId; runtimeId?: RuntimeId; projectId?: num
   environment?: RuntimeCatalogEntry; resolvedTarget?: 'personal' | `project:${number}` }
 interface Active extends Target { userId: number; abort(): void }
 
+/** A submitted request has no response headers; its remote mutation may already have completed. */
+export class NodeServiceResponseUnknownError extends NodeServiceError {
+  /** @param cause - transport failure after request submission, before any response headers. */
+  constructor(cause: NodeServiceError) {
+    super(cause.status, cause.code, cause)
+    this.name = 'NodeServiceResponseUnknownError'
+  }
+}
+
 /** The request binding an issuer signs into a forwarded assertion. */
 interface ForwardRequest { method: string; path: string; sessionHash: string }
 
@@ -53,10 +63,8 @@ function forwardRequestOf(req: IncomingMessage): ForwardRequest {
   }
 }
 
-const HOP_HEADERS = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade'])
-
 function headers(input: IncomingHttpHeaders, upgrade = false): OutgoingHttpHeaders {
-  const omitted = new Set([...HOP_HEADERS, ...(input.connection ?? '').toLowerCase().split(',').map(value => value.trim())])
+  const omitted = httpConnectionFields(input.connection)
   const result: OutgoingHttpHeaders = {}
   for (const [key, value] of Object.entries(input)) if (!omitted.has(key) && value !== undefined) result[key] = value
   if (upgrade) { result.connection = 'Upgrade'; result.upgrade = 'websocket' }
@@ -232,6 +240,31 @@ export class GatewayNodeServiceProxy {
   }
 
   /**
+   * Forward an immutable resource using this request's fresh governance admission.
+   * @param req - strict GET or HEAD module/asset request with an exact Runtime selector.
+   * @param res - response owned through the existing bounded node transport.
+   * @param actor - current account returned by the asset admission query.
+   * @param placement - exact Runtime and computer from the same admission; no cross-request reuse is permitted.
+   * @returns true after remote delivery, or false for this computer.
+   */
+  asset(req: IncomingMessage, res: ServerResponse, actor: UserRow,
+    placement: RuntimePlacement & { environment: NonNullable<RuntimePlacement['environment']> }): Promise<boolean> {
+    if (!isImmutableRuntimeAssetRequest(req.method, req.url ?? '/')) throw new NodeServiceError(400, 'node-service/invalid-target')
+    const url = new URL(req.url ?? '/', 'http://gateway'), environment = placement.environment
+    if (url.searchParams.getAll('dshRuntime').length !== 1 || url.searchParams.get('dshRuntime') !== environment.id
+      || url.searchParams.has('dshNode') && url.searchParams.get('dshNode') !== environment.node.id
+      || url.searchParams.has('dshTarget') && url.searchParams.get('dshTarget') !== placement.target
+      || req.headers[NODE_SERVICE_TARGET_HEADER] !== undefined && !placement.local) {
+      throw new NodeServiceError(409, 'node-service/mismatch')
+    }
+    if (placement.local) return Promise.resolve(false)
+    return this.track(this.forwardSelectedHttp(req, res, {
+      nodeId: environment.node.id, runtimeId: environment.id, environment, resolvedTarget: placement.target,
+      ...(environment.owner.kind === 'project' ? { projectId: environment.owner.id } : {}),
+    }, actor))
+  }
+
+  /**
    * Stream one public provider delivery to metadata-confirmed placement; provider authentication remains node-owned.
    * @param req - original POST whose exact public webhook path is retained.
    * @param res - provider-facing response.
@@ -270,21 +303,32 @@ export class GatewayNodeServiceProxy {
     req.once('aborted', abort); res.once('close', abort)
     if (req.aborted || res.destroyed || res.writableEnded) owner.abort()
     let dispose = () => {}
+    let submitted = false
+    let receivedResponse = false
     try {
       signal.throwIfAborted()
-      const lease = await timeOperation('nodeConnection',()=>this.httpPool.acquire(target.nodeId, signal))
+      const url = new URL(req.url ?? '/', 'http://gateway')
+      const interactive = target.runtimeId !== undefined && (isExplicitSessionRequest(req.method, url.pathname)
+        || req.method === 'GET' && url.pathname === '/' && url.searchParams.get('dshBootstrap') === '1')
+      const lease = await timeOperation('nodeConnection',()=>this.httpPool.acquire(target.nodeId, signal, interactive))
+      recordNodeTransport(lease.reused ? 'reused' : 'opened')
+      const mark = forwardingMarks()
+      mark('leaseAcquired')
       const receivedHeaders=operationPhase('upstream')
       dispose = () => { lease.destroy() }
       signal.throwIfAborted()
       let complete = false
       const assertion = typeof actor === 'number' || this.forwardIssuer === undefined
         ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req))
+      mark('assertionReady')
       const operation = this.outgoing(req, target, lease.agent, false, body, assertion)
       dispose = () => {
         if (complete) lease.release()
         else { operation.dispose(); lease.destroy() }
       }
       const { outgoing } = operation
+      outgoing.once('socket', () => { mark('socketAssigned') })
+      outgoing.once('finish', () => { mark('requestWritten') })
       const cancel = () => { outgoing.destroy(new NodeServiceError(409, 'node-service/cancelled')) }
       signal.addEventListener('abort', cancel, { once: true })
       try {
@@ -293,15 +337,18 @@ export class GatewayNodeServiceProxy {
           timer.unref()
           outgoing.on('error', error => { clearTimeout(timer); reject(error) })
           outgoing.once('response', response => {
+            receivedResponse = true
             clearTimeout(timer)
             try {
               receivedHeaders()
+              mark('responseHeaders')
               if (response.headers[NODE_SERVICE_TARGET_HEADER] !== target.nodeId) throw new NodeServiceError(409, 'node-service/mismatch')
               signal.throwIfAborted()
               res.writeHead(response.statusCode ?? 502, responseHeaders(response.headers, target.resetCookie))
               void pipeline(response, res).then(resolve, reject)
             } catch (error) { response.destroy(); reject(error) }
           })
+          submitted = true
           if (body === undefined) void pipeline(req, outgoing).catch(reject)
           else outgoing.end(body)
         }))
@@ -309,8 +356,12 @@ export class GatewayNodeServiceProxy {
       complete = true
       return true
     } catch (error) {
-      if (error instanceof NodeServiceError) throw error
-      throw new NodeServiceError(signal.aborted ? 409 : 503, signal.aborted ? 'node-service/cancelled' : 'node-service/unavailable', error)
+      const failure = error instanceof NodeServiceError ? error
+        : new NodeServiceError(signal.aborted ? 409 : 503, signal.aborted ? 'node-service/cancelled' : 'node-service/unavailable', error)
+      if (submitted && !receivedResponse && (failure.code === 'node-service/timeout' || failure.code === 'node-service/unavailable')) {
+        throw new NodeServiceResponseUnknownError(failure)
+      }
+      throw failure
     } finally {
       req.removeListener('aborted', abort); res.removeListener('close', abort)
       this.active.delete(active); owner.abort(); dispose()

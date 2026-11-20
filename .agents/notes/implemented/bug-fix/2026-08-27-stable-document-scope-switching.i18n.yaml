@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-27-stable-document-scope-switching.md
 document:
-  en: 44651302c1fb449a42f02d0d05157f2847b07ecc
-  zh: 3a1c10e25a94f1965f96b10cf13910eb26fc5cec
+  en: da499dceb05ab8edd71c1eb0d0ba09564e5dd23a
+  zh: bc44e4ce3c0d99ad485471312c4d457ae9c900df
 /agent-note-stable-document-scope-switching:
   en: 3a12a3e087c810b2
   zh: b43fa93d9fb7b038
@@ -12,8 +12,8 @@ document:
   en: cfbc10a1063b0681
   zh: 5c1f6875567c7fdc
 /agent-note-stable-document-scope-switching/decision:
-  en: d971ccc7d3e7c296
-  zh: a7073c043621e167
+  en: b7bf9b1667c53bbc
+  zh: e460ea8b679034b2
 /agent-note-stable-document-scope-switching/alternatives-considered:
   en: 9c52c36e71366c42
   zh: 48093458e72175c1

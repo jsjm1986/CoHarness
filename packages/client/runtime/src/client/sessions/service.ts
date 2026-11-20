@@ -1,13 +1,13 @@
 /** Session catalog, view references, local scope generations, and renderer bindings. */
 import { sessionPresentation } from './presentation.ts'
 import type { Context, Fiber } from '@deepseek-ai/cordis'
-import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
+import type { HostDescription, HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
 import type {
   IApiClient, RpcError, RpcResult, SessionId, SubagentAddress, WorkspaceId, JobView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 // Value import from the inline-safe wire layer (not the connection plugin):
 // plugin-to-plugin value imports are a bundle purity error.
-import { SESSION_SEARCH_RESULT_LIMIT } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { runtimeTargetKey, SESSION_SEARCH_RESULT_LIMIT } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {
   HostObservable, SessionMaybeProvideInfo, SessionProvideInfo,
 } from '@deepseek-ai/dsh-client-ui-slots'
@@ -15,7 +15,7 @@ import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/t
 import type { SessionCreateOptions } from '../contract/session-create.ts'
 import type { SessionReferenceSource } from '../index.ts'
 import type { ObservableSnapshot } from '../contract/store.ts'
-import type { SessionReference, SessionTarget, SessionRetainOptions, SessionRetainInfo } from '../contract/sessions.ts'
+import type { SessionReference, SessionTarget, SessionRetainOptions, SessionRetainInfo, SessionSearchProgress } from '../contract/sessions.ts'
 import type { SnapshotStore } from '../contract/store.ts'
 import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionFace } from '../contract/session.ts'
@@ -29,8 +29,8 @@ import type { ObservedJob, SessionListPhase, SessionSearchResultItem, SubagentCa
 import type { SessionListEntry } from './lineage.ts'
 import type { PendingInteractionStatus } from './pending.ts'
 import { SessionProvideChannel } from './provide.ts'
-import type { Session } from './session.ts'
-import { PreparedSessionApi } from '../prepare-runtime.ts'
+import { PAGE_MESSAGES, type Session } from './session.ts'
+import { PreparedSessionApi, PromptTargetUnverified } from '../prepare-runtime.ts'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 
 /**
@@ -39,6 +39,8 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
  */
 export interface SessionSummary {
   id: SessionId
+  /** Restored historical conversation can be read but cannot resume execution. */
+  executionRestriction?: 'recovery-read-only'
   /** Authenticated allocation and computer metadata for this browser presentation. */
   runtime?: import('@deepseek-ai/dsh-client-connection/client').ConnectionRuntimeTarget
   /** Latest durable log-backed title, absent until the host projects one. */
@@ -414,7 +416,7 @@ export class SessionRuntime implements ISessions {
     conversationRuntime?: ConversationRuntime,
     options: {
       persistSelection?: boolean
-      /** Storage name for this account and Runtime; omission retains the standalone selection name. */
+      /** Tab-local storage name for a verified account and exact Runtime; omission retains standalone selection. */
       selectionPersistenceKey?: string
       provideService?: boolean
       hostDescription?: HostDescriptionSource
@@ -428,7 +430,7 @@ export class SessionRuntime implements ISessions {
       {},
       options.persistSelection === false ? undefined
         : { persist: options.selectionPersistenceKey !== undefined
-          ? { name: options.selectionPersistenceKey }
+          ? { name: options.selectionPersistenceKey, storage: 'session' }
           : tabRuntime === null ? { name: 'dsh.sessions.current' } : { name: `dsh.sessions.current.v2.${tabRuntime}`, storage: 'session' } })
     const restored = this.selection.getSnapshot()
     if (restored.subagentAddress === undefined) this.restoredHistoryId = restored.sessionId
@@ -463,10 +465,10 @@ export class SessionRuntime implements ISessions {
         const managed = this.rootCtx.get('deploymentContext')?.getSnapshot().context?.mode === 'multi'
         if (!managed && !forRecovery) return undefined
         const account = this.rootCtx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
-        const target = options.runtimeTarget ?? options.hostDescription?.getSnapshot()?.runtimeTarget
+        const target = this.runtimeTarget ?? options.runtimeTarget ?? options.hostDescription?.getSnapshot()?.runtimeTarget
         if (account === undefined || connection === undefined || target?.runtimeId === undefined) {
           if (!managed) return undefined
-          throw new Error('Cannot verify this conversation’s account and Runtime')
+          throw new PromptTargetUnverified('Cannot verify this conversation’s account and Runtime')
         }
         return new PreparedSessionApi(connection, target, account)
       },
@@ -561,6 +563,13 @@ export class SessionRuntime implements ISessions {
     this.runtimeTarget = target
   }
 
+  /** Refresh the authorized computer for the existing Runtime without rebinding retained Sessions.
+   * @param target - directory coordinates for the service's current presentation identity.
+   */
+  setRuntimeLocation(target: import('@deepseek-ai/dsh-client-connection/client').ConnectionRuntimeTarget): void {
+    this.runtimeTarget = target
+  }
+
   /** Read the current provider roster with every Session value absent.
    * @returns the renderer kit used while an account is being withdrawn.
    */
@@ -595,7 +604,10 @@ export class SessionRuntime implements ISessions {
     const reference = this.retainScope(id, source)
     try {
       const session = this.manager.get(id)
-      session.enterStage()
+      const summary = this.list.getSnapshot().byId[id]
+      const prepared = options.preferPreparedHistory === true && typeof target === 'string'
+        && summary?.blank === false && summary.origin !== 'subagent' ? this.preparedInitialHistory(id) : undefined
+      session.enterStage(prepared)
       reference.attachOpening(session, signal)
       return reference
     } catch (error) {
@@ -786,13 +798,21 @@ export class SessionRuntime implements ISessions {
    * request-local; the list snapshot remains the metadata authority.
    * @param query - non-blank literal phrase.
    * @param signal - cancellation for a superseded search.
+   * @param progress - request-local pending and completed results; cancellation suppresses late publication.
    * @returns bounded results or a business/transport error.
    */
-  search(
+  async search(
     query: string,
     signal: AbortSignal,
+    progress?: (value: SessionSearchProgress) => void,
   ): Promise<RpcResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>> {
-    return this.manager.search(query, signal)
+    signal.throwIfAborted()
+    const runtime = this.runtimeTarget ?? { kind: 'personal' as const }
+    progress?.({ items: [], hasMore: false, targets: [{ runtime, status: 'pending' }] })
+    const result = await this.manager.search(query, signal)
+    signal.throwIfAborted()
+    progress?.({ ...(result.ok ? result.value : { items: [], hasMore: false }), targets: [{ runtime, status: result.ok ? 'ready' : 'error' }] })
+    return result
   }
 
   /**
@@ -801,6 +821,28 @@ export class SessionRuntime implements ISessions {
    */
   handleMuxEnvelope(envelope: Parameters<SessionManager['handleMuxEnvelope']>[0]): void {
     this.manager.handleMuxEnvelope(envelope)
+  }
+
+  /** Resume the original conversation stream while Host metadata is reconnecting.
+   * @param envelope - validated frame from the exact managed Runtime's Mux stream.
+   * @param description - description verified against the connection's previous target.
+   * @param signal - lifetime of that connection generation.
+   * @returns whether the resident window consumed the frame.
+   */
+  resumeMuxEnvelope(envelope: Parameters<SessionManager['handleMuxEnvelope']>[0], description: HostDescription, signal: AbortSignal): boolean {
+    if (this.closed) return false
+    if (envelope.payload.type !== 'session/subscribed') return this.manager.resumeMuxEnvelope(envelope, signal)
+    if (this.rootCtx.get('deploymentContext')?.getSnapshot().context?.mode !== 'multi') return false
+    const connection = this.rootCtx.get('connection') as ConnectionHandle | undefined
+    const document = connection?.documentIdentity
+    const target = description.runtimeTarget
+    if (connection === undefined || document === undefined || target?.nodeId === undefined || target.runtimeId === undefined) return false
+    const account = this.rootCtx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
+    if (account !== undefined && account !== document.principalId) return false
+    return this.manager.resumeMuxEnvelope(envelope, signal, () => {
+      const { sessions } = new PreparedSessionApi(connection, target, document.principalId)
+      return (input, historySignal) => sessions.history(input, historySignal)
+    })
   }
 
   /**
@@ -826,7 +868,7 @@ export class SessionRuntime implements ISessions {
       return
     }
     const session = this.manager.get(id)
-    const prefetch = { session, opening: session.open() }
+    const prefetch = { session, opening: session.open(this.preparedInitialHistory(id)) }
     this.restoredHistory = prefetch
     this.trackDisposal(id, prefetch.opening)
     // The baseline still admits the selection. A denied, missing, or failed
@@ -834,6 +876,43 @@ export class SessionRuntime implements ISessions {
     void this.manager.refreshList().then(() => {
       if (this.restoredHistory === prefetch) this.cancelRestoredHistory()
     })
+  }
+
+  /** Only the authenticated document's subscribed Runtime can use the initial prepared reader. */
+  private preparedInitialHistory(id: SessionId): ((signal: AbortSignal) => ReturnType<IApiClient['sessions']['history']>) | undefined {
+    const connection = this.rootCtx.get('connection') as ConnectionHandle | undefined
+    const document = connection?.documentIdentity
+    const description = connection?.hostDescription.getSnapshot()
+    const target = description?.runtimeTarget
+    if (connection === undefined || document === undefined || description?.executionAuthorityRequired !== true
+      || target?.runtimeId === undefined || target.nodeId === undefined
+      || this.hostDescription !== connection.hostDescription
+      || runtimeTargetKey(document.runtimeTarget) !== runtimeTargetKey(target)) return undefined
+
+    const authority = this.rootCtx.get('projectUiPolicy')
+    const account = authority?.getSnapshot().verifiedAccountId
+    const deployment = this.rootCtx.get('deploymentContext')
+    const policy = deployment?.getSnapshot()
+    if (policy?.context?.mode === 'single' || account !== undefined && account !== document.principalId) return undefined
+
+    const entry = this.rootCtx.get('startupDraft')
+    const scope = target.kind === 'project' ? `project:${String(target.projectId)}` : target.kind
+    const authenticatedEntry = entry?.principalId === document.principalId && entry.runtimeId === target.runtimeId
+      && entry.nodeId === target.nodeId && entry.scope === scope
+    const verifiedPolicy = policy?.phase === 'ready' && policy.context?.mode === 'multi' && account === document.principalId
+    if (!authenticatedEntry && !verifiedPolicy) return undefined
+
+    const requests = verifiedPolicy ? this.rootCtx.get('gatewayEntryRequests') : undefined
+    const request = { sessionId: id, maxMessages: PAGE_MESSAGES, detail: 'conversation' as const }
+    return async (signal) => {
+      const response = await (requests?.history(target, request, signal)
+        ?? new PreparedSessionApi(connection, target, document.principalId).sessions.history(request, signal))
+      signal.throwIfAborted()
+      if (connection.hostDescription.getSnapshot() !== description || deployment?.getSnapshot().context?.mode === 'single') {
+        throw new Error('History preparation lost its Runtime authority')
+      }
+      return response
+    }
   }
 
   /** Cancel only the unclaimed window; a real reference takes over its shared opening. */
@@ -901,7 +980,7 @@ export class SessionRuntime implements ISessions {
    */
   async acceptPrepared(id: SessionId, options: SessionCreateOptions, history?: Awaited<ReturnType<IApiClient['sessions']['history']>>,
     created = history === undefined): Promise<void> {
-    this.manager.acceptPrepared(id, created, options)
+    this.manager.acceptPrepared(id, created, options, history?.result.ok ? history.result.value.executionRestriction : undefined)
     this.projectList()
     if (history !== undefined) await this.manager.get(id).open(history)
   }
@@ -1187,6 +1266,7 @@ export class SessionRuntime implements ISessions {
           id: entry.sessionId,
           displayTitle: displayTitleOf(entry.title, entry.cwd, entry.sessionId),
           running: entry.running,
+          ...(entry.executionRestriction === undefined ? {} : { executionRestriction: entry.executionRestriction }),
           ...(entry.completed ? { completed: true } : {}),
           blank: entry.blank,
           updatedAt: entry.updatedAt,
@@ -1219,6 +1299,7 @@ export class SessionRuntime implements ISessions {
           .find(entry => entry.kind === 'child' && entry.id === childId)
         if (child?.kind !== 'child') break
         const summary = byId[childId]
+        const executionRestriction = this.manager.executionRestriction(childId) ?? summary?.executionRestriction
         const projectionValues = summary?.projectionValues ?? this.manager.projectionValues(childId)
         const projectedTitle = projectionValues?.title
         const title = typeof projectedTitle === 'string' && projectedTitle !== '' ? projectedTitle : undefined
@@ -1232,13 +1313,16 @@ export class SessionRuntime implements ISessions {
             running: child.activity === 'running',
             blank: false,
             updatedAt: 0,
+            ...(executionRestriction === undefined ? {} : { executionRestriction }),
             ...(projectionValues === undefined ? {} : { projectionValues }),
             ...(title === undefined ? {} : { title }),
           }
-        } else if (summary.displayTitle !== displayTitle || summary.projectionValues !== projectionValues) {
+        } else if (summary.displayTitle !== displayTitle || summary.projectionValues !== projectionValues
+          || summary.executionRestriction !== executionRestriction) {
           byId[childId] = {
             ...summary,
             displayTitle,
+            ...(executionRestriction === undefined ? {} : { executionRestriction }),
             ...(projectionValues === undefined ? {} : { projectionValues }),
           }
         }
@@ -1251,7 +1335,9 @@ export class SessionRuntime implements ISessions {
       if (byId[id] !== undefined) continue
       const previous = this.list.getSnapshot().byId[id]
       const snapshot = record.session.getSnapshot()
-      byId[id] = { ...(previous ?? { id, displayTitle: id, updatedAt: 0 }), running: snapshot.running, blank: snapshot.blank }
+      const executionRestriction = this.manager.executionRestriction(id)
+      byId[id] = { ...(previous ?? { id, displayTitle: id, updatedAt: 0 }), running: snapshot.running, blank: snapshot.blank,
+        ...(executionRestriction === undefined ? {} : { executionRestriction }) }
     }
     const persisted = this.selection.getSnapshot().sessionId
     // No current (cleared, or masked gap) wipes the persisted cell — a reload

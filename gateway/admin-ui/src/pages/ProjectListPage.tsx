@@ -144,7 +144,7 @@ export function ProjectListPage() {
           />
         ) : (
           <>
-            <div className="tableWrap desktopOnly">
+            <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionTitle')} tabIndex={0}>
               <table className="dataTable">
                 <thead>
                   <tr>

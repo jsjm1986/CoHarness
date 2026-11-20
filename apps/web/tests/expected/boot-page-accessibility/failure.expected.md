@@ -1,0 +1,1 @@
+- text: "COHARNESS Failed to load plugins web boot: 1 entry did not activate @fixture/long-configuration-long-configuration-long-configuration-long-configuration-long-configuration-long-configuration-long-configuration-long-configuration-long-configuration-client: pending (waiting for service: fixtureNeverProvided)"

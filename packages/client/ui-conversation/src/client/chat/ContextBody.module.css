@@ -9,7 +9,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Source fields beneath the text: dimmer than the content they describe. */
+/* Source metadata follows the main content. */
 .fields {
   display: flex;
   flex-direction: column;
@@ -28,7 +28,7 @@
 .fieldKey {
   flex: none;
   min-width: 96px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .fieldValue {
@@ -62,13 +62,13 @@
 }
 
 .fileAction {
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* catalog: a replacement notice above one row per published entry. */
 .catalogNotice {
   margin: 0 0 6px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
 }
 
 
@@ -117,7 +117,7 @@
 }
 
 .sectionName {
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .sectionText {
@@ -130,7 +130,7 @@
 /* relay: who sent this, above what they said. */
 .relaySender {
   margin: 0 0 6px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
   overflow-wrap: anywhere;
 }
 
@@ -157,5 +157,32 @@
 
 .recallCounts {
   flex: none;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
+}
+
+@container (max-width: 480px) {
+  .entries {
+    gap: var(--dsw-space-2);
+  }
+
+  .entry {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .entryName,
+  .entryDescription {
+    min-width: 0;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .recall {
+    flex-wrap: wrap;
+  }
+
+  .recallLabel {
+    flex-basis: 100%;
+  }
 }

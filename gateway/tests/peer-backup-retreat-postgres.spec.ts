@@ -7,6 +7,7 @@ import type { Pool, PoolClient } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createPostgresPool, runMigrations, transaction } from '../src/postgres/database.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
+import { publishRecoveryProtocol } from '../src/peer-backup-recovery-access.ts'
 import { PeerProjectRecovery } from '../src/peer-backup-takeover.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 
@@ -73,6 +74,7 @@ describePg('recovery retreat resolution', () => {
       VALUES($1,$2,$3,'linux','x64',$4,1,now()+interval '5 minutes')`,
       [org, target, randomBytes(32), randomUUID()],
     )
+    await publishRecoveryProtocol(pool, org, target, 300_000, { project: true, personal: false })
     const sourceVolume = randomUUID(), targetVolume = randomUUID()
     const oid = Math.floor(Math.random() * 1_000_000_000) + 100_000
     await pool.query(

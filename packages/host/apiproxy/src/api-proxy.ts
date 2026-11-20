@@ -19,7 +19,7 @@ import { z as zod } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-terminal-controller'
 import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
-import { installModelSelection } from '@deepseek-ai/dsh-agent'
+import { AgentExecutionRestrictedError, installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentSetup, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
@@ -179,6 +179,7 @@ import { admittedPrompts, promptFingerprint, promptReceiptKey, promptReceiptProj
 import { inboxProjectionDefinition } from './inbox-projection.ts'
 import { modelSelectionProjectionDefinition } from './model-selection-projection.ts'
 import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
+import type { PromptAdmissionObserver, PromptAdmissionPhase } from './api/sessions.ts'
 import { questionResponsePayloadSchema } from './api/questions.schema.ts'
 import type { ClientResponse, RpcError, RpcReceipt, RpcRequest, RpcResponse } from './api/rpc.ts'
 import { RpcId, serverRequestJson } from './api/rpc.ts'
@@ -363,6 +364,8 @@ interface GatewayRequestReader {
 interface GatewayRuntimeIdentityReader {
   /** Runtime identity bound into the launch credential. */
   readonly identity: { readonly kind: 'user' | 'project'; readonly id: number; readonly runtimeId?: import('./api/client-session.ts').ClientRuntimeId }
+  /** Registered computer of the process, when supplied by its launcher. */
+  readonly nodeId?: import('./api/client-session.ts').ClientComputerId
 }
 
 function pluginAdministration(ctx: Context): boolean {
@@ -1370,6 +1373,7 @@ interface PendingApproval {
 /** One mux stream's principal-aware publication entry point. */
 interface MuxSubscription {
   publish(envelope: RpcRequest<MuxFrame>): void
+  publishAssistant(session: Session, packet: RpcRequest<Extract<MuxFrame, { type: 'session/assistant-stream' }>>, ordinal: number): void
 }
 
 /**
@@ -1608,6 +1612,7 @@ interface HistoryTailCacheEntry {
 
 /** The value returned by one successful history implementation before carrier encoding. */
 interface HistoryValue {
+  executionRestriction?: 'recovery-read-only'
   events: HistoryEntry[]
   hasMore: boolean
   projections?: SessionProjectionsBlock
@@ -1949,6 +1954,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   let liveEventClients = 0
   const pendingApprovals = new Map<RpcId, PendingApproval>()
   const muxQueues = new Set<MuxSubscription>()
+  const assistantStreams = new AssistantStreamRegistry()
   const imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
   /** Conversation-detail tail pages reused while a project runtime stays warm. */
   const historyTailCache = new Map<SessionId, HistoryTailCacheEntry>()
@@ -2089,6 +2095,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
   ctx.on('session/event', (session, event) => {
     clearHistoryTail(session.id)
+    if (event.type === 'session/title') assistantStreams.recordTitle(session.id, event)
     const draft = draftSessions.get(session.id)
     if (draft === undefined || !materializesSession(event)) return
     draft.materialized = true
@@ -2099,6 +2106,17 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   ctx.on('session/disposed', (session) => {
     draftSessions.delete(session.id)
     clearHistoryTail(session.id)
+    assistantStreams.forget(session.id)
+  })
+  ctx.on('agent/assistant-stream', ({ agent, frame: streamFrame }) => {
+    const ordinal = assistantStreams.accept(agent, streamFrame)
+    if (muxQueues.size === 0) return
+    const packet = frame({
+      type: 'session/assistant-stream' as const,
+      sessionId: agent.session.id,
+      frame: wireStreamFrame(streamFrame, streamDurableCursor(agent.session)),
+    })
+    for (const subscriber of muxQueues) subscriber.publishAssistant(agent.session, packet, ordinal)
   })
   // Presenter registrations are part of a history response. A hot composition
   // change must not leave a cached page carrying views from the old registry.
@@ -2201,20 +2219,31 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return authority?.participant.scope.kind === 'project' ? authority.participant : undefined
   }
 
+  async function timeAdmission<T>(observe: PromptAdmissionObserver | undefined, phase: PromptAdmissionPhase,
+    work: () => Promise<T>): Promise<T> {
+    if (observe === undefined) return work()
+    const started = performance.now()
+    try { return await work() } finally { observe(phase, performance.now() - started) }
+  }
+
   /** Verify the committed inbox insertion while later events may still be appending to the same log. */
-  async function confirmPromptReceipt(session: Session, key: string, signal?: AbortSignal): Promise<boolean> {
+  async function confirmPromptReceipt(session: Session, key: string, signal?: AbortSignal,
+    observe?: PromptAdmissionObserver): Promise<boolean> {
     const marker = ctx.get('sessionProjections')?.stateOf(session, 'acceptedPromptReceipts')?.[key]
     const persistence = ctx.get('sessionPersistence')
-    if (marker === undefined || persistence === undefined || !await ctx.sessions.flush(session)) return false
+    if (marker === undefined || persistence === undefined
+      || !await timeAdmission(observe, 'flushReceipt', () => ctx.sessions.flush(session))) return false
     const options = signal === undefined ? undefined : { signal }
-    const reader = await persistence.open(session.id, 'read', options)
-    try {
-      if (reader.id !== session.id || reader.header.id !== session.id) return false
-      const { events } = await reader.read(marker.seq, 1, options)
-      const [event] = events
-      return events.length === 1 && event?.seq === marker.seq
-        && admittedPrompts(event).some(item => item.key === key && item.digest === marker.digest)
-    } finally { await reader.close() }
+    return timeAdmission(observe, 'readReceipt', async () => {
+      const reader = await persistence.open(session.id, 'read', options)
+      try {
+        if (reader.id !== session.id || reader.header.id !== session.id) return false
+        const { events } = await reader.read(marker.seq, 1, options)
+        const [event] = events
+        return events.length === 1 && event?.seq === marker.seq
+          && admittedPrompts(event).some(item => item.key === key && item.digest === marker.digest)
+      } finally { await reader.close() }
+    })
   }
 
 
@@ -3406,6 +3435,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     session: PresetBearingSession,
     options: { readonly lookupLiveAgent?: boolean } = {},
   ): Promise<ScopeKey | undefined> {
+    if (ctx.get('agentExecutionAdmission')?.restriction(sessionId) !== undefined) return undefined
     const live = options.lookupLiveAgent === false ? undefined : ctx.get('agents')?.get(sessionId)
     if (live !== undefined) return live
     const presets = ctx.get('agentPresets')
@@ -3763,6 +3793,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       } finally { verified.close() }
     }
     items.sort((a, b) => b.updatedAt - a.updatedAt)
+    const admission = ctx.get('agentExecutionAdmission')
+    if (admission !== undefined) {
+      for (const item of items) {
+        const restriction = admission.restriction(item.sessionId)
+        if (restriction !== undefined) item.executionRestriction = restriction.code
+      }
+    }
     const collaboration = collaborationOf(ctx)
     if (collaboration === undefined) return items
     const captured = authority ?? collaboration.capture()
@@ -4507,7 +4544,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               // fresh Session: the stale blank never blocks New Session, and
               // writer contention no longer surfaces to the client.
               const writerHeld = error instanceof Error && error.name === 'SessionAlreadyOwnedError'
-              if (!reuseRequested || (!(error instanceof BlankReuseDeclined) && !writerHeld)) throw error
+              if (!reuseRequested || (!(error instanceof BlankReuseDeclined) && !writerHeld
+                && !(error instanceof AgentExecutionRestrictedError))) throw error
               const minted = `session-${randomUUID()}` as SessionId
               const draft = draftSessions.get(sessionId)
               if (draft !== undefined) {
@@ -4522,6 +4560,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           )
         } catch (error: unknown) {
           if (draftRequested) draftSessions.delete(sessionId)
+          if (error instanceof AgentExecutionRestrictedError) {
+            return err(request, { code: error.code, message: error.message, details: { sessionId: error.sessionId } })
+          }
           if (error instanceof CollaborationError) {
             return err(request, collaborationRefusal(error, 'write', sessionId))
           }
@@ -4645,6 +4686,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async history(request, signal) {
         const { sessionId, toolCallId, beforeSeq, maxMessages, detail } = request.payload
+        const reply = (value: HistoryValue) => {
+          const restriction = ctx.get('agentExecutionAdmission')?.restriction(sessionId)
+          return ok(request, restriction === undefined ? value : { ...value, executionRestriction: restriction.code })
+        }
         if (signal?.aborted) {
           return err(request, { code: 'cancelled', message: 'history read was cancelled', details: {} })
         }
@@ -4660,7 +4705,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         let detachedRevisionCheck: Promise<PromiseSettledResult<SessionPersistenceRevision | undefined>> | undefined
         try {
           signal?.throwIfAborted()
-          if (toolCallId !== undefined) return ok(request, await callHistoryFor(sessionId, toolCallId, signal))
+          if (toolCallId !== undefined) return reply(await callHistoryFor(sessionId, toolCallId, signal))
           const tailRequest = beforeSeq === undefined && detail === 'conversation'
           const normalizedMaxMessages = maxMessages ?? DEFAULT_MAX_MESSAGES
           const projectionRevision = projectionRevisionOf(ctx)
@@ -4681,7 +4726,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                   sessionId, 'detached', undefined, normalizedMaxMessages, projectionRevision, detachedRevisionBefore,
                 )
                 if (cached !== undefined && projectionRevisionOf(ctx) === projectionRevision) {
-                  return ok(request, cached)
+                  return reply(cached)
                 }
               }
             }
@@ -4708,7 +4753,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             if (cached !== undefined
               && projectionRevisionOf(ctx) === projectionRevision
               && sourceSignature === historySourceSignature(source)) {
-              return ok(request, cached)
+              return reply(cached)
             }
           }
           // The parallel probe is observed immediately and joined even when another read fails.
@@ -4770,7 +4815,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               value,
             )
           }
-          return ok(request, value)
+          return reply(value)
         } catch (error: unknown) {
           if (signal?.aborted) {
             return err(request, { code: 'cancelled', message: 'history read was cancelled', details: {} })
@@ -5003,6 +5048,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         try {
           admission = ctx.agents.reserveUse([sessionId])
         } catch (error: unknown) {
+          if (error instanceof AgentExecutionRestrictedError) {
+            return err(request, { code: error.code, message: error.message, details: { sessionId: error.sessionId } })
+          }
           return err(request, { code: 'fork-unavailable', message: String(error), details: { sessionId } })
         }
         using _admission = admission
@@ -5109,7 +5157,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         return ok(request, { sessionId: childId })
       },
 
-      async prompt(request) {
+      async prompt(request, observe) {
         const { sessionId, mode, content, clientTimeZone, requestId } = request.payload
         if (!hasPromptContent(content)) {
           return err(request, {
@@ -5118,7 +5166,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { issues: [] },
           })
         }
-        const authorized = await authorizeSession(sessionId, 'write')
+        const authorized = await timeAdmission(observe, 'sessionAuthority', () => authorizeSession(sessionId, 'write'))
         if ('error' in authorized) return err(request, authorized.error)
         // An archived session admits no input; clients may hold a stale
         // mounted view until the archive baseline lands.
@@ -5134,7 +5182,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { value: clientTimeZone },
           })
         }
-        const resolved = await turnAgentFor<{ accepted: true }>(request, sessionId)
+        const resolved = await timeAdmission(observe, 'agentReadiness', () => turnAgentFor<{ accepted: true }>(request, sessionId))
         if ('refused' in resolved) return resolved.refused
         const agent = resolved.agent
         // Request identity and optional browser zone ride the exact durable user message.
@@ -5149,7 +5197,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           message: 'The input receipt could not be verified on this Runtime.', details: { sessionId } })
         const confirm = async (): Promise<RpcResponse<{ accepted: true }>> => {
           try {
-            if (receipt !== undefined && await confirmPromptReceipt(agent.session, receipt.key)) {
+            if (receipt !== undefined && await confirmPromptReceipt(agent.session, receipt.key, undefined, observe)) {
               return ok(request, { accepted: true as const })
             }
           } catch { /* The caller queries the same receipt after a write failure. */ }
@@ -5163,7 +5211,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           ...(participant === undefined ? {} : { participant }),
         } satisfies MessageSource
         const hasImage = content.some(part => part.type === 'image')
+        const admissionRequested = observe === undefined ? 0 : performance.now()
         const admit = async (): Promise<RpcResponse<{ accepted: true }>> => {
+          observe?.('admissionWait', performance.now() - admissionRequested)
           if (receipt !== undefined) {
             const state = ctx.get('sessionProjections')?.stateOf(agent.session, 'acceptedPromptReceipts')
             if (state === undefined || ctx.get('sessionPersistence') === undefined) return unavailable()
@@ -5189,13 +5239,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               : { ...source, documents: durable.documents }
             let message: UserMessage = createUserMessage({ content: durable.blocks, source: messageSource })
             const execution = executionAuthorityOf(ctx)
-            if (execution !== undefined) message = await execution.stamp(agent.session, message)
+            if (execution !== undefined) {
+              const original = message
+              message = await timeAdmission(observe, 'executionStamp', () => execution.stamp(agent.session, original))
+            }
             // Re-decide after the awaited conversion/stamp: a session archived
             // mid-request admits no input.
             const archived = archivedInputError(sessionId)
             if (archived !== undefined) return err(request, archived)
-            if (mode === 'steer') agent.steer(message)
-            else agent.followup(message)
+            const appendStarted = observe === undefined ? 0 : performance.now()
+            try {
+              if (mode === 'steer') agent.steer(message)
+              else agent.followup(message)
+            } finally { observe?.('inboxAppend', performance.now() - appendStarted) }
           } catch (error: unknown) {
             if (error instanceof AttachmentError) {
               return err(request, {
@@ -5454,6 +5510,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const {
           parentSessionId, childSessionId, mode, toolCallId, beforeSeq, maxMessages, detail,
         } = request.payload
+        const reply = (value: HistoryValue) => {
+          const restriction = ctx.get('agentExecutionAdmission')?.restriction(childSessionId)
+          return ok(request, restriction === undefined ? value : { ...value, executionRestriction: restriction.code })
+        }
         if (signal?.aborted) {
           return err(request, { code: 'cancelled', message: 'subagent history read was cancelled', details: {} })
         }
@@ -5473,7 +5533,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         let detachedBaseline: SessionProjectionsBlock | undefined
         let source: HistorySource
         try {
-          if (toolCallId !== undefined) return ok(request, await callHistoryFor(childSessionId, toolCallId, signal, parentSessionId))
+          if (toolCallId !== undefined) return reply(await callHistoryFor(childSessionId, toolCallId, signal, parentSessionId))
           source = await historySourceFor(childSessionId, {
             ...(beforeSeq === undefined ? {} : { beforeSeq }),
             ...(maxMessages === undefined ? {} : { maxMessages }),
@@ -5549,7 +5609,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           })
         }
         const page = historyPage(ctx, events, beforeSeq, maxMessages, scope)
-        return ok(request, historyValue({
+        return reply(historyValue({
           events: page.events,
           hasMore: page.hasMore || (source.kind === 'detached' && source.hasMore),
         }, detail, projections))
@@ -5933,7 +5993,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         // TODO: version should read apps/cli's package.json; placeholder for now.
         const selection = defaults.defaultModelSelection()
-        const runtimeIdentity = (ctx.get('gatewayRuntime', false) as GatewayRuntimeIdentityReader | undefined)?.identity
+        const gatewayRuntime = ctx.get('gatewayRuntime', false) as GatewayRuntimeIdentityReader | undefined
+        const runtimeIdentity = gatewayRuntime?.identity
         const desktopUnavailable = computerUseUnavailableReason(ctx)
         return ok(request, {
           version: '0.0.1',
@@ -5954,6 +6015,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ...(runtimeIdentity?.kind === 'project'
               ? { kind: 'project' as const, projectId: runtimeIdentity.id } : { kind: 'personal' as const }),
             ...(runtimeIdentity?.runtimeId === undefined ? {} : { runtimeId: runtimeIdentity.runtimeId }),
+            ...(gatewayRuntime?.nodeId === undefined ? {} : { nodeId: gatewayRuntime.nodeId }),
           },
           ...(ctx.get('fs') === undefined ? {} : { workspaceFiles: {
             maxBytes: defaults.workspaceFileMaxBytes ?? DEFAULT_WORKSPACE_FILE_MAX_BYTES,
@@ -6417,7 +6479,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const initializationDeliveries: Array<{ sessionId: SessionId; deliver: () => void }> = []
           const jobs = ctx.get('jobs')
           const openCalls = new Map<SessionId, Map<string, { name: string; args: unknown }>>()
-          const assistantStreams = new AssistantStreamRegistry()
           /** Per-session count of stream frames covered by the pushed baseline. */
           const streamBaseOrdinals = new Map<SessionId, number>()
           let initializing = true
@@ -6462,6 +6523,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               }
               publishFor(sessionId, () => { queue.push(envelope) })
             },
+            publishAssistant(session, packet, ordinal) {
+              publishFor(session.id, () => {
+                subscribe(session)
+                // The subscription baseline covers earlier frames, including output while the transport was closed.
+                if (ordinal > (streamBaseOrdinals.get(session.id) ?? 0)) queue.push(packet)
+              })
+            },
           }
 
           const pushJobs = (session: Session): void => {
@@ -6493,8 +6561,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               publishEvent(session, event)
             }
             const stream = assistantStreams.snapshot(session.id)
+            const title = stream.titleEvent
             streamBaseOrdinals.set(session.id, stream.ordinal)
             subscribeSession(queue, session, lastSeq, stream.baseline)
+            if (stream.baseline.activeAttempt !== undefined && title?.seq === through && title.seq > replayEnd) {
+              publishEvent(session, title)
+            }
             pushJobs(session)
           }
 
@@ -6540,25 +6612,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               subscribed.delete(session.id)
               readable.delete(session.id)
               pendingDeliveries.delete(session.id)
-              assistantStreams.forget(session.id)
               streamBaseOrdinals.delete(session.id)
-            }),
-            ctx.on('agent/assistant-stream', ({ agent, frame: streamFrame }) => {
-              const session = agent.session
-              const cursor = streamDurableCursor(session)
-              const ordinal = assistantStreams.accept(agent, streamFrame)
-              publishFor(session.id, () => {
-                subscribe(session)
-                // Frames at or below the pushed baseline's coverage are
-                // already represented by it; only newer frames go live.
-                if (ordinal > (streamBaseOrdinals.get(session.id) ?? 0)) {
-                  queue.push(frame({
-                    type: 'session/assistant-stream',
-                    sessionId: session.id,
-                    frame: wireStreamFrame(streamFrame, cursor),
-                  }))
-                }
-              })
             }),
             ...jobs === undefined ? [] : [jobs.events.subscribe({ owners: 'all' }, (event) => {
               // Output readers have their own cursor; only lifecycle changes refresh the roster.

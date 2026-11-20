@@ -46,6 +46,7 @@
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- paragraph: partial
 - status: Deep diving...
 - button "3 queued messages" [expanded]
 - list:
@@ -84,8 +85,8 @@
 - button "Stop generating"
 - button "Send message" [disabled]
 - group "Session statistics":
-  - button "1 turns · 1 steps":
+  - button "1 turn · 1 step":
     - img
-    - text: 1 turns · 1 steps
+    - text: 1 turn · 1 step
 - separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

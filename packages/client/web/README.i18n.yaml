@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/web/README.md
 document:
-  en: 0c8421b52d5b255cc30f5345d5f1fe6d46c3d85f
-  zh: 37f385ba590c7d0bdbf536c3fef19cbade814e97
+  en: 6b885a909b88e95ac16aabefbd7278cc6a6b3f7c
+  zh: 75bff9da3df27f120f3706d2bb386317256ef853
 /:
   en: a702bbb711d8d2fb
   zh: 0a51af1cad6486b4
 /deepseek-ai-dsh-client-web:
-  en: 44e5a523d9299a61
-  zh: 197fc6c4f63dfb9c
+  en: cf44356a2af63902
+  zh: 1e41a530dbc6ce91
 /deepseek-ai-dsh-client-web/summary:
-  en: 646bd0a246789400
-  zh: d875dc0d37f46338
+  en: 42c461bf5f4db9ac
+  zh: 41dbd8cccb2d642c
 /deepseek-ai-dsh-client-web/table-of-contents:
   en: b4683d2a53256fda
   zh: 4e65ff63dc8c48fe
@@ -24,8 +24,8 @@ document:
   en: ca75c51c89c2c9b0
   zh: 2026c1566df4f78c
 /deepseek-ai-dsh-client-web/known-limitations-and-deferred-work:
-  en: 53a12f13beafe0c1
-  zh: 4590929ef3e54c8a
+  en: b4d18174d3cd4acd
+  zh: 5ea6249611c9df85
 /deepseek-ai-dsh-client-web/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

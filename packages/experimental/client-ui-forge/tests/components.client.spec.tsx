@@ -157,11 +157,11 @@ describe('ActionToast', () => {
   it('confirms a success with its values', () => {
     const b = toast()
     act(() => { b.notices.report('toast.removed', { tone: 'success', params: { name: '#7' } }) })
-    const alert = screen.getByRole('alert')
-    expect(alert.textContent).toBe('Removed #7 from this Session')
-    expect(alert.querySelector(`.${toastCss.success}`)).not.toBeNull()
+    const notice = screen.getByRole('status')
+    expect(notice.textContent).toBe('Removed #7 from this Session')
+    expect(notice.querySelector(`.${toastCss.success}`)).not.toBeNull()
     act(() => { vi.advanceTimersByTime(4000) })
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('holds an undoable notice longer and dismisses it before undoing', () => {
@@ -175,9 +175,9 @@ describe('ActionToast', () => {
     act(() => { vi.advanceTimersByTime(6999) })
     expect(order).toEqual([])
 
-    fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: en['toast.undo'] }))
+    fireEvent.click(within(screen.getByRole('status')).getByRole('button', { name: en['toast.undo'] }))
     expect(order).toEqual(['dismiss', 'undo'])
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('fades an undoable notice nobody acts on without undoing', () => {

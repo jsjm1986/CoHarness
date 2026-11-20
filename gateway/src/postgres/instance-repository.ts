@@ -1,6 +1,6 @@
 import type { NodeProjectFiles } from '../node-content-files.ts'
 import {getProjectContentBinding,NodeContentUnavailable} from '../node-content-store.ts'
-import { RuntimeStartBlockedError, RuntimeGenerationConflictError, type InstanceRepository, type RuntimeInstanceSnapshot, type RuntimeTarget, type RuntimeStartIntent, type RuntimeStopReason,
+import { RuntimeStartBlockedError, RuntimeAssignmentMissingError, RuntimeGenerationConflictError, type InstanceRepository, type RuntimeInstanceSnapshot, type RuntimeTarget, type RuntimeStartIntent, type RuntimeStopReason,
   type RuntimeStopLease, type RuntimeStopOperationId, type RuntimeStopPurpose } from '../instances.ts'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { PersonalRuntimePolicy } from '../instances.ts'
@@ -19,6 +19,7 @@ import { lockProjectManagement } from './project-management-authority.ts'
 import type { Queryable } from './database.ts'
 import { lockAdministrator } from './administrator-authority.ts'
 import type { ProjectOrigin } from '../projects.ts'
+import type { GovernanceLocalPaths } from '../governance-rebuild-local-paths.ts'
 
 function runtimeAddress(target: RuntimeTarget, parameter: number): string {
   const owner = target.kind === 'user' ? 'user_id' : 'project_id'
@@ -65,9 +66,19 @@ export class PostgresInstanceRepository implements InstanceRepository {
     private readonly runtimeTokenCacheMs = 0,
   ) {}
 
+  /** Node-private verified data paths. Missing required evidence throws; omitted dshHome preserves a new Runtime's layout. */
+  resolveLocalPaths?:(target:RuntimeTarget)=>Promise<GovernanceLocalPaths|undefined>
+
   /** Drop every memoized credential verdict; access invalidation and local fencing call this. */
   invalidateRuntimeTokenCache(): void {
     this.tokenCache.clear()
+    this.tokenFlights.clear()
+  }
+
+  private async afterStopIntent<T extends boolean | RuntimeStopLease>(work: Promise<T>): Promise<T> {
+    const result = await work
+    if (result !== false) this.invalidateRuntimeTokenCache()
+    return result
   }
 
   /** Verify a placed project's files before allocating or launching a new process. */
@@ -237,7 +248,10 @@ export class PostgresInstanceRepository implements InstanceRepository {
       WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND ${owner.predicate}`,
     [this.context.organizationId, this.context.nodeId, target.id, target.runtimeId ?? null])
     const generation = result.rows[0]?.generation
-    if (generation === undefined) throw new Error(`no instance row for ${owner.noun} ${String(target.id)}`)
+    if (generation === undefined) {
+      if (target.runtimeId !== undefined) throw new RuntimeAssignmentMissingError(target)
+      throw new Error(`no instance row for ${owner.noun} ${String(target.id)}`)
+    }
     return Number(generation)
   }
 
@@ -274,8 +288,8 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return row.stop_reason
   }
 
-  async touch(target: RuntimeTarget, at: number): Promise<void> {
-    await this.activity(target,at,false)
+  async touch(target: RuntimeTarget, at: number, generation?: number): Promise<void> {
+    await this.activity(target,at,false,generation)
   }
 
   async admitLease(target: RuntimeTarget, at: number, generation?: number): Promise<boolean> {
@@ -306,9 +320,13 @@ export class PostgresInstanceRepository implements InstanceRepository {
           AND ${owner.predicate} AND i.generation=$4 AND i.observed_state IN ('starting','ready','stopping')
           AND NOT EXISTS(SELECT 1 FROM harness.runtime_destructive_operations operation
             WHERE operation.organization_id=i.organization_id AND operation.runtime_id=i.runtime_id)
+          AND harness.node_execution_available(i.organization_id,i.assigned_node_id)
+          AND NOT EXISTS(SELECT 1 FROM harness.node_resource_requests request
+            WHERE request.organization_id=i.organization_id AND request.node_id=i.assigned_node_id
+              AND request.runtime_kind=$6 AND request.runtime_public_id=owner.public_id AND request.generation=i.generation)
           AND i.node_connection_id IS NOT NULL AND NOT harness.runtime_node_execution_allowed(
             i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)`,
-      [this.context.organizationId, this.context.nodeId, target.id, generation, target.runtimeId ?? null])
+      [this.context.organizationId, this.context.nodeId, target.id, generation, target.runtimeId ?? null, target.kind])
       return result.rowCount === 1
     }
     return administratorUserId === undefined ? claim(this.context.pool) : this.withAdministrator(administratorUserId, claim)
@@ -334,9 +352,11 @@ export class PostgresInstanceRepository implements InstanceRepository {
     [this.context.organizationId, this.context.nodeId, target.id, at, runtimeTokenHash, intent, target.runtimeId ?? null, recordActivity, launchStamp ?? null])
     const result = await (administratorUserId === undefined ? claim(this.context.pool)
       : this.withAdministrator(administratorUserId, claim)).catch((error: unknown) => {
+      if (error instanceof Error && 'constraint' in error && error.constraint === 'runtime_recovery_review')
+        throw new RuntimeStartBlockedError('unavailable','This restored Runtime is paused pending execution recovery review.')
       if (error instanceof Error && 'code' in error && error.code === '55000'
         && 'constraint' in error && (error.constraint === 'runtime_destructive_operation'
-          || error.constraint === 'runtime_node_execution')) throw new RuntimeStartBlockedError('unavailable')
+          || error.constraint === 'runtime_node_execution' || error.constraint === 'runtime_recovery_review')) throw new RuntimeStartBlockedError('unavailable')
       throw error
     })
     const generation = result.rows[0]?.generation
@@ -401,9 +421,8 @@ export class PostgresInstanceRepository implements InstanceRepository {
   }
 
   /**
-   * Recently active stopped assignments whose stop cause was infrastructure,
-   * not intent; reconciliation warms them while manual and access-change
-   * stops stay stopped.
+   * Recover durable running intent after infrastructure failure; recent legacy
+   * stops retain their compatibility window. Explicit and idle stops stay stopped.
    */
   async warmTargets(activityCutoff: number): Promise<RuntimeTarget[]> {
     const result = await this.context.pool.query<{ kind: 'user' | 'project'; public_id: string; runtime_id: RuntimeId }>(`SELECT i.runtime_id,
@@ -414,7 +433,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
       LEFT JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
       WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND i.observed_state='stopped'
         AND i.provisioning_state='ready' AND i.stop_reason IN ('shutdown','failed')
-        AND i.last_activity_at > to_timestamp($3/1000.0)
+        AND (i.desired_state='running' OR i.last_activity_at > to_timestamp($3/1000.0))
       ORDER BY i.last_activity_at DESC`, [this.context.organizationId, this.context.nodeId, activityCutoff])
     return result.rows.map(row => ({ kind: row.kind, id: publicNumber(row.public_id, row.kind), runtimeId: row.runtime_id }))
   }
@@ -429,8 +448,10 @@ export class PostgresInstanceRepository implements InstanceRepository {
       AND NOT EXISTS (SELECT 1 FROM harness.node_resource_requests request WHERE request.organization_id=i.organization_id
         AND request.node_id=i.assigned_node_id AND request.runtime_kind='${target.kind}' AND request.runtime_public_id=$3
         AND request.generation=i.generation)`
-    const result = await database.query(`UPDATE harness.instances i SET desired_state='stopped',observed_state='stopping',
-      stop_reason=CASE WHEN i.stop_reason='manual' THEN 'manual' ELSE $5 END,updated_at=now() FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
+    const result = await database.query(`UPDATE harness.instances i SET observed_state='stopping',
+      desired_state=CASE WHEN $5 IN ('shutdown','failed') AND COALESCE(i.stop_reason,'') NOT IN ('manual','idle','access-change') THEN i.desired_state ELSE 'stopped' END,
+      stop_reason=CASE WHEN i.stop_reason='manual' OR ($5 IN ('shutdown','failed') AND i.stop_reason IN ('idle','access-change')) THEN i.stop_reason ELSE $5 END,
+      updated_at=now() FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
       WHERE owner.id=${target.kind === 'user' ? 'i.user_id' : 'i.project_id'}
         AND owner.organization_id=i.organization_id AND i.organization_id=$1
         AND i.assigned_node_id=$2 AND owner.public_id=$3 AND i.generation=$4 AND ${runtimeAddress(target, 6)} ${idlePredicate}`,
@@ -441,20 +462,20 @@ export class PostgresInstanceRepository implements InstanceRepository {
 
   /** Atomically retain queued, running and uncertain work before claiming automatic process termination. */
   async markIdleStopping(target: RuntimeTarget, generation: number, cutoff: number): Promise<boolean> {
-    return transaction(this.context.pool, async client => {
+    return this.afterStopIntent(transaction(this.context.pool, async client => {
       const locked = await client.query(`SELECT 1 FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2 FOR UPDATE`,
         [this.context.organizationId, this.context.nodeId])
       if (locked.rowCount !== 1) return false
       return this.writeStopping(client, target, generation, 'idle', cutoff)
-    })
+    }))
   }
 
   async markStopping(target: RuntimeTarget, generation: number, reason: RuntimeStopReason = 'manual', actorUserId?: number): Promise<boolean> {
-    if (actorUserId === undefined) return this.writeStopping(this.context.pool, target, generation, reason)
-    return transaction(this.context.pool, async client => {
+    if (actorUserId === undefined) return this.afterStopIntent(this.writeStopping(this.context.pool, target, generation, reason))
+    return this.afterStopIntent(transaction(this.context.pool, async client => {
       await this.destructiveActor(client, target, actorUserId)
       return this.writeStopping(client, target, generation, reason)
-    })
+    }))
   }
 
   private withAdministrator<T>(administratorUserId: number, operation: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -469,13 +490,13 @@ export class PostgresInstanceRepository implements InstanceRepository {
   }
 
   markControlStopping(target: RuntimeTarget, generation: number, reason: RuntimeStopReason, administratorUserId: number): Promise<boolean> {
-    return this.withAdministrator(administratorUserId, client => this.writeStopping(client, target, generation, reason))
+    return this.afterStopIntent(this.withAdministrator(administratorUserId, client => this.writeStopping(client, target, generation, reason)))
   }
 
   async acquireStopLease(target: RuntimeTarget, operationId: RuntimeStopOperationId, owner: GatewayResourceOwner, actorUserId?: number, expectedGeneration?: number,
     purpose: RuntimeStopPurpose = 'destructive'): Promise<RuntimeStopLease> {
     if (owner.organizationId !== this.context.organizationId) throw new Error('Gateway process owner belongs to another organization')
-    return transaction(this.context.pool, async client => {
+    return this.afterStopIntent(transaction(this.context.pool, async client => {
       if (actorUserId !== undefined) {
         switch (purpose) {
           case 'control': await lockAdministrator(client, this.context, actorUserId); break
@@ -509,7 +530,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
         WHERE organization_id=$1 AND runtime_id=$2 AND assigned_node_id=$3 AND generation=$4`,
       [this.context.organizationId, row.runtime_id, this.context.nodeId, generation])
       return { runtimeId: row.runtime_id, operationId, generation, wasStopped: row.observed_state === 'stopped' }
-    })
+    }))
   }
 
   async confirmStopLease(operationId: RuntimeStopOperationId, owner: GatewayResourceOwner): Promise<void> {
@@ -540,8 +561,10 @@ export class PostgresInstanceRepository implements InstanceRepository {
   }
 
   async markStopped(target: RuntimeTarget, generation: number, reason?: RuntimeStopReason): Promise<boolean> {
-    const result = await this.context.pool.query(`UPDATE harness.instances i SET desired_state='stopped',observed_state='stopped',
-      stop_reason=CASE WHEN i.stop_reason='manual' THEN 'manual' ELSE COALESCE($5,i.stop_reason) END,last_heartbeat_at=now(),runtime_token_hash=NULL,runtime_token_issued_at=NULL,updated_at=now()
+    const result = await this.context.pool.query(`UPDATE harness.instances i SET observed_state='stopped',
+      desired_state=CASE WHEN COALESCE($5,i.stop_reason) IN ('shutdown','failed') AND COALESCE(i.stop_reason,'') NOT IN ('manual','idle','access-change') THEN i.desired_state ELSE 'stopped' END,
+      stop_reason=CASE WHEN i.stop_reason='manual' OR ($5 IN ('shutdown','failed') AND i.stop_reason IN ('idle','access-change')) THEN i.stop_reason ELSE COALESCE($5,i.stop_reason) END,
+      last_heartbeat_at=now(),runtime_token_hash=NULL,runtime_token_issued_at=NULL,updated_at=now()
       FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
       WHERE owner.id=${target.kind === 'user' ? 'i.user_id' : 'i.project_id'}
         AND owner.organization_id=i.organization_id AND i.organization_id=$1
@@ -551,11 +574,12 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return result.rowCount === 1
   }
 
-  async owner(target: RuntimeTarget): Promise<{
+  async owner(target: RuntimeTarget,purpose?:'supervisor-identity'): Promise<{
     kind: 'user' | 'project'
     id: number
     username: string
     homePath: string
+    dshHome?: string
     storageLayout?: PersonalRuntimeStorageLayout
     provisioning?: 'preparing' | 'ready'
     name?: string
@@ -564,6 +588,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
     /** Stored creation source for the launch-time directory policy. */
     projectOrigin?: ProjectOrigin
   } | null> {
+    const local=purpose==='supervisor-identity'?undefined:await this.resolveLocalPaths?.(target)
     if (target.kind === 'user') {
       const result = await this.context.pool.query<{
         public_id: string
@@ -582,7 +607,8 @@ export class PostgresInstanceRepository implements InstanceRepository {
         kind: 'user',
         id: publicNumber(row.public_id, 'user'),
         username: row.username,
-        homePath: row.home_path,
+        homePath: local?.homePath??row.home_path,
+        ...(local?.dshHome===undefined?{}:{dshHome:local.dshHome}),
         storageLayout: row.storage_layout,
         provisioning: row.provisioning_state,
       }
@@ -596,10 +622,11 @@ export class PostgresInstanceRepository implements InstanceRepository {
     } & ProjectContentRef>(`SELECT p.public_id::text,p.name::text,m.local_path,p.kind,p.origin,harness.project_content_key(p.organization_id,p.id) content
       FROM harness.projects p
       JOIN harness.instances i ON i.project_id=p.id AND i.organization_id=p.organization_id
-      JOIN harness.project_mounts m ON m.project_id=p.id AND m.organization_id=p.organization_id
+      LEFT JOIN harness.project_mounts m ON m.project_id=p.id AND m.organization_id=p.organization_id
         AND m.node_id=i.assigned_node_id AND m.status='active'
-      WHERE p.organization_id=$1 AND i.assigned_node_id=$2 AND p.public_id=$3 AND ${runtimeAddress(target, 4)}`,
-    [this.context.organizationId, this.context.nodeId, target.id, target.runtimeId ?? null])
+      WHERE p.organization_id=$1 AND i.assigned_node_id=$2 AND p.public_id=$3 AND ${runtimeAddress(target, 4)}
+        AND (m.project_id IS NOT NULL OR $5)`,
+    [this.context.organizationId, this.context.nodeId, target.id, target.runtimeId ?? null,local!==undefined])
     const display=await localProjectDisplays(this.nodeProjects,result.rows)
     const row = result.rows[0]
     return row === undefined ? null : {
@@ -609,7 +636,8 @@ export class PostgresInstanceRepository implements InstanceRepository {
       id: publicNumber(row.public_id, 'project'),
       username: `project-${row.public_id}`,
       name:row.content?display.get(row.content.projectId)!.name:row.name,
-      homePath:row.content?display.get(row.content.projectId)!.rootPath:row.local_path,
+      homePath:local?.homePath??(row.content?display.get(row.content.projectId)!.rootPath:row.local_path),
+      ...(local?.dshHome===undefined?{}:{dshHome:local.dshHome}),
     }
   }
 
@@ -629,13 +657,26 @@ export class PostgresInstanceRepository implements InstanceRepository {
     [this.context.organizationId, this.context.nodeId, id, runtimeId ?? null])
     const result = await (administratorUserId === undefined ? read(this.context.pool) : this.withAdministrator(administratorUserId, read))
     const row = result.rows[0]
-    return row === undefined ? null : { id: publicNumber(row.public_id, 'user'), username: row.username,
-      homePath: row.home_path, role: row.role === 'admin' ? 'admin' : 'user', status: 'active', runtimeId: row.runtime_id, storageLayout: row.storage_layout }
+    if(row===undefined)return null
+    const local=await this.resolveLocalPaths?.({kind:'user',id,runtimeId:row.runtime_id})
+    return { id: publicNumber(row.public_id, 'user'), username: row.username,
+      homePath: local?.homePath??row.home_path,...(local?.dshHome===undefined?{}:{dshHome:local.dshHome}), role: row.role === 'admin' ? 'admin' : 'user', status: 'active', runtimeId: row.runtime_id, storageLayout: row.storage_layout }
   }
 
   /** Resolve a live runtime credential to its current generation and owner ids. */
   async authenticateRuntimeToken(token: string): Promise<RuntimeCredentialSubject | null> {
     return this.authenticateToken(token, false)
+  }
+
+  /**
+   * Recheck a live Runtime bearer and serving data generation for stream liveness.
+   * @param token - private bearer retained by the exact Runtime generation.
+   * @param control - reserved PostgreSQL connection source.
+   * @param writeEpoch - data generation observed by this serving Gateway.
+   * @returns current Runtime authority or null after revocation or restoration.
+   */
+  async authenticateRuntimeControlToken(token: string, control: Queryable, writeEpoch: bigint): Promise<RuntimeCredentialSubject | null> {
+    return this.authenticateTokenQuery(createHash('sha256').update(token).digest(), 'run', control, writeEpoch)
   }
 
   /**
@@ -647,25 +688,38 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return this.authenticateToken(token, true)
   }
 
+  /**
+   * Authenticate an existing project's final Session append or suffix readback during planned stop.
+   * @param token - current generation's private Runtime bearer.
+   * @returns exact node, generation and content scope while its planned stop still owns the write placement.
+   */
+  async authenticateRuntimeShutdownToken(token: string): Promise<RuntimeCredentialSubject | null> {
+    return this.authenticateTokenQuery(createHash('sha256').update(token).digest(), 'shutdown-storage')
+  }
+
   private async authenticateToken(token: string, cleanup: boolean): Promise<RuntimeCredentialSubject | null> {
     const hash = createHash('sha256').update(token).digest()
-    if (this.runtimeTokenCacheMs <= 0) return this.authenticateTokenQuery(hash, cleanup)
-    const key = `${cleanup ? 'cleanup' : 'run'}:${hash.toString('hex')}`
+    const use = cleanup ? 'cleanup' : 'run'
+    if (this.runtimeTokenCacheMs <= 0) return this.authenticateTokenQuery(hash, use)
+    const key = `${use}:${hash.toString('hex')}`
     const cached = this.tokenCache.get(key)
     if (cached !== undefined && cached.expiresAt > Date.now()) return cached.subject
     const flight = this.tokenFlights.get(key)
     if (flight !== undefined) return flight
-    const pending = this.authenticateTokenQuery(hash, cleanup).then(subject => {
-      if (this.tokenCache.size >= 256) this.tokenCache.clear()
-      this.tokenCache.set(key, { subject, expiresAt: Date.now() + this.runtimeTokenCacheMs })
+    const pending: Promise<RuntimeCredentialSubject | null> = this.authenticateTokenQuery(hash, use).then(subject => {
+      if (this.tokenFlights.get(key) === pending) {
+        if (this.tokenCache.size >= 256) this.tokenCache.clear()
+        this.tokenCache.set(key, { subject, expiresAt: Date.now() + this.runtimeTokenCacheMs })
+      }
       return subject
-    }).finally(() => { this.tokenFlights.delete(key) })
+    }).finally(() => { if (this.tokenFlights.get(key) === pending) this.tokenFlights.delete(key) })
     this.tokenFlights.set(key, pending)
     return pending
   }
 
-  private async authenticateTokenQuery(hash: Buffer, cleanup: boolean): Promise<RuntimeCredentialSubject | null> {
-    const result = await this.context.pool.query<{
+  private async authenticateTokenQuery(hash: Buffer, use: 'run' | 'cleanup' | 'shutdown-storage',
+    queryable: Queryable = this.context.pool, writeEpoch?: bigint): Promise<RuntimeCredentialSubject | null> {
+    const result = await queryable.query<{
       organization_id: string
       runtime_id: RuntimeId
       generation: string
@@ -686,14 +740,20 @@ export class PostgresInstanceRepository implements InstanceRepository {
       LEFT JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
       LEFT JOIN harness.project_content_placement cp ON cp.organization_id=i.organization_id AND cp.project_id=i.project_id
       WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND i.runtime_token_hash=$3
+        AND ($5::bigint IS NULL OR COALESCE((SELECT write_epoch FROM harness.cluster_control WHERE organization_id=$1),1)=$5)
         AND (cp.project_id IS NULL OR (cp.node_id=i.assigned_node_id AND cp.runtime_id=i.runtime_id))
-        AND (($4 AND i.observed_state IN ('starting','ready','stopping'))
-          OR (NOT $4 AND o.status='active' AND i.provisioning_state='ready' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
+        AND (($4='cleanup' AND i.observed_state IN ('starting','ready','stopping'))
+          OR ($4 IN ('run','shutdown-storage') AND o.status='active' AND i.provisioning_state='ready'
             AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
-            AND ((u.id IS NOT NULL AND u.status='active' AND u.deleted_at IS NULL AND m.status='active'
-                AND harness.computer_use_allowed(u.organization_id,u.id,i.assigned_node_id))
-              OR (p.id IS NOT NULL AND p.status='active'))))`,
-    [this.context.organizationId, this.context.nodeId, hash, cleanup])
+            AND (($4='run' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
+              AND ((u.id IS NOT NULL AND u.status='active' AND u.deleted_at IS NULL AND m.status='active'
+                AND harness.computer_use_allowed(u.organization_id,u.id,i.assigned_node_id)) OR p.status='active'))
+              OR ($4='shutdown-storage' AND p.status='active' AND i.observed_state='stopping'
+                AND i.stop_reason IN ('manual','idle','shutdown')
+                AND NOT EXISTS (SELECT FROM harness.runtime_destructive_operations stop
+                  WHERE stop.organization_id=i.organization_id AND stop.runtime_id=i.runtime_id AND stop.node_id=i.assigned_node_id
+                    AND stop.generation=i.generation AND stop.quiescent_at IS NOT NULL)))))`,
+    [this.context.organizationId, this.context.nodeId, hash, use, writeEpoch?.toString() ?? null])
     const row = result.rows[0]
     if (row === undefined) return null
     if (row.user_internal_id !== null && row.user_public_id !== null) {

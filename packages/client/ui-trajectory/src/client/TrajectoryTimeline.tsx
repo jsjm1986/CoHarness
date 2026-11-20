@@ -15,6 +15,7 @@ import {
   type TrajectoryTimeRange,
 } from './timeline.ts'
 import css from './TrajectoryTimeline.module.css'
+import { TimelineControls } from './TimelineControls.tsx'
 
 const MINIMUM_DRAG_PX = 3
 const MINIMUM_ZOOM_OPERATIONS = 4
@@ -328,6 +329,7 @@ export const TrajectoryTimeline = memo(function TrajectoryTimeline({
     )
   const domainDuration = viewport === null ? fullDuration : viewportDuration
   const domainStart = viewport === null ? model?.start ?? 0 : viewportStart
+  const minimumZoomDuration = Math.min(mode === 'sequence' ? MINIMUM_ZOOM_OPERATIONS : 20, fullDuration)
   const showsEarlierBoundary = hasEarlierRecords
     && model !== null
     && domainStart === model.start
@@ -366,7 +368,7 @@ export const TrajectoryTimeline = memo(function TrajectoryTimeline({
       const nextDuration = Math.min(
         fullDuration,
         Math.max(
-          Math.min(mode === 'sequence' ? MINIMUM_ZOOM_OPERATIONS : 20, fullDuration),
+          minimumZoomDuration,
           domainDuration * Math.exp(event.deltaY * 0.0015),
         ),
       )
@@ -383,7 +385,7 @@ export const TrajectoryTimeline = memo(function TrajectoryTimeline({
     }
     root.addEventListener('wheel', onWheel, { passive: false })
     return () => { root.removeEventListener('wheel', onWheel) }
-  }, [domainDuration, domainStart, fullDuration, mode, model])
+  }, [domainDuration, domainStart, fullDuration, minimumZoomDuration, model])
 
   if (model === null) {
     return (
@@ -582,14 +584,23 @@ export const TrajectoryTimeline = memo(function TrajectoryTimeline({
     setPanning(false)
   }
 
+  const zoom = (factor: number) => {
+    const duration = Math.min(fullDuration, Math.max(minimumZoomDuration, domainDuration * factor))
+    setAnimateViewport(false)
+    setViewport(duration >= fullDuration ? null : centeredRange(
+      domainStart + domainDuration / 2, duration, model.start, model.end,
+    ))
+  }
+
   return (
     <section ref={rootRef} className={css.root} aria-label={t('timeline.aria')}>
-      <div className={css.plot}>
+      <div className={css.plot} data-controls="">
         <LaneLabels t={t} />
         <div
           ref={trackRef}
           className={css.track}
           data-panning={panning || undefined}
+          role="group"
           aria-label={t('timeline.overviewAria')}
           tabIndex={0}
           onKeyDown={onKeyDown}
@@ -733,6 +744,11 @@ export const TrajectoryTimeline = memo(function TrajectoryTimeline({
               })}
           </div>
         </div>
+        <TimelineControls t={t} bounds={model} range={range} sequence={mode === 'sequence'}
+          canZoomIn={domainDuration > minimumZoomDuration} canZoomOut={viewport !== null}
+          zoomPercent={Math.round(fullDuration / domainDuration * 100)}
+          onRangeChange={onRangeChange} onZoomIn={() => { zoom(0.5) }} onZoomOut={() => { zoom(2) }}
+          onReset={() => { setAnimateViewport(false); setViewport(null); onRangeChange(null) }} />
       </div>
     </section>
   )

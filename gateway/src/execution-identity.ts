@@ -16,10 +16,16 @@ import { getProjectContentBinding, NodeContentUnavailable, type NodeContentStore
 
 /** A refused execution identity request, without database or credential details. */
 export class ExecutionIdentityError extends Error {
-  constructor(readonly status: 400 | 403 | 404 | 409, message: string) {
+  constructor(readonly status: 400 | 403 | 404 | 409 | 503, message: string) {
     super(message)
     this.name = 'ExecutionIdentityError'
   }
+}
+
+/** Server-owned write epoch and current bearer for a personal Runtime statement. */
+export interface PersonalExecutionWriteFence {
+  bearer: string
+  epoch: bigint
 }
 
 /** Canonical server-owned execution actors; input ids are non-secret witnesses, not grants. */
@@ -273,8 +279,10 @@ export class GatewayExecutionIdentity {
    * @param subject - authenticated current runtime
    * @param value - parsed wire metadata
    * @param header - PostgreSQL metadata already checked against the project runtime, if applicable
+   * @param fence - optional current generation credentials for one-statement personal root registration
    */
-  async register(subject: RuntimeCredentialSubject, value: unknown, header?: Pick<ConversationHeader, 'id' | 'parentSessionId' | 'seedLength'>): Promise<void> {
+  async register(subject: RuntimeCredentialSubject, value: unknown, header?: Pick<ConversationHeader, 'id' | 'parentSessionId' | 'seedLength'>,
+    fence?: PersonalExecutionWriteFence): Promise<void> {
     const request = object(value, ['sessionId', 'parentSessionId', 'isSeeded'])
     const sessionId = identity(request.sessionId)
     const parent = request.parentSessionId === undefined ? undefined : identity(request.parentSessionId)
@@ -284,6 +292,12 @@ export class GatewayExecutionIdentity {
     if (subject.target.kind === 'project' && (header === undefined || header.id !== sessionId
       || header.parentSessionId !== parent || (header.seedLength !== undefined) !== seeded)) {
       throw new ExecutionIdentityError(403, 'execution Session metadata differs from persisted lineage')
+    }
+    const runtimeId = subject.target.runtimeId
+    if (fence !== undefined && subject.target.kind === 'user' && runtimeId !== undefined && parent === undefined && !seeded) {
+      await this.personalWrite(() => this.pool.query('SELECT harness.register_personal_execution_root($1,$2,$3,$4,$5,$6,$7,$8)',
+        [...this.personalCoordinates(subject, runtimeId, fence), sessionId]), 'execution Session lineage is immutable')
+      return
     }
     await this.inRuntime(subject, async (client, subject) => {
       if (parent !== undefined) await this.session(client, subject, parent, false)
@@ -315,15 +329,27 @@ export class GatewayExecutionIdentity {
    * @param subject - authenticated runtime
    * @param principal - verified, purpose-free browser identity
    * @param value - input metadata; callers cannot submit actors or roles
+   * @param fence - optional current generation credentials for ordinary personal input; its SQL checks fresh actor authority
    * @returns the immutable receipt and its attributed actors
    */
-  async input(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, value: unknown): Promise<{
+  async input(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, value: unknown, fence?: PersonalExecutionWriteFence): Promise<{
     inputId: string; actors: Array<{ userId: number }>; primaryActorUserId: number
   }> {
     const request = object(value, ['sessionId', 'messageId', 'kind', 'contentHash', 'previousInputId', 'creationAuthorization'])
     if (request.kind !== 'message') throw new ExecutionIdentityError(400, 'question inputs require the question claim endpoint')
     const sessionId = identity(request.sessionId), messageId = identity(request.messageId), hash = contentHash(request.contentHash)
     const previous = request.previousInputId === undefined ? undefined : inputId(request.previousInputId)
+    const runtimeId = subject.target.runtimeId
+    if (fence !== undefined && subject.target.kind === 'user' && runtimeId !== undefined
+      && principal.purpose === undefined && previous === undefined) {
+      if (principal.user.id !== subject.target.id) throw new ExecutionIdentityError(403, 'personal execution cannot borrow another account')
+      const { rows: [receipt] } = await this.personalWrite(() => this.pool.query<{ input_id: string; public_actors: string[] }>(
+        'SELECT * FROM harness.admit_personal_execution_input($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+        [...this.personalCoordinates(subject, runtimeId, fence), sessionId, messageId, hash]),
+      'execution input identity conflicts with an earlier admission')
+      return { inputId: receipt!.input_id, actors: receipt!.public_actors.map(id => ({ userId: publicNumber(id, 'execution actor') })),
+        primaryActorUserId: principal.user.id }
+    }
     return this.inRuntime(subject, async (client, subject) => {
       await this.session(client, subject, sessionId)
       const actor = await this.principalActor(client, subject, sessionId, principal)
@@ -331,6 +357,23 @@ export class GatewayExecutionIdentity {
       const actors = await this.publicActors(client, subject, receipt.actor_user_ids)
       return { inputId: receipt.id, actors, primaryActorUserId: principal.user.id }
     })
+  }
+
+  private personalCoordinates(subject: RuntimeCredentialSubject, runtimeId: RuntimeId,
+    fence: PersonalExecutionWriteFence): [string, string, RuntimeId, number, Buffer, string, number] {
+    return [subject.organizationId, this.nodeId, runtimeId, subject.generation,
+      createHash('sha256').update(fence.bearer).digest(), String(fence.epoch), subject.target.id]
+  }
+
+  private async personalWrite<T>(write: () => Promise<T>, conflict: string): Promise<T> {
+    try { return await write() } catch (error) {
+      const code = (error as { code?: string } | null)?.code
+      if (code === 'P4101') throw new ExecutionIdentityError(403, 'personal execution is no longer authorized')
+      if (code === 'P4102') throw new ExecutionIdentityError(404, 'execution Session is not registered in this runtime')
+      if (code === 'P4103') throw new ExecutionIdentityError(409, conflict)
+      if (code === 'P4104') throw new ExecutionIdentityError(503, 'execution writes are unavailable')
+      throw error
+    }
   }
 
   /**
@@ -484,23 +527,39 @@ export class GatewayExecutionIdentity {
    * Authorize from server-owned witnesses and current account/Session permissions.
    * @param subject - authenticated runtime
    * @param value - Session and requested capability, never caller-supplied actors
+   * @param fence - optional current bearer and serving epoch for scoped personal execution
    * @returns the canonical set only when every actor remains eligible
    */
-  async authorize(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
+  async authorize(subject: RuntimeCredentialSubject, value: unknown, fence?: PersonalExecutionWriteFence): Promise<ExecutionIdentityState> {
     const request = object(value, ['sessionId', 'capability', 'unverifiedHistory', 'scopeId'])
     const sessionId = identity(request.sessionId), capability = request.capability
     if (capability !== 'execute' && capability !== 'plugin-management' && capability !== 'auto-review' && capability !== 'desktop' && capability !== 'memory') throw new ExecutionIdentityError(400, 'invalid execution capability')
     await this.markUnverified(subject, sessionId, request.unverifiedHistory)
+    const scopeId = request.scopeId === undefined ? undefined : inputId(request.scopeId)
+    const runtimeId = subject.target.runtimeId
+    if (fence !== undefined && capability === 'execute' && scopeId !== undefined && runtimeId !== undefined
+      && subject.target.kind === 'user' && subject.contentBinding === undefined) {
+      const { rows: [state] } = await this.personalWrite(() => this.pool.query<Pick<ExecutionScopeRow, 'revision' | 'input_ids' | 'unverified'>>(
+        'SELECT * FROM harness.authorize_personal_execution_scope($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+        [...this.personalCoordinates(subject, runtimeId, fence), sessionId, scopeId]), 'execution scope is immutable')
+      return { scopeId, revision: state!.revision, inputs: state!.input_ids, actors: [{ userId: subject.target.id }],
+        primaryActorUserId: subject.target.id, unverifiedHistory: state!.unverified }
+    }
     return this.inRuntime(subject, async (client, subject) => {
-      if (request.scopeId !== undefined) {
-        const captured = await this.readScope(client, subject, sessionId, inputId(request.scopeId))
-        const receipts = await Promise.all(captured.input_ids.map(id => this.receipt(client, subject, undefined, id)))
-        const actors = [...new Set(receipts.flatMap(receipt => receipt.actor_user_ids))]
+      if (scopeId !== undefined) {
+        const captured = await this.readScope(client, subject, sessionId, scopeId)
+        const actors = await this.scopeActors(subject, captured)
         if (actors.length === 0 || captured.primary_actor_user_id === null || (capability !== 'execute' && captured.unverified)) {
           throw new ExecutionIdentityError(403, 'execution authority has no verified complete actor set')
         }
-        await this.eligibleActors(client, subject, sessionId, actors, capability)
-        return this.scopeState(client, subject, captured)
+        const eligible = await this.eligibleActors(client, subject, sessionId, actors, capability)
+        const publicActors = eligible.map(actor => ({ userId: publicNumber(actor.public_id, 'execution actor') }))
+        const primary = eligible.find(actor => actor.id === captured.primary_actor_user_id)
+        const primaryActorUserId = primary === undefined
+          ? (await this.publicActors(client, subject, [captured.primary_actor_user_id]))[0]!.userId
+          : publicNumber(primary.public_id, 'execution actor')
+        return { scopeId, revision: captured.revision, inputs: captured.input_ids, primaryActorUserId,
+          actors: publicActors.sort((a, b) => a.userId - b.userId), unverifiedHistory: captured.unverified }
       }
       const state = await this.session(client, subject, sessionId)
       const actors = Object.keys(state.actor_witnesses)
@@ -806,12 +865,23 @@ export class GatewayExecutionIdentity {
   }
 
   private async scopeState(client: PoolClient, subject: ExecutionRuntimeSubject, captured: ExecutionScopeRow): Promise<ExecutionIdentityState> {
-    const receipts = await Promise.all(captured.input_ids.map(id => this.receipt(client, subject, undefined, id)))
-    const actors = [...new Set(receipts.flatMap(receipt => receipt.actor_user_ids))]
+    const actors = await this.scopeActors(subject, captured)
     const primary = captured.primary_actor_user_id === null ? undefined : await this.publicActors(client, subject, [captured.primary_actor_user_id])
     return { scopeId: captured.id, revision: captured.revision, inputs: captured.input_ids,
       actors: await this.publicActors(client, subject, actors), unverifiedHistory: captured.unverified,
       ...(primary === undefined ? {} : { primaryActorUserId: primary[0]!.userId }) }
+  }
+
+  private async scopeActors(subject: ExecutionRuntimeSubject, captured: ExecutionScopeRow): Promise<string[]> {
+    if (captured.input_ids.length === 0) return []
+    // Inherited and relayed witnesses can originate in another Session of this exact Runtime.
+    const ids = [...new Set(captured.input_ids)]
+    const result = await subject.storage.db.query<Pick<InputRow, 'id' | 'actor_user_ids'>>(`SELECT id,actor_user_ids
+      FROM ${subject.storage.schema}.execution_inputs
+      WHERE id=ANY($1::uuid[]) AND organization_id=$2 AND runtime_kind=$3 AND runtime_public_id=$4 AND runtime_id=$5`,
+    [ids, subject.organizationId, subject.target.kind, subject.target.id, subject.target.runtimeId])
+    if (result.rows.length !== ids.length) throw new ExecutionIdentityError(403, 'execution input belongs to another Session or runtime')
+    return [...new Set(result.rows.flatMap(receipt => receipt.actor_user_ids))]
   }
 
   private async createScope(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string,
@@ -973,7 +1043,7 @@ export class GatewayExecutionIdentity {
     return id
   }
 
-  private async eligibleActors(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string, actorIds: string[], capability: Capability): Promise<void> {
+  private async eligibleActors(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string, actorIds: string[], capability: Capability): Promise<ActorRow[]> {
     const result = await client.query<ActorRow>(`SELECT u.id,u.public_id::text,m.role
       ${capability === 'auto-review' ? ',u.auto_review_eligible' : ''}
       FROM harness.users u JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
@@ -1012,7 +1082,7 @@ export class GatewayExecutionIdentity {
     if (subject.target.kind === 'user') {
       if (capability === 'memory') throw new ExecutionIdentityError(403, 'memory qualification applies only to project runtimes')
       if (result.rows.some(actor => publicNumber(actor.public_id, 'execution actor') !== subject.target.id)) throw new ExecutionIdentityError(403, 'personal execution cannot borrow another account')
-      return
+      return result.rows
     }
     const { schema, db } = subject.storage
     if (schema === 'node_content') {
@@ -1062,6 +1132,7 @@ export class GatewayExecutionIdentity {
       || (session.visibility === 'private' && session.creator_user_id !== actor.id)))) {
       throw new ExecutionIdentityError(403, 'an execution actor cannot write this Session')
     }
+    return result.rows
   }
 
   private async insertInput(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string, messageId: string,

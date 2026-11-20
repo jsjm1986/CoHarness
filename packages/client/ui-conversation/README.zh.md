@@ -9,7 +9,7 @@ kind: "package-reference"
 
 会话领域：骨架（标题栏／标签页／编辑器／空状态）、聊天视图（分组步骤摘要流、流式尾部隔离与轮次状态）、编辑器 dock（与输入区一同 sticky 的会话统计行）、输入区 dock（队列行加 todo 计划条）、详情壳层，以及按 scope 寻址的 ConversationController。工具展示属于 [`ui-tool`](../ui-tool/README.zh.md)。
 
-在多电脑模式下，标签页在所选 Runtime 准备会话时即可输入，收到回执后才把文字交给目标会话。准备失败或被中断时，未发送内容仍可在该标签页继续编辑。已确认的草稿和引用保存在所属节点。复制标签页后，首次编辑会使用独立的写入标识。提示词持久受理后即可继续输入，已提交轮次和附件仍按事件更新。
+在多电脑模式下，标签页在所选 Runtime 准备会话时即可输入，收到回执后才把文字交给目标会话。准备失败或被中断时，未发送内容仍可在该标签页继续编辑。已确认的草稿和引用保存在所属节点。复制标签页后，首次编辑会使用独立的写入标识。提示词持久受理后即可继续输入，已提交轮次和附件仍按事件更新。 预设或插件准备失败时，页面保留可见草稿，并提示先请管理员检查再重试。状态只使用本地化类别，不展示服务端诊断。既有 `data-conversation-intent` 对应准备操作 ID，`data-intent-failure` 只提供安全类别。 已验证的页面在连接重新校验期间，在当前编辑器保留本页编辑过的输入。仅在账号、会话、Runtime 和电脑相符后恢复同步。
 
 压缩（compaction）在检查点自身的消息流位置渲染为一行折叠标记，不替换其上方的 transcript（文本记录）。自动压缩使用「上下文已压缩」标题。每个已加载对应 `compaction/summary` 事件的完成标记都会显示被替换条目数量和估算 token 数量，并可点击展开摘要。手动 `/compact` 开始时显示为运行中的 `compact` 行；成功结算后，其显式摘要事件引用会在保持同一 React key 的前提下把该命令折叠进检查点行。完成的检查点静止时保留上下文压缩（context compaction）图标，仅在悬停或键盘聚焦时将其替换为收起／展开指示图标。输入被拒绝、没有可压缩历史、取消和失败时仍使用通用命令行及处理器撰写的文本。配对绝不依赖相邻关系，因为压缩运行期间可能注入持久上下文。面向模型的带框检查点载荷绝不渲染；被引用的 `compaction/summary` 事件位于已加载窗口之外时，检查点仍然可见但不可展开。
 
@@ -25,7 +25,21 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 
 别的插件可以经 `ctx.conversation.blocks` 让某个会话的编辑器变为惰性：它设置一个携带自己本地化理由的 block，输入栏就渲染同一个禁用的 textarea，并把该理由作为 placeholder——复用无 Workspace 时的那套姿态。推送方向是约束而非偏好：知道某会话发不出消息的插件（ui-model-selection，在没有适配器服务其路由时）本就依赖本包，因此本包读不到它们。模型 seat 是 block 唯一保留可用的控件——这份约定里的每个 block 都靠选模型来解除，把它一起锁上会让编辑器索要它自己拦下的那件事。block 只是提示性设计；无论客户端禁用了什么，宿主都会拒绝一个它无法路由的提示词。两者同时成立时以无 Workspace 姿态为准，因为选 Workspace 是更靠前的前提。
 
-在 compact 视口下，AppFrame 顶栏拥有手机级 Session 标题；常驻 Session header 保留 action、utility seat 和视图 Tab，但不再重复完整的 breadcrumb 标题。Chat 流会在最后一行下方预留实际 composer 高度；compact 统计 dock 只显示轮次／步骤摘要与统计入口，完整耗时和 token 分组在手机 Sheet 中展开，从而不挤占阅读行。ContextMeter 明细也使用同一套 Sheet 几何。输入触发器、命令和模型选择菜单使用共享的手机 Sheet 几何，同时保留既有焦点和提交路径。
+在 compact 视口下，AppFrame 顶栏拥有手机级 Session 标题；常驻 Session header 保留 action、utility seat 和视图 Tab，但不再重复完整的 breadcrumb 标题。Chat 流会在最后一行下方预留实际悬浮重叠的 composer 高度；compact 统计 dock 只显示轮次／步骤摘要与统计入口，完整耗时和 token 分组在手机 Sheet 中展开，从而不挤占阅读行。ContextMeter 明细也使用同一套 Sheet 几何。输入触发器、命令和模型选择菜单使用共享的手机 Sheet 几何，同时保留既有焦点和提交路径。
+
+回到底部按钮位于正文旁的行末留白区。紧凑布局保留轮次统计和顶栏辅助操作的无障碍名称与操作入口。统计浮层以可视视口限制高度，详情可滚动。
+
+键盘弹出后，如果剩余高度不足以同时显示会话标题和输入区，对话根容器允许滚动隐藏标题。内容区在剩余框架高度内保留最多两行触摸目标所需的高度，使各宽度模式下的草稿输入区仍可滚动到可见位置。当输入区达到自身滚动视区的高度时，它进入普通文档流；正文尾部和悬浮导航不再为已不重叠的输入区预留空间。输入区与滚动视区的尺寸变化都会更新这一判断，包括浏览器页面缩放和面板调整。工作台每行保留面板标题与输入目标所需的高度；键盘占据更多高度时，可滚动工作台将工具栏移出视区。
+
+会话宽度、输入区高度和滚动视口可用高度使用 ResizeObserver 提供的尺寸。工具栏先测量各控件分组，再更新裁剪标记，有空间时恢复标签。输入区高度和裁剪状态在动画帧更新，卸载时取消待执行的测量。
+
+`ctx.conversation.firstEditableComposer` 在客户端生命周期内报告首个已绘制且可编辑的输入区。插件可通过这个只读快照，在用户能够输入后安排可选工作。
+
+以触摸为主要输入方式时，打开会话或解除输入锁定后，由用户主动聚焦输入区来唤起键盘。桌面输入区恢复焦点，并在内部将光标滚动到可见位置。
+
+触屏横屏视口高度不超过 320 CSS 像素时，输入区向软键盘请求显示「发送」操作。该操作走现有的 Enter 提交流程，包含输入法候选确认保护。编辑器始终支持多行草稿和 Shift+Enter 换行。
+
+文字输入区在鼠标操作时至少高 24px，触摸操作时至少高 44px；触摸编辑器控件保留完整尺寸。320px 宽度下，相邻图标控件缩小点击区域之间的间距；额外控件可换行。上下文用量入口和“回到底部”操作在平板与横屏布局下保留相同触摸尺寸。
 
 对话服务提供 `IConversation.canAttachDocument` 做实时预检，提供 `IConversation.attachDocument` 接收文档。两者均遵守会话移除、输入锁定、输入框阻止状态和同步的 `conversation/document-admission` 事件；授权插件返回 `deny` 拒绝，其余情况返回 undefined。文档管理器使用 `attachDocument`：它把已有持久 `docId` 作为就绪的输入框草稿加入对话，不会再次上传。移除管理器加入的文档只释放浏览器草稿元数据，存储中的文档仍可供历史记录和之后的会话使用。
 
@@ -39,7 +53,7 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 
-审批通过本包声明的链条接管编辑器：`ApprovalPanel` 注册为按选择器路由的 `'conversation.composer'` 配置项（ui-user-questions 模式），在审批等待未决期间取代 InputBar 占据编辑器（琥珀色条、工具名称、独立的理由——询问方提供 `displayReason` 时经本项注入的 locale 席位解析其本地化文案，否则用审计 `reason`——来自运行中调用的配对 shell 命令或格式化的非 shell 参数、一次性的拒绝／允许）。`contract/slots.ts` 中的 `PendingApproval` 领域面在运行时 `PendingWait` 载体之上拥有 wire 编码——带审计关联的 `ApprovalResponsePayload` 值；广播的 `approval/resolved` 帧使等待落定并恢复编辑器。运行时 manager 会将所有审批或问题等待通过 `SessionSummary.pendingInteraction` 投影出来，未实例化的会话也不例外；`ui-workspace` 负责其侧边栏呈现。未决等待完全离开消息流：问题（ui-user-questions）与审批（ApprovalPanel）都经编辑器接管作答，不再保留只读占位卡。编辑器底行的 Access 席位挂载 `PermissionSelect`，由 host 计算的 `permissions` 投影经标准工具包 `useProjection` 供数（key 缺席即隐藏 chip）；chip 打开 Menu 原语下拉，内置 preset id 通过当前 locale 解析，部署自定义名称保持原文；普通安全预设会立即经输入栏注入的 `command` 回调提交 `/permission <preset>`，而 `danger-full-access` 使用本地化的完全权限标签，选择后先打开页面内的 Modal 风险确认。用户勾选确认项前启用按钮始终不可用；取消、Escape、关闭按钮与点击遮罩都不会提交命令。审批提交失败时显示行内警告，原决策按钮恢复可用以供手动重试。手机会话设置使用共享弹窗焦点循环，紧凑输入区的扩展内容换行时避开模型和发送控件。
+审批通过本包声明的链条接管编辑器：`ApprovalPanel` 注册为按选择器路由的 `'conversation.composer'` 配置项（ui-user-questions 模式），在审批等待未决期间取代 InputBar 占据编辑器（琥珀色条、工具名称、独立的理由——询问方提供 `displayReason` 时经本项注入的 locale 席位解析其本地化文案，否则用审计 `reason`——来自运行中调用的配对 shell 命令或格式化的非 shell 参数、一次性的拒绝／允许）。`contract/slots.ts` 中的 `PendingApproval` 领域面在运行时 `PendingWait` 载体之上拥有 wire 编码——带审计关联的 `ApprovalResponsePayload` 值；广播的 `approval/resolved` 帧使等待落定并恢复编辑器。运行时 manager 会将所有审批或问题等待通过 `SessionSummary.pendingInteraction` 投影出来，未实例化的会话也不例外；`ui-workspace` 负责其侧边栏呈现。未决等待完全离开消息流：问题（ui-user-questions）与审批（ApprovalPanel）都经编辑器接管作答，不再保留只读占位卡。编辑器底行的 Access 席位挂载 `PermissionSelect`，由 host 计算的 `permissions` 投影经标准工具包 `useProjection` 供数（key 缺席即隐藏 chip）；chip 打开 Menu 原语下拉，内置 preset id 通过当前 locale 解析，部署自定义名称保持原文；普通安全预设会立即经输入栏注入的 `command` 回调提交 `/permission <preset>`，而 `danger-full-access` 使用本地化的完全权限标签，选择后先打开页面内的 Modal 风险确认。用户勾选确认项前启用按钮始终不可用；取消、Escape、关闭按钮与点击遮罩都不会提交命令。审批提交失败时显示行内警告，原决策按钮恢复可用以供手动重试。审批详情不会超过会话滚动容器的高度；较矮面板中的整张卡片可滚动到操作区。作答后的审批正文保留完整对比度；状态色用于提示条背景与色点，状态和失败文案使用主题主文字色。手机会话设置使用共享弹窗焦点循环，紧凑输入区的扩展内容换行时避开模型和发送控件。
 
 会话页头会在标题旁渲染会话作用域的 `'conversation.session.header.actions'` 列表，并在最右侧渲染独立的 `'conversation.session.header.utilities'` 列表。会话上下文和谱系控件保留在 `actions` 中；可选的会话工具不会改变它们的顺序或位置。编辑器链的 currency 包含当前对话 `session`；ui-subagent 会选取 one-shot 或 parent 不可用的已寻址会话，并按原因显示只读文案，而普通 InputBar 会让所有已寻址 child 仅保留 Send，因为继续执行服务不公开逐 Activation 取消操作，`session.cancel` 也会绕过其所有权。
 ```ts type-equiv
@@ -59,7 +73,7 @@ interface ComposerChainProps {
 }
 ```
 
-已记录的非用户消息渲染为默认折叠的展开项，标题栏先给出运行时为该消息投影出的角色——注入为 `上下文注入`，召回为 `跨会话召回`——其后是该投影从持久来源读出的生产者名称，因此读者无需展开即可区分 skill（技能）目录、工作区指令文件与被召回的会话。引用其他会话的直接消息在持久顺序中位于其召回行之前。Chat 快照只从紧随其后的带来源召回中关联准确标签，因此既能保留多词标题，也不会把一条召回的标签带到后续直接消息上。召回使用聊天气泡图标，其他上下文保留文档图标；来源未提供生产者名称时只显示角色。`developer/message` 工具名册更新经同一展开项呈现：单条新增或移除直接点名工具、不再展开，多条变更折叠为「工具已更新」标题并携带新增／移除计数，展开后给出紧凑名称清单——因更新没有可命名的文件或目录，生产者标签被抑制。输入框与用户气泡中的引用使用同一种行内语言：聊天气泡、文件或文件夹图标加业务色文字，不嵌套胶囊容器。与已认领的 slash command 相同，输入框引用会把完整展示文本保留在透明 textarea 中，再用对齐的 backdrop 提供颜色和开头的领域图标；宽度、换行、选择区与光标位置均由原生文本度量决定。occurrence 范围仍为序列化与边界整段删除保留结构身份，在范围内部编辑则会把剩余字符转为普通文本。草稿持久化保留展示文本与语义引用；恢复时重新生成 occurrence id，保留有效范围，并将元数据损坏的部分作为普通文本保留。旧字符串草稿仍可读取。只有引用来源才能提供可执行的命令回调。共享的 `DisclosureRow` 原子组件让该上下文界面与消息流中的其他紧凑行保持相同几何，同时保留上下文语义：展开内容区的高度会随内容自适应，最大为 141px，超出后滚动，且不会合成工具状态或摘要（[历史展开项决策](../../../.agents/notes/archived/feature/2026-07-30-web-context-injection-disclosure.md)、[生产者标签决策](../../../.agents/notes/implemented/feature/2026-08-04-web-context-source-and-steer-marks.zh.md)）。该内容区按生产方在持久来源上声明的形态渲染：`instructions` 在正文之上列出它对账过的文件，`catalog` 列出来源记录的条目而非面向模型的正文，其余取值——未声明、本版本不认识、或字段不可用——一律渲染 opaque 内容区，即按真实换行展示面向模型的文本，并把剩余来源字段列出。opaque 不是兜底剩余物而是有文档的默认：恢复的、fork 的、外部写入的日志，无论其生产方是否挂载在此处，都必须渲染得出来。持久或待处理的 steering（中途引导）气泡沿用用户气泡的呈现，不加任何装饰；transcript 中唯一的 steering 信号是它出现在轮次中途的位置。
+已记录的非用户消息渲染为默认折叠的展开项，标题栏先给出运行时为该消息投影出的角色——注入为 `上下文注入`，召回为 `跨会话召回`——其后是该投影从持久来源读出的生产者名称，因此读者无需展开即可区分 skill（技能）目录、工作区指令文件与被召回的会话。引用其他会话的直接消息在持久顺序中位于其召回行之前。Chat 快照只从紧随其后的带来源召回中关联准确标签，因此既能保留多词标题，也不会把一条召回的标签带到后续直接消息上。召回使用聊天气泡图标，其他上下文保留文档图标；来源未提供生产者名称时只显示角色。`developer/message` 工具名册更新经同一展开项呈现：单条新增或移除直接点名工具、不再展开，多条变更折叠为「工具已更新」标题并携带新增／移除计数，展开后给出紧凑名称清单——因更新没有可命名的文件或目录，生产者标签被抑制。输入框与用户气泡中的引用使用同一种行内语言：聊天气泡、文件或文件夹图标加业务色文字，不嵌套胶囊容器。与已认领的 slash command 相同，输入框引用会把完整展示文本保留在透明 textarea 中，再用对齐的 backdrop 提供颜色和开头的领域图标；宽度、换行、选择区与光标位置均由原生文本度量决定。occurrence 范围仍为序列化与边界整段删除保留结构身份，在范围内部编辑则会把剩余字符转为普通文本。草稿持久化保留展示文本与语义引用；恢复时重新生成 occurrence id，保留有效范围，并将元数据损坏的部分作为普通文本保留。旧字符串草稿仍可读取。只有引用来源才能提供可执行的命令回调。共享的 `DisclosureRow` 原子组件让该上下文界面与消息流中的其他紧凑行保持相同几何，同时保留上下文语义：展开内容区的高度会随内容自适应，最大为 141px，超出后滚动，且不会合成工具状态或摘要（[历史展开项决策](../../../.agents/notes/archived/feature/2026-07-30-web-context-injection-disclosure.md)、[生产者标签决策](../../../.agents/notes/implemented/feature/2026-08-04-web-context-source-and-steer-marks.zh.md)）。compact 屏幕和粗指针设备上的会话标签、消息操作、过程展开项与统计操作保留 44px 触控目标，操作行在需要时换行。compact 屏幕中的生产者标签可在角色旁收缩，通知摘要则独占整行换行。来源元数据使用可读的语义文字颜色。窄阅读列将目录说明和召回数量放在名称下方，compact 正文使用移动端代码排版。内容区遵循持久来源的形态：`instructions` 列出已对账文件，`catalog` 显示有数量上限的条目列表，`snapshot` 按名称分区，`notice` 在摘要下显示正文，`relay` 标识发送方，`recall` 列出来源会话与保留数量。缺失、本版本不认识或字段不可用的形态渲染 opaque 内容区，保留真实换行并列出剩余来源字段。opaque 不是兜底剩余物而是有文档的默认：恢复的、fork 的、外部写入的日志，无论其生产方是否挂载在此处，都必须渲染得出来。持久或待处理的 steering（中途引导）气泡沿用用户气泡的呈现，不加任何装饰；transcript 中唯一的 steering 信号是它出现在轮次中途的位置。
 
 已发送的用户与 steering 消息按照和工具路径相同的文件打开策略处理文件引用：可用的工作区预览接收资源，声明支持原生打开的本地桌面提供原生打开回退。技能引用打开可选的 [`ui-skill` 源码预览](../ui-skill/README.zh.md#current-skill-source)；缺少 renderer 时显示可关闭的不可用对话框。待接纳的提交与队列预览中的引用保持不可点击。
 
@@ -73,7 +87,7 @@ Think 行默认保持折叠。流式摘要通过节流后的横向滚动跟随�
 
 `TodoDock` 以 `order: 0` 占用 `'conversation.input.dock'` 列表 slot（位于 Goal 与 Queue 之前），作为计划条读取 host 计算的 `todos` 投影（当前计划：其后没有更晚 `turn/start` 的最近一次 `todo/write`）并渲染 `TodoPanel`。面板接收纯列表，列表为空时自我隐藏；列表非空时默认折叠，表头显示标题及以 `·` 连接的各状态计数（如 `1 已完成 · 2 进行中 · 1 待处理`，省略零计数）。dock adapter 拥有 selection，因此面板保持为 props 的纯函数。输入区 composer 链隐藏的一切也会隐藏整个 dock。`todo_write` 工具行属于 [`ui-tool`](../ui-tool/README.zh.md)。
 
-`QueueDock` 是 `order: 20` 的末端 input-dock 条目。队列为空时隐藏；只有一个待处理项时直接渲染该行；存在两个或更多待处理项时，默认收起为 `"<n> 条排队消息"` 表头，其按钮可展开或收起完整列表。表头暴露 `aria-expanded` 和 `aria-controls`；展开后的列表以 180px 为高度上限，并可滚动。存在进行中的编辑或变更时，列表行会保持可见；队列清空后，下一次出现队列时会恢复默认收起状态。普通会话中的每条可见行仍是单行预览，并显示持久图片缩略图，同时提供针对精确单次入队项的编辑、删除和严格 steering 操作；本地 queued 提交回显会在 Host 携带匹配 `rpcId` 的队列项到达前，保持浏览器预览显示在同一个 dock 中。`rpcId` 属于存活 transcript 回显的队列行完全不进入 dock——该提交已在 Chat 中渲染，其入队项不得在 dock 中重复出现。已寻址 subagent 则保留只读行，因为其继续执行传输不提供 Queue 变更。如果严格 steering 输给已关闭的窗口，原单次入队项会留在 Queue 中正常投递；如果驱动器已经认领该项，正常投递就已开始。这两种已收敛的竞态都不显示失败，传输和未知错误仍会显示。
+`QueueDock` 是 `order: 20` 的末端 input-dock 条目。队列为空时隐藏；只有一个待处理项时直接渲染该行；存在两个或更多待处理项时，默认收起为 `"<n> 条排队消息"` 表头，其按钮可展开或收起完整列表。表头暴露 `aria-expanded` 和 `aria-controls`；展开后的列表以 180px 为高度上限，并可滚动；短视口下缩为一行触控目标的高度，确保输入区仍可操作。粗指针设备上的行在所有宽度下均为 44px 控件预留空间。存在进行中的编辑或变更时，列表行会保持可见；队列清空后，下一次出现队列时会恢复默认收起状态。普通会话中的每条可见行仍是单行预览，并显示持久图片缩略图，同时提供针对精确单次入队项的编辑、删除和严格 steering 操作；本地 queued 提交回显会在 Host 携带匹配 `rpcId` 的队列项到达前，保持浏览器预览显示在同一个 dock 中。`rpcId` 属于存活 transcript 回显的队列行完全不进入 dock——该提交已在 Chat 中渲染，其入队项不得在 dock 中重复出现。已寻址 subagent 则保留只读行，因为其继续执行传输不提供 Queue 变更。如果严格 steering 输给已关闭的窗口，原单次入队项会留在 Queue 中正常投递；如果驱动器已经认领该项，正常投递就已开始。这两种已收敛的竞态都不显示失败，传输和未知错误仍会显示。
 
 Chat 的事件定义通过持久的 inbox splice 链和当前领取集合识别 next-step steering 与 next-turn 唤醒输入：被认领的非人类 Turn 开场消息渲染为独立的 `turn-trigger` 行，标题按来源本地化，且始终位于可折叠过程窗口之外；同一认领中的人类消息仍保持 steering 或 user 分类（[决策](../../../.agents/notes/implemented/bug-fix/2026-10-18-turn-trigger-and-turn-end-anchored-tail.zh.md)）。
 
@@ -91,13 +105,13 @@ Composer 消息提交会根据所寻址会话的运行状态和 steering 能力�
 
 逐会话 UI 状态中的选择与活跃视图位于已声明的聊天 store（`stores.ts` `createChatStore`）中；InputHub 拥有输入区状态机，并将草稿镜像到该 store 以便持久化。New Session 流程会发出根级 `conversation/draft-initialize` 事件，可携带 `prompt` 与 `clearPreviousDraft`；input hub 将其应用到所寻址 Session 的 shell——已存在时立即应用，否则在 shell 创建时应用——而聊天 store 仍是草稿的持久 owner，因此初始化后的草稿能跨重新挂载与刷新保留，正在提交的会话则拒绝该变更。已验证账号或 Runtime 归属变化时，也会按该归属的存储记录恢复已经挂载的输入框。apply 将同一个 store handle 传给严格限定于会话的子树和聊天视图注册，因此每个会话内共享一个实例，框架拥有其生命周期。工具详情从辅助标签所有者接收明确的调用地址。组件保持纯粹：框架标准工具包提供 `useSession`／`sessionId`、全局 `useSessions`／`useWorkspaces`，以及输入状态机的 `useInput`／`inputActions`；store 表层与 inject factory 提供其余状态和回调。
 
-Chat 在内存中为每个 Session 保留跨视图切换的语义阅读位置。重新挂载后，保存的行在后续布局变化中保持原有视口偏移，包括尚未结束的侧栏动画。读者滚动、回合导航或返回底部会释放恢复锚点。刷新页面后从底部开始。
+Chat 在内存中为每个 Session 保留跨视图切换的语义阅读位置。重新挂载后，保存的行在后续布局变化中保持原有视口偏移，包括尚未结束的侧栏动画。读者滚动、回合导航或返回底部会释放恢复锚点。刷新页面后从底部开始。固定在底部的阅读位置同时跟随内容增长和滚动区域可用高度变化。输入区占满该高度时，自动跟随和「返回底部」会对齐输入区开头，并通过外层滚动区域显露已聚焦的草稿框；读者可继续滚动至下方控件，并保持底部跟随状态。内容区域不高于 320px 时，输入区在正常文档流中滚动，「返回底部」保持在滚动区域边缘。空会话输入组仅在完整内容能够容纳时居中；更高的附件和输入组可从开头滚动阅读。
 
 浏览器持久化包含选择、视图、检查状态和语义草稿文字。Gateway 记录要求已验证的账号、运行时和 Session 归属；未验证身份既不读取也不写入这些记录。独立 Host 保留本地记录。签名传输续连保留文档账号键、未发送草稿和待完成导航；确认账号改变时，先销毁原所有者，其他账号才能接纳状态。会话删除会退役写入实例，并在目录行撤下后仍移除其归属记录。旧 Gateway 记录没有账号来源证明，因此不予接纳；参见[草稿归属决策](../../../.agents/notes/implemented/bug-fix/2026-10-23-account-owned-chat-drafts.zh.md)和[升级指南](../../../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/account-owned-chat-drafts/guide.zh.md)。
 
 新会话准备期间锁定来源输入框，并显示“正在打开新对话…”。输入 facade 也会在提交文本、命令或附件前检查当前导航锁定，防止下一次渲染前到达的回调把消息发送到旧对话。停止操作仍可使用，其他面板和标签页保留各自的输入。
 
-各标签页优先恢复同步的 session storage 镜像，再考虑共用持久副本，因此刷新一页不会用另一页的文字替换其草稿。`SessionInputResolver.hasUnsavedDrafts()` 也覆盖保留的非当前输入：图片、文档引用、正在提交、待初始化草稿或没有已验证保存副本的文字会阻止销毁输入的空间导航。现有导航界面提供在另一标签页打开目标的操作，保留原输入和运行中的任务。
+各标签页优先恢复同步的 session storage 镜像，再考虑共用持久副本，因此刷新一页不会用另一页的文字替换其草稿。切换部署模式时，入口电脑上由同一已验证账号、Runtime 和 Session 拥有的当前草稿在各自标签页继续保留。`SessionInputResolver.hasUnsavedDrafts()` 也覆盖保留的非当前输入：图片、文档引用、正在提交、待初始化草稿或没有已验证保存副本的文字会阻止销毁输入的空间导航。现有导航界面提供在另一标签页打开目标的操作，保留原输入和运行中的任务。
 
 图片经粘贴与整页拖放进入：输入栏绑定 document 级拖拽监听（composer-bar slot 为 `kind: 'single'`，同一时刻至多一个 bar 绑定），文件拖拽悬停窗口时显示 `DropOverlay` 原子组件——纯文本拖拽不受影响，锁定或忙碌的 composer 显示禁用遮罩并拒绝 drop。同一道门按寻址会话限定入口范围：可继续子会话只接受粘贴或拖入的图片——含有普通文件或文件夹的批次被整批拒收并弹出格式不受支持的横幅，其文件选择器与文档库触发器保持禁用——一次性子会话或父会话离线的子会话则完全拒绝附件进入。两种手势共用一条对宿主 `imageLimits` 投影的加入预检（数量、单图字节、总字节）：会突破上限的加入整批拒收，立刻弹出点名上限的横幅，完全不进入附件栏。仍然到达的宿主侧拒绝按 `attachment-error` 原因映射为产品文案（`image-labels.ts` 的 `attachmentErrorText`）；用户无法解决的原因折叠为一条带原因码的发送失败文案，非附件错误码保留开发者可读的原文加错误码。已附加的图片在每条发送路径上都是提交信封的一部分：斜杠命令提交要么消费它们（声明 `images` 的 claim 经 hub 的 `commandImages` 管道序列化图片，尝试信号会取消已放弃的编码，再传给 `claim.submit`，仅在成功 outcome 后清除并释放），要么以 `command.imagesUnsupported` 通知拒绝整个提交，草稿与图片原样保留——命令不可能消费了文字却把图片留在原地。
 
@@ -106,6 +120,8 @@ Chat 在内存中为每个 Session 保留跨视图切换的语义阅读位置。
 在 composer 中直接选择的文件也使用与文档管理器相同的可续传上传会话，包括有界分片、SHA-256 校验、重试，以及重新选择同一文件后继续上传。
 
 composer 的文档控件通过浏览器附加命令打开文档管理器；conversation 包负责监听该命令，并把返回的目标引用转换为会话作用域的草稿 id。
+
+紧凑视口和以触控为主的设备使用紧凑工具栏。Composer 根据可用宽度缩小触控区域之间的间距。空间仍不足时，上下文用量和可选的 `conversation.input.status` 控件依次下移到卡片下方，与会话统计并排。控件移动时保持挂载。在以触控为主的设备上，发送和停止共用随工具栏宽度缩放的圆形底色，触控区域保持 44px 见方。矮横屏下，圆形底色直径上限为 38px。
 
 输入栏为 `'conversation.input.plan'`（位于本地 access 模式控件右侧）和 `'conversation.input.model'`（渲染在 pending 指示器与发送／停止控件之前）声明会话作用域的单实例 seat，并为 overlay、dock、left 和 right 输入扩展声明列表 slot。各功能包拥有相应控件及其状态；ui-conversation 提供放置位置、`locked` owner prop 和标准 slot share。前置加号按钮是 Command launcher，而非附件入口：它要求当前会话的 `InputTriggerController` 基于 textarea 当前 selection，只打开 `/` trigger 的 `command` source，同时 ui-input-trigger 既有的 `MenuView` 仍是唯一的浮层菜单与 pick 路径。不引入 File 行、file input、上传协议或第二套菜单组件。当 `plan` 投影的有效目标为 plan mode 时，InputBar 将文本框 placeholder 切换为 plan 任务措辞，经本包注册的 `conversation` locale 命名空间（`placeholder.plan` / `hint.plan` 键）本地化，并与已认领 `/plan` 命令的提示逐字共用同一份文案（经标准套件 `useProjection` 读取的 host 折叠值；owner 提供的 placeholder 优先）。另一个会话视图活跃时，待处理的 composer 接管仍保持挂载，使被阻塞的 agent（智能体）仍能收到回答；没有待处理交互时，活跃会话的 composer 归 Chat 所有。composer bar slot 本身为 `session-maybe`：没有当前会话时，同一个 bar 会让消息操作保持不可交互（machine face 均缺席、`disabled` owner prop），整张虚线卡片可经指针打开现有 Workspace picker，只读 textarea 也可通过 Enter 或 Space 打开。禁用控件会把指针事件交给卡片，卡片也会拦下 `pointerdown`，避免已打开 picker 的外点关闭与重新打开发生竞态。它不会换入一棵平行树，因此选择 Workspace 时 textarea DOM 不会被销毁；严格会话作用域的控件 seat 在会话存在之前保持为空。
 
@@ -120,6 +136,8 @@ Access 控件还会根据会话所属连接应用[当前账户资格规则](../u
 未发送的文本、附件和正在提交的操作独立于可见面板持有确切的 Client Session 代次。切换视图保留输入；清空或明确丢弃输入后释放该引用。运行时销毁时，无论草稿状态如何都清除引用。
 
 草稿文档的上传和移除固定会话所属环境。已知电脑位置时直接使用文档代理；位置元数据尚未获得时，请求仍保留该会话的 Runtime 地址，不继承当前标签页的环境。无法确认会话归属时拒绝操作。
+
+已恢复的历史对话保留历史与草稿，输入框禁用并提示新建对话。旧消息队列和审批控件不会显示为可继续执行的工作。提示绑定确切 Session，其他工作台窗格或浏览器标签页仍可独立使用新建对话。
 
 ## 概述
 
@@ -137,7 +155,9 @@ Access 控件还会根据会话所属连接应用[当前账户资格规则](../u
 <a id="settings-authority"></a>
 ## 设置权限
 
-忙碌状态下的 Enter 偏好以及对话显示、工作步骤密度、性能详情、链接打开方式偏好都属于账户级 settings 字段。即使处于项目作用域，它们的设置行也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。宽度和字号写入使用数值，并与 Enter 偏好共用同一个账户 revision 栅栏，因此一个字段不会污染另一个字段的写入状态。工作步骤密度经 presentation-policy 表解析为已完成 turn 折叠、思考预览、过程细节三处开关，由 Chat 视图各消费点读取；性能详情开关控制已完成 turn 的用量面板与 composer 统计细节；链接打开方式在内置 Browser 标签页（没有 Browser 消费方认领 `web/browser-open` bail 时回落新标签页）与普通新标签页之间选择，且当装配未注册 Browser 标签类型时该行整体隐藏。policy 与显示控制器会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。显示设置行的紧凑变体填充工作台侧栏面板声明的 `conversation.workbench.display` 孔位，并绑定同一控制器与账户作用域。
+忙碌状态下的 Enter 偏好以及对话显示、工作步骤密度、性能详情、链接打开方式偏好都属于账户级 settings 字段。即使处于项目作用域，它们的设置行也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。通用设置的宽度滑块和填满复选框各有独立标签，并保留 44px 触控区域。宽度和字号写入使用数值，并与 Enter 偏好共用同一个账户 revision 栅栏，因此一个字段不会污染另一个字段的写入状态。工作步骤密度经 presentation-policy 表解析为已完成 turn 折叠、思考预览、过程细节三处开关，由 Chat 视图各消费点读取；性能详情开关控制已完成 turn 的用量面板与 composer 统计细节；链接打开方式在内置 Browser 标签页（没有 Browser 消费方认领 `web/browser-open` bail 时回落新标签页）与普通新标签页之间选择，且当装配未注册 Browser 标签类型时该行整体隐藏。policy 与显示控制器会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。显示设置行的紧凑变体填充工作台侧栏面板声明的 `conversation.workbench.display` 孔位，并绑定同一控制器与账户作用域。
+
+取消手机权限确认后，焦点返回触发确认的选项。确认弹窗打开时独占指针与键盘输入；权限命令未完成、Session 被锁定或账户受限时，权限选项保持禁用。
 
 <a id="model-experience"></a>
 ## 模型体验

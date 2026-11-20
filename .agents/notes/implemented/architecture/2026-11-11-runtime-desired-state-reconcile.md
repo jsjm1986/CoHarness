@@ -1,4 +1,4 @@
-# Agent Note: Desired-state Runtime reconciler with bounded warmup
+# Agent Note: Desired-state Runtime recovery
 
 Status: implemented
 
@@ -6,31 +6,28 @@ English | [中文](2026-11-11-runtime-desired-state-reconcile.zh.md)
 
 ## Problem
 
-A stopped local Runtime only ever came back through a user-facing request: upgrades drain survivors to `stopped`, the idle reaper stops quiet Runtimes, and a crashed supervisor is published `failed` — yet nothing restarted any of them. Every "open the UI and wait" after a deploy was a lazy cold start, and a permanently crash-looping Runtime (observed: one project row at generation 11228) could burn unbounded start attempts.
+Foreground activity is not a Runtime's running obligation. A resident plugin or monthly scheduled task can remain necessary after weeks without browser access. Restricting recovery to recent activity leaves these tasks dormant after a process failure.
 
 ## Decision
 
-`InstanceManager.reconcile()` runs once ~15s after boot and every 60s under the existing `fencedTask` single-flight, and performs two duties against the durable row set:
+`instances.desired_state` owns the durable running intent. A start sets it to `running`. Infrastructure `shutdown` and `failed` transitions preserve that intent through confirmed termination. Explicit `manual`, `idle` and `access-change` stops set it to `stopped` and take precedence over subsequent infrastructure cleanup. A failed stop retains the observed `stopping` state and occupied capacity until supervision confirms termination.
 
-- **Probe**: for each adopted resident lease still `ready`, check the tracked proc (`isAlive`/`hasExited`) or reattach through `liveEndpoint`. A confirmed-dead process is stopped with reason `failed` on the serialized per-runtime lane against the *observed* generation — a racing replacement start is never cancelled or terminated — and a missing resource registration (`unregistered`) is *not* treated as death; the probe only acts on positive evidence. An adopted lease whose row is still `starting` past `HGW_READINESS_TIMEOUT_MS` is settled the same way: the deadline is the launch promise's own budget, so an expired `starting` generation can never publish `ready` again — it only exists because the launch path itself died mid-start (observed on the Windows node: supervisor exit-0 during a Gateway restart left the row `starting` and its adopted lease fenced every later start with `RuntimeStartBlockedError`). A launch that died before the supervisor claimed owner evidence has provably no supervised process, so that edge settles the row and releases the lease directly.
-- **Warm**: `InstanceRepository.warmTargets(cutoff)` returns local `stopped` rows whose `stop_reason` is an infrastructure stop (`shutdown`, `failed`) with `last_activity_at` inside `HGW_RECONCILE_WARM_WINDOW_MS` (default 7 days), most-recently-active first. Each is restarted through `startRequest(subject, 'passive', undefined, { recordActivity: false })` — full admission, capacity, and policy path with a minimal subject rebuilt by `warmSubject()` from `repository.owner` — but `beginStart` leaves `last_activity_at` untouched so an unattended warm cannot renew its own warm window.
+`InstanceManager.reconcile()` probes existing generations and restarts stopped infrastructure assignments with running intent through ordinary authorization, capacity and process-generation admission. Recently used legacy infrastructure stops remain eligible within `HGW_RECONCILE_WARM_WINDOW_MS` (default seven days). That window does not expire durable running intent. Never-started assignments and explicit or idle stops are excluded.
 
-`manual`, `access-change`, and `idle` stops are never revived: the first two are hard semantic lines, and an `idle` stop is the reaper's on-demand verdict — warming it would fight the policy that stopped it. A `reconcileRecovery` map applies consecutive-failure backoff: confirmed deaths and launch failures count, refusals (`blocked`, capacity `cancelled`) only defer one base interval, and the retry delay doubles per failure from `HGW_RECONCILE_BACKOFF_BASE_MS` (60s) to `HGW_RECONCILE_BACKOFF_MAX_MS` (30m); staying ready for `HGW_RECONCILE_STABLE_MS` (10m) closes the streak. `HGW_RECONCILE=off` disables the loop.
+Warm starts leave foreground activity unchanged. Failure-scoped backoff ranges from `HGW_RECONCILE_BACKOFF_BASE_MS` to `HGW_RECONCILE_BACKOFF_MAX_MS`; sustained readiness for `HGW_RECONCILE_STABLE_MS` clears the failure streak. `HGW_RECONCILE=off` disables automatic recovery. Reconciliation does not terminate live incompatible releases; the [survivor policy](2026-11-11-runtime-survivor-retention.md) owns upgrade admission.
 
 ## Alternatives considered
 
-**Supervisor-level respawn** (launchd/systemd-style restart on the supervisor unit). Rejected: respawn bypasses gateway admission, capacity fencing, and generation fencing; the reconciler reuses the ordinary start pipeline so a revived Runtime is indistinguishable from a user-started one.
+**Start every assigned Runtime.** Rejected because metadata-only directory browsing and unused personal allocations must not consume processes.
 
-**Warming every stopped row.** Rejected: cold, long-idle Runtimes would burn start slots on boot for spaces nobody opens. The activity window bounds the warm set to plausibly-used spaces; explicit `manual` stays untouched as a hard semantic line.
+**Use only recent foreground activity.** Rejected because background obligations outlive browser activity. The age window remains only for records without preserved running intent.
 
-**A per-boot attempt cap.** Rejected: an absolute per-boot counter permanently starves a flaky Runtime until the next deploy and charges refusals that consumed no generation. Failure-scoped exponential backoff bounds churn without an end state, and a sustained-ready observation proving recovery clears it.
+**Add another persistent resume flag.** Rejected because `desired_state` already names the required durable intent; a second field could disagree with explicit stop decisions.
+
+**Supervisor-only respawn.** Rejected because it bypasses current Gateway authorization, quotas and generation admission.
 
 ## Consequences
 
-A deploy-restart now self-heals: signature drain → `stopped` rows with `stop_reason='shutdown'` → first reconcile tick warms them back `ready` with zero user-facing wait. Crash recovery is automatic within ~60s instead of waiting for the next entry, and a crash loop settles into geometric retries instead of unbounded churn or a hard per-boot stop — the historical runaway row now retries at most once per 30 minutes once the backoff saturates. A warmed-but-unused Runtime keeps its original `last_activity_at`, so the idle reaper retires it exactly once to `idle`, after which it stays stopped until real use. Warmed starts share the same admission FIFO as user requests, so a mass warm can transiently occupy `maxStarting` slots; interactive starts are not preempted but may queue behind an in-flight warm admission.
+Resident and scheduled work recover regardless of the last browser visit, provided the Runtime was already started and has not been explicitly stopped or revoked. Schedule still requires a running Host; this does not introduce an external timer service. On-demand Runtimes release through existing authenticated idle checks after their obligations end. Recovery shares bounded start capacity with interactive requests.
 
-## Verification
-
-- `instances.spec.ts`: `shutdown`-stopped rows warm back `ready` while `manual`/`access-change`/`idle` stay `stopped`; a real `FAKE_DSH` child killed via `/exit` is published `failed` then warmed back `ready`; a dead adopted survivor is published `failed` through the probe; a dead probe against a generation already replaced by a racing start terminates nothing; a `starting` generation past its readiness deadline is settled `failed` while a fresh one is left to its own launch; a warmed start leaves `last_activity_at` untouched; consecutive launch failures defer geometrically and a sustained-ready observation clears the streak.
-- `config.spec.ts`: defaults `enabled/7d/60s/30m/10m`, `HGW_RECONCILE=off`, rejection of malformed values.
-- Production mac-mini r56 (pre-backoff build): boot signature drain → first reconcile logged `{ failed: 0, warmed: 5, budgeted: 0 }`, six rows (admin personal, mac-mini steward, project Runtimes) reached `ready` unattended; two crash-looping rows retried at ticks 2–3 (generations 24→25→26, 11229→11230→11231) then stopped retrying. The drain→warm path the backoff now gates is unchanged.
+SQLite schema 11 gives the legacy test/local store the same desired-state semantics, preserving active rows and leaving stopped allocations stopped. PostgreSQL uses its existing desired-state column. Tests cover old running obligations, unused allocations, failed termination, stop precedence and unchanged activity timestamps.

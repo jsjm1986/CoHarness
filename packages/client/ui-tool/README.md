@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-client-ui-tool` is the client Tool presentation plugin of the dsh web client: it renders every tool call in the conversation. `ui-conversation` dispatches each ordered `tool-call` Conversation Node through the matching key of `conversation.chat.node`; this package renders its root and PTC dispatch children, then dispatches every atomic call through the keyed `tool.call.toolview` slot. Unregistered Tool names use the generic card. Business UI packages register only their wire Tool names and atomic views — they do not pair Session events, rebuild the transcript, or own root/subcall topology, because the Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection.
+`dsh-client-ui-tool` is the client Tool presentation plugin of the dsh web client: it renders every tool call in the conversation. `ui-conversation` dispatches each ordered `tool-call` Conversation Node through the matching key of `conversation.chat.node`; this package renders its root and PTC dispatch children, then dispatches every atomic call through the keyed `tool.call.toolview` slot. Unregistered Tool names use the generic card. Business UI packages register only their wire Tool names and atomic views — they do not pair Session events, rebuild the transcript, or own root/subcall topology, because the Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection. Tool receipt labels use the theme’s semantic text colors in inline and sidebar details.
 
 ## Table of Contents
 
@@ -29,7 +29,11 @@ Tool rows and details read Host descriptions from the owning Session’s Runtime
 
 Tool calls appear in the conversation as cards: a root call tree with its nested subcalls, each atomic call rendered by its owning view. Every lifecycle state retains the tool's ordinary business glyph; failure and interruption remain explicit through the frozen call/result state, accessible status text, and failure summary. Users can open files or inspect calls through the Host callbacks. A collapsed `web_fetch` row links its http(s) URL, which opens in a new browser tab.
 
+Rows with a file or URL action provide a separate disclosure button so keyboard and touch users can open the link or expand the output independently.
+
 Shared Tool rows and Bash rows retain error and warning colors for failed and stopped summaries, including on hover. Hover darkens only summaries without those states.
+
+Bash cards keep their inspection actions visible on devices without hover and expose touch-sized targets on coarse pointers. Keyboard focus inside the card reveals those actions on desktop. Their running sweep uses compositor transforms and remains static when reduced motion is requested; the textual run state remains available.
 
 Before dispatch, a named model call appears as one non-expandable row with its tool-owned icon and title. A generic row shows `Tool call · <tool name>`. Preparation exposes no complete arguments, file link, result, or parameter-dependent interaction. Write/edit show `Preparing content NKB` in the summary; N is `Math.ceil(raw.length / 1024)`, an integer estimate of the raw argument string length, not the file's byte size. `tool/call` enables the existing call presentation; completing an argument block alone does not start execution.
 

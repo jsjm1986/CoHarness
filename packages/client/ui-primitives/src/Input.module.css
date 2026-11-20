@@ -13,6 +13,10 @@
       var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
+.wrap:has(> .input:enabled):not(:focus-within) {
+  border-color: color-mix(in srgb, var(--dsw-alias-label-secondary) 75%, var(--dsw-alias-bg-layer-1));
+}
+
 /* shadcn input focus: accent border plus a 3px ring at quarter alpha. */
 .wrap:focus-within {
   border-color: var(--dsw-alias-brand-primary);
@@ -34,25 +38,34 @@
   border: none;
   outline: none;
   background: transparent;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   color: var(--dsw-alias-label-primary);
 }
 
 .input::placeholder {
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
+  opacity: 1;
 }
 
 /* Coarse pointers: 16px text keeps iOS Safari from zooming the page on
    focus (it zooms any control below 16px); the wrap grows to fit. */
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 767px) {
   .wrap {
     height: auto;
-    min-height: 40px;
+    min-height: var(--dsw-touch-target);
   }
 
   .input {
-    font-size: 16px;
-    line-height: 24px;
+    min-height: var(--dsw-touch-target);
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+}
+
+@media (forced-colors: active) {
+  .wrap:focus-within {
+    outline: var(--dsw-focus-ring-width) solid Highlight;
+    outline-offset: 2px;
   }
 }

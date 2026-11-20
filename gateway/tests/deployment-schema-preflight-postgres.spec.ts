@@ -11,7 +11,7 @@ import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { PostgresDeploymentBackups } from '../src/postgres/deployment-backups.ts'
 import { PostgresMaintenanceService } from '../src/postgres/maintenance-service.ts'
-import { PostgresBackupService } from '../src/postgres/backup-service.ts'
+import { PostgresBackupService, type BackupRecordView } from '../src/postgres/backup-service.ts'
 import { createDeploymentCommands } from '../src/deployment-commands.ts'
 import { NodeConfigurationStore } from '../src/node-config-store.ts'
 import { nodeConfigurationAuthority } from '../src/postgres/node-configuration-authority.ts'
@@ -76,15 +76,32 @@ it.skipIf(databaseUrl === undefined).each(scenarios)(
       await writeFile(cfg.organizationModelCredentialKeyFile, Buffer.alloc(32, 7), { mode: 0o600 })
       await new NodeConfigurationStore(context, cfg, env, nodeConfigurationAuthority(context)).initialize()
       const maintenance = new PostgresMaintenanceService(context, cfg.nodeStaleMs)
-      await maintenance.enterMaintenance(null)
       const pgDump = command(process.env.HGW_TEST_PG_DUMP_COMMAND, 'pg_dump')
       const pgRestore = command(process.env.HGW_TEST_PG_RESTORE_COMMAND, 'pg_restore')
-      const backups = new PostgresDeploymentBackups(context, cfg, url.href, createDeploymentCommands(scenario === 'insert-export' ? [...pgDump, '--inserts'] : pgDump, pgRestore), env)
-      const record = await backups.create(null)
+      const commands = createDeploymentCommands(scenario === 'insert-export' ? [...pgDump, '--inserts'] : pgDump, pgRestore)
+      const backups = new PostgresDeploymentBackups(context, cfg, url.href, commands, env)
+      let record: BackupRecordView
+      if (sourceMaximum === maximum) {
+        await maintenance.enterMaintenance(null)
+        record = await backups.create(null)
+      } else {
+        // Capture the old schema with native PostgreSQL before running the current Gateway.
+        const dump = await commands.backup(cfg.backupDir, url.href, [{
+          owner: 'gateway', kind: 'file', path: cfg.organizationModelCredentialKeyFile,
+        }])
+        await commands.verifyDump(dump.dumpPath, undefined, dump.sha256)
+        await runMigrations(pool, currentMigrations)
+        const state = await maintenance.enterMaintenance(null)
+        const registry = new PostgresBackupService(context)
+        const registered = await registry.record({
+          path: dump.dumpPath, migrationVersion: sourceMaximum, writeEpoch: BigInt(state.writeEpoch),
+          sizeBytes: dump.sizeBytes, sha256: dump.sha256, managedSnapshot: dump.managedSnapshot, actor: null,
+        })
+        record = await registry.setVerified(registered.id, true)
+      }
       expect(record.status).toBe('verified')
       expect(record.managedSnapshot!.files.length).toBeGreaterThan(0)
       expect(record.migrationVersion).toBe(sourceMaximum)
-      await runMigrations(pool, currentMigrations)
       if (scenario === 'checksum-drift') {
         await pool.query("UPDATE harness.schema_migrations SET checksum=repeat('f',64) WHERE version=$1", [maximum])
       }

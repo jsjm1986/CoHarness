@@ -1,12 +1,24 @@
 /** Real Runtime credentials preserve independent execution identities for equal Host Session IDs. @module */
 import { createHash, randomUUID } from 'node:crypto'
-import { resolve } from 'node:path'
+import { mkdtemp, rm } from 'node:fs/promises'
+import type { AddressInfo } from 'node:net'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import type { Pool } from 'pg'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { RuntimeId } from '../src/runtime-catalog.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
+import { PostgresAuditService } from '../src/postgres/audit-service.ts'
+import { PostgresAuthService } from '../src/postgres/auth-service.ts'
+import { PostgresMaintenanceService, type WriteGateVerdict } from '../src/postgres/maintenance-service.ts'
+import { PostgresProjectService } from '../src/postgres/project-service.ts'
+import { PostgresUserService } from '../src/postgres/user-service.ts'
+import { InstanceManager } from '../src/instances.ts'
+import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { createExecutionFixture } from './execution-fixture.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
+import { testConfig } from './test-config.ts'
 import { GatewayExecutionIdentity, verifyExecutionAttribution, type ExecutionIdentityState } from '../src/execution-identity.ts'
 import { DesktopAccess } from '../src/desktop-access.ts'
 import { NodeResourceBudget, type NodeResourceBudgetConfig } from '../src/node-resource-budget.ts'
@@ -26,7 +38,7 @@ describePg('execution Runtime identity isolation', () => {
   afterAll(async () => { await pool?.end() })
 
   async function fixture(resourceBudget?: NodeResourceBudgetConfig) {
-    const f = await createExecutionFixture(pool, { resourceBudget })
+    const f = await createExecutionFixture(pool, { resourceBudget, executionWriteEpoch: 1n })
     cleanups.push(f.dispose)
     const created = await pool.query<{ runtime_id: RuntimeId }>(`INSERT INTO harness.instances
       (organization_id,user_id,assigned_node_id,port,storage_layout)
@@ -74,6 +86,8 @@ describePg('execution Runtime identity isolation', () => {
     expect(a.receipt.inputId).not.toBe(b.receipt.inputId)
     expect(a.state.scopeId).not.toBe(b.state.scopeId)
     expect((await f.admit(sessionId, f.admin, f.personal, a.receipt.messageId)).inputId).toBe(a.receipt.inputId)
+    expect((await f.call('input', { sessionId, messageId: a.receipt.messageId, kind: 'message',
+      contentHash: createHash('sha256').update('different').digest('hex') }, f.admin, f.personal)).status).toBe(409)
     expect((await f.call('enter', { sessionId, inputId: a.receipt.inputId, messageId: a.receipt.messageId,
       contentHash: a.receipt.contentHash }, undefined, f.sibling)).status).toBe(403)
     expect((await f.call('input', { sessionId, messageId: a.receipt.messageId, kind: 'message',
@@ -84,6 +98,132 @@ describePg('execution Runtime identity isolation', () => {
       expect((await f.call(action, { sessionId, ...value }, undefined, f.sibling)).status).toBe(403)
     }
     expect((await f.call('authorize', { sessionId, scopeId: b.state.scopeId, capability: 'execute' }, undefined, f.sibling)).status).toBe(200)
+  })
+
+  it('checks the computer grant again after waiting for the account lock and commits no receipt on revocation', async () => {
+    const f = await fixture(), sessionId = await f.session(f.personal), messageId = randomUUID()
+    const lease = await pool.connect()
+    try {
+      await lease.query('BEGIN')
+      await lease.query('SELECT id FROM harness.users WHERE id=$1 FOR UPDATE', [f.admin.uuid])
+      const pending = f.call('input', { sessionId, messageId, kind: 'message',
+        contentHash: createHash('sha256').update(messageId).digest('hex') }, f.admin, f.personal)
+      const stopAt = performance.now() + 3000
+      for (;;) {
+        const { rows: [block] } = await pool.query<{ waiting: boolean }>(`SELECT EXISTS(
+          SELECT FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'
+            AND query LIKE 'SELECT * FROM harness.admit_personal_execution_input(%') AS waiting`)
+        if (block?.waiting === true) break
+        if (performance.now() >= stopAt) throw new Error('Personal input did not wait for the account grant change')
+        await delay(10)
+      }
+      await lease.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE (organization_id,node_id,user_id)=($1,$2,$3)',
+        [f.organizationId, f.context.nodeId, f.admin.uuid])
+      await lease.query('COMMIT')
+      expect(await pending).toMatchObject({ status: 403 })
+      const result = await pool.query('SELECT id FROM harness.execution_inputs WHERE organization_id=$1 AND message_id=$2', [f.organizationId, messageId])
+      expect(result.rows).toHaveLength(0)
+    } finally {
+      await lease.query('ROLLBACK')
+      lease.release()
+    }
+  })
+
+  it('rejects a stale serving epoch and rolls back an uncommitted root and input', async () => {
+    const f = await fixture(), sessionId = await f.session(f.personal)
+    const { organizationId, personal } = f
+    const root = randomUUID(), messageId = randomUUID()
+    const p = { sessionId, messageId, kind: 'message', contentHash: createHash('sha256').update(messageId).digest('hex') }
+    await pool.query("INSERT INTO harness.cluster_control(organization_id,mode,write_epoch) VALUES($1,'serving',2)", [organizationId])
+    expect(await f.call('input', p, f.admin, personal)).toMatchObject({ status: 503 })
+    expect(await f.call('register-session', { sessionId: root }, undefined, personal)).toMatchObject({ status: 503 })
+    expect((await pool.query('SELECT id FROM harness.execution_inputs WHERE organization_id=$1 AND message_id=$2', [organizationId, messageId])).rows).toHaveLength(0)
+    expect((await pool.query('SELECT session_id FROM harness.execution_sessions WHERE organization_id=$1 AND session_id=$2', [organizationId, root])).rows).toHaveLength(0)
+  })
+
+  it('admits ordinary personal execution in two SQL trips while retaining write, bearer and epoch fences', async () => {
+    const f = await fixture()
+    const root = await mkdtemp(join(tmpdir(), 'hgw-execution-admission-'))
+    cleanups.push(() => rm(root, { recursive: true, force: true }))
+    const cfg = testConfig(root, { HGW_RUNTIME_API_BODY_LIMIT_BYTES: '512' })
+    const maintenance = new PostgresMaintenanceService(f.context, cfg.nodeStaleMs)
+    const instances = new InstanceManager(f.instances, cfg)
+    await instances.portOf(f.personal)
+    let stopping = false, writers = 0
+    const writerArrival: number[] = []
+    const maintenanceGate = vi.fn(async () => (await maintenance.writeGate(1n)).verdict)
+    const deps: GatewayDeps = { cfg, maintenanceGate, writerSpan: () => {
+      writers++
+      writerArrival.push(writers)
+      return () => { writers-- }
+    }, users: new PostgresUserService(f.context, cfg), auth: new PostgresAuthService(f.context, cfg),
+    projects: new PostgresProjectService(f.context, cfg), audit: new PostgresAuditService(f.context), instances }
+    const listen = async (stopGate?: () => WriteGateVerdict) => {
+      const server = createGatewayServer(deps, { runtime: f.handler, runtimeAuthorize: async req =>
+        await f.instances.authenticateRuntimeToken(req.headers.authorization?.slice('Bearer '.length) ?? '') ?? false,
+      runtimePersonalExecutionStopGate: stopGate })
+      cleanups.push(() => new Promise<void>((resolve, reject) => {
+        server.close(error => error === undefined ? resolve() : reject(error))
+        server.closeAllConnections()
+      }))
+      await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+      return `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+    }
+    const baseline = await listen()
+    const candidate = await listen(() => stopping ? 'maintenance' : 'open')
+    const call = (base: string, action: string, value: unknown, headers = f.headers(f.personal, f.admin)) =>
+      fetch(`${base}/internal/runtime/execution/${action}`, { method: 'POST', headers, body: JSON.stringify(value) })
+    const sessionId = randomUUID(), messageId = randomUUID()
+    const message = { sessionId, messageId, kind: 'message', contentHash: createHash('sha256').update(messageId).digest('hex') }
+    const query = vi.spyOn(pool, 'query')
+    try {
+      for (const [action, payload] of [['register-session', { sessionId }], ['input', message]] as const) {
+        const before = await call(baseline, action, payload)
+        expect(before.status).toBe(200)
+        const accepted: unknown = await before.json()
+        expect(query, `${action} with the shared HTTP gate`).toHaveBeenCalledTimes(4)
+        expect(maintenanceGate).toHaveBeenCalledOnce()
+        query.mockClear()
+        maintenanceGate.mockClear()
+        const after = await call(candidate, action, payload)
+        expect(after.status).toBe(200)
+        expect(await after.json()).toEqual(accepted)
+        expect(query, `${action} with the transaction's write fence`).toHaveBeenCalledTimes(2)
+        expect(maintenanceGate).not.toHaveBeenCalled()
+        query.mockClear()
+      }
+      expect(writerArrival).toEqual([1, 1, 1, 1])
+      expect(writers).toBe(0)
+      const oversized = 'x'.repeat(513)
+      const badToken = await call(candidate, 'input', oversized, { ...f.headers(f.personal), authorization: 'Bearer invalid' })
+      expect(badToken.status).toBe(401)
+      await badToken.json()
+      const oversizedAuthorized = await call(candidate, 'input', oversized)
+      expect(oversizedAuthorized.status).toBe(413)
+      await oversizedAuthorized.json()
+      const unsigned = await call(candidate, 'input', message, f.headers(f.personal))
+      expect(unsigned.status).toBe(403)
+      await unsigned.json()
+      stopping = true
+      const stopped = await call(candidate, 'input', { ...message, messageId: randomUUID() })
+      expect(stopped.status).toBe(503)
+      expect(await stopped.json()).toEqual({ error: 'maintenance' })
+      expect(maintenanceGate).not.toHaveBeenCalled()
+      stopping = false
+      const seeded = await call(candidate, 'register-session', { sessionId: randomUUID(), parentSessionId: sessionId, isSeeded: true })
+      expect(seeded.status).toBe(200)
+      await seeded.json()
+      expect(maintenanceGate).toHaveBeenCalledOnce()
+    } finally { query.mockRestore() }
+    const refusedSession = randomUUID(), refusedMessage = randomUUID()
+    await pool.query("INSERT INTO harness.cluster_control(organization_id,mode,write_epoch) VALUES($1,'serving',2)", [f.organizationId])
+    for (const [action, payload] of [['register-session', { sessionId: refusedSession }], ['input', { ...message, messageId: refusedMessage }]] as const) {
+      const response = await call(candidate, action, payload)
+      expect(response.status).toBe(503)
+      expect(await response.json()).toMatchObject({ error: 'execution-writes-unavailable' })
+    }
+    expect((await pool.query('SELECT id FROM harness.execution_inputs WHERE organization_id=$1 AND message_id<>$2', [f.organizationId, messageId])).rows).toHaveLength(0)
+    expect((await pool.query('SELECT session_id FROM harness.execution_sessions WHERE organization_id=$1 AND session_id=$2', [f.organizationId, refusedSession])).rows).toHaveLength(0)
   })
 
   it('keeps parent admission, inheritance and identical relay message IDs in their originating Runtime', async () => {

@@ -1,6 +1,6 @@
 /** Personal Runtime data stays private while account working directories retain their existing ownership. */
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -21,6 +21,20 @@ async function fixture() {
 }
 
 describe('personal Runtime storage', () => {
+  it('refuses an unbound relative home before creating any user data', async () => {
+    const { cfg, root } = await fixture()
+    expect(() => prepareUserData(cfg, 'member', {}, 'governance-recovery-unbound:' + randomUUID()))
+      .toThrow('User home must be an absolute local path')
+    expect(await readdir(root)).toEqual([])
+  })
+
+  it('does not recreate a retained account home that disappeared before allocating a new Runtime', async () => {
+    const { cfg, root } = await fixture()
+    expect(() => prepareUserData(cfg, 'member', { runtimeId: randomUUID() as RuntimeId, storageLayout: 'isolated' }, join(root, 'retained-home'), true))
+      .toThrow('Retained account home must be an existing canonical directory')
+    expect(await readdir(root)).toEqual([])
+  })
+
   it('preserves released data and creates separate settings and Session directories for additional assignments', async () => {
     const { cfg } = await fixture(), username = 'member'
     prepareUserData(cfg, username)

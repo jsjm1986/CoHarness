@@ -423,7 +423,7 @@ async function readResponseChunk(
   })
 }
 
-async function readBoundedBytes(response: Response, limit: number, signal?: AbortSignal): Promise<Uint8Array> {
+async function readBoundedBytes(response: Response, limit: number, signal?: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
   const responseLike = response as unknown as {
     headers?: Pick<Headers, 'get'>
     body?: ReadableStream<Uint8Array> | null
@@ -539,6 +539,21 @@ export function readApiResponseText(
   signal?: AbortSignal,
 ): Promise<string> {
   return readBoundedText(response, limit, signal)
+}
+
+/**
+ * Read one API response as complete bytes within the carrier's byte budget.
+ * @param response - Fetch response returned by an API carrier.
+ * @param limit - positive safe-integer response byte budget.
+ * @param signal - optional cancellation for response-body reading.
+ * @returns an owned byte buffer; an empty body returns an empty buffer.
+ */
+export function readApiResponseBytes(
+  response: Response,
+  limit = DEFAULT_UNARY_RESPONSE_MAX_BYTES,
+  signal?: AbortSignal,
+): Promise<Uint8Array<ArrayBuffer>> {
+  return readBoundedBytes(response, limit, signal)
 }
 
 /** A prepared operation's correlation header can contain only its intent UUID or the new RPC UUID. */
@@ -677,6 +692,7 @@ export abstract class AbstractApiClient implements IApiClient {
     signal: AbortSignal | undefined,
     timeoutPolicy: UnaryTimeoutPolicy = 'default',
     priority?: 'low',
+    preparationContinuation?: string,
   ): Promise<{ response: Response; signal: AbortSignal | undefined; dispose: () => void }> {
     const lease = requestSignalLease(signal, timeoutPolicy, this.timeoutMs)
     try {
@@ -687,7 +703,8 @@ export abstract class AbstractApiClient implements IApiClient {
       const operation = preparedOperationId(url.pathname, body)
       const response = await this.doFetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', ...(operation === undefined ? {} : { 'x-dsh-operation-id': operation }) },
+        headers: { 'content-type': 'application/json', ...(operation === undefined ? {} : { 'x-dsh-operation-id': operation }),
+          ...(preparationContinuation === undefined ? {} : { 'x-dsh-prepare-continuation': preparationContinuation }) },
         body: encodedBody,
         ...(priority === undefined ? {} : { priority }),
         ...lease.signal === undefined ? {} : { signal: lease.signal },
@@ -707,6 +724,7 @@ export abstract class AbstractApiClient implements IApiClient {
    * Unary protocol path: mint → tap → POST full form → envelope parse → verify
    * echo → value parse → tap → narrow. Virtual so a fake carrier (fixture) can
    * override transport at this layer.
+   * The optional preparation continuation belongs to one request and cannot replace routing, principal or operation headers.
    */
   protected async callUnary<K extends keyof RpcMethodMap>(
     method: K,
@@ -714,10 +732,11 @@ export abstract class AbstractApiClient implements IApiClient {
     signal?: AbortSignal,
     timeoutPolicy: UnaryTimeoutPolicy = 'default',
     priority?: 'low',
+    preparation?: { readonly continuation?: string; readonly rpcId: RpcId },
   ): Promise<RpcResponse<ResponseValue<K>>> {
-    const message: ClientRequest = { type: 'client-request', rpcId: this.mintRpcId(), method, payload }
+    const message: ClientRequest = { type: 'client-request', rpcId: preparation?.rpcId ?? this.mintRpcId(), method, payload }
     this.onEnvelope(message)
-    const posted = await this.postJson(`/api/${method}`, message, signal, timeoutPolicy, priority)
+    const posted = await this.postJson(`/api/${method}`, message, signal, timeoutPolicy, priority, preparation?.continuation)
     try {
       const full = serverResponseSchema.parse(await readBoundedJson(
         posted.response,

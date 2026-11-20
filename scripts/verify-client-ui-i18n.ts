@@ -18,6 +18,7 @@ const COPY_ATTRIBUTES = new Set([
   'alt',
   'aria-description',
   'aria-label',
+  'aria-roledescription',
   'aria-valuetext',
   'cancelLabel',
   'closeLabel',
@@ -89,6 +90,14 @@ function propertyName(node: ts.PropertyName | ts.BindingName): string | undefine
 function copyAttribute(name: string): boolean {
   return !name.endsWith('Key')
     && (COPY_ATTRIBUTES.has(name) || COPY_ATTRIBUTE_SUFFIX.test(name))
+}
+
+function shortcutToken(node: ts.PropertyAssignment): boolean {
+  const name = propertyName(node.name)
+  if (name !== 'aria' && name !== 'keys') return false
+  const owner = node.parent.parent
+  if (ts.isPropertyAssignment(owner) || ts.isVariableDeclaration(owner)) return propertyName(owner.name) === 'shortcut'
+  return ts.isJsxExpression(owner) && ts.isJsxAttribute(owner.parent) && owner.parent.name.getText() === 'shortcut'
 }
 
 function compactText(text: string): string {
@@ -198,6 +207,8 @@ export function findUiI18nViolations(file: string, sourceText: string): UiI18nVi
       for (const property of node.properties) {
         if (ts.isPropertyAssignment(property)) {
           const name = propertyName(property.name)
+          // ARIA token and IDREF values retain platform syntax inside prop bags.
+          if ((name?.startsWith('aria-') && !COPY_ATTRIBUTES.has(name)) || shortcutToken(property)) continue
           const propertyOwnsCopy = name !== undefined
             && (COPY_NAME.test(name) || COPY_SUFFIX.test(name))
           collectExpression(property.initializer, reason, naturalOnly || !propertyOwnsCopy)
@@ -256,7 +267,7 @@ export function findUiI18nViolations(file: string, sourceText: string): UiI18nVi
 
     if ((file.endsWith('.tsx') || file.startsWith('apps/desktop/')) && ts.isPropertyAssignment(node)) {
       const name = propertyName(node.name)
-      if (name !== undefined && (COPY_NAME.test(name) || COPY_SUFFIX.test(name))) {
+      if (name !== undefined && (COPY_NAME.test(name) || COPY_SUFFIX.test(name)) && !shortcutToken(node)) {
         collectExpression(node.initializer, `${name} property`)
       }
     }

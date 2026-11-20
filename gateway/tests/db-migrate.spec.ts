@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { openDb } from '../src/db.ts'
+import { openDb, SCHEMA_VERSION } from '../src/db.ts'
 
 function tables(db: Database.Database): string[] {
   return (db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as Array<{ name: string }>)
@@ -38,12 +38,17 @@ describe('SQLite schema migration', () => {
         { user_id: 3, state: 'stopping', pid: 456, stop_reason: 'manual' },
       ])
       expect(db.prepare('SELECT auto_review_eligible FROM users WHERE id=1').get()).toEqual({ auto_review_eligible: 1 })
+      expect(db.prepare('SELECT user_id,desired_state FROM instances ORDER BY user_id').all()).toEqual([
+        { user_id: 1, desired_state: 'stopped' },
+        { user_id: 2, desired_state: 'running' },
+        { user_id: 3, desired_state: 'stopped' },
+      ])
       expect(() => db.prepare("UPDATE instances SET stop_reason='unknown' WHERE user_id=1").run()).toThrow()
       db.prepare("UPDATE instances SET stop_reason='idle' WHERE user_id=1").run()
       db.close()
       db = openDb(file)
       expect(db.prepare('SELECT stop_reason FROM instances WHERE user_id=1').get()).toEqual({ stop_reason: 'idle' })
-      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 10 })
+      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: SCHEMA_VERSION })
     } finally {
       if (db.open) db.close()
       rmSync(root, { recursive: true, force: true })
@@ -71,21 +76,21 @@ describe('SQLite schema migration', () => {
       db.close()
       db = openDb(file)
       expect(db.prepare('SELECT auto_review_eligible FROM users WHERE id=1').get()).toEqual({ auto_review_eligible: 1 })
-      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 10 })
+      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: SCHEMA_VERSION })
     } finally {
       if (db?.open) db.close()
       rmSync(root, { recursive: true, force: true })
     }
   })
 
-  it('creates project tables on a fresh database and records schema_version=10', () => {
+  it('creates project tables on a fresh database and records the current schema version', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')
     const db = openDb(file)
     expect(tables(db)).toEqual(expect.arrayContaining(['projects', 'project_members', 'model_registration_events', 'schema_meta']))
     expect(tables(db)).not.toEqual(expect.arrayContaining(['groups', 'dir_grants']))
     expect((db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>)
       .some(column => column.name === 'model_access_default_allowed')).toBe(true)
-    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(10)
+    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(SCHEMA_VERSION)
   })
 
   it('folds dir_grants and group members into projects; rw beats ro; then drops old tables', () => {

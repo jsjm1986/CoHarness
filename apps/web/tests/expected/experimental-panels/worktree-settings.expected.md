@@ -1,0 +1,4 @@
+- text: Keep worktrees when archiving
+- paragraph: When on, archiving a Session keeps the worktree it created; when off, a clean, unreferenced worktree is removed while its branch and commits remain.
+- switch "Keep worktrees when archiving" [checked]
+- button "Save" [disabled]

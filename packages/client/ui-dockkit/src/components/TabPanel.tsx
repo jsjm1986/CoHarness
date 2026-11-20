@@ -3,9 +3,9 @@
  * active tab's body with the dock preview overlay. Presentational; every gesture
  * leaves through `PaneCallbacks`, and the body itself comes from `renderTab`.
  *
- * A chip is a capsule carrying one control, its close, shown over its right
- * end while the chip is active, hovered, or focused; the context menu
- * (secondary press) carries the same close plus whatever the embedder appends.
+ * A chip is a capsule with a reserved close-control slot beside its title,
+ * shown while the chip is active, hovered, or focused. Its actions menu also
+ * offers close, movement, floating, and the embedder's entries.
  * Both close routes draw only while the embedder's `canCloseTab` allows, and
  * a pane's lone chip whose close is withheld draws quiet — no capsule, no
  * hover fill — since there is nothing to select against and nothing to do to
@@ -23,9 +23,9 @@
 import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import clsx from 'clsx'
-import { IconCloseFill14, IconPlusOutline16, IconSplitPanesOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseFill14, IconEllipsisOutline16, IconPlusOutline16, IconSplitPanesOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DockZone, LayoutState, PaneNode, TabId } from '../contract/types.ts'
-import { getTab } from '../engine/tree.ts'
+import { dockPaneIds, getPane, getTab } from '../engine/tree.ts'
 import type { PaneCallbacks, SplitBlock } from './render.ts'
 import { TabMenu } from './TabMenu.tsx'
 import { TabTitle } from './TabTitle.tsx'
@@ -233,6 +233,26 @@ export function TabStrip({ state, pane, callbacks }: TabPanelProps): ReactNode {
     chip.focus()
   }
 
+  const menuActions = (tabId: TabId): ReactNode => {
+    const tab = getTab(state, tabId)
+    const index = pane.tabs.indexOf(tabId)
+    const act = (operation: () => void): void => { setMenu(undefined); operation() }
+    return <>
+      {index > 0 && <button type="button" role="menuitem" className={css.menuItem}
+        onClick={() => { act(() => { callbacks.onPlaceTab(tabId, pane.id, index - 1) }) }}>{callbacks.labels.moveBefore}</button>}
+      {index < pane.tabs.length - 1 && <button type="button" role="menuitem" className={css.menuItem}
+        onClick={() => { act(() => { callbacks.onPlaceTab(tabId, pane.id, index + 2) }) }}>{callbacks.labels.moveAfter}</button>}
+      {dockPaneIds(state).map((destination, position) => destination === pane.id ? null :
+        <button key={destination} type="button" role="menuitem" className={css.menuItem}
+          onClick={() => { act(() => { callbacks.onPlaceTab(tabId, destination, getPane(state, destination).tabs.length) }) }}>
+          {callbacks.labels.moveToPane(position + 1)}
+        </button>)}
+      <button type="button" role="menuitem" className={css.menuItem}
+        onClick={() => { act(() => { callbacks.onFloatTab(tabId) }) }}>{callbacks.labels.floatTab}</button>
+      {callbacks.renderTabMenuItems?.(tab, () => { setMenu(undefined) })}
+    </>
+  }
+
   return (
     // The window drag claim is withdrawn while any pane floats: a floating pane
     // renders among this surface's cells in tab-id order, so one sorted before this
@@ -289,7 +309,13 @@ export function TabStrip({ state, pane, callbacks }: TabPanelProps): ReactNode {
                 onKeyDown={(event) => {
                   // Keys on the chip's nested close control are that control's.
                   if (event.target !== event.currentTarget) return
-                  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.nativeEvent.isComposing) return
+                  if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+                  if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+                    event.preventDefault()
+                    setMenu({ tabId, anchor: event.currentTarget })
+                    return
+                  }
+                  if (event.shiftKey) return
                   const next = chipToFocus(event.key, pane.tabs, tabId)
                   if (next !== undefined) {
                     event.preventDefault()
@@ -334,7 +360,7 @@ export function TabStrip({ state, pane, callbacks }: TabPanelProps): ReactNode {
                     anchor={menu.anchor}
                     onClose={closable ? () => { setMenu(undefined); callbacks.onCloseTab(tabId) } : undefined}
                     onDismiss={() => { setMenu(undefined) }}
-                    extras={callbacks.renderTabMenuItems?.(tab, () => { setMenu(undefined) })}
+                    extras={menuActions(tabId)}
                   />
                 )}
               </div>
@@ -360,6 +386,17 @@ export function TabStrip({ state, pane, callbacks }: TabPanelProps): ReactNode {
         </Tooltip>
       )}
       <div className={css.stripFill} data-dockkit-strip-fill />
+      {pane.activeTabId !== undefined && <Tooltip label={callbacks.labels.tabActions} side="bottom" delayMs={500}>
+        <button type="button" className={css.iconButton} aria-label={callbacks.labels.tabActions}
+          aria-haspopup="menu" aria-expanded={menu !== undefined} data-dockkit-tab-actions={pane.activeTabId}
+          onPointerDown={(event) => { event.stopPropagation() }}
+          onClick={(event) => {
+            event.stopPropagation()
+            const tabId = pane.activeTabId
+            const anchor = event.currentTarget
+            if (tabId !== undefined) setMenu(current => current === undefined ? { tabId, anchor } : undefined)
+          }}><IconEllipsisOutline16 /></button>
+      </Tooltip>}
       {!(callbacks.hideSplitWhenBlocked && block !== undefined) && (
         <Tooltip label={block === undefined ? callbacks.labels.splitPane : splitBlockedTitle(callbacks.labels, block)} shortcutKeys={callbacks.labels.splitPaneKeys} side="bottom" delayMs={500}>
           <span

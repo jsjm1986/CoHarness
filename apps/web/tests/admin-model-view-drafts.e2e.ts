@@ -4,7 +4,6 @@ import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
 import { loadConfig } from '../../../gateway/src/config.ts'
 import { openDb } from '../../../gateway/src/db.ts'
@@ -20,10 +19,13 @@ import { createProxyHandlers } from '../../../gateway/src/proxy.ts'
 import { createAdminApiHandler } from '../../../gateway/src/admin-api.ts'
 import { installAdminComputerFixture } from './admin-computer-fixture.ts'
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
+import { responsiveBrowser, responsiveMobileEmulation } from './responsive-browser.ts'
+import { auditAdminState } from './admin-responsive-state.ts'
 
 const EXPECTED = fileURLToPath(new URL('./expected/admin-model-view-drafts/', import.meta.url))
+const matrix = process.env.DSH_FEATURE_MATRIX === '1'
 
-it.each(['desktop-light', 'mobile-dark'] as const)('retains model configuration drafts in the built %s Admin', async (variant) => {
+it.each(matrix ? ['mobile-dark'] as const : ['desktop-light', 'mobile-dark'] as const)('retains model configuration drafts in the built %s Admin', async (variant) => {
   const root = await mkdtemp(join(tmpdir(), 'admin-model-view-drafts-'))
   const cleanup: Array<() => unknown> = [() => rm(root, { recursive: true, force: true })]
   try {
@@ -55,7 +57,7 @@ it.each(['desktop-light', 'mobile-dark'] as const)('retains model configuration 
     cleanup.push(() => { proxy.close() })
     const handler = createAdminApiHandler(deps)
     const writes: string[] = []
-    const server = createGatewayServer(deps, { ...proxy, adminRoot: resolve('gateway/public/admin'),
+    const server = createGatewayServer(deps, { ...proxy, adminRoot: resolve(process.env.DSH_ADMIN_ASSET_ROOT ?? 'gateway/public/admin'),
       admin: async (request, response, user, path, body) => {
         if (path.startsWith('/admin/api/model') && request.method !== 'GET') writes.push(path)
         return handler(request, response, user, path, body)
@@ -67,12 +69,12 @@ it.each(['desktop-light', 'mobile-dark'] as const)('retains model configuration 
     await new Promise<void>((ready, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', ready) })
     const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
     cfg.publicOrigins.push(origin)
-    const browser = await chromium.launch()
+    const browser = await responsiveBrowser.launch()
     cleanup.push(() => browser.close())
     const mobile = variant === 'mobile-dark'
     const context = await browser.newContext({ locale: 'zh-CN',
       viewport: mobile ? { width: 390, height: 844 } : { width: 1400, height: 1000 },
-      colorScheme: mobile ? 'dark' : 'light', hasTouch: mobile, isMobile: mobile })
+      colorScheme: mobile ? 'dark' : 'light', hasTouch: mobile, isMobile: responsiveMobileEmulation && mobile })
     const page = await context.newPage()
     const errors: string[] = []
     page.on('pageerror', (error) => { errors.push(error.message) })
@@ -82,12 +84,14 @@ it.each(['desktop-light', 'mobile-dark'] as const)('retains model configuration 
     await page.goto(`${origin}/admin/models`)
     await page.getByRole('button', { name: '添加组织 Provider', exact: true }).click()
     const route = page.getByRole('textbox', { name: 'Provider ID', exact: true })
+    await auditAdminState(page, 'provider-empty', page.locator('main'))
     await route.fill('org-draft-fixture')
     await page.getByRole('textbox', { name: '显示名称', exact: true }).fill('待保存组织连接')
     const endpoint = page.getByRole('textbox', { name: 'API 地址', exact: true })
     await endpoint.fill('https://draft.example.invalid/v1')
     const credential = page.locator('input[type=password][aria-label="API 密钥"]')
     await credential.fill('fixture-only-key')
+    await auditAdminState(page, 'provider-draft', page.locator('main'))
     const form = await page.locator('main').ariaSnapshot()
     await page.getByRole('button', { name: '组织模型', exact: true }).click()
     expect(await page.getByRole('dialog', { name: '保留当前编辑', exact: true }).count()).toBe(0)
@@ -103,6 +107,7 @@ it.each(['desktop-light', 'mobile-dark'] as const)('retains model configuration 
       expect(await endpoint.inputValue()).toBe('https://draft.example.invalid/v1')
       expect(await credential.inputValue()).toBe('fixture-only-key')
       guardSnapshot = await guard.ariaSnapshot()
+      await auditAdminState(page, destination === '权限与计价' ? 'provider-leave-pricing' : 'provider-leave-personal', guard)
       if (destination === '权限与计价') {
         await page.keyboard.press('Escape')
         await guard.waitFor({ state: 'hidden' })
@@ -116,11 +121,14 @@ it.each(['desktop-light', 'mobile-dark'] as const)('retains model configuration 
     expect(await credential.inputValue()).toBe('fixture-only-key')
     await other.close()
     if (webSnapshotMode() === 'refresh') await mkdir(EXPECTED, { recursive: true })
-    await compareOrRefreshGolden(join(EXPECTED, `${variant}.expected.md`), `${form}\n\n${guardSnapshot}`, webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(EXPECTED, `${variant}.expected.md`), `${form}\n\n${guardSnapshot}`, webSnapshotMode())
     await page.getByRole('button', { name: '取消', exact: true }).click()
     await page.getByRole('button', { name: '权限与计价', exact: true }).click()
     expect(await page.getByRole('button', { name: '权限与计价', exact: true }).getAttribute('aria-pressed')).toBe('true')
     expect(await page.getByRole('dialog', { name: '保留当前编辑', exact: true }).count()).toBe(0)
+    await auditAdminState(page, 'provider-pricing', page.locator('main'))
+    await page.getByRole('button', { name: '个人登记', exact: true }).click()
+    await auditAdminState(page, 'provider-personal-registration', page.locator('main'))
     expect(writes).toEqual([])
     expect(errors).toEqual([])
   } finally {
@@ -130,4 +138,4 @@ it.each(['desktop-light', 'mobile-dark'] as const)('retains model configuration 
     }
     if (failures.length > 0) throw new AggregateError(failures, 'Admin model draft fixture cleanup failed')
   }
-})
+}, 300_000)

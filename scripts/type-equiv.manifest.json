@@ -3018,6 +3018,11 @@
     },
     {
       "doc": "docs/subsystems/web-server.md",
+      "symbol": "WebRequestGuard",
+      "source": "packages/host/webserver/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/web-server.md",
       "symbol": "WebRoute",
       "source": "packages/host/webserver/src/index.ts"
     },

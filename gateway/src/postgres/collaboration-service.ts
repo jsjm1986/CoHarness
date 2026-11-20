@@ -17,10 +17,10 @@ import {
 } from '../collaboration.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 import { publicNumber } from './runtime-context.ts'
-import { transaction } from './database.ts'
+import { transaction, type Queryable } from './database.ts'
 import type { ConversationVisibility } from './conversation-repository.ts'
-import type { ProjectActivityPage } from '../services.ts'
-import { readProjectActivity } from '../node-content-activity.ts'
+import type { ProjectActivityOptions, ProjectActivityPage } from '../services.ts'
+import { readProjectActivity, readProjectActivityMembers } from '../node-content-activity.ts'
 
 interface AccessRow {
   session_id: string
@@ -89,8 +89,8 @@ export class PostgresCollaborationService {
   }
 
   private async projectAuthorities(userId: number, projectId: number | undefined, directory: boolean,
-    browserAccount = false): Promise<ProjectReadAuthorityView[]> {
-    const result = await this.context.pool.query<{
+    browserAccount = false, queryable: Queryable = this.context.pool): Promise<ProjectReadAuthorityView[]> {
+    const result = await queryable.query<{
       content:NodeContentBinding|null
       public_id: string
       name: string
@@ -172,8 +172,8 @@ export class PostgresCollaborationService {
     return this.projectAuthorities(userId, projectId, true, true)
   }
 
-  async projectForUser(projectId: number, userId: number): Promise<ProjectAuthorityView | null> {
-    return (await this.projectAuthorities(userId, projectId, false))[0] ?? null
+  async projectForUser(projectId: number, userId: number, queryable: Queryable = this.context.pool): Promise<ProjectAuthorityView | null> {
+    return (await this.projectAuthorities(userId, projectId, false, false, queryable))[0] ?? null
   }
 
   async internalProject(projectId: number): Promise<{
@@ -591,19 +591,19 @@ export class PostgresCollaborationService {
    * @param userId - requesting member's public id; visibility matches listConversations.
    * @param runtimeId - authenticated Runtime UUID whose roots feed the page.
    * @param projectId - project public id whose root conversations feed the page.
-   * @param options - row cap (clamped to 200) and an opaque `before` cursor; malformed cursors read the first page.
-   * @returns normalized feed rows plus the cursor that resumes after the last row.
+   * @param options - row cap (clamped to 200), optional contributor, and opaque cursor.
+   * @returns visible feed rows, their continuation when available, and the roster on the first request.
    */
   async listActivity(
     userId: number,
     runtimeId: RuntimeId,
     projectId: number,
-    options: { limit: number; before?: string },
+    options: ProjectActivityOptions,
   ): Promise<ProjectActivityPage> {
     const local = await this.localContent(runtimeId)
     if (local !== undefined) return local.listActivity(userId,projectId,options)
     if (await this.projectForUser(projectId, userId) === null) throw new CollaborationDeniedError('not-member')
-    return readProjectActivity(this.context.pool, { schema:'harness',organizationId:this.context.organizationId,runtimeId,
+    const page = await readProjectActivity(this.context.pool, { schema:'harness',organizationId:this.context.organizationId,runtimeId,
       coordinates:[this.context.organizationId,projectId,userId],...options,rootRelation:`FROM harness.conversation_sessions r
       JOIN harness.projects p ON p.id=r.project_id AND p.organization_id=r.organization_id
       JOIN harness.users creator ON creator.id=r.creator_user_id AND creator.organization_id=r.organization_id
@@ -620,6 +620,10 @@ export class PostgresCollaborationService {
             SELECT 1 FROM harness.steward_access_policies sp
             WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.node_id=harness.project_node_id(p.organization_id,p.id) AND sp.enabled)
           OR p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL))` })
+    if (options.before !== undefined) return page
+    const members = await readProjectActivityMembers(this.context.pool, this.context.organizationId, projectId)
+    if (await this.projectForUser(projectId, userId) === null) throw new CollaborationDeniedError('not-member')
+    return { ...page, members }
   }
 
 }

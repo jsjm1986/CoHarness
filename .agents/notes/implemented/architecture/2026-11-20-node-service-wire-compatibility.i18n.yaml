@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-20-node-service-wire-compatibility.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-20-node-service-wire-compatibility.md
+document:
+  en: fe5c3c789f37d9c9c19c4b692ebac36729873bf4
+  zh: 9c5045c0c1171de2eca784c337dc902d175fb5a6
+/agent-note-node-service-forwarding-checks-the-wire-version:
+  en: aac82d9144e03dbf
+  zh: ae2a9ea5c843389a
+/agent-note-node-service-forwarding-checks-the-wire-version/problem:
+  en: 17ea9a2c387a8596
+  zh: 4dba8ca2203a6368
+/agent-note-node-service-forwarding-checks-the-wire-version/decision:
+  en: 8ed0d65997a35b2d
+  zh: 1c584d3259b9ec61
+/agent-note-node-service-forwarding-checks-the-wire-version/alternatives-considered:
+  en: 45700943270e0fe0
+  zh: 2d68c01075f50322
+/agent-note-node-service-forwarding-checks-the-wire-version/consequences:
+  en: 10e65876476e71e7
+  zh: 825fe44571ef061d
+/agent-note-node-service-forwarding-checks-the-wire-version/verification:
+  en: edb4f71c1d362bc8
+  zh: 2a01b7a94e872972

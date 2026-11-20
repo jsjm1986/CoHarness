@@ -14,7 +14,7 @@
 
 ## 安装
 
-在精确的发布 checkout 中执行 `pnpm install --frozen-lockfile && pnpm run build:production`。该生产入口会构建 Harness 库与 Web 应用、树外插件和 Admin SPA，对 Gateway 做类型检查，并在缺少任何 CLI、Web、Gateway、Admin、插件、管理员覆盖层或协作 migration 产物时拒绝发布。
+在精确的发布 checkout 中执行 `pnpm install --frozen-lockfile && DSH_BUILD_CLIENT_PROFILE=coharness pnpm run build:production`。发布构建会在打包 Harness 和 Web 前重新生成所引用的 TypeScript 项目产物。它构建树外插件和 Admin SPA，对 Gateway 做类型检查，并按发布清单验证 CLI、Web、Gateway、Admin、插件和迁移文件。
 
 执行数据库备份或恢复的节点还需要匹配 PostgreSQL 安装的[私密连接适配器](postgres/README.zh.md#private-maintenance-connections)；启用维护命令前，应在实际执行主机上构建。普通 Gateway 和节点代理构建不要求 C 工具链。
 
@@ -28,6 +28,8 @@
 Admin 归档频道由 PostgreSQL migration 015 启用。可通过 `HGW_ARCHIVE_RETENTION_DAYS`（默认 `30`）设置回收站保留窗口。运行时归档快照通过私有 Gateway API 对账；运行时 home 与 Gateway 归档索引必须纳入同一套备份方案。个人正文仍保存在运行时自己的存储中，由管理员阅读器按需读取。
 
 托管桌面按节点选择启用。在宿主机上安装 Cua Driver 应用并授予其操作系统桌面权限，配置已发布的 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp` 包目录（将构建产物复制到发布根下的 `packages/experimental/computer-use-cua-driver-mcp`，或用 `HGW_DESKTOP_DRIVER_PACKAGE` 指向绝对包目录），并把 `HGW_DESKTOP_ID` 设为本节点的桌面标识。之后每个启动的运行时都会挂载 computer-use 服务与该提供者，并发布托管桌面策略；部署需要固定路径或 `--direct` 时，可用 `HGW_DESKTOP_DRIVER_COMMAND` 和 `HGW_DESKTOP_DRIVER_ARGS` 替换 `cua-driver` 查找与 `mcp` 参数。管理员随后在桌面协调页授权用户与项目，每位参与者在作曲器中对活动根会话和桌面完成确认后，驱动调用才会执行。`HGW_DESKTOP_ID` 未设置时，运行时不挂载驱动，也不会读取驱动包。
+
+面向用户的 VNC 访问通过 `HGW_REMOTE_DESKTOP=on|off` 单独配置，默认为 `on`。不提供已配置 VNC 端点的节点设为 `off`：新启动的受管 Runtime 禁用 VNC 提供方与流，不引用 Gateway 的私有桌面文件。控制器保留通过鉴权的空目标列表和结构化不可用响应，桌面环境元数据继续启用。即使宿主机没有 GUI，明确配置外部 VNC 服务器时仍应保持 `on`。此设置可在节点部署配置中管理；保存不会直接应用，应用要求已完成停写的维护状态。不要通过放宽文件权限或停止活动任务绕过缺失的桌面配置。
 
 ## 每用户开号
 
@@ -151,16 +153,27 @@ LaunchAgent 只使用稳定路径。替换 `ACCOUNT`，通过 `launchctl bootstr
 </plist>
 ```
 
-完整构建 release 后，只通过控制器激活：
+先进入维护模式，确认所有个人与项目 Runtime、长任务、定时任务和后台写入已经停止，再暂停 launchd 自动启动并停止 Gateway；浏览器空闲不能证明已经停止。保留已注册任务，用 `launchctl disable gui/$(id -u)/com.maycran.harness-gateway` 暂停自动启动，并且只在完成上述确认后停止进程。控制器不会停止 Gateway 或 Runtime。完整构建 release 后，通过控制器激活：
 
 ```sh
 CONTROL="$HOME/.local/libexec/harness-gateway/release-control.sh"
 RELEASE_NAME=coharness-REVISION
+"$CONTROL" preflight
 "$CONTROL" activate "$HOME/harness-gateway-releases/$RELEASE_NAME"
 "$CONTROL" status
 ```
 
-激活过程会校验产物、持有激活锁、原子替换 `current` 并重启 launchd；只有任务取得新 PID、cwd 指向目标 Gateway 目录且 `/healthz` 报告目标 release id 时，控制器才接受该 release。激活失败时，控制器会把 `current` 切回并验证上一个 release 后再返回错误。激活过程绝不删除 release；清理必须单独显式执行，并且只要目标是当前目录、活动 Gateway cwd、任一进程命令仍引用该目录，或目录下仍有打开的文件，控制器就会拒绝：
+激活会拒绝仍在运行的 Gateway、留存的 release Runtime 进程或无法读取的进程清单。控制器持有激活锁，对照候选携带的迁移文件核对治理库的实时版本和校验和，再切换 `current`。已应用的记录与迁移序列前缀一致时，候选可在启动时执行后续向前迁移。配置的[节点内容卷](node-content/README.zh.md)须事先与其单独的迁移序列完全一致。通过检查后启用并启动已注册的 Gateway，再核对精确 release、PID 和 cwd。
+
+保留能运行在升级后数据库上的备用版本。通过 `--rollback-target <directory>` 指定备用版本，也可以由控制器检查上一个已选版本。候选失败并确认其 Gateway 和 Runtime 均已退出后，控制器暂停自动启动，核对备用版本实际使用的是同一组数据库，并逐个比较实时迁移名称、校验和与备用版本携带的文件。通过后才启动备用版本。旧版本不兼容或证据不可用时，仍选择候选并暂停自动启动。在维护期间准备与现有数据库兼容的版本，再运行 `activate`。检查只读取迁移记录，已提交的迁移继续保留。候选仍持有工作或状态无法确认时，控制器保留其选择，不发送信号。
+
+安装更新后的稳定控制器。候选、上一个已选版本或显式备用版本须有一份提供 `gateway/lib/release-schema-check.js`。只要已安装代码和迁移文件能够证明兼容性，这份程序也可检查旧编译版本和作为隐式备用的源码版本。
+
+复制 Windows 发布目录后，重新创建指向待发布目录的安装包目录链接。以待发布的 CLI 包清单为安装基准，通过 `createRuntimeResolution` 解析受管 Web profile。启用前根据待发布根目录核对安装包的真实路径。Gateway 报告就绪时，继承自旧发布目录的链接仍可能加载旧版 Host 或浏览器包。
+
+Windows 手动 `node-agent-task.ps1 -Restart` 和 `-Uninstall` 要求任务仅包含该脚本持有的一个动作。先暂停同安装目录内其他已启用任务，并确认 Gateway/Runtime 进程全部停止；无法读取进程清单时拒绝操作。正常 watchdog 故障恢复保持原样。不要使用调用 `taskkill /T /F`、停止 Runtime supervisor 或清扫 Gateway 进程树的旧部署脚本。工作无法安全停止时，使用独立数据库、身份、目录和端口验证候选，不替换生产。
+
+激活、自动回退与清理共用发布锁。激活期间会拒绝清理请求。当前版本、进程引用和打开的文件均会阻止清理。
 
 ```sh
 OLD_RELEASE_NAME=coharness-OLD-REVISION

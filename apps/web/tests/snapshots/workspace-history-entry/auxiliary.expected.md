@@ -6,17 +6,21 @@
       - img
   - button "New tab":
     - img
+  - button "Tab actions":
+    - img
   - button "Split"
   - button "Fullscreen"
   - button "Collapse right sidebar":
     - img
+- textbox "Enter an HTTP(S) address"
+- button "Go":
+  - img
 - button "Back" [disabled]:
   - img
 - button "Forward" [disabled]:
   - img
 - button "Reload" [disabled]:
   - img
-- textbox "Enter an HTTP(S) address"
 - button "Open in system browser" [disabled]:
   - img
 - button "Disable sandbox restrictions"

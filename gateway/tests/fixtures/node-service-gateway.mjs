@@ -32,7 +32,8 @@ const [
   { PostgresDeploymentTopology },
   { PostgresMaintenanceService, ensureControl }, { PostgresBackupService },
   { NodeConfigurationStore }, { nodeConfigurationAuthority }, { GatewayNodeConnection },
-  { PostgresWorkspaceCatalog }, { createGatewayWorkbenchCatalogHandler },
+  { PostgresWorkspaceCatalog }, { createGatewayWorkbenchCatalogHandler }, { workbenchRows },
+  { PostgresRuntimeAssetAdmission }, { LocalNodeDrafts },
 ] = await Promise.all([
   'config', 'postgres/database', 'postgres/runtime-context', 'postgres/user-service', 'postgres/auth-service',
   'postgres/project-service', 'postgres/audit-service', 'postgres/collaboration-service', 'postgres/instance-repository',
@@ -44,7 +45,7 @@ const [
   'plugin-management', 'terminal-management', 'documents-local', 'document-catalog', 'postgres/document-catalog-service', 'postgres/document-locations',
   'document-transfer', 'browser-documents', 'postgres/webhook-endpoint-service', 'postgres/webhook-delivery-service', 'webhook-intake', 'deployment-topology',
   'postgres/maintenance-service', 'postgres/backup-service', 'node-config-store', 'postgres/node-configuration-authority', 'node-connection',
-  'workspace-catalog', 'workbench',
+  'workspace-catalog', 'workbench', 'workbench-rows', 'runtime-asset-admission', 'node-drafts',
 ].map(load))
 
 const cfg = loadConfig({
@@ -60,6 +61,7 @@ const cfg = loadConfig({
   ...(nodeName === 'center' ? {} : { HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS: '120000', HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS: '60000', HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS: '120000' }),
   HGW_NODE_SERVICE_FORWARDING: 'on', HGW_NODE_AGENT_HEARTBEAT_MS: '100', HGW_NODE_AGENT_LEASE_MS: '30000',
 })
+cfg.releaseId = nodeName === 'center' ? 'fixture-center-release' : 'fixture-worker-release'
 await mkdir(root, { recursive: true })
 const modelFixture = createHttpServer((req, res) => {
   req.resume(); res.setHeader('content-type', 'application/json')
@@ -116,17 +118,24 @@ await resources.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal
 const repository = new PostgresInstanceRepository(context, cfg.instancePortBase)
 const processOwner = await GatewayModelBudget.open(resources, join(root, 'gateway-owners'))
 const launcher = new LocalLauncher(cfg), credentials = new Map()
+const heldStarts = new Map()
 const startNative = launcher.start.bind(launcher)
 launcher.start = async input => {
   const issued = JSON.parse(input.gatewayCredential)
   const captured = credentials.get(issued.runtime.runtimeId) ?? []
   captured.push({ generation: input.generation, token: issued.token })
   credentials.set(issued.runtime.runtimeId, captured)
+  await heldStarts.get(issued.runtime.runtimeId)?.promise
   return startNative(input)
 }
-const manager = new InstanceManager(repository, cfg, launcher, { principalPublicKey: keys.publicKeyPem }, resources, processOwner)
+const manager = new InstanceManager(repository, cfg, launcher, { principalPublicKey: keys.publicKeyPem, nodeId: context.nodeId }, resources, processOwner)
 const primaryTarget = await manager.resolveTarget({ kind: 'user', id: user.id })
 await manager.stateOf(primaryTarget)
+if (nodeName !== 'center') {
+  const { dshHome } = await manager.storageOf(primaryTarget)
+  await mkdir(dshHome, { recursive: true })
+  await writeFile(join(dshHome, 'settings.yaml'), 'runtime-execution:\n  mode: on-demand\n', { mode: 0o600 })
+}
 const relaySockets = new Set()
 const runtimeRelays = new Set()
 async function relayFor(runtimeId, ownerUserId = user.id) {
@@ -157,7 +166,7 @@ const localMonitor = scopeAccessMonitor(monitor, context.nodeId)
 const catalog = new PostgresRuntimeCatalog(context, cfg.runtimeCatalog, context.nodeId)
 const access = new PostgresNodeAccessService(context, cfg.nodeAccess, cfg.runtimeCatalog)
 const channels = new GatewayNodeChannels(access, cfg.nodeChannel)
-const services = new GatewayNodeServices(access, channels, cfg.nodeService, null)
+const services = new GatewayNodeServices(access, channels, cfg.nodeService)
 const computerAccess = new PostgresComputerAccess(context, cfg.runtimeCatalog, context.nodeId)
 const topology = new PostgresDeploymentTopology(context, { legacyForwarding: false, refreshAfterMs: 30000,
   pageSize: cfg.runtimeCatalog.pageSize, maxBytes: cfg.runtimeCatalog.maxBytes, allowedOrigins: cfg.publicOrigins })
@@ -202,18 +211,24 @@ const localDocuments = new LocalDocumentBroker({ cfg, nodeId: context.nodeId, co
   organizationId: context.organizationId, catalog: documentCatalogHandlers, accessMonitor: localMonitor })
 const documentDeps = { instances: manager, users, projects, collaboration, principals: keys.signer, audit, catalog: documentCatalog,
   maxResponseBytes: cfg.upstreamResponseLimitBytes, upstreamTimeoutMs: cfg.upstreamTimeoutMs, local: localDocuments }
-const local = createProxyHandlers(deps, keys.signer)
+const workspaceCatalog = new PostgresWorkspaceCatalog(context, context.nodeId)
+const drafts = new LocalNodeDrafts(cfg.stateRoot)
+const local = createProxyHandlers(deps, keys.signer, new PostgresRuntimeAssetAdmission(context, 1n))
 const runtime = createRuntimeApiHandler({ documentStore: input => localDocuments.serveRuntimeStore(input),
-  workspaceCatalog: new PostgresWorkspaceCatalog(context),
+  executionWriteEpoch: process.env.HGW_TEST_LEGACY_PERSONAL_ADMISSION === '1' ? undefined : 1n,
+  workspaceCatalog,
   documentCatalogSync: input => localDocuments.reconcileRuntimeCatalog(input),
   documentCatalogAuthorize: documentCatalogHandlers.authorize, documentCatalogOverview: documentCatalogHandlers.overview, documentCatalogHistory: documentCatalogHandlers.history, context, instances: repository, conversations: new PostgresConversationStore(pool),
   principals: keys.signer, resourceBudget: resources, accessMonitor: localMonitor, collaboration, governance })
-const server = createGatewayServer(deps, { ...local, runtime,
+const server = createGatewayServer(deps, { ...local, runtime, nodeDrafts: drafts,
   workbenchCatalog: createGatewayWorkbenchCatalogHandler({ instances: manager, collaboration, principals: keys.signer,
-    workspaceCatalog: new PostgresWorkspaceCatalog(context, context.nodeId), maxResponseBytes: cfg.upstreamResponseLimitBytes,
+    workspaceCatalog, maxResponseBytes: cfg.upstreamResponseLimitBytes,
     upstreamTimeoutMs: cfg.upstreamTimeoutMs }),
+  workbenchRows: workbenchRows(context, workspaceCatalog, collaboration, cfg.runtimeCatalog),
   documentScope: createGatewayDocumentScopeHandler(documentDeps), documentTransferUpload: createGatewayDocumentTransferUploadHandler(documentDeps),
   browserDocuments: createBrowserDocumentHandler({ transfer: documentDeps, locations: deps.documentLocations, organizationId: context.organizationId,
+    overview: documentCatalog, overviewConcurrency: cfg.nodeService.maxConnections, overviewDeadlineMs: cfg.documentOverviewDeadlineMs,
+    overviewTimeoutMs: cfg.upstreamTimeoutMs, overviewAccessMonitor: monitor,
     origin: cfg.publicOrigins[0], responseLimit: cfg.upstreamResponseLimitBytes }), admin: createAdminApiHandler(deps),
   runtimeAuthorize: async req => {
     const token = req.headers.authorization?.slice('Bearer '.length)
@@ -221,6 +236,8 @@ const server = createGatewayServer(deps, { ...local, runtime,
   },
 })
 const intake = createUsageIntakeServer(governance)
+// Production mints the release's launch stamps before accepting requests.
+await manager.inspectUpgradeSurvivors()
 await Promise.all([
   new Promise(resolve => server.listen(0, '127.0.0.1', resolve)),
   new Promise(resolve => intake.listen(0, '127.0.0.1', resolve)),
@@ -233,13 +250,15 @@ if (nodeName === 'center') await pool.query('UPDATE harness.deployment_topology 
 let stopping
 async function stop() {
   return stopping ??= (async () => {
+    for (const held of heldStarts.values()) held.resolve()
+    heldStarts.clear()
     await remote.close(); await services.close(); await channels.close()
     await local.close(); await manager.stopAll(); await processOwner.close(); await monitor.close()
     for (const socket of relaySockets) socket.destroy()
     for (const listener of [server, intake, modelFixture, ...runtimeRelays]) {
       listener.closeAllConnections?.(); await new Promise(resolve => listener.close(resolve))
     }
-    await localDocuments.dispose()
+    await localDocuments.dispose(); await drafts.close()
     await pool.end()
   })()
 }
@@ -248,6 +267,16 @@ const directoryPolicy = { launcher: cfg.launcher, roots: cfg.projectPathRoots }
 process.on('message', input => {
   void (async () => {
     if (input.kind === 'origins') { cfg.publicOrigins.push(...input.values); reply({ kind: 'origins' }) }
+    else if (input.kind === 'hold-start') {
+      assert.ok(!heldStarts.has(input.runtimeId))
+      heldStarts.set(input.runtimeId, Promise.withResolvers())
+      reply({ kind: 'hold-start' })
+    }
+    else if (input.kind === 'release-start') {
+      heldStarts.get(input.runtimeId)?.resolve()
+      heldStarts.delete(input.runtimeId)
+      reply({ kind: 'release-start' })
+    }
     else if (input.kind === 'directory-policy') {
       cfg.launcher = input.systemd ? 'systemd' : directoryPolicy.launcher
       cfg.projectPathRoots = input.systemd ? [root] : directoryPolicy.roots
@@ -255,13 +284,22 @@ process.on('message', input => {
       reply({ kind: 'directory-policy', origin: owner?.projectOrigin })
     }
     else if (input.kind === 'relay') { await relayFor(input.runtimeId, input.userId); reply({ kind: 'relay' }) }
+    else if (input.kind === 'observe-idle-pressure' && process.env.HGW_TEST_VERSIONED_OPERATIONS) {
+      await resources.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 64 })
+      reply({ kind: 'observe-idle-pressure' })
+    }
     else if (input.kind === 'credential-status') {
       const issued = await Promise.all((credentials.get(input.runtimeId) ?? []).map(async value => ({
         generation: value.generation, accepted: await repository.authenticateRuntimeToken(value.token) !== null,
       })))
       reply({ kind: 'credential-status', issued })
     }
-    else if (input.kind === 'quiesce') { await manager.stopAll(); reply({ kind: 'quiesce' }) }
+    else if (input.kind === 'quiesce') {
+      await manager.stopAll(true)
+      // Detachment requires explicit stopped intent. A normal shutdown preserves running intent for recovery.
+      await manager.drainSurvivors('manual')
+      reply({ kind: 'quiesce' })
+    }
     else if (input.kind === 'status') reply({ kind: 'status', resident: manager.capacitySnapshot().resident, state: await manager.stateOf(primaryTarget) })
     else if (input.kind === 'stop') { await stop(); reply({ kind: 'stopped' }); process.disconnect() }
     else throw new Error('Unknown node service fixture command')

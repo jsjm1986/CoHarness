@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { holdInert } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ReactNode } from 'react'
 import type {
   SidebarFooterActionOwnerProps, SidebarRootComponentProps, SidebarSectionOwnerProps,
@@ -194,5 +195,50 @@ describe('SidebarRoot shell', () => {
     const b = mountShell({ collapsed: true })
     expect(b.regionOwner().wide).toBe(false)
     expect(screen.getByRole('button', { name: 'Open sidebar' })).toBeTruthy()
+  })
+
+  it('isolates fading controls and restores displaced focus to the settled rail', () => {
+    vi.useFakeTimers()
+    const b = mountShell()
+    const brand = screen.getAllByRole('button', { name: 'New session' })[0]!
+    const column = brand.closest<HTMLElement>('[data-sidebar-root]')!
+    brand.focus()
+    b.rerender({ collapsed: true })
+    expect(column.inert).toBe(true)
+    brand.blur()
+    act(() => { vi.advanceTimersByTime(150) })
+    expect(column.inert).toBe(false)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open sidebar' }))
+  })
+
+  it('releases an interrupted fade without replacing focus outside the sidebar', () => {
+    vi.useFakeTimers()
+    const b = mountShell()
+    const toggle = screen.getByRole('button', { name: 'Collapse sidebar' })
+    const column = toggle.closest<HTMLElement>('[data-sidebar-root]')!
+    toggle.focus()
+    b.rerender({ collapsed: true })
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    try {
+      outside.focus()
+      b.rerender({ collapsed: false, width: 240 })
+      expect(column.inert).toBe(false)
+      expect(document.activeElement).toBe(outside)
+      act(() => { vi.advanceTimersByTime(150) })
+      expect(b.regionOwner().wide).toBe(true)
+    } finally { outside.remove() }
+  })
+
+  it('keeps another owner’s inert hold and releases its own on unmount', () => {
+    vi.useFakeTimers()
+    const b = mountShell()
+    const column = screen.getByRole('button', { name: 'Collapse sidebar' }).closest<HTMLElement>('[data-sidebar-root]')!
+    const release = holdInert(column)
+    b.rerender({ collapsed: true })
+    cleanup()
+    expect(column.inert).toBe(true)
+    release()
+    expect(column.inert).toBe(false)
   })
 })

@@ -6,22 +6,42 @@ import type { PoolClient } from 'pg'
 const method = new Map([
   ['/api/prepare/v1/session.create','create'],['/api/prepare/v1/session.history','history'],
   ['/api/admit/v1/session.prompt','send'],['/api/admit/v1/session.status','status'],
+  ['/internal/runtime/execution/input','executionInput'],['/internal/runtime/execution/register-session','executionRegister'],
 ] as const)
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
-export type OperationPhase='authorize'|'prepare'|'admit'|'nodeConnection'|'upstream'
-type Method='create'|'history'|'send'|'status'
+export type OperationPhase='authorize'|'prepare'|'admit'|'runtimeQueue'|'runtimeLiveness'|'nodeConnection'|'nodeQueue'|'nodeLeaseCheck'|'nodeServiceOpen'|'upstream'
+type Method='create'|'history'|'send'|'status'|'executionInput'|'executionRegister'
 type SqlRole='governance'|'content'
+type NodeTransport='opened'|'reused'
+type ForwardingMark='leaseAcquired'|'assertionReady'|'socketAssigned'|'requestWritten'|'responseHeaders'
+const admissionPhases=['sessionAuthority','agentReadiness','admissionWait','executionStamp','inboxAppend','flushReceipt','readReceipt'] as const
+type HostAdmission=Partial<Record<typeof admissionPhases[number],number>>
 interface Sample {
-  id:string; operation:Method; durationMs:number; status:number; aborted:boolean; sentBytes:number|null; receivedBytes:number|null
-  phases:Partial<Record<OperationPhase,number>>; sql:Record<SqlRole,{count:number;elapsedMs:number}>; hostMs?:number
+  id:string; operation:Method; startedAtMs:number; durationMs:number; responseHeadersMs?:number
+  status:number; aborted:boolean; sentBytes:number|null; receivedBytes:number|null
+  forwarding?:Partial<Record<ForwardingMark,number>>
+  phases:Partial<Record<OperationPhase,number>>; sql:Record<SqlRole,{count:number;elapsedMs:number}>; hostMs?:number; hostAdmission?:HostAdmission; nodeTransport?:NodeTransport
 }
-interface Flight {sample:Sample; closed:boolean}
+interface Flight {sample:Sample; start:number; closed:boolean}
 const current=new AsyncLocalStorage<Flight>()
 const rounded=(ms:number)=>Math.round(Math.max(0,ms)*100)/100
 function length(value:string|string[]|number|undefined):number|null {
   if(value===undefined || Array.isArray(value) || !/^\d{1,16}$/u.test(String(value))) return null
   const n=Number(value)
   return Number.isSafeInteger(n)?n:null
+}
+
+function hostAdmission(value:unknown):HostAdmission|undefined {
+  if(typeof value!=='string' || value.length>512) return undefined
+  let decoded:unknown
+  try { decoded=JSON.parse(value) } catch { return undefined }
+  if (typeof decoded!=='object' || decoded===null || Array.isArray(decoded)) return undefined
+  const fields=decoded as Record<string,unknown>, result:HostAdmission={}
+  for(const phase of admissionPhases) {
+    const ms=fields[phase]
+    if(typeof ms==='number' && Number.isFinite(ms) && ms>=0 && ms<=1e8) result[phase]=rounded(ms)
+  }
+  return result
 }
 
 /** @param phase - fixed stage of the current operation. @returns a callback for its end, including callbacks on a pooled socket. */
@@ -40,6 +60,28 @@ export function operationPhase(phase:OperationPhase):()=>void {
 export async function timeOperation<T>(phase:OperationPhase,work:()=>Promise<T>):Promise<T>{
   const finish=operationPhase(phase)
   try { return await work() } finally { finish() }
+}
+
+/**
+ * Record connection reuse in the current bounded operation sample.
+ * @param state - whether the node-service acquisition opened or reused a transport.
+ */
+export function recordNodeTransport(state:NodeTransport):void{
+  const flight=current.getStore()
+  if(flight && !flight.closed) flight.sample.nodeTransport=state
+}
+
+/**
+ * Capture the current request's clock for callbacks on a pooled HTTP socket.
+ * @returns a recorder for elapsed milliseconds at a local forwarding event.
+ */
+export function forwardingMarks():(mark:ForwardingMark)=>void {
+  const flight=current.getStore()
+  if(!flight || flight.closed) return ()=>{}
+  const marks=flight.sample.forwarding ??= {}
+  return mark=>{
+    if(!flight.closed) marks[mark] ??= rounded(performance.now()-flight.start)
+  }
 }
 
 /** Capture only query count and duration, preserving pg's native callback, Promise and query-object interfaces.
@@ -80,17 +122,27 @@ export class OperationTimings {
     const requestId=req.headers['x-dsh-operation-id'],path=(req.url??'').split('?',1)[0]!
     const action=(method as ReadonlyMap<string,Method>).get(path)
     if (!this.capacity || req.method!=='POST' || !action || typeof requestId!=='string' || !uuid.test(requestId)) return work()
-    const sample:Sample={id:requestId,operation:action,status:0,durationMs:0,aborted:false,receivedBytes:length(req.headers['content-length']),
+    const sample:Sample={id:requestId,operation:action,startedAtMs:Date.now(),status:0,durationMs:0,aborted:false,receivedBytes:length(req.headers['content-length']),
       sentBytes:null,phases:{},sql:{governance:{count:0,elapsedMs:0},content:{count:0,elapsedMs:0}}}
-    const scope:Flight={sample,closed:false},start=performance.now()
+    const scope:Flight={sample,start:performance.now(),closed:false}
+    const writeHead=res.writeHead
+    const observeWriteHead=new Proxy(writeHead,{apply(target,receiver,args){
+      const result=Reflect.apply(target,receiver,args)
+      if(!scope.closed) sample.responseHeadersMs ??= rounded(performance.now()-scope.start)
+      return result
+    }})
+    res.writeHead=observeWriteHead
     const finish=()=>{
       if(scope.closed)return
       scope.closed=true
       res.off('finish',finish);res.off('close',finish)
-      sample.durationMs=rounded(performance.now()-start);sample.status=res.statusCode;sample.aborted=!res.writableFinished
+      if(res.writeHead===observeWriteHead) res.writeHead=writeHead
+      sample.durationMs=rounded(performance.now()-scope.start);sample.status=res.statusCode;sample.aborted=!res.writableFinished
       sample.sentBytes=length(res.getHeader('content-length'))
       const host=res.getHeader('x-dsh-host-duration-ms')
       if(typeof host==='string' && /^\d{1,8}(?:\.\d{1,3})?$/u.test(host)) sample.hostMs=Number(host)
+      const admissions=action==='send' ? hostAdmission(res.getHeader('x-dsh-host-admission-ms')) : undefined
+      if(admissions!==undefined) sample.hostAdmission=admissions
       if(this.history.length<this.capacity) this.history.push(sample)
       else {this.history[this.position]=sample;this.position=(this.position+1)%this.capacity}
     }

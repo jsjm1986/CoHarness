@@ -273,7 +273,7 @@ export function WebhooksPage() {
   return (
     <>
       <PageHeader title="Webhook" description={t('pageDescription')} />
-      {error === '' ? null : <ErrorBanner message={error} />}
+      <ErrorBanner message={editing === null && deliveries === null && removing === null ? error : ''} />
       {notice === '' ? null : <p role="status">{notice}</p>}
       <Section
         flush
@@ -292,18 +292,18 @@ export function WebhooksPage() {
               <tbody>
                 {endpoints.map(endpoint => (
                   <tr key={endpoint.publicId}>
-                    <td>{endpoint.name}</td>
-                    <td><code>{endpoint.provider}/{endpoint.source}</code></td>
-                    <td>{endpoint.events.length === 0 ? t('filterAll') : endpoint.events.join(t('listSeparator'))}{endpoint.actions.length === 0 ? '' : t('parenthesized', { value: endpoint.actions.join(t('listSeparator')) })}</td>
-                    <td>{endpoint.repositories.length === 0 ? t('filterAll') : endpoint.repositories.join(t('listSeparator'))}</td>
+                    <td className="tableTextCell">{endpoint.name}</td>
+                    <td className="tableTextCell"><code>{endpoint.provider}/{endpoint.source}</code></td>
+                    <td className="tableTextCell">{endpoint.events.length === 0 ? t('filterAll') : endpoint.events.join(t('listSeparator'))}{endpoint.actions.length === 0 ? '' : t('parenthesized', { value: endpoint.actions.join(t('listSeparator')) })}</td>
+                    <td className="tableTextCell">{endpoint.repositories.length === 0 ? t('filterAll') : endpoint.repositories.join(t('listSeparator'))}</td>
                     <td>{users.find(user => user.id === endpoint.executionUserId)?.username ?? `#${String(endpoint.executionUserId)}`}</td>
-                    <td>{endpoint.runtimeKind === 'user' ? t('runtimeKindUser') : t('runtimeKindProject')} · {runtimeOwner(endpoint)}</td>
+                    <td className="tableTextCell">{endpoint.runtimeKind === 'user' ? t('runtimeKindUser') : t('runtimeKindProject')} · {runtimeOwner(endpoint)}</td>
                     <td><StatusBadge tone={endpoint.enabled ? 'success' : 'neutral'}>{endpoint.enabled ? t('statusEnabled') : t('statusDisabled')}</StatusBadge></td>
-                    <td>
+                    <td className="tableActionCell">
                       <IconButton label={t('deliveriesLabel')} icon={Inbox} onClick={() => void openDeliveries(endpoint)} />
                       <IconButton label={t('edit')} icon={Pencil} onClick={() => { setError(''); setEditing({ endpoint, draft: draftOf(endpoint) }) }} />
                       <Button variant="ghost" onClick={() => void toggle(endpoint)} disabled={acting}>{endpoint.enabled ? t('disable') : t('enable')}</Button>
-                      <IconButton label={t('delete')} icon={Trash2} onClick={() => { setRemoving(endpoint) }} />
+                      <IconButton label={t('delete')} icon={Trash2} onClick={() => { setError(''); setRemoving(endpoint) }} />
                     </td>
                   </tr>
                 ))}
@@ -387,6 +387,7 @@ export function WebhooksPage() {
         onClose={() => { if (!acting) setDeliveries(null) }}
         wide
       >
+        <ErrorBanner message={error} />
         {deliveries === null ? null : deliveries.items.length === 0 ? (
           <EmptyState title={t('deliveriesEmpty')} />
         ) : (
@@ -422,6 +423,7 @@ export function WebhooksPage() {
         description={t('deleteDescription')}
         confirmLabel={t('delete')}
         pending={acting}
+        error={error}
         onConfirm={() => void remove()}
         onClose={() => { if (!acting) setRemoving(null) }}
       />

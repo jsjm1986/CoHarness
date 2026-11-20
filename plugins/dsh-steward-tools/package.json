@@ -24,7 +24,8 @@
     "@deepseek-ai/dsh-session": "*",
     "@deepseek-ai/dsh-system-prompt": "*",
     "@deepseek-ai/dsh-tool-executor-native": "*",
-    "@deepseek-ai/dsh-tools": "*"
+    "@deepseek-ai/dsh-tools": "*",
+    "@deepseek-ai/dsh-user-approval": "*"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",

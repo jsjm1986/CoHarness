@@ -1,0 +1,9 @@
+- paragraph:
+  - text: Wrote
+  - code:
+    - button "Open site/report.html": report.html
+  - text: plus two
+  - code: style.css
+  - text: copies;
+  - code: notes.md
+  - text: untouched.

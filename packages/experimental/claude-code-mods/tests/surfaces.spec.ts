@@ -122,23 +122,29 @@ describe('SurfaceTable', () => {
     expect((await surfaces.current('s1')).generation).toBe(0)
   })
 
-  it('reports a failing onPress through the host and still redraws', async () => {
+  it('rejects a failed press after redrawing the state the callback changed', async () => {
     const report = vi.fn()
+    let pressed = false
     const surfaces = new SurfaceTable({
       columns: 120,
       rows: 10,
-      render: () => Promise.resolve(Button({ label: 'Boom', onPress: () => { throw new Error('nope') } })),
+      render: () => Promise.resolve(Button({ label: pressed ? 'Changed before failure' : 'Boom', onPress: () => {
+        pressed = true
+        throw new Error('nope')
+      } })),
       runAction: async (_session, callback) => {
         try {
           await callback()
         } catch (error) {
           report(`a button's onPress failed: ${(error as Error).message}`)
+          throw error
         }
       },
       report,
     })
     await surfaces.current('s1')
-    await surfaces.press('s1', 1, 'a0')
+    await expect(surfaces.press('s1', 1, 'a0')).rejects.toThrow('nope')
     expect(report).toHaveBeenCalledWith("a button's onPress failed: nope")
+    expect(JSON.stringify((await surfaces.current('s1')).tree)).toContain('Changed before failure')
   })
 })

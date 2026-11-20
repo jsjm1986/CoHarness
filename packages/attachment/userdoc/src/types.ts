@@ -268,7 +268,10 @@ export type UserDocScope = (
 /** Authorized document location, independent of Runtime allocation and process state. */
 export interface UserDocLocation {
   readonly scope: UserDocScope
+  /** Display name, or a public project identifier while node metadata is unresolved. */
   readonly name: string
+  /** True when the project name must be read from its owning computer; absent for legacy names. */
+  readonly metadataOnNode?: true
   readonly nodeName: string
   readonly mode: 'ro' | 'rw'
 }

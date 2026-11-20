@@ -1,7 +1,7 @@
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
-import { generateKeyPairSync, randomUUID } from 'node:crypto'
+import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
-import { mkdtemp, mkdir, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -11,10 +11,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import WebSocket, { WebSocketServer } from 'ws'
 import { PostgresAccessMonitor, type AccessInvalidationSubject } from '../src/access-invalidation.ts'
 import { testConfig } from './test-config.ts'
+import { INSTANCE_PROFILE, InstanceManager } from '../src/instances.ts'
+import { computeLaunchStamps } from '../src/launch-stamp.ts'
 import { createGatewayDocumentScopeHandler, type GatewayDocumentScopeHandler } from '../src/document-transfer.ts'
 import { PostgresAuditService } from '../src/postgres/audit-service.ts'
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
+import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import type { PostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
@@ -45,6 +48,13 @@ async function fixture(options: {
   runtime?: (req: IncomingMessage, res: ServerResponse) => boolean
   wrapDocumentScope?: (handler: GatewayDocumentScopeHandler) => GatewayDocumentScopeHandler
   includePrincipal?: boolean
+  primaryInstances?: (input: {
+    context: PostgresRuntimeContext
+    cfg: ReturnType<typeof testConfig>
+    port: number
+    aliceId: number
+    bobId: number
+  }) => Promise<InstanceManager>
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'hgw-access-'))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
@@ -125,14 +135,18 @@ async function fixture(options: {
     owner: PostgresRuntimeContext
   }> = []
   for (const owner of contexts) {
-    // Runtime transport is real HTTP/WS; lifecycle calls are observed separately.
-    const stop = vi.fn<GatewayDeps['instances']['stop']>(async () => {})
+    const stop = vi.fn<GatewayDeps['instances']['stop']>(async () => ({ generation: 1, shutdownOutcome: 'unconfirmed' }))
     const monitor = new PostgresAccessMonitor(owner, 60_000)
+    const primaryInstances = owner === context
+      ? await options.primaryInstances?.({ context, cfg, port, aliceId: alice.id, bobId: bob.id })
+      : undefined
+    if (primaryInstances !== undefined) await monitor.synchronize()
     const deps: GatewayDeps = {
       cfg, users, projects: new PostgresProjectService(owner, cfg),
       auth: new PostgresAuthService(owner, cfg), audit: new PostgresAuditService(owner),
       collaboration: new PostgresCollaborationService(owner), accessMonitor: monitor,
-      instances: {
+      ...(primaryInstances === undefined ? {} : { readiness: () => monitor.checkControlReadiness() }),
+      instances: primaryInstances ?? {
         stopReasonOf: async () => null,
         portOf: async () => port, generationOf: async () => 1, stateOf: async () => 'ready',
         isLive: async () => true, liveEndpoint: async target => ({ port, generation: 1, target: typeof target === 'number' ? { kind: 'user', id: target } : target }),
@@ -141,7 +155,8 @@ async function fixture(options: {
         ensureRunning: async () => ({ port, generation: 1 }), reapIdle: async () => 0,
         reconcile: async () => ({ failed: 0, warmed: 0, deferred: 0 }),
         startRequest: () => ({ admission: Promise.resolve(), completion: Promise.resolve({ port, generation: 1 }) }),
-        stop, stopAll: async () => {}, withStopped: async (_target, operation) => operation(),
+        prepareSessionRuntime: async () => ({ kind: 'ready', endpoint: { port, generation: 1 } }),
+        stop, stopAll: async () => {}, withStopped: async (_target, operation) => operation(undefined, { generation: 1, shutdownOutcome: 'unconfirmed' }),
       },
     }
     const proxy = createProxyHandlers(deps, options.includePrincipal ? principals : undefined)
@@ -167,8 +182,8 @@ async function fixture(options: {
   const aliceCookie = await login('alice')
   const bobCookie = await login('bob')
   const target = `?dshTarget=project:${project.id}`
-  const socket = async (gateway: typeof gateways[number], cookie: string): Promise<WebSocket> => {
-    const ws = new WebSocket(`${gateway.base.replace('http', 'ws')}/api/events.mux${target}`, {
+  const socket = async (gateway: typeof gateways[number], cookie: string, selection = target): Promise<WebSocket> => {
+    const ws = new WebSocket(`${gateway.base.replace('http', 'ws')}/api/events.mux${selection}`, {
       headers: { cookie, origin: gateway.base },
     })
     cleanup.push(() => ws.terminate())
@@ -187,6 +202,81 @@ describePg('cross-Gateway access invalidation', () => {
     await runMigrations(pool, migrations)
   })
   afterAll(async () => { await pool?.end() })
+
+  it.each([true, false])('settles a retired local assignment only with process evidence (tracked: %s)', async tracked => {
+    const terminated = vi.fn(async () => 'confirmed' as const)
+    const stopped = vi.fn<NonNullable<ConstructorParameters<typeof InstanceManager>[4]>['stopped']>()
+    let repository!: PostgresInstanceRepository
+    let manager!: InstanceManager
+    let generation!: number
+    let target!: Awaited<ReturnType<PostgresInstanceRepository['resolveTarget']>>
+    const credential = randomUUID()
+    const f = await fixture({
+      async primaryInstances({ context, cfg, port, aliceId, bobId }) {
+        repository = new PostgresInstanceRepository(context, cfg.instancePortBase)
+        await repository.initialize()
+        const policy = join(cfg.stateRoot, 'fixture-governance')
+        await mkdir(policy, { recursive: true })
+        await writeFile(join(policy, 'package.json'), '{}\n')
+        await writeFile(join(policy, 'cordis.patch.yml'), '[]\n')
+        const runtimeCfg = { ...cfg, dshRepoRoot: cfg.stateRoot, dshCommand: [process.execPath, '--no-open'],
+          modelGovernancePackage: policy, guardPatch: '' }
+        const stamp = [...computeLaunchStamps(runtimeCfg, '', INSTANCE_PROFILE).stamps][0]!
+        target = await repository.resolveTarget({ kind: 'user', id: aliceId })
+        generation = await repository.beginStart(target, Date.now(), createHash('sha256').update(credential).digest(), 'explicit', undefined, true, stamp)
+        await repository.markReady(target, generation)
+        const bob = await repository.resolveTarget({ kind: 'user', id: bobId })
+        await pool.query('UPDATE harness.instances SET port=$1 WHERE organization_id=$2 AND runtime_id=$3', [port, context.organizationId, bob.runtimeId])
+        const bobGeneration = await repository.beginStart(bob, Date.now(), Buffer.alloc(32, 2), 'explicit', undefined, true, stamp)
+        await repository.markReady(bob, bobGeneration)
+        manager = new InstanceManager(repository, runtimeCfg, {
+          instancesOutliveGateway: true,
+          start: async () => { throw new Error('The regression must reuse existing Runtime processes') },
+          attach: runtime => ({
+            hasExited: () => false,
+            terminate: runtime.ownerId === aliceId
+              ? terminated
+              : async () => { throw new Error('The other account must retain its process') },
+          }),
+        }, undefined, { stopped, registered: async () => true, admitRuntimeStart: async () => { throw new Error('No new Runtime may start') } })
+        cleanup.push(() => manager.stopAll(true))
+        if (tracked) expect(await manager.liveEndpoint(target)).toMatchObject({ generation })
+        return manager
+      },
+    })
+    const gateway = f.gateways[0]!
+    const work = `${gateway.base}/api/echo`
+    const bob = tracked ? await f.socket(gateway, f.bobCookie, '') : undefined
+    expect(await repository.authenticateRuntimeToken(credential)).toMatchObject({ generation })
+    expect(manager.capacitySnapshot().resident).toBe(2)
+    // A separate lifecycle owner confirms its stop before catalog retirement.
+    await repository.markStopped(target, generation, 'manual')
+    expect(await gateway.deps.users.remove(f.alice.id)).toBe(true)
+    expect(await repository.authenticateRuntimeToken(credential)).toBeNull()
+    if (!tracked) {
+      await expect(gateway.monitor.synchronize()).rejects.toThrow('termination cannot be confirmed')
+      expect(stopped).not.toHaveBeenCalled()
+      expect(manager.capacitySnapshot().resident).toBe(2)
+      const acknowledged = await pool.query<{ revision: string }>('SELECT access_applied_revision::text revision FROM harness.compute_nodes WHERE id=$1', [gateway.owner.nodeId])
+      expect(acknowledged.rows[0]!.revision).not.toBe(await f.revision())
+      return
+    }
+    await gateway.monitor.synchronize()
+    expect(terminated).toHaveBeenCalledTimes(1)
+    expect(stopped).toHaveBeenCalledExactlyOnceWith(target, generation)
+    expect(manager.capacitySnapshot().resident).toBe(1)
+    if (bob === undefined) throw new Error('The unaffected account must have a live stream')
+    const pong = once(bob, 'message', { signal: AbortSignal.timeout(5_000) })
+    bob.send('retained-work')
+    expect(String((await pong)[0])).toBe('retained-work')
+    const response = await fetch(work, { headers: { cookie: f.bobCookie } })
+    const revoked = await fetch(work, { headers: { cookie: f.aliceCookie } })
+    const readiness = await fetch(`${gateway.base}/healthz/ready`)
+    const acknowledged = await pool.query<{ revision: string }>('SELECT access_applied_revision::text revision FROM harness.compute_nodes WHERE id=$1', [gateway.owner.nodeId])
+    const transcript = { authorized: response.status, body: await response.text(), revoked: revoked.status,
+      readiness: readiness.status, checkpointApplied: acknowledged.rows[0]!.revision === await f.revision(), liveStream: bob.readyState === WebSocket.OPEN }
+    await expect(JSON.stringify(transcript) + '\n').toMatchFileSnapshot(join(import.meta.dirname, 'expected/access-retired-runtime.jsonl'))
+  })
 
   it.each([
     { policy: 'follow-user' as const, projectPublicId: 1701 },
@@ -474,7 +564,10 @@ describePg('cross-Gateway access invalidation', () => {
     const gateway = f.gateways[1]!
     const stopStarted = barrier(), releaseStop = barrier()
     const leaseReleasing = barrier(), releaseLease = barrier()
-    gateway.stop.mockImplementation(async () => { stopStarted.resolve(); await releaseStop.promise })
+    gateway.stop.mockImplementation(async () => {
+      stopStarted.resolve(); await releaseStop.promise
+      return { generation: 1, shutdownOutcome: 'unconfirmed' }
+    })
     const operationRef = vi.mocked(gateway.deps.instances.operationRef!)
     operationRef.mockImplementation(async (_target, delta) => {
       if (delta === -1) { leaseReleasing.resolve(); await releaseLease.promise }
@@ -609,6 +702,7 @@ describePg('cross-Gateway access invalidation', () => {
           stopped.resolve()
           await release.promise
         }
+        return { generation: 1, shutdownOutcome: 'unconfirmed' }
       })
       await pool.query("UPDATE harness.project_mounts SET status='missing' WHERE organization_id=$1", [f.organizationId])
       await stopped.promise

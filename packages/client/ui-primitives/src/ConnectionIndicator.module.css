@@ -47,6 +47,7 @@
 .label {
   display: grid;
   text-align: left;
+  color: var(--dsw-alias-label-primary);
 }
 
 .stateLabel,
@@ -96,8 +97,31 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .indicator {
+    transition: none;
+  }
+
   .secondDot,
   .thirdDot {
     animation: none;
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .warning {
+    min-height: var(--dsw-touch-target);
+    height: auto;
+  }
+}
+
+@media (forced-colors: active) {
+  .indicator {
+    outline: 1px solid ButtonText;
+    outline-offset: -1px;
+  }
+
+  .warning:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
   }
 }

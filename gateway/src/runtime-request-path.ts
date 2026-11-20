@@ -2,6 +2,44 @@
 import type { RuntimeId } from './runtime-catalog.ts'
 
 const SELECTORS = new Set(['dshRuntime', 'dshTarget', 'dshNode', 'dshPrincipal'])
+const IMMUTABLE_ASSET = /^\/assets\/[^/?%\\]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9.]+$/u
+const PLUGIN_PACKAGE = '(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*'
+const COMBO_RESOURCE = new RegExp(`^${PLUGIN_PACKAGE}/client\\.js(\\.map)?$`, 'u')
+const PLUGIN_CHUNK = new RegExp(`^/plugins/${PLUGIN_PACKAGE}/client\\.[A-Za-z0-9][A-Za-z0-9._-]*\\.js(?:\\.map)?$`, 'u')
+const IMMUTABLE_REVISION = /^[a-f0-9]{12}(?:[a-f0-9]{52})?$/u
+
+/**
+ * Qualify only versioned plugin modules and hashed release assets for read-only admission.
+ * @param method - original HTTP method.
+ * @param path - request target; Gateway selectors are removed without reserializing module queries.
+ * @returns whether an exact GET or HEAD resource can bypass execution activity admission.
+ */
+export function isImmutableRuntimeAssetRequest(method: string | undefined, path: string): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false
+  const resource = runtimeRequestPath(path)
+  const question = resource.indexOf('?')
+  const pathname = question < 0 ? resource : resource.slice(0, question)
+  const query = question < 0 ? '' : resource.slice(question + 1)
+  if (IMMUTABLE_ASSET.test(pathname)) return query === ''
+  if (pathname === '/plugins/combo.js') {
+    const match = /^\?([^&]+)&rev=([^&]+)$/u.exec(query)
+    if (match === null || !IMMUTABLE_REVISION.test(match[2]!)) return false
+    const resources = match[1]!.split(',').map(entry => COMBO_RESOURCE.exec(entry))
+    return resources.every(entry => entry !== null && entry[1] === resources[0]?.[1])
+  }
+  return PLUGIN_CHUNK.test(pathname) && query.startsWith('rev=') && IMMUTABLE_REVISION.test(query.slice(4))
+}
+
+/**
+ * Identify browser resources that must not start or replace a Runtime.
+ * @param method - original HTTP method.
+ * @param pathname - request pathname without query parameters.
+ * @returns whether the request may use only an already-ready Runtime generation.
+ */
+export function isRuntimeAssetRequest(method: string | undefined, pathname: string): boolean {
+  return (method === 'GET' || method === 'HEAD') && (pathname.startsWith('/assets/')
+    || pathname === '/favicon.svg' || /^\/plugins\/.+\.(?:js|css)(?:\.map)?$/u.test(pathname))
+}
 
 /**
  * @param method - original HTTP method.
@@ -27,6 +65,27 @@ export function runtimeRequestPath(path: string): string {
   if (question < 0) return path
   const parts = path.slice(question + 1).split('&').filter(part => !SELECTORS.has(new URLSearchParams(part).keys().next().value ?? ''))
   return `${path.slice(0, question)}${parts.length === 0 ? '' : `?${parts.join('&')}`}`
+}
+
+/**
+ * Identify the two loopback stream liveness operations served by the reserved control pool.
+ * @param pathname - normalized internal request path.
+ * @param method - received HTTP method.
+ * @returns whether to use fresh Runtime control authorization.
+ */
+export function isRuntimeStreamControlRequest(pathname: string, method: string | undefined): boolean {
+  return pathname === '/internal/runtime/stream-principals/renew' && method === 'POST'
+    || pathname === '/internal/runtime/execution/watch' && method === 'GET'
+}
+
+/**
+ * Select the completion request that confirms its exact Runtime owner in the accounting transaction.
+ * @param pathname - parsed HTTP pathname.
+ * @param method - HTTP method.
+ * @returns whether this is a resource completion request.
+ */
+export function isRuntimeResourceCompletionRequest(pathname: string, method: string | undefined): boolean {
+  return pathname === '/internal/runtime/resources/finish' && method === 'POST'
 }
 
 /**

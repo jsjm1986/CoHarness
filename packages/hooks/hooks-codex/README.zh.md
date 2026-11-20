@@ -60,6 +60,8 @@ const config: Config = {
 
 hook 本身会在 Agent 的 Session 当前目录中运行：对 agent scope 点，桥接解析 `ctx.workingDirectory.ensure(agent)` 并将结果同时作为 hook 进程工作目录和 payload `cwd`，因此 `pwd`、`cwd` 与相对路径保持一致。没有匹配 command 的 hook 点会完全跳过目录解析。
 
+灾难恢复后的 Runtime 中，命令在[密封执行审核](../../boot/app-boot/README.zh.md#previewing-the-effective-configuration)逐项批准前保持暂停。每次执行前，桥接插件核验事件、解析后的命令和完整源配置文件。未获批准或发生变化的文件不会产生 Hook 调用，也不会阻止新对话。普通 Runtime 保持配置的 Hook 行为。
+
 <a id="hook-points--typed-decisions"></a>
 ## Hook 点 → 类型化 Decision
 

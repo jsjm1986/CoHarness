@@ -1,0 +1,19 @@
+- dialog "签发远程桌面授权":
+  - heading "签发远程桌面授权" [level=2]
+  - paragraph: 被授权用户在工作台的远程桌面入口中可直接连接该目标。
+  - button "关闭"
+  - alert: 该用户已持有此目标的授权。
+  - text: 用户
+  - combobox "用户": admin
+  - text: 工作台登录用户名 节点标识
+  - combobox "节点标识":
+    - option "10000000-0000-4000-8000-000000000001 · 移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789" [selected]
+  - text: 级别
+  - combobox "级别":
+    - option "仅查看" [selected]
+    - option "可控制"
+  - text: 仅查看不可键鼠操控
+  - checkbox "录制"
+  - text: 录制
+  - button "取消"
+  - button "签发授权"

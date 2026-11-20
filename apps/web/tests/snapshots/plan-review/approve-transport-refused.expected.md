@@ -1,0 +1,13 @@
+- region "Approve this plan?":
+  - text: Plan review
+  - button "Open plan in sidebar":
+    - text: View full plan
+    - img
+  - group "Plan review":
+    - heading "Deployment review" [level=3]
+    - paragraph: Confirm the release window before proceeding.
+  - status: Could not confirm your decision. Try again.
+  - button "Request changes":
+    - img
+    - text: Request changes
+  - button "Approve"

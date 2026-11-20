@@ -133,7 +133,7 @@ export function AuditPage() {
       />
       <ErrorBanner message={error} />
       <Section flush title={t('sectionFilters')}>
-        <form className="filterPanel" onSubmit={onFilter}>
+        <form className="filterPanel auditFilterPanel" onSubmit={onFilter}>
           <div className="filterGrid">
             <Field label={t('fieldActor')}>
               <input className="input" value={draft.actor} onChange={event => setDraft({ ...draft, actor: event.target.value })} placeholder={t('fieldActorPlaceholder')} />
@@ -173,16 +173,16 @@ export function AuditPage() {
           <EmptyState icon={ScrollText} title={t('emptyTitle')} detail={hasFilters || family !== '' ? t('emptyDetailFiltered') : t('emptyDetail')} />
         ) : (
           <>
-            <div className="tableWrap desktopOnly">
+            <div className="tableWrap desktopOnly" role="region" aria-label={t('eventsTitle')} tabIndex={0}>
               <table className="dataTable auditTable">
                 <thead><tr><th>{t('columnTime')}</th><th>{t('columnUser')}</th><th>{t('columnAction')}</th><th>{t('columnRequest')}</th><th>{t('columnResult')}</th><th>{t('columnMetadata')}</th><th>{t('columnIp')}</th></tr></thead>
                 <tbody>
                   {rows.map(row => (
                     <tr key={row.id}>
                       <td><time className="auditTime" dateTime={new Date(row.ts).toISOString()}>{formatTime(row.ts)}</time></td>
-                      <td><ActorCell row={row} /></td>
+                      <td className="tableTextCell"><ActorCell row={row} /></td>
                       <td><span className="auditAction"><strong>{row.action}</strong><span>ID {row.id}</span></span></td>
-                      <td><span className="pathText">{row.methodPath}</span></td>
+                      <td className="tableTextCell"><span className="pathText">{row.methodPath}</span></td>
                       <td><RequestResult row={row} /></td>
                       <td><AuditMetadata metadata={row.metadata} /></td>
                       <td><span className="codeText">{row.ip}</span></td>

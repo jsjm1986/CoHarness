@@ -18,30 +18,30 @@
 
 .title {
   margin: 0;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 1rem;
+  line-height: 1.5rem;
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
 }
 
 .intro {
   margin: 0;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   color: var(--dsw-alias-label-tertiary);
 }
 
 .notice {
   margin: 0;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   color: var(--dsw-alias-state-warn-label);
 }
 
 .savedNotice {
   margin: 0;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   color: var(--dsw-alias-state-success-primary);
 }
 
@@ -62,15 +62,15 @@
 .organizationHeading h3 {
   margin: 0;
   color: var(--dsw-alias-label-primary);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
-  line-height: 22px;
+  line-height: 1.375rem;
 }
 
 .organizationHeading span {
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .organizationRows,
@@ -110,9 +110,9 @@
 .organizationModels span {
   overflow: hidden;
   color: var(--dsw-alias-label-primary);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
-  line-height: 22px;
+  line-height: 1.375rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -122,8 +122,8 @@
   overflow: hidden;
   color: var(--dsw-alias-label-tertiary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.6875rem;
+  line-height: 1rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -148,8 +148,8 @@
   padding: 11px 14px;
   border-top: 0.5px solid var(--dsw-alias-border-l2);
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .organizationFailure {
@@ -191,8 +191,8 @@
 }
 
 .rowName {
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
 }
@@ -206,8 +206,8 @@
   padding: 1px 6px;
   border: 0.5px solid var(--dsw-alias-border-l3);
   border-radius: var(--dsw-radius-xs);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.6875rem;
+  line-height: 1rem;
   color: var(--dsw-alias-label-secondary);
 }
 
@@ -247,13 +247,13 @@
   align-items: center;
   justify-content: center;
   gap: var(--dsw-space-1);
-  height: 36px;
+  min-height: max(36px, calc(1lh + var(--dsw-space-2)));
   padding: 0 14px;
   border: none;
   border-radius: 18px;
   font: inherit;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   cursor: pointer;
 }
 
@@ -287,15 +287,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
+  min-height: max(36px, calc(1lh + var(--dsw-space-2)));
   padding: 0 14px;
   border: none;
   border-radius: 18px;
   background: transparent;
   color: var(--dsw-alias-state-error-primary);
   font: inherit;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   cursor: pointer;
 }
 
@@ -306,11 +306,11 @@
 /* Provider-row controls take the dense capsule (Button `.sm`). */
 .rowActions .secondaryButton,
 .rowActions .dangerButton {
-  height: 28px;
+  min-height: max(28px, calc(1lh + var(--dsw-space-2)));
   padding: 0 10px;
   border-radius: 14px;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .primaryButton:disabled,
@@ -353,15 +353,15 @@
 }
 
 .editorTitle {
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
 }
 
 .editorRoute {
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   color: var(--dsw-alias-label-tertiary);
 }
 
@@ -375,8 +375,8 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   font-weight: 500;
   color: var(--dsw-alias-label-secondary);
 }
@@ -392,8 +392,8 @@
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font: inherit;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   cursor: pointer;
 }
 
@@ -404,33 +404,54 @@
 
 .advancedHint {
   margin: 0;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   color: var(--dsw-alias-label-tertiary);
 }
 
 .helpButton {
-  width: 16px;
-  height: 16px;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 24px;
+  block-size: 24px;
   padding: 0;
   margin-left: var(--dsw-space-1, 4px);
-  border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: 50%;
-  corner-shape: round;
+  border: none;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font: inherit;
-  font-size: 11px;
-  line-height: 15px;
+  font-size: 0.6875rem;
+  line-height: 0.9375rem;
   text-align: center;
   cursor: help;
-  vertical-align: 1px;
+  vertical-align: middle;
+}
+
+.helpButton::before {
+  position: absolute;
+  inline-size: 16px;
+  block-size: 16px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 50%;
+  corner-shape: round;
+  content: '';
+  pointer-events: none;
 }
 
 .helpButton:hover,
 .helpButton:focus-visible {
   color: var(--dsw-alias-label-primary);
+}
+
+.helpButton:hover::before,
+.helpButton:focus-visible::before {
   border-color: var(--dsw-alias-label-tertiary);
+}
+
+@media (pointer: coarse) {
+  .helpButton { inline-size: var(--dsw-touch-target); block-size: var(--dsw-touch-target); }
+  .customizedSummary { min-block-size: var(--dsw-touch-target); }
 }
 
 .editorActions {
@@ -514,8 +535,8 @@
   margin-left: -4px;
   border-radius: var(--dsw-radius-sm);
   cursor: pointer;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   font-weight: 500;
   color: var(--dsw-alias-label-secondary);
   list-style: none;
@@ -570,8 +591,8 @@
 }
 
 .modelCatalogTitle {
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   font-weight: 500;
   color: var(--dsw-alias-label-secondary);
 }
@@ -580,8 +601,8 @@
 .modelEmpty {
   margin: 0;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 /* Model list, shared with the pi-ai provider form: one bordered
@@ -659,8 +680,8 @@
   grid-column: 1 / -1;
   margin: 0;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .modelCheckboxField {
@@ -680,8 +701,8 @@
 
 .modelFieldLabel {
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .modelReasoning {
@@ -705,8 +726,8 @@
 .reasoningLevels legend {
   padding: 0 4px;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .reasoningLevel {
@@ -729,15 +750,15 @@
   display: inline-flex;
   align-items: center;
   gap: var(--dsw-space-1);
-  height: 28px;
+  min-height: max(28px, calc(1lh + var(--dsw-space-2)));
   padding: 0 10px;
   border: 0.5px solid var(--dsw-alias-border-l3);
   border-radius: 14px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font: inherit;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   cursor: pointer;
 }
 
@@ -748,13 +769,13 @@
 .input {
   box-sizing: border-box;
   width: 100%;
-  height: 32px;
+  min-height: max(32px, calc(1lh + var(--dsw-space-2)));
   padding: 0 10px;
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: var(--dsw-radius-md);
   font: inherit;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
 }
@@ -774,7 +795,8 @@ select.input {
 }
 
 .input::placeholder {
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
+  opacity: 1;
 }
 
 .input:disabled {
@@ -835,8 +857,8 @@ select.input {
 
 .error {
   margin: 0;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   color: var(--dsw-alias-state-error-primary);
 }
 
@@ -919,15 +941,15 @@ select.input {
 .candidateId {
   flex: 1 1 auto;
   font-family: var(--ds-font-family-code);
-  font-size: 13px;
+  font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
 
 .candidateEmpty {
   margin: 24px 0;
   color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   text-align: center;
 }
 
@@ -1019,11 +1041,31 @@ select.input {
   }
 }
 
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 767px) {
+  .input {
+    min-height: max(var(--dsw-touch-target), calc(1lh + var(--dsw-space-2)));
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .keyInputFilled {
+    min-height: calc(var(--dsw-touch-target) + 2px);
+    padding-inline-end: calc(var(--dsw-touch-target) + var(--dsw-space-2));
+  }
+
+  .keyToggle { width: var(--dsw-touch-target); }
+
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton,
+  .addButton,
   .rowActions .secondaryButton,
   .rowActions .dangerButton,
+  .linkButton,
+  .modelCheckboxField,
+  .candidateLabel,
   .addModelButton {
-    height: var(--dsw-touch-target);
+    min-height: max(var(--dsw-touch-target), calc(1lh + var(--dsw-space-2)));
     min-width: var(--dsw-touch-target);
   }
 

@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/apiproxy/README.md
 document:
-  en: 97f6b1e02db51ff0f79ac80163de645ae35e44d4
-  zh: 577c4eaa48d8c8bc5ec28466bc66cee6cd4d35f8
+  en: 25abbf2efb2090a657017911bf6d6a77b846ed0b
+  zh: e8c953f135d7f2444118ddc022ce56214415d5cd
 /:
   en: 58a220bf8b4cd5b4
   zh: 61495d48365178df
 /deepseek-ai-dsh-host-apiproxy:
-  en: 43c7989c29a6b97a
-  zh: f47e82949a8c25ea
+  en: 39662a45fac2699f
+  zh: a1a430848931d7b5
 /deepseek-ai-dsh-host-apiproxy/summary:
   en: aa261052146068ab
   zh: c81e85c2c46889e5
@@ -21,11 +21,11 @@ document:
   en: fc8be113271938cc
   zh: fbbc3369b9b88279
 /deepseek-ai-dsh-host-apiproxy/contract-layer-api:
-  en: d52f7713255a598e
-  zh: 829d7b82d96c80b0
+  en: 3f60d41d8a345cf3
+  zh: f24041a93f466859
 /deepseek-ai-dsh-host-apiproxy/carrier-layer-client-root:
-  en: 44062696527cc81a
-  zh: 21e59fe23e19baf5
+  en: cc5dba4f00a7698f
+  zh: a9c302f099efc19b
 /deepseek-ai-dsh-host-apiproxy/model-experience:
   en: beb77664ef00a70c
   zh: 29b02408678bc172

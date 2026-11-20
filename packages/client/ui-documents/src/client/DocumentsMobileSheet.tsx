@@ -40,7 +40,8 @@ export function DocumentsMobileSheet({
   wide?: boolean
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={title} headless className={`${css.dialog}${wide ? ` ${css.wide}` : ''}`}>
+    <Modal open={open} onClose={onClose} title={title} headless overlayClassName={css.overlay as string}
+      className={`${css.dialog}${wide ? ` ${css.wide}` : ''}`}>
       <section className={css.surface} data-documents-sheet={kind} data-documents-dialog={kind}>
         <header className={css.header}>
           <h2 className={css.title}>{title}</h2>

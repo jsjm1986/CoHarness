@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-16-independent-computer-directory-search.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-16-independent-computer-directory-search.md
+document:
+  en: ce8546036510c70f55d335c8d4a08da215c5ef8c
+  zh: 936167b1ada250d82a5457868a69a98b4dd22d9c
+/agent-note-keep-account-discovery-and-search-results-independent-of-slow-computers:
+  en: 0386a5bfb5c71111
+  zh: c23adb1f9db2f46e
+/agent-note-keep-account-discovery-and-search-results-independent-of-slow-computers/problem:
+  en: 48a8e9b2db6211d9
+  zh: 01fd9771b27571c0
+/agent-note-keep-account-discovery-and-search-results-independent-of-slow-computers/decision:
+  en: 7a5278dacd2282d2
+  zh: 08e7e6c4b2f8005e
+/agent-note-keep-account-discovery-and-search-results-independent-of-slow-computers/alternatives-considered:
+  en: 89336aec61699e96
+  zh: bb50fd5b23a61d3c
+/agent-note-keep-account-discovery-and-search-results-independent-of-slow-computers/consequences:
+  en: 808d8832c5b642e1
+  zh: ba3cf1df5292f89d
+/agent-note-keep-account-discovery-and-search-results-independent-of-slow-computers/verification:
+  en: 668b63abe7cab356
+  zh: c3beced34dbf8076

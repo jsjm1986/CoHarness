@@ -10,13 +10,21 @@
 // fixture under the same record discipline as every other: DSH_SNAPSHOT=record drives the turn
 // live through the composer (real read tool against seeded workspace files)
 // and harvests seed.jsonl; replay/refresh seed it cold and only render.
+import { responsiveBrowser } from './responsive-browser.ts'
+import { auditWorkflowState, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { auditResponsiveControl } from './responsive-controls.ts'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, Message, MessageSource } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-agent-instructions'
+import type {} from '@deepseek-ai/dsh-tool-skill'
+import type {} from '@deepseek-ai/dsh-time-context'
+import type {} from '@deepseek-ai/dsh-subagent'
+import type {} from '@deepseek-ai/dsh-session-reference/types'
 import { deriveEventMessage, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
@@ -199,7 +207,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
       const realizedWithCompaction = withCompaction(realizeSeedFixture(scaffold, raw, SEED_ID), meter)
       await seedSession(scaffold, realizedWithCompaction, SEED_ID)
     }
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -414,7 +422,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // Interaction over cold-resumed history: read summaries are host-open
     // file links (not expand-in-place / not details). Runs after the golden
     // capture; still zero model calls.
-    const fileLink = page.locator('[data-variant="read"] button').first()
+    const fileLink = page.locator('[data-variant="read"]').getByRole('button', { name: 'a.txt', exact: true })
     await fileLink.waitFor({ timeout: 10_000 })
     const frame = page.locator('[style*="grid-template-columns"]').first()
     expect(await frame.getAttribute('data-details-collapsed')).toBe('true')
@@ -439,7 +447,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
 
   it.skipIf(MODE === 'record')('a Host open refusal keeps the reason and retries the same path', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-file-open-failure'))
-    const fileLink = page.locator('[data-variant="read"] button').first()
+    const fileLink = page.locator('[data-variant="read"]').getByRole('button', { name: 'a.txt', exact: true })
     await fileLink.waitFor({ timeout: 10_000 })
     const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
       .mockImplementation(async (request, _signal) => ({
@@ -550,6 +558,136 @@ describe('web e2e: seeded history renders through cold resume', () => {
     expect(await page.getByRole('group', { name: 'Message time and speed', exact: true }).count()).toBeGreaterThan(0)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'literal-values.expected.md'), actual, MODE)
   })
+
+  it.skipIf(MODE === 'record' || !workflowMatrixEnabled)('inspects compaction, injected context and billed usage at every touch viewport', async () => {
+    const touchPage = await newWorkflowPage(browser)
+    const touchTripwire = watchConsole(touchPage)
+    try {
+      await touchPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await touchPage.locator('[role="treeitem"]').first().click()
+      await touchPage.locator('[role="treeitem"]').nth(1).click()
+      await touchPage.getByText('DONE', { exact: true }).waitFor()
+      const process = touchPage.locator('[data-turn-process="1"]')
+      if (await process.getAttribute('aria-expanded') !== 'true') await process.click()
+      const compaction = touchPage.locator('button:has([data-compaction-disclosure])')
+      await auditWorkflowState(touchPage, 'conversation', 'compaction-collapsed', compaction, [compaction])
+      await compaction.click()
+      await touchPage.getByRole('heading', { name: 'Cold resume compact summary', exact: true }).waitFor()
+      await auditWorkflowState(touchPage, 'conversation', 'compaction-expanded', compaction.locator('..'), [compaction])
+      await compaction.click()
+      const context = touchPage.getByRole('button', { name: 'Context injection AGENTS.md', exact: true })
+      await auditWorkflowState(touchPage, 'conversation', 'context-injection-collapsed', context, [context])
+      await context.click()
+      const body = touchPage.locator('[data-context-injection-body][data-context-form="instructions"]')
+      await body.waitFor()
+      expect(await body.innerText()).toContain('<system-reminder>')
+      await auditWorkflowState(touchPage, 'conversation', 'context-injection-expanded', body, [context])
+      await context.click()
+      const pills = touchPage.locator('[data-composer-stats]')
+      await auditWorkflowState(touchPage, 'conversation', 'session-usage-summary', pills)
+      for (const [index, state] of ['session-timing-details', 'session-token-details'].entries()) {
+        const trigger = pills.getByRole('button').nth(index)
+        await trigger.click()
+        const dialog = touchPage.getByRole('dialog')
+        await dialog.waitFor()
+        await auditWorkflowState(touchPage, 'conversation', state, dialog)
+        await touchPage.keyboard.press('Escape')
+        await dialog.waitFor({ state: 'hidden' })
+      }
+      expect(touchTripwire.pageErrors).toEqual([])
+    } catch (error) {
+      await saveFailureShot(touchPage, 'seeded-history-responsive')
+      throw error
+    } finally { await touchPage.close() }
+  }, 180_000)
+
+  it.skipIf(MODE === 'record' || !workflowMatrixEnabled)('reads every logged context form and bounded catalogs at every touch viewport', async () => {
+    const touchPage = await newWorkflowPage(browser)
+    const touchTripwire = watchConsole(touchPage)
+    const longPath = `workspace/${'long-directory-'.repeat(8)}instructions.md`
+    const scenarios: { state: string; form: string; label: string; source: MessageSource; expected?: string }[] = [
+      { state: 'instructions', form: 'instructions', label: longPath, source: { kind: 'agent-instructions', form: 'instructions', changes: [{ action: 'set', scope: `.\u0000${longPath}`, path: longPath, digest: 'context-form-matrix' }] }, expected: longPath },
+      { state: 'catalog', form: 'catalog', label: 'skill-catalog', source: { kind: 'skill-catalog', form: 'catalog', update: true, entries: Array.from({ length: 203 }, (_, index) => ({ name: `context-skill-${index}`, description: `Catalog entry ${index}: a readable explanation with a long workspace path ${longPath}` })) }, expected: 'context-skill-199' },
+      { state: 'catalog-empty', form: 'catalog', label: 'skill-catalog', source: { kind: 'skill-catalog', form: 'catalog', update: true, entries: [] } },
+      { state: 'snapshot', form: 'snapshot', label: 'time-context', source: { kind: 'time-context', form: 'snapshot', sections: [{ name: 'Current workspace', text: longPath }, { name: 'Runtime state', text: 'Two available computers\nNo pending background tasks' }] }, expected: 'Two available computers' },
+      { state: 'notice', form: 'notice', label: 'subagent-settled', source: { kind: 'subagent-settled', form: 'notice', summary: 'Updated project instructions are available for the next request.', senderSessionId: SessionId('matrix-notice-sender') }, expected: 'Matrix context body: notice' },
+      { state: 'relay', form: 'relay', label: 'agent-message', source: { kind: 'agent-message', form: 'relay', senderSessionId: SessionId(`sender-${'long-name-'.repeat(8)}`) }, expected: 'Matrix context body: relay' },
+      { state: 'recall', form: 'recall', label: 'matrix-recall', source: { kind: 'session-reference', form: 'recall', version: 1, references: [{ sessionId: 'matrix-recall-source', label: 'matrix-recall', capturedThroughSeq: null, compacted: false, originalMessages: 9, retainedMessages: 7, omittedMessages: 2, omittedBytes: 100, inputIndex: 0, truncated: true }] }, expected: 'Matrix context body: recall' },
+    ]
+    try {
+      await touchPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await touchPage.locator('[role="treeitem"]').first().click()
+      await touchPage.locator('[role="treeitem"]').nth(1).click()
+      await touchPage.getByText('DONE', { exact: true }).waitFor()
+      await expect.poll(() => scaffold.ctx.agents.get(SessionId(SEED_ID)), {
+        timeout: 10_000,
+        message: 'selected context-form session has not finished attaching its Agent',
+      }).toBeDefined()
+      const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
+      if (agent === undefined) throw new Error('seeded context-form session did not attach')
+      for (const scenario of scenarios) {
+        agent.session.append('user/message', createUserMessage({
+          content: [{ type: 'text', text: `Matrix context body: ${scenario.state}` }],
+          source: scenario.source,
+        }), { surfaceOp: 'append' })
+        const label = scenario.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const category = scenario.form === 'recall' ? 'Cross-session recall' : 'Context injection'
+        const disclosure = touchPage.getByRole('button', { name: new RegExp(`^${category} ${label}(?: |$)`) }).last()
+        await disclosure.waitFor()
+        await auditWorkflowState(touchPage, 'conversation', `context-${scenario.state}-collapsed`, disclosure, [disclosure])
+        await disclosure.click()
+        const body = touchPage.locator(`[data-context-injection-body][data-context-form="${scenario.form}"]:visible`)
+        await body.waitFor()
+        if (scenario.expected !== undefined) expect(await body.innerText()).toContain(scenario.expected)
+        if (scenario.state === 'catalog') {
+          expect(await body.locator('[data-context-entries] li').count()).toBe(200)
+          expect(await body.locator('[data-context-entries-truncated]').innerText()).toContain('3')
+        }
+        if (scenario.state === 'catalog-empty') {
+          expect(await body.locator('[data-context-entries] li').count()).toBe(0)
+          await body.locator('[data-context-catalog-update]').waitFor()
+        }
+        await auditWorkflowState(touchPage, 'conversation', `context-${scenario.state}-expanded`, body, [disclosure], undefined, async () => {
+          const triggerBox = await disclosure.boundingBox()
+          expect((triggerBox?.height ?? 0) + 1 / 64, `${scenario.state} touch disclosure height`).toBeGreaterThanOrEqual(44)
+          await auditResponsiveControl(touchPage, body, `context/${scenario.state}/reading`, 'center')
+          expect(await body.evaluate((node) => {
+            const rect = node.getBoundingClientRect()
+            return [0.25, 0.75].every(x => [8, rect.height - 8].every((y) => {
+              const hit = document.elementFromPoint(rect.left + rect.width * x, rect.top + y)
+              return hit !== null && node.contains(hit)
+            }))
+          }), `Context ${scenario.state} body must be readable above other page surfaces`).toBe(true)
+          if (scenario.state === 'notice') {
+            const summary = disclosure.locator('[data-context-summary]')
+            expect((await summary.boundingBox())?.width).toBeGreaterThanOrEqual(200)
+          }
+          if (scenario.state === 'catalog') {
+            const bodyBox = await body.boundingBox()
+            if (bodyBox === null) throw new Error('catalog reading viewport is not measurable')
+            const scrollHeight = await body.evaluate(node => node.scrollHeight)
+            await touchPage.mouse.move(bodyBox.x + bodyBox.width / 2, bodyBox.y + bodyBox.height / 2)
+            await touchPage.mouse.wheel(0, scrollHeight)
+            await expect.poll(() => body.evaluate((node) => {
+              const last = node.querySelector('[data-context-entries-truncated]')
+              if (last === null) return false
+              const viewport = node.getBoundingClientRect()
+              const rect = last.getBoundingClientRect()
+              return node.scrollTop > 0 && rect.top >= viewport.top && rect.bottom <= viewport.bottom
+            }), { message: 'catalog wheel scrolling must reach the bounded remainder' }).toBe(true)
+            await touchPage.mouse.wheel(0, -scrollHeight)
+            await expect.poll(() => body.evaluate(node => node.scrollTop)).toBe(0)
+          }
+        })
+        await disclosure.click()
+        await body.waitFor({ state: 'hidden' })
+      }
+      expect(touchTripwire.pageErrors).toEqual([])
+    } catch (error) {
+      await saveFailureShot(touchPage, 'seeded-context-forms-responsive')
+      throw error
+    } finally { await touchPage.close() }
+  }, 180_000)
 
   it.skipIf(MODE === 'record')('issued zero model calls and stayed clean', async () => {
     // No replay fixture was installed and the llm seam is open — any stray

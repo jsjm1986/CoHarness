@@ -164,7 +164,7 @@ describe('resumableUpload', () => {
   })
 
   it.each([
-    { expiresInMs: 300, deadlineMs: 300, name: 'server expiry' },
+    { expiresInMs: 300, deadlineMs: 300_000, name: 'client budget even after receiving expiry' },
     { expiresInMs: 600_000, deadlineMs: 300_000, name: 'client verification deadline' },
   ])('stops verification at the $name', async ({ expiresInMs, deadlineMs }) => {
     vi.useFakeTimers()
@@ -185,21 +185,24 @@ describe('resumableUpload', () => {
   })
 
   it('polls an accepted verification after its session retention timestamp passes', async () => {
+    vi.useFakeTimers()
     const calls: string[] = []
-    const result = await resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
+    const pending = resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, {
       requestJson: async <T>(input: RequestInfo | URL, init?: RequestInit) => {
         const url = urlOf(input)
         calls.push(`${init?.method ?? 'GET'} ${url}`)
-        const complete = init?.method !== 'POST'
+        const complete = calls.filter(call => call.startsWith('GET ')).length === 2
         return { uploadId, name: 'notes.txt', directoryId: '', bytes: 5, fingerprint: 'x', chunkBytes: 65536,
           receivedBytes: 5, expiresAt: 1, state: complete ? 'complete' : 'verifying', ...(complete ? { ref } : {}),
         } as T
       },
       networkError: () => new Error('offline'), responseError: status => new Error(`Unexpected upload status ${status}`),
     })
-    expect(result).toEqual(ref)
+    await vi.advanceTimersByTimeAsync(500)
+    await expect(pending).resolves.toEqual(ref)
     expect(calls).toEqual(['POST /api/documents/uploads',
       'POST /api/documents/uploads/00000000-0000-4000-8000-000000000000/complete',
+      'GET /api/documents/uploads/00000000-0000-4000-8000-000000000000',
       'GET /api/documents/uploads/00000000-0000-4000-8000-000000000000'])
   })
 

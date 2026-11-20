@@ -1,9 +1,10 @@
 /** Runtime management and full preset inventory through the shipped Web composition. */
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser } from 'playwright'
+import { type Browser } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import {
   captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
@@ -43,7 +44,7 @@ it('reads preset compositions only when the full inventory is opened', async () 
     },
   })
   owned.scaffold = scaffold
-  const browser = await chromium.launch()
+  const browser = await responsiveBrowser.launch()
   owned.browser = browser
   const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
   const tripwire = watchConsole(page)

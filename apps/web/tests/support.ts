@@ -19,6 +19,16 @@ export const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 export const ZH_BROWSER_LOCALE = 'zh-CN'
 
 /**
+ * Hold a browser fixture step until its test releases it.
+ * @returns The pending promise and its completion callback.
+ */
+export function completionBarrier(): { promise: Promise<void>; resolve: () => void } {
+  let complete!: () => void
+  const promise = new Promise<void>((resolve) => { complete = resolve })
+  return { promise, resolve: complete }
+}
+
+/**
  * Open the standard browser-test page advertising English before client boot.
  * This keeps role locators and goldens deterministic while leaving the Host
  * settings document free to override the provisional browser-derived locale;
@@ -214,7 +224,6 @@ export function conversationContextKey(kind: string, id: string): string {
  * @param target - descendant whose outer process disclosure should open.
  */
 export async function expandOwningTurnProcess(_page: Page, target: Locator): Promise<void> {
-  if (await target.isVisible()) return
   const owner = await target.evaluateHandle((element) => {
     let owner: Element | null = null
     for (const control of element.ownerDocument.querySelectorAll('[data-turn-process]')) {
@@ -224,7 +233,11 @@ export async function expandOwningTurnProcess(_page: Page, target: Locator): Pro
     return owner
   })
   const control = owner.asElement()
-  if (control === null) return
-  await control.waitForElementState('visible', { timeout: 10_000 })
-  if (await control.getAttribute('aria-expanded') === 'false') await control.click()
+  if (control !== null) {
+    await control.waitForElementState('visible', { timeout: 10_000 })
+    if (await control.getAttribute('aria-expanded') === 'false') await control.click()
+  }
+  // A still-running early return could race the settle-time fold: the member
+  // only counts once it stays visible after the owning disclosure is open.
+  await target.waitFor({ state: 'visible', timeout: 10_000 })
 }

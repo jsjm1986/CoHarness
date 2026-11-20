@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-plan/README.md
 document:
-  en: e3d8b4a113cce1eaedea967c318d4e9eddb7e97b
-  zh: eb35c3e2159a68dfaeebf67743e9751f543ceee1
+  en: e5f3619d70c71738ee86390c93b1390c70c7d327
+  zh: 973dbda05421d5e2916ae3e5718be7930b01426a
 /:
   en: 5abb1dcf34712512
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-ui-plan:
-  en: d5c5898de1f3f5f2
-  zh: e1bad73804c9964e
+  en: 188d771ff760348e
+  zh: 0fddd1a348330253
 /deepseek-ai-dsh-client-ui-plan/summary:
   en: 958c2c8bf80759a0
   zh: 57ffbbfa1bcbdff4

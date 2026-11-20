@@ -20,6 +20,7 @@ Generation-checked stop, restart and retirement affect only the selected runtime
 Computer permission alone cannot borrow another computer’s personal home.
 Normal login opens the original Harness workbench with its authorized local personal default; exact links and other runtimes stay unchanged.
 Documents retain computer ownership; a planned verified snapshot copies through the center without starting a Runtime.
+The streamed document overview pages through both locations without repeating a document or starting a Runtime.
 Revoking computer access hides its document metadata and denies direct content without retargeting the active Runtime.
 A disconnected computer returns unavailable without starting a replacement on the center.
 Organization model and quota management remain available while the execution computer is disconnected.

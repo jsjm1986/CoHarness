@@ -171,6 +171,9 @@ describe('real Loader composition', () => {
     const offRows = loaded.on('webserver/index-inject', (rows) => {
       rows.push({ kind: 'script-preload', src: 'plugins/boot.js' })
     })
+    expect(await request(port, '/?dshBootstrap=1', authenticated())).toMatchObject({
+      status: 200, type: 'application/json; charset=utf-8', body: '{"version":1,"kind":"full-index"}',
+    })
     for (const path of ['/', '/index.html', '/?view=test', '/?fixture']) {
       const got = await request(port, path, authenticated())
       expect(got.status).toBe(200)
@@ -193,6 +196,11 @@ describe('real Loader composition', () => {
     })
     untap()
     expect((await request(port, '/', authenticated())).body).not.toContain('__T__')
+    const boot = await request(port, '/?dshBootstrap=1', authenticated())
+    expect(boot).toMatchObject({ status: 200, type: 'application/json; charset=utf-8' })
+    const injection = JSON.parse(boot.body) as { version: number; kind: string; rows: { kind: string; name: string }[] }
+    expect(injection).toMatchObject({ version: 1, kind: 'injections' })
+    expect(injection.rows.some(row => row.kind === 'global' && row.name === '__DSH_CONNECTION_RECOVERY__')).toBe(true)
 
     // A missing configured index follows the same empty-404 contract for both
     // of its public entry paths and for both supported methods.

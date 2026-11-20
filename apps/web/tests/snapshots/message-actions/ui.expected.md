@@ -22,16 +22,16 @@
   - text: Thinking The user wants me to read a.txt and b.txt, then reply with "DONE". Let me do both reads in parallel.
 - paragraph: I will read both files before answering.
 - button "Read files"
-- button "Read a.txt":
+- button "Read":
   - img
   - img
-  - text: Read
-  - button "a.txt"
-- button "Read b.txt":
+- text: Read
+- button "a.txt"
+- button "Read":
   - img
   - img
-  - text: Read
-  - button "b.txt"
+- text: Read
+- button "b.txt"
 - button "Copy":
   - img
 - button "Branch into a new conversation" [disabled]:

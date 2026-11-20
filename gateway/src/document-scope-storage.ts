@@ -1,9 +1,9 @@
 /** Persist the scope assigned to a document directory and retain superseded private stores independently. */
 import { createHash } from 'node:crypto'
 import { lstat, readFile } from 'node:fs/promises'
-import { isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
-import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
+import { readManagedDataPaths, registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { privateFileState, tightenPrivateFileAcl } from './node-private-file.ts'
 import { DOCUMENT_PERMISSION_DENIED_CODE, DOCUMENT_STORE_UNAVAILABLE_CODE, UserDocError, UserDocRootId } from '@deepseek-ai/dsh-userdoc'
 import { z } from 'zod'
@@ -13,7 +13,7 @@ const keySchema = z.string().regex(/^[a-f0-9]{64}$/u)
 const scopeSchema = z.object({ organizationId: z.string().min(1), target: targetSchema, key: keySchema }).strict()
 const retiredScopeSchema = scopeSchema.extend({ target: targetSchema.nullable() })
 const bindingSchema = z.object({ version: z.literal(1), runtimeRoot: z.string().min(1), current: scopeSchema,
-  retiring: retiredScopeSchema.optional() }).strict()
+  retiring: retiredScopeSchema.optional(), preparing: z.literal(true).optional() }).strict()
 
 /** Maximum encoded bytes of one provider-owned scope or retirement record. */
 export const DOCUMENT_SCOPE_RECORD_MAX_BYTES = 65536
@@ -44,6 +44,8 @@ interface ScopeStorageOptions {
   readonly inventory: string
   readonly scope: DocumentIdentityScope
   readonly preparePrivate: (path: string) => Promise<void>
+  readonly validateFilesRoot: (path: string, requireRoot: boolean) => Promise<void>
+  readonly prepareFilesRoot: (path: string) => Promise<void>
 }
 
 async function privateJson(path: string): Promise<unknown | undefined> {
@@ -104,15 +106,76 @@ async function markerRoot(filesBase: string, key: string): Promise<UserDocRootId
 /**
  * Assign protected storage to the current scope under a durable directory-owner lock.
  * @param options - canonical paths, authenticated scope, inventory and owner-only directory preparation.
- * @returns a private domain key after earlier scope retirement is durably recorded; stale owners are refused.
+ * @returns the scope key and its registered object-store base after earlier scope retirement is durably recorded.
+ * Existing stores require one complete inventory location and a protected physical directory; missing or conflicting evidence refuses reopening.
+ * An explicit first-installation marker permits creator retries at that location only before metadata exists; completed domains never recreate missing roots.
  */
-export async function documentScopeStorageKey(options: ScopeStorageOptions): Promise<string> {
-  const { stateBase, filesBase, runtimeRoot, documentRoot, legacyKey, inventory, scope, preparePrivate } = options
+export async function documentScopeStorageKey(options: ScopeStorageOptions): Promise<{ key: string; filesBase: string }> {
+  const { stateBase, filesBase, runtimeRoot, documentRoot, legacyKey, inventory, scope, preparePrivate, validateFilesRoot, prepareFilesRoot } = options
   const target = { kind: scope.target.kind, id: scope.target.id }
   const bindings = join(stateBase, '.scope-bindings'), retired = join(stateBase, '.retired')
   const path = join(bindings, `${legacyKey}.json`)
   const save = (binding: z.infer<typeof bindingSchema>) => writeFileAtomic(path, JSON.stringify(binding), { mode: 0o600 })
+  const entry = async (path: string) => lstat(path).catch((error: unknown) => {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw error
+  })
+  const registeredBase = async (key: string, verifyActiveFiles: boolean): Promise<string | undefined> => {
+    const info = await lstat(inventory)
+    if (info.isSymbolicLink() || await privateFileState(inventory, info, info.size) !== 'private') {
+      throw new Error('Document storage inventory must remain owner-private.')
+    }
+    const rows = readManagedDataPaths(inventory).filter(row => row.owner.startsWith(`gateway-documents/${key}/`))
+    const metadata = await entry(join(stateBase, key, 'metadata.sqlite'))
+    if (rows.length === 0 && metadata === undefined) return undefined
+    const paths = (kind: string) => rows.filter(row => row.owner === `gateway-documents/${key}/${kind}` && row.kind === 'directory')
+    const public_ = paths('public'), state = paths('metadata'), files = paths('files')
+    if (rows.length !== 3 || public_.length !== 1 || state.length !== 1 || files.length !== 1
+      || public_[0]!.path !== documentRoot || state[0]!.path !== join(stateBase, key)
+      || basename(files[0]!.path) !== key) {
+      throw new Error('Document storage location is missing or conflicting; restore the verified inventory before reopening.')
+    }
+    if (verifyActiveFiles) await validateFilesRoot(files[0]!.path, true)
+    return dirname(files[0]!.path)
+  }
+  const register = (key: string, base: string): void => {
+    for (const [kind, path] of [['public', documentRoot], ['metadata', join(stateBase, key)], ['files', join(base, key)]] as const) {
+      registerManagedDataPath({ owner: `gateway-documents/${key}/${kind}`, kind: 'directory', path }, inventory)
+    }
+  }
+  const select = async (key: string, preparing: boolean): Promise<{ key: string; filesBase: string }> => {
+    const existing = await registeredBase(key, false)
+    if (existing !== undefined) {
+      const filesRoot = join(existing, key)
+      if (preparing && await entry(join(stateBase, key, 'metadata.sqlite')) === undefined && await entry(filesRoot) === undefined) {
+        await validateFilesRoot(filesRoot, false)
+        await prepareFilesRoot(filesRoot)
+        if (await entry(filesRoot) === undefined) return { key, filesBase: existing }
+      }
+      await validateFilesRoot(filesRoot, true)
+      return { key, filesBase: existing }
+    }
+    if (!preparing) throw new Error('The existing document scope has no verified inventory location; restore its registration before reopening.')
+    const orphan = await entry(join(filesBase, key))
+    if (orphan !== undefined) throw new Error('Document object storage has no verified inventory location; restore its registration before reopening.')
+    await preparePrivate(filesBase)
+    await validateFilesRoot(join(filesBase, key), false)
+    register(key, filesBase)
+    await prepareFilesRoot(join(filesBase, key))
+    if (await entry(join(filesBase, key)) !== undefined) await validateFilesRoot(join(filesBase, key), true)
+    return { key, filesBase }
+  }
+  const finish = async (binding: z.infer<typeof bindingSchema>): Promise<{ key: string; filesBase: string }> => {
+    const selected = await select(binding.current.key, binding.preparing === true)
+    if (binding.preparing === true && await entry(join(selected.filesBase, selected.key)) !== undefined) {
+      const { preparing: _, ...ready } = binding
+      await save(ready)
+    }
+    return selected
+  }
   const retire = async (previous: z.infer<typeof retiredScopeSchema>): Promise<void> => {
+    const previousBase = await registeredBase(previous.key, false)
+    if (previousBase === undefined) throw new Error('The preceding document store has no verified inventory location.')
     const markerPath = join(retired, `${previous.key}.json`)
     registerManagedDataPath({ owner: `gateway-document-retirement/${previous.key}`, kind: 'file', path: markerPath }, inventory)
     const initialized = await lstat(join(stateBase, previous.key, 'metadata.sqlite')).then(() => true, (error: unknown) => {
@@ -120,7 +183,7 @@ export async function documentScopeStorageKey(options: ScopeStorageOptions): Pro
       throw error
     })
     const marker = { version: 1 as const, key: previous.key, root: documentRoot,
-      stateRoot: join(stateBase, previous.key), filesRoot: join(filesBase, previous.key),
+      stateRoot: join(stateBase, previous.key), filesRoot: join(previousBase, previous.key),
       initialized,
       scope: { organizationId: previous.organizationId, target: previous.target } }
     for (const [kind, path] of [['public', marker.root], ['metadata', marker.stateRoot], ['files', marker.filesRoot]] as const) {
@@ -138,14 +201,15 @@ export async function documentScopeStorageKey(options: ScopeStorageOptions): Pro
   try {
     await preparePrivate(bindings)
     await preparePrivate(retired)
-    registerManagedDataPath({ owner: `gateway-document-scope/${legacyKey}`, kind: 'file', path }, inventory)
     return await withFileLock(path, async () => {
+      registerManagedDataPath({ owner: `gateway-document-scope/${legacyKey}`, kind: 'file', path }, inventory)
       const raw = await privateJson(path)
       let binding = raw === undefined ? undefined : parseDocumentScopeBinding(raw)
       if (binding !== undefined && binding.runtimeRoot !== runtimeRoot) throw new Error('Document scope directory changed.')
       if (binding?.retiring !== undefined) {
         await retire(binding.retiring)
-        binding = { version: 1, runtimeRoot, current: binding.current }
+        // A persisted retirement precedes creation of its successor's files, including records written before the preparation marker existed.
+        binding = { version: 1, runtimeRoot, current: binding.current, preparing: true }
         await save(binding)
       }
       if (binding !== undefined && binding.current.organizationId === scope.organizationId
@@ -153,7 +217,7 @@ export async function documentScopeStorageKey(options: ScopeStorageOptions): Pro
         if (await privateJson(join(retired, `${binding.current.key}.json`)) !== undefined) {
           throw new Error('The current document store is retired.')
         }
-        return binding.current.key
+        return finish(binding)
       }
       if (binding !== undefined && (binding.current.organizationId !== scope.organizationId
         || binding.current.target.kind !== 'project' || scope.target.kind !== 'project' || binding.current.target.id >= scope.target.id)) {
@@ -162,7 +226,8 @@ export async function documentScopeStorageKey(options: ScopeStorageOptions): Pro
       const key = scopeKey(runtimeRoot, scope.organizationId, scope.target)
       const previous = binding?.current
       const oldKey = previous?.key ?? legacyKey
-      const rootId = await markerRoot(filesBase, oldKey)
+      const previousBase = await registeredBase(oldKey, true)
+      const rootId = previousBase === undefined ? undefined : await markerRoot(previousBase, oldKey)
       const catalogOwner = rootId === undefined ? null : await scope.projectionOwner(rootId)
       if (catalogOwner !== null) {
         if (previous !== undefined || !sameTarget(catalogOwner, scope.target)) {
@@ -170,23 +235,24 @@ export async function documentScopeStorageKey(options: ScopeStorageOptions): Pro
         }
         const current = { organizationId: scope.organizationId, target, key: legacyKey }
         await save({ version: 1, runtimeRoot, current })
-        return legacyKey
+        return { key: legacyKey, filesBase: previousBase! }
       }
-      const legacyExists = previous !== undefined || await lstat(join(filesBase, legacyKey)).then(() => true, (error: unknown) => {
+      const legacyExists = previous !== undefined || previousBase !== undefined || await lstat(join(filesBase, legacyKey)).then(() => true, (error: unknown) => {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
         throw error
       })
       const current = { organizationId: scope.organizationId, target, key }
       if (legacyExists) {
         const retiring = previous ?? { organizationId: scope.organizationId, target: null, key: legacyKey }
-        await save({ version: 1, runtimeRoot, current, retiring })
+        await save({ version: 1, runtimeRoot, current, retiring, preparing: true })
         await retire(retiring)
       }
-      await save({ version: 1, runtimeRoot, current })
-      return key
+      const pending = { version: 1 as const, runtimeRoot, current, preparing: true as const }
+      await save(pending)
+      return finish(pending)
     })
   } catch (error) {
     if (error instanceof UserDocError) throw error
-    throw new UserDocError('Document scope storage is unavailable.', DOCUMENT_STORE_UNAVAILABLE_CODE, { cause: error })
+    throw new UserDocError('Document scope storage is unavailable; verify the registered private storage location before retrying.', DOCUMENT_STORE_UNAVAILABLE_CODE, { cause: error })
   }
 }

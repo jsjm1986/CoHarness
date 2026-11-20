@@ -11,11 +11,13 @@ kind: "package-reference"
 
 受管多电脑入口分别读取已授权的 Runtime 列表和会话、工作区分页。展开电脑只读取对应 Runtime 的目录，此操作无需启动 Host。打开或新建对话时，客户端固定目标 Runtime，核验原生回执，并合并此次确认的工作区成员。用户重试同一次新建操作时，沿用原会话和预留标识。 经验证的新建回执可以直接用所属电脑的实际历史尾页初始化该会话。较早的 Host 或过大的尾页会对同一会话单独发起授权读取。首次连接时用事件流的订阅水位核对该尾页，出现缺口或后续重新连接时补读。
 
+冷新建与历史准备只续等经核验的 Gateway 待启动凭据，保留原载荷和确切目标。每次请求沿用普通超时；第一份凭据给出总等待上限，后续响应不能延长。取消、网络响应丢失、凭据无效或变化以及普通 HTTP 失败均不自动重放。热准备仍为一次请求，标签页草稿和选择继续由现有 Session runtime 持有。 对话意图失败时只发布安全类别（`denied`、`preset-unavailable` 或 `unavailable`），并保留原操作 ID 和预约身份。Host 诊断消息和详情不进入展示状态；显式重试会清除类别并复用同一意图。 排队消息恢复按连接退避查询原回执，原所属 Host 确认就绪后可立即查询。
+
 账户工作台在此对象层上增加惰性的 `SessionRuntimePool`。池只为当前账户聚合列表和标准 props 查询，每个目标运行时仍保留自己的 API client、ConnectionController、SessionManager、事件流和 scope 资源。目标只有在 Gateway 校验成员关系并签发绑定 generation 的 principal 后才会接入；移除面板只释放其引用，不会停止 Host 任务。独立消费方持有引用期间，目标连接继续保留。 Runtime 的来源快照、目标和可见会话集合都未变化时，复用该 Runtime 的会话列表。工作区通知只在草稿变化或前次写入需要重试时保存标签页恢复索引。
 
-已认证的浏览器页面将引导连接的选择保存到 `dsh.sessions.current.v2.<accountId>.<target>`，其中 `<target>` 为 `personal` 或 `project-<projectId>`。每个空间在初始列表请求期间并行恢复自己的历史，账号与 Runtime 基线仍决定其可见性。没有作用域记录的首次访问沿用历史优先的默认选择。未分作用域的浏览器记录保留但不被接纳；独立 Host、fixture 和显式载体继续使用 `dsh.sessions.current`。
+已认证的浏览器页面在本标签页的 session storage 中，以 `dsh.sessions.current.v3.<accountId>.<runtimeId>.<target>` 保存引导连接的选择，其中 `<target>` 为 `personal` 或 `project-<projectId>`。只有已认证页面的确切 Runtime 能确定该命名空间。刷新时，在初始列表请求期间并行恢复本标签页的历史；账号与 Runtime 基线仍决定其可见性。缺少确切身份或作用域记录时采用通常的历史优先选择。旧的 local storage 记录保留但不被接纳。独立 Host 和显式载体保留既有选择行为。
 
-直接读取 JSON 的浏览器消费方共用 Host carrier 的流式 reader；它会在解析前拒绝声明长度或实际分块超过默认 16 MiB 的 body。该 helper 只负责传输上限，不替代端点自己的响应校验。
+直接读取 JSON、文本或完整二进制响应的浏览器消费方共用 Host carrier 的[有界 reader](../../host/apiproxy/README.zh.md#contract-layer-api)。这些 helper 执行响应字节上限和取消；端点自己的校验仍由消费方负责。
 
 对于每条可到达本地根 Agent 或可继续子 Agent 的提示词，运行时都会采样浏览器当前的 `Intl.DateTimeFormat().resolvedOptions().timeZone`，并只把该值附加到这一次 Session 或 subagent 提示词 RPC。该值既不缓存，也不包含在 Session 创建或 fork 状态中，因此旅行与并发标签页都能保留消息本地的来源信息。浏览器若无法提供非空时区，会在本地拒绝该提示词，而不会悄然使用部署状态代替。
 
@@ -42,6 +44,10 @@ kind: "package-reference"
 Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除 Session 列表归属，再允许连接释放发布后续目录变化。未解析或已撤权的 Session 没有目录，不会回退到其他 runtime 的选项；在途读取在返回前复核归属。
 
 `addressRuntimeUrl(URL, target)` 将固定的 Runtime 选择参数写入现有 URL。电脑元数据尚未获得时，消费方仍据此绑定目标；明确的文档位置继续独立按账号和电脑寻址。
+
+已恢复的历史 Session 在列表与历史响应中携带 `executionRestriction: recovery-read-only`，包括直接链接和按地址访问的子会话。显式选择只读取历史，不发布 Agent。工作区启动不会重新激活已恢复的空白会话，重新进入工作区也不复用该空白会话或其草稿预留身份；已保存的输入草稿仍归属于历史 Session。此限制不改变成员资格或文件权限；新 Session 继续沿用现有创建与执行检查。
+
+已认证的受管页面可使用准备接口读取活动根会话的首个历史窗口。已订阅的 Host 必须与已验证部署上下文或分阶段入口确认的账号与 Runtime 归属一致。已保存的根会话与初始列表并行读取；首次访问且没有保存根会话时，先由 Workspace 与 Session 基线选出符合条件的对话，再读取其历史。会话选择仍遵循可见性与归档投影，历史分页及事件缺口修复沿用普通请求。
 
 ## 概述
 
@@ -107,12 +113,16 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 
 `beginNavigation()` 取代尚未完成的视图选择意图，并返回取消信号。传入 `{ blockInputFor: sessionId }` 会为来源 Session 发布当前标签页内的输入锁定；`finishNavigation(signal)` 只解除该意图自己的锁定。新会话准备期间保留原视图、草稿和运行任务，同时拒绝向原对话提交，直至准备结束。异步导航在加载完成后、选择视图前检查信号；`open`、`openSubagent`、`clear`、目标切换与明确拒绝访问都会使旧意图失效。被取代的请求仍将已完成的 Host 操作保留在目录中，并保留当前视图和草稿。插件发起的请求还须响应插件销毁。
 
+个人选择恢复持有自己的准备输入框，直到其他导航取代它或确切的 Session 输入框接纳它。被取代时仅移除该恢复的空输入框；已输入文字保留为当前页面的已保存意图，仍属于原电脑和 Session。明确重试取得新的导航生命周期并重新检查当前访问权限。成功转移会在打开 Session 前解除恢复自身的取消监听。所有尚未完成的恢复读取都被持有至结束，包括取消后与后续重试重叠的读取。已恢复的工作台窗格保留各自草稿及运行中的 Host 任务。
+
 每次连接通过校验后，在 connected 状态与 Host 描述可见前先发出 `connection/will-reset`。消费者同步撤回旧的客户端验证，描述订阅者才能恢复私有布局。Runtime 随后发出 `connection/reset`，再准备新的 Workspace／Session 列表基线或已保存历史的所有权。首次连接通过校验后，Runtime 会在读取 Session 列表基线的同时打开已保存普通根 Session 的会话尾页。这一个尚未展示的窗口不创建 Client scope、引用、历史索引或 Agent。目录与 Workspace 归档投影仍决定最终选择；首次获准获取的引用接管同一次打开。导航、目标或账号撤销、断连、基线缺失或失败，以及根节点销毁都会释放尚未接管的窗口。Runtime 持有尚未完成的读取直到结束，根节点销毁会等待它。带地址的子会话仍走目录确认后的恢复路径。
 
 `commitSessionNavigation()` 在打开尝试完成前持有目标，确认历史可用后只提交当前意图。接收视图先获取自己的引用，再释放临时引用。加载失败保留原视图；取消同时抑制过期提交和过期错误。`SessionReference.ready` 的语义不变：它表示尝试结束，不等同于加载成功。
 
 <a id="workspace-and-session-lists"></a>
 ## Workspace 与 Session 列表
+
+应用加载期间，已认证的 Web 文档可以提供 `startupDraft` 输入桥接。Runtime 核对桥接提供的账号、节点、Runtime 和范围与当前文档一致后，才将其作为提前读取 Session 历史的依据。
 
 `WorkspaceRuntime.startInitialSelection()` 在等待首次列表基线及准备好的 Session 时，通过工作区列表发布可选标记 `initialSelectionPending`。完成、被新导航取代、工作区基线读取失败、准备失败或释放都会移除标记。释放只取消本次导航等待，不影响其他历史读取者；失败后仅在权威列表输入变化时重试。
 
@@ -144,7 +154,7 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 
 `SessionListState.observedJobs` 承载 `sessions.observeJob(sessionId, jobId)` 累积的实时输出视图：每个任务一条引用计数的轮询循环按观察节奏发出 `jobs.output` 读，每次响应推进 `from` 游标并对保留尾部限长；业务拒绝存为终态 `error`，传输失败会重试，最后一个观察者释放时中止循环并丢弃该条目。`sessions.killJob(sessionId, jobId)` 发出 `jobs.kill` 并仅以受理结果作结——行的收敛走下一帧 `session/jobs`。
 
-`SessionRuntime.search(query, signal)` 是基于 `session.search` RPC 的无状态单次操作。它返回经过排序的会话／snippet 对，但不会将查询条件、加载状态或错误状态写入共享 Session 列表，因此每个 UI 所有者都自行负责防抖、取消、抑制陈旧响应和回退呈现。`searchResultLimit` 将 `SESSION_SEARCH_RESULT_LIMIT`——即响应 schema 自身强制执行的上限——作为注入的呈现数据重新公开，使客户端插件无需复制该值。它是协议常量而非逐连接状态，因此连接 handle 不携带它。
+`SessionRuntime.search(query, signal, progress?)` 是基于 `session.search` RPC 的无状态操作。可选回调独立发布各已连接 Runtime 的结果及待完成或失败状态；最终 Promise 仍返回合并结果。搜索不会建立新的 Runtime 连接。取消后不再发布进度，结果身份始终包含 Runtime。它返回经过排序的会话／snippet 对，但不会将查询条件、加载状态或错误状态写入共享 Session 列表，因此每个 UI 所有者都自行负责防抖、取消、抑制陈旧响应和回退呈现。`searchResultLimit` 将 `SESSION_SEARCH_RESULT_LIMIT`——即响应 schema 自身强制执行的上限——作为注入的呈现数据重新公开，使客户端插件无需复制该值。它是协议常量而非逐连接状态，因此连接 handle 不携带它。
 
 <a id="new-session-and-the-blank-mirror"></a>
 ## New Session 与 blank 镜像
@@ -170,6 +180,8 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 
 `session.beginSubmission` 在调用方开始序列化和发送之前，同步地把一条本地回显写入 `SessionSnapshot.pendingSubmissions`，使会话界面能在提交点击的同一帧渲染该消息。Session 依据自身实时 running 状态与请求 mode 固定 `transcript`、`queued` 或 `steering` 位置；prompt 的 `requestId` 即关联身份，Host 会把它回显为持久 user source 的 `rpcId`。每个身份都会跟踪其队列与 splice 位置：queued 与 steering 回显在 Host 发布已接受的队列身份后延迟一个动画帧退役；transcript 回显等待持久录取——已录取回显会一直登记到携带它的队列发布移除其行为止。仅从队列移除并不构成失败证据：`canceled` splice 会立即使被移除的回显失败，而已离开队列且未录取的回显会在移除之后记录的下一条 `request/context` 或 `turn/end` 边界处失败。新的 follow 基线会把所有在 `asOfSeq` 及之前已被队列观察到的身份按已观察接受，即使其持久录取不在已加载窗口内。缓冲、重放或从更早历史页补入的持久用户消息即使早于已安装历史窗口，也会确认身份匹配的提交；处理该回执不会追加旧内容或重放旧队列变更。已识别的 prompt 失败与 `abandon()` 会立即使未录取回显退役；销毁则按已观察处理已录取回显、按失败处理其余未决回显。每次退役恰好触发一次 `onRetire`；已观察的退役携带按内容顺序排列的持久图片引用，以便 composer 释放成功的草稿。回显只存在于 Client 内存中；重新加载与重连后，会话仅从持久事件重建。
 
+在明确所属电脑的受管对话中，排队发送可以等待短暂断线恢复。原标签页保留草稿和请求 ID，直到所属 Runtime 确认受理。每次补发前读取持久回执，并重新核对账号、电脑、Runtime 和 Session。目标变化、明确拒绝或等候到期时，输入框保留草稿并恢复操作。自动补发适用于排队输入。
+
 <a id="conversation-assembly"></a>
 ## Conversation 组装
 
@@ -180,6 +192,10 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 Assistant 尝试退役时会移除其瞬时匹配，仅重放受影响的 Context 及前驱读取者；无关历史 Node 保持身份不变。仅由瞬时内容构成的 Context 消失时，其 Location 数据也一并移除；现有 upsert 协议无法表达删除时，视图使用缓存的未变 Node 进行替换。时间线重新索引仍遍历已加载窗口。
 
 连接 generation 恢复后，`SessionManager` 会对驻留会话的历史重建执行 single-flight，同时最多允许四个并发，并优先当前选中的会话。断开连接会丢弃排队工作；进行中的读取由 Session generation 栅栏取消。scope dispose 还会在释放 Session 实例前取消未完成的初始 history 读取。
+
+已打开的 Session 在后台修复历史期间继续显示序号连续的实时事件。本地历史覆盖重连基线的持久游标后，恢复当前回复的流式前缀。后续为同一水位发出的请求复用正在读取的历史。遇到真实缺口时，先补齐缺失区间，再显示后续事件。
+
+多电脑受管连接恢复时，已打开的根对话收到已验证的 Mux 订阅后即可继续显示。当前窗口已覆盖游标时无需读取历史。缺少的事件通过原账号、Runtime 和所属电脑的一次预备尾页读取补齐。历史页和对话保持事件顺序，新的 Host 元数据和交互请求等到状态流打开后再交付。
 
 Definition 作者只根据当前事件完成匹配，为每条关联事件提供稳定业务 id，并保证 update 能按日志 `seq` 回放；renderer 只消费最终 Node data 与受限 Location value，不扫描 Session 或 Chat 集合。完整注册和分页路径见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 
@@ -246,4 +262,4 @@ reason 为 `max-tokens` 的 `turn/end` 会在该轮位置投影出一个 `turn-m
 
 </details>
 
-入口所属的 `deploymentContext` 服务在资源转发前读取 Gateway 策略，为个人目录、文档和协作界面提供展示与聚合信息，与选中的 Runtime 分离。同源消息只通知策略修订号失效；刷新不改变当前选择或草稿。本机入口保留当前本机 Runtime 的私有工作区隔离。参见[部署模式](../../../gateway/docs/deployment-topology/README.zh.md)。 标签页保留个人对话的 Session、Runtime 和上次核验的电脑身份，直到用户完成新选择或主动清空。断线后须由原电脑重新授权历史，编辑器才能发送。切回页面时重新核验使用权，并读取视窗内已展开的目录，无需启动这些 Runtime。
+入口所属的 `deploymentContext` 服务在资源转发前读取 Gateway 策略，为个人目录、文档和协作界面提供展示与聚合信息，与选中的 Runtime 分离。同源消息只通知策略修订号失效；刷新不改变当前选择或草稿。本机入口保留当前本机 Runtime 的私有工作区隔离。参见[部署模式](../../../gateway/docs/deployment-topology/README.zh.md)。 标签页保留个人对话的 Session、Runtime 和上次核验的电脑身份，直到用户完成新选择或主动清空。断线后须由原电脑重新授权历史，编辑器才能发送。切回页面、主动刷新环境及重试都会重新核验当前使用权，无需启动 Runtime。并发请求共用串行刷新；读取期间收到的请求合并为随后的一次读取，调用返回的 Promise 等到该次结果发布后才完成。切回页面还会读取视窗内已展开的目录。 中心提供的 `/account/api/workbench/context` 根据治理数据校验本标签页的精确 Runtime、账号及入口范围，无需联系该 Runtime 所在电脑。节点所属项目的名称与路径仍保存在所属电脑；在明确向该节点读取之前，目录只展示管理标识。

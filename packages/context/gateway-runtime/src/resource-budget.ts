@@ -5,7 +5,8 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import ResourceBudget, { ResourceAdmissionError, type ResourceLease, type ResourceOperationId, type ResourceRequest } from '@deepseek-ai/dsh-resource-budget'
 import {
-  RESOURCE_MESSAGE_MAX_BYTES, RESOURCE_POLL_MAX_OPERATIONS, resourceErrorSchema, resourceRegistrationSchema,
+  RESOURCE_INGRESS_TIMING_HEADER, RESOURCE_MESSAGE_MAX_BYTES, RESOURCE_PHASE_TIMING_HEADER, RESOURCE_POLL_MAX_OPERATIONS,
+  resourceErrorSchema, resourceRegistrationSchema,
   resourceStatusSchema, type ResourceOrigin, type ResourcePolicy, type ResourceStatus, type ResourceWireRequest,
 } from '@deepseek-ai/dsh-resource-budget/wire'
 import { readGatewayResponseJson, type GatewayRuntime } from './index.ts'
@@ -24,6 +25,66 @@ interface Deferred<T> {
   reject(reason: unknown): void
 }
 
+interface ModelResourceTiming {
+  startedAt: number
+  started: number
+  originMs: number
+  registrationReady?: number
+  registrationWaitMs: number
+  submitMs: number
+  submitCalls: number
+  statusMs: number
+  statusCalls: number
+  queuedResponses: number
+  pollReady?: number | undefined
+  pollWaitMs: number
+  gatewaySamples: number
+  gatewayHandlerBearerMs: number
+  gatewayAuthorityMs: number
+  gatewayTransactionMs: number
+  gatewayIngressSamples: number
+  gatewayIngressBearerMs: number
+  gatewayWriteAdmissionMs: number
+}
+
+function readCoordinatorTiming(response: Response | undefined, name: string, count: 2): [number, number] | undefined
+function readCoordinatorTiming(response: Response | undefined, name: string, count: 3): [number, number, number] | undefined
+function readCoordinatorTiming(
+  response: Response | undefined, name: string, count: 2 | 3,
+): [number, number] | [number, number, number] | undefined {
+  const header = response?.headers.get(name)
+  if (header === undefined || header === null || header.length > 128) return
+  try {
+    const phases: unknown = JSON.parse(header)
+    const duration = (ms: unknown): ms is number => typeof ms === 'number' && Number.isFinite(ms) && ms >= 0 && ms <= Number.MAX_SAFE_INTEGER
+    if (!Array.isArray(phases) || phases.length !== count) return
+    const first: unknown = phases[0], second: unknown = phases[1], third: unknown = phases[2]
+    if (!duration(first) || !duration(second)) return
+    if (count === 2) return [first, second]
+    if (duration(third)) return [first, second, third]
+  } catch { /* Invalid optional timing data cannot influence admission. */ }
+}
+
+function reportTiming(timing: ModelResourceTiming, outcome: 'granted' | 'failed'): void {
+  const round = (ms: number): number => Math.round(ms * 100) / 100
+  const {
+    startedAt, started, originMs, registrationWaitMs, submitMs, submitCalls, statusMs, statusCalls,
+    queuedResponses, pollWaitMs, gatewaySamples, gatewayHandlerBearerMs, gatewayAuthorityMs, gatewayTransactionMs,
+    gatewayIngressSamples, gatewayIngressBearerMs, gatewayWriteAdmissionMs,
+  } = timing
+  try {
+    console.info(`[model-resource-timing] ${JSON.stringify({
+      startedAt, outcome, elapsedMs: round(performance.now() - started), originMs: round(originMs),
+      registrationWaitMs: round(registrationWaitMs), submitMs: round(submitMs), submitCalls,
+      statusMs: round(statusMs), statusCalls, queuedResponses, pollWaitMs: round(pollWaitMs),
+      ...(gatewaySamples === 0 ? {} : { gatewaySamples, gatewayHandlerBearerMs: round(gatewayHandlerBearerMs),
+        gatewayAuthorityMs: round(gatewayAuthorityMs), gatewayTransactionMs: round(gatewayTransactionMs) }),
+      ...(gatewayIngressSamples === 0 ? {} : { gatewayIngressSamples, gatewayIngressBearerMs: round(gatewayIngressBearerMs),
+        gatewayWriteAdmissionMs: round(gatewayWriteAdmissionMs) }),
+    })}`)
+  } catch { /* Diagnostic output cannot interrupt a resource lease. */ }
+}
+
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void, reject!: (reason: unknown) => void
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
@@ -40,12 +101,15 @@ interface Operation {
   readonly kind: ResourceRequest['kind']
   readonly detach: () => void
   readonly timer: ReturnType<typeof setTimeout>
+  readonly timing: ModelResourceTiming | undefined
   bytes: number
   request?: ResourceWireRequest
   attempted: boolean
   registered: boolean
   delivered: boolean
   completed: boolean
+  quiescent: boolean
+  retryingCompletion: boolean
   acknowledged?: 'uncertain' | 'quiescent' | 'not-started'
   completion: Promise<void>
 }
@@ -90,7 +154,11 @@ export class GatewayResourceBudget extends ResourceBudget {
     cleanupTimeoutMs: Schema.natural().min(1).max(2_147_483_647).default(30_000),
   })
 
-  private readonly owner: { readonly ctx: Context; readonly runtime: GatewayRuntime; readonly config: Config }
+  private readonly owner: {
+    readonly runtime: GatewayRuntime
+    readonly config: Config
+    readonly acquire: (caller: Context, request: ResourceRequest) => Promise<ResourceLease>
+  }
   private readonly lifetime = new AbortController()
   private readonly operations = new Map<ResourceOperationId, Operation>()
   private readonly work = new Set<Promise<void>>()
@@ -110,7 +178,10 @@ export class GatewayResourceBudget extends ResourceBudget {
     super(ctx)
     const resolved = GatewayResourceBudget.Config(config)
     if (resolved.cleanupTimeoutMs <= resolved.requestTimeoutMs) throw new Error('resource cleanup timeout must exceed its request timeout')
-    this.owner = { ctx, runtime: ctx.gatewayRuntime, config: resolved }
+    this.owner = {
+      runtime: ctx.gatewayRuntime, config: resolved,
+      acquire: (caller, request) => this.acquireForCaller(caller, request),
+    }
     ctx.effect(() => () => this.shutdown(), 'gateway-resource-budget: operation ownership')
   }
 
@@ -127,7 +198,12 @@ export class GatewayResourceBudget extends ResourceBudget {
     this.initialized = true
   }
 
-  async acquire(request: ResourceRequest): Promise<ResourceLease> {
+  acquire(request: ResourceRequest): Promise<ResourceLease> {
+    // Keep the caller for authority reads. Rescheduled polling belongs to the provider and must not retain nested caller shadows.
+    return this.owner.acquire(this.ctx, request)
+  }
+
+  private async acquireForCaller(caller: Context, request: ResourceRequest): Promise<ResourceLease> {
     const policy = this.policy
     if (!this.initialized || this.closed || policy === undefined) throw new ResourceAdmissionError('unavailable', 'Resource admission is unavailable.')
     if (request.signal?.aborted === true) throw cancellation(request.signal)
@@ -136,8 +212,15 @@ export class GatewayResourceBudget extends ResourceBudget {
       || this.bytes + initialBytes > policy.maxQueuedBytes) throw new ResourceAdmissionError('refused', 'The Runtime resource queue is full.')
     const controller = new AbortController()
     const result = deferred<ResourceLease>(), done = deferred<void>()
+    const timing = request.kind === 'model' && this.owner.runtime.modelTimings ? {
+      startedAt: Date.now(), started: performance.now(), originMs: 0, registrationWaitMs: 0,
+      submitMs: 0, submitCalls: 0, statusMs: 0, statusCalls: 0, queuedResponses: 0, pollWaitMs: 0,
+      gatewaySamples: 0, gatewayHandlerBearerMs: 0, gatewayAuthorityMs: 0, gatewayTransactionMs: 0,
+      gatewayIngressSamples: 0, gatewayIngressBearerMs: 0, gatewayWriteAdmissionMs: 0,
+    } satisfies ModelResourceTiming : undefined
     // The origin read starts in the caller's scope, before joining the serial registration queue.
-    const origin = this.captureOrigin(this.ctx, request).then((value) => {
+    const origin = this.captureOrigin(caller, request).then((value) => {
+      if (timing !== undefined) timing.originMs = performance.now() - timing.started
       if (entry.completed || entry.controller.signal.aborted) throw cancellation(entry.controller.signal)
       const size = Buffer.byteLength(JSON.stringify({ requestId: entry.id, sequence: this.nextSequence, kind: entry.kind, origin: value }))
       if (size > RESOURCE_MESSAGE_MAX_BYTES || this.bytes - entry.bytes + size > policy.maxQueuedBytes) {
@@ -155,7 +238,8 @@ export class GatewayResourceBudget extends ResourceBudget {
       signal: AbortSignal.any([this.lifetime.signal, controller.signal, ...request.signal === undefined ? [] : [request.signal]]),
       detach: () => { request.signal?.removeEventListener('abort', onAbort) },
       timer: setTimeout(() => { controller.abort(new ResourceAdmissionError('expired', 'Resource admission expired.')) }, policy.maxWaitMs),
-      bytes: initialBytes, attempted: false, registered: false, delivered: false, completed: false,
+      bytes: initialBytes, timing, attempted: false, registered: false, delivered: false, completed: false,
+      quiescent: false, retryingCompletion: false,
       completion: Promise.resolve(),
     }
     controller.signal.addEventListener('abort', () => {
@@ -167,13 +251,21 @@ export class GatewayResourceBudget extends ResourceBudget {
     this.operations.set(entry.id, entry)
     this.bytes += initialBytes
     this.track(this.prepareRegistration(entry))
-    return result.promise
+    if (timing === undefined) return result.promise
+    return result.promise.then((lease) => {
+      reportTiming(timing, 'granted')
+      return lease
+    }, (error: unknown) => {
+      reportTiming(timing, 'failed')
+      throw error
+    })
   }
 
   private async prepareRegistration(entry: Operation): Promise<void> {
     try {
       await abortable(entry.origin, entry.controller.signal)
       if (entry.completed) return
+      if (entry.timing !== undefined) entry.timing.registrationReady = performance.now()
       this.registrations.add(entry)
       if (!this.registering) this.track(this.drainRegistrations().catch((error: unknown) => { this.failClosed(error) }))
     } catch (error) {
@@ -224,6 +316,9 @@ export class GatewayResourceBudget extends ResourceBudget {
   }
 
   private async register(entry: Operation): Promise<void> {
+    const timing = entry.timing
+    if (timing?.registrationReady !== undefined) timing.registrationWaitMs = performance.now() - timing.registrationReady
+    const samples = timing === undefined ? undefined : [timing]
     try {
       const policy = this.policy
       if (policy === undefined) throw new ResourceAdmissionError('unavailable', 'Resource admission has not initialized.')
@@ -239,7 +334,7 @@ export class GatewayResourceBudget extends ResourceBudget {
         entry.request = request
         entry.attempted = true
         let status: ResourceStatus
-        try { status = resourceStatusSchema.parse(await this.post('request', request)) } catch (error) {
+        try { status = resourceStatusSchema.parse(await this.post('request', request, undefined, undefined, samples)) } catch (error) {
           if (error instanceof ResourceHttpError && (error.code === 'resource-request-conflict' || error.code === 'resource-sequence-gap')) {
             entry.attempted = false
             await this.resynchronize()
@@ -285,7 +380,8 @@ export class GatewayResourceBudget extends ResourceBudget {
     switch (status.state) {
       case 'active': {
         if (!qualified) {
-          const response = await this.post('statuses', { operations: [{ sequence: request.sequence, requestId: entry.id }] })
+          const samples = entry.timing === undefined ? undefined : [entry.timing]
+          const response = await this.post('statuses', { operations: [{ sequence: request.sequence, requestId: entry.id }] }, undefined, undefined, samples)
           if (!Array.isArray(response) || response.length !== 1) throw new Error('invalid resource grant check')
           await this.acceptStatus(entry, request, resourceStatusSchema.parse(response[0]), true)
           return
@@ -295,10 +391,16 @@ export class GatewayResourceBudget extends ResourceBudget {
         entry.delivered = true
         clearTimeout(entry.timer)
         entry.result.resolve({ signal: entry.signal,
-          release: () => this.complete(entry, 'quiescent'), uncertain: () => this.complete(entry, 'uncertain') })
+          release: () => this.release(entry), uncertain: () => this.complete(entry, 'uncertain') })
         return
       }
-      case 'queued': this.schedulePoll(); return
+      case 'queued':
+        if (entry.timing !== undefined) {
+          entry.timing.queuedResponses += 1
+          entry.timing.pollReady = performance.now()
+        }
+        this.schedulePoll()
+        return
       case 'closed':
         entry.result.reject(new ResourceAdmissionError('expired', 'Resource admission is no longer queued.'))
         this.forget(entry)
@@ -328,10 +430,19 @@ export class GatewayResourceBudget extends ResourceBudget {
       && entry.request !== undefined ? [{ entry, request: entry.request }] : [])
     for (let offset = 0; offset < waiting.length && !this.closed; offset += RESOURCE_POLL_MAX_OPERATIONS) {
       const batch = waiting.slice(offset, offset + RESOURCE_POLL_MAX_OPERATIONS)
+      const samples = batch.flatMap(({ entry }) => {
+        const timing = entry.timing
+        if (timing === undefined) return []
+        if (timing.pollReady !== undefined) {
+          timing.pollWaitMs += performance.now() - timing.pollReady
+          timing.pollReady = undefined
+        }
+        return [timing]
+      })
       try {
         const response = await this.post('statuses', {
           operations: batch.map(({ entry, request }) => ({ sequence: request.sequence, requestId: entry.id })),
-        })
+        }, undefined, undefined, samples)
         if (!Array.isArray(response) || response.length !== batch.length) throw new Error('invalid resource status batch')
         for (const [index, { entry, request }] of batch.entries()) {
           // Another operation's authorization can delay a batched grant.
@@ -343,6 +454,12 @@ export class GatewayResourceBudget extends ResourceBudget {
       } catch (error) {
         if (error instanceof ResourceHttpError && error.status < 500) this.failClosed(error)
         // Transport failure retains the original queue and its cancellation deadline.
+      } finally {
+        for (const { entry } of batch) {
+          if (!entry.completed && !entry.delivered && entry.timing?.queuedResponses && entry.timing.pollReady === undefined) {
+            entry.timing.pollReady = performance.now()
+          }
+        }
       }
     }
   }
@@ -353,21 +470,60 @@ export class GatewayResourceBudget extends ResourceBudget {
     try { await this.complete(entry, 'not-started') } catch (error) { this.failClosed(error) }
   }
 
-  private complete(entry: Operation, outcome: 'not-started' | 'quiescent' | 'uncertain', deadline?: number): Promise<void> {
+  private async release(entry: Operation): Promise<void> {
+    entry.quiescent = true
+    const model = entry.kind === 'model'
+    try {
+      await this.complete(entry, 'quiescent', { retry: !model })
+    } catch (error) {
+      if (!model || this.closed || (error instanceof ResourceHttpError && error.status < 500)) throw error
+      if (entry.retryingCompletion) return
+      entry.retryingCompletion = true
+      this.track(this.retryModelCompletion(entry))
+    }
+  }
+
+  private async retryModelCompletion(entry: Operation): Promise<void> {
+    const signal = this.lifetime.signal
+    this.ctx.logger.warn('Model resource completion is awaiting acknowledgement.')
+    try {
+      for (;;) {
+        await delay(this.owner.config.requestTimeoutMs, undefined, { signal, ref: false })
+        try {
+          await this.complete(entry, 'quiescent', { signal, retry: false })
+          return
+        } catch (error) {
+          if (error instanceof ResourceHttpError && error.status < 500) {
+            this.ctx.logger.warn('Model resource completion was denied by the coordinator.')
+            return
+          }
+        }
+      }
+    } catch (error) {
+      if (!signal.aborted) throw error
+    } finally {
+      entry.retryingCompletion = false
+    }
+  }
+
+  private complete(entry: Operation, outcome: 'not-started' | 'quiescent' | 'uncertain',
+    { deadline, signal, retry = true }: { deadline?: number; signal?: AbortSignal; retry?: boolean } = {}): Promise<void> {
     const completion = entry.completion.catch(() => { /* a later report retries the same exact operation */ }).then(async () => {
       if (entry.acknowledged === 'quiescent' || entry.acknowledged === 'not-started' || entry.acknowledged === outcome) return
       if (entry.request === undefined) { this.forget(entry); return }
       const until = Math.min(deadline ?? Number.POSITIVE_INFINITY, this.shutdownDeadline ?? Number.POSITIVE_INFINITY,
         Date.now() + this.owner.config.cleanupTimeoutMs)
       for (;;) {
+        signal?.throwIfAborted()
         try {
-          await this.post('finish', { sequence: entry.request.sequence, requestId: entry.id, outcome }, until)
+          await this.post('finish', { sequence: entry.request.sequence, requestId: entry.id, outcome }, until, signal)
           entry.acknowledged = outcome
           this.forget(entry)
           return
         } catch (error) {
-          if ((error instanceof ResourceHttpError && error.status < 500) || Date.now() >= until) throw error
-          await delay(Math.min(this.policy?.sampleMs ?? this.owner.config.requestTimeoutMs, Math.max(0, until - Date.now())))
+          if (!retry || (error instanceof ResourceHttpError && error.status < 500) || Date.now() >= until || signal?.aborted) throw error
+          const retryMs = Math.min(this.policy?.sampleMs ?? this.owner.config.requestTimeoutMs, Math.max(0, until - Date.now()))
+          await delay(retryMs, undefined, { signal })
         }
       }
     })
@@ -414,27 +570,55 @@ export class GatewayResourceBudget extends ResourceBudget {
     }
     const finished = Promise.all([...this.operations.values()].map(entry => entry.done.promise))
     await settleBefore(finished, until - this.owner.config.requestTimeoutMs)
-    await Promise.allSettled([...this.operations.values()].map(entry => this.complete(entry, entry.delivered ? 'uncertain' : 'not-started', until)))
+    await Promise.allSettled([...this.operations.values()].map(entry => this.complete(entry,
+      entry.quiescent ? 'quiescent' : entry.delivered ? 'uncertain' : 'not-started', { deadline: until })))
     await settleBefore(Promise.allSettled([...this.work]), until)
     this.shutdownDeadline = undefined
   }
 
-  private async post(action: string, value: unknown, deadline?: number, upstream?: AbortSignal): Promise<unknown> {
+  private async post(
+    action: string, value: unknown, deadline?: number, upstream?: AbortSignal, samples?: readonly ModelResourceTiming[],
+  ): Promise<unknown> {
     const timeout = Math.min(this.owner.config.requestTimeoutMs,
       deadline === undefined ? this.owner.config.requestTimeoutMs : deadline - Date.now())
     if (timeout <= 0) throw new ResourceAdmissionError('unavailable', 'Resource accounting deadline expired.')
     const signal = upstream === undefined ? AbortSignal.timeout(timeout) : AbortSignal.any([upstream, AbortSignal.timeout(timeout)])
     const body = JSON.stringify(value)
     if (Buffer.byteLength(body) > RESOURCE_MESSAGE_MAX_BYTES) throw new ResourceAdmissionError('refused', 'Resource metadata exceeds the protocol byte limit.')
-    const response = await this.owner.runtime.request(`/internal/runtime/resources/${action}`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body, signal,
-    })
-    const payload = await readGatewayResponseJson(response, RESOURCE_MESSAGE_MAX_BYTES, signal)
-    if (!response.ok) {
-      const error = resourceErrorSchema.safeParse(payload)
-      throw new ResourceHttpError(response.status, error.success ? error.data.error : 'resource-response')
+    const started = samples?.length ? performance.now() : undefined
+    let response: Response | undefined
+    try {
+      response = await this.owner.runtime.request(`/internal/runtime/resources/${action}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body, signal,
+      })
+      const payload = await readGatewayResponseJson(response, RESOURCE_MESSAGE_MAX_BYTES, signal)
+      if (!response.ok) {
+        const error = resourceErrorSchema.safeParse(payload)
+        throw new ResourceHttpError(response.status, error.success ? error.data.error : 'resource-response')
+      }
+      return payload
+    } finally {
+      if (started !== undefined && samples !== undefined) {
+        const elapsed = performance.now() - started
+        const phases = readCoordinatorTiming(response, RESOURCE_PHASE_TIMING_HEADER, 3)
+        const ingress = readCoordinatorTiming(response, RESOURCE_INGRESS_TIMING_HEADER, 2)
+        for (const timing of samples) {
+          if (action === 'request') { timing.submitCalls += 1; timing.submitMs += elapsed }
+          if (action === 'statuses') { timing.statusCalls += 1; timing.statusMs += elapsed }
+          if (phases !== undefined) {
+            timing.gatewaySamples += 1
+            timing.gatewayHandlerBearerMs += phases[0]
+            timing.gatewayAuthorityMs += phases[1]
+            timing.gatewayTransactionMs += phases[2]
+          }
+          if (ingress !== undefined) {
+            timing.gatewayIngressSamples += 1
+            timing.gatewayIngressBearerMs += ingress[0]
+            timing.gatewayWriteAdmissionMs += ingress[1]
+          }
+        }
+      }
     }
-    return payload
   }
 }
 

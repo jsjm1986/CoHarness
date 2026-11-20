@@ -7,6 +7,7 @@ import {
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { assertEntriesActive, bootClient, type EntryStateLabel } from '../src/boot-client.ts'
 import { FIBER_STATE } from '../src/loader-status.ts'
+import { mountClient } from '../src/mount.ts'
 
 const BOOTSTRAP_ID = '@deepseek-ai/dsh-client-modules'
 
@@ -20,7 +21,9 @@ function graphOf(ids: readonly string[]): WebBootGraph {
 }
 
 /** Module system seeded with inline plugin modules; `loaded` records every transport call. */
-function modulesOf(graph: WebBootGraph, staticModules: Record<string, unknown>): { modules: ClientModuleLoader; loaded: string[] } {
+function modulesOf(
+  graph: WebBootGraph, staticModules: Record<string, unknown>, load?: (url: string) => Promise<void>,
+): { modules: ClientModuleLoader; loaded: string[] } {
   const loaded: string[] = []
   const pendingQueue: ClientBundleRegistration[] = []
   const target: ClientModuleLoaderTarget = {
@@ -32,7 +35,10 @@ function modulesOf(graph: WebBootGraph, staticModules: Record<string, unknown>):
   const modules = target.create({
     boot: graph,
     staticModules,
-    loadBundle: async (url) => { loaded.push(url) },
+    loadBundle: async (url) => {
+      loaded.push(url)
+      await load?.(url)
+    },
   })
   return { modules, loaded }
 }
@@ -47,6 +53,66 @@ function stateSink(): { states: Map<string, EntryStateLabel[]>; onEntryState: (n
 }
 
 describe('bootClient', () => {
+  it('audits required entries and mounts the renderer before requesting optional bytes', async () => {
+    const graph = graphOf(['renderer', 'extra'])
+    graph.entries[1]!.optional = true
+    const started = Promise.withResolvers<undefined>()
+    const settled = Promise.withResolvers<undefined>()
+    const container = document.createElement('main')
+    const { modules, loaded } = modulesOf(graph, {
+      renderer: { apply: (ctx: Context) => {
+        ctx.reflect.provide('uiRenderer', {
+          mount: (el: HTMLElement) => {
+            el.append(document.createElement('input'))
+            return () => { el.replaceChildren() }
+          },
+        })
+      } },
+    }, async () => {
+      started.resolve(undefined)
+      await settled.promise
+      throw new Error('optional transport unavailable')
+    })
+    const ctx = new Context()
+    ctx.provide('modules', modules)
+    onTestFinished(async () => {
+      settled.resolve(undefined)
+      await ctx.fiber.dispose()
+    })
+    const sink = stateSink()
+
+    await bootClient({ ctx, modules, manifest: modules.manifest, onEntryState: sink.onEntryState })
+    await mountClient(ctx, container)
+    expect(loaded).toEqual([])
+    expect(sink.states.get('extra')).toBeUndefined()
+    expect(sink.states.get('renderer')?.at(-1)).toBe('active')
+    await started.promise
+    const input = container.querySelector('input')
+    expect(input).toBeInstanceOf(HTMLInputElement)
+    expect(input?.disabled).toBe(false)
+    settled.resolve(undefined)
+    await modules.entries.startOptional()
+    const failures = modules.entries.state.getSnapshot().failures
+    expect(failures.map(failure => failure.id)).toEqual(['extra'])
+    expect(failures[0]?.message).toContain('optional transport unavailable')
+    expect(container.querySelector('input')).toBe(input)
+  })
+
+  it('blocks when a required entry depends on an unavailable optional package', async () => {
+    const graph = graphOf(['renderer', 'adapter'])
+    graph.entries[0]!.inject = ['adapter']
+    graph.entries[1]!.optional = true
+    const { modules } = modulesOf(graph, {
+      renderer: { inject: ['adapter'], apply: () => {} },
+    }, async () => { throw new Error('adapter transport unavailable') })
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    const error = vi.spyOn(ctx.logger, 'error').mockImplementation(() => {})
+    onTestFinished(() => { error.mockRestore() })
+
+    await expect(bootClient({ ctx, modules, manifest: modules.manifest })).rejects.toThrow(/adapter: import failed/)
+  })
+
   it('activates every seeded row without touching the bundle transport', async () => {
     const graph = graphOf(['provider', 'consumer'])
     const { modules, loaded } = modulesOf(graph, {

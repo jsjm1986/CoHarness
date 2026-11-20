@@ -25,7 +25,9 @@ This optional browser plugin draws the band a [Claude Code mod](../claude-code-m
 <a id="use-this-package"></a>
 ## Use this package
 
-Compose it beside the bridge and the mods; the [opt-in overlay](../claude-code-mods/cordis.source.patch.yml) does so for a source launch of the Web profile. The band appears only while a mod's `ui.render` hook returns a tree: Token Weather's forecast after the first turn, Blast Radius's Proceed and Cancel while a risky command is held, Replay Theater's hint after a turn with edits. Colors follow Claude Code's terminal palette on this theme's tokens; a hotkey is shown as a hint beside the label, and a press is a click. While a press is in flight every button is disabled; a press the Host refuses shows its message under the band.
+Compose it beside the bridge and the mods; the [opt-in overlay](../claude-code-mods/cordis.source.patch.yml) does so for a source launch of the Web profile. The band appears only while a mod's `ui.render` hook returns a tree: Token Weather's forecast after the first turn, Blast Radius's Proceed and Cancel while a risky command is held, Replay Theater's hint after a turn with edits. Colors follow Claude Code's terminal palette on this theme's tokens; a hotkey is shown as a hint beside the label, and a press is a click. While a press is in flight every button is disabled; a press the Host refuses or whose callback fails shows its message under the band. The drawing reflects changes made before failure; the unsent prompt stays intact.
+
+Band actions retain at least 44-pixel touch targets on coarse-pointer devices and narrow screens.
 
 -----
 

@@ -10,7 +10,13 @@ import { parseArgs } from 'node:util'
 import ts from 'typescript'
 import { pnpmCommand } from './release/process.ts'
 
-type CompilationMode = 'checked' | 'benchmark-emit'
+type CompilationMode = 'checked' | 'benchmark-emit' | 'force-emit'
+
+const compilerFlags: Record<CompilationMode, readonly string[]> = {
+  checked: [],
+  'benchmark-emit': ['--noCheck'],
+  'force-emit': ['--force'],
+}
 
 /** Identifier of one package-library build step. */
 export type LibraryStepId = 'host-src' | 'host-bundle' | 'client-src' | 'client-bundle'
@@ -80,7 +86,7 @@ export function referencedProjectsCompilerArgs(
     ...hostHeapArgs(face),
     fileURLToPath(import.meta.resolve('typescript/bin/tsc')),
     '-b',
-    ...mode === 'benchmark-emit' ? ['--noCheck'] : [],
+    ...compilerFlags[mode],
     // Relative arguments keep the complete workspace graph below Windows' command-line limit.
     ...references.map(reference => relative(root, reference.path)),
   ]
@@ -138,7 +144,7 @@ function compilerStep(
   return {
     id: face === 'host' ? 'host-src' : 'client-src',
     label: `${face} compiler`,
-    displayCommand: `tsc -b${mode === 'benchmark-emit' ? ' --noCheck' : ''} <tsconfig.${face}.json references>`,
+    displayCommand: ['tsc', '-b', ...compilerFlags[mode], `<tsconfig.${face}.json references>`].join(' '),
     command: process.execPath,
     args: referencedProjectsCompilerArgs(root, face, mode),
     needs,

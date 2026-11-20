@@ -15,12 +15,14 @@ import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { SessionEvent, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { Agent } from './types.ts'
 import type { AgentOptions, SessionStartSource } from './runtime-types.ts'
+import { assertAgentExecutionAllowed } from './execution-admission.ts'
 
 export * from './runtime-types.ts'
 export * from './types.ts'
 export type * from './projection.ts'
 export * from './consumed-work.ts'
 export * from './model-selection.ts'
+export * from './execution-admission.ts'
 export { agentCarrier, agentEvents, assembleContextFor, emitAgentEvent } from './dispatch.ts'
 export type { AgentEventDispatch, AgentSubjectEvent } from './dispatch.ts'
 
@@ -388,11 +390,12 @@ export class AgentRegistry extends Service {
 
   /**
    * Hold Session identities while an owner releases resources and removes durable data.
-   * Existing factory work and overlapping removals refuse the reservation.
+   * Planned shutdown, existing factory work, and overlapping removals refuse the reservation.
    * @param ids - exact identities whose creation and resource admission must remain closed.
    * @returns a caller-owned reservation, released after the whole removal operation settles.
    */
   reserveRemoval(ids: readonly SessionId[]): Disposable {
+    this.ctx.root.get('agentShutdownSignal')?.throwIfAborted()
     const selected = new Set(ids)
     for (const id of selected) {
       if (this.removing.has(id) || this.creations.has(id)) throw new Error(`Session "${id}" has a pending lifecycle operation`)
@@ -422,6 +425,7 @@ export class AgentRegistry extends Service {
   reserveUse(ids: readonly SessionId[]): Disposable { return this.creationClaim(ids) }
 
   private creationClaim(ids: readonly (SessionId | undefined)[]): Disposable {
+    assertAgentExecutionAllowed(this.ctx, ids)
     const selected = new Set(ids.filter((id): id is SessionId => id !== undefined))
     for (const id of selected) if (this.removing.has(id)) throw new Error(`Session "${id}" is being removed`)
     const creations = this.creations
@@ -518,6 +522,7 @@ export class AgentRegistry extends Service {
    *   creation dispatch settles.
    */
   enter(agent: Agent, owner: Agent | undefined): () => void {
+    assertAgentExecutionAllowed(this.ctx, [agent.id, owner?.id, agent.session.header.parentSession])
     const id = agent.id
     if (this.removing.has(id)) throw new Error(`Session "${id}" is being removed`)
     if (id !== agent.session.id) {

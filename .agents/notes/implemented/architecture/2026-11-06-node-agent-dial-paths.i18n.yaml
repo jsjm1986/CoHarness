@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-06-node-agent-dial-paths.md
 document:
-  en: 1a698a8b0f2955d991c3bdee8c051b4d7df3f7eb
-  zh: 332d4b7992b123aa9db5de3d4b4a9c8e489ba9f3
+  en: 156aa4e499790030f85cf0354881dfc5bdba3c8a
+  zh: 16ba269451b9a70ddd85c314f5d4b133cf06f859
 /agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity:
   en: 39069f2103fec5b7
   zh: b47f869ae505b507
@@ -12,8 +12,8 @@ document:
   en: 1fb24df9180024de
   zh: 0603af5e18a74be7
 /agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity/decision:
-  en: 0026f5347b2ef775
-  zh: 96e30be3ed9a5bc9
+  en: ac40e2a877b59c90
+  zh: 0bba57c640550a3f
 /agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity/alternatives-considered:
   en: b994435923cdda9a
   zh: f5094a41493f31a3
@@ -21,5 +21,5 @@ document:
   en: 1d354cef8f1d9775
   zh: 4483b6200ebb7288
 /agent-note-the-node-agent-dials-the-center-through-configurable-origins-while-the-center-url-stays-the-identity/testing:
-  en: 72b7bf4f0fc4b5f0
-  zh: 1e88e0770c9dd05d
+  en: 275893f3d30fff24
+  zh: 04b07c5344d6070c

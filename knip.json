@@ -45,6 +45,7 @@
         "scripts/types/client-build-environment/index.d.ts",
         "scripts/bundle-input-isolation.ts",
         "scripts/coverage-canonical-locations.ts",
+        "scripts/existing-deployment-latency/directory.browser.ts",
         "scripts/web-product-bundle-isolation.ts",
         "scripts/workspace-runtime/verify-installed.ts",
         "scripts/compile-referenced-projects.ts"
@@ -66,6 +67,7 @@
     "examples": {
       "entry": [
         "headless-agent/tests/fixtures/cli-mock-llm.ts",
+        "headless-agent/tests/fixtures/cold-preset-model.ts",
         "headless-agent/tests/fixtures/memory-mock-llm.ts",
         "headless-agent/tests/fixtures/semantic-checkpoint-agent.ts",
         "headless-agent/tests/fixtures/subagent-diagnostic-agent.ts",
@@ -984,6 +986,7 @@
         "tests/**/*.e2e.ts",
         "tests/**/*.perf.ts",
         "tests/**/*.snapshot.ts",
+        "tests/peer-backup-browser.ts",
         "tests/support.ts",
         "src/node-module-stub.ts"
       ],

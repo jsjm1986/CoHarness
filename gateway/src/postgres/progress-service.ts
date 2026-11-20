@@ -53,6 +53,8 @@ export interface ProgressEntry {
   readonly id: string
   readonly kind: 'current' | 'period'
   readonly periodKey?: string
+  /** The stored coverage includes dates outside the named ISO week. */
+  readonly spansWeeks?: true
   readonly content: ProgressContent
   readonly activityCount: number
   /** Coverage window of the material rows this entry digested. */
@@ -112,7 +114,7 @@ export interface ProgressConfig {
   readonly maxMaterialRows: number
   /** Agent-kind rows admitted into the same prompt. */
   readonly maxAssistantRows: number
-  /** Items kept per digest section after validation. */
+  /** Newly generated items accepted per section in one week update. */
   readonly maxItemsPerSection: number
   /** Model output bound per pass. */
   readonly maxOutputTokens: number
@@ -185,6 +187,15 @@ interface JournalRow {
   readonly period_end: Date | null
   readonly model: string | null
   readonly generated_at: Date
+}
+
+interface JournalPeriodUpdate {
+  readonly key: string
+  readonly content: ProgressContent
+  readonly memberCount: number
+  readonly start: string
+  readonly end: string
+  readonly model: string
 }
 
 /**
@@ -304,9 +315,10 @@ export function periodKeyOf(date: Date): string {
  * @param raw raw model response text
  * @param material material rows the prompt numbered 1..N
  * @param maxItems per-section item cap
+ * @param active prior doing and blocked items numbered after the new rows, or none if the week has no prior context
  * @returns stored journal payload
  */
-export function resolveDigestOutput(raw: string, material: readonly MaterialRow[], maxItems: number): ProgressContent {
+export function resolveDigestOutput(raw: string, material: readonly MaterialRow[], maxItems: number, active: readonly ProgressItem[] = []): ProgressContent {
   const start = raw.indexOf('{')
   const end = raw.lastIndexOf('}')
   if (start < 0 || end <= start) throw new Error('digest output carried no JSON object')
@@ -315,44 +327,52 @@ export function resolveDigestOutput(raw: string, material: readonly MaterialRow[
     throw new Error('digest output is not a JSON object')
   }
   const body = parsed as Record<string, unknown>
-  const resolveRefs = (refs: unknown): MaterialRow | undefined => {
-    if (!Array.isArray(refs)) return undefined
-    for (const ref of refs) {
-      if (Number.isSafeInteger(ref) && material[ref - 1] !== undefined) return material[ref - 1]
-    }
-    return undefined
-  }
-  const item = (value: unknown, refRequired: boolean): ProgressItem | undefined => {
+  const item = (value: unknown, key: keyof ProgressContent['sections']): ProgressItem | undefined => {
     if (typeof value !== 'object' || value === null) return undefined
     const row = value as Record<string, unknown>
     if (typeof row.text !== 'string' || row.text.trim() === '') return undefined
-    const source = resolveRefs(row.refs)
-    if (source === undefined && refRequired) return undefined
-    return {
-      text: row.text.trim(),
-      ...(source === undefined ? {} : {
+    const text = row.text.trim()
+    if (Array.isArray(row.refs)) for (const ref of row.refs) {
+      if (!Number.isSafeInteger(ref) || ref < 1) continue
+      const source = material[ref - 1]
+      if (source !== undefined) return {
+        text,
         ...(source.actor === null ? {} : { actor: source.actor }),
         sessionId: source.sessionId,
         ...(source.runtimeId === null ? {} : { runtimeId: source.runtimeId }),
         ...(source.sessionTitle === null ? {} : { sessionTitle: source.sessionTitle }),
-        seq: source.seq,
-      }),
+        ...(source.seq < 0 ? {} : { seq: source.seq }),
+      }
+      const prior = active[ref - 1 - material.length]
+      if (prior !== undefined && (key === 'blocked' || (key === 'doing' && prior.sessionId !== undefined))) return { ...prior, text }
     }
+    return key === 'blocked' ? { text } : undefined
   }
-  const section = (key: string, refRequired = true): readonly ProgressItem[] => {
+  const section = (key: keyof ProgressContent['sections']): readonly ProgressItem[] => {
     const value = body[key] ?? (body.sections as Record<string, unknown> | undefined)?.[key]
     if (!Array.isArray(value)) return []
     return value.flatMap((entry) => {
-      const resolved = item(entry, refRequired)
+      const resolved = item(entry, key)
       return resolved === undefined ? [] : [resolved]
     }).slice(0, maxItems)
   }
   const summary = typeof body.summary === 'string' && body.summary.trim() !== '' ? body.summary.trim() : undefined
-  const sections = { decided: section('decided'), done: section('done'), doing: section('doing'), blocked: section('blocked', false) }
+  const sections = { decided: section('decided'), done: section('done'), doing: section('doing'), blocked: section('blocked') }
   if (summary === undefined && Object.values(sections).every(list => list.length === 0)) {
     throw new Error('digest output carried no usable summary or items')
   }
   return { ...(summary === undefined ? {} : { summary }), sections }
+}
+
+/** Preserve published historical items and append distinct newly cited facts. */
+function appendJournalHistory(previous: readonly ProgressItem[] | undefined, fresh: readonly ProgressItem[]): readonly ProgressItem[] {
+  const identity = (item: ProgressItem) => JSON.stringify([item.runtimeId, item.sessionId, item.seq, item.text])
+  const items = new Map(previous?.map(item => [identity(item), item]))
+  for (const item of fresh) {
+    const key = identity(item)
+    if (!items.has(key)) items.set(key, item)
+  }
+  return [...items.values()]
 }
 
 const DIGEST_INSTRUCTION = `You write the shared progress journal for the project "{project}". Project members read it to catch up without opening the chat history. This is not a conversation; address no one.
@@ -365,7 +385,7 @@ const DIGEST_INSTRUCTION = `You write the shared progress journal for the projec
 {openPeriod}
 </open_period>
 
-<new_activity since="{since}">
+<new_activity>
 {material}
 </new_activity>
 
@@ -379,10 +399,11 @@ Produce strict JSON only — no prose, no code fences:
 }
 
 Rules:
-- refs cite row indices from <new_activity>; every item needs at least one ref except blocked.
-- Merge <open_period> with the new activity into one complete period narrative — the output REPLACES it.
+- Write weekly items only for the ISO week named by <open_period>.
+- Report new decisions and completions with refs from <new_activity>. Already recorded decisions and completions are kept separately. Cite a new decision even when it reverses an earlier one.
+- Report the week's still-active work and blockers. These may also cite the numbered active items from <open_period>. Every item needs a ref except blocked.
 - "decided" = member-chosen answers and explicit member decisions; "done" = finished agent work or confirmed completions; "doing" = work in motion; "blocked" = unresolved blockers or questions awaiting answers.
-- Rewrite the rolling summary to describe the project as it stands now, not only the new slice.
+- Update the rolling summary for the whole project. Observe the dates of newly delivered activity so older information does not supersede newer progress.
 - Write in the language of the material. Do not invent facts, names, or outcomes.
 - At most {maxItems} items per section, most significant first.`
 
@@ -762,9 +783,8 @@ export class PostgresProgressService {
   }
 
   /**
-   * Run one pass under an acquired lease: material → model → one transaction
-   * covering entries, source receipts and progress position. Failures record
-   * `last_error` and leave source receipts uncommitted for a later pass.
+   * Digest each UTC ISO week under one lease. Publish all weeks, the rolling
+   * summary, and their source receipts together after every model call succeeds.
    */
   private runPass(publicId: number, internal: JournalProject, lease: string, actorId = 0): Promise<void> {
     const operation = () => this.runPassOwned(publicId, internal, lease, actorId)
@@ -778,7 +798,6 @@ export class PostgresProgressService {
       await this.deps.accessMonitor?.synchronize()
       signal.throwIfAborted()
       this.passes.add(pass)
-      const state = await this.stateRow(internal)
       const fetched = await this.material(internal)
       // A capped stream's tail may be missing rows; digest only the complete
       // prefix so no source receipt acknowledges undigested material.
@@ -806,39 +825,58 @@ export class PostgresProgressService {
           ? 'no resolvable model route'
           : `configured digest model ${pin} is not an allowed served route`)
       }
-      const periodKey = periodKeyOf(material[material.length - 1]!.occurredAt)
-      const [openPeriod, current, projectName] = await Promise.all([
-        this.periodEntry(internal, periodKey), this.currentEntry(internal), this.projectName(internal),
+      const [current, projectName] = await Promise.all([
+        this.currentEntry(internal), this.projectName(internal),
       ])
-      const values: Record<string, string> = {
-        project: projectName ?? String(publicId), previousCurrent: current?.content.summary ?? '(none)', periodKey,
-        openPeriod: openPeriod === undefined ? '(none)' : JSON.stringify(openPeriod.content),
-        since: state?.watermark_ts?.toISOString() ?? 'the beginning',
-        material: material.map((row, index) => materialLine(index + 1, row)).join('\n'),
-        maxItems: String(this.config.maxItemsPerSection),
+      const weeklyRows = new Map<string, MaterialRow[]>()
+      for (const row of material) {
+        const key = periodKeyOf(row.occurredAt)
+        const week = weeklyRows.get(key)
+        if (week === undefined) weeklyRows.set(key, [row])
+        else week.push(row)
       }
-      const prompt = DIGEST_INSTRUCTION.replace(/\{(project|previousCurrent|periodKey|openPeriod|since|material|maxItems)\}/g,
-        (_match, key: string) => values[key]!)
-      let raw: string | undefined
-      let model = ''
-      let failure: unknown = new Error('no resolvable model route')
-      for (const endpoint of endpoints) {
-        try {
-          signal.throwIfAborted()
-          raw = await this.callModel(publicId, internal, lease, material, actorId, endpoint, prompt, signal)
-          model = `${endpoint.provider}/${endpoint.model}`
-          break
-        } catch (error) {
-          failure = error instanceof Error ? new Error(`${endpoint.provider}: ${error.message}`) : error
-          if (signal.aborted || error instanceof ProgressUsageDeliveryError) break
+      const periods: JournalPeriodUpdate[] = []
+      let rolling = current?.content
+      const maxItems = this.config.maxItemsPerSection
+      for (const [key, rows] of weeklyRows) {
+        const previous = (await this.periodEntry(internal, key))?.content.sections
+        const doing = previous?.doing ?? []
+        const blocked = previous?.blocked ?? []
+        const cite = (item: ProgressItem, index: number) => ({ ref: rows.length + index + 1, text: item.text })
+        const active = [...doing, ...blocked]
+        const values: Record<string, string> = {
+          project: projectName ?? String(publicId),
+          previousCurrent: rolling?.summary ?? '(none)',
+          periodKey: key,
+          openPeriod: JSON.stringify({
+            decided: previous?.decided.slice(-maxItems) ?? [],
+            done: previous?.done.slice(-maxItems) ?? [],
+            doing: doing.map(cite),
+            blocked: blocked.map((item, index) => cite(item, doing.length + index)),
+          }),
+          material: rows.map((row, index) => materialLine(index + 1, row)).join('\n'),
+          maxItems: String(maxItems),
         }
+        const prompt = DIGEST_INSTRUCTION.replace(/\{(project|previousCurrent|periodKey|openPeriod|material|maxItems)\}/g,
+          (_match, name: string) => values[name]!)
+        const { raw, model } = await this.runDigestModel(endpoints, signal,
+          endpoint => this.callModel(publicId, internal, lease, rows, actorId, endpoint, prompt, signal))
+        const content = resolveDigestOutput(raw, rows, maxItems, active)
+        const summary = content.summary ?? rolling?.summary
+        rolling = { ...content, ...(summary === undefined ? {} : { summary }) }
+        periods.push({ key, model, memberCount: rows.filter(row => row.kind !== 'agent').length,
+          start: rows[0]!.timestamp, end: rows.at(-1)!.timestamp,
+          content: { ...content, sections: {
+            ...content.sections,
+            decided: appendJournalHistory(previous?.decided, content.sections.decided),
+            done: appendJournalHistory(previous?.done, content.sections.done),
+          } },
+        })
       }
-      if (raw === undefined) throw failure
       await this.deps.accessMonitor?.synchronize()
       signal.throwIfAborted()
-      const content = resolveDigestOutput(raw, material, this.config.maxItemsPerSection)
-      const last = material[material.length - 1]!
-      const memberRows = material.filter(row => row.kind !== 'agent').length
+      const last = material.at(-1)!
+      const memberRows = periods.reduce((total, period) => total + period.memberCount, 0)
       await this.contentTransaction(internal, async (client) => {
         await this.deps.assertDataEpoch?.()
         signal.throwIfAborted()
@@ -850,16 +888,21 @@ export class PostgresProgressService {
           ON CONFLICT (organization_id,project_id) WHERE kind='current'
           DO UPDATE SET content=excluded.content,activity_count=excluded.activity_count,
             model=excluded.model,generated_at=excluded.generated_at,invalidated_at=NULL,updated_at=now()`,
-        [this.context.organizationId, internal.id, JSON.stringify(content), memberRows, model])
-        await client.query(`INSERT INTO ${internal.schema}.project_journal(
-            organization_id,project_id,kind,period_key,content,activity_count,
-            period_start,period_end,model,generated_at,created_at,updated_at)
-          VALUES($1,$2,'period',$3,$4::json,$5,$6,$7,$8,now(),now(),now())
-          ON CONFLICT (organization_id,project_id,period_key) WHERE kind='period'
-          DO UPDATE SET content=excluded.content,activity_count=excluded.activity_count,
-            period_end=excluded.period_end,model=excluded.model,generated_at=excluded.generated_at,invalidated_at=NULL,updated_at=now()`,
-        [this.context.organizationId, internal.id, periodKey, JSON.stringify(content), memberRows,
-          material[0]!.timestamp, last.timestamp, model])
+        [this.context.organizationId, internal.id, JSON.stringify(rolling), memberRows, periods.at(-1)!.model])
+        for (const period of periods) {
+          await client.query(`INSERT INTO ${internal.schema}.project_journal(
+              organization_id,project_id,kind,period_key,content,activity_count,
+              period_start,period_end,model,generated_at,created_at,updated_at)
+            VALUES($1,$2,'period',$3,$4::json,$5,$6,$7,$8,now(),now(),now())
+            ON CONFLICT (organization_id,project_id,period_key) WHERE kind='period'
+            DO UPDATE SET content=excluded.content,
+              activity_count=excluded.activity_count + CASE WHEN project_journal.invalidated_at IS NULL THEN project_journal.activity_count ELSE 0 END,
+              period_start=CASE WHEN project_journal.invalidated_at IS NULL THEN LEAST(project_journal.period_start,excluded.period_start) ELSE excluded.period_start END,
+              period_end=CASE WHEN project_journal.invalidated_at IS NULL THEN GREATEST(project_journal.period_end,excluded.period_end) ELSE excluded.period_end END,
+              model=excluded.model,generated_at=excluded.generated_at,invalidated_at=NULL,updated_at=now()`,
+          [this.context.organizationId, internal.id, period.key, JSON.stringify(period.content), period.memberCount,
+            period.start, period.end, period.model])
+        }
         await this.recordReceipts(client, internal, receipts)
         await client.query(`UPDATE ${internal.schema}.project_journal_state
           SET (watermark_ts,watermark_runtime_namespace,watermark_session,watermark_seq)=(
@@ -875,6 +918,21 @@ export class PostgresProgressService {
       await this.deps.assertDataEpoch?.()
       await this.fail(internal, lease, error instanceof Error ? error.message : String(error))
     } finally { this.passes.delete(pass) }
+  }
+
+  private async runDigestModel(endpoints: readonly DigestEndpoint[], signal: AbortSignal,
+    invoke: (endpoint: DigestEndpoint) => Promise<string>): Promise<{ raw: string; model: string }> {
+    let failure: unknown = new Error('no resolvable model route')
+    for (const endpoint of endpoints) {
+      signal.throwIfAborted()
+      try {
+        return { raw: await invoke(endpoint), model: `${endpoint.provider}/${endpoint.model}` }
+      } catch (error) {
+        failure = error instanceof Error ? new Error(`${endpoint.provider}: ${error.message}`, { cause: error }) : error
+        if (signal.aborted || error instanceof ProgressUsageDeliveryError) break
+      }
+    }
+    throw failure
   }
 
   /**
@@ -1081,6 +1139,8 @@ export class PostgresProgressService {
       id: row.id,
       kind: row.kind,
       ...(row.period_key === null ? {} : { periodKey: row.period_key }),
+      ...(row.period_key !== null && [row.period_start, row.period_end].some(date => date !== null && periodKeyOf(date) !== row.period_key)
+        ? { spansWeeks: true as const } : {}),
       content: row.content,
       activityCount: row.activity_count,
       ...(row.period_start === null ? {} : { periodStart: row.period_start.toISOString() }),

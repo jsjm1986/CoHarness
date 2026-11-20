@@ -29,14 +29,10 @@ import {
   type InstallInputError, type InstallState, type InstallSubject, type PackageRow, type PackageView,
   type PluginManagerFace, type RegistryChoice,
 } from './manager-store.ts'
-import { managementText, noticeText, packageText, registryText, restartText, rowText, type Translate } from './presentation.ts'
+import { listedPackages, managementText, noticeText, packageText, registryText, restartText, rowText, type Translate } from './presentation.ts'
 import type { PluginPackageRef, PluginRowRef, PluginsSubject } from './slot-contract.ts'
 import type { ConfigPageForm } from './slot-contract.ts'
 import css from './PluginManagerPage.module.css'
-import badgeSkillPreview from './assets/badge-skill-preview.svg'
-import badgeSkillPreviewZh from './assets/badge-skill-preview.zh.svg'
-import voiceInputPreview from './assets/voice-input-preview.svg'
-import voiceInputPreviewZh from './assets/voice-input-preview.zh.svg'
 
 /** Full component props assembled by the main slot renderer. */
 export type PluginManagerPageProps =
@@ -99,16 +95,6 @@ function AddPluginMenu({ t, title, disabled, openInstall, renderSlot }: {
 /** How long the list marks a package an install just enabled. */
 const HIGHLIGHT_MS = 2_400
 
-/** Built-in profile bundles stay out of this page even when the profile declares them as dependencies. */
-const BUILTIN_PROFILE_BUNDLES = new Set([
-  '@deepseek-ai/dsh-base',
-  '@deepseek-ai/dsh-web-app',
-  '@deepseek-ai/dsh-headless',
-  '@deepseek-ai/dsh-sdk-app',
-  '@deepseek-ai/dsh-acp-app',
-  '@deepseek-ai/dsh-sdk-minimal',
-])
-
 /** The optional bundles the main list always holds, in this order; new bundles join the main list. */
 const EXTENSION_BUNDLES = [
   '@deepseek-ai/dsh-experimental-agent-team-profile',
@@ -162,10 +148,18 @@ function orderOptionalBundles(packages: readonly PackageView[]): PackageView[] {
   return [...packages].sort((a, b) => optionalBundleRank(a.name) - optionalBundleRank(b.name))
 }
 
-/** Feature previews of official bundles, shown on their detail pages and selected by UI language. */
-const BUNDLE_PREVIEWS = new Map<string, Readonly<Record<'en' | 'zh', string>>>([
-  ['@deepseek-ai/dsh-experimental-badge-skill-bundle', { en: badgeSkillPreview, zh: badgeSkillPreviewZh }],
-  ['@deepseek-ai/dsh-experimental-voice-input-bundle', { en: voiceInputPreview, zh: voiceInputPreviewZh }],
+type PreviewLoader = () => Promise<{ default: string }>
+
+/** Feature previews fetched for the open bundle and its UI language. */
+const BUNDLE_PREVIEWS = new Map<string, Readonly<Record<'en' | 'zh', PreviewLoader>>>([
+  ['@deepseek-ai/dsh-experimental-badge-skill-bundle', {
+    en: () => import('./assets/badge-skill-preview.svg'),
+    zh: () => import('./assets/badge-skill-preview.zh.svg'),
+  }],
+  ['@deepseek-ai/dsh-experimental-voice-input-bundle', {
+    en: () => import('./assets/voice-input-preview.svg'),
+    zh: () => import('./assets/voice-input-preview.zh.svg'),
+  }],
 ])
 
 /** How long a toast holds: long enough to read a failure that names what broke. */
@@ -257,10 +251,23 @@ function PackageArtwork({ src, row = false, size = row ? ROW_ARTWORK_SIZE : CARD
     : <img className={css.packageImage} src={src} width={size} height={size} alt="" onError={() => { setFailedSource(src) }} />
 }
 
-/** A bundle's feature preview; a failed decode is reported in place without blocking management. */
-function PackagePreview({ src, title, t }: { readonly src: string; readonly title: string; readonly t: Translate }): ReactNode {
+/** A bundle's feature preview reports fetch or decode failure without blocking management. */
+function PackagePreview({ load, title, t }: { readonly load: PreviewLoader; readonly title: string; readonly t: Translate }): ReactNode {
+  const [result, setResult] = useState<{ load: PreviewLoader; src?: string }>()
   const [failedSource, setFailedSource] = useState<string>()
-  return src === failedSource
+  useEffect(() => {
+    let current = true
+    void load().then(({ default: src }) => {
+      if (current) setResult({ load, src })
+    }, () => {
+      if (current) setResult({ load })
+    })
+    return () => { current = false }
+  }, [load])
+
+  if (result?.load !== load) return <div className={css.packagePreview} aria-hidden="true" />
+  const { src } = result
+  return src === undefined || src === failedSource
     ? <p className={css.reason} role="status">{t('previewUnavailable')}</p>
     : <img className={css.packagePreview} src={src} alt={t('previewAlt', { name: title })} onError={() => { setFailedSource(src) }} />
 }
@@ -514,14 +521,17 @@ function CardHead({ title, t, onOpen, icon, tags, description, end }: {
   const descriptionId = useId()
   return (
     <div className={css.cardHead}>
-      <span className={css.cardIcon} aria-hidden="true">{icon}</span>
-      <div className={css.cardMain}>
-        <div className={css.titleRow}>
-          <button type="button" className={`${css.cardTitle} ${css.cardOpen}`} aria-label={t('openDetail', { name: title })} aria-describedby={description === undefined ? undefined : descriptionId} onClick={onOpen}>{title}</button>
-          {tags}
-        </div>
-        {description === undefined ? null : <span className={css.cardDesc} id={descriptionId}>{description}</span>}
-      </div>
+      <button type="button" className={css.cardOpen} aria-label={t('openDetail', { name: title })}
+        aria-describedby={description === undefined ? undefined : descriptionId} onClick={onOpen}>
+        <span className={css.cardIcon} aria-hidden="true">{icon}</span>
+        <span className={css.cardMain}>
+          <span className={css.titleRow}>
+            <span className={css.cardTitle}>{title}</span>
+            {tags}
+          </span>
+          {description === undefined ? null : <span className={css.cardDesc} id={descriptionId}>{description}</span>}
+        </span>
+      </button>
       {end === undefined ? null : <div className={css.cardEnd}>{end}</div>}
     </div>
   )
@@ -832,8 +842,7 @@ function PackageDetail({
 }): ReactNode {
   const { title, description, beta } = packageText(pkg, resolveText)
   const status = packageStatus(pkg)
-  const previews = BUNDLE_PREVIEWS.get(pkg.name)
-  const preview = previews === undefined ? undefined : resolveText(previews)
+  const preview = BUNDLE_PREVIEWS.get(pkg.name)?.[resolveText({ en: 'en', zh: 'zh' }) === 'zh' ? 'zh' : 'en']
   const subject: PluginsSubject = { kind: 'bundle', pkg: packageRef(pkg) }
   return (
     <div className={css.detail} data-plugin-detail={pkg.name}>
@@ -886,7 +895,7 @@ function PackageDetail({
       <MetadataError error={pkg.meta?.error} t={t} />
       {pkg.error === undefined ? null : <p className={css.reason} role="status">{t('reasonLabel')}: {managementText(pkg.error, t)}</p>}
       {pkg.readOnlyReason === undefined ? null : <p className={css.reason} role="status">{managementText({ code: pkg.readOnlyReason }, t)}</p>}
-      {preview === undefined ? null : <PackagePreview src={preview} title={title} t={t} />}
+      {preview === undefined ? null : <PackagePreview load={preview} title={title} t={t} />}
       <div className={css.detailSections}>
         {configured
           ? (
@@ -1131,9 +1140,9 @@ function InstallDialog({
   const registryToggleRef = useRef<HTMLButtonElement | null>(null)
   const registryPanelRef = useRef<HTMLFieldSetElement | null>(null)
   const registryCustomRef = useRef<HTMLInputElement | null>(null)
-  const registryShown = install.registryOpen && phase === 'idle'
+  const registryShown = install.open && install.registryOpen && phase === 'idle'
   const specComposition = useInstallComposition(install.open && phase === 'idle')
-  const registryComposition = useInstallComposition(install.open && registryShown)
+  const registryComposition = useInstallComposition(registryShown)
   const registryPosition = useAnchoredPosition({
     open: registryShown, anchorRef: registryToggleRef, panelRef: registryPanelRef, align: 'end', gap: 6, margin: 12,
   })
@@ -1413,7 +1422,7 @@ function InstallDialog({
                   <span className={css.registryHint}>{t('registryCustomHint')}</span>
                 </div>
               </fieldset>,
-              document.body,
+              registryToggleRef.current?.closest('[role="dialog"], dialog[open]') ?? document.body,
             )
             : null}
         </div>
@@ -1612,7 +1621,7 @@ function ConfirmDialog({ name, t, onConfirm, onCancel }: {
 
 /** Render the plugin manager: the official plugins and installed bundles, their pages, the install dialog, and the confirmation. */
 export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
-  const { t, ensure, renderSlot, resolveText } = props
+  const { t, renderSlot, resolveText } = props
   const configurations = props.useConfigurations(snapshot => snapshot.view?.namespaces)
   const formFor = (id: string): ConfigPageForm | undefined => {
     if (!configurations?.some(view => view.ns === id)) return undefined
@@ -1642,7 +1651,6 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   useEffect(() => { if (state.highlight !== null) setTab(INSTALLED_TAB) }, [state.highlight, setTab])
   const tabsId = useId()
   const [activation, setActivation] = useState<string | null>(null)
-  useEffect(() => { ensure() }, [ensure])
   // Installation highlights visible cards without changing the user's current page.
   const { highlight, clearHighlight } = { highlight: state.highlight, clearHighlight: props.clearHighlight }
   useEffect(() => {
@@ -1657,8 +1665,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   // The page manages what the person installed, what the installation ships for them to switch on, and a
   // selected name the Host cannot read; the installation's other bundles are inspected in the Settings
   // Plugins section's Plugin list tab.
-  const listed = state.packages.filter(pkg => !BUILTIN_PROFILE_BUNDLES.has(pkg.name)
-    && (pkg.installed || pkg.official || pkg.error !== undefined))
+  const listed = listedPackages(state.packages)
   const mine = listed.filter(pkg => !pkg.official)
   const official = listed.filter(pkg => pkg.official)
   // Both lists read one order over every offered bundle: the main list holds the always-held ones plus the held-back

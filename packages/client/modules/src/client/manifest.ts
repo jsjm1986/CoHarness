@@ -62,6 +62,8 @@ export interface WebBootEntry {
   inject?: string[]
   /** Stage-one prefetch mark: load the script for factory registration during module-face boot. */
   immediately?: boolean
+  /** May activate after required application startup. Missing means required. */
+  optional?: boolean
   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
   external?: string[]
 }
@@ -71,7 +73,7 @@ export type WebBootBatchPhase = 'bootstrap' | 'application'
 
 /** One initial combo script; a scheduling phase may span several descriptors. */
 export interface WebBootBatch {
-  /** Parser-blocking bootstrap or preloaded application scheduling. */
+  /** Parser-blocking bootstrap or application scheduling after module setup. */
   phase: WebBootBatchPhase
   /** Revisioned combo script endpoint. */
   url: string
@@ -121,6 +123,19 @@ export interface BootModuleRow {
   inject: string[]
   /** Module specifiers this row requests from the module table ([] when the wire omits them). */
   external: string[]
+  /** True for a deferred application entry. */
+  optional?: true
+}
+
+/**
+ * Select a replacement for a revisioned bundle or chunk URL.
+ * @param url - URL with an existing revision query parameter.
+ * @param rev - replacement content revision.
+ * @returns the URL with its existing path and query order.
+ */
+export function atRevision(url: string, rev: string): string {
+  if (!/[?&]rev=[^&#]*/u.test(url)) throw new Error(`client-modules: bundle URL ${url} has no revision`)
+  return url.replace(/([?&]rev=)[^&#]*/u, `$1${encodeURIComponent(rev)}`)
 }
 
 /** The cordis-plugin view of one boot row: what entry composition needs (optional wire fields normalized). */
@@ -131,6 +146,8 @@ export interface BootPluginRow {
   inject: string[]
   /** Stage-one prefetch tier (false when the wire omits it). */
   immediately: boolean
+  /** True when no required dependency path reaches this row. */
+  optional?: true
 }
 
 /** The parsed boot manifest: one wire, two consumer views. */
@@ -206,11 +223,15 @@ export function parseDshClient(pkgName: string, value: unknown): DshClientManife
   if (decl.immediately !== undefined && typeof decl.immediately !== 'boolean') {
     throw new Error(`client-modules: ${pkgName} dsh.client.immediately must be a boolean`)
   }
+  if (decl.optional !== undefined && typeof decl.optional !== 'boolean') {
+    throw new Error(`client-modules: ${pkgName} dsh.client.optional must be a boolean`)
+  }
   return {
     platform: decl.platform,
     ...(inject !== undefined ? { inject } : {}),
     ...(external !== undefined ? { external } : {}),
     ...(decl.immediately !== undefined ? { immediately: decl.immediately } : {}),
+    ...(decl.optional !== undefined ? { optional: decl.optional } : {}),
   }
 }
 
@@ -239,6 +260,29 @@ export function exactPackageSpecifier(specifier: string): string | undefined {
  */
 export function stripClientSuffix(spec: string): string {
   return spec.endsWith('/client') ? spec.slice(0, -'/client'.length) : spec
+}
+
+/**
+ * Compute startup requirements from bootstrap entries and the transitive package dependencies of required rows.
+ * @param rows - declared package edges and opt-in fields from the Host or boot graph.
+ * @param bootstrap - ids the shell must materialize during bootstrap, independent of declarations.
+ * @returns the required graph ids in discovery order.
+ */
+export function requiredBootIds(
+  rows: readonly Pick<WebBootEntry, 'id' | 'optional' | 'inject' | 'external'>[], bootstrap: Iterable<string>,
+): ReadonlySet<string> {
+  const byId = new Map(rows.map(row => [row.id, row]))
+  const required = new Set<string>()
+  const visit = (id: string): void => {
+    const row = byId.get(id)
+    if (row === undefined || required.has(id)) return
+    required.add(id)
+    for (const dependency of row.inject ?? []) visit(dependency)
+    for (const request of row.external ?? []) visit(byId.has(request) ? request : stripClientSuffix(request))
+  }
+  for (const id of bootstrap) visit(id)
+  for (const row of rows) if (row.optional !== true) visit(row.id)
+  return required
 }
 
 /**
@@ -287,6 +331,9 @@ export function parseBootManifest(wire: unknown): BootManifest {
     if (row.immediately !== undefined && typeof row.immediately !== 'boolean') {
       throw new Error(`client-modules: boot manifest entry ${where} immediately must be a boolean`)
     }
+    if (row.optional !== undefined && typeof row.optional !== 'boolean') {
+      throw new Error(`client-modules: boot manifest entry ${where} optional must be a boolean`)
+    }
     moduleFields.push({
       id: row.id,
       url: row.url,
@@ -294,6 +341,7 @@ export function parseBootManifest(wire: unknown): BootManifest {
       ...(chunks === undefined ? {} : { chunks }),
       inject: inject === undefined ? [] : [...inject],
       external: external === undefined ? [] : [...external],
+      ...(row.optional === true ? { optional: true } : {}),
     })
     plugins.push({
       id: row.id,
@@ -302,8 +350,8 @@ export function parseBootManifest(wire: unknown): BootManifest {
     })
   }
 
-  const entryIds = new Set(moduleFields.map(row => row.id))
-  const initialUrls = new Map<string, string>()
+  const initialBatches = new Map<string, WebBootBatch>()
+  const bootstrapIds = new Set<string>()
   const batchUrls = new Set<string>()
   for (const value of graph.batches as unknown[]) {
     if (typeof value !== 'object' || value === null) {
@@ -325,24 +373,37 @@ export function parseBootManifest(wire: unknown): BootManifest {
     if (entries === undefined || entries.length === 0) {
       throw new Error(`client-modules: boot manifest ${phase} batch entries must be a non-empty string array`)
     }
+    const descriptor: WebBootBatch = { phase, url: batch.url, rev: batch.rev, entries }
     for (const id of entries) {
-      if (!entryIds.has(id)) {
+      if (!seenEntryIds.has(id)) {
         throw new Error(`client-modules: boot manifest ${phase} batch names unknown entry "${id}"`)
       }
-      if (initialUrls.has(id)) {
+      if (initialBatches.has(id)) {
         throw new Error(`client-modules: boot manifest entry "${id}" belongs to more than one batch`)
       }
-      initialUrls.set(id, batch.url)
+      initialBatches.set(id, descriptor)
+      if (phase === 'bootstrap') bootstrapIds.add(id)
     }
   }
-  const modules = moduleFields.map((row): BootModuleRow => {
-    const initialUrl = initialUrls.get(row.id)
-    if (initialUrl === undefined) {
+  const required = requiredBootIds(moduleFields, bootstrapIds)
+  // A multi-entry combo carrying optional bytes cannot serve the required pass.
+  const separate = new Set<WebBootBatch>()
+  for (const id of seenEntryIds) {
+    const batch = initialBatches.get(id)
+    if (!required.has(id) && batch !== undefined && batch.entries.length > 1) separate.add(batch)
+  }
+  const modules = moduleFields.map(({ optional: _declared, ...row }): BootModuleRow => {
+    const batch = initialBatches.get(row.id)
+    if (batch === undefined) {
       throw new Error(`client-modules: boot manifest entry "${row.id}" belongs to no initial-load batch`)
     }
-    return { ...row, initialUrl }
+    const initialUrl = separate.has(batch) ? row.url : batch.url
+    return { ...row, initialUrl, ...(required.has(row.id) ? {} : { optional: true }) }
   })
-  return { rev: graph.rev, ...(release === undefined ? {} : { release }), modules, plugins }
+  return {
+    rev: graph.rev, ...(release === undefined ? {} : { release }), modules,
+    plugins: plugins.map(row => required.has(row.id) ? row : { ...row, optional: true }),
+  }
 }
 
 /**
@@ -397,8 +458,8 @@ export interface ClientModuleCreateOptions {
   boot: unknown
   /** Module-table seed: platform-singleton specifier → shell instance. */
   staticModules: Record<string, unknown>
-  /** Bundle-load hook. Defaults to a same-origin classic `<script src>` element. */
-  loadBundle?: (url: string) => Promise<void>
+  /** Bundle-load hook. A cancelled hook must suppress registration. Defaults to a same-origin classic script element. */
+  loadBundle?: (url: string, signal?: AbortSignal) => Promise<void>
 }
 
 /** The modules bundle after its factory has been materialized by the HTML bootstrap facade. */
@@ -474,8 +535,9 @@ export interface ClientModuleLoader {
    * concurrent arrivals share one in-flight task. To force a fresh load (HMR),
    * {@link invalidate} first.
    * @param id - graph entry name.
+   * @param signal - lifetime for an optional arrival, shared by the dependency loads it starts.
    */
-  prefetch(id: string): Promise<void>
+  prefetch(id: string, signal?: AbortSignal): Promise<void>
   /**
    * Full reset of one non-bootstrap package: drop its entry and chunk factories
    * and materialized records so the next prefetch/import loads its one-resource
@@ -498,6 +560,6 @@ export interface ClientModuleSystemOptions {
   registrationTarget: ClientModuleLoaderTarget
   /** Already-materialized modules bundle consumed while creating the system. */
   bootstrapModule: ClientBootstrapModule
-  /** Bundle-load hook. Defaults to a same-origin classic `<script src>` element. */
-  loadBundle?: (url: string) => Promise<void>
+  /** Bundle-load hook. Defaults to a same-origin classic script element. */
+  loadBundle?: ClientModuleCreateOptions['loadBundle']
 }

@@ -41,6 +41,8 @@ const zh = {
   'editor.saving': '保存中…',
   'editor.cancel': '取消',
   'editor.delete': '删除',
+  'editor.deleting': '删除中…',
+  'editor.deleteFailed': '删除失败，请刷新确认条目状态后重试',
   'editor.confirmDelete': '删除这条记忆？此操作不可撤销。',
   'editor.confirmAction': '确认删除',
   'editor.failed': '保存失败，请重试',
@@ -53,6 +55,7 @@ const zh = {
   'card.description': '跨会话保留的持久记忆',
   'card.enabled': '启用记忆',
   'card.enabledHint': '关闭后 Agent 不再读取或写入记忆；已存条目仍可浏览',
+  'card.saving': '保存中…',
   'card.writeError': '写入失败，请重试',
 }
 
@@ -99,6 +102,8 @@ const en: typeof zh = {
   'editor.saving': 'Saving…',
   'editor.cancel': 'Cancel',
   'editor.delete': 'Delete',
+  'editor.deleting': 'Deleting…',
+  'editor.deleteFailed': 'Delete failed — refresh to check the entry, then retry',
   'editor.confirmDelete': 'Delete this memory? This cannot be undone.',
   'editor.confirmAction': 'Delete',
   'editor.failed': 'Save failed — try again',
@@ -111,6 +116,7 @@ const en: typeof zh = {
   'card.description': 'Durable memory that survives sessions',
   'card.enabled': 'Memory enabled',
   'card.enabledHint': 'When off, the agent neither reads nor writes memory; stored entries stay browsable',
+  'card.saving': 'Saving…',
   'card.writeError': 'Write failed — try again',
 }
 

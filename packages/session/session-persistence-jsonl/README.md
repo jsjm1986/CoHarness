@@ -65,6 +65,8 @@ Historical CoHarness headers and packed streams are decoded by `coharnessJsonlFo
 
 The default artifact is a standard concatenation of independent [Zstandard frames](../../../.agents/notes/implemented/architecture/2026-07-19-zstandard-jsonl-session-logs.md): one checksummed frame containing only the header line, followed by one checksummed frame per durable append batch. The backend uses Node's built-in Zstandard API with its default compression level and exposes no level knob. Listing reads and validates only the header frame. `compression: 'none'` keeps the same logical lines in the original raw representation.
 
+`readRaw()` returns decompressed JSONL with its generation filename ending in `.jsonl`; compression suffixes belong only to storage. Export reads leave the committed generation unchanged.
+
 A root belongs to one encoding. Startup discovery and targeted lookup reject the opposite suffix with an error naming the incompatible artifact and instructing the caller to select the matching mode or a separate root. Flat `<project>/<id>.jsonl*` artifacts are also rejected instead of ignored. Format migration preserves the configured encoding; compression conversion, mixed-root fallback, and dual write remain unsupported.
 
 <a id="durability-and-crash-semantics"></a>

@@ -1,3 +1,4 @@
+import { publishRecoveryProtocol } from './peer-backup-recovery-access.ts'
 /** Gateway-owned backup worker and authenticated deployment endpoints. No browser or Runtime supplies storage ownership. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { lstat, readFile, realpath } from 'node:fs/promises'
@@ -23,9 +24,15 @@ import type { NodeContentStore } from './node-content-store.ts'
 import { PeerPersonalExporter } from './peer-backup-personal.ts'
 import type { PeerPersonalFiles } from './peer-backup-personal-files.ts'
 import { PeerSnapshotOwner } from './peer-backup-snapshot-owner.ts'
-import { PeerControlExporter } from './peer-backup-control-export.ts'
+import { PeerGovernanceBackup } from './peer-governance-backup.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { privateFileState } from './node-private-file.ts'
+import { PeerRecoveryExecution } from './peer-backup-execution.ts'
+import type { RuntimeLaunchContext, RuntimeTarget } from './instances.ts'
+import type { RuntimeCredentialSubject } from './runtime-api.ts'
+import { PeerPersonalRecovery } from './peer-backup-personal-recovery.ts'
+import { PeerPersonalRecoveryFiles } from './peer-backup-personal-target.ts'
+import { runPersonalRecoveryPhase, type PersonalRecoveryWorker } from './peer-backup-personal-recovery-worker.ts'
 
 const path = z.string().refine(isAbsolute)
 const configSchema = z
@@ -122,6 +129,10 @@ function send(res: ServerResponse, status: number, data: unknown): void {
 
 export interface PeerBackupInstallation {
   context: PostgresRuntimeContext
+  /** Runtime admission remains available independently of backup provisioning and local content storage. */
+  config?: GatewayConfig
+  /** Prepare a stopped managed profile without allocating a Runtime or requiring backup provisioning. */
+  prepareProfile?: (target: RuntimeTarget) => Promise<void>
   /** Node-owner private config; omission keeps the receiver and background scheduler disabled. */
   configFile?: string
   /** Existing Gateway state. Personal SQLite snapshots select only the policy owner and Runtime. */
@@ -138,6 +149,8 @@ export interface PeerBackupInstallation {
     volume: Pick<NodeContentStore, 'readVolume' | 'writeVolume'>
     instances: Pick<InstanceManager, 'withStopped'>
     fileGate: PeerProjectFileGate
+    /** Materialize managed policy without starting or stopping the selected Runtime. */
+    prepareProfile?: (target: RuntimeTarget) => Promise<void>
   }
   /** Personal and governance domains may each provide their own consistent exporter. */
   exporter?(policy: PeerBackupPolicy): PeerBackupExporter | undefined
@@ -148,10 +161,11 @@ export interface PeerBackupInstallation {
 
 /** Small composition hook shared by production and isolated node deployments. */
 export async function createPeerBackupGateway(installation: PeerBackupInstallation): Promise<PeerBackupGateway> {
-  const governance = new PeerBackupGovernance(installation.context)
+  let governance = new PeerBackupGovernance(installation.context)
   if (!installation.configFile) return new PeerBackupGateway(installation, governance)
   try {
     const config = configSchema.parse(JSON.parse(await readPrivate(installation.configFile, 1 << 20)))
+    governance = new PeerBackupGovernance(installation.context,60000,config.timeoutMs)
     if (
       inside(config.directory, config.stagingDirectory) ||
       inside(config.stagingDirectory, config.directory) ||
@@ -201,11 +215,19 @@ export class PeerBackupGateway {
   private readonly lifetime = new AbortController()
   private timer?: ReturnType<typeof setTimeout>
   private active?: Promise<void>
+  private protocolTimer?: ReturnType<typeof setTimeout>
+  private protocolActive?: Promise<void>
+  private protocolError?: string
+  private capacityAfter = ''
   private readonly engine?: PeerBackupRestic
   private readonly project?: PeerProjectExporter
   private readonly personal?: PeerPersonalExporter
-  private readonly control?: PeerControlExporter
+  private readonly control?: PeerGovernanceBackup
   private readonly recovery: PeerProjectRecovery
+  private readonly execution: PeerRecoveryExecution
+  private readonly personalRecovery: PeerPersonalRecovery
+  private readonly personalExecution: PeerRecoveryExecution
+  private readonly personalRecoveryWorker?: PersonalRecoveryWorker
   private readonly recoveryWorker?: PeerTakeoverDependencies
   private workerError: string | undefined
   constructor(
@@ -220,22 +242,38 @@ export class PeerBackupGateway {
       maxRows: settings?.maxExportRows ?? 0,
       reserveBytes: settings?.reserveBytes ?? 0,
     }
+    const config = installation.config ?? installation.recovery?.config
+    const prepareProfile = installation.prepareProfile ?? installation.recovery?.prepareProfile
+    const inspectionLimits = settings ? limits : config?.recoveryInspection
+    this.personalRecovery = new PeerPersonalRecovery(installation.context, config?.instancePortBase)
+    const personalTarget = config
+      ? new PeerPersonalRecoveryFiles(installation.context, config, installation.recovery?.volume, settings ? limits : undefined) : undefined
+    const requiredPersonalTarget = () => {
+      if (!personalTarget) throw new PeerBackupError(503, 'peer-backup/execution-not-provisioned')
+      return personalTarget
+    }
+    this.personalExecution = new PeerRecoveryExecution({ context: installation.context, config,
+      personal: { service: this.personalRecovery, paths: op => requiredPersonalTarget().paths(op), oldSessions: op => requiredPersonalTarget().oldSessions(op) },
+      maxRows: inspectionLimits?.maxRows, maxBytes: inspectionLimits?.maxBytes, prepareProfile })
+    this.execution = new PeerRecoveryExecution({ context: installation.context, config,
+      volume: installation.recovery?.volume ?? (installation.nodeContent?.readVolume ? {readVolume: installation.nodeContent.readVolume.bind(installation.nodeContent)} : undefined), maxRows: inspectionLimits?.maxRows, maxBytes: inspectionLimits?.maxBytes,
+      prepareProfile })
     this.recovery = new PeerProjectRecovery(
       installation.context,
       installation.recovery?.volume,
       limits,
       installation.recovery?.config.instancePortBase,
       async (op, signal) => {
-        if (!this.project || !settings) throw new PeerBackupError(503, 'peer-backup/file-verifier-unavailable')
-        return latestPeerFileWitness(this.project, this.recoveryPolicy(op), op, settings.stagingDirectory, signal)
+        if (!this.project || !settings || !this.engine) throw new PeerBackupError(503, 'peer-backup/file-verifier-unavailable')
+        return latestPeerFileWitness(this.project, this.recoveryPolicy(op), op, settings.stagingDirectory, signal, this.engine.sourceWrites(signal))
       },
       installation.recovery?.fileGate,
     )
     if (settings) {
-      this.control = new PeerControlExporter(installation.context.pool, {
+      this.control = new PeerGovernanceBackup(installation.context.pool, {
         maxBytes: settings.maxExportBytes,
         maxRows: settings.maxExportRows,
-      })
+      },config?.projectNameKeyFile)
       if (installation.stateRoot)
         this.personal = new PeerPersonalExporter(installation.context.pool, installation.stateRoot, {
           maxBytes: settings.maxExportBytes,
@@ -258,11 +296,22 @@ export class PeerBackupGateway {
           control: installation.context.pool,
           store: installation.nodeContent,
           files: installation.files,
+          recoveryStateRoot: installation.recovery?.config.stateRoot ?? installation.stateRoot,
           maxBytes: settings.maxExportBytes,
           maxRows: settings.maxExportRows,
         })
       if (installation.recovery) {
         const resources = installation.recovery
+        if (personalTarget) this.personalRecoveryWorker = {
+          service: this.personalRecovery, files: personalTarget,
+          gate: new PeerProjectFileGate(resources.config.stateRoot, 'personal-document-handoff'),
+          drill: async (op, signal) => {
+            if (!this.engine || !this.personal) throw new PeerBackupError(503, 'peer-backup/provisioning-required')
+            const policy = { organizationId: op.organizationId, scopeId: op.runtimeId, sourceNodeId: op.sourceNode,
+              targetNodeId: op.repositoryNode, revision: op.policyRevision, policyId: op.policyId }
+            return this.engine.drill(policy, op.pointId, await this.access({kind:'drill',policy}), this.personal, signal)
+          },
+        }
         this.recoveryWorker = {
           service: this.recovery,
           volume: resources.volume,
@@ -278,16 +327,38 @@ export class PeerBackupGateway {
           },
         }
       }
-      this.schedule(0)
     }
+    if(settings)this.scheduleProtocol(0)
+    if (settings || installation.recovery?.prepareProfile) this.schedule(0)
   }
+  /** Authenticate the current owner's recovery permit before either kind of Runtime launches.
+   * @param runtime - managed assignment after its ordinary profile projection.
+   * @returns the exact private policy handoff, or no policy for a Runtime without a recovery hold.
+   */
+  async beforeRuntimeStart(runtime: RuntimeLaunchContext) {
+    return (runtime.kind==='user'?this.personalExecution:this.execution).beforeStart(runtime)
+  }
+
+  /** Keep HMR subject to the same current recovery approval as process launch.
+   * @param subject - already authenticated current Runtime credential.
+   */
+  async verifyRuntimeSubject(subject: RuntimeCredentialSubject):Promise<void> {
+    await (subject.target.kind==='user'?this.personalExecution:this.execution).verifySubject(subject)
+  }
+
   private schedule(ms: number): void {
-    if (this.lifetime.signal.aborted || !this.settings) return
-    const period = this.settings.pollMs
+    if (this.lifetime.signal.aborted) return
+    const period = this.settings?.pollMs ?? this.installation.config?.deploymentContextRefreshMs ?? this.installation.recovery?.config.deploymentContextRefreshMs
+    if (period === undefined) return
     this.timer = setTimeout(() => {
       this.active = Promise.allSettled([
         this.once(),
+        this.measureReceiverCapacity(),
+        this.retireReceiverRepositories(),
         this.recoveryWorker ? runPeerRecoveryPhase(this.recoveryWorker, this.lifetime.signal) : undefined,
+        this.execution.prepareNext(this.lifetime.signal),
+        this.personalExecution.prepareNext(this.lifetime.signal),
+        this.personalRecoveryWorker ? runPersonalRecoveryPhase(this.personalRecoveryWorker,this.lifetime.signal) : undefined,
       ])
         .then((results) => {
           for (const result of results) if (result.status === 'rejected') throw result.reason
@@ -307,19 +378,49 @@ export class PeerBackupGateway {
     }, ms)
     this.timer.unref()
   }
+
+  private async measureReceiverCapacity(): Promise<void> {
+    const repository = this.repository
+    if (!repository || !this.settings) return
+    this.capacityAfter = await this.governance.observeReceiverCapacity(this.capacityAfter,this.settings.pollMs,
+      policy=>repository.capacity(policy))
+  }
+
+  private async retireReceiverRepositories(): Promise<void> {
+    const repository = this.repository
+    if (!repository) return
+    let after = ''
+    for (let batch=0; batch<32 && !this.lifetime.signal.aborted; batch++) {
+      const current = await this.governance.reclaimReceiverRepository(after, policy=>repository.retireBatch(policy))
+      if (!current && !after) break
+      after = current
+    }
+  }
+  private scheduleProtocol(ms:number):void{
+    if(this.lifetime.signal.aborted||!this.settings)return
+    const period=this.settings.pollMs
+    this.protocolTimer=setTimeout(()=>{
+      this.protocolActive=publishRecoveryProtocol(this.installation.context.pool,this.installation.context.organizationId,
+        this.installation.context.nodeId,period*3,{project:!!this.recoveryWorker&&!!this.project&&!!this.engine,
+          personal:!!this.personalRecoveryWorker&&!!this.personal&&!!this.engine})
+        .then(()=>{this.protocolError=undefined},error=>{this.protocolError=safeCode(error)})
+        .finally(()=>{this.protocolActive=undefined;this.scheduleProtocol(period)})
+    },ms)
+    this.protocolTimer.unref()
+  }
   private recoveryPolicy(op: PeerRecoveryOperation) {
     return {
       organizationId: op.organizationId,
       scopeId: op.projectId,
       sourceNodeId: op.sourceNode,
-      targetNodeId: op.targetNode,
+      targetNodeId: op.repositoryNode,
       revision: op.policyRevision,
       policyId: op.policyId,
     }
   }
   private async access(job: {
     kind: PeerBackupJob['kind']
-    policy: Pick<PeerBackupPolicy, 'policyId' | 'sourceNodeId'>
+    policy: Pick<PeerBackupPolicy, 'policyId' | 'sourceNodeId' | 'targetNodeId'> & Partial<Pick<PeerBackupPolicy,'scopeKind'>>
   }): Promise<PeerBackupAccess> {
     const route = this.settings?.routes.find((r) => r.policyId === job.policy.policyId)
     const key = job.kind === 'capture' ? route?.passwordFile : route?.recoveryPasswordFile
@@ -328,7 +429,7 @@ export class PeerBackupGateway {
       throw new PeerBackupError(503, 'peer-backup/provisioning-required')
     const token = (await readPrivate(bearer, 8192)).trim()
     if (!/^[A-Za-z0-9_-]{32,256}$/u.test(token)) throw new PeerBackupError(503, 'peer-backup/provisioning-required')
-    return { origin: route.origin, user: job.policy.sourceNodeId, passwordFile: key, token }
+    return { origin: route.origin, user: job.kind==='drill' && job.policy.scopeKind!=='governance' && this.installation.context.nodeId!==job.policy.targetNodeId ? this.installation.context.nodeId : job.policy.sourceNodeId, passwordFile: key, token }
   }
   private async once(): Promise<void> {
     if (!this.engine) return
@@ -405,8 +506,75 @@ export class PeerBackupGateway {
     const url = new URL(req.url ?? '/', 'http://localhost')
     if (url.pathname !== api && !url.pathname.startsWith(api + '/')) return false
     try {
+      if (url.pathname === api + '/recoveries/local-execution') {
+        if (req.method !== 'GET') throw new PeerBackupError(405, 'peer-backup/unsupported-operation')
+        const cursor=url.searchParams.get('after')??undefined
+        const parsed=cursor?.includes(':')?z.object({scope:z.enum(['project','personal']),id:z.uuid()}).parse({scope:cursor.split(':')[0],id:cursor.split(':')[1]}):undefined
+        const after=parsed?.id??cursor
+        const [project,personal]=await Promise.all([this.execution.listLocal(actor,after,parsed?.scope==='personal'),this.personalExecution.listLocal(actor,after)])
+        const combined=[...project.items.map(item=>({...item,scopeKind:'project' as const})),...personal.items.map(item=>({...item,scopeKind:'personal' as const}))]
+          .sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:a.scopeKind<b.scopeKind?-1:a.scopeKind>b.scopeKind?1:0)
+        const items=combined.slice(0,50)
+        send(res,200,{items,...(combined.length>50||project.nextCursor||personal.nextCursor?{nextCursor:items.at(-1)?.scopeKind+':'+items.at(-1)?.id}:{})})
+        return true
+      }
+      const personalExecutionRoute = /^\/admin\/api\/peer-backups\/personal-recoveries\/([a-f0-9-]{36})\/execution(?:\/(prepare|enable)|\/items\/([^/]+)\/approve)?$/u.exec(url.pathname)
+      if (personalExecutionRoute) {
+        const id=personalExecutionRoute[1]!
+        if(req.method==='GET'&&!personalExecutionRoute[2]&&!personalExecutionRoute[3])send(res,200,await this.personalExecution.status(actor,id))
+        else if(req.method==='POST'){
+          const input=await readJson(req)
+          if(personalExecutionRoute[2]==='prepare')await this.personalExecution.prepare(actor,id,input)
+          else if(personalExecutionRoute[2]==='enable')await this.personalExecution.enable(actor,id,input)
+          else if(personalExecutionRoute[3])await this.personalExecution.approveItem(actor,id,decodeURIComponent(personalExecutionRoute[3]),input)
+          else throw new PeerBackupError(405,'peer-backup/unsupported-operation')
+          send(res,personalExecutionRoute[2]==='enable'?200:202,await this.personalExecution.status(actor,id))
+        }else send(res,405,{error:'peer-backup/unsupported-operation'})
+        return true
+      }
+      const personalRoute=/^\/admin\/api\/peer-backups\/personal-recoveries\/([a-f0-9-]{36})(?:\/(activate|cancel|reapprove|confirm-isolation))?$/u.exec(url.pathname)
+      if(url.pathname===api+'/personal-recoveries'||personalRoute){
+        if(url.pathname===api+'/personal-recoveries'&&req.method==='GET')send(res,200,await this.personalRecovery.choices(actor,url.searchParams.get('policyId')??''))
+        else if(url.pathname===api+'/personal-recoveries'&&req.method==='POST'){
+          if(!this.personalRecoveryWorker)throw new PeerBackupError(503,'peer-backup/recovery-not-provisioned')
+          const input=z.object({requestId:z.uuid(),policyId:z.uuid(),pointId:z.uuid(),targetNode:z.uuid(),targetVolume:z.uuid()}).strict().parse(await readJson(req))
+          send(res,202,{operationId:await this.personalRecovery.request(actor,input)})
+        }else if(personalRoute&&!personalRoute[2]&&req.method==='GET')send(res,200,await this.personalRecovery.status(actor,personalRoute[1]!))
+        else if(personalRoute&&req.method==='POST'){
+          const id=personalRoute[1]!,input=await readJson(req)
+          if(personalRoute[2]==='confirm-isolation')await this.personalRecovery.confirmIsolation(actor,id,input)
+          else if(personalRoute[2]==='reapprove'){
+            const body=z.object({confirm:z.uuid(),policyRevision:z.number().int().positive(),
+              phase:z.enum(['preparing','prepared','externally-fenced','activating'])}).strict().parse(input)
+            if(body.confirm!==id)throw new PeerBackupError(409,'peer-backup/recovery-approval-changed')
+            await this.personalRecovery.reapprove(actor,id,body.policyRevision,body.phase)
+          }else{
+            const body=z.object({confirm:z.uuid()}).strict().parse(input)
+            if(body.confirm!==id)throw new PeerBackupError(409,'peer-backup/recovery-approval-changed')
+            if(personalRoute[2]==='activate')await this.personalRecovery.activate(actor,id)
+            else if(personalRoute[2]==='cancel')await this.personalRecovery.cancel(actor,id)
+            else throw new PeerBackupError(405,'peer-backup/unsupported-operation')
+          }
+          send(res,personalRoute[2]==='activate'?202:200,await this.personalRecovery.status(actor,id))
+        }else send(res,405,{error:'peer-backup/unsupported-operation'})
+        return true
+      }
+      const executionRoute = /^\/admin\/api\/peer-backups\/recoveries\/([a-f0-9-]{36})\/execution(?:\/(prepare|enable)|\/items\/([^/]+)\/approve)?$/u.exec(url.pathname)
+      if (executionRoute) {
+        const id = executionRoute[1]!
+        if (req.method === 'GET' && !executionRoute[2] && !executionRoute[3]) send(res, 200, await this.execution.status(actor, id))
+        else if (req.method === 'POST') {
+          const input = await readJson(req)
+          if (executionRoute[2] === 'prepare') await this.execution.prepare(actor, id, input)
+          else if (executionRoute[2] === 'enable') await this.execution.enable(actor, id, input)
+          else if (executionRoute[3]) await this.execution.approveItem(actor, id, decodeURIComponent(executionRoute[3]), input)
+          else throw new PeerBackupError(405, 'peer-backup/unsupported-operation')
+          send(res, executionRoute[2] === 'prepare' || executionRoute[3] ? 202 : 200, await this.execution.status(actor, id))
+        } else send(res, 405, { error: 'peer-backup/unsupported-operation' })
+        return true
+      }
       const recoveryRoute =
-        /^\/admin\/api\/peer-backups\/recoveries\/([a-f0-9-]{36})(?:\/(approve-retirement|activate|cancel|reapprove))?$/u.exec(
+        /^\/admin\/api\/peer-backups\/recoveries\/([a-f0-9-]{36})(?:\/(approve-retirement|activate|cancel|reapprove|confirm-isolation))?$/u.exec(
           url.pathname,
         )
       if (url.pathname === api + '/recoveries' || recoveryRoute) {
@@ -421,6 +589,7 @@ export class PeerBackupGateway {
               pointId: z.uuid(),
               targetNode: z.uuid(),
               targetVolume: z.uuid(),
+              recoveryMode: z.enum(['planned','disaster']).optional(),
             })
             .strict()
             .parse(await readJson(req))
@@ -431,11 +600,13 @@ export class PeerBackupGateway {
           if (!this.recoveryWorker) throw new PeerBackupError(503, 'peer-backup/recovery-not-provisioned')
           const id = recoveryRoute[1]!
           const input = await readJson(req)
-          if (recoveryRoute[2] === 'reapprove') {
+          if (recoveryRoute[2] === 'confirm-isolation') {
+            await this.recovery.confirmIsolation(actor,id,input)
+          } else if (recoveryRoute[2] === 'reapprove') {
             const body = z.object({
               confirm: z.uuid(),
               policyRevision: z.number().int().positive(),
-              phase: z.enum(['prepared', 'target-ready', 'retire-approved', 'retiring', 'retreat', 'old-fenced', 'published']),
+              phase: z.enum(['preparing','prepared', 'target-ready', 'retire-approved', 'retiring', 'retreat', 'old-fenced', 'published','externally-fenced','disaster-ready']),
             }).strict().parse(input)
             if (id !== body.confirm) throw new PeerBackupError(409, 'peer-backup/recovery-approval-changed')
             await this.recovery.reapprove(actor, id, body.policyRevision, body.phase)
@@ -451,13 +622,26 @@ export class PeerBackupGateway {
         } else send(res, 405, { error: 'peer-backup/unsupported-operation' })
         return true
       }
-      const match = /^\/admin\/api\/peer-backups\/([a-f0-9-]{36})\/(points|capture|drill|preflight)$/u.exec(url.pathname)
+      const readRoute=/^\/admin\/api\/peer-backups\/([a-f0-9-]{36})\/recovery-access(?:\/([a-f0-9-]{36})\/revoke)?$/u.exec(url.pathname)
+      if(readRoute){
+        const policy=readRoute[1]!
+        if(!readRoute[2]&&req.method==='GET')send(res,200,{items:await this.governance.reads(actor,policy),maxLifetimeMs:this.settings?.timeoutMs??null})
+        else if(!readRoute[2]&&req.method==='POST')send(res,200,{id:await this.governance.approveRead(actor,policy,await readJson(req))})
+        else if(readRoute[2]&&req.method==='POST'){
+          const body=z.object({confirm:z.uuid()}).strict().parse(await readJson(req))
+          if(body.confirm!==readRoute[2])throw new PeerBackupError(409,'peer-backup/recovery-access-changed')
+          await this.governance.revokeRead(actor,policy,body.confirm);this.installation.invalidate?.(policy);send(res,200,{revoked:true})
+        }else send(res,405,{error:'peer-backup/unsupported-operation'})
+        return true
+      }
+      const match = /^\/admin\/api\/peer-backups\/([a-f0-9-]{36})\/(points|capture|drill|preflight|retire)$/u.exec(url.pathname)
       if (url.pathname === api && req.method === 'GET')
         send(res, 200, {
           policies: await this.governance.list(actor, url.searchParams.get('after') ?? ''),
           localWorkerConfigured: !!this.settings,
           recoveryConfigured: !!this.recoveryWorker,
-          localWorkerError: this.provisioningError ?? this.workerError,
+          personalRecoveryConfigured: !!this.personalRecoveryWorker,
+          localWorkerError: this.provisioningError ?? this.protocolError ?? this.workerError,
         })
       else if (url.pathname === api + '/scopes' && req.method === 'GET') {
         const kind = z.enum(['project', 'personal', 'governance']).parse(url.searchParams.get('kind'))
@@ -472,11 +656,17 @@ export class PeerBackupGateway {
       } else if (url.pathname === api && req.method === 'PUT') {
         const policy = await this.governance.configure(actor, await readJson(req))
         this.installation.invalidate?.(policy.policyId)
+        if (policy.replacedPolicyId) this.installation.invalidate?.(policy.replacedPolicyId)
         send(res, 200, policy)
       } else if (match?.[2] === 'points' && req.method === 'GET')
         send(res, 200, { points: await this.governance.points(actor, match[1]!) })
       else if (match?.[2] === 'capture' && req.method === 'POST')
         send(res, 202, { operationId: await this.governance.enqueue(actor, match[1]!, 'capture') })
+      else if (match?.[2] === 'retire' && req.method === 'POST') {
+        await this.governance.approveRetirement(actor,match[1]!,await readJson(req))
+        this.installation.invalidate?.(match[1]!)
+        send(res,202,{ approved:true })
+      }
       else if (match && req.method === 'POST' && (match[2] === 'drill' || match[2] === 'preflight')) {
         const body = z
           .object({ pointId: z.uuid(), recoveryNodeId: z.uuid() })
@@ -508,7 +698,8 @@ export class PeerBackupGateway {
   async close(): Promise<void> {
     this.lifetime.abort()
     clearTimeout(this.timer)
-    await this.active
+    clearTimeout(this.protocolTimer)
+    await Promise.all([this.active,this.protocolActive])
     await this.repository?.close()
   }
 }

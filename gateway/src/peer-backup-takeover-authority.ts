@@ -1,9 +1,14 @@
+import { admittedRecoveryRead } from './peer-backup-recovery-access.ts'
 /** Lock the active replacement owner's existing device grant, organization membership and project access for a takeover commit. */
 import type { PoolClient } from 'pg'
 import { PeerBackupError } from './peer-backup-repository.ts'
 import type { PeerRecoveryOperation } from './peer-backup-takeover.ts'
+import { lockRecoveryTarget } from './peer-backup-governance.ts'
 
 export async function lockRecoveryOwner(tx: PoolClient, op: Pick<PeerRecoveryOperation,'organizationId'|'projectId'|'targetNode'>): Promise<void> {
+  if((await tx.query(`SELECT FROM harness.projects p JOIN harness.organizations o ON o.id=p.organization_id
+    WHERE p.organization_id=$1 AND p.id=$2 AND p.kind='standard' AND p.status='active' AND o.status='active'
+      AND p.origin='admin' AND p.owner_user_id IS NULL FOR SHARE OF p,o`,[op.organizationId,op.projectId])).rowCount)return
   const owner = (await tx.query<{id:string;role:string}>(`SELECT u.id,m.role FROM harness.projects p
     JOIN harness.users u ON u.organization_id=p.organization_id AND u.id=p.owner_user_id AND u.status='active' AND u.deleted_at IS NULL
     JOIN harness.organizations o ON o.id=p.organization_id AND o.status='active'
@@ -19,10 +24,12 @@ export async function lockRecoveryOwner(tx: PoolClient, op: Pick<PeerRecoveryOpe
 
 /** The policy row serializes security changes against a short local writer transition. */
 export async function lockRecoveryPolicy(tx: PoolClient, op: PeerRecoveryOperation): Promise<void> {
+  await lockRecoveryTarget(tx,op.organizationId,op.targetNode)
   const result = await tx.query(`SELECT FROM harness.peer_backup_policies p JOIN harness.project_recovery_operations r
     ON r.policy_id=p.id AND r.organization_id=p.organization_id WHERE r.organization_id=$1 AND r.id=$2 AND p.enabled
-    AND p.source_node_id=r.source_node_id AND p.target_node_id=r.target_node_id AND p.scope_kind='project' AND p.scope_id=r.project_id
+    AND p.source_node_id=r.source_node_id AND p.target_node_id=r.repository_node_id AND p.scope_kind='project' AND p.scope_id=r.project_id
     AND p.revision=harness.recovery_policy_revision(r.id,r.policy_revision) FOR SHARE OF p,r`,[op.organizationId,op.id])
   if (!result.rowCount) throw new PeerBackupError(409,'peer-backup/recovery-approval-changed')
+  if(op.repositoryNode!==op.targetNode)await admittedRecoveryRead(tx,op.organizationId,op.policyId,op.targetNode,undefined,op.pointId)
   await lockRecoveryOwner(tx,op)
 }

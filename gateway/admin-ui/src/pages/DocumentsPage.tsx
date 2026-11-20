@@ -137,6 +137,7 @@ export function DocumentsPage() {
   }
 
   async function openDetail(row: AdminDocument) {
+    setError('')
     setDetailLoading(true)
     setMemberIds(null)
     try {
@@ -156,6 +157,7 @@ export function DocumentsPage() {
 
   async function remove() {
     if (detail === null) return
+    setError('')
     setDeleteLoading(true)
     try {
       await deleteAdminDocument(detail.document.catalogId)
@@ -171,6 +173,7 @@ export function DocumentsPage() {
 
   async function changeState(action: 'trash' | 'restore' | 'purge') {
     if (detail === null) return
+    setError('')
     setDeleteLoading(true)
     try {
       const result = await applyAdminDocumentAction(action, [detail.document.catalogId])
@@ -223,6 +226,7 @@ export function DocumentsPage() {
   async function transferOwner(event: FormEvent) {
     event.preventDefault()
     if (detail === null || detail.document.scope.kind !== 'project' || detail.document.state !== 'active' || ownerId === '') return
+    setError('')
     setOwnerSaving(true)
     try {
       await transferAdminDocumentOwnership(detail.document.catalogId, Number(ownerId))
@@ -242,7 +246,7 @@ export function DocumentsPage() {
         description={t('pageDescription')}
         actions={<Button icon={RefreshCw} onClick={() => void reload(active, true, page, pageCursors[page])}>{t('refresh')}</Button>}
       />
-      <ErrorBanner message={error} />
+      <ErrorBanner message={detail === null && !detailLoading && !deleteOpen ? error : ''} />
       <div className="metricGrid" aria-label={t('metricsAria')}>
         <Metric label={t('metricActive')} value={metrics?.active.toLocaleString() ?? '—'} />
         <Metric label={t('stateTrash')} value={metrics === null ? '—' : (metrics.trash ?? metrics.deleted ?? 0).toLocaleString()} tone={(metrics?.trash ?? 0) > 0 ? 'warning' : undefined} />
@@ -253,7 +257,7 @@ export function DocumentsPage() {
       <Section flush title={t('filterSection')}>
         <form className="filterPanel" onSubmit={apply}>
           <div className="filterGrid">
-            <Field label={t('labelQuery')}><div className="inputWithIcon"><Search aria-hidden="true" /><input className="input" value={draft.query} onChange={event => setDraft({ ...draft, query: event.target.value })} placeholder={t('queryPlaceholder')} /></div></Field>
+            <Field label={t('labelQuery')}>{controlProps => <div className="inputWithIcon"><Search aria-hidden="true" /><input {...controlProps} className="input" value={draft.query} onChange={event => setDraft({ ...draft, query: event.target.value })} placeholder={t('queryPlaceholder')} /></div>}</Field>
             <Field label={t('labelScope')}><select className="select" value={draft.scope} onChange={event => setDraft({ ...draft, scope: event.target.value as Draft['scope'] })}><option value="">{t('scopeAll')}</option><option value="personal">{t('scopePersonal')}</option><option value="project">{t('scopeProject')}</option></select></Field>
             <Field label={t('labelProject')}><select className="select" value={draft.projectId} onFocus={() => readNames()} onChange={event => { readNames([Number(event.target.value)]); setDraft({ ...draft, projectId: event.target.value }) }}><option value="">{t('projectAll')}</option>{projects.map(project => <option key={project.id} value={project.id}>{t('entryWithId', { name: project.name, id: String(project.id) })}</option>)}</select></Field>
             {moreNames()}
@@ -266,8 +270,8 @@ export function DocumentsPage() {
       <Section flush className="responsiveSection" title={t('catalogSection')} meta={loading || (rows.length === 0 && error !== '') ? undefined : t('recordCount', { count: String(rows.length) })}>
         {selectedIds.size > 0 && <div className="sectionBody filterActions" role="toolbar" aria-label={t('batchAria')}><span className="muted">{t('selectedCount', { count: String(selectedIds.size) })}</span><Button type="button" variant="danger" loading={batchAction} onClick={() => void changeSelectedState('trash')}>{t('trash')}</Button><Button type="button" loading={batchAction} onClick={() => void changeSelectedState('restore')}>{t('restore')}</Button><Button type="button" variant="danger" loading={batchAction} onClick={requestBatchPurge}>{t('purge')}</Button><Button type="button" disabled={batchAction} onClick={() => setSelectedIds(new Set())}>{t('clearSelection')}</Button></div>}
         {loading ? <LoadingState label={t('loadingCatalog')} /> : rows.length === 0 && error !== '' ? null : rows.length === 0 ? <EmptyState icon={Archive} title={t('emptyTitle')} detail={t('emptyDetail')} /> : <>
-          <div className="tableWrap desktopOnly"><table className="dataTable documentsTable"><thead><tr><th><span className="visuallyHidden">{t('columnSelect')}</span></th><th>{t('columnDocument')}</th><th>{t('labelScope')}</th><th>{t('labelOwner')}</th><th>{t('labelSize')}</th><th>{t('labelState')}</th><th>{t('labelSource')}</th><th>{t('columnUpdated')}</th><th /></tr></thead><tbody>{rows.map(row => <DocumentTableRow key={row.catalogId} row={row} selected={selectedIds.has(row.catalogId)} onSelect={() => setSelectedIds(previous => { const next = new Set(previous); if (next.has(row.catalogId)) next.delete(row.catalogId); else next.add(row.catalogId); return next })} onOpen={() => void openDetail(row)} />)}</tbody></table></div>
-          <div className="mobileList">{rows.map(row => <article className="mobileItem" key={row.catalogId} onClick={() => void openDetail(row)}><div className="mobileItemHeader"><input type="checkbox" aria-label={t('selectRow', { name: row.name })} checked={selectedIds.has(row.catalogId)} onChange={event => { event.stopPropagation(); setSelectedIds(previous => { const next = new Set(previous); if (next.has(row.catalogId)) next.delete(row.catalogId); else next.add(row.catalogId); return next }) }} onClick={event => event.stopPropagation()} /><strong>{row.name}</strong><StatusBadge tone={row.scope.kind === 'project' ? 'info' : 'neutral'}>{row.scope.label}</StatusBadge></div><div className="mobileItemBody"><span className="muted">{row.owner?.displayName ?? t('unassigned')} · {formatBytes(row.bytes)}</span><span className="codeText">{row.catalogId}</span><Button aria-label={`${t('viewDetails')} ${row.name}`} onClick={event => { event.stopPropagation(); void openDetail(row) }}>{t('viewDetails')}</Button></div></article>)}</div>
+          <div className="tableWrap desktopOnly" role="region" aria-label={t('catalogSection')} tabIndex={0}><table className="dataTable documentsTable"><thead><tr><th><span className="visuallyHidden">{t('columnSelect')}</span></th><th>{t('columnDocument')}</th><th>{t('labelScope')}</th><th>{t('labelOwner')}</th><th>{t('labelSize')}</th><th>{t('labelState')}</th><th>{t('labelSource')}</th><th>{t('columnUpdated')}</th><th /></tr></thead><tbody>{rows.map(row => <DocumentTableRow key={row.catalogId} row={row} selected={selectedIds.has(row.catalogId)} onSelect={() => setSelectedIds(previous => { const next = new Set(previous); if (next.has(row.catalogId)) next.delete(row.catalogId); else next.add(row.catalogId); return next })} onOpen={() => void openDetail(row)} />)}</tbody></table></div>
+          <div className="mobileList">{rows.map(row => <article className="mobileItem" key={row.catalogId} onClick={() => void openDetail(row)}><div className="mobileItemHeader"><label className="checkLabel checkboxTarget" onClick={event => event.stopPropagation()}><input type="checkbox" aria-label={t('selectRow', { name: row.name })} checked={selectedIds.has(row.catalogId)} onChange={event => { event.stopPropagation(); setSelectedIds(previous => { const next = new Set(previous); if (next.has(row.catalogId)) next.delete(row.catalogId); else next.add(row.catalogId); return next }) }} onClick={event => event.stopPropagation()} /></label><strong>{row.name}</strong><StatusBadge tone={row.scope.kind === 'project' ? 'info' : 'neutral'}>{row.scope.label}</StatusBadge></div><div className="mobileItemBody"><span className="muted">{row.owner?.displayName ?? t('unassigned')} · {formatBytes(row.bytes)}</span><span className="codeText">{row.catalogId}</span><Button aria-label={`${t('viewDetails')} ${row.name}`} onClick={event => { event.stopPropagation(); void openDetail(row) }}>{t('viewDetails')}</Button></div></article>)}</div>
         </>}
         {!loading && (nextCursor !== undefined || page > 0) && (
           <div className="sectionBody filterActions" aria-label={t('paginationAria')}>
@@ -279,9 +283,10 @@ export function DocumentsPage() {
       </Section>
 
       <Dialog open={detail !== null || detailLoading} title={detail?.document.name ?? t('detailTitleFallback')} description={t('detailDescription')} wide onClose={() => { if (!deleteLoading && !ownerSaving) setDetail(null) }} footer={detail === null ? undefined : <><>{detail.document.state === 'active' && <Button type="button" onClick={() => setDeleteOpen(true)} variant="danger" icon={Trash2} disabled={deleteLoading}>{t('trash')}</Button>}{detail.document.state === 'trash' && <><Button type="button" onClick={() => void changeState('restore')} variant="secondary" disabled={deleteLoading}>{t('restore')}</Button><Button type="button" onClick={requestPurge} variant="danger" disabled={deleteLoading}>{t('purge')}</Button></>}{detail.document.state === 'purged' && <StatusBadge tone="danger">{t('statePurged')}</StatusBadge>}</><Button type="button" onClick={() => setDetail(null)}>{t('close')}</Button></>}>
+        <ErrorBanner message={deleteOpen || purgeOpen ? '' : error} />
         {detailLoading || detail === null ? <LoadingState label={t('loadingDetail')} /> : <div className="documentDetail"><dl className="definitionGrid"><Definition label={t('labelCatalogId')}><span className="codeText">{detail.document.catalogId}</span></Definition><Definition label={t('labelScope')}>{detail.document.scope.label}</Definition><Definition label={t('labelFileId')}><span className="codeText">{detail.document.docId}</span></Definition><Definition label={t('labelSize')}>{formatBytes(detail.document.bytes)}</Definition><Definition label={t('labelState')}>{documentStateLabel(detail.document.state)}</Definition><Definition label={t('labelSource')}>{documentOwnerSourceLabel(detail.document)}</Definition><Definition label={t('labelLineageRoot')}>{detail.document.lineageRootId === null ? t('lineageCurrent') : <span className="codeText">{detail.document.lineageRootId}</span>}</Definition>{detail.document.purgeAfter !== undefined && detail.document.purgeAfter !== null && <Definition label={t('labelAutoPurge')}>{formatTime(detail.document.purgeAfter)}</Definition>}</dl>{detail.document.scope.kind === 'project' && detail.document.state === 'active' ? (<form className="ownershipForm" onSubmit={event => void transferOwner(event)}><Field label={t('labelOwner')}><select className="select" value={ownerId} onChange={event => setOwnerId(event.target.value)} disabled={ownerSaving || memberIds === null}>{(memberIds === null ? [] : users.filter(user => memberIds.has(user.id))).map(user => <option key={user.id} value={user.id}>{t('entryWithId', { name: user.displayName, id: String(user.id) })}</option>)}</select></Field><Button type="submit" variant="secondary" icon={ShieldCheck} loading={ownerSaving}>{t('transferOwnership')}</Button></form>) : <p className="muted">{t('ownerLine', { name: detail.document.owner?.displayName ?? t('unassigned') })}{detail.document.scope.kind === 'personal' ? t('personalOwnerHint') : ''}</p>}<div className="detailDivider" /><h3><History aria-hidden="true" />{t('historyHeading')}</h3>{detail.history.length === 0 ? <p className="muted">{t('historyEmpty')}</p> : <ol className="historyList">{detail.history.map(item => <li key={item.id}><span><strong>{item.eventKind}</strong><small>{item.actor?.displayName ?? t('systemActor')} · {formatTime(item.createdAt)}</small></span><span className="codeText">{item.operationId ?? '—'}</span></li>)}</ol>}<h3><FileText aria-hidden="true" />{t('copiesHeading')}</h3>{detail.copies.length === 0 ? <p className="muted">{t('copiesEmpty')}</p> : <ul className="historyList">{detail.copies.map((item, index) => <li key={`${item.operationId}-${String(index)}`}><span><strong>{item.status}</strong><small>{item.source.name} → {item.targetDocId ?? t('notGenerated')} · {formatTime(item.createdAt)}</small></span><span className="codeText">{item.operationId}</span></li>)}</ul>}</div>}
       </Dialog>
-      <Dialog open={deleteOpen} title={t('trashTitle')} description={t('trashDescription')} danger onClose={() => { if (!deleteLoading) setDeleteOpen(false) }} footer={<><Button type="button" onClick={() => setDeleteOpen(false)} disabled={deleteLoading}>{t('cancel')}</Button><Button type="button" variant="danger" loading={deleteLoading} onClick={() => void remove()}>{t('trash')}</Button></>} />
+      <Dialog open={deleteOpen} title={t('trashTitle')} description={t('trashDescription')} danger onClose={() => { if (!deleteLoading) setDeleteOpen(false) }} footer={<><Button type="button" onClick={() => setDeleteOpen(false)} disabled={deleteLoading}>{t('cancel')}</Button><Button type="button" variant="danger" loading={deleteLoading} onClick={() => void remove()}>{t('trash')}</Button></>}><ErrorBanner message={error} /></Dialog>
       <ConfirmDialog
         open={purgeOpen}
         title={t('purgeTitle')}
@@ -306,7 +311,7 @@ export function DocumentsPage() {
 
 function DocumentTableRow({ row, selected, onSelect, onOpen }: { row: AdminDocument; selected: boolean; onSelect: () => void; onOpen: () => void }) {
   const t = useMemo(() => documentsCopy(), [])
-  return <tr><td><input type="checkbox" aria-label={t('selectRow', { name: row.name })} checked={selected} onChange={onSelect} /></td><td><button className="tableLink" type="button" onClick={onOpen}><span className="documentIdentity"><FileText aria-hidden="true" /><strong>{row.name}</strong><small>{row.docId}</small></span></button></td><td><StatusBadge tone={row.scope.kind === 'project' ? 'info' : 'neutral'}>{row.scope.label}</StatusBadge></td><td>{row.owner?.displayName ?? <span className="muted">{t('unassigned')}</span>}</td><td>{formatBytes(row.bytes)}</td><td><StatusBadge tone={row.state === 'active' ? 'success' : row.state === 'trash' || row.state === 'deleted' ? 'warning' : 'danger'}>{documentStateLabel(row.state)}</StatusBadge></td><td>{documentOwnerSourceLabel(row)}</td><td>{formatTime(row.modifiedAt)}</td><td><IconButton label={t('viewDetails')} icon={ShieldCheck} variant="secondary" onClick={onOpen} /></td></tr>
+  return <tr><td><label className="checkLabel checkboxTarget"><input type="checkbox" aria-label={t('selectRow', { name: row.name })} checked={selected} onChange={onSelect} /></label></td><td><button className="tableLink" type="button" onClick={onOpen}><span className="documentIdentity"><FileText aria-hidden="true" /><strong>{row.name}</strong><small>{row.docId}</small></span></button></td><td><StatusBadge tone={row.scope.kind === 'project' ? 'info' : 'neutral'}>{row.scope.label}</StatusBadge></td><td className="tableTextCell">{row.owner?.displayName ?? <span className="muted">{t('unassigned')}</span>}</td><td>{formatBytes(row.bytes)}</td><td><StatusBadge tone={row.state === 'active' ? 'success' : row.state === 'trash' || row.state === 'deleted' ? 'warning' : 'danger'}>{documentStateLabel(row.state)}</StatusBadge></td><td>{documentOwnerSourceLabel(row)}</td><td>{formatTime(row.modifiedAt)}</td><td><IconButton label={t('viewDetails')} icon={ShieldCheck} variant="secondary" onClick={onOpen} /></td></tr>
 }
 
 const DOCUMENT_OWNER_SOURCE_LABEL_KEYS: Record<AdminDocument['ownerSource'], DocumentsCopyKey> = {

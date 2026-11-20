@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-17-node-maintenance-control.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-node-maintenance-control.md
+document:
+  en: 6ea9084be72315f8d5bcc199bb5cf7f11a28270a
+  zh: 962dd891c7e1d217800eb23801f9c118a056be22
+/agent-note-authenticated-node-control-during-maintenance:
+  en: 1e0e89c7eb021ecf
+  zh: d1e4863d83ae992f
+/agent-note-authenticated-node-control-during-maintenance/problem:
+  en: d1c30ea6c1cfed0c
+  zh: 6f6e88522c4f7c74
+/agent-note-authenticated-node-control-during-maintenance/decision:
+  en: bb5d90f60fd22235
+  zh: 28536959c770ba45
+/agent-note-authenticated-node-control-during-maintenance/alternatives-considered:
+  en: 7c817377d0db2072
+  zh: 52962d749a94581d
+/agent-note-authenticated-node-control-during-maintenance/consequences:
+  en: 1d81ad9faa1fb514
+  zh: 417a2b6a7ede35ee

@@ -7,7 +7,7 @@ kind: "package-library"
 
 [English](README.md) | 中文
 
-Web 启动内核：`new AppWebEntry(el, seams?).run()` 会先等待 Host bootstrap 的可选就绪信号，再分两个阶段挂载客户端。模块阶段调用 Host 安装的 `window.__ModuleLoader__.create()`，传入 `window.__DSH_BOOT__`、外壳静态模块以及可选测试传输覆盖；facade 接纳 parser 预载的 registration 后返回构造好的模块系统与已解析 manifest。本包随后预取 `immediately` 层级。插件阶段挂载仓库内置的 Cordis Loader，通过 Loader 的 `internal` 接口注入该模块系统，将条目创建交给共享的 `ClientEntries` 控制器，并等待每个 fiber 进入 ACTIVE。随后它把带标记的启动 DOM 交给动态 UI 渲染器的 `ctx.uiRenderer.mount(el)` 操作；渲染器先 hydrate 该 DOM，再切换到完整 UI。Graph、parser preload 与 facade 归 Host 所有；AppWebEntry 不感知 bootstrap package id，也不解析 wire 格式。
+Web 启动内核等待 Host 提供的就绪信号，通过 `new AppWebEntry(el, seams?).run()` 挂载客户端。Host 的 `window.__ModuleLoader__.create()` 接收 `window.__DSH_BOOT__`、外壳静态模块和可选的测试传输覆盖。它接纳解析器预载的注册，返回模块系统和已解析的清单。内核预取必需的 `immediately` 条目，将模块系统安装为 Cordis Loader 的 `internal`，由 `ClientEntries` 激活必需条目。必需 fiber 全部激活后，内核把带标记的启动 DOM 交给 `ctx.uiRenderer.mount(el)`。渲染器先接管该 DOM，再渲染应用。后续浏览器任务通过同一个控制器启动可选条目。启动图、解析器预载与注册接口归 Host 所有。
 
 启动页只使用原生 DOM 与本地 CSS，因此客户端 bundle 或插件激活失败时仍能显示。其回退字体和颜色与加载期间到达的主题 token 一致。fiber 更新会保留同一个 spinner 节点，并在 entry 首次进入 active 时增长其 CSS 圆弧；hydrate 会继续保留该节点及其动画相位，直到应用提交。React 挂载、slot 渲染、应用组装和浏览器标题投影位于 [`ui-renderer`](../ui-renderer/README.zh.md)。Modules bundle 会缓存自身已物化导出，并在其普通图 entry 激活时提供闭包中的系统；Cordis service 等待使图 row 创建顺序不依赖该激活时点。
 
@@ -17,13 +17,15 @@ Web 启动内核：`new AppWebEntry(el, seams?).run()` 会先等待 Host bootstr
 
 在预取或激活动态 entry 之前，启动内核会为缺失的 `AbortSignal.any`、`AbortSignal.timeout` 和 `AbortSignal.abort` 工厂安装兼容实现。这样即使 Android WebView 只提供 `AbortController` 而没有较新的静态工厂，浏览器客户端仍可工作；原生实现存在时则保持不变。
 
-外壳基础样式会在支持的浏览器中为普通内容自动添加中西文间距。代码、终端、diff、读取和搜索输出会保留源码中的原始间距和列对齐；不支持 `text-autospace` 的引擎会忽略这些声明。
+外壳基础样式会在支持的浏览器中为普通内容自动添加中西文间距。代码、终端、diff、读取和搜索输出会保留源码中的原始间距和列对齐；不支持 `text-autospace` 的引擎会忽略这些声明。启动失败报告中的长路径会换行，报告在视口内滚动。加载指示器在减少动态效果模式下保持缓慢旋转，在强制颜色模式下使用系统颜色，均不依赖主题加载。
 
 `ClientEntries` 同时负责最初的 Loader 条目创建，以及之后的页面级图协调、重试和重建代码替换。Host 输出 bootstrap 与 application 批次；显式的页面载体通过 `applyIndexInjections` 执行同一结构化注入表。CoHarness 保留 runtime 预加载、静态平台模块、鉴权和 AbortSignal 兼容实现。
 
+主入口 Gateway 可以在连接目标电脑前，为已认证的远端 Runtime 渲染发布包中的公共页面。页面在读取该 Runtime 的已认证启动配置时，先提供当前标签页内的未发送草稿。常规渲染器等待必需插件激活后挂载。浏览器只在原来保存的会话和 Gateway 账号能使用草稿写入服务时交接文字。找不到可交接的原会话，或自定义 index 转换需要完整页面时，文字保留在原标签页供复制。
+
 ## 概述
 
-`dsh-client-web` 启动 web GUI：它先从 Host 提供的启动图加载客户端模块系统，再在应用挂载前激活每一个客户端插件，因此只有当所有插件都就绪时完整 UI 才会出现。无框架启动页会逐 entry 报告状态，因此失败的 bundle 或插件保持可见，而不是白屏。它还定义共享模块表（`PLATFORM_MODULES`），每个动态 bundle 都依据它解析 external。模型永远看不到本包。
+`dsh-client-web` 根据 Host 提供的启动图启动 Web 界面。无框架启动页报告必需条目的激活状态。渲染器挂载后加载可选插件，失败时在侧边栏的「插件」页报告。动态 bundle 使用 `PLATFORM_MODULES` 解析共享依赖。模型看不到本包。
 
 ## 目录
 
@@ -45,7 +47,7 @@ Web 启动内核：`new AppWebEntry(el, seams?).run()` 会先等待 Host bootstr
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
-- **应用会等待完整名册**：只要一个 entry 失败，不依赖框架的启动页就会保留并逐项报告；不支持部分 UI 可用。
+- 必需条目加载失败时，无框架启动页会保留并逐项报告。
 
 <a id="dev-note"></a>
 ### 开发备注

@@ -8,7 +8,7 @@ Web 插件表：[dsh-client-modules](../../packages/client/modules) 中 client �
 
 ## wire
 
-图是 Node 半与浏览器半之间协议层的唯一真源。宿主从扫描到的包组合出 `WebBootEntry` 行与 `WebBootBatch` 描述，随后在 Vite entry 之前向结构化 index 注入表贡献 registration facade、application preload、bootstrap 脚本与图全局量。`global` 行渲染为 `globalThis["__DSH_BOOT__"]`，其中 `<` 已转义，插件可控的字符串因此无法逃出 script 元素。没有有效 manifest 的页面无法启动：浏览器解析器会拒绝畸形 row 或批次、未知批次成员，以及未恰好归属一个初始 combo 描述的 entry。
+图定义 Node 侧与浏览器侧之间的协议格式。宿主从扫描到的包组合出 `WebBootEntry` 行与 `WebBootBatch` 描述，并在 Vite 入口之前向首页提供注册接口、必需应用批次的预加载、引导脚本与全局图。可选批次在必需启动完成后加载。`global` 行为 `globalThis["__DSH_BOOT__"]` 赋值，并转义 `<`，使插件字符串保留在脚本元素内。浏览器拒绝格式错误的行或批次、未知批次成员，以及未恰好归属一个初始合并脚本的条目。
 
 ```ts type-equiv
 /**
@@ -32,6 +32,8 @@ interface WebBootEntry {
   inject?: string[]
   /** Stage-one prefetch mark: load the script for factory registration during module-face boot. */
   immediately?: boolean
+  /** May activate after required application startup. Missing means required. */
+  optional?: boolean
   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
   external?: string[]
 }
@@ -45,7 +47,7 @@ type WebBootBatchPhase = 'bootstrap' | 'application'
 ```ts type-equiv
 /** One initial combo script; a scheduling phase may span several descriptors. */
 interface WebBootBatch {
-  /** Parser-blocking bootstrap or preloaded application scheduling. */
+  /** Parser-blocking bootstrap or application scheduling after module setup. */
   phase: WebBootBatchPhase
   /** Revisioned combo script endpoint. */
   url: string

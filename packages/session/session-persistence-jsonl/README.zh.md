@@ -65,6 +65,8 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 
 默认产物是独立 [Zstandard frame](../../../.agents/notes/implemented/architecture/2026-07-19-zstandard-jsonl-session-logs.zh.md) 的标准拼接：一个仅包含 header 行的带 checksum frame，后跟每个持久 append 批次一个带 checksum frame。后端使用 Node 内置 Zstandard API 和默认压缩级别，不提供级别开关。列表只读取并验证 header frame。`compression: 'none'` 在原始表示中保留相同逻辑行。
 
+`readRaw()` 返回解压后的 JSONL，代次文件名以 `.jsonl` 结尾；压缩后缀仅用于存储。导出读取不会改变已提交的代次。
+
 一个根只属于一种编码。启动发现和定向查找会拒绝相反 suffix，错误会命名不兼容产物，并指示调用方选择匹配 mode 或独立根。平铺 `<project>/<id>.jsonl*` 产物也会被拒绝，而不是忽略。格式迁移会保留已配置编码；不支持压缩转换、混合根回退或双写。
 
 <a id="durability-and-crash-semantics"></a>

@@ -1,0 +1,39 @@
+- button "Back to Optional plugins": Optional plugins
+- button "Uninstall Machine translation of reasoning" [disabled]:
+  - img
+  - text: Uninstall
+- switch "Enable Machine translation of reasoning"
+- heading "Machine translation of reasoning" [level=3]
+- text: v0.2.1-rc.1.coharness.1 Experimental
+- paragraph:
+  - code: "@deepseek-ai/dsh-experimental-cot-translation-bundle"
+- paragraph: Machine translation of expanded reasoning; source text is sent to the selected service
+- paragraph: Expanded reasoning is sent to the selected service. It may contain private code or conversation details.
+- paragraph: Bing and Google need no translation login or API key. Their anonymous endpoints may reject or limit requests.
+- text: Translation service
+- combobox "Translation service":
+  - option "Bing" [selected]
+  - option "Google"
+- text: Target language Overridden
+- button "Reset to default"
+- textbox "Target language":
+  - /placeholder: ""
+  - text: ja
+- paragraph: auto follows the UI language; language codes such as zh, en, and ja also work.
+- button "Save" [disabled]
+- heading "Components" [level=4]
+- text: 2 total · 2 running
+- list:
+  - listitem:
+    - text: "@deepseek-ai/dsh-experimental-translator"
+    - code: translator
+    - text: Running
+  - listitem:
+    - text: "@deepseek-ai/dsh-experimental-client-ui-cot-translation"
+    - code: cot-translation
+    - text: Running
+- heading "Source" [level=4]
+- term: Code source
+- definition: Built in
+- term: Current version
+- definition: 0.2.1-rc.1.coharness.1

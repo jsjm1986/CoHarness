@@ -33,20 +33,18 @@ function mediaBody(query: string): string {
 }
 
 describe('dockkit compact styles', () => {
-  it('grows the strip row without growing the host band', () => {
+  it('gives the touch row its full target height plus breathing room', () => {
     const compact = mediaBody('(max-width: 767px)')
-    expect(compact).toMatch(/\.tabStrip\s*\{[^}]*height:\s*40px/)
-    // The 40px row comes out of the band's bottom padding, so the strip keeps
-    // sharing the host's --dsh-dockkit-strip-block total.
-    expect(compact).toContain('padding-bottom: calc(var(--dsh-dockkit-strip-block, 38px) - var(--dsh-dockkit-strip-block-start, 8px) - 40px)')
+    expect(compact).toContain('height: max(var(--dsh-dockkit-strip-block, 66px), 66px)')
+    expect(sheet).toContain('padding: 8px 6px 8px var(--dsh-dockkit-strip-inline-start, 10px)')
   })
 
   it('lifts chips and controls to compact geometry under 768px', () => {
     const compact = mediaBody('(max-width: 767px)')
-    expect(compact).toMatch(/\.tab\s*\{[^}]*height:\s*32px/)
-    expect(compact).toMatch(/\.tab\s*\{[^}]*min-width:\s*88px/)
-    expect(compact).toMatch(/\.iconButton,\s*\.addTab\s*\{[^}]*width:\s*36px[^}]*height:\s*36px/)
-    expect(compact).toMatch(/\.tabClose\s*\{[^}]*width:\s*22px[^}]*height:\s*22px/)
+    expect(compact).toMatch(/\.tab\s*\{[^}]*height:\s*44px/)
+    expect(compact).toMatch(/\.tab\s*\{[^}]*min-width:\s*124px/)
+    expect(compact).toMatch(/\.iconButton,\s*\.addTab\s*\{[^}]*width:\s*44px[^}]*height:\s*44px/)
+    expect(compact).toMatch(/\.tabClose\s*\{[^}]*width:\s*44px[^}]*height:\s*44px/)
   })
 
   it('leaves the blocked split control\'s visibility to the kit, never the stylesheet', () => {
@@ -54,9 +52,9 @@ describe('dockkit compact styles', () => {
     expect(compact).not.toMatch(/\[data-dockkit-split-blocked\][^}]*display:\s*none/)
   })
 
-  it('gives the tab menu phone-sized items', () => {
-    const compact = mediaBody('(max-width: 767px)')
-    expect(compact).toMatch(/\.menuItem\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/)
-    expect(compact).toMatch(/\.menu\s*\{[^}]*min-width:\s*160px/)
+  it('keeps tab menu items at the touch target on phones and wider touchscreens', () => {
+    const touch = mediaBody('(max-width: 767px), (pointer: coarse)')
+    expect(touch).toMatch(/\.menuItem\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/)
+    expect(touch).toMatch(/\.menu\s*\{[^}]*min-width:\s*160px/)
   })
 })

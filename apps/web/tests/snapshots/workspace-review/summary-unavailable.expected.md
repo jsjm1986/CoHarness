@@ -1,0 +1,3 @@
+- status:
+  - paragraph: This turn’s recorded changes are temporarily unavailable. Retry or check its stored and backed-up records.
+  - button "Retry"

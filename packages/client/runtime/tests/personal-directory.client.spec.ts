@@ -10,6 +10,8 @@ import { WorkspaceRuntime } from '../src/client/workspaces/service.ts'
 import { createSnapshotStore } from '../src/client/contract/store.ts'
 import { ProjectUiPolicyRuntime } from '../src/client/project-policy.ts'
 import { installPersonalDirectory, type PersonalRuntimeDirectory } from '../src/client/personal-directory.ts'
+import { ConversationIntents } from '../src/client/conversation-intents.ts'
+import { GatewayEntryRequests } from '../src/client/entry-requests.ts'
 import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
 
 afterEach(() => { vi.unstubAllGlobals() })
@@ -188,6 +190,99 @@ it('loads central directory metadata after account verification without waking a
 })
 
 function ctxPolicy(ctx: Context, policy: ProjectUiPolicyRuntime): void { ctx.provide('projectUiPolicy', policy) }
+
+async function cachedDirectoryFixture() {
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime()
+  ctxPolicy(f.ctx, policy)
+  vi.stubGlobal('location', new URL(`https://harness.invalid/?dshRuntime=${target(1).runtimeId}`))
+  const state: { available: boolean; reads: number; nextRead?: (signal: AbortSignal) => Promise<void> } = { available: true, reads: 0 }
+  const fetcher = vi.fn(async (path: string, init: RequestInit) => {
+    const url = new URL(path, globalThis.location.origin)
+    if (url.pathname === '/account/api/runtimes') {
+      state.reads++
+      const items = [1, 2].map(n => ({ id: target(n).runtimeId, owner: { kind: 'personal', id: 7, name: 'Me' },
+        node: { id: target(n).nodeId, name: target(n).nodeName, status: n === 2 && !state.available ? 'offline' : 'active' },
+        observedState: 'stopped' }))
+      const hold = state.nextRead
+      delete state.nextRead
+      if (hold !== undefined) await hold(init.signal!)
+      return Response.json({ items, nextCursor: null })
+    }
+    if (url.pathname === '/account/api/workbench/context') return Response.json({
+      user: { id: 7, displayName: 'Me' }, projects: [], environment: { id: target(1).runtimeId },
+    })
+    throw new Error('Unexpected execution or node-content request')
+  })
+  vi.stubGlobal('fetch', fetcher)
+  const requests = new GatewayEntryRequests(f.connection, () => policy.getSnapshot().verifiedAccountId, () => true)
+  f.ctx.provide('gatewayEntryRequests', requests)
+  f.ctx.effect(() => () => requests.dispose())
+  try {
+    const directory = installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+      executionAuthorityRequired: true, runtimeTarget: target(1) })
+    policy.setVerifiedAccountId(7)
+    await vi.waitFor(() => { expect(f.workspaces.list.getSnapshot().directoryState).toBe('ready') })
+    return { ...f, policy, requests, directory, state, fetcher }
+  } catch (error) { await f.ctx.fiber.dispose(); throw error }
+}
+
+it('explicitly refreshes cached computer availability without opening a Runtime', async () => {
+  const f = await cachedDirectoryFixture()
+  const sibling = new GatewayEntryRequests(f.connection, () => 7, () => true)
+  try {
+    expect(f.directory.getSnapshot()[1]?.status).toBe('active')
+    await sibling.catalog()
+    const before = f.state.reads
+    f.state.available = false
+    await f.workspaces.refreshPersonalDirectory()
+    expect(f.directory.getSnapshot()[1]?.status).toBe('offline')
+    expect(f.state.reads).toBe(before + 1)
+    expect(await sibling.catalog()).toMatchObject({ personalWorkspaces: [{ status: 'active' }, { status: 'active' }] })
+    expect(f.state.reads).toBe(before + 1)
+    f.state.available = true
+    await f.workspaces.refreshPersonalDirectory()
+    expect(f.directory.getSnapshot()[1]?.status).toBe('active')
+    expect(f.state.reads).toBe(before + 2)
+    expect(f.forTarget).not.toHaveBeenCalled()
+    expect(f.api.callsOf('session.create')).toEqual([])
+    expect(f.remoteApi.callsOf('session.create')).toEqual([])
+  } finally { await f.ctx.fiber.dispose(); await sibling.dispose() }
+})
+
+it('coalesces refreshes received during an older read and waits for the newer availability', async () => {
+  const f = await cachedDirectoryFixture(), entered = deferred<undefined>(), release = deferred<undefined>()
+  f.state.nextRead = async () => { entered.resolve(undefined); await release.promise }
+  try {
+    const first = f.workspaces.refreshPersonalDirectory()
+    await entered.promise
+    f.state.available = false
+    const second = f.workspaces.refreshPersonalDirectory(), third = f.workspaces.refreshPersonalDirectory()
+    expect(f.state.reads).toBe(2)
+    release.resolve(undefined)
+    await Promise.all([first, second, third])
+    expect(f.state.reads).toBe(3)
+    expect(f.directory.getSnapshot()[1]?.status).toBe('offline')
+    expect(f.forTarget).not.toHaveBeenCalled()
+  } finally { release.resolve(undefined); await f.ctx.fiber.dispose() }
+})
+
+it('drains a cancelled refresh and discards its queued follow-up when the document is disposed', async () => {
+  const f = await cachedDirectoryFixture(), entered = deferred<AbortSignal>(), release = deferred<undefined>()
+  f.state.nextRead = async (signal) => { entered.resolve(signal); await release.promise }
+  try {
+    const first = f.workspaces.refreshPersonalDirectory(), signal = await entered.promise
+    const second = f.workspaces.refreshPersonalDirectory()
+    let disposed = false
+    const closing = f.ctx.fiber.dispose().then(() => { disposed = true })
+    await vi.waitFor(() => { expect(signal.aborted).toBe(true) })
+    expect(disposed).toBe(false)
+    release.resolve(undefined)
+    await Promise.all([first, second, closing])
+    expect(f.state.reads).toBe(2)
+    expect(f.forTarget).not.toHaveBeenCalled()
+  } finally { release.resolve(undefined); await f.ctx.fiber.dispose() }
+})
 
 it('rejects an active Runtime mismatch before publishing new directory metadata and clears the cache on account change', async () => {
   const f = await fixture(), policy = new ProjectUiPolicyRuntime()
@@ -452,6 +547,9 @@ it('still restores the saved Session over an ambient selection the user never co
     setItem: (key: string, value: string) => { storage.set(key, value) } })
   const f = await fixture(), policy = new ProjectUiPolicyRuntime()
   ctxPolicy(f.ctx, policy)
+  const intents = new ConversationIntents()
+  f.ctx.provide('conversationIntents', intents)
+  f.ctx.on('conversation/prepare-input', async () => true)
   f.api.onList = async () => ok({ items: [{ sessionId: rawLocal, updatedAt: 1, running: false, blank: false }] })
   f.remoteApi.onList = async () => ok({ items: [{ sessionId: rawSaved, updatedAt: 1, running: false, blank: false }] })
   vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
@@ -469,7 +567,129 @@ it('still restores the saved Session over an ambient selection the user never co
       executionAuthorityRequired: true })
     policy.setVerifiedAccountId(7)
     await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(saved) })
+    expect(intents.snapshot.getSnapshot()).toEqual({ saved: [] })
   } finally { await f.ctx.fiber.dispose() }
+})
+
+async function pendingPersonalRestore() {
+  const rawSaved = 'saved-on-b' as SessionId, rawLocal = 'pane-on-a' as SessionId
+  const saved = clientSessionKey(target(2), rawSaved), local = clientSessionKey(target(1), rawLocal)
+  const key = `dsh.personal.current.v1.account:7.runtime:${target(1).runtimeId}`
+  const storage = new Map([[key, JSON.stringify({ sessionId: saved, nodeId: target(2).nodeId })]])
+  vi.stubGlobal('location', { search: `?dshRuntime=${target(1).runtimeId}` })
+  vi.stubGlobal('sessionStorage', { getItem: (name: string) => storage.get(name) ?? null,
+    setItem: (name: string, value: string) => { storage.set(name, value) } })
+  const f = await fixture(), policy = new ProjectUiPolicyRuntime(), intents = new ConversationIntents()
+  ctxPolicy(f.ctx, policy)
+  f.ctx.provide('conversationIntents', intents)
+  const drafts = new Map<SessionId, string>([[local, 'existing local draft'], [saved, 'existing remote draft']])
+  f.ctx.on('conversation/prepare-input', async id => drafts.has(id))
+  const append = vi.fn(({ sessionId, text }: { sessionId: SessionId; text: string }) => {
+    drafts.set(sessionId, drafts.get(sessionId)! + text)
+    return true as const
+  })
+  f.ctx.on('conversation/append-input', append)
+  f.api.onList = async () => ok({ items: [{ sessionId: rawLocal, updatedAt: 1, running: true, blank: false }] })
+  f.remoteApi.onList = async () => ok({ items: [{ sessionId: rawSaved, updatedAt: 1, running: true, blank: false }] })
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/account/api/scope?')
+    ? new Response(null, { status: 204, headers: { location: `/?dshRuntime=${target(2).runtimeId}` } })
+    : Response.json({ activeRuntime: target(1), personalWorkspaces: [group(1), group(2)], paged: true,
+      items: [{ sessionId: rawSaved, runtime: target(2), title: 'Saved on B', updatedAt: 1, blank: false }] })))
+  const entered = deferred<undefined>(), release = deferred<undefined>(), settled = deferred<undefined>()
+  const original = f.sessions.ensureSession.bind(f.sessions)
+  const check = vi.spyOn(f.sessions, 'ensureSession').mockImplementationOnce(async (...args) => {
+    entered.resolve(undefined)
+    await release.promise
+    try { return await original(...args) } finally { settled.resolve(undefined) }
+  })
+  try {
+    await f.base.refresh()
+    installPersonalDirectory(f.ctx, f.connection, f.sessions, f.workspaces)
+    f.hostDescription.set({ version: 'test', cwd: '/work', attachedSessions: 0, home: '/home/test',
+      canOpenPath: true, executionAuthorityRequired: true })
+    policy.setVerifiedAccountId(7)
+    await entered.promise
+    return { ...f, intents, drafts, append, saved, local, key, storage, release, settled, check }
+  } catch (error) { release.resolve(undefined); await f.ctx.fiber.dispose(); throw error }
+}
+
+it.each([
+  ['workbench-first', ''], ['workbench-first', ' unsent on B'],
+  ['personal-first', ''], ['personal-first', ' unsent on B'],
+] as const)('settles only the owned restore editor when %s with text %j', async (order, text) => {
+  const f = await pendingPersonalRestore()
+  try {
+    const intent = f.intents.snapshot.getSnapshot().active!
+    expect(intent.target).toEqual(target(2))
+    f.intents.edit(intent.id, text)
+    if (order === 'workbench-first') {
+      f.sessions.open(f.local, { activate: false })
+      expect(f.intents.snapshot.getSnapshot().active).toBeUndefined()
+      expect(f.intents.snapshot.getSnapshot().saved).toEqual(text === '' ? [] : [expect.objectContaining({
+        id: intent.id, target: target(2), text, phase: 'unavailable' })])
+      f.release.resolve(undefined)
+      await f.settled.promise
+      await f.workspaces.refreshPersonalDirectory()
+      expect(f.check).toHaveBeenCalledTimes(1)
+      expect(f.sessions.list.getSnapshot().current).toBe(f.local)
+      expect(f.append).not.toHaveBeenCalled()
+      expect(JSON.parse(f.storage.get(f.key)!)).toEqual({ sessionId: f.saved, nodeId: target(2).nodeId })
+      if (text !== '') {
+        f.intents.resume(intent.id)
+        await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(f.saved) })
+        expect(f.check.mock.calls[1]?.[0]).toEqual(target(2))
+      }
+    } else {
+      f.release.resolve(undefined)
+      await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(f.saved) })
+      f.sessions.open(f.local, { activate: false })
+    }
+    expect(f.intents.snapshot.getSnapshot()).toEqual({ saved: [] })
+    expect(f.drafts.get(f.local)).toBe('existing local draft')
+    expect(f.drafts.get(f.saved)).toBe('existing remote draft' + text)
+    expect(f.append).toHaveBeenCalledTimes(text === '' ? 0 : 1)
+    expect(f.api.callsOf('session.prompt')).toEqual([])
+    expect(f.remoteApi.callsOf('session.prompt')).toEqual([])
+    expect(f.api.callsOf('session.cancel')).toEqual([])
+    expect(f.remoteApi.callsOf('session.cancel')).toEqual([])
+  } finally { f.release.resolve(undefined); await f.ctx.fiber.dispose(); f.intents.clear() }
+})
+
+it('does not withdraw another preparation when a superseded personal restore settles late', async () => {
+  const f = await pendingPersonalRestore(), nextReady = deferred<undefined>()
+  try {
+    const original = f.intents.snapshot.getSnapshot().active!
+    f.intents.edit(original.id, 'retained on B')
+    const next = f.intents.begin({ target: target(3), label: 'Computer 3' }, () => nextReady.promise)
+    f.intents.edit(next, 'new on C')
+    f.sessions.open(f.local, { activate: false })
+    expect(f.intents.snapshot.getSnapshot().active).toMatchObject({ id: next, text: 'new on C', phase: 'preparing' })
+    f.release.resolve(undefined)
+    await f.settled.promise
+    await f.workspaces.refreshPersonalDirectory()
+    expect(f.intents.snapshot.getSnapshot()).toMatchObject({ active: { id: next, target: target(3), text: 'new on C', phase: 'preparing' },
+      saved: [{ id: original.id, target: target(2), text: 'retained on B' }] })
+    expect(f.append).not.toHaveBeenCalled()
+  } finally { f.release.resolve(undefined); nextReady.resolve(undefined); await f.ctx.fiber.dispose(); f.intents.clear() }
+})
+
+it('retains a deliberately resumed original-target draft while the cancelled read still settles', async () => {
+  const f = await pendingPersonalRestore()
+  try {
+    const intent = f.intents.snapshot.getSnapshot().active!
+    f.intents.edit(intent.id, ' delayed draft')
+    f.sessions.open(f.local, { activate: false })
+    f.intents.resume(intent.id)
+    await vi.waitFor(() => { expect(f.sessions.list.getSnapshot().current).toBe(f.saved) })
+    expect(f.drafts.get(f.saved)).toBe('existing remote draft delayed draft')
+    f.release.resolve(undefined)
+    await f.settled.promise
+    await f.workspaces.refreshPersonalDirectory()
+    expect(f.check).toHaveBeenCalledTimes(2)
+    expect(f.intents.snapshot.getSnapshot()).toEqual({ saved: [] })
+    expect(f.append).toHaveBeenCalledOnce()
+    expect(f.sessions.list.getSnapshot().current).toBe(f.saved)
+  } finally { f.release.resolve(undefined); await f.ctx.fiber.dispose(); f.intents.clear() }
 })
 
 it('keeps captured directory operations on B after selection returns to the bootstrap computer', async () => {

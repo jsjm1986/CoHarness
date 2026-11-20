@@ -1,10 +1,12 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createHmac } from 'node:crypto'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadConfig } from '../src/config.ts'
 import * as childCommand from '../src/child-command.ts'
 import { LocalLauncher, RuntimeLaunchCleanupError, SystemdLauncher, selectLauncher, type SystemdLauncherOptions } from '../src/launcher.ts'
+import { systemdRuntimeShutdownReceipt } from '../src/runtime-shutdown.ts'
 
 const CREDENTIAL_HASH = 'a'.repeat(64)
 
@@ -55,6 +57,20 @@ function systemdOptions(unitDir: string, calls: string[][]): SystemdLauncherOpti
 }
 
 describe('SystemdLauncher', () => {
+  it('checks every retained unit process range without stopping or rewriting units',async()=>{
+    const unitDir=temporary('readonly-quiescence-'),calls:string[][]=[],options=systemdOptions(unitDir,calls)
+    const unit=`harness-alice@9-${CREDENTIAL_HASH}.service`
+    writeFileSync(join(unitDir,unit),'owned-unit')
+    const queries:string[][]=[]
+    options.query=async args=>{queries.push(args);return 'ActiveState=inactive\nSubState=dead\nControlGroup=\nMainPID=0\nControlPID=0\n'}
+    const launcher=new SystemdLauncher(options),identity={kind:'user' as const,ownerId:1,runtimeKey:'alice'}
+    await launcher.assertQuiescent(identity)
+    expect(queries).toHaveLength(1);expect(calls).toEqual([])
+    expect(readFileSync(join(unitDir,unit),'utf8')).toBe('owned-unit')
+    options.query=async()=> 'ActiveState=failed\nSubState=failed\nControlGroup=/occupied\nMainPID=0\nControlPID=0\n'
+    await expect(launcher.assertQuiescent(identity)).rejects.toThrow('active or unknown')
+    expect(calls).toEqual([])
+  })
   it.each([
     { code: 1, reason: 'missing', status: 409, diagnostic: 'RUNTIME_ACCOUNT_NOT_PROVISIONED' },
     { code: 'ENOENT', reason: 'unavailable', status: 503, diagnostic: 'RUNTIME_ACCOUNT_VERIFICATION_UNAVAILABLE' },
@@ -217,6 +233,34 @@ describe('SystemdLauncher', () => {
       expect(existsSync(source)).toBe(true)
     } finally { stopped.resolve(); await pending }
     expect(existsSync(source)).toBe(false)
+  })
+
+  it.skipIf(process.platform === 'win32').each([
+    ['confirmed', 'confirmed'], ['timeout', 'timeout'], ['forged', 'unconfirmed'], ['other-generation', 'unconfirmed'],
+  ] as const)('accepts the exact systemd checkpoint proof for %s', async (mode, expected) => {
+    const unitDir = temporary('units-checkpoint-')
+    const dshHome = temporary('runtime-checkpoint-')
+    const options = systemdOptions(unitDir, [])
+    const token = 'fixture-shutdown-authenticator'
+    const runtime = { kind: 'user' as const, ownerId: 1, username: 'alice', runtimeKey: 'alice', systemUser: 'harness-alice', port: 42001,
+      homePath: '/srv/harness/users/alice/home', dshHome, retainedData: true as const, generation: 2, credentialHash: CREDENTIAL_HASH,
+      gatewayCredential: JSON.stringify({ token }) }
+    const receipt = systemdRuntimeShutdownReceipt(dshHome, runtime.generation, CREDENTIAL_HASH)
+    options.run = async ([operation]) => {
+      if (operation !== 'stop') return
+      const outcome = mode === 'timeout' ? 'timeout' : 'confirmed'
+      const provedPath = mode === 'other-generation' ? systemdRuntimeShutdownReceipt(dshHome, 1, CREDENTIAL_HASH) : receipt
+      const proof = createHmac('sha256', mode === 'forged' ? 'other-token' : token)
+        .update(['dsh-gateway-shutdown-v1', basename(provedPath), outcome].join('\0')).digest('base64url')
+      writeFileSync(receipt, `${outcome}\t${proof}\n`)
+    }
+    const launcher = new SystemdLauncher(options)
+    await launcher.start(runtime)
+    const unit = readFileSync(join(unitDir, `harness-alice@2-${CREDENTIAL_HASH}.service`), 'utf8')
+    expect(unit).toContain('Environment="DSH_GATEWAY_SHUTDOWN_RECEIPT=' + receipt + '"')
+    expect(unit).toContain('KillMode=mixed')
+    await expect(launcher.attach(runtime).terminate(5000)).resolves.toBe(expected)
+    if (expected !== 'unconfirmed') expect(existsSync(receipt)).toBe(false)
   })
 
   it('fences an allocation still waiting for grants before confirming that generation stopped', async () => {

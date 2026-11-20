@@ -148,7 +148,7 @@ export interface Config {
 
 - `inject`: `agents` · `sessions` · `llm` · `tools` · `systemPrompt` · `sessionProjections`
 - `refs`: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md)
-- `source`: [`packages/core/agent-loop/src/index.ts:334`](../packages/core/agent-loop/src/index.ts)
+- `source`: [`packages/core/agent-loop/src/index.ts:351`](../packages/core/agent-loop/src/index.ts)
 
 ```ts config-catalog
 /** Agent-loop plugin configuration. */
@@ -604,9 +604,9 @@ export interface Config {
 /** Startup transport grouping; module application keeps the declared graph order. */
 export interface Config {
   /**
-   * Package sets transported separately from ungrouped application entries.
-   * Omission keeps one URL-bounded application sequence. Inactive packages contribute nothing;
-   * active members retain their graph order, and bootstrap packages cannot be grouped here.
+   * Groups of required application packages delivered in their own URL-bounded sequences.
+   * Ungrouped required packages share a sequence. Active members retain graph order.
+   * Bootstrap packages cannot be listed. Each optional package has its own response.
    */
   applicationBatchGroups?: string[][]
 }
@@ -946,7 +946,7 @@ export interface Config {
 
 - `inject`: `translator` · `typert` · `sessionController`
 - `refs`: [`TranslationProvider`](subsystems/translation.md) · `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/experimental/client-ui-cot-translation/src/index.ts:13`](../packages/experimental/client-ui-cot-translation/src/index.ts)
+- `source`: [`packages/experimental/client-ui-cot-translation/src/index.ts:19`](../packages/experimental/client-ui-cot-translation/src/index.ts)
 
 ```ts config-catalog
 /** Live preferences presented on the bundle's Plugins page. */
@@ -1464,7 +1464,7 @@ export type PaidTranslationProvider = 'deepseek-account' | 'deepseek-official'
 
 - `inject`: `workingDirectory` · `fs` · `subprocess` · `sandbox` · `sandboxPolicy` · `sessionProjections`
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/experimental/worktree/src/index.ts:34`](../packages/experimental/worktree/src/index.ts)
+- `source`: [`packages/experimental/worktree/src/index.ts:35`](../packages/experimental/worktree/src/index.ts)
 
 ```ts config-catalog
 /** Worktree location, generated names, executables, subprocess resource limits, and the archive cleanup switch. */
@@ -1586,7 +1586,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-gateway-runtime`
 
 - `inject`: `connection`
-- `source`: [`packages/context/gateway-runtime/src/index.ts:492`](../packages/context/gateway-runtime/src/index.ts)
+- `source`: [`packages/context/gateway-runtime/src/index.ts:524`](../packages/context/gateway-runtime/src/index.ts)
 
 ```ts config-catalog
 /** Managed readiness and Workspace metadata publication settings. */
@@ -1595,6 +1595,8 @@ export interface Config {
   workspaceCatalogTimeoutMs?: number
   /** Loader entry ids that must each have one active instance before readiness; absent means no additional entries. */
   requiredPlugins?: string[]
+  /** Log metadata-only timings for provider-backed model attempts. Defaults to false. */
+  modelTimings?: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-gateway-runtime -->
@@ -1673,7 +1675,7 @@ export interface HmrConfig extends ChokidarOptions {
 ## `@deepseek-ai/dsh-hooks-claude-code`
 
 - `inject`: `shell` · `sessionProjections` · `workingDirectory`
-- `source`: [`packages/hooks/hooks-claude-code/src/index.ts:54`](../packages/hooks/hooks-claude-code/src/index.ts)
+- `source`: [`packages/hooks/hooks-claude-code/src/index.ts:57`](../packages/hooks/hooks-claude-code/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: where the CC hook config lives + substitution roots. */
@@ -1719,7 +1721,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-hooks-codex`
 
 - `inject`: `shell` · `sessionProjections` · `workingDirectory`
-- `source`: [`packages/hooks/hooks-codex/src/index.ts:53`](../packages/hooks/hooks-codex/src/index.ts)
+- `source`: [`packages/hooks/hooks-codex/src/index.ts:56`](../packages/hooks/hooks-codex/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: where the Codex hooks.json lives + the model name for payloads. */
@@ -1754,7 +1756,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-apiproxy`
 
 - `inject`: `agentDefaultModel` · `agents` · `attachments` · `directoryPicker` · `llm` · `sessions` · `subagents` · `sessionQuery` · `tools` · `userQuestions` · `workspaceRegistry`
-- `source`: [`packages/host/apiproxy/src/index.ts:60`](../packages/host/apiproxy/src/index.ts)
+- `source`: [`packages/host/apiproxy/src/index.ts:61`](../packages/host/apiproxy/src/index.ts)
 
 ```ts config-catalog
 /** Gateway plugin configuration. */
@@ -1867,7 +1869,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-host-webserver`
 
-- `source`: [`packages/host/webserver/src/index.ts:80`](../packages/host/webserver/src/index.ts)
+- `source`: [`packages/host/webserver/src/index.ts:83`](../packages/host/webserver/src/index.ts)
 
 ```ts config-catalog
 /** Web server listen, TLS, and response-compression config. */
@@ -1953,7 +1955,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-llm`
 
-- `source`: [`packages/llm/llm/src/index.ts:378`](../packages/llm/llm/src/index.ts)
+- `source`: [`packages/llm/llm/src/index.ts:400`](../packages/llm/llm/src/index.ts)
 
 ```ts config-catalog
 /** Runtime controls for bounded adapter-stream teardown. */
@@ -5431,7 +5433,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-agent` | — | [`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts) |
 | `@deepseek-ai/dsh-api-gateway` | `typert` | [`packages/api/gateway/src/index.ts`](../packages/api/gateway/src/index.ts) |
 | `@deepseek-ai/dsh-api-remote-access` | — | [`packages/api/remote-access/src/index.ts`](../packages/api/remote-access/src/index.ts) |
-| `@deepseek-ai/dsh-api-remote-desktop-controller` | `remoteDesktop` · `typert` | [`packages/api/remote-desktop-controller/src/index.ts`](../packages/api/remote-desktop-controller/src/index.ts) |
+| `@deepseek-ai/dsh-api-remote-desktop-controller` | `typert` | [`packages/api/remote-desktop-controller/src/index.ts`](../packages/api/remote-desktop-controller/src/index.ts) |
 | `@deepseek-ai/dsh-api-remotes` | `typertGateway` | [`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts) |
 | `@deepseek-ai/dsh-authorization` | `credentials` | [`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts) |
 | `@deepseek-ai/dsh-browser-use` | — | [`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts) |

@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write apps/cli/reference/README.md
 document:
-  en: ac09ef76bffa15fda1973a8410550fcd609c5086
-  zh: 449f8c3307c5e44755d83ba5a54bfbb96aa5b565
+  en: 3b003dfa49312f0c9e4c7e7c9c8ec2681f3a2127
+  zh: 3237b7e7e28f35560941241a61ce6262c50f883e
 /dsh-cli-behavior-reference:
   en: 6929889d19279f70
   zh: 7e3a4de9675103e6
 /dsh-cli-behavior-reference/managed-launch:
-  en: 971e86f18aef0163
-  zh: f24a7ad3dba6235a
+  en: f2c797f41e10064c
+  zh: 945ad96082e1494b
 /dsh-cli-behavior-reference/profile-boot:
   en: b474a6fc3c98837d
   zh: 9522b4df8e212f0a
@@ -27,8 +27,8 @@ document:
   en: 9980ff1600fa9460
   zh: cc66ba45e27b5540
 /dsh-cli-behavior-reference/web-profile:
-  en: 763a8de09a041a25
-  zh: 3acb75b09ab48aa6
+  en: 147f73214142dfc9
+  zh: d8f52e37c638ee33
 /dsh-cli-behavior-reference/shared-deployment-behavior:
   en: 24e3da3716d261fe
   zh: 060611966db4ca69

@@ -15,9 +15,13 @@ async function drag(page: Page, pick: string, dx: number, dy: number, startInset
     const box = el.getBoundingClientRect()
     const x0 = box.left + Math.min(startInset, box.width / 2)
     const y0 = box.top + box.height / 2
+    const target = document.elementFromPoint(x0, y0)
+    if (target === null || !el.contains(target)) return 'covered'
     const mk = (type: string, x: number, y: number) => {
-      const touch = new Touch({ identifier: 1, target: el, clientX: x, clientY: y })
-      el.dispatchEvent(new TouchEvent(type, { touches: [touch], bubbles: true, cancelable: true }))
+      const touch = new Touch({ identifier: 1, target, clientX: x, clientY: y })
+      target.dispatchEvent(new TouchEvent(type, {
+        touches: type === 'touchend' ? [] : [touch], changedTouches: [touch], bubbles: true, cancelable: true,
+      }))
     }
     mk('touchstart', x0, y0)
     for (let i = 1; i <= 6; i++) {
@@ -46,7 +50,7 @@ it('compact gestures: edge-swipe opens drawer, swipe closes it, sheets drag-dism
     await page.waitForTimeout(2500)
 
     // Left-edge swipe opens the drawer.
-    expect(await drag(page, '[class*="edgeZone"]', 200, 0)).toBe('ok')
+    expect(await drag(page, '[data-viewport="compact"]', 200, 0, 12)).toBe('ok')
     await page.waitForTimeout(600)
     expect(await drawerOpen(page)).toBe(true)
 

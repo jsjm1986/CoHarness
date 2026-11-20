@@ -182,6 +182,24 @@ describe('SessionComputerLabel', () => {
 })
 
 describe('ScopeControl', () => {
+  it('releases the covered sidebar after closing or switching the open page to a rail', () => {
+    const surface = (wide: boolean) => <div data-sidebar-root>
+      <div data-sidebar-browsing><button type="button">Existing conversation</button></div>
+      <ScopeControl {...scopeProps(snapshot(), { wide })} />
+    </div>
+    const view = render(surface(true))
+    const browsing = view.container.querySelector<HTMLElement>('[data-sidebar-browsing]')!
+    browsing.inert = false
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    expect(browsing.inert).toBe(true)
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '关闭' }))
+    expect(browsing.inert).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    expect(browsing.inert).toBe(true)
+    view.rerender(surface(false))
+    expect(browsing.inert).toBe(false)
+  })
+
   it('opens single-computer project names from the entry itself without asking the user to select a computer', async () => {
     const nodeId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' as import('../src/client/collaboration-client.ts').CollaborationComputerId
     const read = vi.fn().mockResolvedValue(undefined)
@@ -519,7 +537,7 @@ describe('ScopeControl', () => {
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).getAttribute('title')).toBe('正在切换空间')
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).hasAttribute('disabled')).toBe(true)
     view.rerender(<ScopeControl {...scopeProps(snapshot({ scopeError: 'switch-failed' }))} />)
-    expect(screen.getByRole('button', { name: '切换个人或项目空间' }).getAttribute('title')).toBe('空间切换失败，请重试')
+    expect(screen.getByRole('button', { name: '切换个人或项目空间', hidden: true }).getAttribute('title')).toBe('空间切换失败，请重试')
   })
 
   it('shows a non-dismissible target and progress status while switching', () => {

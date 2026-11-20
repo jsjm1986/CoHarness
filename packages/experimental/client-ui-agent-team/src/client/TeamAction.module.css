@@ -38,7 +38,12 @@
 }
 
 .count {
-  min-width: 16px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--dsw-space-4);
+  min-height: var(--dsw-space-4);
   border-radius: 8px;
   background: var(--dsw-alias-interactive-bg-active);
   font-variant-numeric: tabular-nums;
@@ -52,18 +57,16 @@
   /* Fixed so useAnchoredPosition can right-align it to the trigger and clamp
      it inside the viewport on every size. */
   position: fixed;
+  container-type: inline-size;
   z-index: 110;
   box-sizing: border-box;
   width: min(560px, calc(100vw - 32px));
-  max-height: min(680px, calc(100vh - 32px));
+  max-height: min(680px, calc(var(--dsw-viewport-height, 100dvh) - 32px));
   padding: 10px;
   overflow: auto;
   border: 0;
   border-radius: var(--dsw-radius-xl);
-  background: var(--dsw-specific-menu);
-  /* The menu fill is translucent by design; the blur is what keeps the chat
-     behind the panel from bleeding through (MenuSurface contract). */
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
+  background: var(--dsw-alias-bg-layer-1);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
   /* Drops from the header trigger: grow out of its bottom-left corner. */
@@ -98,6 +101,7 @@
 
 .toolbar {
   min-height: 28px;
+  flex-wrap: wrap;
 }
 
 .spacer {
@@ -113,6 +117,9 @@
 }
 
 .panel h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
   margin: 12px 0 6px;
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
@@ -221,6 +228,7 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .meta {
@@ -276,12 +284,26 @@
 .modeRow {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  padding: 4px 0;
+  /* The Switch expands its pointer area 12px above and below its visual box on
+     coarse pointers; the top padding must at least cover that overhang or the
+     expanded area lands on the toolbar buttons in the row above. */
+  padding: 16px 0 4px;
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .trigger, .iconButton, .expandToggle {
+    min-width: var(--dsw-touch-target, 44px);
+    min-height: var(--dsw-touch-target, 44px);
+  }
+  .roster { grid-template-columns: minmax(0, 1fr); }
+  .taskTitle { flex-wrap: wrap; overflow-wrap: anywhere; }
 }
 
 .modeLabel {
   flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--dsh-color-text, inherit);
 }
@@ -293,10 +315,23 @@
 .modeConfirm {
   display: flex;
   align-items: center;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
+.modeConfirm > .iconButton {
+  width: auto;
+  padding-inline: var(--dsw-space-2);
+}
+
 .modeWarning {
-  font-size: 11px;
+  flex: 1 1 180px;
+  font: var(--dsw-font-xs-13);
   color: var(--dsh-color-warning, #b54708);
+}
+
+@container (max-width: 400px) {
+  .modeConfirm { justify-content: flex-end; }
+  .modeWarning { flex-basis: 100%; }
 }

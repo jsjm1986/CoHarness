@@ -196,8 +196,10 @@ describe('maintenance write gate', () => {
     })
     expect(runtime.status).toBe(503)
     const user = (await deps.users.list())[0]!
-    const stop = vi.spyOn(deps.instances, 'stop').mockResolvedValue(undefined)
-    expect((await post(`/admin/api/users/${user.id}/instance/stop`, {})).status).toBe(204)
+    const stop = vi.spyOn(deps.instances, 'stop').mockResolvedValue({ generation: 1, shutdownOutcome: 'confirmed' })
+    const stopped = await post(`/admin/api/users/${user.id}/instance/stop`, {})
+    expect(stopped.status).toBe(204)
+    expect(stopped.headers.get('x-dsh-runtime-shutdown-outcome')).toBe('confirmed')
     expect(stop).toHaveBeenCalledExactlyOnceWith(user.id, 'manual', boss.id)
     expect((await post(`/admin/api/users/${user.id}/instance/start`, {})).status).toBe(503)
     const runtimePath = '/admin/api/runtimes/00000000-0000-4000-8000-000000000001'

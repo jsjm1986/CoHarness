@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/agent-loop/README.md
 document:
-  en: aef2785575183d9998a27a2fbb7a35d19c7203b2
-  zh: cdc8bf4b9440de628d73a7eac54e613c188e8404
+  en: f1f80aa9340d42b08a99878dec7de05f0e54e2c7
+  zh: 0e242496e3d825391c4c5622fe90e4d06e6a7e5b
 /:
   en: c66a79e8f336e414
   zh: 61495d48365178df
@@ -15,14 +15,14 @@ document:
   en: 9256331cd3baf930
   zh: 02b4c10cf3286eb3
 /dsh-agent-loop/table-of-contents:
-  en: 492c43d796a84e64
-  zh: dc6603d84e74247d
+  en: cc3ecaff83d86bd3
+  zh: dbbaa77042c26abd
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop:
   en: 84ddef3e30b22560
   zh: 324d4a65ec82c114
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/public-api:
-  en: 6713c5dd6f6ea66f
-  zh: 598dbb76ea19d903
+  en: b94247a277bcf59b
+  zh: 419caa86169f6aeb
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/injected-services:
   en: 174543e4b0f52e85
   zh: d0c1371fbc538db0
@@ -36,8 +36,11 @@ document:
   en: b27bbabb34a140ac
   zh: f91ef8e2ef970750
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/what-belongs-to-plugins:
-  en: b9711dce401ecc07
-  zh: 2655676c1a5e413f
+  en: 7e3ced6757774f4a
+  zh: ad801aaa5ed29195
+/dsh-agent-loop/service-agentloop-ctx-key-agentloop/planned-shutdown:
+  en: 9887bc866dc0f056
+  zh: 947a976ac5076b30
 /dsh-agent-loop/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -78,8 +81,8 @@ document:
   en: 1750eea3cc5bf2d8
   zh: cd3dfe31be5dedec
 /dsh-agent-loop/known-limitations-and-deferred-work:
-  en: dd90cc276137032e
-  zh: e5d76cc7554e072f
+  en: 5ae9c8623333ac54
+  zh: a74259986a2d3bb1
 /dsh-agent-loop/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

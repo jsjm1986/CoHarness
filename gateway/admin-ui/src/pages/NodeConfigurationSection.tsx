@@ -6,6 +6,7 @@ import { getNodeConfiguration, mutateNodeConfiguration, type NodeConfigurationVi
 import { adminLanguage, translateCopy } from '../language.ts'
 import { zh, en } from './node-configuration.copy.ts'
 import { Button, Dialog, ErrorBanner, Field, LoadingState, Section, StatusBadge } from '../components/ui.tsx'
+import { computerErrorMessage } from '../computer.copy.ts'
 import { DesktopEnvironmentNotice } from '../components/DesktopEnvironmentNotice.tsx'
 
 function configurationMessage(error: unknown): string {
@@ -22,7 +23,7 @@ function configurationMessage(error: unknown): string {
     'gateway-did-not-confirm-configured-revision': t('errRevisionUnconfirmed'),
     'previous-configuration-restored': t('errPreviousRestored'),
   }
-  return message.split('; ').map(part => descriptions[part] ?? part).join(' ')
+  return message.split('; ').map(part => descriptions[part] ?? computerErrorMessage(part)).join(' ')
 }
 
 export function NodeConfigurationSection() {
@@ -97,17 +98,17 @@ export function NodeConfigurationSection() {
         return <details key={group} className="nodeConfigurationGroup" open={filter !== '' || group === 'network'}>
           <summary>{title}</summary>
           <fieldset className="nodeConfigurationFields" aria-label={title} disabled={busy || applying}>
-          {fields.map(field => <Field key={field.key} label={`${field.label}${field.unit === '' ? '' : `（${field.unit}）`}`}>
-            <input className="input" value={draft[field.key]} inputMode={field.kind === 'integer' ? 'numeric' : 'text'}
+          {fields.map(field => <Field key={field.key} label={`${field.label}${field.unit === '' ? '' : `（${field.unit}）`}`}>{controlProps => <>
+            <input {...controlProps} className="input" value={draft[field.key]} inputMode={field.kind === 'integer' ? 'numeric' : 'text'}
               aria-label={`${field.label}${field.unit === '' ? '' : `（${field.unit}）`}`} aria-describedby={`node-setting-help-${field.key} node-setting-current-${field.key}`}
               onChange={event => { setDraft(current => current === null ? null : { ...current, [field.key]: event.target.value }); setSaved('') }} />
             <p id={`node-setting-help-${field.key}`}>{field.help}</p>
             <small id={`node-setting-current-${field.key}`}>{t('currentLine', { value: view.effective[field.key] === '' ? t('notSet') : view.effective[field.key], source: view.runningRevision === 0 ? t('sourceBoot') : t('sourceManaged', { revision: String(view.runningRevision) }) })}</small>
-          </Field>)}
+          </>}</Field>)}
           </fieldset>
         </details>
       })}
-      <div className="formActions">
+      <div className="formActions nodeConfigurationActions">
         <Button variant="primary" disabled={!dirty || applying} loading={busy} onClick={() => { void mutate('save') }}>{t('saveButton')}</Button>
         <Button disabled={busy || dirty || applying || view.revision === view.runningRevision} onClick={() => { setError(''); setConfirm(true) }}>{t('applyButton')}</Button>
         <Button disabled={busy || applying} onClick={() => {
@@ -116,7 +117,7 @@ export function NodeConfigurationSection() {
             .catch((cause: unknown) => { setError(configurationMessage(cause)) }).finally(() => { setBusy(false) })
         }}>{t('rereadButton')}</Button>
       </div>
-      <p>{t('configFileLead')}<code>{view.configFile}</code>{t('configFileCli')}<code>node gateway/lib/node-config-cli.js status</code>{t('configFileStatus')}<code>recover</code>{t('configFileRecover')}</p>
+      <p className="nodeConfigurationHelp">{t('configFileLead')}<code>{view.configFile}</code>{t('configFileCli')}<code>node gateway/lib/node-config-cli.js status</code>{t('configFileStatus')}<code>recover</code>{t('configFileRecover')}</p>
       <Dialog open={confirm} title={t('applyDialogTitle')} description={t('applyDialogDescription')}
         onClose={() => { if (!busy) setConfirm(false) }} footer={<>
           <Button disabled={busy} onClick={() => { setConfirm(false) }}>{t('cancel')}</Button>

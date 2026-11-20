@@ -11,8 +11,10 @@ import { readResponseJson } from './response-budget.ts'
 
 /** Dedicated binary transport, separate from bounded control JSON messages. */
 export const NODE_SERVICE_STREAM_PATH = '/internal/nodes/streams/'
+/** Gateway identity and transport version shared by the peer handshake and binary stream. */
+export const NODE_SERVICE_PROTOCOL_VERSION = 1
 /** WebSocket subprotocol for one HTTP connection, including a possible browser upgrade. */
-export const NODE_SERVICE_STREAM_PROTOCOL = 'dsh-node-service-v1'
+export const NODE_SERVICE_STREAM_PROTOCOL = `dsh-node-service-v${NODE_SERVICE_PROTOCOL_VERSION}`
 /** Private local attestation route; the node's live credential and exact lease are required. */
 export const NODE_SERVICE_IDENTITY_PATH = '/internal/nodes/service'
 /** Request fence checked by a Gateway before processing a forwarded operation. */
@@ -36,7 +38,7 @@ export class NodeServiceError extends Error {
 
 /** Identity reported by the existing Gateway on the enrolled computer. */
 export const nodeServiceIdentitySchema = z.object({
-  protocolVersion: z.literal(1), organizationId: nodeUuidSchema, nodeId: nodeUuidSchema,
+  protocolVersion: z.literal(NODE_SERVICE_PROTOCOL_VERSION), organizationId: nodeUuidSchema, nodeId: nodeUuidSchema,
   release: z.string().min(1).max(256).nullable(),
 }).strict()
 
@@ -48,7 +50,7 @@ export interface NodeServiceBridgeConfig {
   credential: NodeCredential
   lease: NodeLease
   requestTimeoutMs: number
-  /** An explicit release requirement prevents incompatible node services from receiving requests. */
+  /** A non-null value retains an older center's release requirement. Null matches the local Gateway by wire version and identity. */
   release: string | null
 }
 
@@ -117,9 +119,9 @@ export async function runNodeServiceBridge(config: NodeServiceBridgeConfig, id: 
   const handshake = AbortSignal.any([signal, AbortSignal.timeout(config.requestTimeoutMs)])
   const response = await fetch(new URL(NODE_SERVICE_IDENTITY_PATH, local), { headers, signal: handshake, redirect: 'manual' })
   if (!response.ok) { await response.body?.cancel(); throw new NodeServiceError(503, 'node-service/unavailable') }
-  const identity = nodeServiceIdentitySchema.parse(await readResponseJson(response, 4096))
-  if (identity.nodeId !== config.lease.nodeId || identity.organizationId !== config.lease.organizationId
-    || config.release !== null && identity.release !== config.release) {
+  const identity = nodeServiceIdentitySchema.safeParse(await readResponseJson(response, 4096))
+  if (!identity.success || identity.data.nodeId !== config.lease.nodeId || identity.data.organizationId !== config.lease.organizationId
+    || config.release !== null && identity.data.release !== config.release) {
     throw new NodeServiceError(409, 'node-service/mismatch')
   }
   const gateway = await localSocket(local, handshake)

@@ -15,10 +15,10 @@ import { apply, inject } from '../src/client/index.ts'
 import { apply as hostApply } from '../src/index.ts'
 import { TerminalGuide, type TerminalGuideInjected } from '../src/client/TerminalGuide.tsx'
 import { LazyTerminalBody } from '../src/client/LazyTerminalBody.tsx'
-import { TerminalTitle } from '../src/client/TerminalTitle.tsx'
+import { TerminalTitle, TerminalRenameItem } from '../src/client/TerminalTitle.tsx'
 import { TerminalRecovery, type TerminalRecoveryInjected } from '../src/client/TerminalRecovery.tsx'
 import { TerminalCleanup, type TerminalCleanupInjected } from '../src/client/TerminalCleanup.tsx'
-import type { TerminalBodyInjected } from '../src/client/face.ts'
+import type { TerminalBodyInjected, TerminalRenameInjected, TerminalTitleInjected } from '../src/client/face.ts'
 import { en, zh } from '../src/client/locales.ts'
 
 vi.mock('@xterm/xterm', () => ({ Terminal: vi.fn() }))
@@ -43,7 +43,7 @@ async function mountPlugin() {
   }[] = []
   const dictionaries = new Map<string, unknown>()
   let closeHandler: SidebarRightCloseHandler | undefined
-  const model = { state: {} }
+  const model = { state: createSnapshotStore({ phase: 'idle', writable: false }), refresh: vi.fn(async () => {}) }
   const terminals = {
     retainTabs: vi.fn(), view: vi.fn(() => model), close: vi.fn(), closeFailures: {}, retryClose: vi.fn(),
     launchShells: vi.fn(async () => ({ shells: [], selectedShell: undefined })), issueOf: vi.fn(() => undefined), selectShell: vi.fn(),
@@ -105,6 +105,7 @@ it('registers terminal views, recovery and cleanup, then releases every contribu
       ['sidebar.right.pane.tab.title', TerminalTitle, 'sidebarTerminal'],
       ['conversation.input.left', TerminalRecovery, 'sidebarTerminal'],
       ['shell.overlay', TerminalCleanup, 'sidebarTerminal'],
+      ['sidebar.right.tab.menu.item', TerminalRenameItem, 'sidebarTerminal'],
     ])
     const sessionId = 'session' as SessionId
     const launcher = h.entries[0]!.inject(sessionId) as TerminalGuideInjected
@@ -155,6 +156,34 @@ it('registers terminal views, recovery and cleanup, then releases every contribu
   expect(h.dictionaries.size).toBe(0)
 })
 
+it('owns title commands per Session and keeps a replacement registration after the old title unmounts', async () => {
+  const h = await mountPlugin()
+  const sessionId = 'session' as SessionId
+  const title = h.entries[2]!.inject(sessionId) as TerminalTitleInjected
+  const menu = h.entries[5]!.inject(sessionId) as TerminalRenameInjected
+  const other = h.entries[5]!.inject('other-session' as SessionId) as TerminalRenameInjected
+  const first = vi.fn(), replacement = vi.fn(), remounted = vi.fn()
+  try {
+    const unbindFirst = title.bindRename('tab', first)
+    menu.renameTitle('tab')
+    expect(first).toHaveBeenCalledOnce()
+    const unbindReplacement = title.bindRename('tab', replacement)
+    unbindFirst()
+    other.renameTitle('tab')
+    expect(replacement).not.toHaveBeenCalled()
+    menu.renameTitle('tab')
+    expect(replacement).toHaveBeenCalledOnce()
+    unbindReplacement()
+    menu.renameTitle('tab')
+    expect(replacement).toHaveBeenCalledOnce()
+    title.bindRename('tab', remounted)
+    menu.renameTitle('tab')
+    expect(remounted).toHaveBeenCalledOnce()
+  } finally { await h.dispose() }
+  menu.renameTitle('tab')
+  expect(remounted).toHaveBeenCalledOnce()
+})
+
 it('loads the terminal body implementation when its registered wrapper mounts', async () => {
   render(createElement(LazyTerminalBody, {} as never))
   await waitFor(() => { expect(renderedTerminal).toHaveBeenCalledOnce() })
@@ -199,13 +228,18 @@ it('restores terminal occurrences before listing unrepresented Host terminals an
 it('allows a failed Host lookup to be retried without marking the Session recovered', async () => {
   const h = await mountPlugin()
   const unavailable = new Error('Host unavailable')
+  h.tabsIn.mockReturnValue([{ id: 'saved', kind: 'terminal' }])
+  h.model.state.set({ phase: 'failed', writable: false })
   h.terminals.recover.mockRejectedValueOnce(unavailable)
   const sessionId = 'session' as SessionId
   const recovery = h.entries[3]!.inject(sessionId) as TerminalRecoveryInjected
   try {
     await expect(recovery.restore(new AbortController().signal)).rejects.toBe(unavailable)
     expect(h.openTabIn).not.toHaveBeenCalled()
+    expect(h.model.refresh).not.toHaveBeenCalled()
     await recovery.restore(new AbortController().signal)
+    expect(h.model.refresh).toHaveBeenCalledOnce()
+    expect(h.openTabIn).not.toHaveBeenCalled()
     await recovery.restore(new AbortController().signal)
     expect(h.terminals.recover).toHaveBeenCalledTimes(3)
   } finally {

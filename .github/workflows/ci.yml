@@ -946,6 +946,8 @@ jobs:
           HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_dump"]'
           HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_restore"]'
         run: npm run test:postgres --prefix gateway
+      - name: Replay managed node maintenance control transcript
+        run: DSH_SNAPSHOT=replay ./node_modules/.bin/vitest run --config vitest.snapshot.config.ts gateway/tests/node-maintenance.snapshot.ts --maxWorkers=1
       - name: Test node content volumes on a disposable cluster
         run: |
           docker pull postgres:17.6-bookworm
@@ -957,6 +959,12 @@ jobs:
         run: |
           command -v restic || sudo apt-get install -y --no-install-recommends restic
           HGW_TEST_RESTIC="$(command -v restic)" node tests/run-node-content-postgres.mjs --recovery
+          cd ..
+          DSH_SNAPSHOT=replay HGW_TEST_RESTIC="$(command -v restic)" ./node_modules/.bin/vitest run --config vitest.snapshot.config.ts gateway/tests/peer-backup-capacity.snapshot.ts --maxWorkers=1
+        working-directory: gateway
+      - name: Verify peer repository rotation on a disposable governance database
+        timeout-minutes: 4
+        run: HGW_TEST_RESTIC="$(command -v restic)" node tests/run-node-content-postgres.mjs --governance
         working-directory: gateway
       - name: Preserve gate evidence
         if: always()

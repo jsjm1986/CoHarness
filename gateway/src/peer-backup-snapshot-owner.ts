@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { runGatewayChildCommand } from './child-command.ts'
 import { privateFileState } from './node-private-file.ts'
 import { PeerBackupError } from './peer-backup-repository.ts'
+import type { PeerSourceWrites } from './peer-backup-source-space.ts'
 import {
   peerCaptureSchema,
   type PeerBackupBinding,
@@ -79,12 +80,14 @@ export class PeerSnapshotOwner implements PeerBackupExporter {
     }
   }
 
-  async capture(binding: PeerBackupBinding, payload: string, signal: AbortSignal) {
-    return peerCaptureSchema.parse(await this.invoke('capture', binding, payload, signal))
+  async capture(binding: PeerBackupBinding, payload: string, signal: AbortSignal, space?:PeerSourceWrites) {
+    const capture=()=>this.invoke('capture', binding, payload, signal)
+    return peerCaptureSchema.parse(space ? await space.write(dirname(payload), this.limits.maxBytes, capture) : await capture())
   }
 
-  async validate(binding: PeerBackupBinding, capture: PeerCapture, payload: string, signal: AbortSignal) {
-    const { checked } = verified.parse(await this.invoke('validate', binding, payload, signal, capture))
+  async validate(binding: PeerBackupBinding, capture: PeerCapture, payload: string, signal: AbortSignal, space?:PeerSourceWrites) {
+    const validate=()=>this.invoke('validate', binding, payload, signal, capture)
+    const { checked } = verified.parse(space ? await space.write(dirname(payload), this.limits.maxBytes, validate) : await validate())
     for (const required of domains[this.kind]) {
       if (!checked.includes(required) && !capture.gaps.some((value) => value.startsWith(required + ':'))) {
         throw new PeerBackupError(409, 'peer-backup/unverified-domain')

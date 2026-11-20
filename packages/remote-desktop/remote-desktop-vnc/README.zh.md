@@ -28,17 +28,21 @@ kind: "package-reference"
 <a id="configuration"></a>
 ## 配置
 
+初始化由 Cordis 服务生命周期管理。只有授权存储、审计日志及已配置的端点文件全部加载成功后，提供方才可用；权限和解析失败保留为启动错误。不需要 VNC 服务时应明确禁用插件条目。本地图形会话检测不会禁用已配置的外部端点。
+
 | 字段 | 语义 |
 |---|---|
 | `endpoints` | `{ nodeId, desktop?, host, port, username?, passwordRef? }` 行；重复目标键在装载时报错。`passwordRef` 绑定凭据存储引用（见[托管凭据](#managed-credentials)）；`username` 是密码认证服务端所需的登录名。 |
 | `endpointsFile` | 由部署管理面维护的 `{endpoints: [...]}` JSON 文件；设置后取代内联列表并随变更重载。损坏写入在每次调用时持续报错，直至有效文件落地。 |
 | `grantsFile` | JSONL 授权存储路径，每次变更原子重写，外部写入者替换文件时重载；`':memory:'` 选择易失存储。损坏行响亮失败，最后一份完好行继续生效。 |
 | `recordingDir` | 接收带 `recording` 标志授权的 `<sessionId>.rfb` 原始流捕获的目录；为空则禁用，带标志的 `serveStream` 失败。 |
-| `streamPath` | 流挂载提供的路径名；客户端追加 `?token=`；默认 `/remote-desktop/stream`。 |
+| `streamPath` | 流挂载提供的路径名；客户端追加 `?token=`；默认 `/api/remote-desktop/stream`。 |
 | `attachTokenTtlMs` | attach token 有效期窗口；默认 `60000`。 |
 | `auditFile` | 仅追加 JSONL 审计路径；`':memory:'` 选择易失窗口。 |
 | `auditCapacity` | `audit()` 查询保留并从文件尾部重载的审计事件数；默认 `1024`。 |
 | `probeTimeoutMs` | `status` 端点探测超时；默认 `3000`。 |
+
+提供方卸载时拒绝新操作，取消待连接令牌、拨号和握手，并等待所属流、录制及已排队的审计追加结束。取消后才返回的连接会先关闭，不会启动 RFB 转发。卸载前已准入的授权写入继续遵守原有提交与审计规则。
 
 <a id="attachment-flow"></a>
 ## 附件流程
@@ -56,6 +60,8 @@ kind: "package-reference"
 ## view-only 强制
 
 `RfbClientFilter` 解析客户端→服务端方向：版本前导、安全类型选择、认证响应与 `ClientInit` 全部放行，之后仅转发 `SetPixelFormat`、`SetEncodings` 与 `FramebufferUpdateRequest` 帧。`KeyEvent`、`PointerEvent` 与 `ClientCutText` 被消费并计数；未知消息类型与无法成帧的安全类型按失败关闭处理并拆除连接。
+
+消息编号遵循 [RFC 6143 §7.5](https://www.rfc-editor.org/rfc/rfc6143.html#section-7.5)：放行 `SetPixelFormat`（0）、`SetEncodings`（2）与 `FramebufferUpdateRequest`（3）；丢弃 `KeyEvent`（4）、`PointerEvent`（5）与 `ClientCutText`（6）。任意 socket 分块边界都保持相同的帧分类。
 
 **运行时不变量：** 未发布配套入口。授权、会话与审计的真相存于能力层的存储与日志；provider 只持有逐连接传输状态，已在 `tests/` 中直接验证。
 

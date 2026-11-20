@@ -21,7 +21,7 @@ import { ConversationRepository } from '../src/postgres/conversation-repository.
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import { PostgresModelGovernanceService } from '../src/postgres/model-governance-service.ts'
-import { PostgresProgressService, type ProgressConfig } from '../src/postgres/progress-service.ts'
+import { periodKeyOf, PostgresProgressService, type ProgressConfig, type ProgressContent } from '../src/postgres/progress-service.ts'
 import { PostgresProgressUsage } from '../src/postgres/progress-usage.ts'
 import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
@@ -37,6 +37,13 @@ afterEach(async () => { vi.restoreAllMocks(); for (const close of cleanups.splic
 
 function reply(res: ServerResponse, summary = 'Ready', usage: unknown = { prompt_tokens: 12, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 4 } }): void {
   res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ summary }) } }], usage }))
+}
+
+function priorWeekActivityTime(): number {
+  const date = new Date()
+  date.setUTCHours(12, 0, 0, 0)
+  date.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 6) % 7 - 6)
+  return date.getTime()
 }
 
 describePg('project digest governed model path', () => {
@@ -79,13 +86,15 @@ describePg('project digest governed model path', () => {
     const runtimeId = runtime.runtimeId!
     const collaboration = new PostgresCollaborationService(context), sessions = new ConversationRepository(pool, { organizationId: context.organizationId, runtimeId })
     const sessionId = `progress-${randomUUID()}`
+    const activityAt = priorWeekActivityTime()
     await sessions.create({ id: sessionId, organizationId: context.organizationId, runtimeId, creatorUserId: ids.user_id, projectId: ids.project_id,
-      visibility: 'project', sessionFormatVersion: 0, createdAt: Date.now() - 60_000, cwd: project.path })
-    await sessions.append(sessionId, randomUUID(), [{ type: 'user/message', seq: 0, time: Date.now() - 30_000, surfaceOp: 'append',
-      data: { role: 'user', content: [{ type: 'text', text: 'Prepare the release.' }], source: { kind: 'user', participant: {
+      visibility: 'project', sessionFormatVersion: 0, createdAt: activityAt - 60_000, cwd: project.path })
+    const append = (id: string, seq: number, time: number, text: string) => sessions.append(id, randomUUID(), [{ type: 'user/message', seq, time, surfaceOp: 'append',
+      data: { role: 'user', content: [{ type: 'text', text }], source: { kind: 'user', participant: {
         userId: member.id, username: member.username, displayName: member.displayName, role: 'user',
         scope: { kind: 'project', projectId: project.id, projectName: project.name, mode: 'rw' },
       } } } }])
+    await append(sessionId, 0, activityAt, 'Prepare the release.')
     const governance = new PostgresModelGovernanceService(context, new OrganizationModelCredentialCipher(Buffer.alloc(32, 31)))
     const provider = { provider: 'org-digest', displayName: 'Digest', driver: 'pi-ai' as const, protocol: 'openai-completions' as const,
       baseURL: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}/v1`, authMode: 'none' as const,
@@ -136,7 +145,7 @@ describePg('project digest governed model path', () => {
     const state = async () => (await pool.query<{ generating: boolean; last_error: string | null }>(`SELECT generating_since IS NOT NULL generating,last_error
       FROM harness.project_journal_state WHERE project_id=$1`, [ids.project_id])).rows[0]
     return { context, project, runtimeId, creator, member, projects, ids, sessionId, sessions, collaboration, progress, governance, budget, owner, usage, accessMonitor,
-      requests, responses, headers, provider, generate, grant, state, makeService, pause: () => { paused = true } }
+      requests, responses, headers, provider, generate, grant, state, activityAt, append, makeService, pause: () => { paused = true } }
   }
 
   it('keeps the HTTP-triggered model queued, then stores exact inputs and disjoint usage before releasing capacity', async () => {
@@ -291,10 +300,9 @@ describePg('project digest governed model path', () => {
       if (kind === 'maintenance') f.pause()
       await f.grant()
       await expect.poll(async () => (await f.state())?.generating).toBe(false)
-      await expect.poll(async () => (await f.budget.snapshot()).kinds.model.queued).toBe(0)
+      await expect.poll(async () => (await f.budget.snapshot()).kinds.model).toMatchObject({ active: 0, queued: 0 })
       expect(f.requests).toHaveLength(0)
       expect((await f.state())?.last_error !== null).toBe(kind !== 'source-private')
-      expect((await f.budget.snapshot()).kinds.model).toMatchObject({ active: 0, queued: 0 })
       expect((await pool.query('SELECT 1 FROM harness.model_usage WHERE organization_id=$1', [f.context.organizationId])).rowCount).toBe(0)
       await expect(`# Project digest queued policy\n\nchange=${kind}\nrequests=0\nusageCalls=0\nactive=0\nqueued=0\ngenerating=false\nerrorRecorded=${kind !== 'source-private'}\n`)
         .toMatchFileSnapshot(join(import.meta.dirname, `snapshots/project-progress/${kind}.expected.md`))
@@ -373,9 +381,75 @@ describePg('project digest governed model path', () => {
     await f.generate(); await f.grant()
     await expect.poll(async () => (await f.state())?.generating).toBe(false)
     expect(f.requests).toHaveLength(2)
-    expect((await f.progress.progressForUser(f.project.id, f.member.id)).current?.content.summary).toBe('Ready')
+    const rebuilt = await f.progress.progressForUser(f.project.id, f.member.id)
+    expect(rebuilt.current?.content.summary).toBe('Ready')
+    expect(rebuilt.periods[0]?.activityCount).toBe(1)
     await expect('# Project progress source visibility\n\nprivateSource=currentAndPeriodsHidden\nsharedAgain=pendingMaterialRebuilt\nrequests=2\nsummary=Ready\n')
       .toMatchFileSnapshot(join(import.meta.dirname, 'snapshots/project-progress/source-rebuild.expected.md'))
+  })
+
+  it('publishes backlog by week and preserves sourced decisions when older activity arrives in the same week', async () => {
+    const f = await fixture(() => {}, undefined, { maxItemsPerSection: 1 })
+    const earlier = f.activityAt - 7 * 86_400_000
+    const late = f.activityAt - 1000
+    const earlierWeek = periodKeyOf(new Date(earlier))
+    const releaseWeek = periodKeyOf(new Date(f.activityAt))
+    const createSource = async (time: number, text: string) => {
+      const id = `source-${randomUUID()}`
+      await f.sessions.create({ id, organizationId: f.context.organizationId, creatorUserId: f.ids.user_id,
+        projectId: f.ids.project_id, visibility: 'project', sessionFormatVersion: 0, cwd: f.project.path, createdAt: time })
+      await f.append(id, 0, time, text)
+    }
+    await createSource(earlier, 'Complete the initial draft.')
+    const read = () => f.progress.progressForUser(f.project.id, f.member.id)
+    const dispatch = async (index: number) => {
+      await expect.poll(async () => (await f.budget.snapshot()).kinds.model.queued).toBe(1)
+      await f.grant()
+      await expect.poll(() => f.requests.length).toBe(index + 1)
+      return JSON.parse(f.requests[index]!).messages[0].content as string
+    }
+    const deliver = (index: number, content: { summary?: string } & Partial<Record<keyof ProgressContent['sections'], { text: string; refs: number[] }[]>>) => {
+      f.responses[index]!.writeHead(200, { 'content-type': 'application/json' })
+        .end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }))
+    }
+    expect(await f.generate()).toEqual({ started: true })
+    const first = await dispatch(0)
+    expect(first).toContain(`period="${earlierWeek}"`)
+    expect(first).toContain('Complete the initial draft.')
+    expect(first).not.toContain('Prepare the release.')
+    deliver(0, { summary: 'The draft is ready.', done: [{ text: 'Drafted', refs: [1] }] })
+    const second = await dispatch(1)
+    expect(second).toContain(`period="${releaseWeek}"`)
+    expect(second).toContain('Prepare the release.')
+    expect(second).not.toContain('Complete the initial draft.')
+    expect((await read()).periods).toEqual([])
+    deliver(1, { summary: 'Release preparation began.', decided: [{ text: 'Prepare the release', refs: [1] }],
+      doing: [{ text: 'Preparing', refs: [1] }] })
+    await expect.poll(async () => (await f.state())?.generating).toBe(false)
+    const before = await read()
+    expect(before.periods.map(entry => [entry.periodKey, entry.activityCount])).toEqual([[releaseWeek, 1], [earlierWeek, 1]])
+    expect(before.periods[0]?.content.sections.decided).toEqual([expect.objectContaining({ sessionId: f.sessionId, runtimeId: f.runtimeId, seq: 0 })])
+    expect(before.current?.content.summary).toBe('Release preparation began.')
+
+    await createSource(late, 'Docs were updated earlier.')
+    expect(await f.generate()).toEqual({ started: true })
+    expect(await dispatch(2)).toContain('"ref":2,"text":"Preparing"')
+    deliver(2, { done: [{ text: 'Docs updated', refs: [1] }], doing: [{ text: 'Preparing', refs: [2] }] })
+    await expect.poll(async () => (await f.state())?.generating).toBe(false)
+    const after = await read()
+    expect(after.status).toMatchObject({ pending: 0, generating: false })
+    expect(after.current?.content.summary).toBe('Release preparation began.')
+    expect(after.periods[1]).toEqual(before.periods[1])
+    expect(after.periods[0]).toMatchObject({ id: before.periods[0]?.id, periodKey: releaseWeek, activityCount: 2,
+      periodStart: new Date(late).toISOString(), periodEnd: new Date(f.activityAt).toISOString(),
+      content: { sections: { decided: before.periods[0]?.content.sections.decided,
+        doing: before.periods[0]?.content.sections.doing, done: [expect.objectContaining({ text: 'Docs updated' })] } },
+    })
+    expect(after.periods.every(period => period.spansWeeks === undefined)).toBe(true)
+    await pool.query('UPDATE harness.project_journal SET period_start=$1 WHERE id=$2',
+      [new Date(earlier), after.periods[0]?.id])
+    const retained = (await read()).periods[0]
+    expect(retained).toMatchObject({ spansWeeks: true, content: after.periods[0]?.content })
   })
 
   it('refreshes deployment headers after waiting and retains Harness application attribution', async () => {
@@ -393,7 +467,7 @@ describePg('project digest governed model path', () => {
   it('consumes a microsecond question answer exactly once', async () => {
     const f = await fixture()
     await f.collaboration.claimInteraction(f.member.id, f.runtimeId, f.sessionId, 'question', 'microsecond-answer', { answers: [{ selected: ['Friday'] }] })
-    const time = new Date(Date.now() - 1000).toISOString().replace(/\.\d{3}Z$/, '.123456Z')
+    const time = new Date(f.activityAt + 1000).toISOString().replace(/\.\d{3}Z$/, '.123456Z')
     await pool.query('UPDATE harness.conversation_interaction_responses SET responded_at=$2 WHERE conversation_id=$1', [f.sessionId, time])
     await f.generate(); await f.grant()
     await expect.poll(async () => (await f.state())?.generating).toBe(false)
@@ -405,7 +479,7 @@ describePg('project digest governed model path', () => {
     await f.generate(); await f.grant()
     await expect.poll(async () => (await f.state())?.generating).toBe(false)
     for (const label of ['Choice A', 'Choice B']) await f.collaboration.claimInteraction(f.member.id, f.runtimeId, f.sessionId, 'question', label, { answers: [{ selected: [label] }] })
-    const time = new Date(Date.now() - 1000).toISOString().replace(/\.\d{3}Z$/, '.123000Z')
+    const time = new Date(f.activityAt + 1000).toISOString().replace(/\.\d{3}Z$/, '.123000Z')
     await pool.query('UPDATE harness.conversation_interaction_responses SET responded_at=$2 WHERE conversation_id=$1', [f.sessionId, time])
     await f.generate(); await f.grant()
     await expect.poll(async () => (await f.state())?.generating).toBe(false)
@@ -422,13 +496,8 @@ describePg('project digest governed model path', () => {
     await expect.poll(async () => (await f.state())?.generating).toBe(false)
     const sessionId = `late-${randomUUID()}`
     await f.sessions.create({ id: sessionId, organizationId: f.context.organizationId, creatorUserId: f.ids.user_id,
-      projectId: f.ids.project_id, visibility: 'project', sessionFormatVersion: 0, cwd: f.project.path, createdAt: Date.now() - 90_000 })
-    await f.sessions.append(sessionId, randomUUID(), [{ type: 'user/message', seq: 0, time: Date.now() - 60_000, surfaceOp: 'append', data: {
-      role: 'user', content: [{ type: 'text', text: 'Older input delivered later.' }], source: { kind: 'user', participant: {
-        userId: f.member.id, username: f.member.username, displayName: f.member.displayName, role: 'user',
-        scope: { kind: 'project', projectId: f.project.id, projectName: f.project.name, mode: 'rw' },
-      } },
-    } }])
+      projectId: f.ids.project_id, visibility: 'project', sessionFormatVersion: 0, cwd: f.project.path, createdAt: f.activityAt - 60_000 })
+    await f.append(sessionId, 0, f.activityAt - 30_000, 'Older input delivered later.')
     expect((await f.progress.progressForUser(f.project.id, f.member.id)).status.pending).toBe(1)
     await f.generate(); await f.grant()
     await expect.poll(async () => (await f.state())?.generating).toBe(false)
@@ -441,7 +510,7 @@ describePg('project digest governed model path', () => {
     const f = await fixture(undefined, undefined, { maxMaterialRows: 1, maxAssistantRows: 1 })
     await f.generate(); await f.grant()
     await expect.poll(async () => (await f.state())?.generating).toBe(false)
-    const prefix = `ordering-${randomUUID()}`, time = Date.now() - 1000
+    const prefix = `ordering-${randomUUID()}`, time = f.activityAt + 1000
     for (const [suffix, type, text] of [['-a', 'user/message', 'same-time member'], ['_a', 'assistant/message', 'later assistant context']] as const) {
       const sessionId = prefix + suffix
       await f.sessions.create({ id: sessionId, organizationId: f.context.organizationId, creatorUserId: f.ids.user_id,

@@ -95,7 +95,8 @@ it.skipIf(MODE === 'record')('keeps the file browser open for a verification ref
   await target.frameLocator('iframe[data-workspace-html-preview]').getByText('Existing HTML remains available.', { exact: true }).waitFor()
   await target.locator('[data-workbench-toolbar]').getByRole('button', { name: 'Workspace files', exact: true }).click()
   const picker = target.getByRole('dialog', { name: 'Workspace files', exact: true })
-  await picker.getByRole('treeitem', { name: 'request.pdf', exact: true }).waitFor()
+  const file = picker.getByRole('button', { name: 'request.pdf', exact: true })
+  await file.waitFor()
   const established = socket
   if (established === undefined) throw new Error('Host stream was not established')
   held = true
@@ -104,7 +105,7 @@ it.skipIf(MODE === 'record')('keeps the file browser open for a verification ref
   await established.server.close({ code: 1012, reason: 'Fixture account revalidation' })
   await contextRequested.promise
   await expect.poll(() => htmlTab.count()).toBe(0)
-  await picker.getByRole('treeitem', { name: 'request.pdf', exact: true }).click()
+  await file.click()
   const failure = picker.getByRole('alert')
   await expect.poll(() => failure.count()).toBe(1)
   expect(await failure.textContent()).toBe('Checking access permissions. Please try again shortly.')
@@ -118,7 +119,7 @@ it.skipIf(MODE === 'record')('keeps the file browser open for a verification ref
   expect(tripwire.warnings).toEqual([])
   expect(await picker.isVisible()).toBe(true)
   expect(await sidebar.getByRole('tab', { name: /request\.pdf/u }).count()).toBe(0)
-  await picker.getByRole('treeitem', { name: 'request.pdf', exact: true }).click()
+  await file.click()
   await picker.waitFor({ state: 'hidden' })
   const pdf = target.getByRole('region', { name: 'request.pdf', exact: true })
   const canvas = pdf.locator('canvas').first()

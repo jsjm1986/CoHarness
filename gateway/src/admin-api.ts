@@ -10,6 +10,7 @@ import { auditSummary } from './audit-summary.ts'
 import { RuntimeStartBlockedError, RuntimeStopError, RuntimeGenerationConflictError, type RuntimeTarget } from './instances.ts'
 import { RuntimeManagementError } from './runtime-management.ts'
 import { runtimeManagementApi } from './runtime-management-api.ts'
+import { RUNTIME_SHUTDOWN_OUTCOME_HEADER } from './runtime-shutdown.ts'
 import { RuntimeCatalogError } from './runtime-catalog.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { RuntimeAccountError } from './launcher.ts'
@@ -870,6 +871,11 @@ async function dispatch(
     await reply.json(200, await deps.pluginManagement.overview(admin))
     return true
   }
+  if (pathname === '/admin/api/plugins/inventory' && method === 'GET') {
+    if (deps.pluginManagement === undefined) { await reply.error(503, 'plugin-management-unavailable'); return true }
+    await reply.json(200, await deps.pluginManagement.inventory(admin))
+    return true
+  }
   if (pathname === '/admin/api/plugins/target' && method === 'GET') {
     if (deps.pluginManagement === undefined) { await reply.error(503, 'plugin-management-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
@@ -1376,13 +1382,10 @@ async function dispatch(
     if (target === null) { await reply.error(404, 'user not found'); return true }
     const address = await selectedAdminRuntime(deps, admin, req, { kind: 'user', id: userId })
     const subject = { ...target, ...(address.runtimeId === undefined ? {} : { runtimeId: address.runtimeId }) }
-    if (op === 'stop') await deps.instances.stop(address.runtimeId === undefined ? userId : address, 'manual', admin.id)
-    else if (op === 'start') await deps.instances.ensureRunning(subject, 'explicit', admin.id)
-    else {
-      await deps.instances.stop(address.runtimeId === undefined ? userId : address, 'manual', admin.id)
-      await deps.instances.ensureRunning(subject, 'explicit', admin.id)
-    }
-    await write(`admin.instances.${op}`, { id: userId, runtimeId: address.runtimeId })
+    const stopped = op === 'start' ? undefined : await deps.instances.stop(address.runtimeId === undefined ? userId : address, 'manual', admin.id)
+    if (op !== 'stop') await deps.instances.ensureRunning(subject, 'explicit', admin.id)
+    await write(`admin.instances.${op}`, { id: userId, runtimeId: address.runtimeId, ...stopped })
+    if (stopped !== undefined) res.setHeader(RUNTIME_SHUTDOWN_OUTCOME_HEADER, stopped.shutdownOutcome)
     sendNoContent(res)
     return true
   }
@@ -1945,9 +1948,10 @@ async function dispatch(
     const project = await deps.projects.getById(projectId)
     if (project === null) { await reply.error(404, 'project not found'); return true }
     const target = { kind: 'project' as const, id: projectId }
-    if (op !== 'start') await deps.instances.stop(target, 'manual', admin.id)
+    const stopped = op === 'start' ? undefined : await deps.instances.stop(target, 'manual', admin.id)
     if (op !== 'stop') await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit', admin.id)
-    await write(`admin.project-instances.${op}`, { projectId })
+    await write(`admin.project-instances.${op}`, { projectId, ...stopped })
+    if (stopped !== undefined) res.setHeader(RUNTIME_SHUTDOWN_OUTCOME_HEADER, stopped.shutdownOutcome)
     sendNoContent(res)
     return true
   }

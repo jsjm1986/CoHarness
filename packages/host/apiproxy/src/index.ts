@@ -39,6 +39,7 @@ export {
   DEFAULT_UNARY_RESPONSE_MAX_BYTES,
   InProcessApiClient,
   MAX_UNARY_RESPONSE_BYTES,
+  readApiResponseBytes,
   readApiResponseJson,
   readApiResponseText,
 } from './fetch/client.ts'

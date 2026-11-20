@@ -537,7 +537,7 @@ export async function resumableUpload(
     },
   ), file, options.responseError, directoryId)
   onProgress?.(file.size, file.size, 'verifying')
-  const verifyDeadline = Math.min(current.expiresAt, Date.now() + MAX_VERIFY_WAIT_MS)
+  const verifyDeadline = Date.now() + MAX_VERIFY_WAIT_MS
   let firstVerificationRead = true
   while (current.state === 'verifying') {
     const remaining = verifyDeadline - Date.now()

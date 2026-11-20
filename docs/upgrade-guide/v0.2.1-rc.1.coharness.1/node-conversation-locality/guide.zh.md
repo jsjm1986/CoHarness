@@ -9,7 +9,11 @@ description: "升级受管电脑以使用版本化对话受理和节点内容存
 
 ## 变化
 
+冷准备续等需要同时升级主入口、所属 Gateway 与 Web 资源。自定义客户端必须核验 `503 INSTANCE_STARTING`、确切的 Runtime 响应头、有界的 `preparation: {id, waitMs}` 和 `Retry-After`，再通过 `x-dsh-prepare-continuation` 继续等待；保留全部原请求 ID 和载荷字段。响应丢失或普通 HTTP 失败不得自动重试。验证超过单次 HTTP 截止时间的冷打开、两次请求之间撤权，以及目标停止重启后复用旧凭据；旧凭据不得启动或进入其他代次。参见 [Gateway 计时规则](../../../../gateway/README.zh.md#performance-and-runtime-admission)。
+
 Web 客户端通过一次带归属的请求准备对话，并按持久回执确认发送。每个节点按所选 Runtime 分页返回授权条目。工作台的“全部空间”也会搜索本标签页已加载的授权对话。个人目录和项目内容分别管理归属。 升级后，在另一台电脑上打开对话，断开该电脑的连接并刷新标签页。核对输入仍指向该电脑，恢复连接后打开的是原对话。
+
+自定义 `ConversationIntent` 渲染器改为读取 `failure`（`denied`、`preset-unavailable` 或 `unavailable`），替代 `denied` 布尔值。使用原意图 ID 关联准备操作，保留草稿，并显示本地化操作指引，不暴露服务端诊断。预设失败需要先请管理员检查再显式重试，不允许自动续等。
 
 ## 迁移
 
@@ -18,7 +22,7 @@ Web 客户端通过一次带归属的请求准备对话，并按持久回执确�
 3. 为承载新项目数据的节点配置专用 [PostgreSQL 内容卷](../../../../gateway/deploy/node-content/README.zh.md)，在 Admin 中核验位置。项目切换要求每个必需内容域均已核验归属，源写入方也必须已隔离。
 4. 在所属电脑使用管理员操作 `POST /admin/api/runtimes/<id>/personal-directory/promote` 移动个人目录。Gateway 先核对完整发布内容与本地副本，再改变归属。用原账号核验分页，并确认撤权后无法访问该电脑。
 5. 配置获准的异机备份目的地，使用恢复凭据做隔离恢复。退役旧副本前，核对每个受保护空间的恢复点时间和覆盖缺口。[更换项目电脑](../../../../gateway/docs/peer-backup/README.zh.md#takeover)时，若目标登记了多个数据卷，需明确选择。策略变更后先重新演练再审批，替换机成为新源后需配置新备份策略。
-6. 配置主入口的[项目名查重密钥](../../../../gateway/deploy/node-content/README.zh.md)，逐个在所属电脑核对旧项目的查重记录后启用。分别测试同名创建、大小写变体和重命名冲突。
+6. 配置主入口的[项目名查重密钥](../../../../gateway/deploy/node-content/README.zh.md)，逐个在所属电脑核对旧项目的查重记录后启用。分别测试同名创建、大小写变体和重命名冲突。符合条件的单节点部署需重新采集维护备份：恢复预检会拒绝缺少已配置密钥文件或现用、待启用指纹不匹配的快照。多电脑灾难恢复仍需独立保管密钥副本。
 
 ## 回滚
 

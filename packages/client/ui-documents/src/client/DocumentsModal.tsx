@@ -1,10 +1,11 @@
 import { parseClientSessionKey, type ClientRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type FC, type SyntheticEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type FC, type FocusEvent, type PointerEvent, type SyntheticEvent } from 'react'
 import {
   Button,
   IconBrowseOutline16,
   IconCheckOutline16,
   IconChevronDownOutline14,
+  IconChevronLeftOutline14,
   IconChevronRightOutline14,
   IconCloseOutline16,
   IconCopyOutline16,
@@ -29,7 +30,8 @@ import {
   useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
-  createUserDocClient, readDocumentsScopeResult, readDocumentLocations, UserDocHttpError, UserDocServiceUnavailableError,
+  createUserDocClient, readDocumentsScopeResult, readDocumentLocations, readDocumentProjectNames,
+  UserDocHttpError, UserDocServiceUnavailableError,
   type DocumentsWorkspaceScope, type UserDocDirectoryIdType, type UserDocDirectoryRef, type UserDocIdType,
   type UserDocCatalogHistoryItem, type UserDocCatalogOverview, type UserDocCatalogRow, type UserDocLimits,
   type UserDocRef, type UserDocScope,
@@ -39,7 +41,8 @@ import {
   type UserDocTrashRef,
 } from './documents-client.ts'
 import type { UserDocLocationPage } from '@deepseek-ai/dsh-userdoc'
-import { FileTypeIcon } from './FileTypeIcon.tsx'
+import type { PropsRenderFactories } from '@deepseek-ai/dsh-client-ui-slots'
+import { useFileTypeIcon } from './use-file-type-icon.tsx'
 import { DocumentDestinationPicker } from './DocumentDestinationPicker.tsx'
 import { DocumentSortControl } from './DocumentSortControl.tsx'
 import { DocumentPreview } from './DocumentPreview.tsx'
@@ -64,7 +67,12 @@ import {
 import type { DocumentsKey } from './locales.ts'
 import css from './DocumentsModal.module.css'
 
-export interface DocumentsModalProps {
+function revealDialogError(element: HTMLDivElement | null): void {
+  const body = element?.closest<HTMLElement>('[data-documents-sheet-scrollport]')
+  if (body !== undefined && body !== null) body.scrollTop = 0
+}
+
+export interface DocumentsModalProps extends Partial<PropsRenderFactories> {
   /** Presentation comes from the browser entry, while document identities remain fully qualified. */
   showComputer?: boolean
   /** Local entries restrict all location choices to their own computer. */
@@ -91,6 +99,7 @@ interface UploadProgress {
   total: number
   percent: number
   phase?: UserDocUploadPhase
+  fileName?: string
 }
 
 interface UploadBatch {
@@ -453,10 +462,15 @@ function normalizeDirectoryRef(value: {
  */
 export const DocumentsModal: FC<DocumentsModalProps> = ({
   open, onClose, t, mode = 'manage', showComputer = false, allowedNodeId, onAttachDocument, canAttachDocument, privateResourceUrl, attachmentScope, attachmentTargetId,
+  renderFactorySlot,
 }) => {
   const phone = useMediaQuery('(max-width: 767px)')
+  const shortViewport = useMediaQuery('(max-width: 1100px) and (max-height: 480px)')
+  const fullScreenPreview = phone || shortViewport
+  const [searchEditing, setSearchEditing] = useState(false)
   const touch = useMediaQuery('(pointer: coarse)')
   const compactNavigation = useMediaQuery('(max-width: 1100px)')
+  const FileTypeIcon = useFileTypeIcon(open)
   const [documents, setDocuments] = useState<UserDocRef[]>([])
   const [directories, setDirectories] = useState<UserDocDirectoryRef[]>([])
   const [currentDirectoryId, setCurrentDirectoryId] = useState<UserDocDirectoryIdType>(ROOT_DIRECTORY_ID)
@@ -470,11 +484,25 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const [locationsCursor, setLocationsCursor] = useState<string | undefined>()
   const [locationsError, setLocationsError] = useState(false)
   const [locationsLoading, setLocationsLoading] = useState(false)
+  const [deniedScopes, setDeniedScopes] = useState<ReadonlySet<string>>(() => new Set())
+  const permissionVersion = useRef(0)
+  const deniedAt = useRef(new Map<string, number>())
+  const locationNames = useRef({ epoch: 0, requests: new Map<string, AbortController>() })
+  useEffect(() => {
+    const owner = locationNames.current
+    owner.epoch++
+    return () => {
+      owner.epoch++
+      for (const request of owner.requests.values()) request.abort()
+      owner.requests.clear()
+    }
+  }, [open, scope.nodeId, scope.accountId, allowedNodeId])
   useEffect(() => { setLocationsCursor(undefined) }, [allowedNodeId])
   useEffect(() => {
     if (!open || scope.nodeId === undefined) return
     const controller = new AbortController()
     setLocationsLoading(true)
+    const authorizedAt = permissionVersion.current
     void readDocumentLocations(controller.signal, locationsCursor).then((page) => {
       if (!controller.signal.aborted) {
         setLocations((previous) => {
@@ -484,6 +512,37 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           return { items: [...items.values()], nextCursor: page.nextCursor }
         })
         setLocationsError(false)
+        if (page !== undefined) confirmScopePermissions(page.items.map(item => scopeCacheKey(item.scope)), authorizedAt)
+        const groups = new Map<string, number[]>()
+        for (const item of page?.items ?? []) {
+          if (item.metadataOnNode && item.scope.kind === 'project' && item.scope.nodeId) {
+            const ids = groups.get(item.scope.nodeId) ?? []
+            ids.push(item.scope.projectId)
+            groups.set(item.scope.nodeId, ids)
+          }
+        }
+        const owner = locationNames.current, epoch = owner.epoch
+        for (const [nodeId, ids] of groups) for (let start = 0; start < ids.length; start += 32) {
+          const batch = ids.slice(start, start + 32), key = JSON.stringify([nodeId, batch])
+          if (owner.requests.has(key)) continue
+          const namesRequest = new AbortController()
+          owner.requests.set(key, namesRequest)
+          void readDocumentProjectNames(nodeId, batch, namesRequest.signal).then((names) => {
+            if (namesRequest.signal.aborted || owner.epoch !== epoch) return
+            setLocations(previous => previous === undefined ? previous : { ...previous, items: previous.items.map((item) => {
+              if (item.scope.nodeId !== nodeId || item.scope.kind !== 'project'
+                || (deniedAt.current.get(scopeCacheKey(item.scope)) ?? 0) > authorizedAt) return item
+              const name = names.get(item.scope.projectId)
+              if (name === undefined) return item
+              const { metadataOnNode: _pending, ...location } = item
+              return { ...location, name }
+            }) })
+          }, () => {
+            if (!namesRequest.signal.aborted && owner.epoch === epoch) setLocationsError(true)
+          }).finally(() => {
+            if (owner.requests.get(key) === namesRequest) owner.requests.delete(key)
+          })
+        }
       }
     }, () => { if (!controller.signal.aborted) setLocationsError(true) }).finally(() => {
       if (!controller.signal.aborted) setLocationsLoading(false)
@@ -491,6 +550,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     return () => { controller.abort() }
   }, [open, locationsCursor, scope.nodeId, scope.accountId, allowedNodeId])
   const [scopeStatus, setScopeStatus] = useState<'loading' | 'ready' | 'stale'>('loading')
+  const displayedScope = useRef<UserDocScope>({ kind: 'personal' })
   const [scopeView, setScopeView] = useState<ScopeView | null>(null)
   const [alternateSource, setAlternateSource] = useState<SourceOption | null>(null)
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false)
@@ -556,6 +616,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const [toolsOpen, setToolsOpen] = useState(false)
   const previewTriggers = useRef(new Map<string, HTMLButtonElement>())
   const actionReturnTarget = useRef<HTMLButtonElement | null>(null)
+  const captureActionAnchor = (button: HTMLButtonElement) => {
+    actionReturnTarget.current = button
+    button.focus({ preventScroll: true })
+  }
   const focusActionAnchor = () => {
     if (actionReturnTarget.current?.isConnected === true) actionReturnTarget.current.focus({ preventScroll: true })
   }
@@ -582,6 +646,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const [overviewCopyRow, setOverviewCopyRow] = useState<OverviewCopyTarget | null>(null)
   const [overviewError, setOverviewError] = useState('')
   const [unavailableDocumentComputers, setUnavailableDocumentComputers] = useState(0)
+  const [overviewCompleting, setOverviewCompleting] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyItems, setHistoryItems] = useState<UserDocCatalogHistoryItem[]>([])
@@ -623,9 +688,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const listingController = useRef<AbortController | null>(null)
   const overviewRequestGeneration = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const headerCheckRef = useRef<HTMLInputElement>(null)
   const dragDepth = useRef(0)
   const loadGeneration = useRef(0)
+  const scopeNavigation = useRef<number | null>(null)
   const requestScope = useRef(attachmentScope)
   requestScope.current = attachmentScope ?? documentScopeOf(scope)
   const userDocs = useRef(createUserDocClient(privateResourceUrl, () => requestScope.current))
@@ -864,13 +929,57 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     : documentScopeOf(scopeCache.current)
 
   const listingScope = (): UserDocScope => scopeView?.scope ?? alternateSource?.scope ?? runtimeScope()
+  displayedScope.current = listingScope()
 
-  const overviewFilterKey = (): string => JSON.stringify({
+  const confirmScopePermissions = (keys: readonly string[], authorizedAt: number): void => {
+    const verified = new Set(keys)
+    setDeniedScopes(previous => new Set([...previous].filter(key => !verified.has(key)
+      || (deniedAt.current.get(key) ?? 0) > authorizedAt)))
+  }
+
+  const confirmLegacyScopePermissions = (current: DocumentsWorkspaceScope, authorizedAt: number): void => {
+    confirmScopePermissions((current.projects ?? []).map(project => scopeCacheKey({ kind: 'project', projectId: project.projectId,
+      ...(current.nodeId === undefined ? {} : { nodeId: current.nodeId }) })), authorizedAt)
+  }
+
+  const forgetDeniedScope = (target: UserDocScope): void => {
+    const key = scopeCacheKey(target)
+    deniedAt.current.set(key, ++permissionVersion.current)
+    setDeniedScopes(previous => new Set([...previous, key]))
+    const prefix = `{"scope":${JSON.stringify(key)},`
+    for (const cachedKey of listingCache.current.keys()) if (cachedKey.startsWith(prefix)) listingCache.current.delete(cachedKey)
+    for (const cachedKey of serverPages.current.keys()) if (cachedKey.startsWith(prefix)) serverPages.current.delete(cachedKey)
+    overviewCache.current = null
+    setOverviewRows(previous => previous.filter(row => !sameDocumentScope(catalogRowScope(row), target)))
+    if (!sameDocumentScope(displayedScope.current, target)) return
+    clearSelection()
+    setDocuments([])
+    setDirectories([])
+    setTrashDocuments([])
+    setPreviewDoc(null)
+    setDeleteTargets(null)
+    setDeleteDirectory(null)
+    setFolderEditor(null)
+    setMoveTargets(null)
+    setPurgeTarget(null)
+    setHistoryItems([])
+    setHistoryOpen(false)
+    setTotalDocuments(null)
+    setServerTotalDocuments(null)
+    setServerNextCursor(undefined)
+    setTrashNextCursor(undefined)
+    serverLoadedKey.current = null
+  }
+
+  const overviewFilterKey = JSON.stringify({
     entry: allowedNodeId,
+    aggregate: showComputer && allowedNodeId === undefined,
     query: query.trim(),
     type: typeFilter,
     sort: wireSort(parseSort(sortValue)),
   })
+  const currentOverviewFilter = useRef(overviewFilterKey)
+  currentOverviewFilter.current = overviewFilterKey
 
   const clearSelection = (): void => {
     setSelected(new Set())
@@ -926,7 +1035,13 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     listingQuery: UserDocListQuery,
     signal?: AbortSignal,
   ): Promise<unknown> => {
-    return userDocs.current.browseScope(target, directoryId, signal, listingQuery)
+    try {
+      const result = await userDocs.current.browseScope(target, directoryId, signal, listingQuery)
+      return result
+    } catch (cause) {
+      if (!signal?.aborted && cause instanceof UserDocHttpError && cause.status === 403) forgetDeniedScope(target)
+      throw cause
+    }
   }
 
   const isServerPage = (value: unknown): value is {
@@ -1206,6 +1321,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       setScope(scopeCache.current)
       setScopeStatus('ready')
     }
+    const authorizedAt = permissionVersion.current
     const scopeRequest = (shouldReadScope || cachedScope === null
       ? readDocumentsScopeResult(requestSignal)
       : Promise.resolve({ scope: cachedScope, available: true as const })).then((result) => {
@@ -1220,6 +1336,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         const settledKey = settlePendingRuntimePages(documentScopeOf(result.scope), generation)
         if (settledKey !== null) serverLoadedKey.current = settledKey
         setScope(result.scope)
+        if (shouldReadScope) confirmLegacyScopePermissions(result.scope, authorizedAt)
         scopeCache.current = result.scope
         setScopeStatus('ready')
         return { changed, confirmed: true }
@@ -1358,9 +1475,45 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     }
   }
 
-  const openOverview = async (force = false): Promise<boolean> => {
+  const progressiveOverview = showComputer && allowedNodeId === undefined
+    ? userDocs.current.overviewProgress?.bind(userDocs.current)
+    : undefined
+
+  const readOverview = (options: UserDocListQuery, signal: AbortSignal,
+    onProgress: (page: UserDocCatalogOverview) => void): Promise<UserDocCatalogOverview> => {
+    const client = userDocs.current
+    if (progressiveOverview !== undefined) return progressiveOverview(options, signal, onProgress)
+    return client.overviewPage === undefined ? client.overview(signal) : client.overviewPage(options, signal)
+  }
+
+  const applyOverviewPage = (response: UserDocCatalogOverview, page: number, completing: boolean) => {
+    setUnavailableDocumentComputers(response.unavailableNodes?.length ?? 0)
+    setOverviewRows([...response.documents])
+    setOverviewEntry(allowedNodeId)
+    setOverviewPage(page)
+    setOverviewNextCursor(completing ? undefined : response.nextCursor)
+    setOverviewTotalDocuments(completing ? null : response.totalDocuments ?? null)
+    setOverviewServerPaging(completing || response.totalDocuments !== undefined || response.nextCursor !== undefined)
+    setOverviewCompleting(completing)
+  }
+
+  const reportOverviewFailure = (cause: unknown): void => {
+    if (cause instanceof UserDocHttpError && (cause.status === 401 || cause.status === 403)) {
+      overviewCache.current = null
+      setOverviewRows([])
+      setOverviewNextCursor(undefined)
+      setOverviewTotalDocuments(null)
+      setUnavailableDocumentComputers(0)
+    }
+    const message = cause instanceof UserDocHttpError && (cause.status === 401 || cause.status === 403 || cause.code === 'DOCUMENT_DIRECTORY_CHANGED')
+      ? t('overview.changed')
+      : cause instanceof UserDocHttpError && cause.code === 'DOCUMENT_SCOPE_UNAVAILABLE' ? t('error.runtimeUnavailable') : documentErrorMessage(cause, t)
+    setOverviewError(message)
+  }
+
+  const openOverview = async (force = false, onReady?: () => void): Promise<boolean> => {
     discardPendingRuntimePages()
-    const key = overviewFilterKey()
+    const key = overviewFilterKey
     const generation = overviewRequestGeneration.current + 1
     overviewRequestGeneration.current = generation
     const listingRequest = beginListingRequest()
@@ -1372,30 +1525,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     clearSelection()
     setOverviewLoading(true)
     setOverviewError('')
-    try {
-      const clientRecord = userDocs.current as unknown as Record<string, unknown>
-      const pageMethod = clientRecord.overviewPage
-      const cached = !force && overviewCache.current?.key === key ? overviewCache.current.response : undefined
-      const response = cached !== undefined
-        ? cached
-        : typeof pageMethod === 'function'
-          ? await (pageMethod as (query?: UserDocListQuery, signal?: AbortSignal) => Promise<UserDocCatalogOverview>)({
-            limit: PAGE_SIZE,
-            query: query.trim(),
-            type: typeFilter,
-            sort: wireSort(parseSort(sortValue)),
-          }, requestSignal)
-          : await userDocs.current.overview(requestSignal)
-      if (requestSignal.aborted || generation !== overviewRequestGeneration.current) return false
-      overviewCache.current = response.partial ? null : { key, response }
-      overviewLoadedKey.current = key
-      setUnavailableDocumentComputers(response.unavailableNodes?.length ?? 0)
-      setOverviewRows([...response.documents])
-      setOverviewEntry(allowedNodeId)
-      setOverviewPage(1)
-      setOverviewNextCursor(response.nextCursor)
-      setOverviewTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : null)
-      setOverviewServerPaging(typeof response.totalDocuments === 'number' || response.nextCursor !== undefined)
+    setOverviewCompleting(false)
+    const ownsOverview = (): boolean => !requestSignal.aborted && generation === overviewRequestGeneration.current
+      && key === currentOverviewFilter.current
+    let entered = false
+    const hasEntered = () => entered
+    const enter = (): void => {
+      if (hasEntered()) return
+      entered = true
       overviewCursors.current = []
       setOverviewMode(true)
       setTrashMode(false)
@@ -1408,59 +1545,70 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       setScopeView(null)
       setAlternateSource(null)
       setUploadScopePickerOpen(false)
-      clearSelection()
+      onReady?.()
+    }
+    try {
+      const cached = !force && overviewCache.current?.key === key ? overviewCache.current.response : undefined
+      const response = cached ?? await readOverview(queryForPage(), requestSignal, (page) => {
+        if (!ownsOverview()) return
+        overviewLoadedKey.current = key
+        applyOverviewPage(page, 1, true)
+        setOverviewLoading(false)
+        enter()
+      })
+      if (!ownsOverview()) return false
+      overviewCache.current = response.partial ? null : { key, response }
+      overviewLoadedKey.current = key
+      applyOverviewPage(response, 1, false)
+      enter()
       return true
     } catch (cause) {
-      if (generation === overviewRequestGeneration.current) overviewLoadedKey.current = null
-      if (!isAbortError(cause, requestSignal)) {
-        const message = documentErrorMessage(cause, t)
-        setOverviewError(message)
-        setError(message)
+      if (ownsOverview() && !isAbortError(cause, requestSignal)) {
+        if (!hasEntered()) overviewLoadedKey.current = null
+        reportOverviewFailure(cause)
+        if (!hasEntered()) setError(documentErrorMessage(cause, t))
       }
       return false
     } finally {
-      if (generation === overviewRequestGeneration.current) setOverviewLoading(false)
+      if (generation === overviewRequestGeneration.current) {
+        setOverviewLoading(false)
+        setOverviewCompleting(false)
+      }
       finishListingRequest(listingRequest.controller)
     }
   }
 
   const loadOverviewPage = async (requestedPage: number, cursor?: string): Promise<void> => {
     discardPendingRuntimePages()
-    const pageMethod = (userDocs.current as unknown as Record<string, unknown>).overviewPage
-    if (typeof pageMethod !== 'function') {
+    if (userDocs.current.overviewPage === undefined) {
       setOverviewPage(requestedPage)
       return
     }
-    setOverviewLoading(true)
+    if (progressiveOverview !== undefined) setOverviewCompleting(true)
+    else setOverviewLoading(true)
     setOverviewError('')
     const generation = overviewRequestGeneration.current + 1
     overviewRequestGeneration.current = generation
     const listingRequest = beginListingRequest()
     const requestSignal = listingRequest.signal
     serverRequestGeneration.current += 1
-    const key = overviewFilterKey()
+    const key = overviewFilterKey
     try {
-      const response = await (pageMethod as (query?: UserDocListQuery, signal?: AbortSignal) => Promise<UserDocCatalogOverview>)({
-        limit: PAGE_SIZE,
-        query: query.trim(),
-        type: typeFilter,
-        sort: wireSort(parseSort(sortValue)),
-        ...(cursor === undefined ? {} : { cursor }),
-      }, requestSignal)
-      if (requestSignal.aborted || generation !== overviewRequestGeneration.current) return
-      setUnavailableDocumentComputers(response.unavailableNodes?.length ?? 0)
-      setOverviewRows([...response.documents])
-      setOverviewEntry(allowedNodeId)
-      setOverviewNextCursor(response.nextCursor)
-      setOverviewTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : null)
-      setOverviewPage(requestedPage)
+      const response = await readOverview(queryForPage(cursor), requestSignal, () => {})
+      if (requestSignal.aborted || generation !== overviewRequestGeneration.current || key !== currentOverviewFilter.current) return
+      applyOverviewPage(response, requestedPage, false)
       overviewCache.current = null
       overviewLoadedKey.current = key
-      setOverviewServerPaging(true)
     } catch (cause) {
-      if (!isAbortError(cause, requestSignal)) setOverviewError(documentErrorMessage(cause, t))
+      if (generation === overviewRequestGeneration.current && key === currentOverviewFilter.current
+        && !isAbortError(cause, requestSignal)) {
+        reportOverviewFailure(cause)
+      }
     } finally {
-      if (generation === overviewRequestGeneration.current) setOverviewLoading(false)
+      if (generation === overviewRequestGeneration.current) {
+        setOverviewLoading(false)
+        setOverviewCompleting(false)
+      }
       finishListingRequest(listingRequest.controller)
     }
   }
@@ -1568,6 +1716,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       mode,
       canUpload: target.kind === 'personal' || mode === 'rw',
     }
+    scopeNavigation.current = generation
+    setQuery('')
     const cached = cachedRemoteListing(target)
     const shouldFetchListing = cached === undefined || cached.freshness === 'stale'
     const listingRequest = beginListingRequest()
@@ -1583,15 +1733,15 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     if (cached !== undefined) {
       applyCachedListing(cached)
       if (cached.paged) serverLoadedKey.current = remoteListingKey(target)
-      setScopeView(nextScopeView)
+      setScopeView({ ...nextScopeView })
       setAlternateSource(null)
       setOverviewMode(false)
       setTrashMode(false)
       clearSelection()
-      setQuery('')
       setPage(1)
     }
     if (!shouldFetchListing) {
+      scopeNavigation.current = null
       setRefreshing(false)
       finishListingRequest(listingRequest.controller)
       return true
@@ -1658,7 +1808,6 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       setOverviewMode(false)
       setTrashMode(false)
       clearSelection()
-      setQuery('')
       setPage(1)
       listingReadyRef.current = true
       return true
@@ -1668,6 +1817,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       }
       return cached !== undefined
     } finally {
+      if (scopeNavigation.current === generation) scopeNavigation.current = null
       if (generation === loadGeneration.current) {
         setLoading(false)
         setRefreshing(false)
@@ -1694,6 +1844,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     } else {
       void (async () => {
         try {
+          const authorizedAt = permissionVersion.current
           const result = await readDocumentsScopeResult(controller.signal)
           if (controller.signal.aborted) return
           if (!result.available) {
@@ -1705,6 +1856,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
             || !sameDocumentScope(documentScopeOf(previous), documentScopeOf(result.scope))
           scopeCache.current = result.scope
           setScope(result.scope)
+          confirmLegacyScopePermissions(result.scope, authorizedAt)
           setScopeStatus('ready')
           if (changed) {
             listingCache.current.clear()
@@ -1746,8 +1898,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   }, [open])
 
   useEffect(() => {
-    if (!open || !phone) setMobileSheet(null)
     if (!open) {
+      setMobileSheet(null)
+      setSearchEditing(false)
       listingController.current?.abort()
       listingController.current = null
       listingReadyRef.current = false
@@ -1769,7 +1922,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       setUploadScopePickerOpen(false)
       setSourcePickerOpen(false)
     }
-  }, [open, phone])
+  }, [open])
 
   useEffect(() => {
     if (copyTargets === null) return
@@ -1815,6 +1968,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
 
   useEffect(() => {
     if (!open || overviewMode || trashMode || !listingReadyRef.current || !serverPagingRef.current) return
+    // Filters entered during a scope switch belong to its destination. Keep
+    // the committed listing intact until that navigation has a result.
+    if (scopeNavigation.current === loadGeneration.current) return
     // Keep filter reads behind a pending folder change so they address its
     // committed destination instead of cancelling it to reload the old folder.
     if (directoryNavigation.current !== null && directoryNavigation.current.directoryId !== currentDirectoryId) return
@@ -1828,16 +1984,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     serverLoadedKey.current = key
     clearSelection()
     void loadServerPage(1, currentDirectoryId, true)
-  }, [open, overviewMode, trashMode, currentDirectoryId, query, typeFilter, sortValue])
+  }, [open, overviewMode, trashMode, currentDirectoryId, query, typeFilter, sortValue, scopeView])
 
   useEffect(() => {
     if (!open || !overviewMode) return
-    const key = overviewFilterKey()
+    const key = overviewFilterKey
     if (overviewLoadedKey.current === key) return
     overviewLoadedKey.current = key
     overviewCursors.current = []
     void openOverview(true)
-  }, [open, overviewMode, query, typeFilter, sortValue, allowedNodeId])
+  }, [open, overviewMode, query, typeFilter, sortValue, allowedNodeId, showComputer])
 
   const sort = parseSort(sortValue)
   const filtered = useMemo(
@@ -1849,8 +2005,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     return directories.filter(directory => needle === '' || directory.name.toLowerCase().includes(needle))
   }, [directories, query])
 
-  const overviewVisibleRows = useMemo(() => allowedNodeId === undefined ? overviewRows
-    : overviewRows.filter(row => row.scope.nodeId === allowedNodeId), [overviewRows, allowedNodeId])
+  const overviewVisibleRows = useMemo(() => overviewRows.filter(row => (allowedNodeId === undefined || row.scope.nodeId === allowedNodeId)
+    && !deniedScopes.has(scopeCacheKey(catalogRowScope(row)))), [overviewRows, allowedNodeId, deniedScopes])
   const overviewPaging = overviewServerPaging && overviewEntry === allowedNodeId
   const overviewFiltered = useMemo(
     () => overviewPaging ? [...overviewVisibleRows]
@@ -1903,20 +2059,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const pageDocs = serverPaging ? documents : pageSlice(filtered, currentPage)
   const pageIds = pageDocs.map(doc => doc.docId)
   const headerState = pageSelectionState(pageIds, selected)
+  const setPageCheckbox = (node: HTMLInputElement | null): void => {
+    if (node !== null) node.indeterminate = headerState === 'some'
+  }
   const groups = sort.key === 'date' ? groupDocumentsByDate(pageDocs) : null
 
   useEffect(() => {
     if (page !== currentPage) setPage(currentPage)
   }, [page, currentPage])
 
-  useEffect(() => {
-    const node = headerCheckRef.current
-    if (node !== null) node.indeterminate = headerState === 'some'
-  }, [headerState])
-
   const uploadFiles = async (list: FileList | readonly File[]) => {
-    if (!open || uploadBatch.current !== null || uploading || overviewMode || alternateSource !== null
-      || (scopeView !== null ? !scopeView.canUpload : scope.kind === 'project' && scope.mode === 'ro')) return
+    if (!open || uploadBatch.current !== null || uploading || uploadLocked || alternateSource !== null) return
     const files = fileListOf(list)
     if (files.length === 0) return
     const batch: UploadBatch = {
@@ -1955,6 +2108,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
             current: index + 1,
             total: files.length,
             percent: total === 0 ? 0 : Math.round((loaded / total) * 100),
+            fileName: file.name,
             ...(phase === undefined ? {} : { phase }),
           })
         }
@@ -1969,7 +2123,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     } catch (cause) {
       const unstarted = files.length - batch.published - 1
       failure = unstarted > 0
-        ? `${uploadErrorMessage(cause, t)} ${t('modal.upload.incomplete', {
+        ? `${uploadErrorMessage(cause, t)}\n${t('modal.upload.incomplete', {
           name: currentFileName, remaining: String(unstarted),
         })}`
         : uploadErrorMessage(cause, t)
@@ -2302,7 +2456,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     }
   }
 
-  const attachmentReady = (): boolean => onAttachDocument !== undefined && (canAttachDocument?.() ?? true)
+  const attachmentReady = (): boolean => !deniedScopes.has(scopeCacheKey(listingScope()))
+    && onAttachDocument !== undefined && (canAttachDocument?.() ?? true)
 
   const addToCapturedConversation = (documents: readonly UserDocRef[]): UserDocRef[] => {
     const remaining: UserDocRef[] = []
@@ -2471,7 +2626,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
 
   const locationOptions: SourceOption[] = locations?.items.map(item => ({
     value: scopeCacheKey(item.scope),
-    label: `${item.scope.kind === 'personal' ? t('copy.target.personal') : item.name}${showComputer ? ` · ${item.nodeName}` : ''}`,
+    label: `${item.scope.kind === 'personal' ? t('copy.target.personal') : item.metadataOnNode ? t('scope.projectPending', { id: String(item.scope.projectId) }) : item.name}${showComputer ? ` · ${item.nodeName}` : ''}`,
     scope: item.scope, mode: item.mode,
   })) ?? []
 
@@ -2530,7 +2685,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
 
   const mobileScopeValue = overviewMode ? 'all' : scopeView?.value ?? scopeCacheKey(currentScopeDescriptor())
 
-  const uploadMobileScopeOptions = useMemo<MobileScopeOption[]>(() => (
+  const uploadMobileScopeOptions: MobileScopeOption[] = (
     uploadScopeOptions.reduce<MobileScopeOption[]>((result, option) => {
       if (option.scope.kind === 'project') {
         result.push({
@@ -2550,7 +2705,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       }
       return result
     }, [])
-  ), [scope.projects, t])
+  )
 
   const mobileScopeOptions: MobileScopeOption[] = mobileSheet?.kind === 'scope' && mobileSheet.mode === 'source'
     ? sourceOptions.map(option => ({
@@ -2583,7 +2738,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       if (succeeded) setMobileSheet(null)
       return
     } else if (option.kind === 'all') {
-      succeeded = await openOverview()
+      const selection = mobileSheet
+      await openOverview(false, () =>{  setMobileSheet(current => current === selection ? null : current) })
+      return
     } else if (location !== undefined) {
       succeeded = await openScopeView(location.scope, location.label)
     } else if (option.kind === 'personal') {
@@ -3053,10 +3210,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     setModalError('')
   }
 
-  const displayLocationLabel = (target: UserDocScope, captured: string): string => showComputer ? captured
-    : target.kind === 'personal' ? t('copy.target.personal')
-      : locations?.items.find(item => sameDocumentScope(item.scope, target))?.name
-        ?? scope.projects?.find(project => project.projectId === target.projectId)?.name ?? t('selection.currentSpace')
+  const displayLocationLabel = (target: UserDocScope, captured: string): string => locationOptions
+    .find(item => sameDocumentScope(item.scope, target))?.label
+    ?? (showComputer ? captured : target.kind === 'personal' ? t('copy.target.personal')
+      : scope.projects?.find(project => project.projectId === target.projectId)?.name ?? t('selection.currentSpace'))
   const scopeViewLabel = scopeView === null ? '' : displayLocationLabel(scopeView.scope, scopeView.label)
   const alternateSourceLabel = alternateSource === null ? '' : displayLocationLabel(alternateSource.scope, alternateSource.label)
   const selectedCopyTarget = copyTargets?.find(option => option.value === copyTarget)
@@ -3071,11 +3228,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     ?? (scope.kind === 'project' && scope.projectId !== undefined
       ? { kind: 'project' as const, projectId: scope.projectId }
       : { kind: 'personal' as const })
-  const selectedScopeMode = scopeView?.mode ?? alternateSource?.mode
+  const selectedScopeMode = locations?.items.find(item => sameDocumentScope(item.scope, selectedScope))?.mode
+    ?? (selectedScope.kind === 'project' ? scope.projects?.find(project => project.projectId === selectedScope.projectId)?.mode : undefined)
+    ?? scopeView?.mode ?? alternateSource?.mode
     ?? (readOnlyProject ? 'ro' : 'rw')
   const unavailableScope = allowedNodeId !== undefined && listingScope().nodeId !== undefined && listingScope().nodeId !== allowedNodeId
-  const writeLocked = unavailableScope || overviewMode || selectedScopeMode === 'ro'
-  const uploadLocked = unavailableScope || overviewMode || selectedScopeMode === 'ro'
+  const scopeDenied = deniedScopes.has(scopeCacheKey(listingScope()))
+  const writeLocked = unavailableScope || scopeDenied || overviewMode || selectedScopeMode === 'ro'
+  const uploadLocked = unavailableScope || scopeDenied || overviewMode || selectedScopeMode === 'ro'
   const remoteScopeView = scopeView !== null || alternateSource !== null
   const uploadView = useRef({ open, key: '' })
   uploadView.current = {
@@ -3096,13 +3256,15 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const visibility = scope.kind === 'project'
     ? t('modal.visibility.project')
     : t('modal.visibility.personal')
-  const visibleScope = scopeView !== null
+  const visibleScope = scopeDenied ? scopeViewLabel || alternateSourceLabel
+    || (scope.kind === 'project' ? scope.projectName : t('copy.target.personal')) : scopeView !== null
     ? scopeView.canUpload
       ? t('scope.upload.target', { name: scopeViewLabel })
       : t('scope.viewing', { name: scopeViewLabel })
     : alternateSource === null
       ? visibility
       : t('copy.source.viewing', { name: alternateSourceLabel })
+  const trashScope = scopeView === null ? visibleScope : t('scope.viewing', { name: scopeViewLabel })
   const mobileScopeLabel = overviewMode
     ? t('scope.all')
     : alternateSource !== null
@@ -3143,12 +3305,15 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
   const busy = unavailableScope || uploading
   const displayedProgress = uploadBatch.current === null || visibleUploadFeedback !== null ? progress : null
   const uploadLabel = visibleUploadFeedback?.reconciling === true ? t('modal.refreshing')
-    : displayedProgress !== null && uploading
-      ? t(displayedProgress.phase === 'verifying' ? 'modal.upload.verifyingCount' : 'modal.upload.progressCount', {
-        current: String(displayedProgress.current),
-        total: String(displayedProgress.total),
-        percent: String(displayedProgress.percent),
-      })
+    : displayedProgress !== null
+      ? visibleUploadFeedback === null
+        ? t('modal.operation.progress', { current: String(displayedProgress.current), total: String(displayedProgress.total) })
+        : displayedProgress.current === 0 ? t('modal.upload.progress')
+          : t(displayedProgress.phase === 'verifying' || displayedProgress.percent === 100 ? 'modal.upload.verifyingCount' : 'modal.upload.progressCount', {
+            current: String(displayedProgress.current),
+            total: String(displayedProgress.total),
+            percent: String(displayedProgress.percent),
+          })
       : t('modal.upload')
 
   const uploadButton = (
@@ -3158,12 +3323,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       variant="soft"
       size="toolbar"
       disabled={busy || uploadLocked}
-      aria-label={uploading ? uploadLabel : t('modal.upload')}
+      aria-label={t('modal.upload')}
       title={scopeView !== null && !scopeView.canUpload ? t('scope.upload.readOnly', { name: scopeViewLabel }) : undefined}
       icon={<IconPlusOutline16 size={16} />}
       onClick={() => fileInputRef.current?.click()}
     >
-      {phone && !uploading ? t('modal.upload.compact') : uploadLabel}
+      {phone ? t('modal.upload.compact') : t('modal.upload')}
     </Button>
   )
 
@@ -3188,6 +3353,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
     ? serverTotalDocuments === null ? serverNextCursor !== undefined || currentPage > 1 : pages > 1
     : filtered.length > PAGE_SIZE
   const hasEntries = directories.length > 0 || documents.length > 0
+  const hasActiveFilters = query.trim() !== '' || typeFilter !== 'all'
+  const showFilterIndicator = shortViewport && hasActiveFilters && !trashMode
+  const moreLabel = showFilterIndicator ? `${t('action.more')} · ${t('modal.filters.active')}` : t('action.more')
+  const showCaption = hasEntries || hasActiveFilters
+  const showFilters = hasEntries || hasActiveFilters
     || (serverPaging && (serverTotalDocuments ?? 0) > 0)
   const emptyReadPending = !hasEntries && (loading || refreshing)
   const emptyUploadPending = !hasEntries && visibleUploadFeedback !== null && !visibleUploadFeedback.reconciled
@@ -3236,14 +3406,22 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         <span className={css.fileIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
         <span className={css.name} title={directory.name}>{directory.name}</span>
       </button>
-      {phone ? <Button className={css.rowMore} data-documents-row-more="folder" type="button" variant="ghost" aria-label={t('action.moreFolderNamed', { name: directory.name })} aria-haspopup="dialog" onClick={(event) => { actionReturnTarget.current = event.currentTarget; setMobileSheet({ kind: 'directory', directory }) }}><IconEllipsisOutline16 size={16} /></Button> :
+      {phone ? <Button className={css.rowMore} data-documents-row-more="folder" type="button" variant="ghost" aria-label={t('action.moreFolderNamed', { name: directory.name })} aria-haspopup="dialog" onClick={(event) => { captureActionAnchor(event.currentTarget); setMobileSheet({ kind: 'directory', directory }) }}><IconEllipsisOutline16 size={16} /></Button> :
         <Menu open={rowMenuId === `folder:${directory.directoryId}`} portal autoFocus compact={!touch} align="end" onClose={() => { setRowMenuId(null) }}
-          anchor={<Button className={css.rowMore} size="toolbar" type="button" variant="ghost" aria-label={t('action.moreFolderNamed', { name: directory.name })} aria-haspopup="menu" aria-expanded={rowMenuId === `folder:${directory.directoryId}`} onClick={(event) => { actionReturnTarget.current = event.currentTarget; setRowMenuId(rowMenuId === `folder:${directory.directoryId}` ? null : `folder:${directory.directoryId}`) }}><IconEllipsisOutline16 size={16} /></Button>}>
+          anchor={<Button className={css.rowMore} size="toolbar" type="button" variant="ghost" aria-label={t('action.moreFolderNamed', { name: directory.name })} aria-haspopup="menu" aria-expanded={rowMenuId === `folder:${directory.directoryId}`} onClick={(event) => { captureActionAnchor(event.currentTarget); setRowMenuId(rowMenuId === `folder:${directory.directoryId}` ? null : `folder:${directory.directoryId}`) }}><IconEllipsisOutline16 size={16} /></Button>}>
           <MenuItemButton icon={<IconEditOutline16 size={16} />} disabled={busy || writeLocked} onSelect={() => { focusActionAnchor(); setRowMenuId(null); openRenameDirectory(directory) }}>{t('folder.rename')}</MenuItemButton>
           <MenuItemButton icon={<IconTrashOutline16 size={16} />} danger disabled={busy || writeLocked} onSelect={() => { focusActionAnchor(); setRowMenuId(null); setDeleteDirectory(directory) }}>{t('folder.delete')}</MenuItemButton>
         </Menu>}
     </div>
   )
+
+  const rowMetaLabel = (doc: UserDocRef): string => {
+    const includeDate = sort.key !== 'date' || shortViewport
+    if (phone) return documentMetaLabel(doc, t, includeDate)
+    const type = t(`modal.type.${documentTypeBucket(doc.mediaType)}`)
+    if (compactNavigation) return `${type} · ${documentMetaLabel(doc, t, includeDate)}`
+    return includeDate ? `${type} · ${getDateGroup(doc.modifiedAt, t('date.unknown'))}` : type
+  }
 
   const renderRow = (doc: UserDocRef) => (
     <div key={doc.docId} className={`${css.row}${selected.has(doc.docId) ? ` ${css.rowSelected}` : ''}${previewVisible && previewDoc.docId === doc.docId ? ` ${css.rowPreviewing}` : ''}`} role="listitem" data-documents-row-kind="document">
@@ -3254,14 +3432,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           else previewTriggers.current.set(doc.docId, element)
         }} onClick={() => { openPreview(doc) }}>
         <span className={css.fileIcon} aria-hidden="true"><FileTypeIcon name={doc.name} mediaType={doc.mediaType} /></span>
-        <span className={css.meta}><span className={css.name} title={doc.name}>{doc.name}</span><span className={css.size}>{phone ? documentMetaLabel(doc, t, true) : `${t(`modal.type.${documentTypeBucket(doc.mediaType)}`)} · ${getDateGroup(doc.modifiedAt, t('date.unknown'))}`}</span></span>
+        <span className={css.meta}>
+          <span className={css.name} title={doc.name}>{doc.name}</span><span className={css.size}>{rowMetaLabel(doc)}</span>
+        </span>
       </button>
       <span className={css.rowBytes}>{formatBytes(doc.bytes)}</span>
       <span className={css.rowPrimaryActions}>
-        <Button className={css.quickAttach} type="button" size="toolbar" variant="soft" aria-label={t('action.attachNamed', { name: doc.name })} disabled={busy || onAttachDocument === undefined} onClick={() => { attachDocument(doc) }}>{attachLabel}</Button>
-        {phone ? <Button className={css.rowMore} data-documents-row-more="document" type="button" variant="ghost" aria-label={t('action.moreNamed', { name: doc.name })} aria-haspopup="dialog" onClick={(event) => { actionReturnTarget.current = event.currentTarget; setMobileSheet({ kind: 'document', document: doc }) }}><IconEllipsisOutline16 size={16} /></Button> :
+        {(onAttachDocument !== undefined || mode === 'select') && <Button className={css.quickAttach} type="button" size="toolbar" variant="soft" aria-label={t('action.attachNamed', { name: doc.name })} disabled={busy || onAttachDocument === undefined} onClick={() => { attachDocument(doc) }}>{attachLabel}</Button>}
+        {phone ? <Button className={css.rowMore} data-documents-row-more="document" type="button" variant="ghost" aria-label={t('action.moreNamed', { name: doc.name })} aria-haspopup="dialog" onClick={(event) => { captureActionAnchor(event.currentTarget); setMobileSheet({ kind: 'document', document: doc }) }}><IconEllipsisOutline16 size={16} /></Button> :
           <Menu open={rowMenuId === `document:${doc.docId}`} portal autoFocus compact={!touch} align="end" onClose={() => { setRowMenuId(null) }}
-            anchor={<Button className={css.rowMore} size="toolbar" type="button" variant="ghost" aria-label={t('action.moreNamed', { name: doc.name })} aria-haspopup="menu" aria-expanded={rowMenuId === `document:${doc.docId}`} onClick={(event) => { actionReturnTarget.current = event.currentTarget; setRowMenuId(rowMenuId === `document:${doc.docId}` ? null : `document:${doc.docId}`) }}><IconEllipsisOutline16 size={16} /></Button>}>
+            anchor={<Button className={css.rowMore} size="toolbar" type="button" variant="ghost" aria-label={t('action.moreNamed', { name: doc.name })} aria-haspopup="menu" aria-expanded={rowMenuId === `document:${doc.docId}`} onClick={(event) => { captureActionAnchor(event.currentTarget); setRowMenuId(rowMenuId === `document:${doc.docId}` ? null : `document:${doc.docId}`) }}><IconEllipsisOutline16 size={16} /></Button>}>
             <MenuItemButton icon={<IconInspectOutline12 size={16} />} onSelect={() => { focusActionAnchor(); openPreview(doc) }}>{t('action.preview')}</MenuItemButton>
             <MenuItemButton icon={<IconFolderOpenOutline16 size={16} />} disabled={busy || writeLocked} onSelect={() => { focusActionAnchor(); setRowMenuId(null); void openMove([doc]) }}>{t('action.move')}</MenuItemButton>
             <MenuItemButton icon={<IconCopyOutline16 size={16} />} disabled={busy} onSelect={() => { focusActionAnchor(); setRowMenuId(null); openCopy([doc], true) }}>{t('scope.copy')}</MenuItemButton>
@@ -3326,6 +3506,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       </li>)}
     </ul>
   )
+
+  const trashNavigation = <Button
+    className={css.sheetAction}
+    type="button"
+    variant="ghost"
+    disabled={busy || trashLoading}
+    onClick={() => { closeMobileSheet(); if (trashMode) returnFromTrash(); else void openTrash() }}
+  >
+    {trashMode ? t('trash.back') : t('trash.button')}
+  </Button>
 
   const mobileSheetContent = mobileSheet?.kind === 'scope' ? (
     <DocumentsMobileSheet
@@ -3399,18 +3589,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       closeLabel={t('modal.close')}
       onClose={closeMobileSheet}
     >
-      <Button
-        className={css.sheetAction}
-        type="button"
-        variant="ghost"
-        disabled={busy || trashLoading}
-        onClick={() => { closeMobileSheet(); if (trashMode) returnFromTrash(); else void openTrash() }}
-      >
-        {trashMode ? t('trash.back') : t('trash.button')}
-      </Button>
+      {trashMode && trashNavigation}
       {!trashMode && <>
         <section className={css.sheetSection} aria-label={t('modal.filters')}>
           <h3 className={css.sheetSectionTitle}>{t('modal.filters')}</h3>
+          <Input
+            icon={<IconSearchOutline16 size={16} />}
+            aria-label={t('modal.search')}
+            placeholder={t('modal.search')}
+            value={query}
+            onChange={(event) => { setQuery(event.currentTarget.value) }}
+          />
           <label className={css.sheetLabel} htmlFor="documents-mobile-type">{t('modal.type')}</label>
           <select
             id="documents-mobile-type"
@@ -3423,6 +3612,13 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           </select>
           <DocumentSortControl sort={sort} onChange={setSortValue} t={t} inline disabled={busy} />
         </section>
+        {shortViewport && !overviewMode && showCaption && <div className={css.sheetSection}>
+          <p>{t('listing.entries', { folders: String(filteredDirectories.length), documents: String(totalDocuments ?? filtered.length) })}</p>
+          {pageDocs.length > 0 && <label className={css.sheetPageSelection}>
+            <input ref={setPageCheckbox} type="checkbox" checked={headerState === 'all'} onChange={togglePage} />
+            <span>{t('selection.selectPage')}</span>
+          </label>}
+        </div>}
         <div className={css.sheetActions} role="list">
           <Button
             className={css.sheetAction}
@@ -3453,6 +3649,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
           >
             {t('history.button')}
           </Button>
+          {trashNavigation}
           {scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
             <Button
               className={css.sheetAction}
@@ -3493,7 +3690,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         <small>{formatBytes(mobileSheet.document.bytes)} · {getDateGroup(mobileSheet.document.modifiedAt)}</small>
       </div>
       <div className={css.sheetActions} role="list">
-        <Button className={css.sheetAction} type="button" variant="soft" disabled={busy} icon={<IconPaperclipOutline16 size={18} />} onClick={() => { performMobileDocumentAction('attach', mobileSheet.document) }}>{attachLabel}</Button>
+        {(onAttachDocument !== undefined || mode === 'select') && <Button className={css.sheetAction} type="button" variant="soft" disabled={busy || onAttachDocument === undefined} icon={<IconPaperclipOutline16 size={18} />} onClick={() => { performMobileDocumentAction('attach', mobileSheet.document) }}>{attachLabel}</Button>}
         <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy} icon={<IconInspectOutline12 size={18} />} onClick={() => { performMobileDocumentAction('preview', mobileSheet.document) }}>{t('action.preview')}</Button>
         <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy || writeLocked} icon={<IconFolderOpenOutline16 size={18} />} onClick={() => { performMobileDocumentAction('move', mobileSheet.document) }}>{t('action.move')}</Button>
         <a
@@ -3530,7 +3727,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       open
       key={`overview-${mobileSheet.row.catalogId}`}
       kind="overview-actions"
-      title={t('scope.copyNamed', { name: mobileSheet.row.name })}
+      title={t('action.more')}
       closeLabel={t('modal.close')}
       onClose={closeMobileSheet}
     >
@@ -3568,6 +3765,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         <Button
           type="button"
           variant="outline"
+          aria-label={t('pager.prev')}
           disabled={currentPage <= 1 || busy}
           onClick={() => {
             const next = currentPage - 1
@@ -3575,7 +3773,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
             else setPage(next)
           }}
         >
-          {t('pager.prev')}
+          {phone ? <IconChevronLeftOutline14 size={18} aria-hidden="true" /> : t('pager.prev')}
         </Button>
         <span>{t('pager.status', {
           page: String(currentPage), pages: serverPaging && serverTotalDocuments === null ? '…' : String(pages),
@@ -3583,6 +3781,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         <Button
           type="button"
           variant="outline"
+          aria-label={t('pager.next')}
           disabled={busy || (serverPaging
             ? serverNextCursor === undefined
             : currentPage >= pages)}
@@ -3592,11 +3791,21 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
             else setPage(next)
           }}
         >
-          {t('pager.next')}
+          {phone ? <IconChevronRightOutline14 size={18} aria-hidden="true" /> : t('pager.next')}
         </Button>
       </div>
     )
     : undefined
+
+  const finishFilterEditing = (event: FocusEvent<HTMLElement>): void => {
+    if (event.relatedTarget instanceof Element && event.relatedTarget.closest('[data-documents-inline-filters], [data-documents-toolbar-more], [data-documents-overview-more]') !== null) return
+    setSearchEditing(false)
+  }
+
+  const preserveFilterFocusOnPress = (event: PointerEvent<HTMLButtonElement>): void => {
+    // On WebKit a button press can move focus to the dialog, collapsing the scrolled filters before click.
+    if (shortViewport && searchEditing && event.button === 0) event.preventDefault()
+  }
 
   const filterControls = (
     <>
@@ -3626,9 +3835,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         onClose={onClose}
         title={title}
         headless
+        mobilePresentation="page"
         className={css.dialog as string}
+        overlayClassName={css.overlay as string}
         onKeyDownCapture={(event) => {
-          if (!phone && previewVisible && event.key === 'Escape' && event.target instanceof Element && event.target.closest('[data-document-preview]') !== null) {
+          if (!fullScreenPreview && previewVisible && event.key === 'Escape' && event.target instanceof Element && event.target.closest('[data-document-preview]') !== null) {
             event.preventDefault(); event.stopPropagation(); closePreview()
           }
         }}
@@ -3643,6 +3854,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
             </div>
           </header>
           {unavailableScope && <p role="alert" className={css.error}>{t('scope.entryUnavailable')}</p>}
+          {scopeDenied && error === '' && <p role="status" className={css.error}>{t('scope.permissionPending')}</p>}
           <div className={css.workbench} ref={focusTrashReturn}>
             <aside className={css.scopeRail} aria-label={t('scope.rail.label')}>
               <Input className={css.scopeSearch as string} icon={<IconSearchOutline16 size={14} />} aria-label={t(showComputer ? 'scope.search' : 'scope.searchLocal')} placeholder={t(showComputer ? 'scope.search' : 'scope.searchLocal')} value={scopeFilter} onChange={(event) => { setScopeFilter(event.currentTarget.value) }} />
@@ -3695,7 +3907,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                 </span>}
               </div>}
               {compactNavigation && (
-                <>
+                <div className={css.compactScopeHeader}>
                   <button
                     type="button"
                     className={css.scopeTrigger}
@@ -3704,17 +3916,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                     aria-haspopup="dialog"
                     aria-expanded={mobileSheet?.kind === 'scope' && mobileSheet.mode === 'view'}
                     disabled={busy || overviewLoading}
-                    onClick={(event) => { actionReturnTarget.current = event.currentTarget; openMobileScopeSheet('view') }}
+                    onClick={(event) => { captureActionAnchor(event.currentTarget); openMobileScopeSheet('view') }}
                   >
                     <span className={css.scopeItemIcon} aria-hidden="true"><IconBrowseOutline16 size={18} /></span>
                     <span className={css.scopeTriggerCopy}>
                       <strong>{mobileScopeLabel}</strong>
-                      <small>{visibleScope}</small>
+                      {overviewMode ? <small>{t('scope.all.description')}</small> : !scopeDenied && scopeView === null && alternateSource === null && <small>{visibility}</small>}
                     </span>
                     <IconChevronDownOutline14 className={css.scopeTriggerChevron} size={14} />
                   </button>
-                  {scopeStatus === 'stale' && <div className={css.scopeStaleMobile} role="status"><span>{t('scope.stale')}</span><button type="button" onClick={() => { scopeCache.current = null; void load(ROOT_DIRECTORY_ID) }}>{t('scope.retry')}</button></div>}
-                </>
+                  {scopeStatus === 'stale' && <div className={css.scopeStaleMobile} role="status"><span title={t('scope.stale')}>{t('scope.stale.short')}</span><button type="button" onClick={() => { scopeCache.current = null; void load(ROOT_DIRECTORY_ID) }}>{t('scope.retry')}</button></div>}
+                </div>
               )}
               <div
                 className={`${css.panel}${dropActive ? ` ${css.dropActive}` : ''}${overviewMode ? ` ${css.overviewPanel}` : ''}${trashMode ? ` ${css.trashPanel}` : ''}`}
@@ -3726,21 +3938,32 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               >
                 {error !== '' && <div className={css.error} role="alert">{error}</div>}
                 {pendingAttachments.length > 0 && <div className={css.notice} role="status"><span>{t('copy.attachPending', { names: pendingAttachments.map(document => document.name).join('、') })}</span><Button type="button" variant="soft" disabled={busy} onClick={retryPendingAttachments}>{t('copy.retryAttachment')}</Button></div>}
-                {onAttachDocument === undefined && <div className={css.notice} role="status">{t('action.attach.noTarget')}</div>}
+                {mode === 'select' && onAttachDocument === undefined && <div className={css.notice} role="status">{t('action.attach.noTarget')}</div>}
                 {notice !== '' && <div className={css.notice} role="status">{notice}</div>}
                 {overviewMode && (
                   <section className={css.overview} aria-label={t('scope.all')}>
                     <header className={css.overviewHeader}>
-                      <div><h2>{t('scope.all')}</h2><p>{t('scope.all.description')}</p></div>
+                      {!phone && !shortViewport && <div><h2>{t('scope.all')}</h2><p>{t('scope.all.description')}</p></div>}
                       <div className={css.overviewActions}>
-                        <Button size="toolbar" type="button" variant="soft" icon={<IconPlusOutline16 size={16} />} disabled={overviewLoading || busy} onClick={(event) => { actionReturnTarget.current = event.currentTarget; openUploadScopePicker() }}>{t('scope.upload.choose')}</Button>
-                        <Button size="toolbar" type="button" variant="ghost" icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading || busy} onClick={() => { void openOverview(true) }}>{t('modal.refresh')}</Button>
+                        <Button size="toolbar" type="button" variant="soft" icon={<IconPlusOutline16 size={16} />} disabled={overviewLoading || busy} onClick={(event) => { captureActionAnchor(event.currentTarget); openUploadScopePicker() }}>{t('scope.upload.choose')}</Button>
+                        <Button className={css.overviewRefresh} size="toolbar" type="button" variant="ghost" aria-label={t('modal.refresh')} icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading || busy} onClick={() => { void openOverview(true) }}>{phone ? null : t('modal.refresh')}</Button>
+                        {(phone || shortViewport) && <Button className={`${css.rowMore}${showFilterIndicator ? ` ${css.moreFiltered}` : ''}`} size="toolbar" type="button" variant="ghost"
+                          data-documents-overview-more="" aria-label={moreLabel} aria-haspopup="dialog" aria-expanded={mobileSheet?.kind === 'more'}
+                          icon={<IconEllipsisOutline16 size={16} />}
+                          onBlur={finishFilterEditing}
+                          onPointerDown={preserveFilterFocusOnPress}
+                          onClick={(event) => { captureActionAnchor(event.currentTarget); setMobileSheet({ kind: 'more' }); setSearchEditing(false) }}>
+                          {showFilterIndicator ? <span>{t('modal.filters.active')}</span> : null}
+                        </Button>}
                       </div>
                     </header>
-                    <div className={css.overviewToolbar} role="group" aria-label={t('modal.filters')}>{filterControls}{phone && <Button className={css.rowMore} size="toolbar" type="button" variant="ghost" aria-label={t('action.more')} onClick={(event) => { actionReturnTarget.current = event.currentTarget; setMobileSheet({ kind: 'more' }) }}><IconEllipsisOutline16 size={16} /></Button>}</div>
-                    {unavailableDocumentComputers > 0 && <div className={css.notice} role="status">{t('overview.unavailable', { count: String(unavailableDocumentComputers) })}</div>}
+                    {(!shortViewport || searchEditing) && <div className={css.overviewToolbar} data-documents-inline-filters="" role="group" aria-label={t('modal.filters')} onFocus={() => { setSearchEditing(true) }} onBlur={finishFilterEditing}>{filterControls}</div>}
+                    {overviewCompleting ? <div className={css.notice} role="status">{t('overview.completing')}</div>
+                      : unavailableDocumentComputers > 0 && <div className={css.notice} role="status">{t('overview.unavailable', { count: String(unavailableDocumentComputers) })}</div>}
                     {overviewError !== '' && <div className={css.error} role="alert">{overviewError}</div>}
-                    {overviewLoading ? <p className={css.status}>{t('scope.all.loading')}</p> : overviewFiltered.length === 0 ? <p className={css.empty}>{t('scope.all.empty')}</p> : (
+                    {overviewLoading ? <p className={css.status}>{t('scope.all.loading')}</p> : overviewFiltered.length === 0 ? (
+                      !overviewCompleting && overviewError === '' && unavailableDocumentComputers === 0 && <p className={css.empty}>{t('scope.all.empty')}</p>
+                    ) : (
                       <div className={css.overviewList} role="list" data-documents-scrollport="overview">
                         {overviewPageRows.map(row => <div key={row.catalogId} className={css.overviewRow} role="listitem">
                           <span className={css.fileIcon} aria-hidden="true"><FileTypeIcon name={row.name} mediaType={row.mediaType} /></span>
@@ -3759,10 +3982,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                               data-documents-row-more="overview"
                               type="button"
                               variant="ghost"
-                              aria-label={t('scope.copyNamed', { name: row.name })}
+                              aria-label={t('action.moreNamed', { name: row.name })}
                               aria-haspopup="dialog"
                               disabled={overviewLoading}
-                              onClick={(event) => { actionReturnTarget.current = event.currentTarget; setMobileSheet({ kind: 'overview', row }) }}
+                              onClick={(event) => { captureActionAnchor(event.currentTarget); setMobileSheet({ kind: 'overview', row }) }}
                             >
                               <IconEllipsisOutline16 size={20} />
                             </Button>
@@ -3776,7 +3999,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       </div>
                     )}
                     {overviewPages > 1 && <div className={css.overviewPager}>
-                      <Button type="button" variant="outline" disabled={overviewCurrentPage <= 1 || overviewLoading} onClick={() => {
+                      <Button type="button" variant="outline" aria-label={t('pager.prev')} disabled={overviewCurrentPage <= 1 || overviewLoading || overviewCompleting} onClick={() => {
                         const previous = overviewCurrentPage - 1
                         if (overviewPaging) {
                           void loadOverviewPage(
@@ -3785,25 +4008,25 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                           )
                         }
                         else setOverviewPage(previous)
-                      }}>{t('pager.prev')}</Button>
+                      }}>{phone ? <IconChevronLeftOutline14 size={18} aria-hidden="true" /> : t('pager.prev')}</Button>
                       <span>{t('pager.status', {
                         page: String(overviewCurrentPage),
                         pages: overviewPaging && overviewTotalDocuments === null ? '…' : String(overviewPages),
                       })}</span>
-                      <Button type="button" variant="outline" disabled={overviewPaging ? overviewNextCursor === undefined || overviewLoading : overviewCurrentPage >= overviewPages || overviewLoading} onClick={() => {
+                      <Button type="button" variant="outline" aria-label={t('pager.next')} disabled={overviewLoading || overviewCompleting || (overviewPaging ? overviewNextCursor === undefined : overviewCurrentPage >= overviewPages)} onClick={() => {
                         const next = overviewCurrentPage + 1
                         if (overviewPaging && overviewNextCursor !== undefined) {
                           overviewCursors.current[overviewCurrentPage] = overviewNextCursor
                           void loadOverviewPage(next, overviewNextCursor)
                         } else setOverviewPage(next)
-                      }}>{t('pager.next')}</Button>
+                      }}>{phone ? <IconChevronRightOutline14 size={18} aria-hidden="true" /> : t('pager.next')}</Button>
                     </div>}
                   </section>
                 )}
                 {trashMode && (
                   <section className={css.trash} aria-label={t('trash.title')}>
                     <header className={css.trashHeader} data-documents-trash-header>
-                      <div><h2>{t('trash.title')}</h2><p>{visibleScope}</p></div>
+                      <div><h2>{t('trash.title')}</h2><p>{trashScope}</p></div>
                       <div className={css.trashActions}><Button type="button" variant="soft" disabled={busy || trashLoading} onClick={returnFromTrash}>{t('trash.back')}</Button>
                         <Button type="button" variant="ghost" disabled={busy || trashLoading} onClick={() => { void openTrash() }}>{t('modal.refresh')}</Button></div>
                     </header>
@@ -3825,16 +4048,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       </div>
                     )}
                     {!trashLoading && (trashNextCursor !== undefined || trashPage > 1) && <div className={css.overviewPager}>
-                      <Button type="button" variant="outline" disabled={trashPage <= 1 || busy} onClick={() => {
+                      <Button type="button" variant="outline" aria-label={t('pager.prev')} disabled={trashPage <= 1 || busy} onClick={() => {
                         const previous = trashPage - 1
                         void openTrash(previous <= 1 ? undefined : trashCursors.current[previous - 1], previous)
-                      }}>{t('pager.prev')}</Button>
+                      }}>{phone ? <IconChevronLeftOutline14 size={18} aria-hidden="true" /> : t('pager.prev')}</Button>
                       <span>{t('pager.status', { page: String(trashPage), pages: trashNextCursor === undefined ? String(trashPage) : '…' })}</span>
-                      <Button type="button" variant="outline" disabled={trashNextCursor === undefined || busy} onClick={() => {
+                      <Button type="button" variant="outline" aria-label={t('pager.next')} disabled={trashNextCursor === undefined || busy} onClick={() => {
                         if (trashNextCursor === undefined) return
                         trashCursors.current[trashPage] = trashNextCursor
                         void openTrash(trashNextCursor, trashPage + 1)
-                      }}>{t('pager.next')}</Button>
+                      }}>{phone ? <IconChevronRightOutline14 size={18} aria-hidden="true" /> : t('pager.next')}</Button>
                     </div>}
                   </section>
                 )}
@@ -3847,14 +4070,20 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                         <button
                           type="button"
                           className={css.parentBack}
+                          aria-label={t('breadcrumb.parent')}
+                          title={t('breadcrumb.parent')}
                           disabled={loading && !listingReadyRef.current}
                           onClick={() => { navigate(parentDirectory(currentDirectoryId)) }}
                         >
-                          {t('breadcrumb.parent')}
+                          {phone ? <IconChevronLeftOutline14 aria-hidden="true" size={18} /> : t('breadcrumb.parent')}
                         </button>
                       )}
                       <nav className={css.breadcrumbs} aria-label={t('breadcrumb.label')}>
-                        {directoryTrail.map((crumb, index) => (
+                        {phone ? directoryTrail.slice(-1).map(crumb => (
+                          <h3 key={crumb.directoryId || 'root'} className={css.mobileFolderTitle} aria-current="page">
+                            {crumb.directoryId === ROOT_DIRECTORY_ID ? t('breadcrumb.root') : crumb.name}
+                          </h3>
+                        )) : directoryTrail.map((crumb, index) => (
                           <span key={crumb.directoryId || 'root'} className={css.crumbSeat}>
                             {index > 0 && <IconChevronRightOutline14 size={12} className={css.crumbChevron} />}
                             <button
@@ -3871,7 +4100,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       </nav>
                     </div>
 
-                    {scopeView !== null && (
+                    {!scopeDenied && scopeView !== null && (
                       <div className={`${css.scopeNotice} ${scopeView.canUpload ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
                         <span className={css.scopeNoticeIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
                         <span className={css.scopeNoticeCopy}>
@@ -3882,7 +4111,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                         </span>
                       </div>
                     )}
-                    {alternateSource !== null && (
+                    {!scopeDenied && alternateSource !== null && (
                       <div className={`${css.scopeNotice} ${alternateSource.mode === 'rw' ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
                         <span className={css.scopeNoticeIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
                         <span className={css.scopeNoticeCopy}>
@@ -3894,7 +4123,6 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
 
                   </div>
                   <div className={css.toolbar}>
-                    <div className={css.filterGroup} role="group" aria-label={t('modal.filters')}>{filterControls}</div>
                     <div className={`${css.actionGroup}${phone ? ` ${css.mobileActionGroup}` : ''}`} role="group" aria-label={t('modal.actions')}>
                       <input
                         ref={fileInputRef}
@@ -3908,7 +4136,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                           if (files !== null) void uploadFiles(files)
                         }}
                       />
-                      {phone ? (
+                      {phone || shortViewport ? (
                         <>
                           {trashMode ? (
                             <Button size="toolbar"
@@ -3922,18 +4150,20 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                             </Button>
                           ) : alternateSource === null && !overviewMode && uploadButton}
                           <Button size="toolbar"
-                            className={css.mobileMore}
+                            className={`${css.mobileMore}${showFilterIndicator ? ` ${css.moreFiltered}` : ''}`}
                             data-documents-toolbar-more=""
                             type="button"
                             variant="ghost"
-                            aria-label={t('action.more')}
+                            aria-label={moreLabel}
                             aria-haspopup="dialog"
                             aria-expanded={mobileSheet?.kind === 'more'}
                             disabled={busy}
                             icon={<IconEllipsisOutline16 size={18} />}
-                            onClick={(event) => { actionReturnTarget.current = event.currentTarget; setMobileSheet({ kind: 'more' }) }}
+                            onBlur={finishFilterEditing}
+                            onPointerDown={preserveFilterFocusOnPress}
+                            onClick={(event) => { captureActionAnchor(event.currentTarget); setMobileSheet({ kind: 'more' }); setSearchEditing(false) }}
                           >
-                            {t('action.more.compact')}
+                            {showFilterIndicator ? <span>{t('modal.filters.active')}</span> : null}
                           </Button>
                         </>
                       ) : (
@@ -3941,7 +4171,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                           {!trashMode && <Button size="toolbar" className={css.newFolder} type="button" variant="ghost" disabled={busy || writeLocked} icon={<IconPlusOutline16 size={16} />} onClick={openCreateDirectory}>{t('folder.create')}</Button>}
                           {!trashMode && alternateSource === null && !overviewMode && uploadButton}
                           <Menu open={toolsOpen} onClose={() => { setToolsOpen(false) }} portal compact={!touch} autoFocus align="end"
-                            anchor={<Button size="toolbar" className={css.desktopMore} data-documents-toolbar-more="" type="button" variant="ghost" aria-label={t('action.more')} aria-haspopup="menu" aria-expanded={toolsOpen} disabled={busy} onClick={(event) => { actionReturnTarget.current = event.currentTarget; setToolsOpen(!toolsOpen) }}><IconEllipsisOutline16 size={16} /></Button>}>
+                            anchor={<Button size="toolbar" className={css.desktopMore} data-documents-toolbar-more="" type="button" variant="ghost" aria-label={t('action.more')} aria-haspopup="menu" aria-expanded={toolsOpen} disabled={busy} onClick={(event) => { captureActionAnchor(event.currentTarget); setToolsOpen(!toolsOpen) }}><IconEllipsisOutline16 size={16} /></Button>}>
                             {compactNavigation && <MenuItemButton icon={<IconTrashOutline16 size={16} />} disabled={busy || trashLoading} onSelect={() => { setToolsOpen(false); if (trashMode) returnFromTrash(); else void openTrash() }}>{trashMode ? t('trash.back') : t('trash.button')}</MenuItemButton>}
                             {!trashMode && scopeView === null && alternateSource === null && sourceOptions.length > 0 && <MenuItemButton icon={<IconBrowseOutline16 size={16} />} disabled={busy} onSelect={() => { focusActionAnchor(); setToolsOpen(false); openSourcePicker() }}>{t('copy.source')}</MenuItemButton>}
                             {!trashMode && (scopeView !== null || alternateSource !== null) && <MenuItemButton disabled={busy} onSelect={() => { focusActionAnchor(); setToolsOpen(false); void load(ROOT_DIRECTORY_ID) }}>{t('copy.source.current')}</MenuItemButton>}
@@ -3953,12 +4183,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className={css.caption}>
+                  {showFilters && (!shortViewport || searchEditing) && <div className={css.filterGroup} data-documents-inline-filters="" role="group" aria-label={t('modal.filters')} onFocus={() => { setSearchEditing(true) }} onBlur={finishFilterEditing}>{filterControls}</div>}
+
+                  {showCaption && !shortViewport && <div className={css.caption}>
                     <span className={css.captionLeading}>
                       {pageDocs.length > 0 && (
                         <label className={css.check}>
                           <input
-                            ref={headerCheckRef}
+                            ref={setPageCheckbox}
                             type="checkbox"
                             checked={headerState === 'all'}
                             aria-label={t('selection.selectPage')}
@@ -3966,48 +4198,52 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                           />
                         </label>
                       )}
-                      {visibleUploadFeedback === null ? <span>{visibleScope}</span> : (
-                        <span role="status" aria-live="polite">{t('modal.upload.published', {
-                          published: String(visibleUploadFeedback.published), total: String(visibleUploadFeedback.total),
-                        })}</span>
-                      )}
+                      <span className={css.visibilityCaption}>{visibleScope}</span>
                       {refreshing && !emptyReadPending && visibleUploadFeedback === null && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
                     </span>
-                    {!loading && !emptyReadPending && !emptyUploadPending && <span>{t('listing.entries', { folders: String(filteredDirectories.length), documents: String(totalDocuments ?? filtered.length) })}</span>}
-                  </div>
+                    {!scopeDenied && !loading && !emptyReadPending && !emptyUploadPending && <span>{t('listing.entries', { folders: String(filteredDirectories.length), documents: String(totalDocuments ?? filtered.length) })}</span>}
+                  </div>}
 
                 </div>
 
+                {shortViewport && refreshing && !emptyReadPending && visibleUploadFeedback === null && <span className={css.refreshingStatus} role="status" aria-live="polite">
+                  {pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}
+                </span>}
+
                 {displayedProgress !== null && (
-                  <div
-                    className={css.progress}
-                    role="progressbar"
-                    aria-label={uploadLabel}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={displayedProgress.percent}
-                  >
-                    <span style={{ width: `${String(displayedProgress.percent)}%` }} />
+                  <div className={css.operationProgress}>
+                    <strong>{uploadLabel}</strong>
+                    {displayedProgress.fileName !== undefined && <span className={css.uploadFileName}>{displayedProgress.fileName}</span>}
+                    <progress className={css.progress}
+                      aria-label={visibleUploadFeedback === null ? uploadLabel : t('modal.upload.overall')}
+                      max={visibleUploadFeedback?.total ?? 100}
+                      value={visibleUploadFeedback?.published ?? displayedProgress.percent} />
+                    {visibleUploadFeedback !== null && <span role="status" aria-live="polite">{t('modal.upload.published', {
+                      published: String(visibleUploadFeedback.published), total: String(visibleUploadFeedback.total),
+                    })}</span>}
                   </div>
                 )}
 
+                {displayedProgress === null && visibleUploadFeedback !== null && (
+                  <p className={css.uploadResult} role="status" aria-live="polite">{t('modal.upload.published', {
+                    published: String(visibleUploadFeedback.published), total: String(visibleUploadFeedback.total),
+                  })}</p>
+                )}
+
                 <div className={css.browseBody} data-documents-browse-body="" inert={overviewMode || trashMode} aria-hidden={overviewMode || trashMode}>
-                  {!hasEntries && busy ? null : emptyUploadPending ? null : emptyReadPending ? (
+                  {!hasEntries && (busy || scopeDenied) ? null : emptyUploadPending ? null : emptyReadPending ? (
                     <div className={css.loadingState} role="status" aria-live="polite">
                       <span className={css.visuallyHidden}>{t('modal.loading')}</span>
                       {[0, 1, 2].map(index => <span key={index} className={css.loadingRow} aria-hidden="true" />)}
                     </div>
-                  ) : !hasEntries ? (
+                  ) : !hasEntries && !hasActiveFilters ? (
                     <div className={css.emptyState}>
                       <span className={css.emptyIcon} aria-hidden="true"><IconBrowseOutline16 size={24} /></span>
                       <p className={css.empty}>{t('modal.empty')}</p>
-                      {!uploadLocked && (
+                      {(phone || shortViewport) && !uploadLocked && (
                         <div className={css.emptyActions}>
-                          <Button type="button" variant="soft" aria-label={t('modal.upload')} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
-                            {phone ? t('modal.upload.compact') : t('modal.upload')}
-                          </Button>
                           <Button type="button" variant="outline" aria-label={t('folder.create')} disabled={busy} icon={<IconFolderClose16 size={16} />} onClick={openCreateDirectory}>
-                            {phone ? t('folder.create.compact') : t('folder.create')}
+                            {t('folder.create')}
                           </Button>
                         </div>
                       )}
@@ -4033,8 +4269,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                           <div
                             key={group.date}
                             className={css.group}
-                            role="group"
-                            aria-label={`${t('listing.date')} ${group.date}`}
+                            role={shortViewport ? undefined : 'group'}
+                            aria-label={shortViewport ? undefined : `${t('listing.date')} ${group.date}`}
                           >
                             <div className={css.groupDate}>{group.date}</div>
                             {group.documents.map(renderRow)}
@@ -4044,17 +4280,18 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                   )}
                   {previewVisible && <DocumentPreview
                     doc={previewDoc}
+                    {...(renderFactorySlot === undefined ? {} : { renderFactorySlot })}
                     privateResourceUrl={privateResourceUrl}
                     {...((scopeView?.scope ?? alternateSource?.scope) === undefined
                       ? {} : { scope: scopeView?.scope ?? alternateSource?.scope })}
                     maxTextBytes={MAX_PREVIEW_TEXT_BYTES}
-                    embedded={!phone}
+                    embedded={!fullScreenPreview}
                     sourceLabel={mobileScopeLabel}
                     onClose={closePreview}
                     t={t}
                     actions={<>
-                      <p className={css.previewTarget}>{t('preview.destination')}{selected.size > 0 && <><br />{t('preview.singleHint')}</>}</p>
-                      <Button className={css.previewAttach} size="toolbar" type="button" variant="soft" disabled={busy} icon={<IconPaperclipOutline16 size={16} />} onClick={() => { attachDocument(previewDoc) }}>{selected.size > 0 ? t(crossScopeAttachment ? 'preview.copyAttachOne' : 'preview.attachOne') : attachLabel}</Button>
+                      {(onAttachDocument !== undefined || mode === 'select') && <p className={css.previewTarget}>{t('preview.destination')}{selected.size > 0 && <><br />{t('preview.singleHint')}</>}</p>}
+                      {(onAttachDocument !== undefined || mode === 'select') && <Button className={css.previewAttach} size="toolbar" type="button" variant="soft" disabled={busy || onAttachDocument === undefined} icon={<IconPaperclipOutline16 size={16} />} onClick={() => { attachDocument(previewDoc) }}>{selected.size > 0 ? t(crossScopeAttachment ? 'preview.copyAttachOne' : 'preview.attachOne') : attachLabel}</Button>}
                       <div className={css.previewSecondary}>
                         <a href={documentContentUrl(previewDoc.docId)} target="_blank" rel="noopener noreferrer"><IconDownloadOutline16 size={16} />{t('action.download')}</a>
                         <Tooltip label={t('action.move')} disabled={phone}><Button size="toolbar" type="button" variant="ghost" aria-label={t('action.move')} disabled={busy || writeLocked} onClick={() => { void openMove([previewDoc]) }}><IconFolderOpenOutline16 size={16} />{phone && t('action.move')}</Button></Tooltip>
@@ -4119,7 +4356,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                       variant="ghost"
                       aria-label={t('selection.actions')}
                       aria-haspopup="dialog"
-                      onClick={(event) => { actionReturnTarget.current = event.currentTarget; setMobileSheet({ kind: 'selection' }) }}
+                      onClick={(event) => { captureActionAnchor(event.currentTarget); setMobileSheet({ kind: 'selection' }) }}
                     >
                       {t('selection.actions.compact')}
                     </Button>
@@ -4202,7 +4439,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               </>
             )}
           >
-            {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
+            {modalError !== '' && <div ref={revealDialogError} className={css.error} role="alert">{modalError}</div>}
             {renderOperationDocuments(deleteTargets)}
             <p className={css.confirm}>{confirmMessage}</p>
           </DocumentsMobileSheet>
@@ -4235,7 +4472,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
             closeLabel={t('modal.close')}
           >
             <form id={folderFormId} className={css.form} onSubmit={(event) => { void handleFolderSubmit(event) }}>
-              {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
+              {modalError !== '' && <div ref={revealDialogError} className={css.error} role="alert">{modalError}</div>}
               <label className={css.formLabel} htmlFor="documents-folder-name">{t('folder.name')}</label>
               <Input
                 id="documents-folder-name"
@@ -4277,7 +4514,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               </>
             )}
           >
-            {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
+            {modalError !== '' && <div ref={revealDialogError} className={css.error} role="alert">{modalError}</div>}
             <p className={css.confirm}>{t('folder.delete.message', { name: deleteDirectory.name })}</p>
           </DocumentsMobileSheet>
         )}
@@ -4314,7 +4551,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
             )}
           >
             <div className={css.form}>
-              {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
+              {modalError !== '' && <div ref={revealDialogError} className={css.error} role="alert">{modalError}</div>}
               <p className={css.confirm}>{t('move.message', { count: String(moveTargets.length) })}</p>
               {renderOperationDocuments(moveTargets)}
               {moveLoading ? (
@@ -4361,7 +4598,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
               </>
             )}
           >
-            {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
+            {modalError !== '' && <div ref={revealDialogError} className={css.error} role="alert">{modalError}</div>}
             {copyUnavailable && <p className={css.error} role="alert">{t('scope.entryUnavailable')}</p>}
             <div className={css.form}>
               {!showComputer || copySourceScope?.nodeId === undefined ? null : <p className={css.confirm}>{t('computer.source')}: <ComputerBadge label={t('computer.source')}

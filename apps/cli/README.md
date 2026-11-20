@@ -21,6 +21,8 @@ The invoking directory is the default workspace root. The `web`, `headless`, `sd
 
 Gateway-managed launches require model, resource and execution authorization before SDK bootstrap or profile plugins run. See the [managed launch reference](reference/README.md#managed-launch).
 
+A disaster-recovery launch verifies the node-private policy file against the process-supplied digest before plugin imports. Environment files cannot replace that permission. The root installs historical Session admission and the sealed plugin composition before boot; SDK bootstrap injection is refused in this mode. Ordinary profile launches retain their existing behavior.
+
 ## App arguments
 
 The launcher parses only its own flags and hands everything after them to the booted profile, where any injected app plugin may parse the shared immutable snapshot ([`dsh-cmdline`](../../packages/boot/cmdline/README.md)). The first token the launcher does not recognize starts the app's arguments:

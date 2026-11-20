@@ -9,12 +9,13 @@
 // and no event references the workspace, so the lane replays on any host
 // with a usable `pwsh` — the lane mounts the pwsh stack through an overlay
 // (the shipped tree keeps the bash stack).
+import { responsiveBrowser } from './responsive-browser.ts'
 import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 import {
@@ -53,7 +54,7 @@ describe.skipIf(MODE === 'record' || !HAS_PWSH)('web e2e: pwsh calls use the bas
     expect(fixtureUserPrompts(fixture), 'seed fixture must carry the single drive prompt').toEqual([PROMPT])
     scaffold = await launchWebScaffold({ extraOverlayPath: OVERLAY })
     await seedSession(scaffold, fixture, SEED_ID)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)

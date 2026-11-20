@@ -102,6 +102,15 @@ export function apply(ctx: ClientContext): void {
   // Registration-time text (the nav label thunk) and the inject faces share
   // one bound translate; copy freshness rides the locale revision.
   const t = ctx.locale.bind(NS) as ModelsSectionInjected['t']
+  const deferOnboarding = ctx.get('startupDraft') !== undefined
+  const startupReady = {
+    getSnapshot: () => {
+      if (!deferOnboarding) return true
+      const current = ctx.get('workspaces')?.list.getSnapshot()
+      return current?.baselinesReady === true || current?.state === 'error'
+    },
+    subscribe: (listener: () => void) => (deferOnboarding ? ctx.get('workspaces')?.list.subscribe(listener) : undefined) ?? (() => {}),
+  }
   const injected = (): ModelsSectionInjected => ({
     controller,
     hooks: { snapshot: controller.store },
@@ -113,7 +122,7 @@ export function apply(ctx: ClientContext): void {
   })
   const deepSeekOnboardingInjected = (): DeepSeekOnboardingInjected => ({
     controller,
-    hooks: { models: controller.store },
+    hooks: { models: controller.store, startupReady },
     api: connection.api,
     discoverModels: (settingsNs, request) => ctx.remote.llm.discoverModels(settingsNs, request),
     schema,

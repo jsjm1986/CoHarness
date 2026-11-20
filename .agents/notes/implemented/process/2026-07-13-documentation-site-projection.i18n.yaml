@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-13-documentation-site-projection.md
 document:
-  en: 10b8ac8761ef6cc522e752780324c11dfda23622
-  zh: 386ce50ae5e73133d5a4464997fc7d63e654fd70
+  en: 986143da11710ab88442d52c6710f00552b605cb
+  zh: 7f70a0ccadbd1741209998fa864fdea1c6337b79
 /agent-note-project-canonical-documentation-into-the-website:
   en: 386e1a9d29380abc
   zh: 52d34438711dd54b
@@ -12,8 +12,8 @@ document:
   en: d772e1c046763127
   zh: a9f44ff05bffa408
 /agent-note-project-canonical-documentation-into-the-website/decision:
-  en: 94d302749cba29e0
-  zh: c2f132a4e5cbb665
+  en: d159f780975b7bb8
+  zh: 1484bec0f69ea7d1
 /agent-note-project-canonical-documentation-into-the-website/alternatives-considered:
   en: 166e5d7536820a83
   zh: ee2960934bb4fce2

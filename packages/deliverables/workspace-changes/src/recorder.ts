@@ -7,7 +7,8 @@ import { captureFile, mutationPath, sameCapture, type Capture } from './capture.
 import { compareText } from './compare.ts'
 import type { PosixRecorderExecution } from './execution.ts'
 import {
-  blobText, diffTrees, gitlinkPaths, ignoredPaths, locateGitWorkspace, snapshotTree, treeBlob, type GitRunner, type GitWorkspace,
+  blobText, canSkipLocalGitDiscovery, diffTrees, gitlinkPaths, ignoredPaths, locateGitWorkspace, snapshotTree, treeBlob,
+  type GitRunner, type GitWorkspace,
 } from './git.ts'
 import { canonicalPath, compareDisplay, displayPathOf, durablePathOf, isInside, isTemporaryPath, temporaryRoots, toPosix } from './paths.ts'
 import type { WorkspaceChangedFile, WorkspaceChangesSummary, WorkspaceFileDiff, WorkspaceReviewId } from './types.ts'
@@ -342,6 +343,7 @@ export class TurnRecorder {
   /** The repository enclosing the working directory, located once; null keeps retrying each turn. */
   private async locate(paths: Paths, signal: AbortSignal): Promise<Repository | null> {
     if (this.repository !== null) return this.repository
+    if (this.env.execution === undefined && await canSkipLocalGitDiscovery(paths.cwd, signal)) return null
     const git = await this.env.git()
     if (git === null) return null
     const workspace = await locateGitWorkspace(git, paths.cwd, () => this.snapshotDir(paths.scratchRoot, signal), signal)

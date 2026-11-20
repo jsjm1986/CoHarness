@@ -3,10 +3,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Pool } from 'pg'
 import { z } from 'zod'
 import {
-  RESOURCE_MESSAGE_MAX_BYTES, resourceFinishSchema, resourceRequestSchema, resourceStatusesSchema,
+  RESOURCE_MESSAGE_MAX_BYTES, RESOURCE_PHASE_TIMING_HEADER, resourceFinishSchema, resourceRequestSchema, resourceStatusesSchema,
   type ResourceOrigin, type ResourceStatus,
 } from '@deepseek-ai/dsh-resource-budget/wire'
-import { ExecutionIdentityError, type GatewayExecutionIdentity } from './execution-identity.ts'
+import { ExecutionIdentityError, type GatewayExecutionIdentity, type PersonalExecutionWriteFence } from './execution-identity.ts'
 import { NodeResourceBudgetError, type NodeResourceAdmission, type NodeResourceBudget } from './node-resource-budget.ts'
 import type { GatewayPrincipalClaims, GatewayPrincipalSigner } from './principal.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
@@ -16,6 +16,8 @@ interface Dependencies {
   readonly principals: GatewayPrincipalSigner
   readonly execution: GatewayExecutionIdentity
   readonly budget: NodeResourceBudget
+  readonly personalFence?: PersonalExecutionWriteFence
+  readonly bearerMs?: number
 }
 
 function assertNeverOrigin(_origin: never): never {
@@ -85,7 +87,7 @@ async function authorizeSession(deps: Dependencies, subject: RuntimeCredentialSu
   if (origin.scopeId === undefined) {
     if (await deps.execution.hasScopes(subject, origin.sessionId)) throw new ExecutionIdentityError(403, 'resource execution requires its immutable scope')
   }
-  return deps.execution.authorize(subject, { sessionId: origin.sessionId, scopeId: origin.scopeId, capability: 'execute' })
+  return deps.execution.authorize(subject, { sessionId: origin.sessionId, scopeId: origin.scopeId, capability: 'execute' }, deps.personalFence)
 }
 
 /** Recheck stored ownership after the node transaction releases its database connection. */
@@ -128,6 +130,11 @@ export async function handleRuntimeResourceApi(
     res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
     res.end(JSON.stringify(value))
   }
+  const round = (ms: number): number => Math.round(ms * 100) / 100
+  const { bearerMs } = deps
+  const timing = bearerMs === undefined ? undefined : (authorityMs: number, transactionMs: number): void => {
+    res.setHeader(RESOURCE_PHASE_TIMING_HEADER, JSON.stringify([round(bearerMs), round(authorityMs), round(transactionMs)]))
+  }
   if (req.method !== 'POST') { send(405, { error: 'resource-method' }); return true }
   if (Buffer.byteLength(body) > RESOURCE_MESSAGE_MAX_BYTES) { send(413, { error: 'resource-message-too-large' }); return true }
   try {
@@ -139,19 +146,26 @@ export async function handleRuntimeResourceApi(
         return true
       case 'request': {
         const request = resourceRequestSchema.parse(payload)
+        const started = timing === undefined ? 0 : performance.now()
         const attribution = await actor(deps, subject, request.origin)
-        send(200, await deps.budget.request(subject, {
+        const authorized = timing === undefined ? 0 : performance.now()
+        const status = await deps.budget.request(subject, {
           sequence: request.sequence, requestId: request.requestId, kind: request.kind, ...attribution, origin: request.origin.kind,
           projectId: subject.target.kind === 'project' ? subject.target.id : 0,
           ...(request.origin.kind === 'session' ? { sessionId: request.origin.sessionId, scopeId: request.origin.scopeId } : {}),
-        }))
+        })
+        timing?.(authorized - started, performance.now() - authorized)
+        send(200, status)
         return true
       }
       case 'statuses': {
         const request = resourceStatusesSchema.parse(payload)
+        const started = timing === undefined ? 0 : performance.now()
         const admissions = await deps.budget.admissions(subject, request.operations)
+        const observed = timing === undefined ? 0 : performance.now()
         const statuses: ResourceStatus[] = []
         for (const admission of admissions) statuses.push(await qualifiedStatus(deps, subject, admission))
+        timing?.(performance.now() - observed, observed - started)
         send(200, statuses)
         return true
       }

@@ -192,7 +192,9 @@ function Lines({ file, text, open, handlers, split, wrap, review, visible, comme
   const singleSide = file.status === 'added' ? 'R' : file.status === 'deleted' ? 'L' : null
   let maximum = Math.max(1, lines?.length ?? 0, (lines?.length ?? 0) + file.deletions - file.additions)
   for (const hunk of file.hunks) maximum = Math.max(maximum, hunk.oldStart + hunk.oldLines - 1, hunk.newStart + hunk.newLines - 1)
-  const style: CSSProperties & { '--forge-number-width': string } = { '--forge-number-width': `calc(${Math.max(2, String(maximum).length)}ch + 12px)` }
+  const style: CSSProperties & { '--forge-number-width': string } = {
+    '--forge-number-width': `max(var(--forge-number-min-width, 0px), calc(${Math.max(2, String(maximum).length)}ch + 12px))`,
+  }
   const highlighter = useCodeHighlighter(languageForPath(file.path))
   const [selection, setSelection] = useState<ReviewSelection | null>(null)
   // Mirrors `selection` for the release of a hover-plus drag, whose listener outlives the render that chose the range.
@@ -393,18 +395,21 @@ function Lines({ file, text, open, handlers, split, wrap, review, visible, comme
   const editorOf = (item: ReviewSelection, actions: ReviewActions): ReactNode =>
     <ReviewComposer key={`comment-${rangeKey(item)}`} selection={item} visible={visible} actions={actions}
       close={() => { setEditors(list => list.filter(open => !sameRange(open.comment, item.comment))) }} t={t} />
-  // Side by side, a row's comments sit in a row of two cells under its columns, each continuing its line's background.
+  // Side-specific keys keep forms mounted when changing the number of code columns.
+  const noteCell = (side: 'L' | 'R', line: number | null, nodes: ReactNode[], kind: DiffRow['kind'] | 'empty', emptyKey: string): ReactNode => (
+    <div key={line === null ? `notes-empty-${side}-${emptyKey}` : `notes-${side}-${line}`}
+      className={clsx(css.noteCell, css[kind])} data-forge-notes={side}>
+      <span className={css.number} />
+      <div className={css.noteStack} data-forge-comments="">{nodes}</div>
+    </div>
+  )
+  // Side by side, each cell continues its line's background and both cells share a grid row.
   const notes = (key: string, pair: SplitRow): void => {
     const left = commentsAt('L', pair.left?.no ?? null)
     const right = commentsAt('R', pair.right?.no ?? null)
     if (left.length === 0 && right.length === 0) return
-    const side = (value: SplitCell | null, nodes: ReactNode[]): ReactNode => (
-      <div className={clsx(css.noteCell, css[value?.kind ?? 'empty'])}>
-        <span className={css.number} />
-        <div className={css.noteStack} data-forge-comments="">{nodes}</div>
-      </div>
-    )
-    rows.push(<div key={key} className={css.notes} data-forge-notes="">{side(pair.left, left)}{side(pair.right, right)}</div>)
+    rows.push(noteCell('L', pair.left?.no ?? null, left, pair.left?.kind ?? 'empty', key),
+      noteCell('R', pair.right?.no ?? null, right, pair.right?.kind ?? 'empty', key))
   }
   for (const [at, segment] of prepared.entries()) {
     if (segment.kind === 'gap') {
@@ -435,7 +440,10 @@ function Lines({ file, text, open, handlers, split, wrap, review, visible, comme
           {singleSide !== 'R' && number('L', row.old, row.kind === 'del' && !labeled)}{singleSide !== 'L' && number('R', row.new, row.kind !== 'del' && !labeled)}<span className={css.sign}>{SIGN[row.kind]}</span>
           <Code text={row.text} old={row.old} next={row.new} spans={row.kind === 'del' ? segment.old?.get(row.old) : segment.new?.get(row.new)} />
         </div>)
-        rows.push(...commentsAt('L', row.old), ...commentsAt('R', row.new))
+        const left = commentsAt('L', row.old)
+        const right = commentsAt('R', row.new)
+        if (left.length > 0) rows.push(noteCell('L', row.old, left, row.kind, `${at}-${index}`))
+        if (right.length > 0) rows.push(noteCell('R', row.new, right, row.kind, `${at}-${index}`))
       }
     }
   }
@@ -515,6 +523,7 @@ function FileMenu({ name, file, handlers, t }: {
     <Menu
       open={menuOpen}
       portal
+      className={css.fileMenu}
       align="end"
       dense
       autoFocus

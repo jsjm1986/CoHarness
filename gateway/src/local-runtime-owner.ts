@@ -1,7 +1,7 @@
 /** Durable local-runtime identities and inherited kernel allocation leases. */
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { closeSync, constants, fstatSync } from 'node:fs'
-import { lstat, mkdir, open, rename, rm, type FileHandle } from 'node:fs/promises'
+import { lstat, mkdir, open, opendir, rename, rm, type FileHandle } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { isAbsolute, join } from 'node:path'
 import { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock'
@@ -9,15 +9,18 @@ import type { Branded } from '@deepseek-ai/dsh-brand'
 import { z } from 'zod'
 import { privateDirectoryState, privateFileState, probeWindowsAclPrivate, syncStateDirectory, tightenPrivateFileAcl,
   type PrivateFileState, type WindowsAclProbe } from './node-private-file.ts'
+import { probeNativeWindowsOwnerAcl } from './local-runtime-owner-win32-acl.ts'
+import type { RuntimeCheckpointOutcome } from './runtime-shutdown.ts'
 
 const OWNER_RECORD_BYTES = 65_536
 /**
- * Bound on a replayed 'private' Windows ACL verdict inside one store. Each
- * verdict costs a PowerShell spawn while the record open/read and lock-inode
- * checks stay per-request, so a committed verdict replays briefly; failures
- * never replay, and a changed record-file identity re-probes before expiry.
+ * A successful Windows ACL verdict may be reused for this store while the
+ * record identity matches. The record and lock inode are checked on every read.
  */
 const PRIVATE_ACL_CACHE_MS = 10_000
+const probeRuntimeOwnerAcl: WindowsAclProbe = async (file, signal) =>
+  await probeNativeWindowsOwnerAcl(file, signal) ?? await probeWindowsAclPrivate(file, signal)
+
 const identitySchema = z.object({
   node: z.string().min(1),
   kind: z.enum(['user', 'project']),
@@ -60,6 +63,36 @@ export type LocalRuntimeIdentity = z.infer<typeof identitySchema>
 /** Private recovery capability; it never enters runtime environment or command arguments. */
 export type LocalRuntimeOwnerRecord = z.infer<typeof recordSchema>
 
+/** Find all private generation records for one node-local Runtime, including generations newer than a recovered database.
+ * @param directory - existing supervisor ownership directory.
+ * @param identity - stable node, owner and supervisor key; no restored bearer is trusted.
+ * @returns validated stores whose record and lock identity match the selected Runtime; missing evidence rejects.
+ */
+export async function localRuntimeOwnerStores(directory:string,identity:Pick<LocalRuntimeIdentity,'node'|'kind'|'ownerId'|'runtimeKey'>):Promise<LocalRuntimeOwnerStore[]>{
+  const stores:LocalRuntimeOwnerStore[]=[]
+  if(await privateDirectoryState(directory,await lstat(directory),undefined,probeRuntimeOwnerAcl)!=='private')throw new Error('Local runtime ownership directory is not private')
+  const entries=await opendir(directory)
+  for await(const entry of entries){
+    if(!entry.name.endsWith('.json'))continue
+    if(!/^[a-f0-9]{64}\.json$/u.test(entry.name))throw new Error('Local runtime ownership contains an unrecognized record')
+    const path=join(directory,entry.name),handle=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW)
+    let record:LocalRuntimeOwnerRecord
+    try{
+      if(await privateFileState(path,await handle.stat(),OWNER_RECORD_BYTES,undefined,probeRuntimeOwnerAcl)!=='private')throw new Error('Local runtime owner record is not private')
+      const bytes=Buffer.alloc(OWNER_RECORD_BYTES+1);let length=0
+      while(length<bytes.length){const read=await handle.read(bytes,length,bytes.length-length,length);if(!read.bytesRead)break;length+=read.bytesRead}
+      if(length>OWNER_RECORD_BYTES)throw new Error('Local runtime owner record exceeds its byte limit')
+      record=recordSchema.parse(JSON.parse(new TextDecoder('utf8',{fatal:true}).decode(bytes.subarray(0,length))))
+    }finally{await handle.close()}
+    if(record.identity.node!==identity.node||record.identity.kind!==identity.kind||record.identity.ownerId!==identity.ownerId||record.identity.runtimeKey!==identity.runtimeKey)continue
+    const store=new LocalRuntimeOwnerStore(directory,record.identity)
+    if(store.recordPath!==path)throw new Error('Local runtime owner filename differs from its identity')
+    stores.push(store)
+  }
+  if(!stores.length)throw new Error('Local runtime ownership evidence is missing')
+  return stores
+}
+
 const transitions: Readonly<Record<LocalRuntimeOwnerRecord['phase'], readonly LocalRuntimeOwnerRecord['phase'][]>> = {
   reserved: ['starting', 'stopped'],
   starting: ['running', 'stopping', 'uncertain', 'stopped'],
@@ -75,6 +108,7 @@ export class LocalRuntimeOwnerStore {
   readonly recordPath: string
   readonly lockPath: string
   readonly cancellationPath: string
+  readonly shutdownReceiptPath: string
   private directoryAclAt: number | undefined
   private recordAcl: { at: number; mtimeMs: number; ctimeMs: number; size: number } | undefined
 
@@ -85,6 +119,7 @@ export class LocalRuntimeOwnerStore {
     this.recordPath = join(directory, `${key}.json`)
     this.lockPath = join(directory, `${key}.lock`)
     this.cancellationPath = join(directory, `${key}.cancel`)
+    this.shutdownReceiptPath = join(directory, `${key}.shutdown`)
   }
 
   /**
@@ -257,7 +292,7 @@ export class LocalRuntimeOwnerStore {
   private readonly directoryAclProbe: WindowsAclProbe = async (file, signal) => {
     const now = Date.now()
     if (this.directoryAclAt !== undefined && now - this.directoryAclAt < PRIVATE_ACL_CACHE_MS) return 'private'
-    const state = await probeWindowsAclPrivate(file, signal)
+    const state = await probeRuntimeOwnerAcl(file, signal)
     this.directoryAclAt = state === 'private' ? now : undefined
     return state
   }
@@ -269,7 +304,7 @@ export class LocalRuntimeOwnerStore {
    * fresh probe ahead of {@link PRIVATE_ACL_CACHE_MS}.
    * @param file - record path, fixed per store.
    * @param stat - stat result already read from this read's open handle.
-   * @param signal - caller cancellation for the child process.
+   * @param signal - caller cancellation for the ACL check.
    * @returns the cached or freshly probed verdict.
    */
   private async recordAclProbe(file: string, stat: { mtimeMs: number; ctimeMs: number; size: number },
@@ -277,7 +312,7 @@ export class LocalRuntimeOwnerStore {
     const now = Date.now(), cached = this.recordAcl
     if (cached !== undefined && now - cached.at < PRIVATE_ACL_CACHE_MS
       && cached.mtimeMs === stat.mtimeMs && cached.ctimeMs === stat.ctimeMs && cached.size === stat.size) return 'private'
-    const state = await probeWindowsAclPrivate(file, signal)
+    const state = await probeRuntimeOwnerAcl(file, signal)
     this.recordAcl = state === 'private'
       ? { at: now, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs, size: stat.size } : undefined
     return state
@@ -406,6 +441,15 @@ export class LocalRuntimeOwnerLease {
     })
   }
 
+  /** Commit the exact generation's reported checkpoint while its process range is still owned. */
+  recordShutdownOutcome(outcome: RuntimeCheckpointOutcome): Promise<void> {
+    return this.mutate(async () => {
+      const record = await this.store.read()
+      if (record?.phase !== 'stopping') throw new Error('Local runtime shutdown receipt requires a stopping owner')
+      await this.writePrivateFile(this.store.shutdownReceiptPath, `${outcome}\n`)
+    })
+  }
+
   /**
    * Retire an earlier boot after acquiring and verifying the current kernel lease.
    * @param kernelBootId - positively observed current boot, which must differ from the saved boot.
@@ -436,13 +480,17 @@ export class LocalRuntimeOwnerLease {
   private async write(record: LocalRuntimeOwnerRecord): Promise<void> {
     const text = JSON.stringify(record) + '\n'
     if (Buffer.byteLength(text) > OWNER_RECORD_BYTES) throw new Error('Local runtime owner record exceeds its byte limit')
+    await this.writePrivateFile(this.store.recordPath, text)
+  }
+
+  private async writePrivateFile(destination: string, text: string): Promise<void> {
     const path = join(this.store.directory, `.${randomUUID()}.tmp`)
     const handle = await open(path, 'wx', 0o600)
     try {
       try { await handle.writeFile(text); await handle.sync() } finally { await handle.close() }
       await this.verify()
-      await rename(path, this.store.recordPath)
-      await tightenPrivateFileAcl(this.store.recordPath)
+      await rename(path, destination)
+      await tightenPrivateFileAcl(destination)
       await syncStateDirectory(this.store.directory)
     } finally { await rm(path, { force: true }) }
   }

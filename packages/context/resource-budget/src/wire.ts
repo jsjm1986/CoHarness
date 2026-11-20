@@ -12,6 +12,20 @@ const sessionId = z.string().min(1).max(512).transform(value => value as Branded
 export const RESOURCE_MESSAGE_MAX_BYTES = 64 * 1024
 /** Maximum exact operation references in one status poll. */
 export const RESOURCE_POLL_MAX_OPERATIONS = 512
+/** Optional internal JSON tuple of handler bearer, authority and transaction durations in milliseconds. */
+export const RESOURCE_PHASE_TIMING_HEADER = 'x-dsh-resource-phases-ms'
+/** Optional internal JSON tuple of initial bearer and write admission durations in milliseconds. */
+export const RESOURCE_INGRESS_TIMING_HEADER = 'x-dsh-resource-ingress-ms'
+
+/**
+ * Identify the two remote admission exchanges sampled by managed model diagnostics.
+ * @param pathname - parsed internal request pathname.
+ * @param method - HTTP request method.
+ * @returns whether the exchange can submit or observe a resource reservation.
+ */
+export function isResourceAdmissionRequest(pathname: string, method: string | undefined): boolean {
+  return method === 'POST' && (pathname === '/internal/runtime/resources/request' || pathname === '/internal/runtime/resources/statuses')
+}
 
 /** Durable deployment limits, read under the coordinator's node lock. */
 export const resourcePolicySchema = z.object({

@@ -2,6 +2,25 @@ import { createPublicKey, type KeyObject } from 'node:crypto'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 
 /**
+ * Select the issuer's current key and managed lease in a caller-owned statement.
+ * @param issuerParameter - parameter containing the issuer UUID in that statement.
+ * @returns SQL using parameter 1 for the tenant UUID and the given parameter for the issuer.
+ */
+export function nodePrincipalKeyQuery(issuerParameter: 2 | 5): string {
+  return `SELECT n.principal_public_key::text pem,
+         (SELECT max(a.lease_expires_at) FROM harness.node_agents a
+           WHERE a.organization_id=n.organization_id AND a.node_id=n.id
+             AND a.attachment_state='managed') lease_exp
+       FROM harness.compute_nodes n
+       WHERE n.organization_id=$1 AND n.id=$${issuerParameter} AND n.status='active'
+         AND (NOT EXISTS (SELECT 1 FROM harness.node_agents a
+             WHERE a.organization_id=n.organization_id AND a.node_id=n.id)
+           OR EXISTS (SELECT 1 FROM harness.node_agents a
+               WHERE a.organization_id=n.organization_id AND a.node_id=n.id
+                 AND a.attachment_state='managed' AND a.lease_expires_at>clock_timestamp()))`
+}
+
+/**
  * Resolve the Ed25519 principal public key another Gateway published on its
  * compute_nodes row. Issuance requires a live managed agent lease, or no
  * agent row at all — directly provisioned gateways such as the center never
@@ -26,6 +45,16 @@ export class NodePrincipalDirectory {
   invalidate(): void { this.keys.clear() }
 
   /**
+   * Read previously published key bytes for signature verification pending fresh admission.
+   * The returned bytes alone prove neither current publication nor a live issuer lease.
+   * @param nodeId - claiming Gateway's compute node id from the assertion.
+   * @returns PEM from the bounded directory, or null without a previously published key.
+   */
+  publishedKeyCandidate(nodeId: string): string | null {
+    return this.keys.get(nodeId)?.pem ?? null
+  }
+
+  /**
    * Return the issuer's published key while its agent lease is live.
    * @param nodeId - claiming Gateway's compute node id from the assertion.
    * @returns SPKI public key, or null when unknown, unpublished, or unleased.
@@ -35,18 +64,7 @@ export class NodePrincipalDirectory {
     if (cached !== undefined && cached.expiresAt > Date.now()) {
       return cached.pem === null ? null : createPublicKey(cached.pem)
     }
-    const result = await this.context.pool.query<{ pem: string | null; lease_exp: Date | null }>(
-      `SELECT n.principal_public_key::text pem,
-         (SELECT max(a.lease_expires_at) FROM harness.node_agents a
-           WHERE a.organization_id=n.organization_id AND a.node_id=n.id
-             AND a.attachment_state='managed') lease_exp
-       FROM harness.compute_nodes n
-       WHERE n.organization_id=$1 AND n.id=$2 AND n.status='active'
-         AND (NOT EXISTS (SELECT 1 FROM harness.node_agents a
-             WHERE a.organization_id=n.organization_id AND a.node_id=n.id)
-           OR EXISTS (SELECT 1 FROM harness.node_agents a
-               WHERE a.organization_id=n.organization_id AND a.node_id=n.id
-                 AND a.attachment_state='managed' AND a.lease_expires_at>clock_timestamp()))`,
+    const result = await this.context.pool.query<{ pem: string | null; lease_exp: Date | null }>(nodePrincipalKeyQuery(2),
       [this.context.organizationId, nodeId])
     const pem = result.rows[0]?.pem ?? null
     // Negative verdicts are memoized too: the forward header is client-settable,

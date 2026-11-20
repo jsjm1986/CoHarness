@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/remote-desktop/remote-desktop-vnc/README.md
 document:
-  en: 9e53eb0ac17848590b0eb94435538a24abc34067
-  zh: e2831f8d633da4df47661c342d406d8d288fa50d
+  en: ccca5cae70abaf879c705899b9d2f41edf1690a6
+  zh: 29b051d3478bb95e4bcc08eb5daf20247dc9df6c
 /:
   en: 9835f98a6bc8c02f
   zh: 72392264908cad84
@@ -18,8 +18,8 @@ document:
   en: 44a97d20b47c965f
   zh: 57e087a65dd06a37
 /deepseek-ai-dsh-remote-desktop-vnc/configuration:
-  en: e0b5e24ba8300a45
-  zh: feb37623c1f16455
+  en: c2267c3a06bc7397
+  zh: 3378c69222451625
 /deepseek-ai-dsh-remote-desktop-vnc/attachment-flow:
   en: e1431cc05b25f88b
   zh: a0feebe7efa63a05
@@ -27,8 +27,8 @@ document:
   en: 705a94c8588f8ded
   zh: 94166c42bc8cd1c7
 /deepseek-ai-dsh-remote-desktop-vnc/view-only-enforcement:
-  en: 41efabf9bfe1bea4
-  zh: b4e00d8d0f515310
+  en: cee2823c7b1b76c4
+  zh: e87ac105e8a605e2
 /deepseek-ai-dsh-remote-desktop-vnc/model-experience:
   en: d03dc543ec417a50
   zh: d51d67f5d2129474

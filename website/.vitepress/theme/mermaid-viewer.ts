@@ -164,15 +164,6 @@ function openDiagram(
     fit.addEventListener('click', refit, options)
     viewport.addEventListener('wheel', event => controller.zoomWithWheel(event), { ...options, passive: false })
     dialog.addEventListener('keydown', (event) => {
-      if (event.key === 'Tab') {
-        const controls = [close, zoomOut, zoomIn, fit, helpToggle]
-        const current = controls.indexOf(doc.activeElement as HTMLButtonElement)
-        const next = current < 0 ? (event.shiftKey ? controls.length - 1 : 0)
-          : (current + (event.shiftKey ? -1 : 1) + controls.length) % controls.length
-        event.preventDefault()
-        controls[next]?.focus()
-        return
-      }
       const distance = 64 / controller.getScale()
       const offsets: Record<string, [number, number]> = {
         ArrowLeft: [distance, 0], ArrowRight: [-distance, 0],

@@ -25,7 +25,9 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-与桥接和模组一起组合；[可选叠加层](../claude-code-mods/cordis.source.patch.yml)为 Web 配置文件的源码启动完成了这一组合。横幅只在某个模组的 `ui.render` 钩子返回树时出现：首轮之后 Token Weather 的预报、风险命令被持有期间 Blast Radius 的 Proceed 与 Cancel、含编辑的一轮之后 Replay Theater 的提示。颜色按 Claude Code 的终端调色板映射到本主题的令牌；热键显示为标签旁的提示，按下即点击。按下处理期间所有按钮禁用；被宿主拒绝的按下会在横幅下方显示其消息。
+与桥接和模组一起组合；[可选叠加层](../claude-code-mods/cordis.source.patch.yml)为 Web 配置文件的源码启动完成了这一组合。横幅只在某个模组的 `ui.render` 钩子返回树时出现：首轮之后 Token Weather 的预报、风险命令被持有期间 Blast Radius 的 Proceed 与 Cancel、含编辑的一轮之后 Replay Theater 的提示。颜色按 Claude Code 的终端调色板映射到本主题的令牌；热键显示为标签旁的提示，按下即点击。按下处理期间所有按钮禁用；宿主拒绝或回调失败时会在横幅下方显示消息。绘制内容反映失败前已发生的修改，未发送的提示词保持不变。
+
+粗指针设备和窄屏中的操作带按钮保留至少 44 像素的触控目标。
 
 -----
 

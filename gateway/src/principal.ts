@@ -19,11 +19,12 @@ import {
 import { join } from 'node:path'
 import type { UserRow } from './auth.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
+import { isImmutableRuntimeAssetRequest, runtimeRequestPath } from './runtime-request-path.ts'
 
 export const PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
 
 /** Narrow purpose carried by a Gateway assertion that is not a browser request. */
-export type GatewayPrincipalPurpose = 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch'
+export type GatewayPrincipalPurpose = 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch' | 'runtime-asset'
 
 export type PrincipalScope =
   | { kind: 'personal' }
@@ -60,6 +61,8 @@ export interface GatewayPrincipalClaims {
   nonce: string
   /** Optional capability purpose; ordinary browser assertions omit it. */
   purpose?: GatewayPrincipalPurpose
+  /** Exact resource coordinates; required only for a read-only asset assertion. */
+  asset?: { method: 'GET' | 'HEAD'; path: string }
 }
 
 /** Immutable runtime session header bound into a delayed-creation authorization. */
@@ -126,6 +129,7 @@ type PrincipalInput = {
     scope: PrincipalScope
     runtime: { kind: 'user' | 'project'; id: number; generation: number; runtimeId?: RuntimeId }
     purpose?: GatewayPrincipalPurpose
+    asset?: GatewayPrincipalClaims['asset']
     now?: number
   }
 
@@ -148,9 +152,17 @@ export class GatewayPrincipalSigner {
     this.publicKey = createPublicKey(privateKey)
   }
 
-  /** Create one compact Ed25519 assertion bound to a runtime generation. */
-  issue(input: PrincipalInput): string {
-    return this.signPrincipal(input, this.ttlMs)
+  /**
+   * Create one compact Ed25519 assertion bound to a runtime generation.
+   * @param input - current server-owned identity, scope and generation.
+   * @param notAfter - earliest known session or node deadline, when a fresh admission supplies one.
+   * @returns a signed Runtime principal that expires by the supplied deadline.
+   */
+  issue(input: PrincipalInput, notAfter?: number): string {
+    const now = input.now ?? Date.now()
+    const lifetimeMs = notAfter === undefined ? this.ttlMs : Math.min(this.ttlMs, notAfter - now)
+    if (!Number.isSafeInteger(lifetimeMs) || lifetimeMs <= 0) throw new Error('runtime principal deadline has elapsed')
+    return this.signPrincipal({ ...input, now }, lifetimeMs)
   }
 
   /**
@@ -178,6 +190,21 @@ export class GatewayPrincipalSigner {
     return this.signPrincipal({ ...input, purpose: 'webhook-dispatch' }, lifetimeMs)
   }
 
+  /**
+   * Sign a read-only resource request for one current Runtime generation.
+   * @param input - current account, scope, generation and exact Runtime resource request target.
+   * @param notAfter - earliest session or node-connection deadline; this assertion never extends it.
+   * @returns an assertion unusable for API, index, upgrades, or another resource URL.
+   */
+  issueAsset(input: Omit<PrincipalInput, 'purpose' | 'asset'> & { method: 'GET' | 'HEAD'; path: string }, notAfter: number): string {
+    const path = runtimeRequestPath(input.path)
+    if (!isImmutableRuntimeAssetRequest(input.method, path)) throw new Error('invalid Runtime asset request')
+    const now = input.now ?? Date.now()
+    const lifetimeMs = Math.min(this.ttlMs, Math.floor(notAfter - now))
+    if (!Number.isSafeInteger(lifetimeMs) || lifetimeMs <= 0) throw new Error('Runtime asset authority has expired')
+    return this.signPrincipal({ ...input, now, purpose: 'runtime-asset', asset: { method: input.method, path } }, lifetimeMs)
+  }
+
   private signPrincipal(input: PrincipalInput, lifetimeMs: number): string {
     const now = input.now ?? Date.now()
     const issuedAt = process.platform === 'win32' ? now - WINDOWS_PRINCIPAL_CLOCK_TICK_MS : now
@@ -198,6 +225,7 @@ export class GatewayPrincipalSigner {
       expiresAt: issuedAt + lifetimeMs,
       nonce: randomUUID(),
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.asset === undefined ? {} : { asset: input.asset }),
     }
     return signedPayload(claims, this.privateKey)
   }
@@ -304,14 +332,17 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     throw new Error('invalid principal assertion')
   }
   if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin'
-    && claims.purpose !== 'terminal-admin' && claims.purpose !== 'plugin-admin' && claims.purpose !== 'webhook-dispatch') {
+    && claims.purpose !== 'terminal-admin' && claims.purpose !== 'plugin-admin' && claims.purpose !== 'webhook-dispatch' && claims.purpose !== 'runtime-asset') {
     throw new Error('invalid principal assertion')
   }
-  // Webhook dispatch carries the endpoint's configured execution account, which
-  // is deliberately not an administrator; every other purpose is an admin power.
-  if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch' && user.role !== 'admin') {
+  if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch' && claims.purpose !== 'runtime-asset' && user.role !== 'admin') {
     throw new Error('invalid principal assertion')
   }
+  const asset = record(claims.asset)
+  if (claims.purpose === 'runtime-asset'
+    ? (asset?.method !== 'GET' && asset?.method !== 'HEAD') || typeof asset.path !== 'string'
+      || !isImmutableRuntimeAssetRequest(asset.method, asset.path) || runtimeRequestPath(asset.path) !== asset.path
+    : claims.asset !== undefined) throw new Error('invalid principal asset assertion')
   if (scope.kind === 'project' && (!positiveId(scope.projectId) || typeof scope.projectName !== 'string'
     || scope.projectName === '' || (scope.mode !== 'ro' && scope.mode !== 'rw')
     || (scope.canManage !== undefined && typeof scope.canManage !== 'boolean'))) {

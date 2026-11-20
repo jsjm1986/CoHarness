@@ -27,6 +27,8 @@ interface ServiceSlot {
 export interface NodeChannelClientConfig {
   /** Ordered center dial candidates; the agent owns one instance per process. */
   dialer: NodeDialer
+  /** Optional service-only dial sequence. Omission shares the control dialer. */
+  serviceDialer?: NodeDialer
   credential: NodeCredential
   lease: NodeLease
   limits: NodeChannelClientLimits
@@ -138,7 +140,8 @@ async function connect(config: NodeChannelClientConfig, signal: AbortSignal,
               if (signal.aborted || socket.readyState !== WebSocket.OPEN) current.controller.abort()
               try {
                 if (!current.controller.signal.aborted) {
-                  await runNodeServiceBridge({ ...config, localUrl, release: current.release }, current.id, current.controller.signal)
+                  await runNodeServiceBridge({ ...config, dialer: config.serviceDialer ?? config.dialer,
+                    localUrl, release: current.release }, current.id, current.controller.signal)
                 }
               } catch {
                 // Bridge failures report their own service request; cancelled owners need no reply.

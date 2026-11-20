@@ -10,6 +10,9 @@ export async function verifyNativeProjectPoint({lib,temp,config,context,store,pr
   const {NativePeerProjectSnapshots}=await lib('peer-native-project-snapshots')
   const {PeerProjectExporter,validatePeerProject}=await lib('peer-backup-project-export')
   const {NodeProjectFiles}=await lib('node-content-files')
+  const {NodeProjectMetadata}=await lib('node-content-projects')
+  const {PostgresInstanceRepository}=await lib('postgres/instance-repository')
+  const {InstanceManager}=await lib('instances')
   const {LocalDocumentBroker}=await lib('documents-local')
   const {PostgresDocumentCatalogService}=await lib('postgres/document-catalog-service')
   const {verifiedPeerFileRoots}=await lib('peer-snapshot-roots')
@@ -28,15 +31,24 @@ export async function verifyNativeProjectPoint({lib,temp,config,context,store,pr
     const provider=new NativePeerProjectSnapshots(settings,15000,context,store,files,input=>documents.snapshotProjectDocumentRoots({
       organizationId:context.organizationId,nodeId:context.nodeId,projectPublicId:input.projectId,origin:input.origin,projectPath:input.workspace,
       rootId:input.rootId,cursor:input.cursor}))
-    const live=join(workspace,'ongoing-work.txt'),home=join(config.projectRuntimesRoot,String(project),'dsh'),storage=join(home,'storages')
+    const live=join(workspace,'ongoing-work.txt'),home=join(config.projectRuntimesRoot,String(project),'dsh'),storage=join(home,'storages'),profile=join(home,'profiles','web')
+    const b=(await context.pool.query('SELECT harness.project_content_key($1,$2) AS b',[context.organizationId,projectUuid])).rows[0].b
+    await mkdir(profile,{recursive:true,mode:0o700})
+    await writeFile(join(profile,'package.json'),JSON.stringify({name:'private-native-project-fixture',private:true,type:'module',
+      dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-web-app']}}})+'\n',{flag:'wx',mode:0o600})
+      .catch(error=>{if(error?.code!=='EEXIST')throw error})
+    const manager=new InstanceManager(new PostgresInstanceRepository(context,config.instancePortBase,new NodeProjectMetadata(context,store),files),config)
+    try{await manager.prepareRecoveryProfile({kind:'project',id:project,runtimeId:b.runtimeId})}finally{await manager.stopAll()}
+    const custom=join(profile,'node_modules','native-private-plugin');await mkdir(custom,{recursive:true,mode:0o700})
+    await writeFile(join(custom,'package.json'),JSON.stringify({name:'native-private-plugin',type:'module',main:'index.js'})+'\n')
+    await writeFile(join(custom,'index.js'),'export default function nativePrivatePlugin() {}\n')
     const safe='published workspace version',next='foreground work continued',timer='{"next":"2099-06-01T00:00:00Z"}\n'
     await writeFile(live,safe,{flag:'wx'})
     await mkdir(storage,{recursive:true,mode:0o700})
     await writeFile(join(storage,'scheduled.json'),timer,{mode:0o600})
-    await writeFile(join(home,'managed-data.jsonl'),JSON.stringify({version:1,owner:'@deepseek-ai/dsh-storage-json',kind:'directory',path:storage})+'\n',{mode:0o600})
-    const b=(await context.pool.query('SELECT harness.project_content_key($1,$2) AS b',[context.organizationId,projectUuid])).rows[0].b
+    await writeFile(join(home,'managed-data.jsonl'),JSON.stringify({version:1,owner:'@deepseek-ai/dsh-storage-json',kind:'directory',path:storage})+'\n',{flag:'a',mode:0o600})
     await files.verify(b)
-    const limits={maxRows:10000,maxBytes:16<<20}
+    const limits={maxRows:10000,maxBytes:32<<20}
     const exporter=new PeerProjectExporter({control:context.pool,store,...limits,files:{
       async acquire(...args){
         const view=await provider.acquire(...args)
@@ -47,6 +59,13 @@ export async function verifyNativeProjectPoint({lib,temp,config,context,store,pr
     await validatePeerProject(policy,point,directory,signal,limits)
     const map=await verifiedPeerFileRoots(policy,directory,true)
     const {snapshot}=JSON.parse(await readFile(join(directory,'managed','manifest.json'),'utf8'))
+    const installed=map.roots.find(row=>row.owner==='gateway-runtime-profiles')
+    assert.ok(installed,'managed profile is part of the same native snapshot')
+    for(const file of ['web/node_modules/@deepseek-ai/dsh-model-governance/package.json','web/node_modules/native-private-plugin/index.js']){
+      const retained=snapshot.files.find(row=>row.sourcePath===join(installed.snapshotRoot,...file.split('/')))
+      assert.ok(retained,'installed artifact retained: '+file)
+      assert.equal(await readFile(join(directory,'managed',retained.member),'utf8'),await readFile(join(home,'profiles',...file.split('/')),'utf8'))
+    }
     if(!windowsVolume)assert.ok(map.devices && map.devices.sourceVolume!==map.devices.snapshotVolume && map.devices.sourceDevice!==map.devices.snapshotDevice)
     for(const role of ['userdoc-public','userdoc-metadata','userdoc-objects']){
       const mapped=map.roots.find(row=>row.role===role)
@@ -76,6 +95,6 @@ export async function verifyNativeProjectPoint({lib,temp,config,context,store,pr
     assert.ok(partial.gaps.includes('runtime:undeclared-files'))
     console.log(JSON.stringify({entry:'published Gateway project',provider:providerName,workspaceAndScheduleFrozen:true,
       sourceStillWritable:true,verifiedWithoutSourceSnapshot:true,userDocRootVerified:true,sourceDeviceAndInodesMatch:true,
-      ...(!windowsVolume?{foreignSnapshotDeviceRejected:true}:{}),foreignPrivateRootRejected:true,unknownPluginReported:true}))
+      ...(!windowsVolume?{foreignSnapshotDeviceRejected:true}:{}),foreignPrivateRootRejected:true,unknownPluginReported:true,managedAndCustomProfileArtifactsRetained:true}))
   }finally{await documents.dispose();await rm(directory,{recursive:true,force:true})}
 }

@@ -17,6 +17,25 @@ const USER: UserRow = {
 }
 
 describe('GatewayPrincipalSigner', () => {
+  it('binds an asset assertion to its immutable request and the earlier login or node-lease deadline', () => {
+    const signer = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'acme', 30_000)
+    const input = { user: USER, scope: { kind: 'personal' as const }, runtime: { kind: 'user' as const, id: USER.id, generation: 4 }, now: 10_000,
+      method: 'GET' as const, path: '/plugins/fixture/client.lazy.js?rev=012345abcdef' }
+    const assertion = signer.issueAsset(input, 11_000)
+    const claims = signer.verify(assertion, 10_500)
+    expect(claims).toMatchObject({ purpose: 'runtime-asset', asset: { method: 'GET', path: input.path }, runtime: { generation: 4 } })
+    expect(claims.expiresAt).toBeLessThanOrEqual(11_000)
+    expect(() => signer.verify(assertion, 11_000)).toThrow('expired')
+    expect(() => signer.issueAsset(input, 10_000)).toThrow('expired')
+    for (const path of ['/api/session.list', '/plugins/events', input.path + '&extra=1']) {
+      expect(() => signer.issueAsset({ ...input, path }, 11_000)).toThrow('invalid Runtime asset request')
+    }
+    for (const asset of [undefined, { method: 'POST', path: input.path }, { method: 'GET', path: '/api/session.list' }]) {
+      const invalid = signer.issue({ ...input, purpose: 'runtime-asset', asset: asset as never })
+      expect(() => signer.verify(invalid, 10_500)).toThrow('invalid principal asset assertion')
+    }
+  })
+
   it('preserves the absolute expiry and refuses times before the signer’s platform-specific validity start', () => {
     const now = 100_000, lifetimeMs = 15 * 60_000
     const { privateKey } = generateKeyPairSync('ed25519')

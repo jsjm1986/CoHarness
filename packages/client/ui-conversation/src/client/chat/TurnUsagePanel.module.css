@@ -78,3 +78,12 @@
     margin-left: 0;
   }
 }
+
+@media (pointer: coarse) {
+  .trigger { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
+}
+
+:global([data-viewport='compact']) .trigger {
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
+}

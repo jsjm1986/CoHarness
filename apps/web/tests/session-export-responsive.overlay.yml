@@ -1,0 +1,3 @@
+- insert:
+    - id: session-log-download
+      name: '@deepseek-ai/dsh-session-log-export'

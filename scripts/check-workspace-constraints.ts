@@ -196,6 +196,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // unpublished, as everywhere else in the repository.
   '@deepseek-ai/dsh-client-ui-primitives': ['lib/**/*.css'],
   '@deepseek-ai/dsh-client-ui-dockkit': ['lib/**/*.css'],
+  '@deepseek-ai/dsh-client-ui-plugin-manager': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-remote-desktop': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-documentpreview': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-terminal': ['lib/client.*.js'],
@@ -208,7 +209,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // index-injection interpreter is ported with its first consumer.
   '@deepseek-ai/dsh-client-web': ['lib/**/*.css'],
   // Document icons distribute their upstream license notice.
-  '@deepseek-ai/dsh-client-ui-documents': ['LICENSE.material-icon-theme'],
+  '@deepseek-ai/dsh-client-ui-documents': ['lib/client.*.js', 'LICENSE.material-icon-theme'],
   '@deepseek-ai/dsh-client-ui-theme': ['lib/styles'],
   // The physical-key protocol is a public entry usable without the browser service.
   '@deepseek-ai/dsh-client-shortcuts': ['lib/protocol.js'],

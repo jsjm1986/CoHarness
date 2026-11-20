@@ -1,0 +1,3 @@
+- status:
+  - strong: 80% usage alert
+  - text: Token usage this monthhas reached 80% of the quota.

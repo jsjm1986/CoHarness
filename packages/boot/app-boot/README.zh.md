@@ -70,7 +70,12 @@ profile 导入插件前，DSH 会检查其 `peerDependencies` 中对 `@deepseek-
 
 `sanitizeProfile(binName, profileDir, bundles)` 提供文件恢复，无需加载插件或解析 patch。Desktop 在原生致命错误恢复中调用它。调用前必须停止 profile 并排除并发 profile 写入。它将 profile 的 `cordis.patch.yml` 重命名为带唯一 `.bak-<timestamp>` 后缀的同目录备份，并恢复调用方指定的 bundle 列表，保留已安装包和其他 manifest 字段。时间戳为 Unix 毫秒数；同名备份已存在时追加序号（`-1`、`-2`、……），时间戳保持不变。返回值为备份路径；patch 不存在时返回 `undefined`，缺失的 profile 不会被创建。下次启动的 profile 初始化会重新创建空 patch。home 级 patch 不变。无效 profile JSON 在修改前报错；后续错误向调用方抛出，保留已完成的修改供重试。
 
+<a id="previewing-the-effective-configuration"></a>
 ### 预览生效配置
+
+恢复启动先通过 `inspectRecoveryProfile` 检查，再在根树挂载前调用 `installRecoveryPolicy`。检查只读取生效行和独立安装的软件包字节，不导入插件；个人 profile 内的同名软件包不能充当执行证明。私有策略及单独提供的 SHA-256 绑定确切配置和执行产物。配置未改变且解析到独立安装位置的基础条目信任该部署的依赖，并核验自身软件包字节。Gateway 管理的策略副本只有在本机完整软件包与独立安装源中由 Gateway 复制的清单、库、语言资源和策略 patch 完全一致时，才能采用该信任；每次挂载仍核验完整本机副本。自定义、覆盖安装包或配置改变的条目携带 `dependencyClosure: true`，同时密封已安装的运行时依赖。摘要在一次检查内共享缓存，后续检查和重新挂载时重新计算。自定义依赖闭包存在无法解析的依赖、非普通文件，或超过 256 MiB、32,768 个文件或 1,024 个软件包时，不能批准；须将扩展打包成更小的可审核单元。安装策略时必须提供调用方的 Session 执行准入实现。根 profile 必须保持为空，配置中的自动启动 agent 会清空，profile 重载和 preset 都经过相同的导入前检查。源 Session 文件保持原样。
+
+配置为字面量且安装产物可枚举的自定义插件、定时任务、桌面连接、MCP 服务器和 Hook 命令需要逐项审核。动态 Include、未获证明的表达式和自修改组合保持暂停。MCP 许可绑定具名传输及其未展开的配置。Settings 保存的 profile patch 参与检查。必须执行插件才能枚举的插件动态注册保持暂停，不随所属插件自动获批。Hook 许可绑定命令、事件和完整配置文件。每次连接、探测和 Hook 执行均检查许可，配置变化后须重新审核。这些许可批准经过审核的代码和连接目标，不替代 Runtime 的文件系统、模型、工具或组织权限。
 
 启动前，你可以打印应用将挂载的确切配置：dump 会以 `!!js` 表达式原样展示组合后的条目列表，并按注释分组标明每个源文件及其 patch 层，输出是一份可加载的 YAML 文档。未匹配到任何行的 patch 会连同其层标签一起报告；配置缺失、无法解析或字段无效都会使 dump 失败。
 

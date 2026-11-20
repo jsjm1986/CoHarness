@@ -48,15 +48,42 @@ Gateway 服务账号需要运行 DiskShadow 和访问本机卷影复制服务的
 
 为项目备份策略的 `snapshotExecutable` 配置本机获准使用的快照服务。完成运行中项目的采集，并在指定接收电脑还原验证后，才能将项目文件计入已保护范围。缺少一致的文件快照时，内置项目导出会记录工作区及插件文件的覆盖缺口。
 
+使用内置数据卷时，由本机管理员在现有物理容器中新增独立的加密 APFS 卷，并记录卷 UUID。该卷共享物理磁盘容量，不能防范整盘损坏。在已验证的迁移能够不停止运行中任务地进行之前，保留现有项目位置。快照服务除文件系统访问权外，还必须具备 macOS 快照授权；仅有管理员权限不能满足[内核授权检查](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/vfs/vfs_syscalls.c)。配置自动采集前，先验证该服务。
+
 ## 验证隔离数据库链路
 
 在已安装 Docker 且本地有 `postgres:17.6-bookworm` 镜像的 POSIX 电脑上运行 `node gateway/tests/run-node-content-postgres.mjs --legacy`。测试会建立独立集群，通过 Runtime HTTP 和本地模拟模型执行请求，并清理临时集群及数据目录。它也会运行原共享存储的项目动态、进度、对话命名空间和执行权限测试。
 
 已构建 Gateway、CLI 和 Web Host 时，`node gateway/tests/run-node-content-postgres.mjs --operations` 会启动两套 Gateway、两套 Web Host、Node Agent、专用治理数据库，以及校验访问密钥的本机模型端点。该用例检查对话准备、浏览器断开后阻止新请求、Runtime 归属和重复提交。可将 `HGW_TEST_PG_BINDIR` 设为本机 PostgreSQL 可执行文件目录以创建独立原生集群。验证结束后，夹具会清理临时集群及其不可变执行回执。
 
+使用 `--governance`，在专用临时 PostgreSQL 数据库中验证加密备份接收端及治理清单。清单保留已批准的管理字段，包括电脑权限和配额，同时排除业务正文、本地路径及活动凭据。其覆盖缺口会明确保留；成功还原清单不授予组织接管权限。
+
 ## 组织内项目名
 
 组织内继续沿用原数据库的大小写与排序规则查重。对于已切换到所属电脑的项目，主入口保存带密钥的查重标识及项目、节点和名称版本的标识。显示名称与路径从所属电脑读取。
+
+准备名称策略前，使用主入口 Gateway 的实际启动环境和私有数据库连接文件运行隐私预检：
+
+```sh
+node gateway/lib/project-name-privacy-main.js
+```
+
+成功时返回 `ready: true`、`readOnly: true` 及所连接的账号和数据库。预检在只读事务中使用固定公开值调用生产 SQL 名称规范化逻辑；不创建项目、不启动 Runtime，也不授予权限。它验证 SQL 日志保护，不代表节点存储或项目整体已就绪。失败时以状态码 1 退出，并提示检查数据库配置。
+
+使用受限 Gateway 账号时，由数据库管理员设置以下默认值，把 `harness_gateway` 和 `harness` 替换为实际账号及治理数据库：
+
+```sql
+ALTER ROLE harness_gateway IN DATABASE harness SET log_parameter_max_length = 0;
+ALTER ROLE harness_gateway IN DATABASE harness SET log_parameter_max_length_on_error = 0;
+```
+
+默认值对新数据库连接生效。若要让现有 Gateway 连接建立事务局部保护，避免为此重启运行中的工作，管理员可仅授予所需参数的设置权限：
+
+```sql
+GRANT SET ON PARAMETER log_parameter_max_length TO harness_gateway;
+```
+
+该授权不含转授权能力，也不授予超级用户或业务数据权限。关闭已安装审计或自动执行计划扩展中的参数日志后，再运行预检。每次名称请求仍在提交显示名称前独立核验这些设置；预检通过不会绕过该检查。
 
 在指定主入口上，于所有工作区之外建立仅服务账号可访问的目录。下列命令使用该目录的规范绝对路径。第一个参数是可公开的密钥编号，第二个是尚不存在的新文件。命令使用 Gateway 已配置的组织连接，密钥不会输出到终端。
 
@@ -68,7 +95,7 @@ node gateway/lib/project-name-key-main.js k1 /private/organization-keys/project-
 
 轮换时，向同一命令传入第三个参数指向旧密钥文件，在另一个路径生成下一代文件。由组织独立保管可恢复的密钥副本，验证可取回后，再将主入口配置切换到新文件。按当前修订号准备新密钥，在所有项目所属电脑上建立查重记录，最后启用。轮换期间原有密钥继续约束重名。治理库备份中的指纹无法还原密钥。
 
-主入口校验名称时，治理库账号需要能够阻止 SQL 参数值写入日志。数据库管理员可为该账号把 `log_parameter_max_length` 和 `log_parameter_max_length_on_error` 默认值设为零，并关闭已安装的审计或自动执行计划扩展中的参数日志。无法确认这些设置时，Gateway 会先拒绝请求，不会把显示名称提交给数据库做大小写处理。
+单节点维护备份包含已配置的私有密钥文件。采集与恢复预检要求其组织、入口身份、规范路径及全部现用和待启用密钥指纹一致。缺少密钥或未包含该文件的旧备份会被拒绝；恢复不生成替代密钥，也不修改名称策略。灾难恢复与更换主入口需要单独流程，仍需保留组织独立保管的副本。
 
 ## 迁移已有项目
 

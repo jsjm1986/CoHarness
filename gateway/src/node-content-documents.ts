@@ -292,9 +292,18 @@ export class NodeContentDocuments {
     )
   }
 
-  /** Read one authorized node page; filenames and counts never pass through the control database. */
-  async overview(actor: number, filters: DocumentCatalogOverviewOptions, offset: number, limit: number) {
+  /** Read one authorized node index without opening a Runtime.
+   * @param actor - authorized account number.
+   * @param filters - matching and sort rules for this page.
+   * @param offset - consumed rows from this node index.
+   * @param limit - requested maximum number of rows.
+   * @param signal - browser request lifetime, checked between database operations.
+   * @returns metadata, bounded counts and placement revision for this computer.
+   */
+  async overview(actor: number, filters: DocumentCatalogOverviewOptions, offset: number, limit: number, signal?: AbortSignal) {
+    signal?.throwIfAborted()
     const before = await this.authority.readable(actor, false)
+    signal?.throwIfAborted()
     const metrics: DocumentCatalogMetrics = {
       total: 0,
       active: 0,
@@ -343,6 +352,7 @@ export class NodeContentDocuments {
         )
       ).rows
       if (available.length !== ids.length) documentRootUnavailable()
+      signal?.throwIfAborted()
       for (const row of available) if (row.name !== null) roots.get(row.root_id)!.label = row.name
       const result = (
         await tx.query<NodeDocumentEntry & { root_id: string }>(
@@ -363,6 +373,7 @@ export class NodeContentDocuments {
           args,
         )
       ).rows[0]!
+      signal?.throwIfAborted()
       const names = await this.ownerNames(result.map((row) => row.owner_public_id))
       return {
         revision: createHash('sha256')
@@ -379,7 +390,7 @@ export class NodeContentDocuments {
           bytes: sizes.bytes,
         },
       }
-    })
+    }, signal)
     const current = new Map((await this.authority.readable(actor, false)).map((grant) => [grant.placement.rootId, grant]))
     if (
       current.size !== roots.size ||

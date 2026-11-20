@@ -112,7 +112,7 @@ export function StewardPage() {
         )}
         actions={<Button icon={RefreshCw} loading={loading && overview !== null} onClick={() => void reload()}>{t('refresh')}</Button>}
       />
-      <ErrorBanner message={error} />
+      <ErrorBanner message={pending === null ? error : ''} />
       {notice === '' ? null : <p role="status">{notice}</p>}
 
       <Section title={t('sectionRules')}>
@@ -151,7 +151,7 @@ export function StewardPage() {
           <EmptyState icon={ShieldCheck} title={t('emptyTitle')} detail={t('emptyDetail')} />
         ) : (
           <>
-            <div className="tableWrap desktopOnly">
+            <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionMembers')} tabIndex={0}>
               <table className="dataTable">
                 <thead>
                   <tr>
@@ -167,7 +167,7 @@ export function StewardPage() {
                       key={entry.userId}
                       entry={entry}
                       busy={saving}
-                      onToggle={next => setPending({ entry, grant: next })}
+                      onToggle={next => { setError(''); setPending({ entry, grant: next }) }}
                     />
                   ))}
                 </tbody>
@@ -179,7 +179,7 @@ export function StewardPage() {
                   key={entry.userId}
                   entry={entry}
                   busy={saving}
-                  onToggle={next => setPending({ entry, grant: next })}
+                  onToggle={next => { setError(''); setPending({ entry, grant: next }) }}
                 />
               ))}
             </div>
@@ -193,6 +193,7 @@ export function StewardPage() {
         description={pending === null ? '' : t(pending.grant ? 'grantDetail' : 'revokeDetail', { name: pending.entry.displayName || pending.entry.username })}
         confirmLabel={pending?.grant === false ? t('confirmRevoke') : t('confirmGrant')}
         pending={saving}
+        error={error}
         onConfirm={() => void confirmGrant()}
         onClose={() => { if (!saving) setPending(null) }}
       />

@@ -45,7 +45,10 @@ export function DocumentsButton({ t, wide, useSessions }: DocumentsButtonProps) 
         type="button"
         className={wide ? css.trigger : `${css.trigger} ${css.rail}`}
         aria-label={t('button.label')}
-        onClick={handleOpen}
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true })
+          handleOpen()
+        }}
       >
         <IconBrowseOutline16 size={16} />
         {wide && <span className={css.label}>{t('button.label')}</span>}

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-20-managed-mux-reconnect.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-20-managed-mux-reconnect.md
+document:
+  en: 71d6de38d05f2edbe52312f357915f919d0e7916
+  zh: 41ea557d58f92f3c7cd6a89adf3ab2c9f648f877
+/agent-note-resume-a-managed-conversation-before-host-metadata:
+  en: e79fe9bf2a59f77e
+  zh: a07dbfbf45f6113a
+/agent-note-resume-a-managed-conversation-before-host-metadata/problem:
+  en: afd14be021a506f6
+  zh: 327e4f60d317177c
+/agent-note-resume-a-managed-conversation-before-host-metadata/decision:
+  en: 8e98ae938ea9e66a
+  zh: 714059499b7135f9
+/agent-note-resume-a-managed-conversation-before-host-metadata/alternatives-considered:
+  en: cdf2ec0fbf87c624
+  zh: 5ed39f8d5700a5f2
+/agent-note-resume-a-managed-conversation-before-host-metadata/consequences:
+  en: 3d849460e30f73c8
+  zh: 7aa949e32f50653c

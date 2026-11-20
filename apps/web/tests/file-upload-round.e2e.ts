@@ -9,17 +9,19 @@
 // arguments replay verbatim against a freshly re-uploaded object.
 // Record: DSH_SNAPSHOT=record rewrites session.v7.jsonl, then a keyless
 // DSH_SNAPSHOT=refresh regenerates ui.expected.md.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
-  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden as compareOrRefreshGolden, newWorkflowPage as newEnglishPage } from './workflow-responsive-state.ts'
 import type { AriaPathDecl } from './aria-normalize.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/file-upload-round', import.meta.url))
@@ -89,8 +91,12 @@ describe('web e2e: file upload through the real assembly', () => {
     name: /^USER, Uploaded document "poem\.txt" at "[^"]*"; contents inlined verbatim:/,
   })
 
-  /** Inspect one durable mixed message through the real image slot and all message tabs. */
-  async function inspectTrajectoryAttachments(): Promise<string> {
+  /**
+   * Inspect one durable mixed message through the real image slot and all message tabs.
+   * @param inspectImageLayout - run the original-image viewport matrix during the first inspection.
+   * @returns the normalized accessible transcript.
+   */
+  async function inspectTrajectoryAttachments(inspectImageLayout = false): Promise<string> {
     const userMessage = sessionEvents.find(event => event.type === 'user/message' && event.data.source.kind === 'user')
     if (userMessage?.type !== 'user/message') throw new Error('the replayed turn recorded no user message')
     const content = userMessage.data.content
@@ -138,6 +144,7 @@ describe('web e2e: file upload through the real assembly', () => {
       const dialog = page.getByRole('dialog', { name: 'Original image preview', exact: true })
       await dialog.waitFor()
       expect(await dialog.getByRole('img', { name: imageName }).getAttribute('src')).toBe(chatImageUrl)
+      if (inspectImageLayout && tab === 'Summary') await auditWorkflowState(page, 'attachments', 'original-image-preview', dialog)
       await page.keyboard.press('Escape')
       await dialog.waitFor({ state: 'hidden' })
       expect(await opener.evaluate(element => element === document.activeElement)).toBe(true)
@@ -174,7 +181,7 @@ describe('web e2e: file upload through the real assembly', () => {
       ...(MODE === 'record' ? {} : { replayFixture: FIXTURE, replayOverride: OVERRIDE, paceMs: 15 }),
     })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     await page.setViewportSize({ width: 900, height: 900 })
     tripwire = watchConsole(page)
@@ -230,6 +237,7 @@ describe('web e2e: file upload through the real assembly', () => {
       }
     })
     await compareOrRefreshGolden(DRAFT_EXPECTED, renderDraftRailsGeometry(geometry), MODE)
+    await auditWorkflowState(page, 'attachments', 'pending-document-and-image-rail', page.locator('[class*="centerCol"]'))
     for (const name of IMAGE_NAMES.slice(1)) {
       await page.getByRole('button', { name: `Remove image ${name}` }).click({ force: true })
     }
@@ -239,6 +247,7 @@ describe('web e2e: file upload through the real assembly', () => {
     const send = page.getByRole('button', { name: 'Send message' })
     await send.waitFor({ state: 'visible', timeout: 15_000 })
     await expect.poll(() => send.isEnabled(), { timeout: 15_000 }).toBe(true)
+    await auditWorkflowState(page, 'attachments', 'ready-to-send', page.locator('[class*="centerCol"]'))
     const settled = scaffold.whenTurnSettled(60_000)
     await send.click()
     const sessionId = await settled
@@ -314,6 +323,7 @@ describe('web e2e: file upload through the real assembly', () => {
       .toBeGreaterThanOrEqual(1)
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, ariaPaths())
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'attachments', 'settled-mixed-message', page.locator('[class*="centerCol"]'))
   })
 
   it.skipIf(MODE === 'record')('keeps the mixed durable message readable through the document chip and bubble', async () => {
@@ -328,11 +338,12 @@ describe('web e2e: file upload through the real assembly', () => {
       .toBeGreaterThanOrEqual(1)
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, ariaPaths())
     await compareOrRefreshGolden(HISTORY_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'attachments', 'document-chip-and-bubble', page.locator('[class*="centerCol"]'))
   })
 
   it.skipIf(MODE === 'record')('shows both attachment kinds throughout the Trajectory inspector', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-file-upload-trajectory'))
-    liveTrajectory = await inspectTrajectoryAttachments()
+    liveTrajectory = await inspectTrajectoryAttachments(true)
     await compareOrRefreshGolden(TRAJECTORY_EXPECTED, liveTrajectory, MODE)
   })
 
@@ -378,6 +389,7 @@ describe('web e2e: file upload through the real assembly', () => {
       const loading = await captureStableAria(
         page, '[role="tabpanel"] [class*="messageImages"]', scaffold.workspaceCwd, ariaPaths(),
       )
+      await auditWorkflowState(page, 'attachments', 'thumbnail-loading', panel)
 
       releaseRead.resolve(undefined)
       const retry = panel.getByRole('button', { name: 'Image failed to load; click to retry', exact: true })
@@ -386,6 +398,7 @@ describe('web e2e: file upload through the real assembly', () => {
       const failed = await captureStableAria(
         page, '[role="tabpanel"] [class*="messageImages"]', scaffold.workspaceCwd, ariaPaths(),
       )
+      await auditWorkflowState(page, 'attachments', 'thumbnail-retry', panel)
       await retry.focus()
       await retry.press('Enter')
       await panel.getByRole('img', { name: IMAGE_NAMES[0]!, exact: true }).waitFor()

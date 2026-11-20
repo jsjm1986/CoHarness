@@ -1,42 +1,31 @@
-# Agent Note: 以启动戳保留 Runtime 幸存进程
+# Agent Note：使用启动指纹保留 Runtime 存活进程
 
 Status: implemented
 
 [English](2026-11-11-runtime-survivor-retention.md) | 中文
 
-## 问题
+## Problem
 
-`LocalLauncher.instancesOutliveGateway=false` 意味着每次 Gateway 优雅关闭都会排空所有本地 Runtime(`stopAll` → `stop_reason='shutdown'`)。在开发用 Mac mini 上，每次发版都让每个空间在下次进入时付出约 13 秒的冷启动——这是「打开 UI 就干等」的最大来源。`systemd` 节点的 Runtime 本来就能跨重启存活；本地启动器选择排空是策略而非技术必需：owner 记录、凭证哈希、主体密钥与 supervisor 内核租约都能跨 Gateway 进程重启存活。
+Gateway 重启不能证明 Runtime 已完成工作。版本不匹配也不能证明静默：新进程使用不同代码时，原进程仍可能持有长任务、定时投递或插件清理工作。
 
-## 决策
+## Decision
 
-本地启动器默认保留幸存进程，但改用逐代 **launch stamp** 把关，替代原先的全局签名文件。
+Gateway 默认保留受监督进程。每个代次记录内容寻址的启动指纹，覆盖 CLI 与 Web 解析到的运行依赖及随包分发的代码和资源、工具链、监督器、凭据格式和实际策略输入。生产构建记录依赖摘要，发布激活验证摘要。兼容的存活进程沿用原代次和凭据重新挂接。指纹与代次认领一起持久写入 `instances.launch_stamp`。
 
-- `launch-stamp.ts` 提供 `computeLaunchStamps(cfg, principalPublicKey, profile)`：对 Runtime 代码闭包（`dshRepoRoot` 下的 `apps`、`packages`、`vendor`、`plugins` 及 lockfile)、解析后的 supervisor 源码、规范化后的 `dshCommand`(node 二进制记 `process.version`、`argv[1]` 入口脚本记内容摘要、之后的参数记字面文本——运行时新建的文件不进签名）、启动器类型、node 可执行文件路径与版本、profile、凭证格式（`principalPublicKey`、`streamPrincipalRenewal`)、默认 env 文件以及每个物化策略包（governance、guard、steward 工具、桌面驱动）做内容摘要。基础摘要再按**启动变体**(`admin` × `kind` × `steward`）与 `mountPolicyBundles` 实际写入的同一份 `policyPatchText` 组合，使行内戳记录该代启动时的全部输入。
-- `beginStart` 按描述符所属变体铸戳，并在认领 generation 的同一事务里持久化为 `instances.launch_stamp`(SQLite schema 10,Postgres 迁移 129)。策略输入缺失的变体无法铸戳：`stampFor` 会抛出与挂载时相同的配置错误，且不消耗 generation；失败的尝试仍会为现有 generation 发布静默事件，让排队的资源工作被唤醒。若所有变体都无法铸戳，戳计算整体失败——`retireIncompatibleSurvivors` 此时不退休任何进程，由请求期围栏暴露配置错误，而不是杀掉健康进程。
-- 服务请求之前，`index.ts` 调用 `instances.retireIncompatibleSurvivors()`：记戳不在已铸集合内的收养幸存进程——包括 `NULL` 的旧行——经由正常 `stop` 管线按 `shutdown` 停掉；戳匹配的行保持收养状态，经 `attachSurvivor`/`liveEndpoint` 重连。
-- 同一道围栏惰性生效：`liveEndpoint` 对戳未铸中的 ready 行返回 `null`;`ensureRunningNow` 在转入全新启动前，按观测到的 generation 以 `shutdown` 终止该幸存进程；reconcile 探活对戳不兼容的 ready 行按 `shutdown` 退休，与死亡探测路径一样按代围栏。停不掉的幸存进程保持被挡状态，不会被重新接上。
-- `stopAll(retainLocalSurvivors)` 仍以排空为默认（大量测试清理调用点依赖它）；生产关闭路径传 `!cfg.drainRuntimesOnShutdown`。运维者想要「关闭即排空」旧语义时可设 `HGW_DRAIN_RUNTIMES_ON_SHUTDOWN=true`。
-- 先前的全局 `boot-signature.json` 机制（目标相同，输入更粗：发布路径、入口文件哈希、git HEAD）被替换，因为它既看不见原地重建，又会在内容逐字节相同的换目录发版时照样排空全部。
+`inspectUpgradeSurvivors()` 报告不兼容和未知代次，不会停止它们。新转发仍受限制：`liveEndpoint` 拒绝不兼容指纹，`ensureRunning` 提示进程已保留、正在等待安全升级，说明 Gateway 重启可能中断任务，并要求管理员确认安全停止点。协调器独立于版本兼容性检查监督器存活状态；只有确认进程死亡才允许故障清理。监督状态缺失时保留容量占用。
 
-## 备选方案
+Runtime bearer 鉴权继续检查当前代次、节点租约、成员资格和策略。启动指纹不匹配本身不撤销执行授权。保留进程不代表授权流持续存活：Gateway 关闭会断开授权和转发连接，执行授权监听中断会取消受影响的 Agent 工作、中止工具并停止作业。管理员显式停止、撤权及配置的关闭排空保持既有终止语义。`HGW_DRAIN_RUNTIMES_ON_SHUTDOWN=false` 跳过进程终止；该设置的任一值都不保证任务跨 Gateway 重启连续执行。
 
-**由部署脚本写标记文件。** 部署侧的可选开关无法表达绕过脚本的升级；对真实启动输入做哈希让兼容性判定可以自证。
+## Alternatives considered
 
-**直接把本地启动器设为 `instancesOutliveGateway=true`。** 能去掉关闭时的排空，但完全丢掉升级保护：新版本会无限期地重连旧代码幸存进程。
+**指纹不匹配就终止。** 否决：代码指纹不能证明后台工作已结束，固定终止宽限会中断长任务。
 
-**保留全局 boot 签名。** 它只对网关自身的薄入口与 supervisor 文件哈希，因此路径不变的 Runtime 代码变化检测不到（原地重建），而逐字节相同的新目录发版却照样全排空。逐行内容戳让两个方向都正确。
+**向任意存活进程转发新工作。** 否决：启动策略和协议输入变化仍必须阻止不兼容代码接受新请求。
 
-## 影响
+**挑战凭据不可用时假定空闲。** 否决：活动状态未知不能授权终止。即使经过鉴权的空闲响应也只是某一时刻的观测，不能阻止新工作进入。安全自动替换需要独立的、经过鉴权且没有竞态的静默协议。
 
-同内容重启与仅改网关的发版零冷启动：Runtime 行保持 `ready`,generation 不变，supervisor 与子进程保住端口。Runtime 代码、启动输入、凭证格式或工具链变化则保守退休，该行下次进入时冷启动。已收养但已停止的行保留原有兜底：下一次启动的管理器在确认终止前都把其租约按常驻计数；缺凭证哈希的旧行仍然拒绝重连，而不是凭空授予权限。
+## Consequences
 
-由生命周期中途的配置变化引起的戳不匹配（例如轮换默认 env 文件）与代码变化一样退休幸存进程——这是刻意的，因为这些输入本就该计入该代的启动内容。角色变化（member→admin)会让幸存进程按其已记录的变体保持连接，直到下一代；每次请求的使用期策略检查照常生效。
+不兼容存活进程需要管理员等待安全停止点后停止并重新启动。新请求收到明确的不可用响应；已受理工作仅在执行授权和所需连接持续有效时才能继续。部署 Gateway 时，必须先防止新的用户操作和后台工作进入，再等待活动工作和清理完成，之后才能关闭 Gateway。仅凭空闲挑战不能建立这一条件。旧的不可变发布目录必须保留到对应进程停止，延迟导入仍可能依赖其中的文件。兼容进程重新挂接可避免进程冷启动，不能避免执行授权中断。
 
-旧 release 目录在仍有幸存进程从它运行时不得删除：幸存进程的代码闭包是惰性加载的，即使其行能通过围栏，删掉目录也会弄坏一个被保留的进程。
-
-## 验证
-
-- `launch-stamp.spec.ts`：铸戳确定性、逐变体戳互不相同、闭包内容变化使全部戳翻转、相同内容换路径铸出相同集合、缺 governance 包时整组失败，以及 `policyPatchText` 只在对应变体中内嵌 admin/steward 覆盖层（6/6)。
-- `instances.spec.ts`：戳不兼容的幸存进程分别被 `retireIncompatibleSurvivors`、`ensureRunning` 与 reconcile 探活按 `shutdown` 退休；戳已铸中的幸存进程保持收养并重连；一次真实 `FAKE_DSH` 启动把成员戳写入 `instances.launch_stamp`(109/109)。
-- 生产 mac-mini:r54→r55 启动排空全部 5 个旧 supervisor；同版本 `launchctl kickstart -k` 后 supervisor `16635` 与子进程 `16637`(42000 端口）存活、行保持 `ready` 且 generation 不变；重启后一次带认证的代理请求 33ms 返回。
+真实子进程 Gateway 快照验证版本不匹配后已受理工作仍能完成、Admin 启动提示等待升级、管理员显式停止仍然有效。PostgreSQL 测试验证等待升级时原 bearer 保持有效，账号撤权后拒绝使用。这些检查不能证明受管执行在 Gateway 真正关闭、授权流中断后仍连续运行。

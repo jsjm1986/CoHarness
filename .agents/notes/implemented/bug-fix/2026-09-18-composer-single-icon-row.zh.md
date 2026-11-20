@@ -10,7 +10,7 @@
 
 ## 决定
 
-每个紧凑控件在任何宽度下都是单行上的纯图标触发器。模型槽只渲染 `IconBrainOutline16`，权限槽只渲染按权限级别区分的盾牌字形，上下文计量、附件和发送控件保持既有字形。输入控件契约中的 `summary` presentation 被移除；点击任一紧凑触发器仍打开既有的会话设置面板，完整标签都在那里。紧凑图标目标为 40px，360px 以下降到 36px，使七个控件仍能放进 320px 卡片；tools 网格列宁可裁切也不允许换行。可访问名称与 title 仍携带完整的模型/权限文本，非紧凑层级完全不变。
+紧凑工具栏使用纯图标控件。模型槽渲染 `IconBrainOutline16`，权限槽渲染对应权限级别的图标。两者都提供可访问名称，点击后打开带完整标签的会话设置面板。工具栏先收紧 44px 触控区域之间的间距，空间不足时再把上下文用量和可选状态控件下移到卡片下方。在以触控为主的设备上，发送和停止的圆面随工具栏宽度缩放，在矮横屏下采用更小的直径上限。
 
 相关：[统一移动端会话设置](../architecture/2026-08-24-unified-mobile-session-settings.zh.md)（本笔记在工具栏一侧反转的 Sheet 架构）、[compact 框架密度](../architecture/2026-08-19-compact-chrome-density.zh.md)。
 
@@ -22,8 +22,8 @@
 
 ## 影响
 
-紧凑 composer 再也不会把模型/发送组折到第二行，包括 `data-viewport='compact'` 生效的窄工作台分栏。输入控件的 `presentation` 联合类型现在是 `'trigger' | 'section'`；处理过 `'summary'` 的槽位实现必须删掉该分支。44px 触控目标 token 不再决定紧凑 composer 控件尺寸，后者归入 40px/36px 图标目标族。
+在支持的手机宽度下，模型和发送控件处于工具栏同一行。输入控件的 `presentation` 联合类型为 `'trigger' | 'section'`。发送与停止在相同的 44px 触控区域内缩放圆面，按下或切换状态时，工具栏间距和状态控件位置的计算保持稳定。
 
 ## 测试
 
-`composer-model-mobile.e2e.ts` 在真实浏览器中于 390/375/320px 测量组装后的卡片，要求模型槽位于 tools 与 send 之间、单行、且在卡片内；提交的 golden 记录新契约。单元 spec 断言紧凑触发器保留可访问名称，compact-chrome 样式 spec 断言强制换行的选择器已不存在。缺口：纯图标 affordance 依赖会话面板提供辨识，首次使用时模型/权限槽的可发现性弱于带文字的 chip。
+`composer-model-mobile.e2e.ts` 在 390px、375px 和 320px 检查模型槽位于工具控件和发送之间。`composer-status-layout.e2e.ts` 测量普通会话和维护中枢的圆面与触控区域，并检查停止状态下按钮边缘仍可点中。

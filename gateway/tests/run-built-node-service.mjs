@@ -147,11 +147,19 @@ async function verify(){
   const a = await center.wait('ready')
   const node = ownedChild(entry, { NODE_SERVICE_FIXTURE_ROOT: join(root, 'remote'), NODE_SERVICE_FIXTURE_ORGANIZATION: slug, NODE_SERVICE_FIXTURE_NODE: 'computer-b' })
   const b = await node.wait('ready')
+  for (const [base, release] of [[a.base, 'fixture-center-release'], [b.base, 'fixture-worker-release']]) {
+    const health = await fetch(base + '/healthz/live')
+    assert.equal(health.status, 200)
+    assert.equal((await health.json()).release, release)
+  }
   await node.command('origins', { values: [a.base] })
-  agent = ownedChild(new URL('../lib/node-agent-main.js', import.meta.url), {
+  const agentEntry = new URL('../lib/node-agent-main.js', import.meta.url)
+  const agentEnvironment = {
     HGW_NODE_CENTER_URL: a.base, HGW_NODE_AGENT_STATE_FILE: join(root, 'agent/access.json'),
-    HGW_NODE_ENROLLMENT_TOKEN: ticket.token, HGW_NODE_LOCAL_GATEWAY_URL: b.base,
-  }, false)
+    HGW_NODE_LOCAL_GATEWAY_URL: b.base,
+  }
+  const startAgent = (enrollment = {}) => ownedChild(agentEntry, { ...agentEnvironment, ...enrollment }, false)
+  agent = startAgent({ HGW_NODE_ENROLLMENT_TOKEN: ticket.token })
   await agent.wait('channel-ready')
   const cookie = await login(a.base, 'remote-owner')
   const directory = await fetch(`${a.base}/account/api/runtimes`, { headers: { cookie } })
@@ -159,7 +167,17 @@ async function verify(){
   const environment = (await directory.json()).items.find(item => item.owner.id === b.userId && item.node.id === b.nodeId)
   assert.ok(environment)
   if(operationsOnly){
-    const {verifyVersionedNodeService}=await import('./fixtures/versioned-node-service.mjs')
+    const reconnectOnly = process.env.HGW_TEST_PROMPT_RECONNECT_ONLY === '1'
+    if (!reconnectOnly) {
+      const {verifyColdSessionPreparation}=await import('./fixtures/cold-session-preparation.mjs')
+      await verifyColdSessionPreparation({pool,org:organization,base:a.base,cookie,runtimeId:environment.id,nodeId:b.nodeId,userId:b.userId,
+        command:(kind,fields)=>node.command(kind,fields)})
+    }
+    const {verifyQueuedPromptReconnect} = await import('./fixtures/queued-prompt-reconnect.mjs')
+    await verifyQueuedPromptReconnect({ pool, base: a.base, cookie, runtimeId: environment.id, nodeId: b.nodeId, userId: b.userId,
+      disconnect: () => agent.stop(), reconnect: async () => { agent = startAgent(); await agent.wait('channel-ready') } })
+    if (reconnectOnly) return
+    const {verifyVersionedNodeService} = await import('./fixtures/versioned-node-service.mjs')
     const localCookie=await login(a.base,'center-owner')
     const localDirectory=await fetch(a.base+'/account/api/runtimes',{headers:{cookie:localCookie}})
     assert.equal(localDirectory.status,200)
@@ -167,7 +185,7 @@ async function verify(){
     assert.ok(localEnvironment)
     await verifyVersionedNodeService({pool,org:organization,base:a.base,secondary:b.base,
       local:{id:localEnvironment.id,node:a.nodeId,cookie:localCookie},remote:{id:environment.id,node:b.nodeId,cookie},
-      count:Number(process.env.HGW_TEST_VERSIONED_OPERATIONS)})
+      count:Number(process.env.HGW_TEST_VERSIONED_OPERATIONS),observeOwnerPressure:()=>node.command('observe-idle-pressure')})
     return
   }
   transcript.push('One center login discovers the account runtime on computer B.')
@@ -196,7 +214,12 @@ async function verify(){
   for (const path of bootstrapScripts) {
     const script = await fetch(new URL(path, a.base), { headers: { cookie, referer: `${a.base}${address}` } })
     assert.equal(script.status, 200, `Initial browser script unavailable: ${path}`)
-    assert.equal(new URL(script.url).searchParams.get('dshRuntime'), environment.id)
+    const loaded = new URL(script.url)
+    assert.equal(script.headers.get('x-dsh-target-node'), b.nodeId)
+    if (loaded.searchParams.has('dshRuntime')) assert.equal(loaded.searchParams.get('dshRuntime'), environment.id)
+    else assert.ok(/^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.js$/u.test(loaded.pathname)
+      || /^(?:[a-f0-9]{12}|[a-f0-9]{64})$/u.test(loaded.searchParams.get('rev') ?? ''),
+    `An unpinned bootstrap script must be content-versioned: ${loaded.pathname}`)
     assert.match(script.headers.get('content-type') ?? '', /javascript/u)
     assert.ok((await script.arrayBuffer()).byteLength > 0)
   }
@@ -489,6 +512,26 @@ async function verify(){
 
   assert.equal((await center.command('status')).resident, 0)
   transcript.push('Documents retain computer ownership; a planned verified snapshot copies through the center without starting a Runtime.')
+  const overviewAddress = new URL('/account/api/documents/overview?limit=1&sort=name-asc', a.base)
+  const overviewPage = async () => {
+    const response = await fetch(overviewAddress, { headers: { ...browserHeaders, accept: 'application/x-ndjson' } })
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('content-type'), 'application/x-ndjson')
+    const frames = (await response.text()).trimEnd().split('\n').map(line => JSON.parse(line))
+    assert.equal(frames.at(-1)?.type, 'complete')
+    return frames.at(-1).page
+  }
+  const firstCatalogPage = await overviewPage()
+  assert.equal(firstCatalogPage.documents.length, 1)
+  assert.ok(firstCatalogPage.nextCursor)
+  overviewAddress.searchParams.set('cursor', firstCatalogPage.nextCursor)
+  const nextCatalogPage = await overviewPage()
+  assert.equal(nextCatalogPage.documents.length, 1)
+  assert.deepEqual(new Set([firstCatalogPage.documents[0].catalogId, nextCatalogPage.documents[0].catalogId]),
+    new Set([sourceCatalog.catalogId, targetCatalog.catalogId]))
+  assert.equal((await center.command('status')).resident, 0)
+  assert.equal((await node.command('status')).resident, 1)
+  transcript.push('The streamed document overview pages through both locations without repeating a document or starting a Runtime.')
   await pool.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE organization_id=$1 AND node_id=$2 AND user_id=$3', [organization, a.nodeId, remoteAccount])
   const revokedDocument = await fetch(`${a.base}/api/documents/scope/content?scope=personal&dshNode=${a.nodeId}&id=${encodeURIComponent(copied.items[0].target.docId)}`, { headers: browserHeaders })
   assert.equal(revokedDocument.status, 403); await revokedDocument.arrayBuffer()
@@ -522,10 +565,7 @@ async function verify(){
     assert.equal(shared.status, 200, await shared.text())
   }
   transcript.push('Organization model and quota management remain available while the execution computer is disconnected.')
-  agent = ownedChild(new URL('../lib/node-agent-main.js', import.meta.url), {
-    HGW_NODE_CENTER_URL: a.base, HGW_NODE_AGENT_STATE_FILE: join(root, 'agent/access.json'),
-    HGW_NODE_LOCAL_GATEWAY_URL: b.base,
-  }, false)
+  agent = startAgent()
   await agent.wait('channel-ready')
   const stale = await fetch(`${a.base}/api/host.describe?dshRuntime=${environment.id}`, { method: 'POST',
     headers: { cookie, origin: a.base, 'content-type': 'application/json' },
@@ -661,6 +701,9 @@ async function verify(){
   assert.equal(beforeDisableDocuments.status, 200, await beforeDisableDocuments.clone().text())
   assert.ok((await beforeDisableDocuments.json()).documents.some(document => document.scope.nodeId === b.nodeId))
   await node.command('quiesce'); await agent.stop()
+  const remaining = await pool.query(`SELECT count(*)::int AS total FROM harness.instances
+    WHERE organization_id=$1 AND assigned_node_id=$2 AND (observed_state<>'stopped' OR desired_state<>'stopped')`, [organization, b.nodeId])
+  assert.equal(remaining.rows[0].total, 0, 'Every detached Runtime needs a durable stopped intent and confirmed stop')
   const accessPage = await fetch(`${a.base}/admin/api/deployment/nodes/access`, { headers: { cookie: centralAdminCookie } })
   const attached = (await accessPage.json()).items.find(item => item.nodeId === b.nodeId)
   assert.ok(attached)

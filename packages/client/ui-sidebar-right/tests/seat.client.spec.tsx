@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /** Sidebar presentation and tab subscriptions through the production slot renderer. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent } from '@testing-library/react'
+import { act, fireEvent, within } from '@testing-library/react'
 import { useState } from 'react'
 import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
@@ -186,7 +186,8 @@ describe('RightbarSeat presentation', () => {
       act(() => { h.controller.close(initial.id) })
       expect(h.layout()).toBe(before)
       fireEvent.contextMenu(element(h.view.container, '[data-dockkit-tab]'))
-      expect(document.querySelector('[data-dockkit-tab-menu] [role^="menuitem"]')).toBeNull()
+      expect(within(document.body).queryByRole('menuitem', { name: /^Close$/ })).toBeNull()
+      expect(within(document.body).getByRole('menuitem', { name: 'Float tab' })).toBeTruthy()
       expect(h.view.container.querySelector('[data-dockkit-add-tab]')).toBeNull()
       return
     }
@@ -254,7 +255,7 @@ describe('RightbarSeat presentation', () => {
     expect(panel.style.width).toBe('420px')
     fireEvent.click(element(h.view.container, '[data-sidebar-right-mode]'))
     expect(h.layout().mode).toBe('fullscreen')
-    expect(panel.style.width).toBe('100vw')
+    expect(panel.style.width).toBe('1440px')
     expect(panel.dataset['sidebarRightPanel']).toBe('fullscreen')
     expect(element(h.view.container, '[data-tab-body]')).toBe(body)
     expect(h.frame.openRightbar).toHaveBeenLastCalledWith(true, true)
@@ -602,6 +603,31 @@ describe('slot-owned useTabInfo', () => {
     // unmounts rather than drawing a disabled circle — the kit's
     // hideSplitWhenBlocked path, which keeps the room reading stable.
     expect(splitButtons()).toHaveLength(0)
+  })
+
+  it('reserves tab space by hiding blocked split controls on a coarse-pointer tablet', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
+    Object.defineProperty(window, 'matchMedia', { configurable: true, value: (query: string): MediaQueryList => ({
+      matches: query === '(pointer: coarse)', media: query, onchange: null,
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(() => true),
+      // oxlint-disable-next-line typescript/no-deprecated -- MediaQueryList requires the legacy members.
+      addListener: vi.fn(),
+      // oxlint-disable-next-line typescript/no-deprecated -- MediaQueryList requires the legacy members.
+      removeListener: vi.fn(),
+    }) })
+    try {
+      const h = await mountSeat(768)
+      act(() => { h.controller.toggleExpanded() })
+      h.open()
+      const splitButtons = () => h.view.container.querySelectorAll('[data-dockkit-split-button]')
+      expect(splitButtons()).toHaveLength(1)
+      act(() => { h.controller.split() })
+      expect(splitButtons()).toHaveLength(0)
+      expect(within(h.view.container).getAllByRole('button', { name: 'Fullscreen' })).toHaveLength(1)
+    } finally {
+      if (descriptor === undefined) Reflect.deleteProperty(window, 'matchMedia')
+      else Object.defineProperty(window, 'matchMedia', descriptor)
+    }
   })
 })
 

@@ -37,6 +37,8 @@ Source files under `src/client/`: `definition.tsx` (the type), `store.ts` (what 
 
 The root is the session's working directory, read from `useSessions().byId[sessionId].cwd`. Filesystem roots such as `/` and Windows drive roots are valid tree roots. Every level is keyed by absolute path; a child's path is its parent's joined with the entry name by `/`. A level is listed when it is first expanded, through `connection.api.workspaceFiles.list({ sessionId, path })` on the Session's target connection, with `path` relative to the workspace root — the face converts the displayed absolute path against the Session's `cwd`; the adapter keeps the listing's entries and truncation flag. Rows are ordered directories first, then by natural, case-insensitive name; dotfiles are shown like any other entry.
 
+A failed directory query stays in its own branch, including transport failures. Refresh retries open branches while keeping their expansion state.
+
 | Entry type | Row |
 |---|---|
 | `directory` | Toggles; reopening lists again and restores still-present expanded descendants. Displayed entries remain cached while collapsed. |

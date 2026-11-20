@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-17-project-reservation-draft-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-project-reservation-draft-authority.md
+document:
+  en: fa6f34286d50fdee4cda5e2d979b70b0204136f3
+  zh: 4f53f326ab559864ad1c029709a51550e7693a4f
+/agent-note-project-reservation-authority-for-private-drafts:
+  en: d1708061927848f0
+  zh: 8f4173c367e672a9
+/agent-note-project-reservation-authority-for-private-drafts/problem:
+  en: 0e4d78308d73aff7
+  zh: bdb66fcce78a1cff
+/agent-note-project-reservation-authority-for-private-drafts/decision:
+  en: ba52990905ce7f1c
+  zh: 3cb42ad3c4bb0e48
+/agent-note-project-reservation-authority-for-private-drafts/alternatives-considered:
+  en: 4d8f3e3c178a48b1
+  zh: 695e1031ab5e87aa
+/agent-note-project-reservation-authority-for-private-drafts/consequences:
+  en: bff007e4a7a4693a
+  zh: ae59c2cc92ebca69
+/agent-note-project-reservation-authority-for-private-drafts/verification:
+  en: d9285848a0511e2d
+  zh: 36d85544efd09a1e

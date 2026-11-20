@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-20-session-preview-keyboard.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-20-session-preview-keyboard.md
+document:
+  en: 35eea36eba4c6bee7bdb562d31fe65a706516467
+  zh: fb0a1cb29a3cc85319dbcf83b8d0b7a98e1f81d4
+/agent-note-session-preview-keyboard-access:
+  en: 5d72bcf3f032cbf3
+  zh: fefd62e1bee5a2c5
+/agent-note-session-preview-keyboard-access/problem:
+  en: b5eee7dfe5aa6889
+  zh: a11013c8d0a12acb
+/agent-note-session-preview-keyboard-access/decision:
+  en: 642d536e52ddf09a
+  zh: 2355bb39756c40d3
+/agent-note-session-preview-keyboard-access/alternatives-considered:
+  en: d40cebfe6a459c0d
+  zh: a79718896fa13b58
+/agent-note-session-preview-keyboard-access/consequences:
+  en: a7a89918931bbace
+  zh: e1134b50c4662686
+/agent-note-session-preview-keyboard-access/verification:
+  en: 6b1b1410e53fd157
+  zh: 44e96e673df4ea07

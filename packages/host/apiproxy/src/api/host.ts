@@ -60,7 +60,7 @@ export interface HostApi {
     executionAuthorityRequired?: boolean
     /** Known driver or environment limitation; absence grants no desktop authority. */
     computerUseUnavailableReason?: ComputerUseUnavailableReason
-    /** Runtime pinned by the launch credential, independent of the viewer's current project selection. */
+    /** Runtime and any registered computer pinned by its launch credential. */
     runtimeTarget?: import('./client-session.ts').ClientRuntimeTarget
     /** Present only when a filesystem provider serves read-only Workspace resources. */
     workspaceFiles?: { maxBytes: number; maxLines: number; maxEntries: number; maxResources: number }

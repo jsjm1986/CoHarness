@@ -133,7 +133,12 @@ export function createList(
     if (api === undefined || directory === undefined) {
       return { ok: false, error: { code: 'internal', message: 'Workspace runtime is unavailable', details: {} } }
     }
-    const response = await api.list(directory === '' ? { sessionId } : { sessionId, path: directory }, signal)
+    let response: Awaited<ReturnType<WorkspaceFilesListApi['list']>>
+    try {
+      response = await api.list(directory === '' ? { sessionId } : { sessionId, path: directory }, signal)
+    } catch (error) {
+      return { ok: false, error: { code: 'internal', message: error instanceof Error ? error.message : String(error), details: {} } }
+    }
     if (!response.result.ok) return response.result
     return { ok: true, value: { entries: response.result.value.entries, truncated: response.result.value.truncated } }
   }

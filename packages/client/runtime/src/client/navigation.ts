@@ -1,5 +1,5 @@
 /** Supersession and disposal for asynchronous view-selection intents. */
-import type { ISessions, SessionTarget } from './contract/sessions.ts'
+import type { ISessions, SessionRetainOptions, SessionTarget } from './contract/sessions.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /**
@@ -8,6 +8,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
  * @param target - exact root or direct-parent child address.
  * @param signal - current intent combined with the caller's lifetime.
  * @param commit - synchronous view update while the prepared generation remains retained.
+ * @param history - optional request for the prepared initial root tail; other navigation uses the ordinary opening.
  * @returns whether the intent committed; supersession returns false, opening failures throw.
  */
 export async function commitSessionNavigation(
@@ -15,10 +16,11 @@ export async function commitSessionNavigation(
   target: SessionTarget,
   signal: AbortSignal,
   commit: () => void,
+  history?: Pick<SessionRetainOptions, 'preferPreparedHistory'>,
 ): Promise<boolean> {
   const isCancelled = (): boolean => signal.aborted
   if (isCancelled()) return false
-  const reference = sessions.retain(target, { source: 'controllerOperation', signal })
+  const reference = sessions.retain(target, { source: 'controllerOperation', signal, ...history })
   try {
     const binding = await reference.ready
     if (isCancelled()) return false

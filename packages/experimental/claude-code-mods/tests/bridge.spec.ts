@@ -1129,12 +1129,12 @@ describe('the band above the prompt', () => {
     await mods.pressBand(agent, second.generation, proceedId ?? '')
     expect(h.warn).toHaveBeenCalledWith(expect.stringMatching(/band press ignored/))
 
-    // A button whose onPress throws is reported and the band redraws.
+    // A failed press rejects after the band's changed state reaches watchers.
     await h.ctx.commands.execute(agent, '/arm-boom', [], new AbortController().signal)
     await waitFor(() => JSON.stringify(seen.at(-1)).includes('Boom'))
     const armed = seen.at(-1) as { generation: number; tree: unknown }
     const boomId = [...JSON.stringify(armed.tree).matchAll(/"actionId":"(a\d+)"/gu)][0]?.[1]
-    await mods.pressBand(agent, armed.generation, boomId ?? '')
+    await expect(mods.pressBand(agent, armed.generation, boomId ?? '')).rejects.toThrow('nope')
     expect(h.warn).toHaveBeenCalledWith("claude-code-mods: a button's onPress failed: nope")
     await waitFor(() => !JSON.stringify(seen.at(-1)).includes('Boom'))
     watching.abort()

@@ -2,7 +2,7 @@
 import { verifiedPeerFileRoots, type PeerFileRootMap } from './peer-snapshot-roots.ts'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { lstat, mkdir, open, readFile, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, open, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import type { PoolClient } from 'pg'
@@ -20,6 +20,8 @@ import {
 } from './peer-backup-restic.ts'
 
 import { peerProjectTables } from './node-content-project-tables.ts'
+import { exportRecoveryExecutionData, verifyRecoveryExecutionData } from './peer-backup-execution-data.ts'
+import { writePeerSourceFile, type PeerSourceWrites } from './peer-backup-source-space.ts'
 
 export { peerProjectTables }
 const tables = peerProjectTables
@@ -41,6 +43,7 @@ const inventorySchema = z
     tables: z.array(tableRecord).max(tables.length),
     hasFileSnapshot: z.boolean(),
     sourceOnlyFileWitnesses: z.boolean().optional(),
+    hasExecutionPolicies: z.boolean().optional(),
   })
   .strict()
 interface View {
@@ -57,7 +60,7 @@ interface View {
 
 /** An online file snapshot owner attests one content watermark and every declared plugin's coverage. */
 export interface PeerProjectFileSnapshots {
-  acquire(binding: NodeContentBinding, revision: string, signal: AbortSignal, maxEntries:number): Promise<View>
+  acquire(binding: NodeContentBinding, revision: string, signal: AbortSignal, maxEntries:number, space?:PeerSourceWrites): Promise<View>
   validate(binding: PeerBackupBinding, payload: string, signal: AbortSignal): Promise<void>
 }
 
@@ -65,6 +68,7 @@ interface Options {
   control: Queryable
   store: Pick<NodeContentStore, 'read'>
   files?: PeerProjectFileSnapshots
+  recoveryStateRoot?: string
   maxBytes: number
   maxRows: number
 }
@@ -89,6 +93,7 @@ async function exportTable(
   destination: string,
   budget: { bytes: number; rows: number },
   signal: AbortSignal,
+  space?: PeerSourceWrites,
 ) {
   // ctid is an in-snapshot tie-breaker. Event replay always follows the recorded Session sequence.
   const order = table === 'conversation_events' ? 'session_id,seq' : table === 'conversation_sessions' ? 'id' : 'ctid'
@@ -98,7 +103,11 @@ async function exportTable(
     WHERE organization_id=$1 AND ${projectScoped.has(table) ? 'project_id' : 'runtime_id'}=$2 ORDER BY ${order}`,
     [binding.organizationId, projectScoped.has(table) ? binding.projectId : binding.runtimeId, Math.min(8 << 20, budget.bytes)],
   )
-  const file = await open(join(destination, table + '.jsonl'), 'wx', 0o600),
+  const create = () => open(join(destination, table + '.jsonl'), 'wx', 0o600)
+  const file = await (space ? space.write(destination, 0, create) : create()).catch(async error => {
+    await tx.query('CLOSE peer_rows')
+    throw error
+  }),
     hash = createHash('sha256')
   let count = 0
   try {
@@ -112,7 +121,8 @@ async function exportTable(
         budget.bytes -= Buffer.byteLength(line)
         budget.rows--
         if (budget.bytes < 0 || budget.rows < 0) throw new PeerBackupError(507, 'peer-backup/export-budget')
-        await file.writeFile(line)
+        if (space) await space.write(destination, Buffer.byteLength(line), () => file.writeFile(line))
+        else await file.writeFile(line)
         hash.update(line)
         count++
       }
@@ -128,18 +138,20 @@ async function exportTable(
 /** One verified local transaction pins all SQL rows. Mutable paths never silently enter a certified snapshot. */
 export class PeerProjectExporter implements PeerBackupExporter {
   constructor(private readonly options: Options) {}
-  async capture(policy: PeerBackupBinding, destination: string, signal: AbortSignal): Promise<PeerCapture> {
+  async capture(policy: PeerBackupBinding, destination: string, signal: AbortSignal, sourceSpace?:PeerSourceWrites): Promise<PeerCapture> {
     const binding = await projectBinding(this.options.control, policy)
     const directory = join(destination, 'project')
-    await mkdir(directory, { mode: 0o700 })
+    if (sourceSpace) await sourceSpace.write(destination, 0, () => mkdir(directory, { mode: 0o700 }))
+    else await mkdir(directory, { mode: 0o700 })
     let files: View | undefined
     const budget = { bytes:this.options.maxBytes, rows:this.options.maxRows }
     try {
+      const policies = await exportRecoveryExecutionData(this.options.control, binding, this.options.recoveryStateRoot, directory, budget, signal, sourceSpace)
       if(this.options.files) {
         const version=await this.options.store.read(binding,async tx=>(await tx.query<{revision:string}>(`SELECT revision::text
           FROM node_content.spaces WHERE organization_id=$1 AND runtime_id=$2`,[binding.organizationId,binding.runtimeId])).rows[0],signal)
         if(!version) throw new PeerBackupError(409,'peer-backup/space-placement-changed')
-        files=await this.options.files.acquire(binding,version.revision,signal,this.options.maxRows)
+        files=await this.options.files.acquire(binding,version.revision,signal,this.options.maxRows,sourceSpace)
       }
       const result = await this.options.store.read(
         binding,
@@ -182,7 +194,7 @@ export class PeerProjectExporter implements PeerBackupExporter {
               if ((addedAt[name] ?? 1) <= installed) gaps.push('table-missing:' + name)
               continue
             }
-            records.push(await exportTable(tx, name, binding, directory, budget, signal))
+            records.push(await exportTable(tx, name, binding, directory, budget, signal, sourceSpace))
           }
           const inventory = inventorySchema.parse({
             version: 1,
@@ -196,8 +208,9 @@ export class PeerProjectExporter implements PeerBackupExporter {
             tables: records,
             hasFileSnapshot: files !== undefined,
             sourceOnlyFileWitnesses: present.has('project_file_anchors'),
+            hasExecutionPolicies: policies > 0,
           })
-          await writeFile(join(directory, 'inventory.json'), JSON.stringify(inventory), { flag: 'wx', mode: 0o600 })
+          await writePeerSourceFile(join(directory, 'inventory.json'), JSON.stringify(inventory), sourceSpace)
           return {
             version: 1 as const,
             organizationId: binding.organizationId,
@@ -206,7 +219,7 @@ export class PeerProjectExporter implements PeerBackupExporter {
             writerEpoch: binding.writerEpoch,
             watermark: space.revision,
             capturedAt: files && files.capturedAt<space.capturedAt.toISOString()?files.capturedAt:space.capturedAt.toISOString(),
-            coveredCount: records.length + (files?.roots.length ?? 0),
+            coveredCount: records.length + (files?.roots.length ?? 0) + policies,
             gaps,
           }
         },
@@ -214,15 +227,17 @@ export class PeerProjectExporter implements PeerBackupExporter {
       )
       if (files) {
         const managed = join(destination, 'managed')
-        await mkdir(managed, { mode: 0o700 })
+        if (sourceSpace) await sourceSpace.write(destination, 0, () => mkdir(managed, { mode: 0o700 }))
+        else await mkdir(managed, { mode: 0o700 })
         const witness = await snapshotManagedFiles(files.roots,managed,signal,{maxBytes:budget.bytes,maxEntries:budget.rows,
+          guardWrite:sourceSpace && ((bytes,write)=>sourceSpace.write(managed,bytes,write)),
           rejectNestedBtrfs:files.logicalRoots?.provider==='btrfs',btrfsDevices:files.logicalRoots?.devices,verifiedVssPath:files.verifiedVssPath})
         await files.confirm?.()
-        if(files.logicalRoots) await writeFile(join(managed,'roots.json'),JSON.stringify(files.logicalRoots),{flag:'wx',mode:0o600})
-        await writeFile(
+        if(files.logicalRoots) await writePeerSourceFile(join(managed,'roots.json'),JSON.stringify(files.logicalRoots),sourceSpace)
+        await writePeerSourceFile(
           join(managed, 'manifest.json'),
           JSON.stringify({ platform: process.platform === 'win32' ? 'win32' : 'posix', snapshot: witness }),
-          { flag: 'wx', mode: 0o600 },
+          sourceSpace,
         )
       }
       const current = await projectBinding(this.options.control, policy)
@@ -322,6 +337,8 @@ export async function validatePeerProject(
   }
   if (spaces !== 1) throw new PeerBackupError(409, 'peer-backup/space-placement-changed')
   for (const entry of counts.values()) if (entry.seen !== entry.count) throw new PeerBackupError(409, 'peer-backup/session-order')
+  if (manifest.hasExecutionPolicies) await verifyRecoveryExecutionData(base, manifest.runtimeId, manifest.nodeId,
+    { bytes: options.maxBytes - bytes, rows: options.maxRows - rows }, signal)
   if (manifest.hasFileSnapshot) {
     const native=await verifiedPeerFileRoots(binding,destination,capture.gaps.length===0)
     await verifyPeerManagedFiles(join(destination,'managed'),signal,native?'roots.json':undefined)

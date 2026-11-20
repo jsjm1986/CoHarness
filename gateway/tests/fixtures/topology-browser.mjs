@@ -84,10 +84,13 @@ export async function topologyBrowser({ primary, secondary, primaryCookie, remot
     const unifiedA = await unifiedContext.newPage(), unifiedB = await unifiedContext.newPage()
     for (const page of [unifiedA, unifiedB]) {
       const baseline = page.waitForResponse(response => new URL(response.url()).pathname === '/api/workspace.list', { timeout: 60000 })
-      const metadata = page.waitForResponse(response => new URL(response.url()).pathname === '/account/api/workbench/catalog', { timeout: 60000 })
+      const metadata = page.waitForResponse(response => {
+        const url = new URL(response.url())
+        return url.pathname === '/account/api/runtimes' && !url.searchParams.has('ids')
+      }, { timeout: 60000 })
       await page.goto(`${primary}/?dshRuntime=${localRuntime}`)
       assert.equal((await (await baseline).json()).result.ok, true)
-      assert.ok((await (await metadata).json()).personalWorkspaces.some(group => group.runtime.runtimeId === unifiedRuntime && group.items.length > 0))
+      assert.ok((await (await metadata).json()).items.some(item => item.id === unifiedRuntime))
       const postpone = page.getByRole('button', { name: '稍后配置', exact: true })
       try { await postpone.click({ timeout: 2000 }) } catch (error) { if (error.name !== 'TimeoutError') throw error }
       await input(page).waitFor({ state: 'visible', timeout: 30000 })
@@ -98,6 +101,11 @@ export async function topologyBrowser({ primary, secondary, primaryCookie, remot
       await unifiedA.waitForFunction(() => { const field = document.querySelector('textarea'); return field !== null && !field.readOnly })
     }
     await input(unifiedA).fill('本机标签页的独立草稿')
+    const workspaceRows = unifiedB.waitForResponse(response => new URL(response.url()).pathname === '/account/api/workbench/rows'
+      && new URL(response.url()).searchParams.get('dshRuntime') === unifiedRuntime, { timeout: 60000 })
+    await unifiedB.getByRole('button', { name: 'computer-b', exact: true }).click()
+    assert.equal((await workspaceRows).status(), 200)
+    await verifyUnifiedPassive()
     await unifiedB.getByRole('button', { name: '选择工作区', exact: true }).click()
     const remoteWorkspace = unifiedB.getByRole('menuitem').filter({ hasText: unifiedWorkspace }).filter({ hasText: 'computer-b' }).first()
     await remoteWorkspace.waitFor({ state: 'visible', timeout: 30000 })
@@ -111,6 +119,7 @@ export async function topologyBrowser({ primary, secondary, primaryCookie, remot
     assert.equal(prepared.status(), 204); assert.equal(prepared.headers()['set-cookie'], undefined)
     assert.equal((await (await remoteBaseline).json()).result.ok, true)
     await verifyUnifiedStarted()
+    await unifiedB.locator('[aria-label="工作电脑"]:visible').filter({ hasText: /computer-b/u }).waitFor({ timeout: 30000 })
     await unifiedB.waitForFunction(() => { const field = document.querySelector('textarea'); return field !== null && !field.readOnly })
     await input(unifiedB).fill('远程电脑标签页的独立草稿')
     assert.equal(await input(unifiedA).inputValue(), '本机标签页的独立草稿')

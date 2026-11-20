@@ -24,6 +24,13 @@ interface WebRoute {
 }
 ```
 
+```ts type-equiv
+/** Synchronous admission before HTTP route dispatch; false means the guard has answered or closed the response. */
+type WebRequestGuard = (request: IncomingMessage, response: ServerResponse) => boolean
+```
+
+HTTP guards run synchronously before route matching, in registration order. A false result leaves the response with that guard and skips later guards and handlers; removing its registration stops subsequent checks. Upgrade routes keep their own admission.
+
 Match order is fixed: exact table first, then longest matching prefix, then the registered fallback. Registration order carries no request-facing semantics — named routes are composed to be disjoint, and the fallback seat answers anything no named route claims; one owner only, a second registration throws. The shipped Web composition claims the seat with [`dsh-host-frontend-static`](../../packages/host/frontend-static/src/index.ts), the SPA dist server with locked semantics: non-GET/HEAD is 405, traversal outside the dist root is 403, any miss falls back to `index.html` with HTTP 200 (SPA routing), and unknown extensions ship as octet-stream.
 
 <a id="config"></a>
@@ -135,6 +142,14 @@ getOrigin(): string
  * @returns the disposer removing the route.
  */
 register(route: WebRoute): () => void
+
+/**
+ * Qualify HTTP requests before named routes and the fallback; upgrades retain their own admission.
+ * Guards run synchronously in registration order, so removal cannot race an unfinished guard.
+ * @param guard - returns true to continue dispatch, or false after taking response ownership.
+ * @returns the disposer removing this guard.
+ */
+registerRequestGuard(guard: WebRequestGuard): () => void
 
 /**
  * Register an exact-path HTTP upgrade route. Duplicate paths throw because

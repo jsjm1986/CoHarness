@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-18-cot-translation-port.md
 document:
-  en: 65598f9d8eb2618294f4e987d6f0b5803ffc2fa0
-  zh: 4eef09fc71d2d07181362250821459d00350ce53
+  en: 9d6027f335ff27bfc0476cf973528c1cf43a8982
+  zh: 3c54585a7a380385a90b48082a87c83c96e141b1
 /agent-note-chain-of-thought-translation-port-through-fork-seams:
   en: b6d5f3edebe57587
   zh: 25af37a05ad94ca8
@@ -12,8 +12,8 @@ document:
   en: c74d6ebc8fbc2d99
   zh: 80bee69b31f8e642
 /agent-note-chain-of-thought-translation-port-through-fork-seams/decision:
-  en: 400cb6beb6189858
-  zh: 2433a8795e4e7189
+  en: ee22204dc59897d4
+  zh: d023997f2083b973
 /agent-note-chain-of-thought-translation-port-through-fork-seams/alternatives-considered:
   en: 5eae648f884b90cf
   zh: 12b436d27a740533

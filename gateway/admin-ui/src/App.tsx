@@ -19,34 +19,52 @@ import {
   Webhook,
   type LucideIcon,
 } from 'lucide-react'
-import { NavLink, Navigate, Route, createBrowserRouter, RouterProvider, Routes, useLocation } from 'react-router-dom'
-import { AuditPage } from './pages/AuditPage.tsx'
-import { ProjectDetailPage } from './pages/ProjectDetailPage.tsx'
-import { ProjectListPage } from './pages/ProjectListPage.tsx'
+import { Link, NavLink, Navigate, Route, createBrowserRouter, RouterProvider, Routes, useLocation } from 'react-router-dom'
 import { UsersPage } from './pages/UsersPage.tsx'
-import { UserDetailPage } from './pages/UserDetailPage.tsx'
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { Button, Dialog, ErrorBanner } from './components/ui.tsx'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { createPageImport, lazyPage, PageLoading } from './components/async-route.tsx'
+import { Button, Dialog, ErrorBanner, PageHeader } from './components/ui.tsx'
 import { adminLanguage, setAdminLanguage, translateCopy, type AdminLanguage } from './language.ts'
 import { zh as chromeZh, en as chromeEn, type ChromeCopyKey } from './chrome.copy.ts'
-const PluginsPage = lazy(async () => ({ default: (await import('./pages/PluginsPage.tsx')).PluginsPage }))
-import { ModelsPage } from './pages/ModelsPage.tsx'
-import { UsagePage } from './pages/UsagePage.tsx'
-import { DocumentsPage } from './pages/DocumentsPage.tsx'
-import { ArchivesPage } from './pages/ArchivesPage.tsx'
-import { DesktopsPage } from './pages/DesktopsPage.tsx'
-import { RemoteDesktopPage } from './pages/RemoteDesktopPage.tsx'
-import { SshPage } from './pages/SshPage.tsx'
-import { DeploymentPage } from './pages/DeploymentPage.tsx'
-import { WebhooksPage } from './pages/WebhooksPage.tsx'
-import { TerminalsPage } from './pages/TerminalsPage.tsx'
-import { StewardPage } from './pages/StewardPage.tsx'
 import { ComputerSelector } from './ComputerSelector.tsx'
 import { adminComputerBase, adminComputerTarget } from './computer-target.ts'
 import { PendingEditsProvider, useProtectedNavigation } from './pending-edits.tsx'
 import { zh as computerZh, en as computerEn } from './computer.copy.ts'
 
+const ArchivesPage = lazyPage(async () => ({ default: (await import('./pages/ArchivesPage.tsx')).ArchivesPage }))
+const AuditPage = lazyPage(async () => ({ default: (await import('./pages/AuditPage.tsx')).AuditPage }))
+const DeploymentPage = lazyPage(async () => ({ default: (await import('./pages/DeploymentPage.tsx')).DeploymentPage }))
+const DesktopsPage = lazyPage(async () => ({ default: (await import('./pages/DesktopsPage.tsx')).DesktopsPage }))
+const DocumentsPage = lazyPage(async () => ({ default: (await import('./pages/DocumentsPage.tsx')).DocumentsPage }))
+const GovernanceRecoveryPage = lazyPage(async () => ({
+  default: (await import('./pages/GovernanceRecoveryPage.tsx')).GovernanceRecoveryPage,
+}))
+const LocalGovernanceRecoveryPage = lazyPage(async () => ({
+  default: (await import('./pages/GovernanceRecoveryPage.tsx')).LocalGovernanceRecoveryPage,
+}))
+const modelCatalog = createPageImport(() => import('./pages/ModelsPage.tsx'))
+const ModelsPage = lazyPage(async () => ({ default: (await modelCatalog.load()).ModelsPage }))
+const PluginsPage = lazyPage(async () => ({ default: (await import('./pages/PluginsPage.tsx')).PluginsPage }))
+const ProjectDetailPage = lazyPage(async () => ({ default: (await import('./pages/ProjectDetailPage.tsx')).ProjectDetailPage }))
+const ProjectListPage = lazyPage(async () => ({ default: (await import('./pages/ProjectListPage.tsx')).ProjectListPage }))
+const RemoteDesktopPage = lazyPage(async () => ({ default: (await import('./pages/RemoteDesktopPage.tsx')).RemoteDesktopPage }))
+const SshPage = lazyPage(async () => ({ default: (await import('./pages/SshPage.tsx')).SshPage }))
+const StewardPage = lazyPage(async () => ({ default: (await import('./pages/StewardPage.tsx')).StewardPage }))
+const TerminalsPage = lazyPage(async () => ({ default: (await import('./pages/TerminalsPage.tsx')).TerminalsPage }))
+const UsagePage = lazyPage(async () => ({ default: (await import('./pages/UsagePage.tsx')).UsagePage }))
+const UserDetailPage = lazyPage(async () => ({ default: (await import('./pages/UserDetailPage.tsx')).UserDetailPage }))
+const WebhooksPage = lazyPage(async () => ({ default: (await import('./pages/WebhooksPage.tsx')).WebhooksPage }))
+
 export function App() {
+  const path = window.location.pathname
+  if (path === '/admin/governance-recovery/local' || path === '/admin/governance-recovery') {
+    const RecoveryPage = path.endsWith('/local') ? LocalGovernanceRecoveryPage : GovernanceRecoveryPage
+    return <PendingEditsProvider><Suspense fallback={<PageLoading />}><RecoveryPage /></Suspense></PendingEditsProvider>
+  }
+  return <OrdinaryAdminApp />
+}
+
+function OrdinaryAdminApp() {
   const [computer] = useState(() => {
     try { return { nodeId: adminComputerTarget(window.location.pathname), invalid: false } }
     catch { return { nodeId: undefined, invalid: true } }
@@ -62,9 +80,12 @@ export function App() {
     return () => { owned.dispose() }
   }, [computer])
   if (computer.invalid) return <main className="mainContent">
-    <div className="page"><p role="alert">{t('invalid')}</p><a href="/admin/">{t('returnCenter')}</a></div>
+    <div className="page">
+      <p role="alert">{t('invalid')}</p>
+      <a className="button button-secondary" href="/admin/">{t('returnCenter')}</a>
+    </div>
   </main>
-  return router === undefined ? <PluginsFallback /> : <RouterProvider router={router} />
+  return router === undefined ? <PageLoading /> : <RouterProvider router={router} />
 }
 
 function AdminDocument({ nodeId }: { nodeId: ReturnType<typeof adminComputerTarget> }) {
@@ -99,27 +120,37 @@ function AdminDocument({ nodeId }: { nodeId: ReturnType<typeof adminComputerTarg
             navigation.navigate(`${adminComputerBase(nextNodeId)}${location.pathname}${location.search}${location.hash}`)
           }} />}
           {deployment.error && location.pathname !== '/deployment' && <div className="page"><ErrorBanner message={t('policyFailed')} /><Button onClick={() => void deployment.refresh()}>{t('retryPolicy')}</Button></div>}
-          {unavailable && <div className="page"><p role="alert">{t('entryUnavailable')}</p><a href="/admin/" target="_blank" rel="noopener noreferrer">{t('openLocal')}</a></div>}
-          <div className="adminRouteContent" inert={unavailable || undefined} aria-disabled={unavailable || undefined}><Routes>
-            <Route path="/" element={<UsersPage />} />
-            <Route path="/users" element={<Navigate to="/" replace />} />
-            <Route path="/users/:id" element={<UserDetailPage />} />
-            <Route path="/projects" element={<ProjectListPage />} />
-            <Route path="/projects/:id" element={<ProjectDetailPage />} />
-            <Route path="/plugins" element={<Suspense fallback={<PluginsFallback />}><PluginsPage /></Suspense>} />
-            <Route path="/models" element={<ModelsPage />} />
-            <Route path="/usage" element={<UsagePage />} />
-            <Route path="/documents" element={<DocumentsPage />} />
-            <Route path="/archives" element={<ArchivesPage />} />
-            <Route path="/terminals" element={<TerminalsPage />} />
-            <Route path="/ssh" element={<SshPage />} />
-            <Route path="/deployment" element={<DeploymentPage />} />
-            <Route path="/steward" element={<StewardPage />} />
-            <Route path="/webhooks" element={<WebhooksPage />} />
-            <Route path="/desktops" element={<DesktopsPage />} />
-            <Route path="/remote-desktops" element={<RemoteDesktopPage />} />
-            <Route path="/audit" element={<AuditPage />} />
-          </Routes></div>
+          {unavailable && <div className="page">
+            <p role="alert">{t('entryUnavailable')}</p>
+            <a className="button button-secondary" href="/admin/" target="_blank" rel="noopener noreferrer">{t('openLocal')}</a>
+          </div>}
+          <div className="adminRouteContent" inert={unavailable || undefined} aria-disabled={unavailable || undefined}>
+            <Suspense fallback={<PageLoading />}>
+              <Routes>
+                <Route path="/" element={<UsersPage prepareNextPage={
+                  deployment.value !== null && !deployment.error && !unavailable ? modelCatalog.prepare : undefined
+                } />} />
+                <Route path="/users" element={<Navigate to="/" replace />} />
+                <Route path="/users/:id" element={<UserDetailPage />} />
+                <Route path="/projects" element={<ProjectListPage />} />
+                <Route path="/projects/:id" element={<ProjectDetailPage />} />
+                <Route path="/plugins" element={<PluginsPage />} />
+                <Route path="/models" element={<ModelsPage />} />
+                <Route path="/usage" element={<UsagePage />} />
+                <Route path="/documents" element={<DocumentsPage />} />
+                <Route path="/archives" element={<ArchivesPage />} />
+                <Route path="/terminals" element={<TerminalsPage />} />
+                <Route path="/ssh" element={<SshPage />} />
+                <Route path="/deployment" element={<DeploymentPage />} />
+                <Route path="/steward" element={<StewardPage />} />
+                <Route path="/webhooks" element={<WebhooksPage />} />
+                <Route path="/desktops" element={<DesktopsPage />} />
+                <Route path="/remote-desktops" element={<RemoteDesktopPage />} />
+                <Route path="/audit" element={<AuditPage />} />
+                <Route path="*" element={<AdminPageNotFound />} />
+              </Routes>
+            </Suspense>
+          </div>
         </main>
         <AdminNav className="mobileNav" />
       </div>
@@ -150,9 +181,12 @@ function ShellTitle() {
   return <span>{t('shellTitle')}</span>
 }
 
-function PluginsFallback() {
+function AdminPageNotFound() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
-  return <p role="status">{t('loading')}</p>
+  return <div className="page">
+    <PageHeader title={t('pageNotFound')} description={t('pageNotFoundDetail')}
+      actions={<Link to="/" className="button button-primary">{t('returnToUsers')}</Link>} />
+  </div>
 }
 
 /** The CoHarness firefly mark; silhouette parts ride `currentColor`, `.cut` cutouts take the surface behind them, and `.lamp` parts use the brand accent — both classes resolve in index.css. */

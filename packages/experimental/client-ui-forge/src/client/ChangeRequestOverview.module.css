@@ -194,3 +194,15 @@
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
 }
+
+@media (pointer: coarse) {
+  .issue {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+}

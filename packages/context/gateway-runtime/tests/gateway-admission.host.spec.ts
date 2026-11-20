@@ -114,6 +114,59 @@ function tamperPayload(assertion: string, patch: Record<string, unknown>): strin
 }
 
 describe('gateway runtime admission', () => {
+  it('checks the signed generation before a plugin resource route and removes the guard on unload', async () => {
+    const gateway = await loadGatewayComposition()
+    const path = '/plugins/fixture/client.lazy.js?rev=012345abcdef'
+    let dispatches = 0
+    const unregister = gateway.ctx.webServer.register({ kind: 'prefix', path: '/plugins', handler: (_req, res) => {
+      dispatches += 1
+      res.setHeader('content-type', 'text/javascript')
+      res.end('export const fixture = true')
+    } })
+    try {
+      const plain = { host: new URL(gateway.origin).host }
+      for (const headers of [plain, principalHeaders(gateway.origin, 'not.an-assertion'),
+        principalHeaders(gateway.origin, gateway.issue({ runtime: { kind: 'user', id: 9, generation: 8 } }))]) {
+        expect((await call(gateway.origin, path, headers)).status).toBe(401)
+      }
+      expect(dispatches).toBe(0)
+      expect((await call(gateway.origin, path, principalHeaders(gateway.origin, gateway.issue()))).status).toBe(200)
+      expect(dispatches).toBe(1)
+      const entry = [...gateway.ctx.loader.entries()].find(candidate => candidate.options.name === '@deepseek-ai/dsh-gateway-runtime')
+      if (entry === undefined) throw new Error('GatewayRuntime Loader entry is missing')
+      await gateway.ctx.loader.update(entry.id, { disabled: true })
+      expect((await call(gateway.origin, path, plain)).status).toBe(200)
+      expect(dispatches).toBe(2)
+    } finally { unregister(); await gateway.dispose() }
+  })
+
+  it('confines an asset assertion to its exact GET or HEAD resource URL', async () => {
+    const gateway = await loadGatewayComposition()
+    const path = '/plugins/fixture/client.lazy.js?rev=012345abcdef'
+    const unregister = gateway.ctx.webServer.register({ kind: 'prefix', path: '/plugins', handler: (_req, res) => {
+      res.setHeader('content-type', 'text/javascript')
+      res.end('export const fixture = true')
+    } })
+    const issueAsset = (method: 'GET' | 'HEAD', resource = path): string => gateway.issue({
+      purpose: 'runtime-asset', asset: { method, path: resource },
+    })
+    try {
+      for (const method of ['GET', 'HEAD'] as const) {
+        const headers = principalHeaders(gateway.origin, issueAsset(method))
+        expect((await call(gateway.origin, path, headers, method)).status).toBe(200)
+        for (const changed of [path.replace('abcdef', 'abcdee'), path + '&extra=1', '/plugins/fixture/client.other.js?rev=012345abcdef']) {
+          expect((await call(gateway.origin, changed, headers, method)).status).toBe(401)
+        }
+        expect((await call(gateway.origin, path, headers, method === 'GET' ? 'HEAD' : 'GET')).status).toBe(401)
+        expect((await call(gateway.origin, '/', headers)).status).toBe(401)
+        expect((await call(gateway.origin, '/api/probe/ping', { ...headers, 'content-type': 'application/json' }, 'POST', '{}')).status).toBe(401)
+      }
+      for (const invalid of ['/api/probe/ping', '/plugins/events', '/plugins/fixture/settings.js?rev=012345abcdef']) {
+        expect((await call(gateway.origin, invalid, principalHeaders(gateway.origin, issueAsset('GET', invalid)))).status).toBe(401)
+      }
+    } finally { unregister(); await gateway.dispose() }
+  })
+
   it.each(['user', 'project'] as const)('renders only the authenticated document identity for a %s runtime', async (kind) => {
     const gateway = await loadGatewayComposition({ runtime: { kind, id: 9, generation: 7 } })
     try {

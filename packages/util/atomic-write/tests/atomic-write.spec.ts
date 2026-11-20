@@ -99,6 +99,17 @@ async function scratch(): Promise<string> {
   return dir
 }
 
+it('replaces files in an existing parent without recreating a missing parent when creation is disabled',async()=>{
+  const root=await scratch(),parent=join(root,'retained'),file=join(parent,'policy.json')
+  await mkdir(parent)
+  await writeFileAtomic(file,'before',{ mode:0o600,createParent:false })
+  await writeFileAtomic(file,'after',{ mode:0o600,createParent:false })
+  expect(await readFile(file,'utf8')).toBe('after')
+  await rm(parent,{ recursive:true })
+  await expect(writeFileAtomic(file,'must not create',{ mode:0o600,createParent:false })).rejects.toMatchObject({ code:'ENOENT' })
+  await expect(lstat(parent)).rejects.toMatchObject({ code:'ENOENT' })
+})
+
 /**
  * A PID the probe reports as absent. A real exited PID can be reissued while
  * the test runs, which Windows does almost at once.

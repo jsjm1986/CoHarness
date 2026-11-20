@@ -15,6 +15,7 @@ import { createRequire } from 'node:module'
 import { basename, dirname, extname, isAbsolute, join, normalize, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { brotliCompress, constants, gzip } from 'node:zlib'
+import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 
 const brotli = promisify(brotliCompress)
 const deflate = promisify(gzip)
@@ -43,6 +44,17 @@ const CONTENT_HASHED_NAME = /-[A-Za-z0-9_-]{8,}\.[^/\\]+$/u
 
 /** Cache policy for content-addressed files: the authenticated bundle stays out of shared caches. */
 const IMMUTABLE_PRIVATE = 'private, max-age=31536000, immutable'
+const DEFERRED_INDEX_MARKER = '<!-- dsh-runtime-bootstrap -->'
+
+/** Identity selected by the authenticated entry before it contacts the owning Runtime. */
+export interface DeferredRuntimeIndex {
+  readonly principalId: number
+  readonly runtimeId: RuntimeId
+  readonly nodeId: RuntimeNodeId
+  readonly nodeName: string
+  readonly scope: 'personal' | `project:${number}`
+  readonly language: 'zh' | 'en'
+}
 
 /** Content codings the center can serve, mirroring `precompressed.ts` in `packages/host/webserver`. */
 type Coding = 'br' | 'gzip'
@@ -149,6 +161,28 @@ export class ReleaseAssets {
   static forConfig(cfg: { dshRepoRoot: string; dshCommand: readonly string[] }): ReleaseAssets | undefined {
     const root = releaseAssetRoot(cfg)
     return root === undefined ? undefined : new ReleaseAssets(root)
+  }
+
+  /**
+   * Serve the release shell without waiting for the selected Runtime's plugins.
+   * @param res - authenticated browser response.
+   * @param selection - exact account and placement for this browser document.
+   * @returns false when the installed frontend lacks deferred boot support.
+   */
+  async serveDeferredIndex(res: ServerResponse, selection: DeferredRuntimeIndex): Promise<boolean> {
+    let template: string
+    try { template = await readFile(join(this.root, 'index.html'), 'utf8') }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+      throw error
+    }
+    if (!template.includes(DEFERRED_INDEX_MARKER)) return false
+    const encoded = JSON.stringify({ version: 1, ...selection }).replaceAll('<', '\\u003c')
+    const html = template.replace(DEFERRED_INDEX_MARKER, () =>
+      `<script type="application/json" id="dsh-runtime-bootstrap">${encoded}</script>`)
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+    res.end(html)
+    return true
   }
 
   private schedule(target: string, entry: EncodedBody, coding: Coding, produce: Promise<Buffer>): void {

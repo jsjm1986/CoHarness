@@ -1,0 +1,6 @@
+- "button \"Preview {{cwd}}/review.txt in sidebar\""
+- text: review.txt
+- status: Could not open. Click to retry.
+- "button \"Open {{cwd}}/review.txt in sidebar\"": Open
+- "button \"More file actions for {{cwd}}/review.txt\"":
+  - img

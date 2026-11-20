@@ -99,21 +99,30 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
-  width: 300px;
+  left: -300px;
+  width: calc(100% + 300px);
   background: linear-gradient(
     90deg,
     transparent 0%,
     color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent) 55%,
     transparent 100%
   );
-  animation: dsh-bash-row-sweep 2.6s ease-out infinite;
+  background-size: 300px 100%;
+  background-repeat: no-repeat;
   pointer-events: none;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .root[data-state='running']::after {
+    opacity: 1;
+    animation: dsh-bash-row-sweep 2.6s ease-out infinite;
+  }
 }
 
 @keyframes dsh-bash-row-sweep {
-  0% { left: -300px; }
-  90%, 100% { left: 100%; }
+  0% { transform: translateX(0); }
+  90%, 100% { transform: translateX(100%); }
 }
 
 .leading {
@@ -148,12 +157,14 @@
   transition: opacity 100ms ease;
 }
 
-.root:hover .iconIdle {
-  opacity: 0;
-}
+@media (hover: hover) {
+  .root:hover .iconIdle {
+    opacity: 0;
+  }
 
-.root:hover .chevronHover {
-  opacity: 1;
+  .root:hover .chevronHover {
+    opacity: 1;
+  }
 }
 
 .title {
@@ -213,20 +224,37 @@
   font-size: 11px;
   line-height: 16px;
   cursor: pointer;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 100ms ease;
 }
 
-.card:hover .inspectButton,
-.inspectButton:focus-visible {
+.card:focus-within .inspectButton {
   opacity: 1;
 }
 
-/* Solid hover fill: the pill floats over terminal output, so a translucent
-   hover token would let the text underneath bleed through. */
-.inspectButton:hover {
-  background: var(--dsw-alias-interactive-bg-hover-solid);
-  color: var(--dsw-alias-label-primary);
+@media (hover: hover) {
+  .inspectButton {
+    opacity: 0;
+  }
+
+  .card:hover .inspectButton {
+    opacity: 1;
+  }
+
+  .inspectButton:hover {
+    background: var(--dsw-alias-interactive-bg-hover-solid);
+    color: var(--dsw-alias-label-primary);
+  }
+}
+
+@media (pointer: coarse) {
+  .root[data-expandable] { height: auto; min-height: var(--dsw-touch-target); }
+
+  .inspectButton {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    padding-inline: var(--dsw-space-3);
+  }
 }
 
 

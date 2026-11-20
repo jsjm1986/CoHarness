@@ -43,3 +43,24 @@ describe('readDocumentsScope', () => {
     expect(await readDocumentsScope()).toEqual({ kind: 'personal' })
   })
 })
+
+describe('computer-owned document labels', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('keeps physical project names node-owned and validates each returned owner', async () => {
+    const { readDocumentLocations, readDocumentProjectNames } = await import('../src/client/documents-client.ts')
+    const node = '10000000-0000-4000-8000-000000000001'
+    const request = vi.fn(async (input: string) => new Response(JSON.stringify(input.startsWith('/account/api/document-locations')
+      ? { items: [{ name: '#41', metadataOnNode: true, scope: { kind: 'project', projectId: 41, nodeId: node }, nodeName: 'Computer', mode: 'rw' }], nextCursor: null }
+      : { items: [{ projectId: 41, nodeId: node, name: 'Private project' }] }), { headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', request)
+    const signal = new AbortController().signal
+    expect((await readDocumentLocations(signal))?.items[0]).toMatchObject({ metadataOnNode: true, name: '#41' })
+    expect(await readDocumentProjectNames(node, [41], signal)).toEqual(new Map([[41, 'Private project']]))
+    expect(request.mock.calls[1]?.[0]).toBe(`/account/api/project-metadata?dshNode=${node}&ids=41`)
+    request.mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ projectId: 41, nodeId: 'wrong-computer', name: 'Wrong' }] })))
+    await expect(readDocumentProjectNames(node, [41], signal)).rejects.toThrow('owner changed')
+    request.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] })))
+    await expect(readDocumentProjectNames(node, [41], signal)).rejects.toThrow('incomplete')
+  })
+})

@@ -33,6 +33,9 @@
       "path": "../ui-slots"
     },
     {
+      "path": "../ui-workbench"
+    },
+    {
       "path": "../userdoc-upload"
     },
     {

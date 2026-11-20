@@ -203,17 +203,17 @@ export function SshPage() {
   return (
     <>
       <PageHeader title="SSH" description={t('pageDescription')} />
-      {error === '' ? null : <ErrorBanner message={error} />}
+      <ErrorBanner message={editing === null && sharing === null && removing === null ? error : ''} />
       {notice === '' ? null : <p role="status">{notice}</p>}
       <Section
         flush
         title={t('sectionTargets')}
         actions={<>
           <IconButton label={t('refresh')} icon={RefreshCw} onClick={refresh} />
-          <Button icon={Plus} onClick={() => { setEditing({ target: null, draft: EMPTY_DRAFT }) }}>{t('registerTarget')}</Button>
+          <Button icon={Plus} onClick={() => { setError(''); setEditing({ target: null, draft: EMPTY_DRAFT }) }}>{t('registerTarget')}</Button>
         </>}
       >
-        {targets === null ? <LoadingState label={t('loading')} /> : targets.length === 0 ? (
+        {targets === null ? error === '' ? <LoadingState label={t('loading')} /> : null : targets.length === 0 ? (
           <EmptyState title={t('emptyTitle')} detail={t('emptyDetail')} />
         ) : (
           <div className="tableWrap" role="region" aria-label={t('tableAria')} tabIndex={0}>
@@ -222,16 +222,16 @@ export function SshPage() {
               <tbody>
                 {targets.map(target => (
                   <tr key={target.publicId}>
-                    <td>{target.name}</td>
-                    <td><code>{target.host}</code></td>
-                    <td><code>{target.workspace}</code></td>
-                    <td>{target.sharedProjects.length === 0 ? '—' : target.sharedProjects.map(id => projects.find(project => project.id === id)?.name ?? `#${String(id)}`).join(t('projectSeparator'))}</td>
+                    <td className="tableTextCell">{target.name}</td>
+                    <td className="tableTextCell"><code>{target.host}</code></td>
+                    <td className="tableTextCell"><code>{target.workspace}</code></td>
+                    <td className="tableTextCell">{target.sharedProjects.length === 0 ? '—' : target.sharedProjects.map(id => projects.find(project => project.id === id)?.name ?? `#${String(id)}`).join(t('projectSeparator'))}</td>
                     <td><StatusBadge tone={target.enabled ? 'success' : 'neutral'}>{target.enabled ? t('statusEnabled') : t('statusDisabled')}</StatusBadge></td>
-                    <td>
-                      <IconButton label={t('edit')} icon={Pencil} onClick={() => { setEditing({ target, draft: draftOf(target) }) }} />
-                      <IconButton label={t('shareAction')} icon={Share2} onClick={() => { setSharing(target); readNames() }} />
+                    <td className="tableActionCell">
+                      <IconButton label={t('edit')} icon={Pencil} onClick={() => { setError(''); setEditing({ target, draft: draftOf(target) }) }} />
+                      <IconButton label={t('shareAction')} icon={Share2} onClick={() => { setError(''); setSharing(target); readNames() }} />
                       <Button variant="ghost" onClick={() => void toggle(target)} disabled={acting}>{target.enabled ? t('disable') : t('enable')}</Button>
-                      <IconButton label={t('delete')} icon={Trash2} onClick={() => { setRemoving(target) }} />
+                      <IconButton label={t('delete')} icon={Trash2} onClick={() => { setError(''); setRemoving(target) }} />
                     </td>
                   </tr>
                 ))}
@@ -277,6 +277,7 @@ export function SshPage() {
         description={t('shareDescription')}
         onClose={() => { if (!acting) setSharing(null) }}
       >
+        <ErrorBanner message={error} />
         {sharing === null ? null : projects.length === 0 ? <EmptyState title={t('shareEmpty')} /> : (
           projects.map(project => (
             <Switch
@@ -296,6 +297,7 @@ export function SshPage() {
         description={t('removeDescription')}
         confirmLabel={t('delete')}
         pending={acting}
+        error={error}
         onConfirm={() => void remove()}
         onClose={() => { if (!acting) setRemoving(null) }}
       />

@@ -207,11 +207,33 @@ function Surface({
   }
 
   const callbacks: PaneCallbacks = {
+    onAdjustDivider: (splitId, index, delta) => {
+      const split = getSplit(state, splitId)
+      const sizes = clampSizes(dividerSizes(split.sizes, index, delta), minPaneFraction)
+      if (!sameSizes(sizes, split.sizes)) intents.resizeSplit(splitId, sizes)
+    },
     onFocusTab: intents.focusTab.bind(intents),
     onFocusPane: intents.focusPane.bind(intents),
     onSplitPane: intents.splitPane.bind(intents),
     onAddTab: intents.addTab.bind(intents),
     onCloseTab: intents.closeTab.bind(intents),
+    onPlaceTab: intents.placeTab.bind(intents),
+    onFloatTab: intents.floatTab.bind(intents),
+    minPaneFraction,
+    onDividerKey: (splitId, index, event) => {
+      if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+      const split = getSplit(state, splitId)
+      const backward = split.axis === 'row' ? 'ArrowLeft' : 'ArrowUp'
+      const forward = split.axis === 'row' ? 'ArrowRight' : 'ArrowDown'
+      let delta: number
+      if (event.key === backward) delta = event.shiftKey ? -0.1 : -0.02
+      else if (event.key === forward) delta = event.shiftKey ? 0.1 : 0.02
+      else if (event.key === 'Home') delta = -1
+      else if (event.key === 'End') delta = 1
+      else return
+      event.preventDefault()
+      callbacks.onAdjustDivider(splitId, index, delta)
+    },
     // A press is not yet a drag: the chip lifts, and the drop preview follows,
     // once the pointer has travelled the threshold. A release before that is a
     // click and reports nothing here.

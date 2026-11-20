@@ -207,6 +207,14 @@ function conversation(): HistoryValue {
 }
 
 describe('history wire codec', () => {
+  it('preserves recovery read-only state through JSON and rejects unknown restrictions', () => {
+    const value = { ...conversation(), executionRestriction: 'recovery-read-only' as const }
+    const { decoded, wire } = roundTrip(value, DEFAULT_HISTORY_PAGE_TARGET_BYTES)
+    expect(decoded.executionRestriction).toBe('recovery-read-only')
+    expect(historyWireValueSchema.safeParse({ ...wire as object, executionRestriction: 'allow' }).success).toBe(false)
+    expect(roundTrip(conversation(), DEFAULT_HISTORY_PAGE_TARGET_BYTES).decoded).not.toHaveProperty('executionRestriction')
+  })
+
   it('exposes the 128 KiB default complete-response target', () => {
     expect(DEFAULT_HISTORY_PAGE_TARGET_BYTES).toBe(128 * 1024)
   })

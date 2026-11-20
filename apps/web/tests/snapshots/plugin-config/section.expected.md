@@ -10,47 +10,37 @@
 - heading "内置功能" [level=3]
 - list:
   - listitem:
-    - button "查看 终端": 终端
-    - text: 限制 agent 运行的每一条命令。
+    - button "查看 终端": 终端 限制 agent 运行的每一条命令。
     - switch "启用组件 终端" [checked]
   - listitem:
-    - button "查看 Agent 循环": Agent 循环
-    - text: Agent 如何派发工具调用。
+    - button "查看 Agent 循环": Agent 循环 Agent 如何派发工具调用。
     - switch "启用组件 Agent 循环" [checked]
   - listitem:
-    - button "查看 子智能体": 子智能体
-    - text: 设置子智能体的递归层级和并行数量。
+    - button "查看 子智能体": 子智能体 设置子智能体的递归层级和并行数量。
     - switch "启用组件 子智能体" [checked]
   - listitem:
-    - button "查看 模型选择": 模型选择
-    - text: 允许 Agent 为子智能体选择模型
+    - button "查看 模型选择": 模型选择 允许 Agent 为子智能体选择模型
     - switch "启用组件 模型选择" [checked]
   - listitem:
-    - button "查看 网页搜索": 网页搜索
-    - text: DeepSeek 搜索提供方。
+    - button "查看 网页搜索": 网页搜索 DeepSeek 搜索提供方。
     - switch "启用组件 网页搜索" [checked]
   - listitem:
-    - button "查看 记忆": 记忆
-    - text: 跨会话保留的持久记忆
+    - button "查看 记忆": 记忆 跨会话保留的持久记忆
     - switch "启用组件 记忆" [checked]
 - heading "可选插件" [level=3]
 - button "更多"
 - list:
   - listitem:
-    - button "查看 智能体团队": 智能体团队
-    - text: 实验性 启用团队协作、团队工具、成员列表和共享任务看板。
+    - button "查看 智能体团队": 智能体团队 实验性 启用团队协作、团队工具、成员列表和共享任务看板。
     - switch "启用 智能体团队"
   - listitem:
-    - button "查看 语音输入": 语音输入
-    - text: 实验性 在本机使用 SenseVoice 转写录音，首次使用需安装依赖。
+    - button "查看 语音输入": 语音输入 实验性 在本机使用 SenseVoice 转写录音，首次使用需安装依赖。
     - switch "启用 语音输入"
   - listitem:
-    - button "查看 自动授权审查": 自动授权审查
-    - text: 实验性 提供自动审查权限模式，由模型在每次工具调用前判断是否授权。
+    - button "查看 自动授权审查": 自动授权审查 实验性 提供自动审查权限模式，由模型在每次工具调用前判断是否授权。
     - switch "启用 自动授权审查"
   - listitem:
-    - button "查看 开发者工具": 开发者工具
-    - text: 实验性 查看调试会话原始数据、聊天消息分组数据，以及调试 NodeJS 后端
+    - button "查看 开发者工具": 开发者工具 实验性 查看调试会话原始数据、聊天消息分组数据，以及调试 NodeJS 后端
     - switch "启用 开发者工具"
 - heading "已安装插件" [level=3]
 - list:

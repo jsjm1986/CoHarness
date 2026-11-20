@@ -194,6 +194,7 @@ export class SessionManager {
   private readonly addresses = new Map<SessionId, SubagentAddress>()
   /** Sessions whose live Agent was published by an explicit open; reconnect re-publishes them. */
   private readonly activated = new Set<SessionId>()
+  private readonly recoveryReadOnly = new Set<SessionId>()
   private readonly catalogs = new Map<SessionId, SubagentCatalogSnapshot>()
   private readonly catalogInflight = new Map<SessionId, CatalogInflight>()
   /** Catalog owners whose membership changed while a pull was in flight: one trailing refresh after it settles. */
@@ -301,7 +302,8 @@ export class SessionManager {
   activate(sessionId: SessionId): void {
     // Catalog-addressed identities belong to subagent routing; the Host fences
     // their generic activation, so a retained address means never ask.
-    if (this.addresses.has(sessionId)) return
+    if (this.addresses.has(sessionId) || this.recoveryReadOnly.has(sessionId)
+      || this.summaries.some(summary => summary.sessionId === sessionId && summary.executionRestriction === 'recovery-read-only')) return
     this.activated.add(sessionId)
     void this.api.sessions.activate({ sessionId }).then(
       () => undefined,
@@ -317,6 +319,14 @@ export class SessionManager {
    */
   isActivated(sessionId: SessionId): boolean {
     return this.activated.has(sessionId)
+  }
+
+  /** Read a restriction confirmed by history, including catalog-addressed children.
+   * @param sessionId - exact historical identity.
+   * @returns immutable recovery restriction when confirmed by the data owner.
+   */
+  executionRestriction(sessionId: SessionId): 'recovery-read-only' | undefined {
+    return this.recoveryReadOnly.has(sessionId) ? 'recovery-read-only' : undefined
   }
 
   /**
@@ -464,6 +474,11 @@ export class SessionManager {
       // session surfaces (lists filter on blank) before any host frame lands.
       onEngaged: (engaged, visibleContentSeq) => {
         this.recordMutation({ kind: 'engaged', sessionId: engaged.sessionId, seq: visibleContentSeq })
+      },
+      onRecoveryReadOnly: () => {
+        if (this.recoveryReadOnly.has(sessionId)) return
+        this.recoveryReadOnly.add(sessionId)
+        this.notifier.markDirty()
       },
       projections: this.projectionStore(sessionId),
       ...this.conversation === undefined ? {} : { conversation: this.conversation },
@@ -791,10 +806,13 @@ export class SessionManager {
    * @param sessionId - original Host identity.
    * @param blank - whether creation reserved an empty draft.
    * @param options - optional returned Workspace and preset metadata.
+   * @param restriction - execution restriction supplied by authorized history.
    */
-  acceptPrepared(sessionId: SessionId, blank: boolean, options: SessionCreateOptions): void {
+  acceptPrepared(sessionId: SessionId, blank: boolean, options: SessionCreateOptions,
+    restriction?: WireSessionSummary['executionRestriction']): void {
     if (blank && options.workspaceId !== undefined) this.draftWorkspaceIds.set(sessionId, options.workspaceId)
     this.mergeSummary({ sessionId, updatedAt: Date.now(), running: false, blank,
+      ...(restriction === undefined ? {} : { executionRestriction: restriction }),
       ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
       ...(options.workspaceId === undefined ? {} : { workspaceId: options.workspaceId }),
       ...(options.agentPreset === undefined ? {} : { agentPreset: options.agentPreset }),
@@ -1018,6 +1036,24 @@ export class SessionManager {
       }
     }
     session.handleMuxEnvelope(envelope.rpcId, frame)
+  }
+
+  /** Offer early conversation frames only to a resident open root window.
+   * @param envelope - authenticated Mux frame.
+   * @param signal - generation lifetime.
+   * @param history - create a prepared reader for this generation's exact Runtime, when accepting a baseline.
+   * @returns whether normal replay can skip the frame.
+   */
+  resumeMuxEnvelope(envelope: RpcRequest<MuxFrame>, signal: AbortSignal, history?: () => IApiClient['sessions']['history']): boolean {
+    const frame = envelope.payload
+    if (frame.type !== 'session/subscribed' && frame.type !== 'session/event' && frame.type !== 'session/assistant-stream') return false
+    const session = this.sessions.get(frame.sessionId)
+    if (session === undefined) return false
+    const accepted = frame.type === 'session/subscribed'
+      ? history !== undefined && session.beginMuxRecovery(frame.lastSeq, signal, history())
+      : session.followsResumedMux(signal)
+    if (accepted) this.handleMuxEnvelope(envelope)
+    return accepted
   }
 
   /**
@@ -1434,6 +1470,7 @@ export class SessionManager {
       const projectionValues = projectionStore?.values()
       return {
         ...summary,
+        ...(this.recoveryReadOnly.has(summary.sessionId) ? { executionRestriction: 'recovery-read-only' as const } : {}),
         ...(typeof title === 'string' && title !== '' ? { title } : {}),
         ...(projectionValues === undefined ? {} : { projectionValues }),
       }
@@ -1456,6 +1493,7 @@ export class SessionManager {
         && prev.parentSessionId === entry.parentSessionId && prev.cwd === entry.cwd
         && prev.workspaceId === entry.workspaceId && prev.sshTarget === entry.sshTarget
         && prev.visibility === entry.visibility && prev.projectId === entry.projectId
+        && prev.executionRestriction === entry.executionRestriction
         && prev.origin === entry.origin && prev.title === entry.title && prev.depth === entry.depth
         && prev.pendingInteraction === entry.pendingInteraction
         && prev.projectionValues === entry.projectionValues
@@ -1528,6 +1566,7 @@ function applyMutation(summaries: readonly ClientSessionSummary[], mutation: Ses
         // Visibility mutates through setVisibility; the freshest list row wins.
         ...(mutation.summary.visibility !== undefined
           ? { visibility: mutation.summary.visibility } : {}),
+        ...(mutation.summary.executionRestriction === undefined ? {} : { executionRestriction: mutation.summary.executionRestriction }),
         ...(existing.projectId === undefined && mutation.summary.projectId !== undefined
           ? { projectId: mutation.summary.projectId } : {}),
       }
@@ -1540,6 +1579,7 @@ function applyMutation(summaries: readonly ClientSessionSummary[], mutation: Ses
         && filled.origin === existing.origin && filled.blank === existing.blank
         && filled.visibleContentSeq === existing.visibleContentSeq
         && filled.agentPreset === existing.agentPreset
+        && filled.executionRestriction === existing.executionRestriction
         && filled.sshTarget === existing.sshTarget) return [...summaries]
       return summaries.map(summary => summary.sessionId === mutation.summary.sessionId ? filled : summary)
     }

@@ -54,18 +54,20 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
     ? total
     : t('message.turnUsage.summaryWithCache', { total, percent: cacheHit })
   const routes = usage.routes?.map(route => `${route.provider}/${route.model}`).join(', ') ?? ''
+  const label = t('message.turnUsage.consumed', { total: summary })
 
   return (
     <span ref={rootRef} className={css.root}>
       <button
         type="button"
         className={css.trigger}
+        aria-label={label}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => { setOpen(!open) }}
       >
         <IconDatabaseOutline16 />
-        <span className={css.label}>{t('message.turnUsage.consumed', { total: summary })}</span>
+        <span className={css.label}>{label}</span>
       </button>
       {open && createPortal(
         <div
@@ -134,17 +136,19 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
  */
 export function TurnTimePanel({ runMs, tokensPerSecond, ttftMs, t }: TurnTimePanelProps) {
   const { open, setOpen, rootRef, panelRef, pos } = useStatDialog()
+  const label = t('message.ranFor', { duration: formatRunDuration(runMs, t).map(part => part.text).join('') })
   return (
     <span ref={rootRef} className={css.root} role="group" aria-label={t('message.turnTime.title')}>
       <button
         type="button"
         className={css.trigger}
+        aria-label={label}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => { setOpen(!open) }}
       >
         <IconClockOutline16 />
-        <span className={css.label}>{t('message.ranFor', { duration: formatRunDuration(runMs, t).map(part => part.text).join('') })}</span>
+        <span className={css.label}>{label}</span>
       </button>
       {open && createPortal(
         <div

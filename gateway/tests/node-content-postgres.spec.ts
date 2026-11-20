@@ -164,6 +164,35 @@ describe.skipIf(skip)('physical project content PostgreSQL', () => {
       const headers = { authorization:'Bearer '+token,'content-type':'application/json' }
       const projectNumber=Number((await control.query('SELECT public_id FROM harness.projects WHERE id=$1',[b.projectId])).rows[0].public_id)
       const runtime={kind:'project' as const,id:projectNumber,runtimeId:b.runtimeId,generation:1}
+      const checkpointSession = randomUUID()
+      await repository.append(checkpointSession, randomUUID(), [event], { ...header, id: checkpointSession })
+      const finalEvent: ConversationEvent = { type: 'turn/end', seq: 1, time: 1002, data: { turn: 1, reason: { kind: 'completed' } } }
+      const checkpointAppend = async (payload: Record<string, unknown>) => {
+        const response = await fetch(endpoint + 'append', { method: 'POST', headers, body: JSON.stringify({
+          sessionId: checkpointSession, batchId: randomUUID(), events: [finalEvent], ...payload,
+        }) })
+        return { status: response.status, body: await response.json() }
+      }
+      expect(await instances.markStopping(runtime, 1, 'manual')).toBe(true)
+      try {
+        expect(await instances.authenticateRuntimeToken(token)).toBeNull()
+        expect(await checkpointAppend({ creationAuthorization: 'not-an-existing-Session' }))
+          .toEqual({ status: 409, body: { error: 'runtime-stop-requires-materialized-session' } })
+        expect(await checkpointAppend({})).toMatchObject({ status: 200, body: { result: 'inserted' } })
+        const suffix = await fetch(endpoint + `read-from?sessionId=${checkpointSession}&fromSeq=1`, { headers })
+        expect(suffix.status).toBe(200)
+        expect(await suffix.json()).toMatchObject({ events: [finalEvent] })
+        const unrelated = await fetch(endpoint + `meta?sessionId=${checkpointSession}`, { headers })
+        expect(unrelated.status).toBe(401)
+        await unrelated.arrayBuffer()
+        await control.query("UPDATE harness.instances SET stop_reason='access-change' WHERE runtime_id=$1", [b.runtimeId])
+        expect(await checkpointAppend({})).toMatchObject({ status: 401 })
+        expect(await instances.markStopped(runtime, 1)).toBe(true)
+        expect(await instances.authenticateRuntimeShutdownToken(token)).toBeNull()
+      } finally {
+        await control.query(`UPDATE harness.instances SET desired_state='running',observed_state='ready',stop_reason=NULL,
+          runtime_token_hash=$2,runtime_token_issued_at=now() WHERE runtime_id=$1`, [b.runtimeId,createHash('sha256').update(token).digest()])
+      }
       const principal = principals.issue({ user:{id:Number(owner.public_id),username:'owner',displayName:'Owner',role:'user',
         status:'active',homePath:'/owner',mustChangePassword:false,autoReviewEligible:false},
         runtime,scope:{kind:'project',projectId:projectNumber,projectName:privateName,mode:'rw'} })
@@ -182,9 +211,12 @@ describe.skipIf(skip)('physical project content PostgreSQL', () => {
       expect(await invoke('question',question)).toEqual(answered)
       expect((await content.query('SELECT outcome FROM node_content.conversation_interaction_responses WHERE interaction_id=$1',[question.questionId])).rows[0].outcome).toEqual(question.answer)
       const activityService=new PostgresCollaborationService(context,undefined,store)
-      const activity=await activityService.listActivity(Number(member.public_id),b.runtimeId,projectNumber,{limit:1})
+      const filter = { limit: 1, member: Number(owner.public_id) }
+      const activity=await activityService.listActivity(Number(member.public_id),b.runtimeId,projectNumber,filter)
       expect(activity.items[0]).toMatchObject({kind:'answer',actorUserId:Number(owner.public_id),outcome:question.answer})
-      expect((await activityService.listActivity(Number(member.public_id),b.runtimeId,projectNumber,{limit:1,before:activity.nextBefore})).items[0]).toMatchObject({kind:'message',text:words})
+      expect(activity.members).toEqual(expect.arrayContaining([{ userId: Number(owner.public_id), label: 'Owner' }]))
+      expect((await activityService.listActivity(Number(member.public_id),b.runtimeId,projectNumber,{ ...filter, before: activity.nextBefore })).items[0]).toMatchObject({kind:'message',text:words})
+      expect((await activityService.listActivity(Number(member.public_id),b.runtimeId,projectNumber,{ ...filter, member: Number(member.public_id) })).items).toEqual([])
       const usage={organizationId:org,runtime,sessionId,inputIds:[receipt.inputId],primaryActorUserId:Number(owner.public_id)}
       await expect(verifyExecutionAttribution(control,usage,store)).resolves.toBeUndefined()
       await expect(verifyExecutionAttribution(control,{...usage,primaryActorUserId:Number(member.public_id)},store)).rejects.toMatchObject({status:403})

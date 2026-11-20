@@ -39,6 +39,8 @@ The trigger's mode control calls `agentTeams.setEnabled` for the current root Se
 
 The task board shows task identity, owner, blockers, readiness, advisory write scopes, and overlap warnings. It is read-only; agents mutate tasks through the Team tools while the panel renders the resulting view.
 
+On narrow screens, the roster and task board use one column. Long task names wrap, and the panel scrolls within the visible viewport so its close action remains reachable. Section headings keep their numeric badges centered and separated from the label. The opaque panel keeps background conversation text out of the reading surface; mode-confirmation copy and actions wrap below the mode label when space is limited.
+
 -----
 
 <a id="understand-the-implementation"></a>

@@ -31,6 +31,7 @@ export const zh = {
   modeDisabled: '当前未启用多电脑接入。',
   notFound: '该电脑已不在列表中，请刷新后重试。',
   nodeDetached: '该电脑已退出接入，请刷新列表。',
+  quarantined: '已隔离', quarantinedDetail: '该电脑因灾难恢复已隔离，不能重新接入。',
 } as const
 
 export type NodeAccessCopyKey = keyof typeof zh
@@ -66,4 +67,5 @@ export const en: Record<NodeAccessCopyKey, string> = {
   modeDisabled: 'Multi-computer access is not enabled.',
   notFound: 'This computer is no longer listed; refresh and retry.',
   nodeDetached: 'This computer has detached; refresh the list.',
+  quarantined: 'Quarantined', quarantinedDetail: 'This computer is quarantined after disaster recovery and cannot enroll again.',
 }

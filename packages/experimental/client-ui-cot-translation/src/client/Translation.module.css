@@ -10,6 +10,9 @@
 .field label { font-size: 13px; color: var(--dsw-alias-label-primary); }
 .field select { min-height: 32px; border: 0.5px solid var(--dsw-alias-border-l4); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 0 8px; font: inherit; }
 .notice { margin: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
+@media (pointer: coarse), (max-width: 767px) {
+  .field select { min-height: var(--dsw-touch-target, 44px); min-width: 0; font-size: 16px; }
+}
 
 .spinner { animation: cot-translation-spin 1s linear infinite; }
 @keyframes cot-translation-spin { to { transform: rotate(360deg); } }

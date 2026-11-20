@@ -512,9 +512,10 @@ describe('elevated surface rebinds', () => {
     // button or an inline code span reaching the same rung is out of scope
     // (ChatView's `.toBottom`, CodeBlock's banner). Geometry cannot make that
     // call — a floating button carries a radius, a shadow, and a fixed size.
-    for (const [file, surfaces] of sheetSurfaces) {
-      if (!surfaces.scrolls || surfaces.rebindsElevation) continue
-      expect([...surfaces.elevated], `${file} scrolls on an elevated surface without rebinding`).toEqual([])
-    }
+    const unrebound = [...sheetSurfaces].flatMap(([file, surfaces]) =>
+      surfaces.scrolls && !surfaces.rebindsElevation
+        ? [...surfaces.elevated].map(surface => `${file} ${surface}`)
+        : [])
+    expect(unrebound).toEqual([])
   })
 })

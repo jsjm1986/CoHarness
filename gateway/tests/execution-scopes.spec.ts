@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
-import { verifyExecutionAttribution, type ExecutionIdentityState } from '../src/execution-identity.ts'
+import { GatewayExecutionIdentity, verifyExecutionAttribution, type ExecutionIdentityState } from '../src/execution-identity.ts'
 import { createExecutionFixture, type Receipt } from './execution-fixture.ts'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
@@ -44,6 +44,40 @@ describePg('current execution scopes', () => {
     await runMigrations(pool, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
   })
   afterAll(async () => { await pool?.end() })
+
+  it('authorizes inherited personal witnesses and checks current computer access on every dispatch', async () => {
+    const f = await createExecutionFixture(pool, { executionWriteEpoch: 1n })
+    cleanup.push(f.dispose)
+    const parent = await f.session(f.personal)
+    const parentInput = await f.admit(parent, f.admin, f.personal)
+    const parentEntry = await f.call<ExecutionIdentityState>('enter', { sessionId: parent,
+      inputId: parentInput.inputId, messageId: parentInput.messageId, contentHash: parentInput.contentHash,
+      currentScopeId: null, unverifiedHistory: false }, undefined, f.personal)
+    expect(parentEntry.status).toBe(200)
+    const parentScope = parentEntry.body
+    const child = await f.session(f.personal, parent)
+    const inherited = await f.call<ExecutionIdentityState>('inherit', { sessionId: child, parentSessionId: parent,
+      scopeId: parentScope.scopeId, inputs: parentScope.inputs, primaryActorUserId: f.admin.id, unverifiedHistory: false }, undefined, f.personal)
+    expect(inherited.status).toBe(200)
+    const childInput = await f.admit(child, f.admin, f.personal)
+    const combined = await f.call<ExecutionIdentityState>('enter', { sessionId: child,
+      inputId: childInput.inputId, messageId: childInput.messageId, contentHash: childInput.contentHash,
+      currentScopeId: inherited.body.scopeId, unverifiedHistory: false }, undefined, f.personal)
+    expect(combined.status).toBe(200)
+    expect(combined.body.inputs).toHaveLength(2)
+    const request = { sessionId: child, scopeId: combined.body.scopeId, capability: 'execute', unverifiedHistory: false }
+    expect(await f.call('authorize', request, undefined, f.personal)).toEqual({ status: 200, body: combined.body })
+    expect((await f.call('authorize', { ...request, sessionId: parent }, undefined, f.personal)).status).toBe(403)
+    expect((await f.call('authorize', request, undefined, f.peerPersonal)).status).toBe(403)
+
+    const identity = new GatewayExecutionIdentity(pool, f.context.nodeId)
+    const authenticated = (await f.instances.authenticateRuntimeToken(f.personal.token))!
+    await expect(identity.authorize(authenticated, request, { bearer: f.personal.token, epoch: 2n })).rejects.toMatchObject({ status: 503 })
+    await pool.query(`UPDATE harness.computer_use_permissions SET enabled=false
+      WHERE organization_id=$1 AND node_id=$2 AND user_id=$3`, [f.organizationId, f.context.nodeId, f.admin.uuid])
+    await expect(identity.authorize(authenticated, request, { bearer: f.personal.token, epoch: 1n })).rejects.toMatchObject({ status: 403 })
+    expect((await f.call('authorize', request, undefined, f.personal)).status).toBe(401)
+  })
 
   it('allows a new qualified initiator after an ordinary historical participant and retains both audit witnesses', async () => {
     const f = await fixture(), id = await f.session()

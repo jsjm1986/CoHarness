@@ -14,6 +14,8 @@ Session 格式 v4 从 `SessionEventMap` 移除 `assistant/chunk`。一次成功�
 
 实时输出走 `agent/assistant-stream` 帧（`start`/`chunk`/`end`，携带尝试身份、revision、稠密序号与持久游标），以 `session/assistant-stream` 传输给宿主客户端；宿主重连累加器把每个尝试对其持久游标取基线。Web 客户端把帧折叠成瞬态 `assistant/live-chunk` 行，并与持久 `assistant/message`/`assistant/attempt` 事件结算，因此持久主脉保持纯 `SessionEvent`。
 
+活跃尝试的前缀由 Host Session 在其生命周期内持有，客户端重连后可以恢复离线期间开始的回复。浏览器在后台读取历史尾页时继续显示连续的实时事件，以持久游标拦住缺少前序的事件。如果末尾仅差一条标题提交，Host 可以在活跃回复基线前通过受授权的流回放原事件。已在进行的读取覆盖对同一水位的再次观察，使经授权的实时回复及时显示，同时保留持久事件顺序。
+
 已发布各代保持可读：格式目录新增 v3→v4 阶段，把每个连续的同步 step `assistant/chunk` 序列折叠进结算事件的内嵌流，对没有 message 的孤儿序列合成 `assistant/attempt`。已提交的 v0–v3 文件绝不重写；夹具门禁对前代文件保持逐字节原样，只对当前代或未版本化文件做规范化。JSONL 每行写一个逻辑事件，仅解码 v3 打包存储行。SQLite schema 21 每行写一个事件，打包物理行仍可解码，且 `scripts/session-sqlite-migration.ts` 独占 v18↔v20 打包行编码——core 不保留编码器，退役词汇无法回流运行时写路径。
 
 ## Alternatives considered

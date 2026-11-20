@@ -3,9 +3,11 @@
 // assembled lane adapts from a coarse width budget and keeps a capability-gated folder handoff.
 // The folder request is intercepted so one real browser click can exercise
 // the full client carrier without launching a native application in CI.
+import { responsiveBrowser } from './responsive-browser.ts'
+import { auditWorkflowState, newWorkflowPage } from './workflow-responsive-state.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -13,7 +15,7 @@ import type {} from '@deepseek-ai/dsh-session-title'
 import {
   launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { saveFailureShot } from './support.ts'
 
 const MODE = webSnapshotMode()
 const OVERLAY = fileURLToPath(new URL('./produced-files.overlay.yml', import.meta.url))
@@ -115,8 +117,8 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ extraOverlayPath: OVERLAY })
     await seedSession(scaffold, producedFixture(), SEED_ID)
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     // Keep the responsive sidebar available while selecting the cold seed;
     // the assertion itself narrows the conversation after navigation.
     await page.setViewportSize({ width: 1800, height: 900 })
@@ -190,6 +192,7 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
       clientWidth: element.clientWidth, scrollWidth: element.scrollWidth,
     }))
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth)
+    await auditWorkflowState(page, 'deliverables', 'ten-produced-files-summary', row.locator('..'), [showFolder])
 
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])

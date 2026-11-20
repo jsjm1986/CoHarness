@@ -28,6 +28,7 @@ export function DeploymentTopologySection() {
   const failed = (cause: unknown): void => {
     const code = cause instanceof AdminRequestError ? cause.code : ''
     setError(t(code === 'deployment/revision-conflict' ? 'conflict'
+      : code === 'deployment/current-computer-quarantined' ? 'quarantined'
       : code === 'deployment/computers-still-attached' ? 'attached' : code === 'deployment/origin-not-configured' ? 'originUnconfigured'
         : code === 'deployment/legacy-primary-required' ? 'legacyPrimary' : 'failed'))
   }

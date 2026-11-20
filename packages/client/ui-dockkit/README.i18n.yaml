@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-dockkit/README.md
 document:
-  en: 424fc310ab7fff4705cafab5082e62d43437ad98
-  zh: 372b6ea05b008a8ca71689ad0de19770baa2aa77
+  en: b1a84771846be61c18cc180045b5813a4f0a78d8
+  zh: e4f2553cb6582b52df0c58310fbf904ce19622c8
 /:
   en: 93fc2e9e86fc50f8
   zh: 61c7c38a66935ad6
@@ -18,14 +18,14 @@ document:
   en: 42038fdc402b9c2a
   zh: 99890f8f908624ce
 /deepseek-ai-dsh-client-ui-dockkit/the-two-layers:
-  en: ea872ff2c2089037
-  zh: 76d210437e533745
+  en: 4b869fa43e7e7182
+  zh: d9f2d5c4c17c59aa
 /deepseek-ai-dsh-client-ui-dockkit/embedding-it:
-  en: 47b9852393643b6a
-  zh: ee7a70f7297e56a3
+  en: b135f730f8a4b501
+  zh: 1c781e17f1ee6b14
 /deepseek-ai-dsh-client-ui-dockkit/interaction-rules-worth-keeping:
-  en: 7e5c1e9a9f9f244f
-  zh: 30639a06febc2042
+  en: 6d933f703e63405d
+  zh: e6fd6b3a1a261883
 /deepseek-ai-dsh-client-ui-dockkit/build-shape:
   en: 21216ba5798d7f5f
   zh: ac505fdcd5c114d4
@@ -36,8 +36,8 @@ document:
   en: ca75c51c89c2c9b0
   zh: ae5eece628147ab8
 /deepseek-ai-dsh-client-ui-dockkit/known-limitations-and-deferred-work:
-  en: 4323810ca5a87e6c
-  zh: 3a24af2ea4467ab7
+  en: d0b899934c44c278
+  zh: 1f2b45d39b1d7e59
 /deepseek-ai-dsh-client-ui-dockkit/known-limitations-and-deferred-work/dev-note:
   en: 4ef026fc65e83e96
   zh: 96d1eba1cabb6c83

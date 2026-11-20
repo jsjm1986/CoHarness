@@ -28,6 +28,11 @@ import { prepareProfilePatches } from './compatibility-preflight.ts'
 import { ProfileRuntimeResolution, type RuntimeResolution } from './profile.ts'
 import { ResolutionRestartRequired } from './profile-resolution/resolver.ts'
 export { prepareProfileEntries, prepareProfilePatches } from './compatibility-preflight.ts'
+export { inspectRecoveryComposition, inspectRecoveryProfile, readRecoveryPolicy, installRecoveryPolicy, readRecoveryPresetEntries,
+  type RecoveryPolicy, type RecoveryComposition, type RecoveryRowApproval, type RecoveryReviewItem, type RecoveryInspection,
+  type RecoveryCompositionInput, type RecoveryProfileInput } from './recovery-policy.ts'
+export { recoveryMcpConnection, recoveryHookConnection, recoveryConnectionPermitted, assertRecoveryMcpConnection, recoveryHookPermitted,
+  type RecoveryConnection, type RecoveryMcpInput, type RecoveryHookInput } from './recovery-connections.ts'
 export { readPluginMeta } from './package-meta.ts'
 export { generateConfigSchema, type ConfigSchemaDump, type NativeConfigSchema } from './config-schema/index.ts'
 export { createConfigProjector, LOADER_EXPRESSION_SCHEMA, type ConfigProjection } from './config-schema/projector.ts'
@@ -755,6 +760,10 @@ export async function mountRootInclude(
   bareModuleBaseUrl?: string,
   binName = 'dsh',
 ): Promise<Entry | undefined> {
+  if (ctx.get('recoveryPolicy') !== undefined) {
+    const root: unknown = yaml.load(readFileSync(absoluteConfigPath, 'utf8'), { schema: entryListSchema })
+    if (!Array.isArray(root) || root.length !== 0) throw new Error('Recovery launch requires an empty profile root and sealed patch composition')
+  }
   ctx.loader.builtins.include = bareModuleBaseUrl === undefined
     ? Include
     : class HostResolvedRootInclude extends Include {

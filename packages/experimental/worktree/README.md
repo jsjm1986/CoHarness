@@ -27,6 +27,8 @@ Create an isolated checkout from a local commit and continue the same Session in
 
 Mount the service alongside `workingDirectory`, `fs`, `subprocess`, `sandbox`, and `sandboxPolicy` providers. Add the tool package when models need the operation.
 
+When a settings provider is mounted, the `worktree` namespace persists `retainOnArchive` over the composition default. The Forge client exposes the switch on the Worktree settings card on the Plugins page. Each archive reads the accepted preference before scheduling cleanup; changing it does not affect cleanup already scheduled. Without a settings provider, the composition's live value applies.
+
 ```yaml
 - name: '@deepseek-ai/dsh-experimental-worktree'
 - name: '@deepseek-ai/dsh-experimental-tool-worktree'

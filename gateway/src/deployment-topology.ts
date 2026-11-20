@@ -82,7 +82,8 @@ export class PostgresDeploymentTopology {
         (SELECT count(*)::int FROM harness.instances i WHERE i.organization_id=a.organization_id AND i.assigned_node_id=a.node_id
           AND (i.observed_state<>'stopped' OR i.desired_state<>'stopped')) "activeRuntimes"
       FROM harness.node_agents a JOIN harness.compute_nodes n ON n.id=a.node_id AND n.organization_id=a.organization_id
-      WHERE a.organization_id=$1 AND a.attachment_state<>'detached' ORDER BY n.name,n.id
+      WHERE a.organization_id=$1 AND a.attachment_state<>'detached'
+        AND NOT harness.node_physically_isolated(a.organization_id,a.node_id) ORDER BY n.name,n.id
     ) SELECT (SELECT count(*)::text FROM blockers) total,
       COALESCE((SELECT jsonb_agg(page) FROM (SELECT * FROM blockers LIMIT $2) page),'[]'::jsonb) computers`,
     [this.context.organizationId, this.options.pageSize])
@@ -149,6 +150,8 @@ export class PostgresDeploymentTopology {
         throw new DeploymentTopologyError(409, 'deployment/legacy-primary-required')
       }
       if (current.enabled && current.primary_node_id !== this.context.nodeId) throw new DeploymentTopologyError(403, 'deployment/primary-required')
+      if (input.enabled && (await tx.query('SELECT FROM harness.node_recovery_quarantines WHERE organization_id=$1 AND node_id=$2',
+        [this.context.organizationId,this.context.nodeId])).rowCount) throw new DeploymentTopologyError(409, 'deployment/current-computer-quarantined')
       if (!input.enabled && !(await this.blockers(tx)).canDisable) throw new DeploymentTopologyError(409, 'deployment/computers-still-attached')
       if (input.enabled && current.attachment_state === 'managed') throw new DeploymentTopologyError(409, 'deployment/current-computer-attached')
       const address = input.enabled ? origin(input.primaryOrigin ?? current.primary_origin ?? '') : current.primary_origin

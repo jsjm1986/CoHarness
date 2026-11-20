@@ -16,7 +16,7 @@ type Action = { kind: 'create' } | { kind: 'reissue' | 'revoke' | 'detach'; node
 type Ticket = { name: string; receipt: NodeEnrollment }
 const NAME = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,63}$/u
 const STATUS: Record<NodeAccessEntry['status'], 'neutral' | 'success' | 'warning' | 'danger'> = {
-  detached: 'neutral', pending: 'warning', connected: 'success', disconnected: 'neutral', revoked: 'danger',
+  detached: 'neutral', pending: 'warning', connected: 'success', disconnected: 'neutral', revoked: 'danger', quarantined: 'danger',
 }
 
 function mutationMessage(error: unknown, t: CopyTranslate<NodeAccessCopyKey>): { message: string; uncertain: boolean } {
@@ -28,6 +28,7 @@ function mutationMessage(error: unknown, t: CopyTranslate<NodeAccessCopyKey>): {
     'node-access/enrollment-already-issued': 'issuedBefore', 'maintenance': 'maintenance', 'stale-epoch': 'maintenance',
     'node-access/mode-disabled': 'modeDisabled', 'node-access/not-found': 'notFound',
     'node-access/detached': 'nodeDetached',
+    'node-access/quarantined': 'quarantinedDetail',
   }
   if (error.status === 401 || error.status === 403) return { message: t('denied'), uncertain: false }
   const known = Object.hasOwn(key, error.code) ? key[error.code] : undefined
@@ -186,11 +187,11 @@ export function NodeAccessSection() {
                   <td>{node.platform === null ? t('unknownSystem')
                     : `${node.platform === 'darwin' ? 'macOS' : node.platform === 'linux' ? 'Linux' : 'Windows'}${node.architecture ? ` · ${node.architecture}` : ''}`}</td>
                   <td>{node.lastSeenAt === null ? t('never') : <time dateTime={node.lastSeenAt}>{time(node.lastSeenAt)}</time>}</td>
-                  <td><div className="rowActions">
+                  <td>{node.status === 'quarantined' ? t('quarantinedDetail') : <div className="rowActions">
                     <Button variant="ghost" onClick={() => open({ kind: 'reissue', node })}>{t('reissue')}</Button>
                     {node.status !== 'detached' && <Button variant="ghost" onClick={() => open({ kind: 'detach', node })}>{t('detach')}</Button>}
                     {node.status === 'revoked' || node.status === 'detached' ? null : <Button variant="ghost" onClick={() => open({ kind: 'revoke', node })}>{t('revoke')}</Button>}
-                  </div></td>
+                  </div>}</td>
                 </tr>
               ))}</tbody>
             </table>
@@ -226,7 +227,7 @@ export function NodeAccessSection() {
         {candidates?.nextCursor && <Button disabled={acting || uncertain} onClick={() => setCandidateCursor(candidates.nextCursor!)}>{t('candidatesMore')}</Button>}</>}
         {action?.kind === 'create' && existing === '' ? (
           <Field label={t('name')} hint={t('nameHint')}>
-            <input ref={nameInput} aria-label={t('name')} aria-description={t('nameHint')} value={name} maxLength={64} placeholder={t('namePlaceholder')} disabled={acting || uncertain}
+            <input className="input" ref={nameInput} aria-label={t('name')} aria-description={t('nameHint')} value={name} maxLength={64} placeholder={t('namePlaceholder')} disabled={acting || uncertain}
               onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() } }} />
           </Field>
         ) : null}
@@ -239,7 +240,7 @@ export function NodeAccessSection() {
         {ticket === null ? null : (
           <div className="nodeAccessTicket">
             <Field label={t('token')}>
-              <input readOnly type={revealed ? 'text' : 'password'} autoComplete="off" spellCheck={false} value={ticket.receipt.token} />
+              <input className="input" readOnly type={revealed ? 'text' : 'password'} autoComplete="off" spellCheck={false} value={ticket.receipt.token} />
             </Field>
             <div className="rowActions">
               <Button icon={Copy} onClick={() => void copy()}>{t('copy')}</Button>

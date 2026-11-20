@@ -15,12 +15,14 @@ import { PostgresDeploymentTopology } from '../src/deployment-topology.ts'
 import type { NodeCredential } from '../src/node-access.ts'
 import { NodeContentStore } from '../src/node-content-store.ts'
 import { migrateNodeContent } from '../src/node-content-migrations.ts'
+import { publishRecoveryProtocol } from '../src/peer-backup-recovery-access.ts'
 import { PeerBackupGovernance } from '../src/peer-backup-governance.ts'
 import { PeerBackupRestic } from '../src/peer-backup-restic.ts'
 import { PeerBackupRepository, PEER_REPOSITORY_PREFIX } from '../src/peer-backup-repository.ts'
 import { PeerProjectExporter } from '../src/peer-backup-project-export.ts'
 import type { PeerFileRootMap } from '../src/peer-snapshot-roots.ts'
 import { verifyReplacementDispatch } from './peer-backup-takeover-dispatch.ts'
+import { runDisasterRecovery } from './peer-backup-disaster-full.ts'
 import { runNormalRecovery } from './peer-backup-takeover-http.ts'
 import { prepareCrossReceiver, finishCrossReceiver, writeExchange } from './peer-backup-takeover-cross-source.ts'
 import { PeerProjectRecovery, recoveryBinding } from '../src/peer-backup-takeover.ts'
@@ -38,16 +40,21 @@ import { InstanceManager } from '../src/instances.ts'
 import type { RuntimeId } from '../src/runtime-catalog.ts'
 import { testConfig } from './test-config.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
+import { installLegacyRecoverySchema, upgradeLegacyIsolatedRecovery } from './peer-backup-legacy-isolation-fixture.ts'
 
 const controlUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const contentUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_NODE_CONTENT_DATABASE_URL)
 const pgdata = process.env.HGW_TEST_NODE_CONTENT_PGDATA,
   restic = process.env.HGW_TEST_RESTIC
+const adminProject=process.env.HGW_TEST_RECOVERY_ADMIN_PROJECT==='1'
+const thirdNode = process.env.HGW_TEST_RECOVERY_THIRD_NODE==='1'
+const disasterMode = process.env.HGW_TEST_RECOVERY_DISASTER==='1'
+const legacyIsolated=process.env.HGW_TEST_RECOVERY_LEGACY_ISOLATED==='1'
 const crossDirectory = process.env.HGW_TEST_PEER_TAKEOVER_EXCHANGE
 const hash = (s: string) => createHash('sha256').update(s).digest('hex')
 describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-approved replacement project', () => {
   it(
-    'restores a real UserDoc and the allocated workspace, fences a genuinely stopped writer, preserves scheduled receipts and resumes only the new epoch',
+    disasterMode ? 'restores encrypted files after source loss, preserves unavailable source evidence and holds execution for review' : 'restores a real UserDoc and the allocated workspace, fences a genuinely stopped writer, preserves scheduled receipts and resumes only the new epoch',
     async () => {
       const root = await realpath(await mkdtemp(join(tmpdir(), 'hgw-peer-takeover-')))
       const targetUrl = new URL(contentUrl!)
@@ -56,8 +63,9 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
         source = createPostgresPool(contentUrl!, { max: 3 }),
         replacement = createPostgresPool(targetUrl.href, { max: 3 })
       const cfg = testConfig(root, crossDirectory ? { HGW_NODE_AGENT_LEASE_MS: '600000' } : {})
-      const signal = AbortSignal.timeout(crossDirectory ? 1050000 : 75000),
+      const signal = AbortSignal.timeout(crossDirectory ? 1050000 : process.env.HGW_TEST_RECOVERY_PLANNED_TRANSFER==='1' ? 120000 : 75000),
         limits = { maxBytes: 32 << 20, maxRows: 5000, reserveBytes: 1 << 20 }
+      let sourceClosed=false
       let closeRepo: (() => Promise<void>) | undefined,
         closeOwner: (() => Promise<void>) | undefined,
         dispose: (() => Promise<void>) | undefined
@@ -65,16 +73,21 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
       let cross: Awaited<ReturnType<typeof prepareCrossReceiver>> | undefined
       try {
         const slug = 'takeover-' + randomUUID()
-        await runMigrations(control, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
+        if(legacyIsolated){
+          if(!disasterMode||thirdNode)throw new Error('Legacy isolation requires the original receiver and disaster fixture')
+          await installLegacyRecoverySchema(control,root)
+        }else await runMigrations(control, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
         const org = (
           await control.query("INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Synthetic') RETURNING id", [
             slug,
           ])
         ).rows[0]!.id
-        for (const name of ['source', 'destination'])
+        for (const name of [...(disasterMode ? ['source','destination','primary'] : ['source', 'destination']), ...(thirdNode ? ['receiver'] : [])])
           await control.query('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2)', [org, name])
         const a = await resolvePostgresRuntimeContext(control, slug, 'source'),
-          b = await resolvePostgresRuntimeContext(control, slug, 'destination')
+          b = await resolvePostgresRuntimeContext(control, slug, 'destination'),
+          primary = disasterMode ? await resolvePostgresRuntimeContext(control,slug,'primary') : a,
+          receiver = thirdNode ? await resolvePostgresRuntimeContext(control,slug,'receiver') : b
         const users = new PostgresUserService(a, cfg)
         const admin = await users.create({
           username: 'restore-admin',
@@ -89,7 +102,7 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
           'INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true) ON CONFLICT DO NOTHING',
           [org, b.nodeId, user],
         )
-        const topo = new PostgresDeploymentTopology(a, {
+        const topo = new PostgresDeploymentTopology(primary, {
           legacyForwarding: false,
           refreshAfterMs: 30000,
           pageSize: 10,
@@ -101,7 +114,7 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
           enabled: true,
           primaryOrigin: 'https://source.test',
         })
-        const access = new PostgresNodeAccessService(a, cfg.nodeAccess, cfg.runtimeCatalog)
+        const access = new PostgresNodeAccessService(primary, cfg.nodeAccess, cfg.runtimeCatalog)
         const ticket = await access.issue(admin, { requestId: randomUUID(), nodeId: b.nodeId }),
           credential = ('dsh_node_' + randomBytes(32).toString('base64url')) as NodeCredential
         await access.enroll(ticket.token, {
@@ -111,6 +124,24 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
           credential,
         })
         await access.connect(credential, { connectionId: randomUUID(), executionReady: true })
+        if(disasterMode) {
+          const sourceTicket=await access.issue(admin,{requestId:randomUUID(),nodeId:a.nodeId}),sourceCredential=('dsh_node_'+randomBytes(32).toString('base64url')) as NodeCredential
+          await access.enroll(sourceTicket.token,{protocolVersion:1,platform:'linux',architecture:'x64',credential:sourceCredential})
+          await access.connect(sourceCredential,{connectionId:randomUUID(),executionReady:true})
+        }
+        if(thirdNode) {
+          await control.query('INSERT INTO harness.cluster_control(organization_id) VALUES($1) ON CONFLICT DO NOTHING',[org])
+          const ticket=await access.issue(admin,{requestId:randomUUID(),nodeId:receiver.nodeId})
+          const credential=('dsh_node_'+randomBytes(32).toString('base64url')) as NodeCredential
+          await access.enroll(ticket.token,{protocolVersion:1,platform:'linux',architecture:'x64',credential})
+          await access.connect(credential,{connectionId:randomUUID(),executionReady:true})
+          await publishRecoveryProtocol(control,org,receiver.nodeId,300000,{project:false,personal:false})
+          await publishRecoveryProtocol(control,org,b.nodeId,300000,{project:true,personal:true})
+        }
+        if(!thirdNode&&!legacyIsolated){
+          await control.query('INSERT INTO harness.cluster_control(organization_id) VALUES($1) ON CONFLICT DO NOTHING',[org])
+          await publishRecoveryProtocol(control,org,b.nodeId,300000,{project:true,personal:true})
+        }
         const options = [
           { pool: source, nodeId: a.nodeId },
           { pool: replacement, nodeId: b.nodeId },
@@ -128,6 +159,7 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
           storage = join(home, 'storages')
         for (const path of [workspace, storage, join(workspace, 'documents'), cfg.stateRoot])
           await mkdir(path, { recursive: true, mode: 0o700 })
+        await writeFile(join(home, '.env'), 'HGW_NODE_TOKEN=retired-node\nDSH_GATEWAY_CREDENTIAL_FD=3\nPGHOST=retired-host\nPGPASSWORD=retired-password\nDATABASE_URL=retired-url\nPGP_RECIPIENT=preserved\nBUSINESS_SETTING=preserved\n', { mode: 0o600 })
         const prospective = Number(
           (await control.query('SELECT coalesce(max(public_id),0)+1 n FROM harness.projects')).rows[0].n,
         )
@@ -182,6 +214,7 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
               [org, user],
             )
           ).rows[0]!
+          if(adminProject)await tx.query("UPDATE harness.projects SET owner_user_id=NULL,origin='admin' WHERE id=$1",[p.id])
           await tx.query(
             'INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path) VALUES($1,$2,$3,$4,$4)',
             [org, p.id, a.nodeId, 'urn:hgw:project:' + p.id],
@@ -302,26 +335,40 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
         })
         const witness = await old.read(project, (tx) => readProjectScheduleWitness(tx, project, limits, signal))
         await saveSchedule({ ...schedule, tables: { tasks: {} } })
-        await expect(
-          old.read(project, (tx) => readProjectScheduleWitness(tx, project, limits, signal)),
-        ).rejects.toMatchObject({ code: 'peer-backup/schedule-evidence-incomplete' })
+        const deletedWitness = await old.read(project, (tx) => readProjectScheduleWitness(tx, project, limits, signal))
+        expect(deletedWitness).not.toBe(witness)
+        const retainedTask = schedule.tables.tasks[task]!
+        await saveSchedule({ ...schedule, tables: { tasks: {
+          ...schedule.tables.tasks,
+          [task]: { ...retainedTask, deliveryHistory: { ...retainedTask.deliveryHistory,
+            earlierRecordsUnavailable: true, earlierRecordsPruned: true } },
+        } } })
+        await expect(old.read(project, (tx) => readProjectScheduleWitness(tx, project, limits, signal))).resolves.toMatch(/^[a-f0-9]{64}$/u)
+        await saveSchedule({ ...schedule, tables: { tasks: {
+          ...schedule.tables.tasks,
+          [task]: { ...retainedTask, record: { ...retainedTask.record, scheduledAt: delivered } },
+        } } })
+        await expect(old.read(project, (tx) => readProjectScheduleWitness(tx, project, limits, signal)))
+          .rejects.toMatchObject({ code: 'peer-backup/schedule-evidence-incomplete' })
         await saveSchedule(schedule)
         const ga = new PeerBackupGovernance(a),
+          administrative = new PeerBackupGovernance(primary,60000,300000),
+          receiverGovernance=new PeerBackupGovernance(receiver),
           gb = new PeerBackupGovernance(b),
-          write = randomUUID(),
-          read = randomUUID()
-        const policy = await ga.configure(admin.id, {
+          write = randomUUID()
+        let read=randomUUID()
+        const policy = await administrative.configure(admin.id, {
           id: randomUUID(),
           expectedRevision: 0,
           scopeKind: 'project',
           scopeId: project.projectId,
           sourceNodeId: a.nodeId,
-          targetNodeId: b.nodeId,
+          targetNodeId: receiver.nodeId,
           tier: 'important',
           quotaBytes: 32 << 20,
           enabled: true,
           appendFingerprint: hash(write),
-          recoveryFingerprint: hash(read),
+          recoveryFingerprint: hash(thirdNode ? 'legacy-repository-reader-'+randomUUID() : read),
         })
         const passwordFile = join(root, 'pass')
         const password = randomUUID()
@@ -347,12 +394,12 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
         if (!cross) {
           const repository = await PeerBackupRepository.open({
             directory: join(root, 'repository'),
-            nodeId: b.nodeId,
+            nodeId: receiver.nodeId,
             capacityBytes: 64 << 20,
             objectLimit: 256,
             maxObjectBytes: 32 << 20,
             concurrency: 2,
-            grant: (id, user, token) => gb.grant(id, user, token),
+            grant: (id, user, token) => receiverGovernance.grant(id, user, token),
           })
           closeRepo = () => repository.close()
           server.on('request', (req, res) => {
@@ -364,7 +411,7 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
                 res.writeHead(403).end()
                 return
               }
-              await repository.handle(req, res, await gb.grant(policy.policyId, user, token))
+              await repository.handle(req, res, await receiverGovernance.grant(policy.policyId, user, token))
             })().catch(() => {
               if (!res.headersSent) res.writeHead(403)
               res.end()
@@ -406,6 +453,7 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
               logicalRoot: path!,
               snapshotRoot: path!,
             }))
+            roots.push({ role: 'plugin', owner: 'gateway-runtime-configuration', kind: 'file', logicalRoot: join(home, '.env'), snapshotRoot: join(home, '.env') })
             return {
               revision,
               capturedAt: new Date().toISOString(),
@@ -432,7 +480,7 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
           },
         }
         const exporter = new PeerProjectExporter({ control, store: old, ...limits, files: fileProvider })
-        const jobId = await ga.enqueue(admin.id, policy.policyId, 'capture'),
+        const jobId = await administrative.enqueue(admin.id, policy.policyId, 'capture'),
           job = await ga.claim()
         if (!job || job.id !== jobId) throw new Error('Missing capture claim')
         const point = await ga.withLease(job, signal, (active, progress) =>
@@ -441,7 +489,7 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
         expect(point.gapCount).toBe(0)
         await ga.finish(job, { point })
         const projectA = new PeerProjectRecovery(
-          a,
+          primary,
           old,
           limits,
           cfg.instancePortBase,
@@ -455,10 +503,15 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
           targetNode: b.nodeId,
           targetVolume: options[1]!.volumeId,
         }
-        await expect(projectA.request(admin.id, intent)).rejects.toMatchObject({
+        const approveReader=async(revision:number)=>{
+          if(thirdNode){if(revision!==policy.revision)read=randomUUID();await administrative.approveRead(admin.id,policy.policyId,{id:randomUUID(),expectedRevision:revision,pointId:point.pointId,
+            recoveryNodeId:b.nodeId,fingerprint:hash(read),expiresAt:new Date(Date.now()+240000).toISOString()})}
+        }
+        await approveReader(policy.revision)
+        if(!legacyIsolated)await expect(projectA.request(admin.id, intent)).rejects.toMatchObject({
           code: 'peer-backup/independent-drill-required',
         })
-        await ga.enqueue(admin.id, policy.policyId, 'drill', point.pointId, b.nodeId)
+        await administrative.enqueue(admin.id, policy.policyId, 'drill', point.pointId, b.nodeId)
         const budget = new NodeResourceBudget(control, org, a.nodeId, {
           sampleMs: 500,
           staleMs: 2000,
@@ -500,12 +553,25 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
         const drill = await engine.drill(
           policy,
           point.pointId,
-          { origin, user: a.nodeId, token: read, passwordFile },
+          { origin, user: thirdNode ? b.nodeId : a.nodeId, token: read, passwordFile },
           exporter,
           signal,
         )
         dispose = () => drill.dispose()
         await gb.finish(rehearsal, { recoveryMs: drill.recoveryMs })
+        if(disasterMode) {
+          if(legacyIsolated){
+            await upgradeLegacyIsolatedRecovery(control,admin.id,intent)
+            expect(await projectA.status(admin.id,intent.requestId)).toMatchObject({phase:'externally-fenced',lastError:'peer-backup/recovery-worker-unavailable'})
+            await publishRecoveryProtocol(control,org,b.nodeId,300000,{project:true,personal:false})
+          }
+          await source.end();sourceClosed=true
+          await rm(workspace,{recursive:true,force:true});await rm(home,{recursive:true,force:true})
+          await rm(docs.stateRoot,{recursive:true,force:true});await rm(docs.filesRoot,{recursive:true,force:true})
+          await runDisasterRecovery({primary,b,cfg,next,root,projectA,projectB,manager,admin:admin.id,intent,engine,policy,point,
+            origin,passwordFile,read,readerAccess:()=>({user:thirdNode ? b.nodeId : a.nodeId,token:read}),approveReader,exporter,limits,signal,session,rootId,legacyIsolated})
+          return
+        }
         if (process.env.HGW_TEST_RECOVERY_ENTRY === '1') {
           await runNormalRecovery({
             a,
@@ -630,11 +696,11 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
         if (server.listening) await new Promise<void>((done) => server.close(() => done()))
         await closeRepo?.()
         await closeOwner?.()
-        await Promise.all([source.end(), replacement.end(), control.end()])
+        await Promise.all([sourceClosed?undefined:source.end(), replacement.end(), control.end()])
         await rm(root, { recursive: true, force: true })
         if (crossDirectory) await writeExchange(join(crossDirectory, 'source-finished.json'), { closed: true })
       }
     },
-    crossDirectory ? 1100000 : 90000,
+    crossDirectory ? 1100000 : process.env.HGW_TEST_RECOVERY_PLANNED_TRANSFER==='1' ? 150000 : 90000,
   )
 })

@@ -130,4 +130,48 @@ describe('DocumentsPage', () => {
     expect(await screen.findByText('上传')).toBeTruthy()
     expect(screen.queryByText('upload')).toBeNull()
   })
+
+  function documentRows(count: number): api.AdminDocument[] {
+    return Array.from({ length: count }, (_, index): api.AdminDocument => ({
+      catalogId: `11111111-1111-4111-8111-${String(index + 2).padStart(12, '0')}`,
+      scope: { kind: 'personal', label: '个人' },
+      docId: `doc-${index + 2}`,
+      directoryId: 'dir-1',
+      name: `文档-${index + 2}.md`,
+      bytes: 1024,
+      mediaType: 'text/markdown',
+      modifiedAt: Date.parse('2026-08-25T00:00:00Z'),
+      owner: null,
+      ownerSource: 'upload',
+      state: 'active',
+      legacy: false,
+      lineageRootId: null,
+    }))
+  }
+
+  it('walks forward through listing cursors and returns along the cursor history', async () => {
+    vi.mocked(api.listAdminDocumentsPage)
+      .mockResolvedValueOnce({ documents: documentRows(50), nextCursor: 'cursor-page-2' })
+      .mockResolvedValueOnce({ documents: documentRows(20), nextCursor: undefined })
+      .mockResolvedValueOnce({ documents: documentRows(50), nextCursor: 'cursor-page-2' })
+    render(<DocumentsPage />)
+    await screen.findByText('第 1 页')
+    const directions = () => ({
+      prev: screen.getByRole('button', { name: '上一页' }) as HTMLButtonElement,
+      next: screen.getByRole('button', { name: '下一页' }) as HTMLButtonElement,
+    })
+    expect(directions().prev.disabled).toBe(true)
+    expect(directions().next.disabled).toBe(false)
+
+    fireEvent.click(directions().next)
+    await screen.findByText('第 2 页')
+    expect(api.listAdminDocumentsPage).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'cursor-page-2' }))
+    expect(directions().prev.disabled).toBe(false)
+    expect(directions().next.disabled).toBe(true)
+
+    fireEvent.click(directions().prev)
+    await screen.findByText('第 1 页')
+    expect(api.listAdminDocumentsPage).toHaveBeenLastCalledWith(expect.not.objectContaining({ cursor: expect.anything() }))
+    expect(directions().next.disabled).toBe(false)
+  })
 })

@@ -1,0 +1,12 @@
+- status:
+  - strong: 80% usage alert
+  - text: Token usage this monthhas reached 80% of the quota.
+- status:
+  - strong: 100% usage alert
+  - text: Token usage this monthhas reached 100% of the quota.
+- status:
+  - strong: 80% usage alert
+  - text: Company model cost this monthhas reached 80% of the quota.
+- status:
+  - strong: 100% usage alert
+  - text: Company model cost this monthhas reached 100% of the quota.

@@ -1,0 +1,19 @@
+- strong: Personal Runtime disaster recovery
+- paragraph: Switching ownership
+- status: Restored schedules remain paused. Enabling new conversations does not redeliver old tasks. Keep source delivery records and external outcomes for review.
+- group:
+  - text: Suspended connection and environment settings (5)
+  - paragraph: Reconfigure these settings for the target computer so the Runtime cannot connect to the previous databases or reuse old credentials. Only names appear here; original values remain in the encrypted recovery point.
+  - list:
+    - listitem:
+      - code: DATABASE_URL
+    - listitem:
+      - code: DSH_GATEWAY_CREDENTIAL_FD
+    - listitem:
+      - code: HGW_DATABASE_URL
+    - listitem:
+      - code: HGW_NODE_TOKEN
+    - listitem:
+      - code: PGPASSWORD
+- paragraph: "Isolation evidence recorded: fixture/personal-source-isolation"
+- button "Refresh takeover status"

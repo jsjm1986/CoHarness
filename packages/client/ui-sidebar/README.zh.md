@@ -15,7 +15,7 @@ kind: "package-reference"
 
 `SidebarRootComponentProps` 组合布局 owner share、全局 `useSessions` 和 `useWorkspaces` 钩子、已声明的品牌、`sidebar.workspaces`、`sidebar.settings` 与 `sidebar.settings.action` 子 slot，以及注入的 `startSession` 与侧边栏切换回调。这里没有插件 store。
 
-实时收起时，外壳会把展开内容固定在当前宽度，并用 150ms 将其淡出。随后，上方四个控件——外壳的侧栏切换与新建会话，以及通过 `sidebar.workspaces` 渲染的添加和搜索——共用一次 150ms 的淡入和 49px 左移，在布局的 300ms 栏滑动结束时一起进入 56px 轨道；每个 36px 控件盒都会沿同一条路径到达轨道左侧 10px 的内边距。固定在底部的 `sidebar.settings` 控件只共用淡入时序，不发生横向位移。页面初始即为收起状态时会静态渲染轨道；减少动态效果模式会禁用两段过渡。
+实时收起时，外壳会把展开内容固定在当前宽度，并用 150ms 将其淡出。淡出的控件在轨道稳定前保持 inert；因这段隔离而丢失的焦点会回到仍存在的控件或轨道切换按钮，用户已移到其他位置时则不恢复。随后，上方四个控件——外壳的侧栏切换与新建会话，以及通过 `sidebar.workspaces` 渲染的添加和搜索——共用一次 150ms 的淡入和 49px 左移，在布局的 300ms 栏滑动结束时一起进入 56px 轨道；每个 36px 控件盒都会沿同一条路径到达轨道左侧 10px 的内边距。固定在底部的 `sidebar.settings` 控件只共用淡入时序，不发生横向位移。页面初始即为收起状态时会静态渲染轨道；减少动态效果模式会禁用两段过渡。
 
 栏内的滚动条是一种指针可供性：只要指针不在栏内，外壳就把 ui-theme 的[滚动条间接层](../ui-theme/README.zh.md)重新绑定为 `transparent`；指针离开后滑块再保留 2 秒，因此没人指向的列表不会带着滚动条。避免行位移的空间预留属于滚动区域本身（[ui-workspace](../ui-workspace/README.zh.md)），所以显示滑块不会引起重排。
 
@@ -23,9 +23,13 @@ kind: "package-reference"
 
 `/client` 导出表层只包含插件主体（`apply`／`inject`）及约定类型；SidebarRoot、行组件和树派生仍由 slot 注册封装在包内。
 
+视口高度不超过 480px 时，侧边栏自身可滚动，并为浏览区域保留空间。Workspace 行与页脚操作均可完整触及，不会争用固定栏高。
+
+桌面端作用域选择器与浏览区域对齐。侧边栏在浏览器完成布局后提供该区域的顶部偏移和高度。
+
 ## 概述
 
-dsh Web 客户端的侧边栏让用户识别当前构建、启动新会话、将导航折叠为 56px 轨道、浏览 Workspace 与 Session，以及打开 Settings。它会将 Settings 入口固定在底部，并在隐藏空闲滚动条时避免浏览器行发生位移。New Session 优先使用显式选择的 Workspace，其次使用当前 Session 所属的 Workspace，再其次使用最近活跃的 Workspace；如果都不存在，则打开空白的 New Session 页面。部署可以替换品牌标记或名称，同时保留导航控件和轨道几何。
+dsh Web 客户端的侧边栏让用户识别当前构建、启动新会话、将导航折叠为 56px 轨道、浏览 Workspace 与 Session，以及打开 Settings。它会保持 Settings 入口可达，并在隐藏空闲滚动条时避免浏览器行发生位移。New Session 优先使用显式选择的 Workspace，其次使用当前 Session 所属的 Workspace，再其次使用最近活跃的 Workspace；如果都不存在，则打开空白的 New Session 页面。部署可以替换品牌标记或名称，同时保留导航控件和轨道几何。
 
 ## 目录
 

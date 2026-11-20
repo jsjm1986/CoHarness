@@ -292,6 +292,7 @@ describe('DockSurface', () => {
       act(() => { vi.advanceTimersByTime(500) })
       expect(screen.getByRole('tooltip').textContent).toBe(TEST_LABELS.splitPane)
       fireEvent.mouseLeave(button)
+      act(() => { vi.advanceTimersByTime(200) })
       expect(screen.queryByRole('tooltip')).toBeNull()
     } finally {
       vi.useRealTimers()
@@ -669,14 +670,14 @@ describe('DockSurface', () => {
 
     // The menu still opens on the withheld chip: the embedder's items remain reachable.
     fireEvent.contextMenu(seedChip)
-    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['embedder item'])
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([TEST_LABELS.moveAfter, TEST_LABELS.floatTab, 'embedder item'])
     fireEvent.pointerDown(document.body)
 
     fireEvent.contextMenu(fileChip)
-    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([TEST_LABELS.closeTab, 'embedder item'])
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([TEST_LABELS.closeTab, TEST_LABELS.moveBefore, TEST_LABELS.floatTab, 'embedder item'])
   })
 
-  it('draws a lone unclosable chip quiet, and shows no menu on it when the embedder renders no item', () => {
+  it('keeps a lone unclosable chip quiet while exposing its float action', () => {
     const controller = seededController()
     render(
       <DockSurface
@@ -693,9 +694,8 @@ describe('DockSurface', () => {
     if (chip === undefined) throw new Error('expected the seeded chip')
     // The lone unclosable chip draws quiet: no capsule, no hover fill.
     expect(chip.getAttribute('data-dockkit-tab-quiet')).toBe('true')
-    // The menu would hold nothing, so it dismisses itself before painting.
     fireEvent.contextMenu(chip)
-    expect(document.querySelector('[data-dockkit-tab-menu]')).toBeNull()
+    expect(screen.getByRole('menuitem', { name: TEST_LABELS.floatTab })).toBeDefined()
   })
 
   it('lets the embedder render a chip\'s title, and shows the record\'s text when it does not', () => {
@@ -749,7 +749,7 @@ describe('DockSurface', () => {
     renderSurface(controller, intents, true, undefined, { canCloseTab: tabId => tabId === allowed })
     expect(screen.getByRole('button', { name: TEST_LABELS.closeTab }).getAttribute('data-dockkit-tab-close')).toBe(allowed)
     fireEvent.contextMenu(screen.getByRole('tab', { name: 'Start' }))
-    expect(screen.queryByRole('menu')).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: TEST_LABELS.closeTab })).toBeNull()
     fireEvent.contextMenu(screen.getByRole('tab', { name: /A/u }))
     fireEvent.click(screen.getByRole('menuitem', { name: TEST_LABELS.closeTab }))
     expect(intents.closeTab).toHaveBeenCalledExactlyOnceWith(allowed)
@@ -761,14 +761,14 @@ describe('DockSurface', () => {
     ['conditional', false],
     ['empty array', []],
     ['empty text', ''],
-  ])('hides close and creates no popup when extras are %s', (_, extras) => {
+  ])('keeps float available without close when extras are %s', (_, extras) => {
     const controller = seededController()
     const intents = spyIntents()
     renderSurface(controller, intents, true, extras === undefined ? undefined : () => extras, { canCloseTab: () => false })
     expect(screen.queryByRole('button', { name: TEST_LABELS.closeTab })).toBeNull()
     fireEvent.contextMenu(screen.getByRole('tab'))
     expect(screen.queryByRole('menuitem', { name: TEST_LABELS.closeTab })).toBeNull()
-    expect(screen.queryByRole('menu')).toBeNull()
+    expect(screen.getByRole('menuitem', { name: TEST_LABELS.floatTab })).toBeDefined()
     expect(intents.closeTab).not.toHaveBeenCalled()
   })
 
@@ -791,7 +791,7 @@ describe('DockSurface', () => {
     expect(screen.getByRole('menuitem', { name: TEST_LABELS.closeTab })).toBeDefined()
     rerender(<DockSurface {...props} />)
     expect(screen.queryByRole('button', { name: TEST_LABELS.closeTab })).toBeNull()
-    expect(screen.queryByRole('menu')).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: TEST_LABELS.closeTab })).toBeNull()
     rerender(<DockSurface {...props} canCloseTab={() => true} />)
     fireEvent.click(screen.getByRole('menuitem', { name: TEST_LABELS.closeTab }))
     expect(intents.closeTab).toHaveBeenCalledTimes(1)
@@ -800,7 +800,7 @@ describe('DockSurface', () => {
     expect(intents.closeTab).toHaveBeenCalledTimes(2)
   })
 
-  it.each([false, true])('hides the popup when an extras component renders no content inside a wrapper: %s', (wrapped) => {
+  it.each([false, true])('keeps built-in actions when an extras component renders no content inside a wrapper: %s', (wrapped) => {
     const EmptyExtras = () => null
     renderSurface(seededController(), spyIntents(), true,
       () => wrapped ? <div style={{ display: 'contents' }}><EmptyExtras /></div> : <EmptyExtras />,
@@ -814,9 +814,9 @@ describe('DockSurface', () => {
       .replaceAll(/\.menu(?=[:\s{])/g, `.${[...menu.classList].join('.')}`)
     document.head.append(style)
     onTestFinished(() => { style.remove() })
-    expect(menu.querySelectorAll('[role^="menuitem"]')).toHaveLength(0)
-    expect(getComputedStyle(menu).display).toBe('none')
-    expect(screen.queryByRole('menu')).toBeNull()
+    expect(menu.querySelectorAll('[role^="menuitem"]')).toHaveLength(1)
+    expect(getComputedStyle(menu).display).not.toBe('none')
+    expect(screen.getByRole('menuitem', { name: TEST_LABELS.floatTab })).toBeDefined()
   })
 
   it('toggles the menu closed on a second secondary press, and dismisses it on a press anywhere else', () => {
@@ -844,7 +844,7 @@ describe('DockSurface', () => {
     const tab = screen.getByRole('tab')
     for (let attempt = 0; attempt < 2; attempt++) {
       fireEvent.contextMenu(tab)
-      const target = focus === 'tab' ? tab : screen.getByRole('menuitem')
+      const target = focus === 'tab' ? tab : screen.getByRole('menuitem', { name: TEST_LABELS.closeTab })
       target.focus()
       expect(fireEvent.keyDown(target, { key: 'Escape', code: 'Escape' })).toBe(false)
       expect(screen.queryByRole('menu')).toBeNull()
@@ -911,15 +911,18 @@ describe('DockSurface', () => {
     left = window.innerWidth + 100
     renderSurface(controller, spyIntents())
     fireEvent.contextMenu(screen.getByRole('tab'))
-    expect(screen.getByRole('menu').style.left).toBe(`${left + 60}px`)
+    expect(screen.getByRole('menu').style.left).toBe(`${window.innerWidth - 4}px`)
   })
 
-  it('offers no copy or float item: those gestures are the embedder\'s API and the drag', () => {
+  it('offers floating through the visible actions button without dragging', () => {
     const controller = seededController()
-    renderSurface(controller, spyIntents())
-    fireEvent.contextMenu(screen.getByRole('tab'))
-    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([TEST_LABELS.closeTab])
-    expect(document.querySelector('[data-dockkit-tab-more]')).toBeNull()
+    const intents = spyIntents()
+    renderSurface(controller, intents)
+    fireEvent.click(screen.getByRole('button', { name: TEST_LABELS.tabActions }))
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([TEST_LABELS.closeTab, TEST_LABELS.floatTab])
+    fireEvent.click(screen.getByRole('menuitem', { name: TEST_LABELS.floatTab }))
+    const state = controller.getSnapshot().state
+    expect(intents.floatTab).toHaveBeenCalledExactlyOnceWith(getPane(state, state.rootId).tabs[0])
   })
 
   it.each([true, false])('keeps embedder menu items and their tab and dismiss when close is allowed: %s', (canClose) => {
@@ -942,7 +945,7 @@ describe('DockSurface', () => {
     // Order is contract: the kit's own item stays in the same place in every
     // menu, so an embedder item cannot displace it.
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(
-      canClose ? [TEST_LABELS.closeTab, 'embedder item'] : ['embedder item'],
+      canClose ? [TEST_LABELS.closeTab, TEST_LABELS.floatTab, 'embedder item'] : [TEST_LABELS.floatTab, 'embedder item'],
     )
     expect(screen.queryByRole('button', { name: TEST_LABELS.closeTab }) !== null).toBe(canClose)
 
@@ -1225,6 +1228,36 @@ describe('keyboard tabs', () => {
 })
 
 describe('divider drags', () => {
+  it('names each separator and resizes it with its axis keys and bounded Home/End', () => {
+    const { intents } = twoPanes()
+    const divider = screen.getByRole('separator', { name: TEST_LABELS.resizePane })
+    expect(divider.getAttribute('aria-orientation')).toBe('vertical')
+    expect(divider.getAttribute('aria-valuenow')).toBe('50')
+    divider.focus()
+    fireEvent.keyDown(divider, { key: 'ArrowRight' })
+    expect(intents.resizeSplit.mock.calls.at(-1)?.[1]).toEqual([0.52, 0.48])
+    fireEvent.keyDown(divider, { key: 'ArrowLeft', shiftKey: true })
+    expect(intents.resizeSplit.mock.calls.at(-1)?.[1]).toEqual([0.4, 0.6])
+    fireEvent.keyDown(divider, { key: 'Home' })
+    expect(intents.resizeSplit.mock.calls.at(-1)?.[1]).toEqual([0.12, 0.88])
+    fireEvent.keyDown(divider, { key: 'End' })
+    expect(intents.resizeSplit.mock.calls.at(-1)?.[1]).toEqual([0.88, 0.12])
+    const calls = intents.resizeSplit.mock.calls.length
+    fireEvent.keyDown(divider, { key: 'ArrowDown' })
+    fireEvent.keyDown(divider, { key: 'ArrowRight', isComposing: true })
+    expect(intents.resizeSplit).toHaveBeenCalledTimes(calls)
+    expect(document.activeElement).toBe(divider)
+  })
+
+  it('cancels an in-flight resize on Escape without committing it', () => {
+    const { intents } = twoPanes()
+    const divider = screen.getByRole('separator', { name: TEST_LABELS.resizePane })
+    drag(divider, [420, 300], [504, 300], false)
+    fireEvent.keyDown(divider, { key: 'Escape' })
+    fireEvent.pointerUp(window, { pointerId: 7, clientX: 504, clientY: 300 })
+    expect(intents.resizeSplit).not.toHaveBeenCalled()
+    expect(divider.hasAttribute('data-dockkit-pointer')).toBe(false)
+  })
   /** A row split whose second pane is itself split into a column: the column split's id and a spied intent set. */
   function withColumn(columnBox: DOMRect): { intents: ReturnType<typeof spyIntents>; columnId: string } {
     const controller = seededController()
@@ -1391,6 +1424,39 @@ describe('FloatLayer', () => {
     expect(screen.queryByRole('tablist')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: TEST_LABELS.dockFloat }))
     expect(intents.unfloatPane).toHaveBeenCalledTimes(1)
+  })
+
+  it('moves and resizes a float with arrow keys and click menus, returning menu focus', () => {
+    const { intents, paneId } = floating()
+    const move = screen.getByRole('button', { name: TEST_LABELS.moveFloat })
+    fireEvent.keyDown(move, { key: 'ArrowLeft', shiftKey: true })
+    expect(intents.moveFloat).toHaveBeenCalledWith(paneId, 60, 80)
+    const resize = screen.getByRole('button', { name: TEST_LABELS.resizeFloat })
+    fireEvent.keyDown(resize, { key: 'ArrowRight' })
+    expect(intents.resizeFloat).toHaveBeenCalledWith(paneId, { x: 100, y: 80, width: 310, height: 200 })
+    fireEvent.click(resize)
+    const first = screen.getByRole('menuitem', { name: TEST_LABELS.adjustFloat.narrower })
+    expect(document.activeElement).toBe(first)
+    fireEvent.keyDown(first, { key: 'End' })
+    const taller = screen.getByRole('menuitem', { name: TEST_LABELS.adjustFloat.taller })
+    expect(document.activeElement).toBe(taller)
+    fireEvent.click(taller)
+    expect(intents.resizeFloat).toHaveBeenCalledWith(paneId, { x: 100, y: 80, width: 300, height: 240 })
+    fireEvent.keyDown(taller, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.activeElement).toBe(resize)
+  })
+
+  it('keeps floating controls within a narrowed viewport and clamps keyboard movement', () => {
+    vi.stubGlobal('innerWidth', 320)
+    vi.stubGlobal('innerHeight', 240)
+    const { panel, paneId, intents } = floating()
+    expect(panel.style.left).toBe('20px')
+    expect(panel.style.top).toContain('40px')
+    fireEvent.keyDown(screen.getByRole('button', { name: TEST_LABELS.moveFloat }), { key: 'ArrowRight', shiftKey: true })
+    expect(intents.moveFloat).not.toHaveBeenCalled()
+    fireEvent.keyDown(screen.getByRole('button', { name: TEST_LABELS.resizeFloat }), { key: 'ArrowRight', shiftKey: true })
+    expect(intents.resizeFloat).toHaveBeenCalledWith(paneId, { x: 0, y: 40, width: 320, height: 200 })
   })
 
   it('closes a floating panel through its own control', () => {
@@ -1604,11 +1670,12 @@ describe('surface chrome', () => {
     const role = (child: Element): string => {
       if (child.hasAttribute('data-dockkit-strip-tabs')) return 'tabs'
       if (child.hasAttribute('data-dockkit-add-tab')) return 'add'
+      if (child.hasAttribute('data-dockkit-tab-actions')) return 'actions'
       if (child.hasAttribute('data-dockkit-split-button') || child.querySelector('[data-dockkit-split-button]')) return 'split'
       if (child.hasAttribute('data-dockkit-strip-chrome')) return 'chrome'
       return 'fill'
     }
-    expect([...(strip?.children ?? [])].map(role)).toEqual(['tabs', 'add', 'fill', 'split', 'chrome'])
+    expect([...(strip?.children ?? [])].map(role)).toEqual(['tabs', 'add', 'fill', 'actions', 'split', 'chrome'])
     expect(strip?.querySelectorAll('[data-dockkit-strip-tabs] [data-dockkit-tab]')).toHaveLength(2)
     expect(strip?.querySelectorAll(':scope > [data-dockkit-tab]')).toHaveLength(0)
   })

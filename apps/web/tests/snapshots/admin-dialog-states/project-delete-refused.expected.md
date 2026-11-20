@@ -1,0 +1,7 @@
+- dialog "删除项目":
+  - heading "删除项目" [level=2]
+  - paragraph: 删除 移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789 的授权记录？宿主机目录不会被删除。
+  - button "关闭"
+  - alert: QA write refused. The reviewed record remains unchanged.
+  - button "取消"
+  - button "确认删除"

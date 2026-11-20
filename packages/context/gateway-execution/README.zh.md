@@ -54,6 +54,8 @@ Gateway 数据库需要执行身份迁移 030、031 和[不可变执行范围迁
 
 在模型请求或允许的工具调用之前，提供者核验该次执行范围中的每位参与人。普通执行要求当前写权限；Full 和 profile 管理要求管理员权限，Auto 要求独立资格。当前链中的未知输入会阻止特权执行，但新的已验证根请求可在未知历史输入之后继续。预设选择核验当前选择者，真实执行再次核验完整执行链。[权限预设](../../interaction/permission-presets/README.zh.md) 负责选择与默认值。
 
+启用[受管模型计时](../gateway-runtime/README.zh.md#resource-admission)后，`model-input-timing` 记录进入首次助手流的最后一条已签名输入。它度量已观察到的收件箱等待、认领到进入的间隔、继承和进入授权，并记录流开始前的请求授权和准备。重放输入可能缺少实时收件箱记录。样本只包含计时信息。
+
 本提供者拥有 `pluginManagementAuthorization` 和 `permissionPresetAuthorization`。交互式 profile 操作使用 Gateway 的实时管理员检查；Agent 发起的操作使用该 Agent 的完整参与者集合。授权缺失不会回退到先前 HTTP 请求或浏览器自报角色。[Profile 管理授权](../../../.agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.zh.md) 定义受保护操作和取消行为。
 
 <a id="revocation-and-cancellation"></a>

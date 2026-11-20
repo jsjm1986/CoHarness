@@ -201,7 +201,8 @@
 }
 
 .searchField input::placeholder {
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
+  opacity: 1;
 }
 
 .searchField input:focus-visible {
@@ -886,6 +887,7 @@
 
 .zoneSearch {
   box-sizing: border-box;
+  min-width: 0;
   width: 100%;
   padding: 6px 8px;
   border: 0.5px solid var(--dsw-alias-border-l2);
@@ -1444,6 +1446,28 @@
   outline: none;
 }
 
+/* Landscape-height windows squeeze the detail scrollport below the box's
+   resting 112px, which would keep it permanently clipped no matter the scroll;
+   three 24px lines stay the smallest block that reads as the field, and its
+   own scrollbar covers the rest. The cap joins the floor so a taller draft
+   cannot push the box past the scrollport's last subpixel. */
+@media (max-height: 480px) {
+  .instruction {
+    min-height: 72px;
+    max-height: 72px;
+  }
+}
+
+/* The Pill touch floor (44px) cannot fit seven 36px calendar tracks, so the
+   monthly date group lets the column count follow the available width instead
+   of overlapping the neighbouring pills' hit regions. */
+@media (max-width: 767px), (pointer: coarse) {
+  .ruleMonthDays {
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    justify-content: stretch;
+  }
+}
+
 /* The mock's `.automation-detail` gutter steps: 24px by default, 20px from the
    `1100px` breakpoint down, and 16px at the narrowest one. */
 @media (max-width: 1100px) {
@@ -1484,5 +1508,92 @@
 
   .detailActions {
     gap: 0;
+  }
+}
+
+/* The Button atom already grows to the coarse-pointer target; the page's own
+   bare controls match it: the 28px filter chip and clear affordance, the 36px
+   search field, the 29px detail tab, and the 32px name field. The chip keeps
+   its pill silhouette at the new height. */
+@media (pointer: coarse) {
+  .filterTab {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    border-radius: 22px;
+  }
+
+  .searchField {
+    height: var(--dsw-touch-target);
+  }
+
+  .searchClear {
+    min-width: var(--dsw-touch-target);
+  }
+
+  .detailIconButton {
+    min-width: var(--dsw-touch-target);
+  }
+
+  .ruleInput {
+    min-height: var(--dsw-touch-target);
+  }
+
+  .retentionInfo {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+
+  .zoneSearch {
+    min-height: var(--dsw-touch-target);
+  }
+
+  /* The interval stepper follows the settings stepper's own coarse layout: the
+     36px pill becomes a three-cell grid whose flanking arrows each take the
+     44px target — decrease on the left, the value centered, increase right. */
+  .ruleIntervalStepper {
+    display: grid;
+    grid-template-columns: var(--dsw-touch-target) minmax(72px, auto) var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+    border-radius: 22px;
+  }
+
+  .ruleIntervalInput {
+    width: auto;
+    min-width: 0;
+    padding: 0 8px;
+    grid-column: 2;
+  }
+
+  .ruleIntervalArrows {
+    display: contents;
+    opacity: 1;
+  }
+
+  .ruleIntervalArrow {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+
+  .ruleIntervalArrow:first-child {
+    grid-column: 3;
+  }
+
+  .ruleIntervalArrow:last-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .detailTabsBar,
+  .tabBody > .detail .detailTabsBar {
+    min-height: var(--dsw-touch-target);
+  }
+
+  .detailTab {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+
+  .editName {
+    min-height: var(--dsw-touch-target);
   }
 }

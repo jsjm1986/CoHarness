@@ -13,6 +13,9 @@
 /* jscpd:ignore-start */
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { resolve } from 'node:path'
+import { recoveryHookPermitted } from '@deepseek-ai/dsh-app-boot'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
@@ -104,9 +107,13 @@ export function apply(ctx: Context, config: Config): void {
   const cap = (text: string): string => capModelFeedback(text, modelFeedbackMaxChars)
   const defaultTimeoutMs = config.defaultTimeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS
   assertPositiveInteger('defaultTimeoutMs', defaultTimeoutMs)
+  const configPath = resolve(config.configPath)
+  let configSha256: string
   let parsed: CodexHookConfig = {}
   try {
-    const raw: unknown = JSON.parse(readFileSync(config.configPath, 'utf8'))
+    const bytes = readFileSync(configPath)
+    configSha256 = createHash('sha256').update(bytes).digest('hex')
+    const raw: unknown = JSON.parse(bytes.toString('utf8'))
     const result = parseCodexConfig(raw)
     parsed = result.config
     for (const s of result.skipped) {
@@ -142,12 +149,14 @@ export function apply(ctx: Context, config: Config): void {
       plainStdoutAsContext?: boolean
     },
   ): Promise<MergedHookOutcome> {
-    const groups = selectHookGroups(parsed[point], matchQuery, 'codex')
+    const groups = selectHookGroups(parsed[point], matchQuery, 'codex').map(group => ({ ...group, hooks: group.hooks.filter(hook =>
+      recoveryHookPermitted(ctx, { dialect: 'codex', configPath, point, command: hook.command, configSha256 })) })).filter(group => group.hooks.length > 0)
     if (groups.length === 0) return mergeHookOutputs([])
     const outputs: HookOutput[] = []
     const workdir = opts.agent === undefined ? undefined : await ctx.workingDirectory.ensure(opts.agent, opts.signal)
     for (const group of groups) {
       for (const hook of group.hooks) {
+        if (!recoveryHookPermitted(ctx, { dialect: 'codex', configPath, point, command: hook.command, configSha256 })) continue
         const handlerId = nextHandlerId(point)
         const session = opts.agent?.session
         if (session && opts.turn !== undefined) {

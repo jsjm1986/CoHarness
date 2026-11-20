@@ -141,6 +141,13 @@ describe('Gateway runtime credential', () => {
     expect(() => parseGatewayRuntimeCredential({ ...selected, runtime: { ...selected.runtime, runtimeId: 'invalid' } })).toThrow(/invalid/)
   })
 
+  it('retains a registered computer in the private launch credential', () => {
+    const { credential } = fixture()
+    const nodeId = '11111111-1111-4111-8111-111111111111'
+    expect(parseGatewayRuntimeCredential({ ...credential, nodeId }).nodeId).toBe(nodeId)
+    expect(() => parseGatewayRuntimeCredential({ ...credential, nodeId: 'another-computer' })).toThrow('invalid Gateway runtime credential')
+  })
+
   it('accepts only the signed administrator archive capability for another personal runtime', () => {
     const { credential, issue } = fixture()
     const personalCredential: GatewayRuntimeCredential = {
@@ -164,6 +171,36 @@ describe('Gateway runtime credential', () => {
 })
 
 describe('Gateway request context', () => {
+  it('writes enabled model phase measurements to the managed process log', async () => {
+    const { credential } = fixture()
+    const root = await mkdtemp(join(tmpdir(), 'dsh-gateway-model-timings-'))
+    const output = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const ctx = new Context()
+    try {
+      const credentialPath = join(root, 'credential.json')
+      await writeFile(credentialPath, JSON.stringify(credential))
+      process.env.DSH_GATEWAY_CREDENTIAL_FILE = credentialPath
+      ctx.provide('connection', {} as never)
+      await ctx.plugin(GatewayRuntime, { modelTimings: true }).await()
+      const sample = {
+        startedAt: 1000, outcome: 'first-text', elapsedMs: 29,
+        adapterPreparationMs: 1, resourceWaitMs: 3, initialAuthorizationMs: 2,
+        adapterDispatchPreparationMs: 4, dispatchAuthorizationMs: 5, adapterCallbacks: 1,
+        afterLastAuthorizationMs: 14,
+      } as const
+      ctx.emit('llm/model-attempt-timing', sample)
+      expect(output).toHaveBeenCalledTimes(1)
+      const prefix = '[model-attempt-timing] '
+      const line = String(output.mock.calls[0]?.[0])
+      expect(line.startsWith(prefix)).toBe(true)
+      expect(JSON.parse(line.slice(prefix.length))).toEqual(sample)
+    } finally {
+      output.mockRestore()
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('isolates concurrent principals and forwards only the selected assertion', async () => {
     const { credential, issue } = fixture()
     const root = await mkdtemp(join(tmpdir(), 'dsh-gateway-runtime-'))

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 
@@ -36,6 +36,7 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('Tooltip', () => {
@@ -237,7 +238,7 @@ describe('Tooltip', () => {
     })
   })
 
-  it('shows the bubble to the right on hover and hides it on leave', () => {
+  it('shows the bubble to the right on hover and hides it after leaving', async () => {
     render(
       <Tooltip label="Open sidebar">
         <button type="button">anchor</button>
@@ -251,7 +252,7 @@ describe('Tooltip', () => {
     expect(bubble.style.left).toBe('12px')
     expect(bubble.style.top).toBe('0px')
     fireEvent.mouseLeave(anchor)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await waitFor(() => { expect(screen.queryByRole('tooltip')).toBeNull() })
   })
 
   it('supports bottom placement and the focus/blur channel', () => {
@@ -503,7 +504,7 @@ describe('Tooltip', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
-  it('shows informational tooltips on hover and focus, and consumes Escape only while open', () => {
+  it('shows informational tooltips on hover and focus, and consumes Escape only while open', async () => {
     const onKeyDown = vi.fn()
     render(<div onKeyDown={onKeyDown}>
       <Tooltip label="Plugin information" openOnClick><button>anchor</button></Tooltip>
@@ -512,7 +513,7 @@ describe('Tooltip', () => {
     fireEvent.mouseEnter(anchor)
     expect(screen.getByRole('tooltip').textContent).toBe('Plugin information')
     fireEvent.mouseLeave(anchor)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await waitFor(() => { expect(screen.queryByRole('tooltip')).toBeNull() })
     fireEvent.keyDown(anchor, { key: 'Tab' })
     fireEvent.focus(anchor)
     expect(screen.getByRole('tooltip')).toBeTruthy()
@@ -549,7 +550,7 @@ describe('Tooltip', () => {
     }
   })
 
-  it('drops a click pin when disabled or when click opening is removed', () => {
+  it('drops a click pin when disabled or when click opening is removed', async () => {
     const view = render(<Tooltip label="Plugin information" openOnClick><button>anchor</button></Tooltip>)
     const anchor = screen.getByText('anchor')
     fireEvent.click(anchor)
@@ -562,7 +563,7 @@ describe('Tooltip', () => {
     expect(screen.getByRole('tooltip')).toBeTruthy()
     view.rerender(<Tooltip label="Plugin information"><button>anchor</button></Tooltip>)
     fireEvent.mouseLeave(anchor)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await waitFor(() => { expect(screen.queryByRole('tooltip')).toBeNull() })
     view.rerender(<Tooltip label="Plugin information" openOnClick><button>anchor</button></Tooltip>)
     fireEvent.click(anchor)
     view.unmount()
@@ -653,24 +654,50 @@ describe('Tooltip', () => {
     expect(screen.getByRole('tooltip')).toBeTruthy()
   })
 
-  it('mouse leave hides the bubble immediately, even while the anchor stays focused', () => {
+  it('keeps a tooltip while either keyboard focus or pointer hover remains', async () => {
     render(
       <Tooltip label="Sticky">
         <button type="button">anchor</button>
       </Tooltip>,
     )
     const anchor = screen.getByText('anchor')
-    // Focused AND hovered: leaving with the mouse drops the bubble at once.
+    fireEvent.keyDown(anchor, { key: 'Tab' })
     fireEvent.focus(anchor)
     fireEvent.mouseEnter(anchor)
     fireEvent.mouseLeave(anchor)
-    expect(screen.queryByRole('tooltip')).toBeNull()
-    // Re-entering shows it again; blurring while still hovered keeps it.
+    expect(screen.getByRole('tooltip')).toBeTruthy()
     fireEvent.mouseEnter(anchor)
     fireEvent.blur(anchor)
     expect(screen.getByRole('tooltip')).toBeTruthy()
     fireEvent.mouseLeave(anchor)
+    await waitFor(() => { expect(screen.queryByRole('tooltip')).toBeNull() })
+  })
+
+  it('lets the pointer cross into tooltip content and dismisses it with Escape without moving focus', () => {
+    vi.useFakeTimers()
+    render(<Tooltip label="Details" portal><button>anchor</button></Tooltip>)
+    const anchor = screen.getByText('anchor')
+    fireEvent.mouseEnter(anchor)
+    const bubble = screen.getByRole('tooltip')
+    fireEvent.mouseLeave(anchor)
+    act(() => { vi.advanceTimersByTime(100) })
+    fireEvent.mouseEnter(bubble)
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(screen.getByRole('tooltip')).toBe(bubble)
+    fireEvent.mouseLeave(bubble)
+    act(() => { vi.advanceTimersByTime(200) })
     expect(screen.queryByRole('tooltip')).toBeNull()
+    fireEvent.keyDown(anchor, { key: 'Tab' })
+    act(() => { anchor.focus() })
+    expect(screen.getByRole('tooltip')).toBeTruthy()
+    fireEvent.compositionStart(anchor)
+    fireEvent.keyDown(anchor, { key: 'Escape' })
+    fireEvent.compositionEnd(anchor)
+    fireEvent.keyDown(anchor, { key: 'Escape' })
+    expect(screen.getByRole('tooltip')).toBeTruthy()
+    expect(fireEvent.keyDown(anchor, { key: 'Escape' })).toBe(false)
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(document.activeElement).toBe(anchor)
   })
 
   it('forwards the anchor element to the child ref (object and callback)', () => {
@@ -710,7 +737,7 @@ describe('Tooltip', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
-  it('withdraws the enclosing bubble while a nested tooltip shows its own', () => {
+  it('withdraws the enclosing bubble while a nested tooltip shows its own', async () => {
     render(
       <Tooltip label="Open sidebar">
         <button type="button">
@@ -734,10 +761,10 @@ describe('Tooltip', () => {
     // Leaving the nested anchor for the enclosing one restores its bubble;
     // the pointer never left the enclosing anchor, so only the badge is left.
     fireEvent.mouseLeave(badge, { relatedTarget: anchor })
-    expect(screen.getByRole('tooltip').textContent).toBe('Open sidebar')
+    await waitFor(() => { expect(screen.getByRole('tooltip').textContent).toBe('Open sidebar') })
 
     fireEvent.mouseLeave(anchor)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await waitFor(() => { expect(screen.queryByRole('tooltip')).toBeNull() })
   })
 
   it('releases the enclosing bubble when a shown nested tooltip unmounts', () => {

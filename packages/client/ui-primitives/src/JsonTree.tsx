@@ -6,7 +6,8 @@ import type {
   ReactNode,
   UIEvent as ReactUIEvent,
 } from 'react'
-import { IconCheckOutline16, IconCopyOutline16 } from './icons/index.tsx'
+import { IconCheckOutline16, IconChevronDownOutline14, IconCopyOutline16 } from './icons/index.tsx'
+import { focusWithoutRing } from './focus.ts'
 import { Menu } from './Menu.tsx'
 import type { MenuEntry } from './Menu.tsx'
 import css from './JsonTree.module.css'
@@ -30,6 +31,8 @@ export interface JsonTreeLabels {
   copyPrettyJson: string
   /** Menu item: copy the value as compact JSON (object rows). */
   copyCompactJson: string
+  /** Discoverable menu button for choosing the copy representation. */
+  copyOptions: string
   /** Copy-button state label after a successful copy. */
   copied: string
   /** Copy-button state label after a failed copy. */
@@ -200,7 +203,7 @@ function moveFocus(button: HTMLElement, direction: -1 | 1): void {
   const tree = button.closest<HTMLElement>('[role="tree"]')
   /* v8 ignore next -- JsonTree attaches expander handlers only beneath its owning role=tree. */
   if (tree === null) return
-  const expanders = Array.from(tree.querySelectorAll<HTMLElement>('[data-json-expander]'))
+  const expanders = Array.from(tree.querySelectorAll<HTMLElement>('[data-json-focus-target]'))
   const current = expanders.indexOf(button)
   /* v8 ignore next -- the current expander is a member of the queried non-empty set. */
   if (current < 0 || expanders.length === 0) return
@@ -237,6 +240,7 @@ interface JsonTreeNodeProps {
   lastElement: boolean
   onClaimTabStop: (id: string) => void
   onRowHover: (row: HTMLElement, target: RowTarget) => void
+  onCopyMenu: (row: HTMLElement, target: RowTarget) => void
   path: JsonPath
   tabStopId: string | null
   value: unknown
@@ -249,6 +253,7 @@ function JsonTreeNode({
   lastElement,
   onClaimTabStop,
   onRowHover,
+  onCopyMenu,
   path,
   tabStopId,
   value,
@@ -267,6 +272,12 @@ function JsonTreeNode({
   }
 
   const onExpanderKeyDown = (event: ReactKeyboardEvent<HTMLSpanElement>) => {
+    if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      toggle()
+      return
+    }
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
       event.preventDefault()
       setExpanded(event.key === 'ArrowRight')
@@ -283,6 +294,30 @@ function JsonTreeNode({
       className={css.row}
       role="treeitem"
       aria-expanded={ariaExpanded}
+      data-json-focus-target={!expandable ? '' : undefined}
+      tabIndex={!expandable ? tabStopId === nodeId ? 0 : -1 : undefined}
+      onFocus={(event) => {
+        event.stopPropagation()
+        onClaimTabStop(nodeId)
+        onRowHover(event.currentTarget, { path, value })
+      }}
+      onPointerDown={(event) => {
+        if (event.pointerType !== 'touch') return
+        event.stopPropagation()
+        onRowHover(event.currentTarget, { path, value })
+      }}
+      onKeyDown={(event) => {
+        if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+        if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+          event.preventDefault()
+          event.stopPropagation()
+          onCopyMenu(event.currentTarget, { path, value })
+        } else if (!expandable && !event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+          event.preventDefault()
+          event.stopPropagation()
+          moveFocus(event.currentTarget, event.key === 'ArrowUp' ? -1 : 1)
+        }
+      }}
       onMouseOver={(event) => {
         event.stopPropagation()
         onRowHover(event.currentTarget, { path, value })
@@ -320,6 +355,7 @@ function JsonTreeNode({
         ref={expanderRef}
         className={clsx(css.expander, expanded ? css.collapseIcon : css.expandIcon)}
         data-json-expander
+        data-json-focus-target=""
         role="button"
         aria-label={expanded ? labels.collapseNode : labels.expandNode}
         aria-expanded={expanded}
@@ -346,6 +382,7 @@ function JsonTreeNode({
               tabStopId={tabStopId}
               onClaimTabStop={onClaimTabStop}
               onRowHover={onRowHover}
+              onCopyMenu={onCopyMenu}
             />
           ))}
         </ul>
@@ -409,15 +446,16 @@ export function JsonTree({
   const firstExpandableIndex = rootEntries.findIndex(([, value]) => (
     isExpandableValue(value) && hasEntries(value)
   ))
-  const firstExpandableEntry = rootEntries[firstExpandableIndex]
+  const firstExpandableEntry = rootEntries[firstExpandableIndex] ?? rootEntries[0]
   const initialTabStopId = expandTopLevel
     ? firstExpandableEntry === undefined
       ? null
-      : pathId([Array.isArray(data) ? firstExpandableIndex : firstExpandableEntry[0]])
+      : pathId([Array.isArray(data) ? Math.max(0, firstExpandableIndex) : firstExpandableEntry[0]])
     : isExpandableValue(data) && rootEntries.length > 0 ? pathId([]) : null
   const rootRef = useRef<HTMLDivElement>(null)
   const activeRowRef = useRef<HTMLElement>(undefined)
   const copyButtonRef = useRef<HTMLButtonElement>(null)
+  const copyMenuButtonRef = useRef<HTMLButtonElement>(null)
   const copyMenuOpenRef = useRef(false)
   const resetTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [copyTarget, setCopyTarget] = useState<CopyTarget>()
@@ -446,7 +484,7 @@ export function JsonTree({
     const rootRect = root.getBoundingClientRect()
     const rowRect = row.getBoundingClientRect()
     return {
-      left: rootRect.left + root.clientWidth - 26,
+      left: rootRect.left + root.clientWidth - 6,
       side: rowRect.top - rootRect.top > root.clientHeight / 2 ? 'top' : 'bottom',
       top: rowRect.top,
     }
@@ -504,11 +542,21 @@ export function JsonTree({
     positionCopyButton(row, target)
   }
 
+  const openCopyMenu = (row: HTMLElement, target: RowTarget): void => {
+    if (!copyable) return
+    setActiveRow(row)
+    positionCopyButton(row, target)
+    if (copyMenuButtonRef.current !== null) focusWithoutRing(copyMenuButtonRef.current)
+    copyMenuOpenRef.current = true
+    setCopyMenuOpen(true)
+  }
+
   const handleRootMouseOver = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (!copyable || copyMenuOpenRef.current) return
     /* v8 ignore next -- browser mouse events delivered through React target an Element. */
     if (!(event.target instanceof Element)) return
-    if (event.target.closest('[data-json-copy-button]') === null) clearCopyTarget()
+    if (event.target.closest('[data-json-copy-button], [data-json-copy-menu]') === null
+      && !rootRef.current?.contains(document.activeElement)) clearCopyTarget()
   }
 
   const handleScroll = (_event: ReactUIEvent<HTMLDivElement>) => {
@@ -544,7 +592,7 @@ export function JsonTree({
       className={clsx(css.root, className)}
       onMouseOver={handleRootMouseOver}
       onMouseLeave={() => {
-        if (!copyMenuOpenRef.current) clearCopyTarget()
+        if (!copyMenuOpenRef.current && !rootRef.current?.contains(document.activeElement)) clearCopyTarget()
       }}
       onScroll={handleScroll}
     >
@@ -554,6 +602,20 @@ export function JsonTree({
             <div
               className={clsx(css.row, css.topLevelBracket)}
               data-json-root-row
+              role={copyable ? 'button' : undefined}
+              tabIndex={copyable ? 0 : undefined}
+              aria-label={copyable ? `${copyLabels.copyOptions}: ${label}` : undefined}
+              onFocus={(event) => { handleRowHover(event.currentTarget, { path: [], value: data }) }}
+              onClick={copyable ? (event) => { openCopyMenu(event.currentTarget, { path: [], value: data }) } : undefined}
+              onKeyDown={(event) => {
+                if (!copyable || event.nativeEvent.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                openCopyMenu(event.currentTarget, { path: [], value: data })
+              }}
+              onPointerDown={(event) => {
+                if (event.pointerType === 'touch') handleRowHover(event.currentTarget, { path: [], value: data })
+              }}
               onMouseOver={(event) => {
                 event.stopPropagation()
                 handleRowHover(event.currentTarget, { path: [], value: data })
@@ -578,6 +640,7 @@ export function JsonTree({
                   tabStopId={tabStopId}
                   onClaimTabStop={setTabStopId}
                   onRowHover={handleRowHover}
+                  onCopyMenu={openCopyMenu}
                 />
               ))}
             </div>
@@ -597,6 +660,7 @@ export function JsonTree({
               tabStopId={tabStopId}
               onClaimTabStop={setTabStopId}
               onRowHover={handleRowHover}
+              onCopyMenu={openCopyMenu}
             />
           </div>
         )}
@@ -607,11 +671,12 @@ export function JsonTree({
         >
           <Menu
             open={copyMenuOpen}
+            autoFocus
             compact
             portal
             align="end"
             side={copyTarget.side}
-            anchor={(
+            anchor={<>
               <button
                 ref={copyButtonRef}
                 type="button"
@@ -632,16 +697,23 @@ export function JsonTree({
                   ? <IconCheckOutline16 size={12} />
                   : <IconCopyOutline16 size={12} />}
               </button>
-            )}
+              <button ref={copyMenuButtonRef} type="button" className={css.copyButton}
+                data-json-copy-menu aria-label={copyLabels.copyOptions} aria-haspopup="menu" aria-expanded={copyMenuOpen}
+                onClick={(event) => {
+                  focusWithoutRing(event.currentTarget)
+                  copyMenuOpenRef.current = !copyMenuOpen
+                  setCopyMenuOpen(!copyMenuOpen)
+                }}><IconChevronDownOutline14 size={12} /></button>
+            </>}
             items={copyTargetIsObject ? objectCopyMenuItems(copyLabels) : valueCopyMenuItems(copyLabels)}
             onSelect={(id) => {
               void copy(id as 'json' | 'path' | 'prettyJson' | 'value')
               copyMenuOpenRef.current = false
               setCopyMenuOpen(false)
             }}
-            onClose={clearCopyTarget}
+            onClose={() => { copyMenuOpenRef.current = false; setCopyMenuOpen(false) }}
             getAnchorRect={() => (
-              copyButtonRef.current as HTMLButtonElement
+              copyMenuButtonRef.current as HTMLButtonElement
             ).getBoundingClientRect()}
           />
         </span>

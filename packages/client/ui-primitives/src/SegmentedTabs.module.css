@@ -30,14 +30,20 @@
   transition: color 180ms ease;
 }
 
-.tab:hover,
 .tab[aria-selected='true'] {
   background: transparent;
   color: var(--dsw-alias-label-primary);
 }
 
 .tab[aria-selected='true'] {
-  font-weight: 600;
+  font-weight: 500;
+}
+
+@media (hover: hover) {
+  .tab:hover {
+    background: transparent;
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 .underline {
@@ -65,7 +71,8 @@
 }
 
 @media (pointer: coarse), (max-width: 767px) {
-  .underline .tab { min-height: var(--dsw-touch-target); font-size: 14px; }
+  .tab { min-height: var(--dsw-touch-target); }
+  .underline .tab { font-size: 14px; }
 }
 
 .tab:focus-visible {
@@ -85,3 +92,8 @@
 .underline .tab[aria-selected='true'] { font-weight: 500; }
 .underline .tab:hover:not([aria-selected='true']) { color: var(--dsw-alias-label-secondary); }
 @media (hover: hover) { .underline .tab:hover:not([aria-selected='true']) { color: var(--dsw-alias-label-primary); } }
+
+@media (forced-colors: active) {
+  .tab[aria-selected='true'] { text-decoration: underline; text-underline-offset: 4px; }
+  .tab:focus-visible { outline: 2px solid Highlight; outline-offset: -2px; }
+}

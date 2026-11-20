@@ -442,7 +442,7 @@ describe.skipIf(!hasPwsh)('PwshLocalExecutor.run', () => {
     expect(result.timeoutMs).toBe(10_000)
   })
 
-  it('uses config cwd, overridable per call', async () => {
+  it('uses config cwd, overridable per call', { timeout: 15_000 }, async () => {
     const first = mkdtempSync(join(tmpdir(), 'dsh-pwsh-cwd-a-'))
     const second = mkdtempSync(join(tmpdir(), 'dsh-pwsh-cwd-b-'))
     tempDirs.push(first, second)

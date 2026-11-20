@@ -55,9 +55,6 @@ declare module '@deepseek-ai/dsh-client-runtime/client' {
   }
 }
 
-/** The worktree row of the Forge bundle, whose Plugins page carries the archive cleanup switch. */
-export const WORKTREE_ROW_KEY = '@deepseek-ai/dsh-experimental-forge-bundle#worktree'
-
 /** The Loader entry id the worktree service's settings namespace follows. */
 export const WORKTREE_NS = 'worktree'
 
@@ -420,15 +417,19 @@ function registerUi(ctx: Context): void {
   const worktreeScope: SettingsFormScope<WorktreeSettingsFields> = {
     getSnapshot: () => bound.getSnapshot(),
     subscribe: listener => bound.subscribe(listener),
-    mutate: (ops, expectedRevision) => bound.mutate(ops.map(op => op.op === 'set'
-      ? { op: 'set', path: [...op.path], value: op.value as JsonValue }
-      : { op: 'unset', path: [...op.path] }), expectedRevision),
+    mutate: async (ops, expectedRevision) => {
+      await bound.mutate(ops.map(op => op.op === 'set'
+        ? { op: 'set', path: [...op.path], value: op.value as JsonValue }
+        : { op: 'unset', path: [...op.path] }), expectedRevision)
+      const write = bound.getSnapshot().write
+      if (write.status === 'error' || write.status === 'blocked') throw new Error('Worktree settings were not saved')
+    },
   }
   /* jscpd:ignore-end */
   const worktreeSettings = new WorktreeSettingsForm(worktreeScope)
   ctx.effect(() => () => { worktreeSettings.dispose() }, 'forge-panel: worktree settings form')
-  ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
-    name: 'plugins.row.config', key: WORKTREE_ROW_KEY, locale: NS, inject: () => worktreeSettings.inject(),
+  ctx.slots.inject('plugins.item', () => ctx.slots.register({
+    name: 'plugins.item', id: WORKTREE_NS, label: () => t('checkout.worktree'), locale: NS, inject: () => worktreeSettings.inject(),
   }, WorktreeSettings))
 }
 

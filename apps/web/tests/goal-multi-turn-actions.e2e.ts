@@ -1,20 +1,22 @@
 // Keyless replay of a real two-round Goal run. Each autonomous round ends as
 // its own turn, so the first answer must keep its IconActions when Goal opens
 // round two and the final answer must own a second, distinct action row.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterEach, describe, expect, it, onTestFailed } from 'vitest'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-goal'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  assertFixtureInventory, captureStableAria,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { compareWorkflowGolden, auditWorkflowState, newWorkflowPage } from './workflow-responsive-state.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/goal-multi-turn-actions', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
@@ -114,8 +116,8 @@ describe('web e2e: Goal keeps one assistant action row per completed turn', () =
     )
     await seedPackageInventory(scaffold.workspaceCwd)
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -128,7 +130,11 @@ describe('web e2e: Goal keeps one assistant action row per completed turn', () =
     await input.waitFor({ timeout: 10_000 })
     const settled = whenTurnsSettled(scaffold!, 2, timeoutMs)
     await input.fill(COMMAND)
-    await input.press('Enter')
+    // Firefox fill() inserts through the IME composition pipeline; its compositionend
+    // clears the composer's composing guard one tick late, so a racing Enter keydown is
+    // swallowed as a newline. The Send button resolves the same 'enter' submit mode
+    // without going through the keydown IME guard.
+    await page.getByRole('button', { name: 'Send message' }).click()
     return settled
   }
 
@@ -155,6 +161,11 @@ describe('web e2e: Goal keeps one assistant action row per completed turn', () =
     await expect.poll(() => branchButtons.count(), { timeout: 15_000 }).toBe(2)
     expect(await branchButtons.evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-disabled'))))
       .toEqual([null, null])
+    // Script focus in Firefox is :focus-visible only when the previously focused
+    // element was reached by keyboard; the Send-button click left pointer
+    // modality, so a real Tab first gives the branch button a keyboard-focused
+    // predecessor for its script-driven focus to inherit.
+    await page.keyboard.press('Tab')
     await branchButtons.last().focus()
     // Focus raises the tail button's tooltip through a portal render; capture
     // only after it mounts or the poll can converge on the pre-focus tree. The
@@ -172,7 +183,8 @@ describe('web e2e: Goal keeps one assistant action row per completed turn', () =
     // give it the same explicit budget as the assertions above.
     await expect.poll(() => page.getByRole('button', { name: 'Back to bottom' }).count(), { timeout: 15_000 }).toBe(0)
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
-    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(UI_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'goal', 'completed-turns', page.locator('[class*="centerCol"]'))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 140_000)

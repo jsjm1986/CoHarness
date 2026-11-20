@@ -1,9 +1,10 @@
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { MessageId } from '@deepseek-ai/dsh-llm'
 import {
@@ -11,11 +12,12 @@ import {
 import type {} from '@deepseek-ai/dsh-agent'
 import { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import {
-  acknowledgeReloadConnectionLoss, captureStableAria, compareOrRefreshGolden,
+  acknowledgeReloadConnectionLoss, captureStableAria,
   launchWebScaffold, watchConsole,
   webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { compareWorkflowGolden, auditWorkflowState, newWorkflowPage } from './workflow-responsive-state.ts'
 
 const BASE_FIXTURE = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl', import.meta.url))
 const AVAILABLE_CHILD_EXPECTED = fileURLToPath(new URL('./snapshots/subagent-conversation/ui.expected.md', import.meta.url))
@@ -113,8 +115,8 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       replayChildFixtures: [childFixturePath],
       paceMs: 25,
     })
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     page.on('request', (request) => {
       const path = new URL(request.url()).pathname
       if (path.startsWith('/api/')) apiCalls.push(path)
@@ -304,6 +306,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     await menu.getByText('Subagents', { exact: true }).waitFor({ timeout: 15_000 })
     await menu.getByRole('option', { name: new RegExp(LABEL) }).waitFor({ timeout: 15_000 })
     expect(await menu.getByRole('option', { name: new RegExp(CHILD_TITLE) }).count()).toBe(0)
+    await auditWorkflowState(page, 'subagent', 'reference-menu', menu)
     await page.keyboard.press('Escape')
     await input.fill('')
   })
@@ -347,13 +350,15 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       const tree = page.getByRole('tree', { name: 'Subagent sessions' })
       await tree.getByRole('treeitem', { name: 'Loading subagents' }).first().waitFor()
       expect(await tree.getByRole('treeitem', { name: 'Loading subagents' }).count()).toBe(2)
-      await compareOrRefreshGolden(
+      await compareWorkflowGolden(
         STALE_CATALOG_EXPECTED,
         await captureStableAria(page, '[role="tree"][aria-label="Subagent sessions"]', scaffold.workspaceCwd),
         MODE,
       )
+      await auditWorkflowState(page, 'subagent', 'catalog-loading-stale', tree)
       releaseCatalog()
       await tree.getByRole('treeitem', { name: new RegExp(LABEL) }).waitFor({ timeout: 15_000 })
+      await auditWorkflowState(page, 'subagent', 'catalog-recovered', tree)
       await tree.press('Escape')
     } finally {
       releaseCatalog()
@@ -386,7 +391,8 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       '[role="tree"][aria-label="Subagent sessions"]',
       scaffold.workspaceCwd,
     )
-    await compareOrRefreshGolden(TREE_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(TREE_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'subagent', 'nested-catalog', page.getByRole('tree', { name: 'Subagent sessions' }))
     await page.getByRole('tree', { name: 'Subagent sessions' }).press('Escape')
   })
 
@@ -397,11 +403,12 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     const sidebarChat = page.locator('[data-sidebar-chat]')
     await sidebarChat.getByText(/^Explain event sourcing in one sentence\.Your final answer is delivered /)
       .waitFor({ timeout: 15_000 })
-    await compareOrRefreshGolden(
+    await compareWorkflowGolden(
       SIDEBAR_CHAT_EXPECTED,
       await captureStableAria(page, '[data-sidebar-chat]', scaffold.workspaceCwd),
       MODE,
     )
+    await auditWorkflowState(page, 'subagent', 'sidebar-history', sidebarChat)
     await page.locator('[data-sidebar-right-panel]').getByRole('button', { name: 'Close', exact: true }).click()
     await sidebarChat.waitFor({ state: 'detached' })
 
@@ -436,7 +443,8 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       '[role="tree"][aria-label="Sessions"]',
       scaffold.workspaceCwd,
     )
-    await compareOrRefreshGolden(SIDEBAR_EXPECTED, sidebar, MODE)
+    await compareWorkflowGolden(SIDEBAR_EXPECTED, sidebar, MODE)
+    await auditWorkflowState(page, 'subagent', 'completed-child', page.locator('[class*="centerCol"]'))
   })
 
   it('continues through FIFO follow-up admission and receives the child mux events', async () => {
@@ -469,7 +477,8 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
   it('matches the settled addressed-conversation aria golden and stays clean', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-subagent-aria'))
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(AVAILABLE_CHILD_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(AVAILABLE_CHILD_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'subagent', 'followup-settled', page.locator('[class*="centerCol"]'))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   })
@@ -492,11 +501,12 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       Math.round(treeBox!.x + treeBox!.width - clickAreaBox!.x - clickAreaBox!.width),
     // Menu padding alone insets the rows now that the border is gone.
     ]).toEqual([4, 4])
-    await compareOrRefreshGolden(
+    await compareWorkflowGolden(
       BRANCHLESS_EXPECTED,
       await captureStableAria(page, '[role="tree"][aria-label="Subagent sessions"]', scaffold.workspaceCwd),
       MODE,
     )
+    await auditWorkflowState(page, 'subagent', 'branchless-catalog', tree)
     await nestedRow.click()
     await page.getByText('The parent session is offline; reopen it to continue sending messages.').waitFor()
     // The offline banner renders from the descriptor alone, so it says nothing
@@ -505,15 +515,17 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     // "Loading history…". Wait for the message the golden asserts.
     await page.getByText(NESTED_PROMPT).waitFor()
     const hierarchy = page.getByRole('navigation', { name: 'Session hierarchy' })
-    const crumbs = await hierarchy.getByRole('button').allTextContents()
-    expect(crumbs.slice(-2)).toEqual([LABEL, NESTED_LABEL])
+    await hierarchy.getByRole('button', { name: LABEL, exact: true }).waitFor()
+    await hierarchy.getByRole('button', { name: `Switch subagent: ${LABEL}`, exact: true }).waitFor()
+    await hierarchy.getByRole('button', { name: `Switch subagent: ${NESTED_LABEL}`, exact: true }).waitFor()
     expect(scaffold.ctx.agents.get(childId)).toBeUndefined()
     expect(scaffold.ctx.agents.get(grandchildId)).toBeUndefined()
-    await compareOrRefreshGolden(
+    await compareWorkflowGolden(
       UNAVAILABLE_GRANDCHILD_EXPECTED,
       await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd),
       MODE,
     )
+    await auditWorkflowState(page, 'subagent', 'offline-grandchild', page.locator('[class*="centerCol"]'))
   })
 
   it('opens a one-shot child as permanently read-only history', async () => {
@@ -523,6 +535,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     await page.getByRole('treeitem', { name: new RegExp(ONE_SHOT_LABEL) }).click()
     await page.getByText('One-shot tasks do not accept follow-ups; review the full execution record here.').waitFor()
     expect(scaffold.ctx.agents.get(oneShotId)).toBeUndefined()
+    await auditWorkflowState(page, 'subagent', 'oneshot-readonly', page.locator('[class*="centerCol"]'))
   })
 
   it('places an ordinary fork from a subagent beside its workspace-owning ancestor', async () => {
@@ -548,7 +561,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     ).toBe(0)
     const hierarchy = page.getByRole('navigation', { name: 'Session hierarchy' })
     await expect.poll(() => hierarchy.getByRole('button').count()).toBe(1)
-    await compareOrRefreshGolden(
+    await compareWorkflowGolden(
       FORK_EXPECTED,
       await captureStableAria(page, '[role="tree"][aria-label="Sessions"]', scaffold.workspaceCwd),
       MODE,

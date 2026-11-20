@@ -87,7 +87,7 @@ export function RemoteDesktopPage() {
   const endpointList = useMemo(() => endpoints ?? [], [endpoints])
 
   const saveEndpoints = async (rows: RemoteDesktopEndpoint[]) => {
-    setBusy(true)
+    setBusy(true); setError(null)
     try {
       const result = await saveRemoteDesktopEndpoints(rows)
       setEndpoints(result.endpoints)
@@ -102,7 +102,7 @@ export function RemoteDesktopPage() {
 
   const issueGrant = async () => {
     if (grantDraft === null) return
-    setBusy(true)
+    setBusy(true); setError(null)
     try {
       const sep = grantDraft.endpoint.indexOf(' ')
       const nodeId = sep === -1 ? grantDraft.endpoint : grantDraft.endpoint.slice(0, sep)
@@ -162,12 +162,12 @@ export function RemoteDesktopPage() {
     <div>
       <PageHeader title={t('pageTitle')} description={t('pageDescription')}
         actions={<Button onClick={() => void reload()} icon={RefreshCw}>{t('refresh')}</Button>} />
-      {error !== null && <ErrorBanner message={error} />}
+      {error !== null && endpointDraft === null && grantDraft === null && <ErrorBanner message={error} />}
       {notice !== null && <p role="status">{notice}</p>}
       <DesktopEnvironmentNotice />
 
       <Section title={t('sectionEndpoints')} flush
-        actions={<Button variant="secondary" icon={Plus} onClick={() => setEndpointDraft(EMPTY_ENDPOINT)}>{t('addEndpoint')}</Button>}>
+        actions={<Button variant="secondary" icon={Plus} onClick={() => { setError(null); setEndpointDraft(EMPTY_ENDPOINT) }}>{t('addEndpoint')}</Button>}>
         {endpointList.length === 0
           ? <EmptyState title={t('endpointsEmpty')} detail={t('endpointsEmptyDetail')} />
           : (
@@ -182,8 +182,8 @@ export function RemoteDesktopPage() {
                 <tbody>
                   {endpointList.map(e => (
                     <tr key={endpointKeyOf(e)}>
-                      <td>{e.nodeId} {e.host === '127.0.0.1' && <StatusBadge tone="info">{t('localBadge')}</StatusBadge>}</td>
-                      <td>{e.desktop ?? '—'}</td><td><code>{e.host}</code></td><td><code>{e.port}</code></td>
+                      <td className="tableTextCell">{e.nodeId} {e.host === '127.0.0.1' && <StatusBadge tone="info">{t('localBadge')}</StatusBadge>}</td>
+                      <td className="tableTextCell">{e.desktop ?? '—'}</td><td className="tableTextCell"><code>{e.host}</code></td><td><code>{e.port}</code></td>
                       <td>{e.passwordRef === undefined ? '—' : <StatusBadge tone="info">{t('signInManaged')}</StatusBadge>}</td>
                       <td>
                         <div className="compactActions">
@@ -202,7 +202,7 @@ export function RemoteDesktopPage() {
       <Section title={t('sectionGrants')} flush
         actions={endpointList.length === 0 ? undefined : (
           <Button variant="secondary" icon={Plus}
-            onClick={() => setGrantDraft({ ...EMPTY_GRANT, endpoint: endpointKeyOf(endpointList[0]!) })}>{t('grantAccess')}</Button>
+            onClick={() => { setError(null); setGrantDraft({ ...EMPTY_GRANT, endpoint: endpointKeyOf(endpointList[0]!) }) }}>{t('grantAccess')}</Button>
         )}>
         {grants.length === 0
           ? <EmptyState title={t('grantsEmpty')} detail={t('grantsEmptyDetail')} />
@@ -220,11 +220,11 @@ export function RemoteDesktopPage() {
                   {grants.map(g => (
                     <tr key={g.id}>
                       <td>{g.principal}</td>
-                      <td>{targetLabel(g.target)}</td>
+                      <td className="tableTextCell">{targetLabel(g.target)}</td>
                       <td>
                         {g.revokedAt === undefined
                           ? (
-                            <select className="selectCompact" value={g.level}
+                            <select className="selectCompact" value={g.level} aria-label={`${g.principal} · ${t('labelLevel')}`}
                               onChange={e => void changeLevel(g, e.target.value as 'view' | 'control')}>
                               <option value="view">{t('levelView')}</option>
                               <option value="control">{t('levelControl')}</option>
@@ -300,6 +300,7 @@ export function RemoteDesktopPage() {
       >
         {endpointDraft === null ? null : (
           <div className="formGrid">
+            <div className="formSpanFull"><ErrorBanner message={error ?? ''} /></div>
             <Field label={t('labelNodeId')} hint={t('hintNodeId')}>
               <input className="input" value={endpointDraft.nodeId}
                 onChange={e => setEndpointDraft({ ...endpointDraft, nodeId: e.target.value })} />
@@ -340,13 +341,14 @@ export function RemoteDesktopPage() {
       >
         {grantDraft === null ? null : (
           <div className="formGrid">
-            <Field label={t('labelPrincipal')} hint={t('hintPrincipal')}>
-              <input className="input" list="remote-desktop-principals" value={grantDraft.principal}
+            <div className="formSpanFull"><ErrorBanner message={error ?? ''} /></div>
+            <Field label={t('labelPrincipal')} hint={t('hintPrincipal')}>{controlProps => <>
+              <input {...controlProps} className="input" list="remote-desktop-principals" value={grantDraft.principal}
                 onChange={e => setGrantDraft({ ...grantDraft, principal: e.target.value })} />
               <datalist id="remote-desktop-principals">
                 {usernames.map(u => <option key={u} value={u} />)}
               </datalist>
-            </Field>
+            </>}</Field>
             <Field label={t('labelNodeId')}>
               <select className="input" value={grantDraft.endpoint}
                 onChange={e => setGrantDraft({ ...grantDraft, endpoint: e.target.value })}>

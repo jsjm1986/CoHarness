@@ -113,38 +113,37 @@
   }
 }
 
-/* The compact phone row carries every seat as an icon-only control on one
-   line: the brain glyph alone (a tap opens the session sheet) while the
-   title/aria-label still name the current model. */
-:global([data-viewport='compact']) .trigger {
+/* Compact and touch toolbars use the glyph. The title and accessible name
+   identify the current model. */
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trigger {
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
   padding: 0;
 }
 
-:global([data-viewport='compact']) .triggerLabel,
-:global([data-viewport='compact']) .triggerEffort,
-:global([data-viewport='compact']) .chevron {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .triggerLabel,
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .triggerEffort,
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .chevron {
   display: none;
 }
 
-:global([data-viewport='compact']) .trigger:hover:not(:disabled) {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trigger:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
 }
 
-:global([data-viewport='compact']) .triggerGlyph {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .triggerGlyph {
   display: inline-flex;
   width: auto;
   height: auto;
 }
 
-:global([data-viewport='compact']) .trigger:hover:not(:disabled) .triggerGlyph {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trigger:hover:not(:disabled) .triggerGlyph {
   background: transparent;
 }
 
-:global([data-viewport='compact']) .triggerGlyph svg {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .triggerGlyph svg {
   width: var(--dsw-mobile-icon-secondary);
   height: var(--dsw-mobile-icon-secondary);
 }
@@ -331,10 +330,6 @@
   line-height: normal;
 }
 
-.searchRow .search input::placeholder {
-  color: var(--dsw-alias-label-caption);
-}
-
 .option {
   box-sizing: border-box;
   display: flex;
@@ -415,7 +410,7 @@
   gap: 8px;
   width: auto;
   min-width: 100%;
-  height: 40px;
+  height: var(--dsw-touch-target);
   padding: 0 10px;
   border: none;
   border-radius: 10px;
@@ -453,19 +448,11 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-:global([data-viewport='compact']) .root {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .root {
   flex: 0 0 auto;
   max-width: none;
 }
 
-/* The narrowest phones keep the same single icon row at a slightly smaller
-   target so every control still fits. */
-@media (max-width: 359px) {
-  :global([data-viewport='compact']) .trigger {
-    width: 36px;
-    height: 36px;
-  }
-}
 
 :global([data-viewport='compact']) .menu {
   position: fixed;
@@ -565,4 +552,8 @@
    quiet surface tint rather than a second card. */
 .sectionContent .option[aria-checked='true'] {
   background: var(--dsw-alias-interactive-bg-active);
+}
+
+@media (pointer: coarse) {
+  .trigger { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
 }

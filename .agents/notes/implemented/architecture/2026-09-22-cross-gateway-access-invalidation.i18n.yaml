@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-cross-gateway-access-invalidation.md
 document:
-  en: 2b1641b2b93576f235432ef6670ba6c0267973bd
-  zh: 1219d939330bf4f8f310ec867b54530912537dd2
+  en: f7e0598586a9911734fadeaada06092763852468
+  zh: 6dde9b70f26fa9d244b1346c11e94c66487323a1
 /agent-note-cross-gateway-access-invalidation:
   en: 7b58c322e6680282
   zh: a95da07738615577
@@ -12,8 +12,8 @@ document:
   en: 16417c352fa2b335
   zh: a4338688ced3168a
 /agent-note-cross-gateway-access-invalidation/decision:
-  en: 834205c996ee8739
-  zh: 99774f31c48cb561
+  en: fa466ad935f6f03a
+  zh: 8458acdc382cc5c0
 /agent-note-cross-gateway-access-invalidation/alternatives-considered:
   en: d01949565084f22a
   zh: 09a0d344ace36bd7

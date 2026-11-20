@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/README.md
 document:
-  en: 7452fcb04d3e840f0c0f46c42812b512b1a49d26
-  zh: e095e888c245d09397a9bb3b6ed8d79d0d00da86
+  en: deaf83985f3bc2272cd0de888c3353bd1380cdad
+  zh: e4bd5d60fa3a0eec5993282077405a983dc1b8c8
 /production-deployment-runbook:
   en: bab9204fe333e354
   zh: dda096b4b8c30c4b
@@ -12,8 +12,8 @@ document:
   en: 2d51a5fadb66766e
   zh: 99955f92a7d497d9
 /production-deployment-runbook/install:
-  en: 1415de7d65588d83
-  zh: 8c5acd0f18a1cee6
+  en: 076fe704d4b4e2fd
+  zh: fceea052f8c637f6
 /production-deployment-runbook/per-user-provisioning:
   en: eac189a38d8c6d23
   zh: f8177e5741daaa1b
@@ -30,8 +30,8 @@ document:
   en: 6381007832bdb568
   zh: 6e4727e1fad60137
 /production-deployment-runbook/macos-variant-launchd-tunnel-entry:
-  en: b5cb53b47020b9d0
-  zh: 93cf79f582399a55
+  en: 89592db0a18ccbb5
+  zh: ffea953271b219a0
 /production-deployment-runbook/upgrades-and-backup:
   en: 4c6a963ec9d3a868
   zh: eb865d6939e8d8ba

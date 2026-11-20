@@ -238,12 +238,11 @@ export class GatewayNodeChannels implements NodeServiceChannels {
    * Ask an enrolled computer to connect its fixed local Gateway to a one-use stream.
    * @param nodeId - target already authorized by the caller's existing account or Admin route.
    * @param id - service owner's one-use connection identity.
-   * @param release - center release required by the node-local identity check.
    * @param failed - connection owner notified on refusal, revocation or control-channel loss.
    * @param signal - owning request lifetime.
    * @returns the exact lease and a disposer that cancels only this connection.
    */
-  async requestService(nodeId: RuntimeNodeId, id: NodeProbeId, release: string | null,
+  async requestService(nodeId: RuntimeNodeId, id: NodeProbeId,
     failed: (error: unknown) => void, signal: AbortSignal): Promise<NodeServiceRequest> {
     if (this.lifetime.signal.aborted) throw new NodeServiceError(503, 'node-service/closed')
     const peer = this.peers.get(nodeId)
@@ -257,7 +256,8 @@ export class GatewayNodeChannels implements NodeServiceChannels {
       try { sendNodeChannelFrame(peer.socket, { kind: 'cancel', id }, this.config) }
       catch (error) { this.drop(peer, error) }
     }
-    try { sendNodeChannelFrame(peer.socket, { kind: 'service', id, release }, this.config) }
+    // v1 agents require the legacy field. Null selects the service identity and wire version.
+    try { sendNodeChannelFrame(peer.socket, { kind: 'service', id, release: null }, this.config) }
     catch (error) { dispose(); throw error }
     return { lease, dispose }
   }

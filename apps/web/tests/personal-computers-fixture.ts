@@ -1,8 +1,9 @@
 /** Two real personal Hosts behind the account directory, with eighteen additional cold computers. @module */
-import { createServer, request } from 'node:http'
+import { createServer, request, type ServerResponse } from 'node:http'
 import type { AddressInfo, Socket } from 'node:net'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import type {} from '@deepseek-ai/dsh-workspace'
 import { launchWebScaffold, seedSession, type WebScaffold } from './scaffold.ts'
 
 type DraftValue = { revision: number; text: string }
@@ -21,6 +22,17 @@ interface FixtureDraftStore {
   close(): Promise<void>
 }
 
+interface FixtureReleaseAssets {
+  serveDeferredIndex(response: ServerResponse, selection: {
+    principalId: number
+    runtimeId: string
+    nodeId: string
+    nodeName: string
+    scope: 'personal'
+    language: 'zh' | 'en'
+  }): Promise<boolean>
+}
+
 /** Stable browser identities used by the personal-directory scenario. */
 export const personalTargets = Array.from({ length: 20 }, (_, i) => ({ kind: 'personal' as const,
   runtimeId: `10000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
@@ -32,14 +44,33 @@ export const personalTargets = Array.from({ length: 20 }, (_, i) => ({ kind: 'pe
  * @returns owned servers, directory counters and quiescent cleanup.
  */
 export async function launchPersonalComputersFixture(
-  options: { localReplay?: HostReplay; remoteReplay?: HostReplay; workbench?: boolean; projectMetadata?: boolean } = {},
+  options: {
+    localReplay?: HostReplay
+    remoteReplay?: HostReplay
+    workbench?: boolean
+    projectMetadata?: boolean
+    sessionIds?: readonly [string, string]
+    extraOverlayPath?: string | readonly string[]
+    /** Exercise legacy Runtime creation without prepared-session support. */
+    executionAuthorityRequired?: boolean
+    /** Real entry shell and authenticated structured boot for the remote computer. */
+    deferredEntry?: boolean
+    /** Hold a specific event-stream upgrade until the test releases it. */
+    beforeEventUpgrade?: (runtimeId: string, path: string) => Promise<void> | undefined
+  } = {},
 ) {
+  const sessionIds = options.sessionIds ?? ['same-personal-session', 'same-personal-session']
   const worlds: WebScaffold[] = [], sockets = new Set<Socket>(), requests = new Set<ReturnType<typeof request>>()
   const cookies = new Map<string, string>(), calls = new Map<string, number>(), preparations = new Map<string, number>()
   const source = new URL('../../../gateway/src/node-drafts.ts', import.meta.url)
   const { LocalNodeDrafts } = await import(/* @vite-ignore */ source.href) as {
     LocalNodeDrafts: new (directory: string) => FixtureDraftStore
   }
+  const assetsSource = new URL('../../../gateway/src/release-assets.ts', import.meta.url)
+  const assets = options.deferredEntry === true
+    ? new ((await import(/* @vite-ignore */ assetsSource.href)) as { ReleaseAssets: new (directory: string) => FixtureReleaseAssets })
+      .ReleaseAssets(fileURLToPath(new URL('../dist', import.meta.url)))
+    : undefined
   const draftStores: FixtureDraftStore[] = []
   const draftSlots = new Map<string, number>()
   const draftReceipts: { node: number; slot: number; method?: string; status: number; revision?: number; hasText?: boolean }[] = []
@@ -80,6 +111,7 @@ export async function launchPersonalComputersFixture(
     for (let i = 0; i < 2; i++) {
       const replay = i === 0 ? options.localReplay : options.remoteReplay
       const world = await launchWebScaffold({ openInApp: false,
+        ...(options.extraOverlayPath === undefined ? {} : { extraOverlayPath: options.extraOverlayPath }),
         ...(options.workbench === undefined ? {} : { workbench: options.workbench }),
         ...(replay === undefined ? {} : { replayFixture: replay.file, replayChildFixtures: replay.children, paceMs: 0 }) })
       draftStores.push(new LocalNodeDrafts(world.workspaceCwd))
@@ -89,7 +121,7 @@ export async function launchPersonalComputersFixture(
         const event = JSON.parse(line) as { type: string; data?: object }
         return event.type === 'session/title' ? JSON.stringify({ ...event, data: { ...event.data, messageSeqs: [], title: i === 0 ? 'Office conversation' : 'Compute conversation', source: { kind: 'user' } } }) : line
       }).join('\n')
-      const id = await seedSession(world, titled, 'same-personal-session')
+      const id = await seedSession(world, titled, sessionIds[i]!)
       const workspace = await world.ctx.workspaceRegistry.create(world.workspaceCwd)
       await workspace.attachSession(id)
       await workspace.setTitle(i === 0 ? 'Office work' : 'Compute work')
@@ -104,6 +136,18 @@ export async function launchPersonalComputersFixture(
         const url = new URL(req.url ?? '/', 'http://fixture'), index = selected(req.url), world = worlds[index]!, target = personalTargets[index]!
         const reply = (value: unknown): void => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(value)) }
         const requested = url.searchParams.get('dshRuntime')
+        const boot = assets !== undefined && index === 1 && url.pathname === '/' && req.method === 'GET'
+        if (boot && !url.searchParams.has('dshBootstrap') && await assets.serveDeferredIndex(res, {
+          principalId: 7, runtimeId: target.runtimeId, nodeId: target.nodeId, nodeName: target.nodeName,
+          scope: 'personal', language: 'en',
+        })) return
+        if (boot && url.searchParams.get('dshBootstrap') === '1') {
+          if (req.headers['x-dsh-expected-principal-id'] !== '7' || url.searchParams.get('dshNode') !== target.nodeId
+            || url.searchParams.get('dshTarget') !== 'personal' || requested !== target.runtimeId) {
+            res.writeHead(403); res.end(); return
+          }
+          res.setHeader('x-dsh-principal-id', '7')
+        }
         const prepared = url.pathname.startsWith('/api/prepare/v1/') || url.pathname.startsWith('/api/admit/v1/')
         const measured = prepared || url.pathname === '/account/api/workbench/rows' || url.pathname.startsWith('/account/api/drafts/')
         const requestAt = performance.now()
@@ -123,7 +167,7 @@ export async function launchPersonalComputersFixture(
           const at = personalTargets.findIndex(row => row.runtimeId === requested)
           const group = groups[at]!
           passive.set(requested!, (passive.get(requested!) ?? 0) + 1)
-          const items = at >= 0 && at < worlds.length ? [{ sessionId: 'same-personal-session', runtime: group.runtime,
+          const items = at >= 0 && at < worlds.length ? [{ sessionId: sessionIds[at], runtime: group.runtime,
             title: at === 0 ? 'Office conversation' : 'Compute conversation', cwd: worlds[at]!.workspaceCwd,
             visibility: 'personal', creatorUserId: 7, creatorDisplayName: 'Lin', updatedAt: 1, blank: false, canWrite: true }] : []
           const conversations = { runtimeId: requested, items, workspaces: [], nextCursor: null }
@@ -159,7 +203,7 @@ export async function launchPersonalComputersFixture(
           reply({ mode: 'multi', revision: '1', entry, primary: { ...entry, origin: `http://127.0.0.1:${req.socket.localPort}` },
             role: 'primary', scope: 'organization', refreshAfterMs: 30000, legacyMigrationRequired: false }); return
         }
-        if (url.pathname === '/account/api/context') {
+        if (url.pathname === '/account/api/context' || url.pathname === '/account/api/workbench/context') {
           reply({ user: { id: 7, username: 'lin', displayName: 'Lin', role: 'member' }, scope: { kind: 'personal' },
             projects: placed.map(({ projectId, nodeId, nodeName }) => ({ projectId, nodeId, nodeName, mode: 'rw', metadataOnNode: true, name: 'unverified control-plane name', path: '/unverified' })),
             environment: { id: target.runtimeId, nodeId: target.nodeId, nodeName: target.nodeName } }); return
@@ -173,13 +217,13 @@ export async function launchPersonalComputersFixture(
         }
         if (url.pathname === '/account/api/workbench/catalog') {
           reply({ personalComplete: false, personal: { id: 7, name: 'Personal' }, activeRuntime: target, projects: [], personalWorkspaces: groups,
-            items: personalTargets.slice(0, 2).map((runtime, i) => ({ sessionId: 'same-personal-session', runtime,
+            items: personalTargets.slice(0, 2).map((runtime, i) => ({ sessionId: sessionIds[i], runtime,
               title: i === 0 ? 'Office conversation' : 'Compute conversation', cwd: worlds[i]!.workspaceCwd,
               visibility: 'personal', creatorUserId: 7, creatorDisplayName: 'Lin', updatedAt: 1, blank: false, canWrite: true })) }); return
         }
         if (url.pathname === '/account/api/runtimes') {
-          reply({ items: [...personalTargets.map(runtime => ({ id: runtime.runtimeId, owner: { kind: 'personal', id: 7, name: 'Lin' },
-            node: { id: runtime.nodeId, name: runtime.nodeName, status: 'active', lastHeartbeatAt: null }, routing: 'local', observedState: 'stopped', generation: 1 })),
+          reply({ items: [...personalTargets.map((runtime, index) => ({ id: runtime.runtimeId, owner: { kind: 'personal', id: 7, name: 'Lin' },
+            node: { id: runtime.nodeId, name: runtime.nodeName, status: groups[index]!.status, lastHeartbeatAt: null }, routing: 'local', observedState: 'stopped', generation: 1 })),
           ...placed.map(row => ({ id: row.runtimeId, owner: { kind: 'project', id: row.projectId, name: 'unverified control-plane name' }, metadataOnNode: true,
             node: { id: row.nodeId, name: row.nodeName, status: 'active', lastHeartbeatAt: null }, routing: 'local', observedState: 'stopped', generation: 1 }))], nextCursor: null }); return
         }
@@ -202,7 +246,8 @@ export async function launchPersonalComputersFixture(
               const envelope = JSON.parse(body) as { result: { ok: boolean
                 value?: { runtimeTarget?: unknown; executionAuthorityRequired?: boolean } } }
               if (envelope.result.value !== undefined) {
-                Object.assign(envelope.result.value, { runtimeTarget: target, executionAuthorityRequired: true })
+                Object.assign(envelope.result.value, { runtimeTarget: target,
+                  executionAuthorityRequired: options.executionAuthorityRequired ?? true })
               }
               res.writeHead(response.statusCode ?? 502, { 'content-type': 'application/json' }); res.end(JSON.stringify(envelope))
             }); return
@@ -221,24 +266,33 @@ export async function launchPersonalComputersFixture(
     })
     server.on('connection', observeSocket)
     server.on('upgrade', (req, socket, head) => {
-      const world = worlds[selected(req.url)]!
-      const upstream = request(new URL(req.url ?? '/', world.baseUrl), { headers: { ...req.headers, cookie: cookies.get(world.baseUrl) ?? '' } })
-      requests.add(upstream); upstream.on('close', () => { requests.delete(upstream) })
-      upstream.on('error', () => { socket.destroy() })
-      upstream.on('upgrade', (response, peer, peerHead) => {
-        observeSocket(peer)
-        if (/^\/api\/events\.(?:mux|host)$/u.test(new URL(req.url ?? '/', 'http://fixture').pathname)) {
-          eventStreams.set(peer, personalTargets[selected(req.url)]!.runtimeId)
-          peer.on('close', () => { eventStreams.delete(peer) })
-        }
-        const headers = response.rawHeaders.reduce<string[]>((lines, name, i, all) => i % 2 === 0 ? [...lines, `${name}: ${all[i + 1] ?? ''}`] : lines, [])
-        socket.write(`HTTP/1.1 ${response.statusCode ?? 101} ${response.statusMessage ?? 'Switching Protocols'}\r\n${headers.join('\r\n')}\r\n\r\n`)
-        if (head.length) peer.write(head)
-        if (peerHead.length) socket.write(peerHead)
-        socket.pipe(peer).pipe(socket)
-        socket.on('close', () => { peer.destroy() }); peer.on('close', () => { socket.destroy() })
-      })
-      upstream.end()
+      const index = selected(req.url)
+      const runtimeId = personalTargets[index]!.runtimeId
+      const pathname = new URL(req.url ?? '/', 'http://fixture').pathname
+      const open = (): void => {
+        if (socket.destroyed) return
+        const world = worlds[index]!
+        const upstream = request(new URL(req.url ?? '/', world.baseUrl), { headers: { ...req.headers, cookie: cookies.get(world.baseUrl) ?? '' } })
+        requests.add(upstream); upstream.on('close', () => { requests.delete(upstream) })
+        upstream.on('error', () => { socket.destroy() })
+        upstream.on('upgrade', (response, peer, peerHead) => {
+          observeSocket(peer)
+          if (/^\/api\/events\.(?:mux|host)$/u.test(pathname)) {
+            eventStreams.set(peer, runtimeId)
+            peer.on('close', () => { eventStreams.delete(peer) })
+          }
+          const headers = response.rawHeaders.reduce<string[]>((lines, name, i, all) => i % 2 === 0 ? [...lines, `${name}: ${all[i + 1] ?? ''}`] : lines, [])
+          socket.write(`HTTP/1.1 ${response.statusCode ?? 101} ${response.statusMessage ?? 'Switching Protocols'}\r\n${headers.join('\r\n')}\r\n\r\n`)
+          if (head.length) peer.write(head)
+          if (peerHead.length) socket.write(peerHead)
+          socket.pipe(peer).pipe(socket)
+          socket.on('close', () => { peer.destroy() }); peer.on('close', () => { socket.destroy() })
+        })
+        upstream.end()
+      }
+      const gate = options.beforeEventUpgrade?.(runtimeId, pathname)
+      if (gate === undefined) open()
+      else void gate.then(open, () => { socket.destroy() })
     })
     const port = Number(process.env['DSH_BROWSER_FIXTURE_PORT'] ?? '0')
     if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error('Invalid loopback test fixture port')
@@ -258,6 +312,11 @@ export async function launchPersonalComputersFixture(
       cookies.set(world.baseUrl, cookie.split(';', 1)[0]!)
     }
     return { worlds, calls, preparations, passive, receipts, projectReads, draftReceipts, setLatency: (ms: number) => { latencyMs = ms }, url: `http://${authority}/?dshRuntime=${personalTargets[0]!.runtimeId}`,
+      setRuntimeAvailable: (index: number, available: boolean): void => {
+        const group = groups[index]
+        if (group === undefined) throw new Error('Personal fixture Runtime does not exist')
+        group.status = available ? 'active' : 'offline'
+      },
       renewEventStreams: (runtimeId: string): void => {
         for (const [socket, owner] of eventStreams) if (owner === runtimeId) socket.destroy()
       }, close }

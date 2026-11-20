@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-21-preset-mount-audit-failed-rows.md
 document:
-  en: 3225ccaf6a2ba0c1bec1470fe7c4d8fa2b860de9
-  zh: 33ba6a57b9e7800a7d0a4c80088fe5164d86d540
+  en: 159d57c8aa6658752a7d023cb8c5c68024870b1b
+  zh: c11c3d9897e94a427180fedaf66db4eb616df3db
 /agent-note-preset-mount-audit-settles-rows-and-reports-failed-fibers:
   en: 17f2a02380e8d2de
   zh: 9abca69e43ba3d28
@@ -12,11 +12,11 @@ document:
   en: 73357a2cd0ba0ebf
   zh: 5f0387b663ce74de
 /agent-note-preset-mount-audit-settles-rows-and-reports-failed-fibers/decision:
-  en: c2a7fac4f03deb8a
-  zh: 2787461279a41875
+  en: e95bd71659d6d8df
+  zh: e56105add1c3f0e5
 /agent-note-preset-mount-audit-settles-rows-and-reports-failed-fibers/alternatives-considered:
   en: 706e1b6ccc7a21bf
   zh: b9c3c76e0e1787c8
 /agent-note-preset-mount-audit-settles-rows-and-reports-failed-fibers/consequences:
-  en: 49119a285df001fd
-  zh: 9d1323cbb99a4240
+  en: f80c5337d9d60ddc
+  zh: 60aea3bba95774eb

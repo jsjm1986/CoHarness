@@ -52,6 +52,60 @@ function Sweep-AgentOrphans([object[]]$Actions) {
     Where-Object { $_.CommandLine -match 'node-agent-main\.js' -and ($null -eq $gatewayDir -or $_.CommandLine -like ('*' + [WildcardPattern]::Escape($gatewayDir) + '*')) } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
+# Manual connection changes are not a Runtime handoff protocol. Keep the
+# channel and its task untouched until this installation has stopped its work.
+function Assert-AgentControlSafe([object]$Task, [string]$ScriptFile) {
+  if (@($Task.Actions).Count -ne 1) { throw 'task must contain exactly one owned agent action; no task or process was stopped' }
+  $gatewayDir = $null
+  $owned = $false
+  foreach ($action in $Task.Actions) {
+    if ($action.Arguments -notmatch '-File\s+"([^"]+)"') { continue }
+    $script = [IO.Path]::GetFullPath($Matches[1])
+    if (-not $script.Equals([IO.Path]::GetFullPath($ScriptFile), [StringComparison]::OrdinalIgnoreCase)) { continue }
+    if ($action.Arguments -notmatch '-Run\b' -or $action.Arguments -notmatch '-GatewayDir\s+"([^"]+)"') { continue }
+    $gatewayPath = [IO.Path]::GetFullPath($Matches[1])
+    $gatewayDir = $gatewayPath.Replace('/', '\')
+    if ($action.Arguments -notmatch '-StateRoot\s+"([^"]+)"') { continue }
+    $ownerDirectory = Join-Path ([IO.Path]::GetFullPath($Matches[1])) 'local-runtime-supervisors'
+    $owned = $true
+  }
+  if (-not $owned) { throw 'task is not the node agent hosted by this exact script; no task or process was stopped' }
+  $releaseRoot = ([IO.Path]::GetDirectoryName($gatewayPath)).Replace('/', '\')
+  foreach ($peer in @(Get-ScheduledTask -ErrorAction Stop)) {
+    if ($peer.State -eq 'Disabled' -or (Test-HostsAgent $peer.Actions)) { continue }
+    foreach ($action in $peer.Actions) {
+      if ($action.Arguments -match '-Watchdog\b' -or -not $action.WorkingDirectory) { continue }
+      $directory = [IO.Path]::GetFullPath($action.WorkingDirectory).Replace('/', '\')
+      if ($directory.Equals($gatewayDir, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "task $($peer.TaskName) can run in this Gateway installation; pause its automatic launch and confirm its work has stopped before changing the agent connection; no task or process was stopped"
+      }
+    }
+  }
+  if (-not (Test-Path -LiteralPath $ownerDirectory -PathType Container)) {
+    throw 'Runtime ownership inventory is unavailable; no task or process was stopped'
+  }
+  foreach ($file in @(Get-ChildItem -LiteralPath $ownerDirectory -File -Filter '*.json' -ErrorAction Stop)) {
+    try { $record = Get-Content -LiteralPath $file.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+    catch { throw 'Runtime ownership inventory cannot be read; no task or process was stopped' }
+    if ($record.version -ne 1 -or $record.phase -ne 'stopped') {
+      throw 'Runtime ownership does not confirm every retained generation stopped; no task or process was stopped'
+    }
+  }
+  $processes = @(Get-CimInstance Win32_Process -ErrorAction Stop)
+  foreach ($process in $processes) {
+    $command = ([string]$process.CommandLine).Replace('/', '\')
+    if (-not ($command.IndexOf($releaseRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -ge 0)) { continue }
+    if ($command -match 'local-runtime-supervisor|apps\\cli\\lib\\bin\.js' -or
+        (($command.IndexOf($gatewayDir.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -ge 0) -and $command -match '(?:gateway\\)?lib\\index\.js')) {
+      throw "managed Gateway or Runtime pid $($process.ProcessId) is running; long tasks and schedules may still need this connection; no task or process was stopped"
+    }
+  }
+}
+if ($Uninstall -or $Restart) {
+  $controlled = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -eq $TaskName }
+  if ($controlled) { Assert-AgentControlSafe $controlled $PSCommandPath }
+  elseif ($Restart) { throw "task $TaskName is not registered" }
+}
 if ($Install -or $Uninstall -or $Restart) {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
   if (-not [Security.Principal.WindowsPrincipal]::new($identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {

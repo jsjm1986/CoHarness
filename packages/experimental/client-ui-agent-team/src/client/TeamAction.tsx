@@ -237,6 +237,7 @@ function RootTeamAction({
                       memberCount={members.length}
                       sessionId={sessionId}
                       openTeammate={openTeammate}
+                      onOpened={() => { if (sessionRef.current === sessionId) changeOpen(false) }}
                       onError={setError}
                       t={t}
                     />
@@ -338,12 +339,13 @@ function TeamModeRow({
 }
 
 function TeamMemberRow({
-  member, memberCount, sessionId, openTeammate, onError, t,
+  member, memberCount, sessionId, openTeammate, onOpened, onError, t,
 }: {
   member: MemberRow
   memberCount: number
   sessionId: SessionId
   openTeammate: TeamActionInjected['openTeammate']
+  onOpened: () => void
   onError: (message: string) => void
   t: TeamActionProps['t']
 }) {
@@ -357,7 +359,7 @@ function TeamMemberRow({
         className={highlightCurrent ? `${css.member} ${css.memberCurrent}` : css.member}
         disabled={isCurrent}
         onClick={() => {
-          void openTeammate(sessionId, member.id).catch((reason: unknown) => { onError(String(reason)) })
+          void openTeammate(sessionId, member.id).then(onOpened, (reason: unknown) => { onError(String(reason)) })
         }}
       >
         <StateDot state={member.activity === 'running' ? 'ongoing' : 'done'} />

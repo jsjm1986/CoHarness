@@ -135,14 +135,14 @@ describe('chat row diff body', () => {
     // Collapsed: the summary row (path) only, no diff body.
     expect(view.queryByText('hello fixture')).toBeNull()
     // The path link is not the expand control; the leading toggle is.
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(view.container.querySelector('[data-diff]')).not.toBeNull()
     expect(view.getByText('hello fixture')).toBeTruthy()
   })
 
   it('a running diff call expands to its intended change', () => {
     const view = render(<GenericToolCard {...ownerProps(running())} />)
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(view.container.querySelector('[data-diff]')).not.toBeNull()
   })
 
@@ -157,7 +157,7 @@ describe('chat row diff body', () => {
         callView: null, resultView: null,
       }),
     }} />)
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(view.container.querySelector('[data-diff]')).toBeNull()
     expect(view.getByText(/"foo"/)).toBeTruthy()
   })
@@ -183,7 +183,7 @@ describe('FileMutationRow diff card', () => {
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
   const toggleRow = (view: { container: HTMLElement }) => {
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
   }
 
   it('collapses to the summary row; expanding reveals the applied diff card', () => {

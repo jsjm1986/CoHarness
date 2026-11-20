@@ -1,12 +1,8 @@
-- button "Today Zhou · Lin 2"
-- "button \"Zhou Release plan Pinned the migration checklist to the top of the plan. {{clock}}\"":
-  - text: Zhou
-  - button "Release plan"
-  - text: Pinned the migration checklist to the top of the plan. 09:00
-- "button \"Lin Release plan chose Proceed with the staged rollout {{clock}}\"":
-  - text: Lin
-  - button "Release plan"
-  - text: chose Proceed with the staged rollout 08:59
+- button "Today Zhou · Lin 2" [expanded]
+- "button \"Zhou Pinned the migration checklist to the top of the plan. {{clock}}\""
+- button "Release plan"
+- "button \"Lin chose Proceed with the staged rollout {{clock}}\" [expanded]"
+- button "Release plan"
 - text: "Question: Roll out to production now or stage first?"
 - img
 - text: Proceed with the staged rollout

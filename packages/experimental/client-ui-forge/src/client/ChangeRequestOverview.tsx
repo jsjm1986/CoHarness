@@ -612,7 +612,7 @@ export function IssuesRow({ snapshot, openLink, t }: {
     )
   })
   return (
-    <div className={css.row} data-forge-closing-issues="">
+    <div className={clsx(css.row, css.issuesRow)} data-forge-closing-issues="">
       <RowParts label={undefined} icon={<IssueGlyph />} opens={false}
         value={<>{t('issues.label')}{' '}{links}{snapshot.closingIssuesTruncated && t('issues.more')}</>} />
     </div>

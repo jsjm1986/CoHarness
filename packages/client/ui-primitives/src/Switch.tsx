@@ -36,7 +36,9 @@ export function Switch({ checked, onChange, label, disabled = false, title, clas
       className={clsx(css.switch, className)}
       onClick={() => { onChange(!checked) }}
     >
-      <span className={css.thumb} />
+      <span className={css.track} data-switch-track>
+        <span className={css.thumb} />
+      </span>
     </button>
   )
 }

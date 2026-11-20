@@ -131,7 +131,7 @@ export function clientBundle(
   return ({ env }) => {
     const face = buildFace(env?.DSH_BUILD_FACE)
     const clientEntry = face === undefined ? 'src/client/index.ts' : 'lib/types/client/index.js'
-    const client = clientConfig(id, clientEntry, options.clientBanner, options.codeSplitting)
+    const client = clientConfig(id, clientEntry, options)
     const node = [lib, ...(options.companions ?? [])]
     if (face === 'host') return options.hostPhase === true ? node : [SKIP_WORKSPACE_BUILD]
     if (face === 'client') {
@@ -230,6 +230,8 @@ interface ClientBundleOptions {
    * it must stay a dynamic import in source while remaining bundle-internal).
    */
   readonly codeSplitting?: boolean
+  /** Keep code shared by a lazy chunk and its entry in the entry's exports. */
+  readonly preserveEntrySignatures?: 'allow-extension'
   /** Optional legal or attribution text selected by emitted client filename. */
   readonly clientBanner?: (fileName: string) => string | undefined
 }
@@ -483,6 +485,13 @@ function asyncChunkRequirePlugin(): TsdownPlugin {
     name: 'dsh-client-async-chunk-require',
     renderChunk(code, chunk, outputOptions) {
       if (outputOptions.format !== 'cjs') return null
+      for (const imported of chunk.imports) {
+        const fileName = imported.replace(/^\.\//u, '')
+        if (/^client(?:\.[A-Za-z0-9][A-Za-z0-9._-]*)?\.js$/u.test(fileName)
+          && (chunk.isEntry || fileName !== 'client.js')) {
+          throw new Error(`client bundle compiler: ${chunk.fileName} synchronously imports ${imported}`)
+        }
+      }
       const transformed = new Rolldown.RolldownMagicString(code)
       for (const dynamicImport of chunk.dynamicImports) {
         const fileName = dynamicImport.startsWith('./') ? dynamicImport.slice(2) : dynamicImport
@@ -520,7 +529,9 @@ function asyncChunkRequirePlugin(): TsdownPlugin {
   }
 }
 
-function clientConfig(id: string, entry: string, clientBanner?: (fileName: string) => string | undefined, codeSplitting?: boolean): UserConfig {
+function clientConfig(id: string, entry: string, {
+  clientBanner, codeSplitting, preserveEntrySignatures,
+}: ClientBundleOptions): UserConfig {
   const isRequested = (specifier: string): boolean => clientExternals(id).has(specifier)
   const isolation = clientInputIsolation(id)
   return {
@@ -554,6 +565,7 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
     // a CJS bundle cannot carry) resolve their static flavor matching the
     // NODE_ENV the defines below bake in.
     inputOptions: {
+      ...(preserveEntrySignatures === undefined ? {} : { preserveEntrySignatures }),
       resolve: {
         conditionNames: [
           (process.env.NODE_ENV ?? 'production') === 'development' ? 'development' : 'production',

@@ -1,0 +1,215 @@
+/** Default-theme interactive controls adapted to the 44px coarse-pointer floor. */
+
+/* Rendered-but-hidden controls must also hide from hit testing: the closed
+   sidebar is translated off-canvas without a visibility state, and the closed
+   language picker clips its list behind the 24px title row. */
+@media (max-width: 959px) {
+  .VPSidebar {
+    transition: opacity 0.5s, transform 0.25s ease, visibility 0s linear 0.25s;
+  }
+
+  .VPSidebar:not(.open) {
+    visibility: hidden;
+  }
+}
+
+.VPNavScreenTranslations:not(.open) .list {
+  visibility: hidden;
+}
+
+.VPNavBar .VPFlyout > .menu {
+  inset-block-start: 100%;
+}
+
+/* Long code tokens and bare URLs must wrap inside whatever width their line
+   box gives them; leaving them unbreakable stretches the line past the
+   viewport's edge. `pre` still holds `white-space: pre` and is unaffected. */
+.vp-doc code,
+.vp-doc a {
+  overflow-wrap: anywhere;
+}
+
+.vp-doc a.standalone-document-link {
+  display: inline-flex;
+  max-inline-size: 100%;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  align-items: center;
+}
+
+/* Inside a table, wrapping every token would collapse min-content columns
+   into single-character strips; the table scrolls horizontally instead and
+   its cells keep their natural width. */
+.vp-doc :is(td, th) :is(code, a) {
+  overflow-wrap: normal;
+}
+
+.vp-doc .documentation-table-scroll {
+  margin-block: 16px 8px;
+  padding-block-end: 8px;
+  overflow-x: auto;
+}
+
+.vp-doc .documentation-table-scroll > table {
+  display: table;
+  margin: 0;
+  overflow: visible;
+}
+
+/* Heading permalinks sit below even the 24px fine-pointer floor, so they stay
+   ungated. The em outdent keeps the # glyph in the gutter, but at large text
+   scales it pushes the box off the viewport's left edge; pin the box to the
+   heading edge and indent the glyph instead so both stay put. The anchor's
+   own box stays glyph-sized so the symbol keeps its line alignment; a
+   generated area centered on it carries the 44px target, and its overhang
+   lands in the adjacent blocks' margins instead of inside their border
+   boxes. */
+.vp-doc .header-anchor {
+  margin-left: 0;
+  text-indent: -0.87em;
+}
+
+.vp-doc .header-anchor::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px;
+}
+
+.VPSwitch {
+  position: relative;
+}
+
+/* The 40×22 knob keeps its visual size; generated content grows the hit area. */
+.VPSwitch::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .vp-doc a.standalone-document-link {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+  }
+
+  /* Navbar local-search trigger: height 40px at ≥768px. */
+  .DocSearch-Button {
+    min-height: 44px;
+  }
+
+  /* Search modal action icons (back, clear, layout toggle): 34×34. */
+  .VPLocalSearchBox .search-actions button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Search modal input row: the bar is 38px tall and the input does not stretch. */
+  .VPLocalSearchBox .search-bar,
+  .VPLocalSearchBox .search-input {
+    min-height: 44px;
+  }
+
+  /* Single-line result rows collapse to ~36px on small screens. */
+  .VPLocalSearchBox .result {
+    min-height: 44px;
+  }
+
+  /* Language picker: the collapsed 24px container clips its title row. */
+  .VPNavScreenTranslations {
+    min-height: 44px;
+  }
+
+  .VPNavScreenTranslations button.title {
+    min-height: 44px;
+  }
+
+  .VPNavScreenTranslations .list .link {
+    display: flex;
+    align-items: center;
+    min-block-size: 44px;
+  }
+
+  .VPNavScreenMenuGroupLink,
+  .VPMenu .link {
+    line-height: 44px;
+  }
+
+  /* Social icon links: 36×36. */
+  .VPSocialLink {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Code-block copy button: 40×40. */
+  .vp-doc [class*='language-'] > button.copy {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Code-group tab labels are 48px tall; guard a narrow tab name. */
+  .vp-code-group .tabs label {
+    min-width: 44px;
+  }
+
+  /* Sidebar rows: 32px text rows, 32×32 carets and role=button group rows. */
+  .VPSidebarItem > .item {
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .VPSidebarItem .link {
+    min-height: 44px;
+  }
+
+  .VPSidebarItem .caret {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Aside/local-nav outline links: block + line-height 32px; padding keeps
+     text-overflow: ellipsis working. */
+  a.outline-link {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  /* Local-nav outline toggle: 24px text inside a 47px strip; negative
+     margins keep the strip height unchanged. */
+  .VPLocalNavOutlineDropdown > button {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin-block: -10px;
+  }
+
+  /* Local-nav menu button: padding collapses to 0 at 768–959px, leaving a
+     24px row inside the 47px container. */
+  .VPLocalNav button.menu {
+    min-height: 44px;
+  }
+
+  /* Doc footer edit link: flex row + line-height 32px. */
+  .edit-link .edit-link-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* 404 page home link: inline-block + padding 3px 16px. */
+  .NotFound .action .link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}

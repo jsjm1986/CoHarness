@@ -7,9 +7,21 @@
 .trigger { align-self: stretch; flex: none; height: auto; width: 44px; padding: 0; border-radius: 0 24px 24px 0; }
 .menu { display: flex; align-self: stretch; flex: none; }
 
+.feedback {
+  max-inline-size: 30ch;
+  margin: 0;
+  padding: var(--dsw-space-2) var(--dsw-space-3);
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* Phone: the entry joins the guide's flat-list grammar — full-width rows split
    by hairlines — instead of a capsule card floating mid-pane. */
 @media (max-width: 767px) {
+  .feedback { font: var(--dsw-mobile-font-secondary); }
+
   .entry {
     background: transparent;
     border: none;

@@ -7,6 +7,11 @@ import { Toast } from '../src/Toast.tsx'
 afterEach(cleanup)
 
 describe('Toast', () => {
+  it('announces successful actions politely', () => {
+    const view = render(<Toast text="Saved" tone="success" onDone={vi.fn()} />)
+    expect(view.getByRole('status').textContent).toBe('Saved')
+    expect(view.queryByRole('alert')).toBeNull()
+  })
   it('announces its text and reports done after the hold-and-fade lifetime', () => {
     vi.useFakeTimers()
     try {

@@ -6,6 +6,7 @@ import { verifiedPeerFileRoots, type PeerFileRootMap } from './peer-snapshot-roo
 import { readVerifiedPeerManagedFiles, type PeerBackupBinding, type PeerBackupExporter } from './peer-backup-restic.ts'
 import { snapshotManagedFiles, type ManagedSnapshot } from './managed-files.ts'
 import { peerPrivateDirectory, PeerBackupError } from './peer-backup-repository.ts'
+import type { PeerSourceWrites } from './peer-backup-source-space.ts'
 
 /** The comparison is insensitive to physical snapshot path and device numbers. It covers membership, logical roles, modes and bytes. */
 export function logicalPeerFileDigest(
@@ -46,11 +47,14 @@ export async function latestPeerFileWitness(
   coordinate: { oldEpoch: string; revision: string },
   staging: string,
   signal: AbortSignal,
+  space?: PeerSourceWrites,
 ): Promise<string> {
   await peerPrivateDirectory(staging)
-  const directory = await mkdtemp(join(staging, 'current-writer-'))
+  const create = () => mkdtemp(join(staging, 'current-writer-'))
+  const directory = space ? await space.write(staging, 0, create) : await create()
   try {
-    const capture = await exporter.capture(binding, directory, signal)
+    const capture = await exporter.capture(binding, directory, signal, space)
+    await space?.check(directory)
     if (capture.gaps.length || capture.watermark !== coordinate.revision || capture.writerEpoch !== coordinate.oldEpoch)
       throw new PeerBackupError(409, 'peer-backup/new-quiescent-point-required')
     const roots = await verifiedPeerFileRoots(binding, directory, true)

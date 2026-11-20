@@ -58,9 +58,40 @@ function bodyFace(value: Record<string, unknown>): asserts value is Record<strin
   assert(typeof value.hooks === 'object' && value.hooks !== null)
 }
 
-function formFace(value: Record<string, unknown>): asserts value is Record<string, unknown> & Pick<TranslationFormInjected, 'edit'> {
+function formFace(value: Record<string, unknown>): asserts value is Record<string, unknown> & TranslationFormInjected {
   assert(typeof value.edit === 'function')
+  assert(typeof value.save === 'function')
+  assert(typeof value.hooks === 'object' && value.hooks !== null)
 }
+
+it.each(['error', 'blocked'] as const)('preserves the staged language when the settings scope settles with %s', async (status) => {
+  const b = await fixture()
+  b.scope.publish({ status: 'ready', writable: true, revision: 1,
+    value: { provider: 'bing', targetLanguage: 'auto' }, base: { provider: 'bing', targetLanguage: 'auto' }, user: {} })
+  try {
+    await mountTranslation(b.ctx, contribution)
+    const form = b.ctx.slots.entries('plugins.bundle.config')[0]!.inject!()
+    formFace(form)
+    b.scope.mutate.mockImplementationOnce(async () => {
+      b.scope.publish({ write: status === 'error'
+        ? { status: 'error', code: 'transport', message: 'offline' }
+        : { status: 'blocked', reason: 'provider' } })
+    })
+    form.edit('targetLanguage', 'ja')
+    form.save()
+    await vi.waitFor(() => { expect(form.hooks.translationForm.getSnapshot()).toMatchObject({
+      failed: true, dirty: true, saving: false, targetLanguage: { text: 'ja' },
+    }) })
+    b.scope.mutate.mockImplementationOnce(async () => {
+      b.scope.publish({ write: { status: 'idle' }, value: { provider: 'bing', targetLanguage: 'ja' },
+        user: { targetLanguage: 'ja' }, revision: 2 })
+    })
+    form.save()
+    await vi.waitFor(() => { expect(form.hooks.translationForm.getSnapshot()).toMatchObject({
+      failed: false, dirty: false, saving: false, targetLanguage: { text: 'ja' },
+    }) })
+  } finally { await b.ctx.fiber.dispose() }
+})
 
 /** Invoke the owned reasoning contribution with its declared Session parameters. */
 function injectReasoning(entry: StoredEntry, sessionId: SessionId): Record<string, unknown> {

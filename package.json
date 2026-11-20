@@ -71,6 +71,7 @@
     "docs:check": "pnpm exec vitest run scripts/project-doc-site.spec.ts scripts/verify-doc-site-fragments.spec.ts website/tests/mermaid-viewer.spec.ts website/tests/code-groups.spec.ts website/tests/page-markdown-actions.spec.ts website/tests/raw-markdown.spec.ts && pnpm run docs:build",
     "docs:dev": "pnpm --filter @deepseek-ai/website run dev",
     "docs:preview": "pnpm --filter @deepseek-ai/website run preview",
+    "docs:test:responsive": "pnpm run docs:build && pnpm exec vitest run --config vitest.docs-web.config.ts",
     "dsh": "node --import tsx/esm apps/cli/src/bin.ts",
     "duplication": "jscpd --config .jscpd.json packages scripts",
     "gen-client-catalog": "tsx scripts/gen-client-catalog.ts",

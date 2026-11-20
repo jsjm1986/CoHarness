@@ -1,9 +1,10 @@
 /** Real Office conversion and PDF rendering through the shipped authorized Workspace preview. */
+import { responsiveBrowser, responsiveBrowserName, responsiveMobileEmulation, responsiveViewports, expectViewportFit } from './responsive-browser.ts'
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Page, type Response } from 'playwright'
+import { type Browser, type Page, type Response } from 'playwright'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@deepseek-ai/dsh-workspace'
@@ -12,6 +13,7 @@ import { realOfficeBytes } from './office-fixture.ts'
 import { pdfResourceFixture } from '../../../packages/client/ui-workbench/tests/pdf-resource-fixture.ts'
 import { launchWebScaffold, seedSession, watchConsole, captureStableAria, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
 import { expectPdfResolution, hideDocumentZoom, newEnglishPage, revealDocumentZoom, saveFailureShot } from './support.ts'
+import { auditResponsiveControls } from './responsive-controls.ts'
 
 const FORMATS = ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt'] as const
 // Workbooks take the read-only browser-parsed sheet surface, not Office→PDF.
@@ -39,17 +41,18 @@ describe('web e2e: authorized Office preview', () => {
     for (const extension of FORMATS) await writeFile(join(scaffold.workspaceCwd, `preview.${extension}`), realOfficeBytes(extension))
     for (const kind of PDF_RESOURCES) await writeFile(join(scaffold.workspaceCwd, `resource-${kind}.pdf`), pdfResourceFixture(kind))
     await writeFile(join(scaffold.workspaceCwd, 'readonly.csv'), 'key,value\nAlpha,1\nBeta,2\n')
+    await writeFile(join(scaffold.workspaceCwd, 'readonly.tsv'), 'key\tvalue\nAlpha\t1\nBeta\t2\n')
     await writeFile(join(scaffold.workspaceCwd, 'broken.docx'), 'This is not an Office archive.')
     const links = [
       ...FORMATS.map(extension => `[Preview ${extension}](preview.${extension})`),
       ...PDF_RESOURCES.map(kind => `[Resource ${kind}](resource-${kind}.pdf)`),
-      '[Read-only spreadsheet](readonly.csv)', '[Broken document](broken.docx)',
+      '[Read-only spreadsheet](readonly.csv)', '[Tab-separated spreadsheet](readonly.tsv)', '[Broken document](broken.docx)',
     ].join('\n\n')
     const source = (await readFile(SEED, 'utf8')).replace('"text":"DONE"', `"text":${JSON.stringify(links)}`)
     const history = await seedSession(scaffold, source, 'workspace-office-history')
     const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
     await workspace.attachSession(history)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     page.on('request', (request) => {
       const path = new URL(request.url()).pathname
@@ -78,7 +81,7 @@ describe('web e2e: authorized Office preview', () => {
         const data = context.getImageData(0, 0, element.width, element.height).data
         return data.some((value, index) => index % 4 === 3 && value > 200
           && (data[index - 3]! < 200 || data[index - 2]! < 200 || data[index - 1]! < 200))
-      })).toBe(true)
+      }), { message: `The ${kind} PDF draws visible pixels` }).toBe(true)
       if (kind === 'vector') expect(resourceRequests).toEqual([])
       if (kind === 'standard') expect(resourceRequests.filter(path => path.endsWith('/client.fonts.js'))).toHaveLength(1)
       if (kind === 'cjk') {
@@ -327,6 +330,73 @@ describe('web e2e: authorized Office preview', () => {
     await preview.getByRole('button', { name: 'Close preview', exact: true }).click()
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
+
+  it.each(responsiveViewports)('$name checks every Office, spreadsheet and PDF decoder surface with real content', async ({ name, width, height }) => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold is unavailable')
+    const responsivePage = await browser.newPage({ viewport: { width, height }, locale: 'en-US', hasTouch: true,
+      isMobile: responsiveMobileEmulation && width < 768, reducedMotion: 'reduce' })
+    const tripwire = watchConsole(responsivePage)
+    const files = [
+      ...FORMATS.map(extension => ({ file: `preview.${extension}`, label: `Preview ${extension}`, sheet: SPREADSHEETS.has(extension) })),
+      ...PDF_RESOURCES.map(kind => ({ file: `resource-${kind}.pdf`, label: `Resource ${kind}`, sheet: false })),
+      { file: 'readonly.csv', label: 'Read-only spreadsheet', sheet: true },
+      { file: 'readonly.tsv', label: 'Tab-separated spreadsheet', sheet: true },
+    ]
+    let active = 'entry'
+    try {
+      await responsivePage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      for (const { file, label, sheet } of files) {
+        active = file
+        await responsivePage.getByRole('button', { name: label, exact: true }).click()
+        const preview = responsivePage.getByRole('region', { name: file, exact: true })
+        const canvas = preview.locator('canvas').first()
+        await canvas.waitFor({ timeout: 60_000 })
+        await expect.poll(() => canvas.evaluate((node: HTMLCanvasElement) => node.width > 0 && node.height > 0)).toBe(true)
+        await expectViewportFit(responsivePage, preview, [preview.getByRole('button', { name: 'Reload', exact: true }), preview.getByRole('button', { name: 'Close preview', exact: true })])
+        if (sheet) {
+          const formula = preview.locator('#luckysheet-functionbox-cell')
+          await expect.poll(() => formula.textContent()).toContain(file.startsWith('readonly.') ? 'key' : 'Office preview')
+          expect(await preview.locator('#luckysheet-rich-text-editor').getAttribute('contenteditable')).toBe('false')
+        } else {
+          await canvas.scrollIntoViewIfNeeded()
+          await expectPdfResolution(canvas)
+          const zoom = await revealDocumentZoom(responsivePage, preview)
+          await zoom.click()
+          await responsivePage.getByRole('menuitem', { name: '150%', exact: true }).click()
+          await canvas.scrollIntoViewIfNeeded()
+          await expectPdfResolution(canvas)
+          const fit = await revealDocumentZoom(responsivePage, preview)
+          await fit.click()
+          await responsivePage.getByRole('menuitem', { name: 'Fit width', exact: true }).click()
+          await expect.poll(() => preview.locator('[data-document-zoom-scrollport]').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+          const content = await preview.locator('[data-document-zoom-scrollport]').boundingBox()
+          const controls = await preview.locator('[data-document-zoom-controls]').boundingBox()
+          expect(content).not.toBeNull()
+          expect(controls).not.toBeNull()
+          expect(content!.height).toBeGreaterThan(0)
+          expect(content!.y + content!.height).toBeLessThanOrEqual(controls!.y + 1)
+        }
+        await auditResponsiveControls(responsivePage, preview, `office-preview/${file}`)
+        const screenshots = process.env.DSH_MOBILE_SCREENSHOTS
+        if (screenshots !== undefined) {
+          await mkdir(screenshots, { recursive: true })
+          await responsivePage.screenshot({ path: join(screenshots, `preview-${responsiveBrowserName}-${name}-${file}.png`), animations: 'disabled' })
+        }
+        await preview.getByRole('button', { name: 'Close preview', exact: true }).click()
+        await preview.waitFor({ state: 'hidden' })
+      }
+      active = 'broken.docx'
+      await responsivePage.getByRole('button', { name: 'Broken document', exact: true }).click()
+      const failure = responsivePage.getByRole('region', { name: 'broken.docx', exact: true })
+      await failure.getByRole('alert').waitFor({ timeout: 60_000 })
+      await expectViewportFit(responsivePage, failure, [failure.getByRole('button', { name: 'Reload', exact: true }), failure.getByRole('button', { name: 'Close preview', exact: true })])
+      expect(await failure.locator('[data-pdf-preview]').count()).toBe(0)
+      expect(tripwire.pageErrors).toEqual([])
+    } catch (error) {
+      await saveFailureShot(responsivePage, `preview-${responsiveBrowserName}-${name}-${active}`)
+      throw error
+    } finally { await responsivePage.close() }
+  }, 120_000)
 
   it('reports a damaged document without displaying a successful PDF', async () => {
     await page.getByRole('button', { name: 'Broken document', exact: true }).click()

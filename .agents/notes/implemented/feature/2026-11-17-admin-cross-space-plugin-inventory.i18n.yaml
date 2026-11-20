@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-17-admin-cross-space-plugin-inventory.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-17-admin-cross-space-plugin-inventory.md
+document:
+  en: 2273b2dc9c34b397a8dc2e0c51fbb0ef41e3d1bd
+  zh: 7c03d4c2c5296e12ad46a7da1747c78f53c5a7cb
+/agent-note-admin-cross-space-plugin-inventory:
+  en: 072a381e0d9ecda6
+  zh: 9a5ba6d708c7daa8
+/agent-note-admin-cross-space-plugin-inventory/problem:
+  en: c76eb1370aa0faa3
+  zh: dc95391e322ff52d
+/agent-note-admin-cross-space-plugin-inventory/decision:
+  en: 98e7bf0012aac7a3
+  zh: cd0881df06f9b0ae
+/agent-note-admin-cross-space-plugin-inventory/alternatives-considered:
+  en: 3f449cdf63781f23
+  zh: 0bfc33361e4f3fa9
+/agent-note-admin-cross-space-plugin-inventory/consequences:
+  en: 1e8aecaa54a10ac8
+  zh: a586559ec8fd44a4
+/agent-note-admin-cross-space-plugin-inventory/verification:
+  en: c0bfe376c661f758
+  zh: a192be76d67f9704

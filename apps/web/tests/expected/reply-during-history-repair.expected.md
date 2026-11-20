@@ -1,0 +1,1 @@
+- paragraph: The original response survives the history wait.

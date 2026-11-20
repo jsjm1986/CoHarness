@@ -16,6 +16,8 @@ The [forge lane absorption](../architecture/2026-11-15-forge-lane-absorption.md)
 - `experimental/forge-bundle` stays unported. No shipped composition may mount an experimental panel — release bundles cannot depend on experimental packages — and no opt-in preset composes the lane, so the upstream patch layer has no local consumer; the panel's coverage is its package suites.
 - Only the `en` and `zh` locale catalogs are carried, matching every package in the fork.
 
+The Client sources consume an `AsyncIterable` and cancel it through the signal supplied to the opener. The local Gateway returns plain async iterators, so teardown does not call an upstream-only `dispose` method on them. Source tests provide iterables without that method; the assembled browser scenario switches away from a Session with the Forge plugin mounted.
+
 ## Alternatives considered
 
 - Wiring `decide` into `typert-gateway/authorize` was rejected: the authorization request carries no principal, so every call would evaluate as the owner and allow — a listener that can never deny is a second decision path with no decision. Re-entry: a carrier that mints non-owner principals names the call site.

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-17-runtime-immutable-resource-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-17-runtime-immutable-resource-admission.md
+document:
+  en: 42245d77cb697e2e654dbb282f16f804a2297435
+  zh: 0f68688320214ccba406bd7b1ba2eada0497e047
+/agent-note-read-only-admission-for-immutable-runtime-resources:
+  en: 552bc1ebf261da3f
+  zh: 692110515bd071d6
+/agent-note-read-only-admission-for-immutable-runtime-resources/problem:
+  en: 7d8abc64b5456f3e
+  zh: e0d6c948da849b76
+/agent-note-read-only-admission-for-immutable-runtime-resources/decision:
+  en: 71e8818b98ad8120
+  zh: 31e87449d7a3d4b8
+/agent-note-read-only-admission-for-immutable-runtime-resources/alternatives-considered:
+  en: 5adac1747e2f3804
+  zh: 568a94351fab48f7
+/agent-note-read-only-admission-for-immutable-runtime-resources/consequences:
+  en: e16bdb0db62d2349
+  zh: a82b2fd68a4949d5

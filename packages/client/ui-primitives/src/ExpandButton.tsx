@@ -3,6 +3,9 @@
 // surrounding rows and supplies its own `.expand` style; this is the single
 // aria/label contract they share.
 
+import clsx from 'clsx'
+import css from './ExpandButton.module.css'
+
 /** Copy labels consumed by the block expand/collapse toggle. */
 export interface ExpandButtonCopy {
   /** Collapse-toggle aria label while expanded. */
@@ -35,7 +38,7 @@ export function ExpandButton({ hidden, expanded, onToggle, copy, className }: {
   return (
     <button
       type="button"
-      className={className}
+      className={clsx(css.button, className)}
       aria-expanded={expanded}
       aria-label={expanded ? copy.collapseAria : copy.expandAria(hidden)}
       onClick={onToggle}

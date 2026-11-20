@@ -30,7 +30,7 @@ export function PlanReviewPanel({ pending, review, t, renderSlot }: PlanReviewPa
   // Foreground decisions wait for the resolved frame; accepted Remote decisions
   // hide the panel. A failed send re-enables the buttons and shows the error.
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<'error.decision' | 'status.sent' | null>(null)
   const settle = (send: () => Promise<void>, remote = false): void => {
     setBusy(true)
     setError(null)
@@ -38,11 +38,15 @@ export function PlanReviewPanel({ pending, review, t, renderSlot }: PlanReviewPa
       .then(() => {
         if (!remote) return
         setBusy(false)
-        void pending.dismiss().catch(() => { setError(t('status.sent')) })
+        void pending.dismiss().catch((cause: unknown) => {
+          console.warn('[ui-user-questions] The accepted plan review panel could not close.', cause)
+          setError('status.sent')
+        })
       })
       .catch((cause: unknown) => {
         setBusy(false)
-        setError(cause instanceof Error ? cause.message : String(cause))
+        console.warn('[ui-user-questions] Plan decision was not confirmed.', cause)
+        setError('error.decision')
       })
   }
   const decide = (label: string): void => {
@@ -69,7 +73,7 @@ export function PlanReviewPanel({ pending, review, t, renderSlot }: PlanReviewPa
           {summary.description !== '' && <p className={css.description}>{summary.description}</p>}
         </div>
         <div className={css.footer}>
-          <div className={css.feedback} role="status">{error}</div>
+          <div className={css.feedback} role="status">{error === null ? null : t(error)}</div>
           <div className={css.actions}>
             <Button
               variant="outline" className={css.discuss} icon={<IconEditOutline16 size={14} />}

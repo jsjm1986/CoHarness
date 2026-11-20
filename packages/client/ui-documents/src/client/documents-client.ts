@@ -156,13 +156,43 @@ export async function readDocumentLocations(signal: AbortSignal, cursor?: string
     if (scope === undefined || !['personal', 'project'].includes(String(scope.kind)) || typeof scope.nodeId !== 'string'
       || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(scope.nodeId)
       || scope.kind === 'project' && (typeof scope.projectId !== 'number' || !Number.isSafeInteger(scope.projectId) || scope.projectId < 1)
-      || typeof row.name !== 'string' || typeof row.nodeName !== 'string' || row.mode !== 'ro' && row.mode !== 'rw') throw new Error('Invalid document location')
+      || typeof row.name !== 'string' || typeof row.nodeName !== 'string' || row.mode !== 'ro' && row.mode !== 'rw'
+      || row.metadataOnNode !== undefined && (row.metadataOnNode !== true || scope.kind !== 'project')) throw new Error('Invalid document location')
     const location = { nodeId: scope.nodeId as NonNullable<DocumentScope['nodeId']>, nodeName: row.nodeName }
     return { name: row.name, nodeName: row.nodeName, mode: row.mode,
+      ...(row.metadataOnNode === true ? { metadataOnNode: true as const } : {}),
       scope: scope.kind === 'personal' ? { kind: 'personal' as const, ...location }
         : { kind: 'project' as const, projectId: scope.projectId as number, ...location } }
   })
   return { items, nextCursor: body.nextCursor }
+}
+
+/** Resolve one computer's project labels without selecting or starting a Runtime.
+ * @param nodeId - owning computer from the authorized location page.
+ * @param projectIds - at most 32 public projects from that page.
+ * @param signal - document manager request lifetime.
+ * @returns names keyed by project ID; a mismatched or incomplete response is rejected.
+ */
+export async function readDocumentProjectNames(
+  nodeId: string, projectIds: readonly number[], signal: AbortSignal,
+): Promise<Map<number, string>> {
+  const query = new URLSearchParams({ dshNode: nodeId, ids: projectIds.join(',') })
+  const response = await fetch(`/account/api/project-metadata?${query}`, { signal, cache: 'no-store' })
+  if (!response.ok) throw new UserDocHttpError(response.status, 'Project names are unavailable')
+  const body = await readApiResponseJson(response) as { items?: unknown }
+  if (!Array.isArray(body.items)) throw new Error('Invalid document project names')
+  const wanted = new Set(projectIds), result = new Map<number, string>()
+  for (const value of body.items as unknown[]) {
+    if (value === null || typeof value !== 'object') throw new Error('Invalid document project name')
+    const row = value as Record<string, unknown>
+    if (row.nodeId !== nodeId || typeof row.projectId !== 'number' || !wanted.delete(row.projectId)
+      || typeof row.name !== 'string' || !row.name || row.name.length > 200 || /[\u0000-\u001f\u007f]/u.test(row.name)) {
+      throw new Error('Document project owner changed')
+    }
+    result.set(row.projectId, row.name)
+  }
+  if (wanted.size) throw new Error('Document project names are incomplete')
+  return result
 }
 
 /**

@@ -338,8 +338,11 @@ function EntityHead({ icon, title, badges, description, expanded, toggleLabel, o
 }
 
 /** One labeled control pair in an entity row: the facet name, then its widget. */
-function EntityControl({ label, children }: { readonly label: string; readonly children: ReactNode }): ReactNode {
-  return <span className={css.entityControl}><span className={css.entityControlLabel}>{label}</span>{children}</span>
+function EntityControl({ label, htmlLabel = false, children }: { readonly label: string; readonly htmlLabel?: boolean; readonly children: ReactNode }): ReactNode {
+  const content = <><span className={css.entityControlLabel}>{label}</span>{children}</>
+  return htmlLabel
+    ? <label className={css.entityControl}>{content}</label>
+    : <span className={css.entityControl}>{content}</span>
 }
 
 /** First-read placeholders share the list's row and text-line layout. */
@@ -1380,7 +1383,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
             </EntityControl>
             {composition.persist
               ? (
-                <EntityControl label={t('listStartup')}>
+                <EntityControl label={t('listStartup')} htmlLabel>
                   <input
                     type="checkbox"
                     className={css.startupCheck}
@@ -1466,7 +1469,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
             })()}
             {composition.persist
               ? (
-                <EntityControl label={t('listStartup')}>
+                <EntityControl label={t('listStartup')} htmlLabel>
                   <select
                     className={css.startupSelect}
                     aria-label={t('listStartupEntry', { name: title })}

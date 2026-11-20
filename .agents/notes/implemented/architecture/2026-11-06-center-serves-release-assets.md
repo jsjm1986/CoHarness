@@ -16,7 +16,7 @@ The serve sits after authentication in [server.ts](../../../../gateway/src/serve
 
 Cache semantics are per file. A basename carrying Vite's `-<8+ char hash>.<ext>` marker is content-addressed and gets `private, max-age=31536000, immutable`; any other file — `favicon.svg`, unhashed names — is served with no `cache-control`, matching the Runtime's `frontend-static` behavior for non-content-addressed files. `private` stays: bytes remain per-account, only the browser shares them across Runtime URLs, and no CDN or shared cache may store them. `br`/`gzip` variants mirror `packages/host/webserver`'s `precompressed.ts` (quality 9 / level 1, background-scheduled on first read, settled-entries-only with identity fallback, `vary: accept-encoding`) because the Runtime path compresses the same bytes and the center must not regress transfer size.
 
-What stays runtime-scoped is everything not byte-identical across Runtimes. All `/plugins/*` keeps the existing path: combo bodies and `client.*.js` chunks are synthesized per Runtime composition, runtime-installed plugins have no release file to serve, and `/plugins/events` is a live HMR channel that must reach its owning Runtime. The Referer pin still redirects those URLs (`302` + `?dshRuntime=`), and shareable plugin URLs still forward silently under the Referer Runtime. A release-bundled name that is absent from the center's dist — including path-traversal attempts — takes the identical fallback.
+Plugin combos and `client.*.js` chunks remain Runtime-owned because the module registry synthesizes them from each composition; installed plugins have no release file, and `/plugins/events` is a live HMR channel. Strict revisioned resources use [read-only resource admission](2026-11-17-runtime-immutable-resource-admission.md) and forward silently under their explicit or referring Runtime. Unversioned resources and events retain Referer pin redirects. Names absent from the center's dist fall through to the appropriate Runtime route; no second bundle synthesizer runs at the entry.
 
 ## Alternatives considered
 
@@ -28,7 +28,7 @@ What stays runtime-scoped is everything not byte-identical across Runtimes. All 
 
 ## Consequences
 
-A browser loading the same release on any number of Runtimes downloads each hashed bundle once, and no Runtime — local or remote — sits on the asset path. First-hit cost is one stat plus a read per file, with Brotli/gzip bodies built once per file generation on the libuv pool. Requests that miss the release dist (installed plugins, events, missing names, non-GET methods) are byte-for-byte on today's behavior. The fallback also bounds correctness: a deployment without a built frontend dist simply keeps Referer-pinned forwarding.
+A browser loading the same release on any number of Runtimes downloads each hashed bundle once, and no Runtime — local or remote — sits on the asset path. First-hit cost is one stat plus a read per file, with Brotli/gzip bodies built once per file generation on the libuv pool. Requests that miss the release dist retain Runtime ownership, including installed plugins, events, missing names and non-GET methods. A deployment without a built frontend dist uses the authenticated Runtime routes rather than publishing substitute bytes.
 
 ## Testing
 

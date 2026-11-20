@@ -14,6 +14,10 @@
 
 `client-ui-cot-translation` 挂载在 fork 自有会话面上（其 client 半侧引入 `dsh-client-ui-conversation`），不引入上游 `ui-chat`。`cot-translation-bundle` 已注册进 `OPTIONAL_BUNDLES`（供橱窗开关）与 `apps/cli` 依赖；不进入任何出厂默认组成。
 
+Host 注册 `cot-translation` 设置分区，并让元数据与请求准入读取同一份已接受值。Schema 默认值与组合值作为基础，保存的偏好作为用户层。仅有 Loader 的 volatile 字段不会向 `settings.describe` 暴露分区，因此表单与翻译控制器共用设置服务。
+
+Client 适配器在清除草稿前检查设置作用域的最终写入状态。已结束的 mutation 仍可能报告网络错误或文档写入受阻；这些结果会保留草稿，并显示可重试的本地化表单错误。
+
 ## 已考虑的替代方案
 
 - **维持延期**被否决：阻塞只是可选提供方面之一，并非硬依赖；bundle 默认即用匿名提供方。

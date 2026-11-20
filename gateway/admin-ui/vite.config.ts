@@ -1,9 +1,30 @@
 import react from '@vitejs/plugin-react'
-import { resolve } from 'node:path'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import { promisify } from 'node:util'
+import { gzip } from 'node:zlib'
 import { defineConfig } from 'vitest/config'
 
+const gzipAsset = promisify(gzip)
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), {
+    name: 'precompress-admin-assets',
+    apply: 'build',
+    async writeBundle({ dir }, bundle) {
+      if (dir === undefined) return
+      await Promise.all(Object.keys(bundle).map(async (name) => {
+        if (!name.startsWith('assets/') || !/\.(?:js|css)$/u.test(name)) return
+        const file = join(dir, name)
+        const bytes = await readFile(file)
+        if (bytes.byteLength < 1024) return
+        const source = await gzipAsset(bytes, { level: 9 })
+        if (source.byteLength < bytes.byteLength) {
+          await writeFile(file + '.gz', source)
+        }
+      }))
+    },
+  }],
   base: '/admin/',
   resolve: {
     // The admin surface mounts the shared Models plugin from the workspace

@@ -16,6 +16,8 @@ Status: implemented
 - `experimental/forge-bundle` 继续不移植。任何已交付组合都不得挂载 experimental 面板——release bundle 不能依赖 experimental 包——也没有任何可选 preset 组合该谱系，上游 patch layer 在本地没有消费者；面板的覆盖由其包级套件承担。
 - 只携带 `en` 与 `zh` locale 目录，与仓库每个包一致。
 
+Client source 消费 `AsyncIterable`，并通过传给 opener 的信号取消。当前 Gateway 返回普通异步迭代器，清理时不调用其未提供的上游 `dispose` 方法。Source 测试使用没有该方法的 iterable；完整装配的浏览器场景在挂载 Forge 插件时切换离开会话。
+
 ## Alternatives considered
 
 - 把 `decide` 接入 `typert-gateway/authorize` 被否：授权请求不携带 principal，每次调用都会按 owner 评估而放行——一个永远不会拒绝的监听器是没有决策的第二条决策路径。重新引入条件：出现铸造非 owner principal 的 carrier 时，由它指定调用点。

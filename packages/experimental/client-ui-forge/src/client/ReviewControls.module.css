@@ -160,3 +160,12 @@
 .ringFill {
   stroke: var(--dsw-alias-state-success-primary);
 }
+
+@media (pointer: coarse), (hover: none) {
+  .segmented { height: 48px; }
+  .segment,
+  .trigger,
+  .switch { min-height: 44px; }
+  .segment,
+  .trigger { min-width: 44px; }
+}

@@ -17,7 +17,7 @@ import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
   ConnectionIndicator, IconAgentPresetOutline16, IconArchiveOutline16, IconCloseOutline16,
-  IconModelOutline16, IconPluginsOutline16, IconSettingsOutline16, holdInert, useModalLayer,
+  IconModelOutline16, IconPluginsOutline16, IconSettingsOutline16, focusWithoutRing, holdInert, useModalLayer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConnectionIndicatorState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { onSettingsNavigation } from '@deepseek-ai/dsh-client-runtime/client'
@@ -221,7 +221,11 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
           className={clsx(css.trigger, !wide && css.rail)}
           aria-haspopup="dialog"
           aria-expanded={open}
-          onClick={() => { actions.open() }}
+          onClick={(event) => {
+            // Safari pointer activation does not focus buttons.
+            focusWithoutRing(event.currentTarget)
+            actions.open()
+          }}
         >
           {renderSlot('settings.trigger', { wide })}
         </button>

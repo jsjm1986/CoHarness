@@ -3,23 +3,20 @@
   display: grid;
   /* Row 2 is the shell.bottom seat: auto-sized so an empty slot takes nothing. */
   grid-template-rows: minmax(0, 1fr) auto;
-  height: 100%;
+  height: min(100%, var(--dsw-viewport-height, 100%));
   overflow: hidden;
   overflow: clip;
   scrollbar-gutter: auto;
   background: var(--dsw-alias-bg-base);
 }
 
-/* Compact template is CSS-owned: shell topbar row over one content column.
-   The frame height follows the visual viewport (ui-layout writes the
-   variable) so the composer rides above the on-screen keyboard where the
-   layout viewport does not shrink. */
+/* Compact template: shell topbar row over one content column. Every width
+   follows the visual viewport so landscape keyboards also reduce the frame. */
 .frame[data-viewport='compact'] {
   grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr);
   justify-items: stretch;
   align-items: stretch;
-  height: var(--dsw-viewport-height, 100%);
 }
 
 .frame[data-viewport='compact'][data-viewport-short] .topbar {
@@ -28,7 +25,7 @@
 
 .topbar {
   display: grid;
-  grid-template-columns: var(--dsw-touch-target) minmax(0, 1fr) var(--dsw-touch-target);
+  grid-template-columns: var(--dsw-touch-target) minmax(0, 1fr) auto;
   grid-column: 1;
   justify-self: start;
   align-self: stretch;
@@ -189,18 +186,6 @@
     visibility var(--ds-transition-duration-slow) step-start;
 }
 
-/* Left-edge swipe strip for opening the compact drawer. Below the scrim so
-   an open drawer never leaves a stray touch lane; wide modes never mount it. */
-.edgeZone {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 13;
-  width: 24px;
-  touch-action: pan-y;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .scrim,
   .drawer {
@@ -309,6 +294,12 @@
   top: var(--dsw-space-2);
   right: var(--dsw-space-2);
   bottom: var(--dsw-space-2);
+}
+
+.frame:not([data-viewport='compact']) .detailsCol[data-fullscreen] {
+  top: 0;
+  right: 0;
+  bottom: 0;
 }
 
 /* The medium overlay panel must cover its own scrim: the dock layer (10)

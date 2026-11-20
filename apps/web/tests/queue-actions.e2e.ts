@@ -2,13 +2,14 @@
 // composition and real HTTP/SSE wire. Replay overrides park consecutive turns
 // so the page can edit and remove exact occurrences, then stop the active turn
 // while proving the preserved Queue advances in FIFO order.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterEach, describe, expect, it, onTestFailed } from 'vitest'
 import { deriveReplayScript, parseSessionLog, type ReplayEntry } from '@deepseek-ai/dsh-llm-replay'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -79,7 +80,7 @@ describe('web e2e: queue row actions', () => {
     const sessionEvents: SessionEvent[] = []
     scaffold = await launchWebScaffold({ replayFixture: FIXTURE, replayOverride: overridePath })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     const tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -205,7 +206,7 @@ describe('web e2e: queue row actions', () => {
     const events: SessionEvent[] = []
     scaffold = await launchWebScaffold({ replayFixture: FIXTURE, replayOverride: overridePath })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { events.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     const tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -254,7 +255,7 @@ describe('web e2e: queue row actions', () => {
     const sessionEvents: SessionEvent[] = []
     scaffold = await launchWebScaffold({ replayFixture: FIXTURE, replayOverride: overridePath })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     const tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

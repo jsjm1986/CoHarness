@@ -15,7 +15,7 @@ import {
   reconcileProfilePatches, OPTIONAL_BUNDLES, PluginPackages, readPluginMeta, getDshRuntimeVersion,
   type ProfileContext, type RuntimeResolution,
 } from '@deepseek-ai/dsh-app-boot'
-import PluginManager, { type Config, type PluginChange, type PluginDesiredState, type PluginInstallFrame, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
+import PluginManager, { type Config, type PluginChange, type PluginDesiredState, type PluginInstallFrame, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId, type PluginInventoryReport } from '../src/index.ts'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import type { AgentPresetRegistry } from '@deepseek-ai/dsh-agent-preset-registry'
@@ -1825,4 +1825,35 @@ it('keeps the profile composition and warns when the state store is unreachable'
   expect(result.changed).toBe(true)
   expect(result.warnings?.[0]).toMatch(/^desired-state sync failed: gateway unreachable/)
   expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core'])
+})
+
+it('reports the observed inventory after startup settles and after a committed change', async () => {
+  const reports: PluginInventoryReport[] = []
+  const { manager } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', {
+      protectedModules: new Set<string>(), authorize: async () => {},
+      reportInventory: async (snapshot) => { reports.push(snapshot) },
+    })
+  }, { authorization: 'required' })
+  await vi.waitFor(() => { expect(reports.length).toBeGreaterThan(0) }, { timeout: 5000 })
+  const first = reports[0]!
+  expect(first.bundles.map(bundle => bundle.name)).toContain('extra')
+  expect(first.plugins.some(entry => entry.moduleName === 'cordis:manager')).toBe(true)
+  reports.length = 0
+  await manager.setBundleEnabled('extra', false)
+  await vi.waitFor(() => { expect(reports.length).toBeGreaterThan(0) }, { timeout: 5000 })
+  const next = reports.at(-1)!
+  expect(next.bundles.find(bundle => bundle.name === 'extra')?.enabled).toBe(false)
+})
+
+it('keeps committed changes working while the inventory store is unreachable', async () => {
+  const { manager } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', {
+      protectedModules: new Set<string>(), authorize: async () => {},
+      reportInventory: async () => { throw new Error('gateway unreachable') },
+    })
+  }, { authorization: 'required' })
+  const result = await manager.setBundleEnabled('extra', false)
+  expect(result.application).toBe('applied')
+  expect(result.changed).toBe(true)
 })

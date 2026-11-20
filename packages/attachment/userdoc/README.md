@@ -27,7 +27,7 @@ Personal and project stores are isolated runtime stores. The Gateway document br
 
 Provider adapters can reuse `defaultUserDocDirectoryPage` and `defaultUserDocTrashPage` against context-free listing implementations; paging and validation remain identical to `UserDocStore` defaults. `USERDOC_ERROR_CODES` and `userDocErrorStatus` define the shared stable error codes and HTTP mapping, including permission refusal, pending-request saturation and malformed transport metadata.
 
-`UserDocScope.nodeId` identifies computer-local storage independently of a Runtime; `nodeName` is display metadata. The browser-safe `userDocLocationUrl` export in `/identity` binds document paths to that scope and routes managed overview/copy operations through the Gateway. The server rechecks current account, computer and project permissions; a location descriptor grants no authority. See the [browser document reference](../../../gateway/docs/node-agent/browser/README.md).
+`UserDocScope.nodeId` identifies computer-local storage independently of a Runtime; `nodeName` is display metadata. The browser-safe `userDocLocationUrl` export in `/identity` binds document paths to that scope and routes managed overview/copy operations through the Gateway. The server rechecks current account, computer and project permissions; a location descriptor grants no authority. `UserDocLocation.metadataOnNode` marks project names that must be resolved on the owning computer; its initial `name` is a public project identifier. See the [browser document reference](../../../gateway/docs/node-agent/browser/README.md).
 
 ## Summary
 

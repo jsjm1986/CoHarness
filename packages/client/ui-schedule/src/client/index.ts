@@ -59,7 +59,7 @@ import { createSessionScheduleSource, type SessionScheduleSourceFactory } from '
 import { TaskTabBindings } from './task-tab-bindings.ts'
 import { TaskManagerPage, type TaskManagerInjected, type TaskPageActions } from './TaskManagerPage.tsx'
 import type { TaskDetailInjected } from './TaskDetail.tsx'
-import { TaskManagerIcon } from './TaskManagerIcon.tsx'
+import { TaskManagerIcon, TaskManagerTitle } from './TaskManagerIcon.tsx'
 import { sessionLinkState } from './session-link.ts'
 import { en, NS, zh, type ScheduleCatalogKey } from './locales.ts'
 import { en as managerEn, zh as managerZh, type TaskManagerKey } from './task-manager-locales.ts'
@@ -211,6 +211,9 @@ export function apply(ctx: ClientContext): void {
       onNewTask: signal => pageFor('base').actions.onNewTask(signal),
     }),
   }, TaskManagerPage))
+  ctx.slots.inject('shell.mobile.header.title', () => ctx.slots.register({
+    name: 'shell.mobile.header.title', key: PANEL_ID, locale: MANAGER_NS,
+  }, TaskManagerTitle))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist',
     id: PANEL_ID,

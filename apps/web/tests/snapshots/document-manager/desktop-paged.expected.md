@@ -22,10 +22,18 @@
       - img
       - text: Trash
     - button "History"
-  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
   - heading "Personal documents" [level=3]
   - navigation "Document path":
     - button "Root folder" [disabled]
+  - group "Document actions":
+    - button "New Folder":
+      - img
+      - text: New Folder
+    - button "Upload Document":
+      - img
+      - text: Upload Document
+    - button "More actions":
+      - img
   - group "Document filters":
     - img
     - textbox "Search document name"
@@ -39,25 +47,15 @@
       - img
       - text: Modified · Newest first
       - img
-  - group "Document actions":
-    - button "New Folder":
-      - img
-      - text: New Folder
-    - button "Upload Document":
-      - img
-      - text: Upload Document
-    - button "More actions":
-      - img
   - checkbox "Select this page"
-  - text: Visible only to you 0 folders · 21 documents
+  - text: "Visible only to you Folders: 0 · Documents: 21"
   - list "Document Manager":
     - group "Upload date 2026-08-01":
       - text: 2026-08-01
       - listitem:
         - checkbox "f-01.txt"
-        - button "Preview f-01.txt": f-01.txt Text · 2026-08-01
+        - button "Preview f-01.txt": f-01.txt Text
         - text: 21 B
-        - button "Add f-01.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: f-01.txt"':
           - img
   - button "Previous page"

@@ -20,7 +20,7 @@ import {
   Menu, Modal, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
-  SessionId, SessionListState, SessionRuntimeTarget, SessionSearchResultItem, WorkspaceId, WorkspaceView,
+  SessionId, SessionListState, SessionRuntimeTarget, SessionSearchResultItem, SessionSearchProgress, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { WorkspaceBrowserProps } from './contract/slots.ts'
@@ -1033,6 +1033,7 @@ interface RemoteSearchState {
   status: 'idle' | 'loading' | 'ready' | 'error'
   items: readonly SessionSearchResultItem[]
   hasMore: boolean
+  targets?: SessionSearchProgress['targets']
 }
 
 /** Flat search body: local metadata matches plus the current Host result page. */
@@ -1047,6 +1048,8 @@ function SearchResults({
   query,
   remote,
   resultLimit,
+  computerMatches = [],
+  selectComputer,
   t,
 }: Pick<SessionTreeProps, 'useSessions' | 'usePanelInfo' | 'open' | 't'> & {
   /** Unarchive an archived result row (its trailing restore button). */
@@ -1058,6 +1061,8 @@ function SearchResults({
   query: string
   remote: RemoteSearchState
   resultLimit: number
+  computerMatches?: readonly { id: string; name: string }[]
+  selectComputer?: (id: string) => void
 }) {
   const list = useSessions(s => s)
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
@@ -1071,10 +1076,19 @@ function SearchResults({
   )
   const pending = currentRemote.status === 'loading'
   const failed = currentRemote.status === 'error'
+  const targetNames = (status: 'pending' | 'error'): string => (currentRemote.targets ?? []).filter(target => target.status === status)
+    .map(({ runtime }) => runtime.nodeName ?? (runtime.kind === 'project' ? runtime.projectName ?? `#${runtime.projectId}` : t('search.currentEnvironment'))).join('、')
+  const pendingNames = targetNames('pending'), failedNames = targetNames('error')
+  const multipleTargets = (currentRemote.targets?.length ?? 0) > 1
 
   return (
     <div className={clsx(css.treeBody, css.wide)}>
       <div className={css.list}>
+        {computerMatches.map(computer => <div key={computer.id} className={css.computerHeader}>
+          <button type="button" className={css.computerHeading} onClick={() => { selectComputer?.(computer.id) }}>
+            <IconFollowsystemOutline16 size={14} /><span className={css.computerName}>{computer.name}</span>
+          </button>
+        </div>)}
         <div className={css.searchTree} role="tree" aria-label={t('search.results.aria')}>
           {results.items.map(result => (
             <SearchResultItem
@@ -1088,14 +1102,14 @@ function SearchResults({
           ))}
         </div>
         {pending && (
-          <div className={css.searchStatus} role="status">{t('search.pending')}</div>
+          <div className={css.searchStatus} role="status">{multipleTargets && pendingNames ? t('search.computersPending', { names: pendingNames }) : t('search.pending')}</div>
         )}
-        {failed && (
+        {(failed || failedNames !== '') && (
           <div className={css.searchWarning} role="status">
-            {t('search.unavailable')}
+            {multipleTargets && failedNames ? t('search.computersFailed', { names: failedNames }) : t('search.unavailable')}
           </div>
         )}
-        {!pending && results.items.length === 0 && (
+        {!pending && results.items.length === 0 && computerMatches.length === 0 && (
           <div className={css.empty}>{t('search.noMatches')}</div>
         )}
         {results.hasMore && (
@@ -1467,8 +1481,15 @@ export function WorkspaceBrowser({
       hasMore: false,
     })
     const timer = window.setTimeout(() => {
-      searchSessions(normalizedQuery, controller.signal).then((result) => {
+      let progressive = false
+      searchSessions(normalizedQuery, controller.signal, (result) => {
         if (controller.signal.aborted) return
+        progressive = true
+        setRemoteSearch({ ...result, query: normalizedQuery,
+          status: result.targets.some(target => target.status === 'pending') ? 'loading' : 'ready' })
+      }).then((result) => {
+        if (controller.signal.aborted) return
+        if (progressive) return
         setRemoteSearch({
           query: normalizedQuery,
           status: 'ready',
@@ -1477,6 +1498,7 @@ export function WorkspaceBrowser({
         })
       }).catch(() => {
         if (controller.signal.aborted) return
+        if (progressive) { setRemoteSearch(previous => ({ ...previous, status: 'error' })); return }
         setRemoteSearch({
           query: normalizedQuery,
           status: 'error',
@@ -1843,7 +1865,7 @@ export function WorkspaceBrowser({
       </div>}
       <div className={clsx(css.listArea, workbenchMode && css.workbenchListHidden)} aria-busy={navigationPending || undefined}
         data-workspace-list-region data-workspace-list-state={listBaseline}>
-        {wide && (computerGroups !== undefined && (normalizedQuery === '' || matchingComputers.length > 0) ? renderComputers() : normalizedQuery !== ''
+        {wide && (computerGroups !== undefined && normalizedQuery === '' ? renderComputers() : normalizedQuery !== ''
           ? (
             <SearchResults
               useSessions={useCurrentSessions}
@@ -1856,6 +1878,8 @@ export function WorkspaceBrowser({
               query={normalizedQuery}
               remote={remoteSearch}
               resultLimit={searchResultLimit}
+              computerMatches={matchingComputers}
+              selectComputer={(id) => { setQuery(''); setExpandedComputers(previous => ({ ...previous, [id]: true })); setShowAllComputers(true) }}
               t={t}
             />
           )
@@ -1944,8 +1968,11 @@ export function WorkspaceBrowser({
           onCompositionStart={() => { composingRef.current = true }}
           onCompositionEnd={() => { composingRef.current = false }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !composingRef.current) {
+            if (e.key === 'Enter') {
               e.preventDefault()
+              // Safari can deliver compositionend before the confirming Enter.
+              if (composingRef.current || e.nativeEvent.isComposing
+                || Reflect.get(e.nativeEvent, 'keyCode') === 229) return
               confirmRename()
             }
           }}

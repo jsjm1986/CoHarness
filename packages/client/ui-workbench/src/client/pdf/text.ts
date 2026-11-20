@@ -7,7 +7,7 @@ import type { RenderPdfText } from './document.ts'
 /**
  * Create a selectable overlay in a component-owned host.
  * @param host - absolute overlay matching the displayed canvas dimensions.
- * @returns renderer whose cancellation also releases its resize observer and DOM.
+ * @returns renderer whose cancellation also releases its resize observer, queued alignment, and DOM.
  */
 export function pdfTextRenderer(host: HTMLDivElement): RenderPdfText {
   return (page, viewport) => {
@@ -22,7 +22,14 @@ export function pdfTextRenderer(host: HTMLDivElement): RenderPdfText {
       // Width fitting must compose with the viewer's page rotation and translation.
       container.style.scale = String(host.getBoundingClientRect().width / viewport.width)
     }
-    const observer = new ResizeObserver(resize)
+    let frame: number | undefined
+    const observer = new ResizeObserver(() => {
+      if (frame !== undefined) return
+      frame = requestAnimationFrame(() => {
+        frame = undefined
+        resize()
+      })
+    })
     observer.observe(host)
     resize()
     return {
@@ -30,6 +37,7 @@ export function pdfTextRenderer(host: HTMLDivElement): RenderPdfText {
       promise: layer.render({ viewport } as Parameters<TextLayerBuilder['render']>[0]),
       cancel() {
         observer.disconnect()
+        if (frame !== undefined) cancelAnimationFrame(frame)
         layer.cancel()
         container.remove()
       },

@@ -4,7 +4,7 @@ import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { expect,it } from 'vitest'
 import type { PoolClient } from 'pg'
-import { OperationTimings, observeOperationSql, timeOperation } from '../src/operation-timing.ts'
+import { OperationTimings, forwardingMarks, observeOperationSql, operationPhase, recordNodeTransport, timeOperation } from '../src/operation-timing.ts'
 
 it('preserves callback and promise results and bounds the operation ring without storing the request or SQL',async()=>{
   const ring=new OperationTimings(2)
@@ -19,6 +19,17 @@ it('preserves callback and promise results and bounds the operation ring without
       await new Promise<void>(done=>db.query(secret,(_e,result)=>{expect(result).toBe(7);done()}))
       expect(await db.query(secret)).toBe(8)
     })
+    const queued=operationPhase('runtimeQueue')
+    await Promise.resolve()
+    queued()
+    expect(await timeOperation('runtimeLiveness',async()=>true)).toBe(true)
+    recordNodeTransport('reused')
+    const mark=forwardingMarks()
+    mark('leaseAcquired')
+    await Promise.resolve()
+    mark('socketAssigned')
+    mark('requestWritten')
+    mark('responseHeaders')
     res.setHeader('x-dsh-host-duration-ms','2.1')
     res.end()
   })})
@@ -34,7 +45,12 @@ it('preserves callback and promise results and bounds the operation ring without
       await response.arrayBuffer()
     }
     expect(ring.samples().map(row=>row.id)).toEqual(ids.slice(2))
-    expect(ring.samples(ids[2])).toMatchObject([{operation:'history',status:200,hostMs:2.1,sql:{content:{count:2},governance:{count:0}}}])
+    expect(ring.samples(ids[2])).toMatchObject([{operation:'history',status:200,hostMs:2.1,nodeTransport:'reused',
+      startedAtMs:expect.any(Number),responseHeadersMs:expect.any(Number),
+      forwarding:{leaseAcquired:expect.any(Number),socketAssigned:expect.any(Number),requestWritten:expect.any(Number),responseHeaders:expect.any(Number)},
+      phases:{runtimeQueue:expect.any(Number),runtimeLiveness:expect.any(Number)},sql:{content:{count:2},governance:{count:0}}}])
+    const sample=ring.samples(ids[2])[0]!
+    expect(sample.forwarding!.responseHeaders).toBeLessThanOrEqual(sample.responseHeadersMs!)
     expect(JSON.stringify(ring.samples())).not.toContain(secret)
   } finally {
     const closing=once(http,'close')

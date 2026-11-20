@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-19-resource-budget-poll-ownership.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-19-resource-budget-poll-ownership.md
+document:
+  en: 0e7873631b29204385a1b1b641d2bbf12fe7d607
+  zh: cf3cd3c928964ad418a996b8e2a7f9d95b8b4afe
+/agent-note-keep-queued-resource-polling-on-the-runtime-service:
+  en: ea2f67a572a17d86
+  zh: 13c066764cc1fa37
+/agent-note-keep-queued-resource-polling-on-the-runtime-service/problem:
+  en: 5cbcb127f0cb9bd6
+  zh: d29ef83f155752ca
+/agent-note-keep-queued-resource-polling-on-the-runtime-service/decision:
+  en: 5a7daab28363fccd
+  zh: 30fb738f8b6ab1ed
+/agent-note-keep-queued-resource-polling-on-the-runtime-service/alternatives-considered:
+  en: 10c9d7619562d420
+  zh: 8bcc75b316338938
+/agent-note-keep-queued-resource-polling-on-the-runtime-service/consequences:
+  en: 1b413036879d069b
+  zh: 312f16023a519415

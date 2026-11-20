@@ -33,6 +33,8 @@ Mount `dsh-agent` wherever live agents exist: it provides `ctx.agents` and the `
 
 ### Create or resume an agent
 
+A recovery owner can install `agentExecutionAdmission` on the root Context before profile composition. `installAgentExecutionAdmission()` retains an immutable set of historical Session identities. Registry reservations, creation, resume and publication reject those identities and their parent identities before preset or factory work; stored history remains readable. The default driver enforces the same check at its direct entry points. This process restriction grants no user, model or tool permission.
+
 `ctx.agents.create()` builds a fresh agent and session under one identity; `ctx.agents.resume()` loads a persisted session and rebuilds the agent on it. Both delegate to the registered factory and return an `AgentHandle` — the only object that can tear that agent down. Set `parentAgent` in either operation's options to make the result a runtime child; omit it for a runtime root. `get(id)`, `list()`, and `roots()` find live agents, and `isOwnedBy(id, parent)` tests that exact live relation.
 
 ```text

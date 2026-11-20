@@ -12,6 +12,7 @@ export function MobileSheetBackdrop({ onClose }: { onClose: () => void }) {
     <div
       className={css.root}
       aria-hidden="true"
+      data-modal-backdrop=""
       onPointerDown={(event) => {
         event.stopPropagation()
         onClose()

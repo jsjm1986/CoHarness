@@ -48,15 +48,42 @@ Run `node gateway/scripts/check-apfs-project-volume.mjs` on the project Mac to l
 
 Configure the project policy’s scoped `snapshotExecutable` with an approved snapshot service on this Mac. Qualify a live capture and a restore from the designated receiving computer before counting the project files as protected. Without a consistent file snapshot, the built-in project export records a workspace and plugin file coverage gap.
 
+For an internal data volume, a local administrator adds a separate encrypted APFS volume in the existing physical container and records its volume UUID. This shares the physical disk’s capacity; it does not provide protection from disk failure. Keep the existing project locations until their verified migration can proceed without stopping live work. The snapshot service must have the macOS snapshot entitlement in addition to filesystem access; administrator privileges alone do not satisfy [the kernel authorization check](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/vfs/vfs_syscalls.c). Verify that service before configuring automated capture.
+
 ## Verify the isolated database path
 
 On a POSIX machine with Docker and the local `postgres:17.6-bookworm` image, run `node gateway/tests/run-node-content-postgres.mjs --legacy`. The fixture provisions an independent test cluster, drives Runtime HTTP and a loopback model, and cleans up the temporary cluster and data directory. It also runs the existing shared-store project activity, progress, namespace and execution tests.
 
 With the Gateway, CLI and Web Host built, `node gateway/tests/run-node-content-postgres.mjs --operations` starts two Gateways, two Web Hosts, a Node Agent, a private governance database and an authenticated loopback model. It checks prepared conversations, rejection after browser disconnect, Runtime ownership and duplicate prompt admission. Set `HGW_TEST_PG_BINDIR` to a local PostgreSQL binary directory to use a separate native cluster. The harness removes the cluster after verification, including its immutable execution receipts.
 
+Use `--governance` to exercise the encrypted backup receiver and the governance inventory against a disposable PostgreSQL database. The inventory retains approved management fields, including computer permissions and quotas, while excluding business contents, local paths and active credentials. Its explicit coverage gaps remain visible; a successful inventory restore does not authorize organization takeover.
+
 ## Organization-wide project names
 
 Project names retain the organization database’s existing case and collation rules. The primary keeps keyed equality tags and opaque project, node and name-version IDs for physically placed projects. Their display names and paths are read on their owning computers.
+
+Before preparing name policy, run the privacy preflight with the primary Gateway's actual launch environment and private database connection file:
+
+```sh
+node gateway/lib/project-name-privacy-main.js
+```
+
+Success returns `ready: true`, `readOnly: true`, and the connected role and database. It checks the production SQL normalizer in a read-only transaction using a fixed public value; it creates no project, starts no Runtime and grants no privileges. It verifies SQL logging protections, not node storage or complete project readiness. Failure exits with code 1 and directs the operator to the database configuration.
+
+For a restricted Gateway role, a database administrator applies these defaults, replacing `harness_gateway` and `harness` with the actual role and governance database:
+
+```sql
+ALTER ROLE harness_gateway IN DATABASE harness SET log_parameter_max_length = 0;
+ALTER ROLE harness_gateway IN DATABASE harness SET log_parameter_max_length_on_error = 0;
+```
+
+Defaults apply to new database connections. To let existing Gateway connections establish transaction-local protection without restarting running work, the administrator can grant only the required parameter permission:
+
+```sql
+GRANT SET ON PARAMETER log_parameter_max_length TO harness_gateway;
+```
+
+This grant has no grant option and does not confer superuser or business-data privileges. Disable parameter logging for any installed audit or auto-explain extensions, then rerun the preflight. Every name request independently verifies these settings before submitting the display name; passing the preflight does not bypass that check.
 
 On the designated primary, create an operating-system-private directory outside all workspaces. Use canonical absolute paths under that directory for the following command. The first argument is a public key identifier. The second is a new file that must not exist. The command reads the Gateway's existing organization connection and writes no key material to the terminal.
 
@@ -68,7 +95,7 @@ Set `HGW_PROJECT_NAME_KEY_FILE` to that file on the primary. With an authenticat
 
 To rotate, create a second private generation by giving the same command a third argument pointing to its predecessor. Back up the keyring in the organization's independent recovery custody and check the recovery copy before switching the primary to the new file. Prepare with the current revision, reindex every owner, and activate. Existing keys enforce uniqueness during rotation. The fingerprints in the governance backup cannot regenerate the secret keys.
 
-The primary database role must be able to suppress bind-value logging during name normalization. A database administrator can apply role-specific defaults for `log_parameter_max_length` and `log_parameter_max_length_on_error` of zero, and disable parameter logging for installed audit or auto-explain extensions. A request refuses to send a display name to the SQL normalizer if it cannot establish those settings.
+The single-node maintenance backup includes the configured private keyring. Capture and restore preflight require its original organization and entry identity, canonical location, and every active or pending key fingerprint. Missing keys or older backups without this file are rejected; restore never generates a replacement key or changes name policy. Keep independent custody for disaster recovery and primary replacement, which require separate procedures.
 
 ## Move an existing project
 

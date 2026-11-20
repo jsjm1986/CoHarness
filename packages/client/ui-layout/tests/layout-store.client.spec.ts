@@ -7,6 +7,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createLayoutStore } from '@deepseek-ai/dsh-client-ui-layout/src/client/stores.ts'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/src/client/service.ts'
 import {
   DETAILS_MAX_RATIO, DETAILS_MIN,
   SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
@@ -137,6 +138,20 @@ describe('createLayoutStore', () => {
     })
     actions.setViewportWidth(980)
     expect(store.getSnapshot().narrowExpanded).toBe(false)
+  })
+
+  it.each([320, 767, 768, 1023])('panel navigation at %ipx dismisses only the compact drawer, including the selected panel', (width) => {
+    const { store, actions } = createLayoutStore().create()
+    const panel = 'plugins' as MainPanelId
+    actions.setSidebar(400)
+    actions.setViewportWidth(width)
+    for (const selected of [panel, panel, null]) {
+      if (!store.getSnapshot().narrowExpanded) actions.toggleSidebar()
+      actions.selectPanel(selected)
+      expect(store.getSnapshot()).toMatchObject({
+        panelInfo: { activePanelId: selected }, narrowExpanded: width >= 768, sidebar: 400,
+      })
+    }
   })
 
   it('opening leaves the preference unset; a dragged width survives close/open', () => {

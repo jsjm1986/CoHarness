@@ -11,6 +11,18 @@ export interface TerminalInjected {
   readonly keyedHooks: { readonly terminal: (key: string) => HostObservable<TerminalViewState> }
 }
 
+/** The title's mounted editor is callable from its tab menu. */
+export interface TerminalTitleInjected extends TerminalInjected {
+  /** @param key - sidebar occurrence key. @param edit - mounted editor action. @returns the matching registration's disposer. */
+  readonly bindRename: (key: string, edit: () => void) => () => void
+}
+
+/** Requests editing through the terminal title owned by this plugin instance. */
+export interface TerminalRenameInjected {
+  /** @param key - sidebar occurrence whose mounted title should edit. */
+  readonly renameTitle: (key: string) => void
+}
+
 
 /** The terminal screen follows the resolved application theme through a framework hook. */
 export interface TerminalBodyInjected extends TerminalInjected {

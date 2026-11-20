@@ -12,7 +12,7 @@ Status: implemented
 
 工作台网格使用连续的全高列，保留显式身份、姿态与注意力状态。所有姿态存于 `ConversationViewportController` 的实时快照；[principal 拥有的工作台布局](../architecture/2026-09-23-principal-owned-workbench-layouts.zh.md)所拥有的持久化记录不新增任何字段。
 
-- **栏身份。** 桌面栏头在一行内展示空间 tile、标题与状态；完整空间和工作区名称保留在身份提示与无障碍文本中。窄屏和标签栏头在标题下展示 `空间 · 工作区` 副标题。维护色调通过 `parseClientSessionKey` 与 `projectUiPolicy` 从栏自身 Session id 解析。侧栏栏表与会话选择器通过 `ScopeTile` 和 `paneIdentity` 获取一致的身份信息。
+- **栏身份。** 桌面栏头在一行内展示空间 tile、标题与状态。标签布局以选中标签作为标题，栏头保留空间与状态。“更多”在与操作共用的滚动区内展示完整标题、空间、工作区以及可见的电脑身份。触屏和紧凑布局在该行旁保留“更多”和“关闭”；收起与放大仍可通过“更多”进入，无需另占一行 44px 控件。维护色调通过 `parseClientSessionKey` 与 `projectUiPolicy` 从栏自身 Session id 解析。侧栏栏表与会话选择器通过 `ScopeTile` 和 `paneIdentity` 获取一致的身份信息。
 - **焦点信号。** 激活栏标题使用主强调色，细竖线分隔各列，不使用卡片描边。
 - **状态语言。** `StateDot` 增加可选 `word` 标签，在状态点旁渲染全词胶囊（`就绪`/`运行中`/`等待批准`/`运行失败`）；`data-state` 保留给自动化。
 - **折叠身份细条。** `ConversationViewportSnapshot` 增加 `collapsedIds`。`setCollapsed` 把栏收成 46px 细条（tile、状态点、竖排标题、展开指示）并拒绝折叠最后一个展开栏；折叠激活栏时焦点移交给仍展开的邻栏。`soloPane` 折叠其余栏并聚焦目标栏；对已独展栏再次调用则恢复全部。`focus` 只展开目标栏。移除栏时其细条一并消失。`collapsedIds` 是纯视图状态，刻意不进入 `SavedWorkbench` 与两个 localStorage 模式版本——折叠姿态绝不跨刷新存活。

@@ -28,6 +28,7 @@ export interface EventPrincipalScenarioResult {
   eventSockets: number
   initialHttpStatus: number
   renewalBatches: number
+  unavailableBatches: number
   batchSizes: number[]
   passedOriginalDeadline: boolean
   retainedAuthority: boolean
@@ -48,6 +49,7 @@ export async function runEventPrincipalScenario(enabled: boolean): Promise<Event
     principal: string | string[] | undefined
     body: unknown
   }> = []
+  let unavailableBatches = 0
   let nonce = 0
   const serving = new Set<Promise<void>>()
   const failures: unknown[] = []
@@ -61,6 +63,11 @@ export async function runEventPrincipalScenario(enabled: boolean): Promise<Event
     const body = JSON.parse(Buffer.concat(chunks).toString()) as { version: number; leaseIds: string[] }
     requests.push({ url: req.url, authorization: req.headers.authorization, principal: req.headers[GATEWAY_PRINCIPAL_HEADER], body })
     if (fixture === undefined) throw new Error('runtime not loaded')
+    if (requests.length === 1) {
+      unavailableBatches++
+      res.writeHead(503).end()
+      return
+    }
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ version: 1, leases: body.leaseIds.map(leaseId => ({
       leaseId, status: 'renewed', assertion: fixture!.issue({ nonce: `replacement-${++nonce}` }),
@@ -104,17 +111,18 @@ export async function runEventPrincipalScenario(enabled: boolean): Promise<Event
     if (enabled) {
       await vi.waitFor(() => {
         expect(admitted.every(principal => principal.claims.expiresAt > originalDeadline)).toBe(true)
-      }, { interval: 1, timeout: 5000 })
-      expect(requests).toHaveLength(1)
+      }, { interval: 100, timeout: 10_000 })
+      expect(requests).toHaveLength(2)
       expect(requests[0]).toEqual({
         url: '/internal/runtime/stream-principals/renew', authorization: 'Bearer runtime-secret', principal: undefined,
         body: { version: 1, leaseIds: ['initial-0', 'initial-1'] },
       })
-      for (const count of [2, 3]) {
+      expect(requests[1]).toEqual(requests[0])
+      for (const count of [3, 4]) {
         await vi.advanceTimersByTimeAsync(10_000)
         await vi.waitFor(() => { expect(requests).toHaveLength(count) }, { interval: 1, timeout: 5000 })
         await vi.waitFor(() => {
-          expect(admitted.every(principal => principal.claims.expiresAt > originalDeadline + (count - 1) * 10_000)).toBe(true)
+          expect(admitted.every(principal => principal.claims.expiresAt > originalDeadline + (count - 2) * 10_000)).toBe(true)
         }, { interval: 1, timeout: 5000 })
       }
       await vi.advanceTimersByTimeAsync(1)
@@ -135,9 +143,11 @@ export async function runEventPrincipalScenario(enabled: boolean): Promise<Event
       expect(requests).toHaveLength(0)
       expect(admitted.every(principal => principal.signal === undefined)).toBe(true)
     }
-    return { enabled, eventSockets: admitted.length, initialHttpStatus: response.status, renewalBatches: requests.length,
+    return {
+      enabled, eventSockets: admitted.length, initialHttpStatus: response.status, renewalBatches: requests.length, unavailableBatches,
       batchSizes: requests.map(entry => (entry.body as { leaseIds: string[] }).leaseIds.length),
-      passedOriginalDeadline, retainedAuthority, oldHttpStatus, releasedOnSocketClose }
+      passedOriginalDeadline, retainedAuthority, oldHttpStatus, releasedOnSocketClose,
+    }
   } finally {
     for (const socket of sockets) socket.destroy()
     vi.useRealTimers()

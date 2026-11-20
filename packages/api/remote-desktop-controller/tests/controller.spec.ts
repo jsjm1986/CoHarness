@@ -10,6 +10,7 @@ import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import { RemoteDesktopError } from '@deepseek-ai/dsh-remote-desktop'
 import { afterEach, describe, expect, it } from 'vitest'
 import { RemoteDesktopController } from '../src/index.ts'
+import type { GatewayPrincipalClaims } from '@deepseek-ai/dsh-gateway-runtime'
 
 const roots: Context[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(ctx => ctx.fiber.dispose())) })
@@ -65,5 +66,44 @@ describe('RemoteDesktopController error translation', () => {
   it('translates revoke capability rejections into the wire failure code', async () => {
     const h = fixture({ revoke: async () => { throw capabilityError } })
     expect(await wireCode(h.controller.revoke(agent(h.ctx), { grantId: 'g1' }, signal()))).toBe('REMOTE_DESKTOP_GRANT_NOT_FOUND')
+  })
+})
+
+describe('RemoteDesktopController without a desktop provider', () => {
+  function withoutProvider(role?: 'user' | 'admin') {
+    const ctx = new Context()
+    roots.push(ctx)
+    const claims: GatewayPrincipalClaims = {
+      version: 1, issuer: 'harness-gateway', audience: 'dsh-runtime', organization: 'org',
+      user: { id: 1, username: 'alice', displayName: 'Alice', role: role ?? 'user' },
+      scope: { kind: 'personal' }, runtime: { kind: 'user', id: 1, generation: 1 },
+      issuedAt: Date.now(), expiresAt: Date.now() + 60_000, nonce: 'n',
+    }
+    ctx.provide('executionAuthorityRequired', true as never)
+    ctx.provide('gatewayRuntime', { interactive: () => role === undefined ? undefined : { assertion: 'a', claims } } as never)
+    return { ctx, controller: new RemoteDesktopController(ctx) }
+  }
+
+  it('keeps anonymous requests forbidden before reporting availability', async () => {
+    const h = withoutProvider(), a = agent(h.ctx)
+    await expect(h.controller.listGrants(a, {}, signal())).rejects.toMatchObject({ code: 'remote-desktop/forbidden' })
+    await expect(h.controller.status(a, { nodeId: 'n1' }, signal())).rejects.toMatchObject({ code: 'remote-desktop/forbidden' })
+  })
+
+  it('returns no attachable targets and the existing unavailable code to authenticated callers', async () => {
+    const h = withoutProvider('user'), a = agent(h.ctx), target = { nodeId: 'n1', level: 'view' as const }
+    expect(await h.controller.listGrants(a, { attachable: true }, signal())).toEqual([])
+    for (const result of [
+      h.controller.status(a, target, signal()), h.controller.confirm(a, target, signal()), h.controller.attach(a, target, signal()),
+    ]) {
+      await expect(result).rejects.toMatchObject({ code: 'remote-desktop/unavailable' })
+    }
+    await expect(h.controller.revoke(a, { grantId: 'old' }, signal())).rejects.toMatchObject({ code: 'remote-desktop/forbidden' })
+  })
+
+  it('reports unavailable for administrator mutations without granting a fallback provider', async () => {
+    const h = withoutProvider('admin')
+    await expect(h.controller.revoke(agent(h.ctx), { grantId: 'old' }, signal())).rejects.toMatchObject({ code: 'remote-desktop/unavailable' })
+    expect(h.ctx.get('remoteDesktop')).toBeUndefined()
   })
 })

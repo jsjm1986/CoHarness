@@ -1,3 +1,5 @@
+import { adminLanguage, translateCopy } from '../language.ts'
+
 /** Models page copy: governance tabs, the access-and-pricing dialog, and the personal registration audit. */
 
 export const zh = {
@@ -181,3 +183,8 @@ export const en = {
   digestModelSave: 'Save',
   digestModelSaved: 'Saved',
 } satisfies Record<ModelsPageCopyKey, string>
+
+/** @returns the model administration copy for the current document language. */
+export function modelsPageT() {
+  return translateCopy(adminLanguage(), { zh, en })
+}

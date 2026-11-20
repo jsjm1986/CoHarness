@@ -1,9 +1,8 @@
-- button "Edit config.txt +1 -1" [expanded]:
+- button "Edit" [expanded]:
   - img
-  - text: Edit
-  - button "config.txt"
-  - text: +1 -1
-- text: Code block
+- text: Edit
+- button "config.txt"
+- text: +1 -1 Code block
 - button "Wrap lines"
 - button "Copy":
   - img

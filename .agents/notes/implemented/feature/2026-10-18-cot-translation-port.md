@@ -14,6 +14,10 @@ All three packages are ported into `packages/experimental/` under upstream names
 
 `client-ui-cot-translation` mounts on the fork's own conversation surface (`dsh-client-ui-conversation` imports in its client half) instead of upstream's `ui-chat`. `cot-translation-bundle` is registered in `OPTIONAL_BUNDLES` for the showcase toggle and in `apps/cli` dependencies; none enters a shipped default composition.
 
+The Host registers the `cot-translation` settings section and reads its accepted values for both metadata and request admission. Schema defaults and composition values remain the base, and saved preferences form the user layer. A volatile Loader field alone does not expose a namespace through `settings.describe`; the form and the translation controller therefore share the settings service.
+
+The Client adapter checks the settings scope’s settled write state before clearing staged values. A fulfilled mutation can still report a transport error or blocked document; these outcomes retain the draft and expose the localized retryable form error.
+
 ## Alternatives considered
 
 - **Keeping the defer** was rejected: the blocker was one optional provider surface, not a hard dependency; the bundle's own default uses an anonymous provider.

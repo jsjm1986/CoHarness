@@ -7,6 +7,7 @@ import { PageMarkdownActions } from './page-markdown-actions.ts'
 import './mermaid-viewer.css'
 import './code-group.css'
 import './page-markdown-actions.css'
+import './touch-targets.css'
 
 export default {
   extends: DefaultTheme,

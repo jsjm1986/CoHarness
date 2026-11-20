@@ -30,6 +30,36 @@ describe.skipIf(!url || !/^\/hgw_peer_[0-9a-f]+_test$/u.test(new URL(url).pathna
   afterAll(async () => {
     await pool?.end()
   })
+  it.skipIf(!process.env.HGW_TEST_RESTIC)('rotates a live encrypted repository and retires it after an independent recovery drill', async () => {
+    const root = await mkdtemp(join(tmpdir(),'peer-retirement-'))
+    const org = randomUUID(), source = randomUUID(), target = randomUUID(), slug = 'rotation-'+org
+    try {
+      await pool.query("INSERT INTO harness.organizations(id,slug,display_name) VALUES($1,$2,'Repository rotation')",[org,slug])
+      await pool.query("INSERT INTO harness.compute_nodes(id,organization_id,name) VALUES($1,$2,'source'),($3,$2,'target')",[source,org,target])
+      await pool.query("UPDATE harness.deployment_topology SET enabled=true,revision=1,primary_node_id=$2,primary_origin='https://primary.test' WHERE organization_id=$1",[org,source])
+      await pool.query(`INSERT INTO harness.node_agents(organization_id,node_id,credential_hash,platform,architecture,connection_id,connection_epoch,lease_expires_at)
+        VALUES($1,$2,$3,'linux','x64',$4,1,clock_timestamp()+interval '5 minutes')`,[org,target,randomBytes(32),randomUUID()])
+      const admin = (await pool.query<{id:string;public_id:string}>(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
+        VALUES($1,'admin','Administrator',$2) RETURNING id,public_id::text`,[org,join(root,'admin')])).rows[0]!
+      await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')",[org,admin.id])
+      await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) VALUES($1,'fixture-password',false)",[admin.id])
+      const primary = await resolvePostgresRuntimeContext(pool,slug,'source'), receiver = await resolvePostgresRuntimeContext(pool,slug,'target')
+      const actor = Number(admin.public_id), governance = new PeerBackupGovernance(primary)
+      await actualPeerFlow(primary,receiver,actor,root,process.env.HGW_TEST_RESTIC!,{rotate:true})
+      const legacy = randomUUID()
+      await governance.configure(actor,{ id:legacy,scopeKind:'governance',scopeId:org,sourceNodeId:source,targetNodeId:target,
+        tier:'important',enabled:false,expectedRevision:0,quotaBytes:1<<20,appendFingerprint:digest('legacy-a'),recoveryFingerprint:digest('legacy-r') })
+      await pool.query(`INSERT INTO harness.peer_backup_points(id,organization_id,policy_id,revision,writer_epoch,watermark,snapshot_id,manifest_digest,
+        covered_count,gap_count,protected_through) VALUES($1,$2,$3,1,1,1,$4,$5,3,1,clock_timestamp()-interval '2 hours')`,
+        [randomUUID(),org,legacy,digest('legacy-snapshot'),digest('legacy-manifest')])
+      expect(await governance.list(actor)).toContainEqual(expect.objectContaining({
+        policyId:legacy,coverage:'partial',freshness:'overdue',
+      }))
+    } finally {
+      await rm(root,{recursive:true,force:true})
+      await removeFixtureOrganization(pool,org)
+    }
+  },120000)
   it('exports only opaque project coordinates and rejects a content field in restored governance', async () => {
     const org = randomUUID(), node = randomUUID(),
       root = await mkdtemp(join(tmpdir(), 'hgw-peer-governance-fields-')),
@@ -42,6 +72,14 @@ describe.skipIf(!url || !/^\/hgw_peer_[0-9a-f]+_test$/u.test(new URL(url).pathna
         primary_origin='https://primary.test' WHERE organization_id=$1`, [org, node])
       const owner = (await pool.query(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
         VALUES($1,'owner','Owner','/private/local-only') RETURNING id`, [org])).rows[0].id
+      await pool.query(`INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled,revision)
+        VALUES($1,$2,$3,false,7)`, [org,node,owner])
+      await pool.query(`INSERT INTO harness.node_user_accounts(organization_id,node_id,user_id,home_path)
+        VALUES($1,$2,$3,'/private/account-documents')`, [org,node,owner])
+      await pool.query(`INSERT INTO harness.user_quotas(user_id,token_mode,token_limit,company_cost_mode)
+        VALUES($1,'custom',1234,'inherit')`,[owner])
+      await pool.query(`INSERT INTO harness.audit_events(organization_id,action,detail)
+        VALUES($1,'backup-policy-changed',$2::jsonb)`,[org,JSON.stringify({privateContent:title})])
       await pool.query(`INSERT INTO harness.projects(organization_id,name,created_by,owner_user_id)
         VALUES($1,$2,$3,$3)`, [org, title, owner])
       const binding = { organizationId: org, scopeId: org, sourceNodeId: node, targetNodeId: randomUUID(),
@@ -54,6 +92,11 @@ describe.skipIf(!url || !/^\/hgw_peer_[0-9a-f]+_test$/u.test(new URL(url).pathna
       expect(body).toContain('"table":"projects"')
       expect(body).not.toContain(title)
       expect(body).not.toContain('/private/local-only')
+      expect(body).not.toContain('/private/account-documents')
+      const records=body.trim().split('\n').map(line=>JSON.parse(line))
+      expect(records).toContainEqual({table:'computer_use_permissions',row:expect.objectContaining({user_id:owner,enabled:false,revision:7})})
+      expect(records).toContainEqual({table:'user_quotas',row:expect.objectContaining({user_id:owner,token_limit:1234})})
+      expect(records).toContainEqual({table:'audit_events',row:expect.objectContaining({action:'backup-policy-changed'})})
       await exporter.validate(binding, captured, payload, signal)
       const changed = body.split('\n').filter(Boolean).map((line) => {
         const record = JSON.parse(line)
@@ -67,8 +110,11 @@ describe.skipIf(!url || !/^\/hgw_peer_[0-9a-f]+_test$/u.test(new URL(url).pathna
       await expect(exporter.validate(binding, captured, payload, signal)).rejects.toMatchObject({
         code: 'peer-backup/invalid-export',
       })
-      await writeFile(manifestPath, JSON.stringify({ ...manifest, version: 1, sha256: digest(changed) }))
-      const legacy = { ...captured, coveredCount: captured.coveredCount - 2 }
+      const legacyLines=changed.trim().split('\n').filter(line=>['organizations','users','compute_nodes','projects','deployment_topology'].includes(JSON.parse(line).table))
+      const legacyBody=legacyLines.join('\n')+'\n'
+      await writeFile(jsonl,legacyBody)
+      await writeFile(manifestPath, JSON.stringify({ ...manifest, version: 1, rows:legacyLines.length,sha256: digest(legacyBody) }))
+      const legacy = { ...captured, coveredCount: 17 }
       await exporter.validate(binding, legacy, payload, signal)
       await expect(exporter.validate(binding, { ...legacy, gaps: [] }, payload, signal)).rejects.toMatchObject({
         code: 'peer-backup/coverage-incomplete',
@@ -143,7 +189,7 @@ describe.skipIf(!url || !/^\/hgw_peer_[0-9a-f]+_test$/u.test(new URL(url).pathna
       const grant = await gb.grant(policy.policyId, a.nodeId, token)
       expect(grant.mode).toBe('append')
       expect((await gb.grant(policy.policyId, a.nodeId, readToken)).mode).toBe('recover')
-      await expect(gb.grant(policy.policyId, b.nodeId, token)).rejects.toMatchObject({ status: 403 })
+      await expect(gb.grant(policy.policyId, b.nodeId, token)).rejects.toMatchObject({ code:'peer-backup/recovery-protocol-upgrade-required' })
       const first = await ga.enqueue(admin.id, policy.policyId, 'capture')
       expect(await ga.enqueue(admin.id, policy.policyId, 'capture')).toBe(first)
       const job = await ga.claim()

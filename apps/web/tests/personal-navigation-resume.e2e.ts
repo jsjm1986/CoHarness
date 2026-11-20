@@ -1,10 +1,129 @@
 /** Restore one personal selection and refresh only directory sections visible in the document. */
+import { completionBarrier } from './support.ts'
 import { writeFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { computerBrowser } from './computer-browser.ts'
 import { launchPersonalComputersFixture, personalTargets } from './personal-computers-fixture.ts'
 import { clientSessionKey, type ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { compareOrRefreshGolden, webSnapshotMode } from './scaffold.ts'
+
+it('reloads two authenticated computer tabs without reading the other computer\'s raw conversation', async () => {
+  const sessionIds = ['office-only-history', 'compute-only-history'] as const
+  const fixture = await launchPersonalComputersFixture({ sessionIds })
+  for (const [index, world] of fixture.worlds.entries()) {
+    const runtimeId = personalTargets[index]!.runtimeId
+    world.ctx.on('webserver/index-inject', (rows) => {
+      rows.push({ kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: {
+        version: 1, principalId: 7, runtimeTarget: { kind: 'personal', runtimeId },
+      } })
+    })
+  }
+  const browser = await computerBrowser()
+  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } })
+  const pages = [await context.newPage(), await context.newPage()]
+  const reads: { tab: number; sessionId: string; runtimeId: string | null }[] = []
+  const evidence: string[] = []
+  try {
+    for (const [index, page] of pages.entries()) {
+      const target = personalTargets[index]!
+      const key = clientSessionKey(target as ClientRuntimeTarget, sessionIds[index]! as SessionId)
+      page.on('request', (request) => {
+        const url = new URL(request.url())
+        if (request.method() !== 'POST' || !/\/api\/(?:prepare\/v1\/)?session\.history$/u.test(url.pathname)) return
+        const body = request.postDataJSON() as { payload: { sessionId: string } }
+        reads.push({ tab: index, sessionId: body.payload.sessionId, runtimeId: url.searchParams.get('dshRuntime') })
+      })
+      const url = new URL(fixture.url)
+      url.searchParams.set('dshRuntime', target.runtimeId)
+      await page.goto(url.href, { waitUntil: 'networkidle' })
+      const group = page.getByRole('region', { name: target.nodeName, exact: true })
+      const heading = group.getByRole('button', { name: target.nodeName, exact: true })
+      if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
+      const row = group.getByText(index === 0 ? 'Office conversation' : 'Compute conversation', { exact: true })
+      if (!await row.isVisible()) await group.getByText(index === 0 ? 'Office work' : 'Compute work', { exact: true }).click()
+      await row.click()
+      await page.locator('[data-conversation-intent]').waitFor({ state: 'hidden' })
+      const editor = page.locator(`[data-conversation-session="${key}"] textarea:enabled`)
+      await editor.waitFor()
+      const saved = page.waitForResponse(response => response.request().method() === 'PUT'
+        && new URL(response.url()).pathname.startsWith('/account/api/drafts/') && response.status() === 200)
+      await editor.fill(index === 0 ? 'Office tab draft' : 'Compute tab draft')
+      await saved
+    }
+    reads.length = 0
+    for (const [index, page] of pages.entries()) {
+      const target = personalTargets[index]!
+      const key = clientSessionKey(target as ClientRuntimeTarget, sessionIds[index]! as SessionId)
+      await page.reload({ waitUntil: 'networkidle' })
+      await page.locator('[data-conversation-intent]').waitFor({ state: 'hidden' })
+      const editor = page.locator(`[data-conversation-session="${key}"] textarea:enabled`)
+      await editor.waitFor()
+      const draft = await editor.inputValue()
+      expect(draft).toBe(index === 0 ? 'Office tab draft' : 'Compute tab draft')
+      const owned = reads.filter(row => row.tab === index)
+      expect(owned.length).toBeGreaterThan(0)
+      expect(owned.every(row => row.runtimeId === target.runtimeId && row.sessionId === sessionIds[index])).toBe(true)
+      evidence.push(`${target.nodeName}: ${sessionIds[index]}; ${draft}; history requests remain on this computer`)
+    }
+    await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/tab-selection.expected.md', import.meta.url)),
+      evidence.join('\n'), webSnapshotMode())
+  } finally { await context.close(); await browser.close(); await fixture.close() }
+}, 120_000)
+
+it('keeps typed input in the same conversation while its authenticated connection renews', async () => {
+  const fixture = await launchPersonalComputersFixture()
+  const target = personalTargets[0]!
+  fixture.worlds[0]!.ctx.on('webserver/index-inject', (rows) => {
+    rows.push({ kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: {
+      version: 1, principalId: 7, runtimeTarget: { kind: 'personal', runtimeId: target.runtimeId },
+    } })
+  })
+  const browser = await computerBrowser()
+  const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1440, height: 900 } })
+  const renewal = completionBarrier()
+  const resume = completionBarrier()
+  try {
+    const url = new URL(fixture.url)
+    url.searchParams.set('dshRuntime', target.runtimeId)
+    await page.goto(url.href, { waitUntil: 'networkidle' })
+    const computer = page.getByRole('region', { name: target.nodeName, exact: true })
+    const heading = computer.getByRole('button', { name: target.nodeName, exact: true })
+    if (await heading.getAttribute('aria-expanded') !== 'true') await heading.click()
+    const conversation = computer.getByText('Office conversation', { exact: true })
+    if (!await conversation.isVisible()) await computer.getByText('Office work', { exact: true }).click()
+    await conversation.click()
+    await page.locator('[data-conversation-intent]').waitFor({ state: 'hidden' })
+    const input = page.locator('[data-composer-seat] textarea:visible')
+    const saved = page.waitForResponse(response => response.request().method() === 'PUT' && response.ok()
+      && new URL(response.url()).pathname.startsWith('/account/api/drafts/'))
+    await input.fill('A draft for this conversation')
+    await saved
+    await page.route(url => url.pathname === '/account/api/context', async (route) => {
+      renewal.resolve()
+      await resume.promise
+      await route.continue()
+    })
+    fixture.renewEventStreams(target.runtimeId)
+    await renewal.promise
+    const during = await input.inputValue()
+    expect(during).toBe('A draft for this conversation')
+    const confirmed = page.waitForResponse(response => new URL(response.url()).pathname === '/account/api/context' && response.ok())
+    resume.resolve()
+    await (await confirmed).finished()
+    const after = await input.inputValue()
+    expect(after).toBe(during)
+    expect(fixture.receipts.filter(row => row.path === '/api/admit/v1/session.prompt')).toHaveLength(0)
+    await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/draft-renewal.expected.md', import.meta.url)),
+      `During verification: ${during}\nAfter verification: ${after}\nSubmitted messages: 0`, webSnapshotMode())
+  } finally {
+    resume.resolve()
+    await page.close()
+    await browser.close()
+    await fixture.close()
+  }
+}, 120_000)
 
 it('restores the offline computer after reload and transfers input only to its original conversation', async () => {
   const fixture = await launchPersonalComputersFixture()

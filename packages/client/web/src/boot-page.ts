@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-client-web/src/boot-page
  */
 import type { LoaderEntryState } from './loader-status.ts'
+import type { StartupDraftView } from './startup-draft.ts'
 import css from './boot-page.module.css'
 
 /** Create a div with one module class and optional text. */
@@ -100,6 +101,12 @@ export class BootPage {
   dispose(): void {
     this.root.remove()
   }
+
+  /**
+   * Present the existing draft while the remote workspace is starting or recovering.
+   * @param draft - local input owned by this document's remote-entry bootstrap.
+   */
+  attachDraft(draft: StartupDraftView): void { draft.attach(this.card) }
 
   /** Redraw the state-dependent content below the wordmark. */
   private render(): void {

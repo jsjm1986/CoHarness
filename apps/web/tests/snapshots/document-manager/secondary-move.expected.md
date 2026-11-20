@@ -1,7 +1,7 @@
 - heading "Move Documents" [level=2]
 - button "Close":
   - img
-- paragraph: "Move 1 documents to:"
+- paragraph: "Documents to move: 1"
 - list "Documents in this operation":
   - listitem: brief.txt 21 B
 - radiogroup "Destination folder":

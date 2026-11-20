@@ -1,19 +1,23 @@
 /** Shared-project activity tab through the shipped Web composition. */
 
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, BrowserContext, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession,
+  assertFixtureInventory, captureStableAria, launchWebScaffold, seedSession,
   watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden, workflowTouchOptions } from './workflow-responsive-state.ts'
+import { activateActivityControl, auditActivityState, openActivitySession } from './activity-responsive-state.ts'
 
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const SESSION_ID = 'project-activity-web-e2e'
+const OVERVIEW = 'ACTIVITYOVERVIEW'
 const MESSAGE_TEXT = 'Pinned the migration checklist to the top of the plan.'
 const ANSWER_TEXT = 'Proceed with the staged rollout'
 const QUESTION_TEXT = 'Roll out to production now or stage first?'
@@ -85,29 +89,27 @@ async function mockActivityGateway(target: Page, day = '2026-10-23'): Promise<vo
   })
 }
 
-/** Open a fresh conversation so the reveal click visibly switches panes. */
-async function openBlankSession(target: Page): Promise<void> {
-  await target.getByRole('button', { name: 'New session' }).first().click()
-  await target.getByText('DONE', { exact: true }).waitFor({ state: 'hidden' })
-}
-
 /** Open the activity tab through the right Sidebar guide capsule. */
 async function openActivityTab(target: Page): Promise<void> {
-  await target.getByRole('button', { name: 'Open right sidebar' }).click()
   const entry = target.locator('[data-sidebar-right-guide-entry="activity"]')
-  if (await entry.count() === 0) {
-    await target.getByRole('button', { name: 'New tab' }).click()
-  }
+  const expand = target.getByRole('button', { name: 'Open right sidebar', exact: true })
+  const add = target.getByRole('button', { name: 'New tab', exact: true })
+  await entry.or(expand).or(add).first().waitFor()
+  if (await expand.isVisible()) await expand.click()
+  if (!await entry.isVisible()) await add.click()
   await entry.click()
 }
 
 describe('project activity tab', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold()
-    const seeded = await seedSession(scaffold, await readFile(SEED, 'utf8'), SESSION_ID)
+    const recording = await readFile(SEED, 'utf8')
+    const seeded = await seedSession(scaffold, recording, SESSION_ID)
+    const overview = await seedSession(scaffold, recording.replaceAll('DONE', OVERVIEW), 'project-activity-overview')
     const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
     await workspace.attachSession(seeded)
-    browser = await chromium.launch()
+    await workspace.attachSession(overview)
+    browser = await responsiveBrowser.launch()
   }, 120_000)
 
   afterEach(async () => {
@@ -131,7 +133,7 @@ describe('project activity tab', () => {
   })
 
   it('keeps project activity pinned after another tab changes scope, then reveals the conversation row', async () => {
-    context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', timezoneId: 'UTC' })
+    context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', ...workflowTouchOptions, timezoneId: 'UTC' })
     page = await context.newPage()
     await page.clock.setFixedTime(new Date('2026-10-23T12:00:00.000Z'))
     tripwire = watchConsole(page)
@@ -139,18 +141,28 @@ describe('project activity tab', () => {
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-activity'))
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-    await openBlankSession(page)
+    await openActivitySession(page, OVERVIEW)
 
     await openActivityTab(page)
     const feed = page.locator('[class*="feed"]')
-    // The panel lands on the progress journal; the raw feed lives one segment over.
+    await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor({ timeout: 15_000 })
+    expect(await page.getByRole('button', { name: 'Time', exact: true }).getAttribute('aria-pressed')).toBe('true')
+    await page.getByRole('button', { name: 'Progress', exact: true }).click()
     await feed.getByText('No progress journal yet', { exact: true }).waitFor({ timeout: 15_000 })
+    await auditActivityState(page, 'progress-empty', feed)
     await page.getByRole('button', { name: 'Time', exact: true }).click()
     await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor({ timeout: 15_000 })
     await feed.getByText(ANSWER_TEXT, { exact: true }).waitFor()
     await feed.getByText('Zhou', { exact: true }).waitFor()
     await feed.getByText('chose', { exact: true }).waitFor()
     await feed.getByRole('button', { name: 'Today Zhou · Lin 2', exact: true }).waitFor()
+    const dayHeading = feed.getByRole('button', { name: 'Today Zhou · Lin 2', exact: true })
+    await activateActivityControl(dayHeading)
+    await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor({ state: 'hidden' })
+    await auditActivityState(page, 'activity-time-collapsed', feed)
+    await activateActivityControl(dayHeading)
+    await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor()
+    await auditActivityState(page, 'activity-time-expanded', feed)
 
     // The folded line expands to the detail card; the question shows there.
     await feed.getByText(ANSWER_TEXT, { exact: true }).click()
@@ -172,8 +184,9 @@ describe('project activity tab', () => {
     expect(new URL(response.url()).searchParams.get('dshTarget')).toBe('project:9')
     await feed.getByText(MESSAGE_TEXT, { exact: true }).waitFor()
     expect(await feed.getByText(OTHER_PROJECT_TEXT, { exact: true }).count()).toBe(0)
+    await auditActivityState(page, 'activity-expanded-answer', feed)
     const snapshot = await captureStableAria(page, '[class*="feed"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(join(EXPECTED_DIR, 'ui.expected.md'), snapshot, MODE)
+    await compareWorkflowGolden(join(EXPECTED_DIR, 'ui.expected.md'), snapshot, MODE)
 
     const seeded = page.getByText('DONE', { exact: true })
     await feed.getByText('Jump to conversation', { exact: true }).click()
@@ -184,31 +197,150 @@ describe('project activity tab', () => {
     { season: 'spring', day: '2026-03-08', now: '2026-03-09T04:30:00.000Z' },
     { season: 'fall', day: '2026-10-31', now: '2026-11-02T04:30:00.000Z' },
   ])('uses the previous local calendar day after the $season daylight-saving change', async ({ season, day, now }) => {
-    context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', timezoneId: 'America/New_York' })
+    context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', ...workflowTouchOptions, timezoneId: 'America/New_York' })
     page = await context.newPage()
     await page.clock.setFixedTime(new Date(now))
     tripwire = watchConsole(page)
     await mockActivityGateway(page, day)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-    await openBlankSession(page)
+    await openActivitySession(page, OVERVIEW)
     await openActivityTab(page)
     const feed = page.locator('[class*="feed"]')
-    await feed.getByText('No progress journal yet', { exact: true }).waitFor()
-    await page.getByRole('button', { name: 'Time', exact: true }).click()
     await feed.getByRole('button', { name: /Zhou · Lin 2/ }).waitFor()
     expect(await feed.getByRole('button', { name: `Yesterday · ${day.slice(5)} Zhou · Lin 2`, exact: true }).count()).toBe(1)
     const time = await captureStableAria(page, '[class*="feed"]', scaffold.workspaceCwd)
     await page.getByRole('button', { name: 'Conversation', exact: true }).click()
     await feed.getByText('Yesterday 05:00', { exact: true }).waitFor()
     const conversation = await captureStableAria(page, '[class*="feed"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(join(EXPECTED_DIR, `${season}-calendar-day.expected.md`),
+    await compareWorkflowGolden(join(EXPECTED_DIR, `${season}-calendar-day.expected.md`),
       `Time view\n${time}\n\nConversation view\n${conversation}`, MODE)
   })
 
   it('owns its browser expectations', async () => {
     await assertFixtureInventory(EXPECTED_DIR, [
-      'fall-calendar-day.expected.md', 'spring-calendar-day.expected.md', 'ui.expected.md',
+      'fall-calendar-day.expected.md', 'member-filter.expected.md', 'spring-calendar-day.expected.md', 'ui.expected.md',
     ])
   })
+
+  it.each([true, false])('opens the nested conversation target of a long answer when available=%s', async (available) => {
+    context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', ...workflowTouchOptions, timezoneId: 'UTC' })
+    page = await context.newPage()
+    const current = page
+    await current.clock.setFixedTime(new Date('2026-10-23T12:00:00.000Z'))
+    await mockActivityGateway(current)
+    const title = 'Deployment approval — verify the release window, workspace access and recovery instructions'
+    const answer = 'Proceed only after checking the workspace permissions and preserving the current deployment data. '.repeat(12)
+    await current.route(/\/account\/api\/activity(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ json: { items: [{ kind: 'answer', sessionId: available ? SESSION_ID : 'unavailable-activity-session',
+        conversationTitle: title, actorUserId: 7, actorLabel: 'Lin', occurredAt: '2026-10-23T09:00:00.000Z',
+        seq: 2, text: answer, questionText: 'Which release window and recovery plan should the team use?' }] } })
+    })
+    await current.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await current.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await openActivitySession(current, OVERVIEW)
+    await openActivityTab(current)
+    const feed = current.locator('[class*="feed"]')
+    const entry = feed.locator('[class*="tLine"]')
+    await entry.focus()
+    await entry.press('Enter')
+    await feed.locator('[class*="detailAns"]').waitFor()
+    if (available) await auditActivityState(current, 'activity-long-answer-nested-target', feed)
+    await activateActivityControl(feed.getByRole('button', { name: title, exact: true }))
+    if (available) {
+      await current.getByText('DONE', { exact: true }).waitFor({ timeout: 15_000 })
+    } else {
+      await current.getByText('This conversation is not loaded. Start and open its workspace, then try again.', { exact: true }).waitFor()
+      await auditWorkflowState(current, 'collaboration', 'activity-source-unavailable', current.locator('[class*="centerCol"]'))
+    }
+  }, process.env.DSH_FEATURE_MATRIX === '1' ? 300_000 : 60_000)
+
+  it('keeps activity loading, empty, failed, filtered and paged states reachable', async () => {
+    context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', ...workflowTouchOptions, timezoneId: 'UTC' })
+    page = await context.newPage()
+    const current = page
+    await current.clock.setFixedTime(new Date('2026-10-23T12:00:00.000Z'))
+    tripwire = watchConsole(current)
+    await mockActivityGateway(current)
+    let release!: () => void
+    let phase: 'loading' | 'empty' | 'failed' | 'paged' = 'loading'
+    let earlierRefused = false
+    const ready = new Promise<void>((resolve) => { release = resolve })
+    const entry = { kind: 'message', sessionId: SESSION_ID, conversationTitle: 'QA activity source',
+      actorUserId: 7, actorLabel: 'Lin', occurredAt: '2026-10-23T09:00:00Z', seq: 1, text: 'The first activity page' }
+    const roster = [{ userId: 7, label: 'Lin' }, { userId: 8, label: 'Zhou' }, { userId: 9, label: 'Ada' }]
+    const zhou = { ...entry, actorUserId: 8, actorLabel: 'Zhou', seq: 0, text: 'The earlier activity page' }
+    const filteredRequests: (string | null)[] = []
+    await current.route(/\/account\/api\/activity(?:\?.*)?$/, async (route) => {
+      if (phase === 'loading') await ready
+      if (phase === 'failed') { await route.fulfill({ status: 503, json: { error: 'QA feed reader unavailable' } }); return }
+      const query = new URL(route.request().url()).searchParams
+      const before = query.get('before')
+      if (phase === 'empty' || query.get('member') === '9') { await route.fulfill({ json: { items: [], members: roster } }); return }
+      if (query.get('member') === '8') {
+        filteredRequests.push(before)
+        const json = before === null ? { items: [zhou], members: roster, nextBefore: 'qa-zhou-older' }
+          : { items: [{ ...zhou, sessionId: 'older-zhou', text: 'Zhou’s earlier update' }] }
+        await route.fulfill({ json })
+        return
+      }
+      if (before !== null && earlierRefused) {
+        await route.fulfill({ status: 503, json: { error: 'QA earlier activity reader unavailable' } })
+        return
+      }
+      await route.fulfill({ json: before === null
+        ? { items: [entry], members: roster, nextBefore: 'qa-page-2' }
+        : { items: [zhou] } })
+    })
+    try {
+      await current.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await current.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+      await openActivitySession(current, OVERVIEW)
+      await openActivityTab(current)
+      const feed = current.locator('[class*="feed"]')
+      await activateActivityControl(current.getByRole('button', { name: 'Time', exact: true }))
+      await feed.getByText('Loading…', { exact: true }).waitFor()
+      await auditActivityState(current, 'activity-loading', feed)
+      phase = 'empty'
+      release()
+      await feed.getByText('No member activity yet', { exact: true }).waitFor()
+      await auditActivityState(current, 'activity-empty', feed)
+      phase = 'failed'
+      await activateActivityControl(current.getByRole('button', { name: 'Refresh', exact: true }))
+      await feed.getByText('Load failed — refresh to retry', { exact: true }).waitFor()
+      await auditActivityState(current, 'activity-read-failed', feed)
+      phase = 'paged'
+      await activateActivityControl(current.getByRole('button', { name: 'Refresh', exact: true }))
+      await feed.getByText(entry.text, { exact: true }).waitFor()
+      await auditActivityState(current, 'activity-earlier-available', feed)
+      const memberFilter = current.getByRole('combobox', { name: 'Filter by member', exact: true })
+      await memberFilter.selectOption('8')
+      await feed.getByText(zhou.text, { exact: true }).waitFor()
+      expect(await feed.getByText(entry.text, { exact: true }).count()).toBe(0)
+      await activateActivityControl(feed.getByRole('button', { name: 'Load earlier', exact: true }))
+      await feed.getByText('Zhou’s earlier update', { exact: true }).waitFor()
+      expect(filteredRequests).toEqual([null, 'qa-zhou-older'])
+      await auditActivityState(current, 'activity-member-filtered', feed)
+      const filtered = await captureStableAria(current, '[class*="feed"]', scaffold.workspaceCwd)
+      await memberFilter.selectOption('9')
+      await feed.getByText('No visible activity from this member', { exact: true }).waitFor()
+      await activateActivityControl(current.getByRole('button', { name: 'Refresh', exact: true }))
+      await feed.getByText('No visible activity from this member', { exact: true }).waitFor()
+      expect(await memberFilter.inputValue()).toBe('9')
+      await auditActivityState(current, 'activity-member-filter-empty-after-refresh', feed)
+      const memberEmpty = await captureStableAria(current, '[class*="feed"]', scaffold.workspaceCwd)
+      await compareWorkflowGolden(join(EXPECTED_DIR, 'member-filter.expected.md'), `Filtered history\n${filtered}\n\nQuiet member\n${memberEmpty}`, MODE)
+      await memberFilter.selectOption('')
+      await feed.getByText(entry.text, { exact: true }).waitFor()
+      earlierRefused = true
+      await activateActivityControl(feed.getByRole('button', { name: 'Load earlier', exact: true }))
+      await feed.getByText('Load failed — refresh to retry', { exact: true }).waitFor()
+      expect(await feed.getByText(entry.text, { exact: true }).isVisible()).toBe(true)
+      await auditActivityState(current, 'activity-earlier-refused-retained', feed)
+      earlierRefused = false
+      await activateActivityControl(feed.getByRole('button', { name: 'Load earlier', exact: true }))
+      await feed.getByText('The earlier activity page', { exact: true }).waitFor()
+      await auditActivityState(current, 'activity-earlier-loaded', feed)
+    } finally { phase = 'empty'; release() }
+  }, process.env.DSH_FEATURE_MATRIX === '1' ? 600_000 : 90_000)
 })

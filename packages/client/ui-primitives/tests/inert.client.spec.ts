@@ -7,6 +7,21 @@ afterEach(() => {
 })
 
 describe('holdInert', () => {
+  it('retains isolation when owners release out of order and ignores repeated release', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<button tabindex="2">Background</button>'
+    document.body.append(root)
+    const first = holdInert(root)
+    const second = holdInert(root)
+    first()
+    first()
+    expect(root.inert).toBe(true)
+    expect(root.querySelector('button')?.tabIndex).toBe(-1)
+    second()
+    expect(root.inert).toBe(false)
+    expect(root.hasAttribute('aria-hidden')).toBe(false)
+    expect(root.querySelector('button')?.tabIndex).toBe(2)
+  })
   it('holds native and fallback accessibility state, then restores it', () => {
     const root = document.createElement('div')
     const button = document.createElement('button')

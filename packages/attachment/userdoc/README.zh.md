@@ -27,7 +27,7 @@ kind: "package-reference"
 
 提供方适配器可以在不依赖 Context 的列表实现上复用 `defaultUserDocDirectoryPage` 和 `defaultUserDocTrashPage`，分页与验证保持 `UserDocStore` 默认行为。`USERDOC_ERROR_CODES` 和 `userDocErrorStatus` 定义共用的稳定错误码及 HTTP 映射，包括权限拒绝、待完成请求达到上限和传输元数据格式错误。
 
-`UserDocScope.nodeId` 独立于 Runtime 标识电脑本地存储，`nodeName` 仅用于显示。`/identity` 中可在浏览器使用的 `userDocLocationUrl` 将文档路径绑定到该位置，并将受管总览及复制操作路由至 Gateway。服务端重新检查当前账号、电脑和项目权限；位置描述本身不授予权限。参见[浏览器文档参考](../../../gateway/docs/node-agent/browser/README.zh.md)。
+`UserDocScope.nodeId` 独立于 Runtime 标识电脑本地存储，`nodeName` 仅用于显示。`/identity` 中可在浏览器使用的 `userDocLocationUrl` 将文档路径绑定到该位置，并将受管总览及复制操作路由至 Gateway。服务端重新检查当前账号、电脑和项目权限；位置描述本身不授予权限。`UserDocLocation.metadataOnNode` 标记需要到所属电脑解析名称的项目，其初始 `name` 为公开项目标识。参见[浏览器文档参考](../../../gateway/docs/node-agent/browser/README.zh.md)。
 
 ## 概述
 

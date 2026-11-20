@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-供 Gateway 启动的 Harness 运行时使用的认证请求上下文和私有 loopback 传输。启动凭据将进程绑定到一个组织、一个个人或项目运行时身份，以及用于验证短期浏览器 principal 的 Gateway 密钥。
+供 Gateway 启动的 Harness 运行时使用的认证请求上下文和私有 loopback 传输。启动凭据将进程绑定到一个组织、一个个人或项目运行时身份，以及用于验证短期浏览器 principal 的 Gateway 密钥。受管 Gateway 启动时还会在凭据中提供所属电脑 ID。Host 通过 `host.describe` 返回这个 ID，使直接打开的对话能够按原电脑、Runtime 和账号恢复排队消息。
 
 插件向已认证的 Gateway 发布已提交的工作区元数据，不传输 Session 正文。个人 Runtime 还需要 `apiProxy`，通过其现有会话目录发布根对话摘要；项目 Runtime 只发布 Workspace 元数据，不读取其他参与者的对话目录。同一时间只有一次发布，后续变更合并为最新快照；卸载时中止并等待请求结束。`workspaceCatalogTimeoutMs` 限制单次发布时长，默认 30000 毫秒。
 
@@ -38,10 +38,13 @@ kind: "package-reference"
 - 已分配环境在私有凭据与每份 principal 中携带相同 `runtimeId`。旧式单实例组合在两者中都省略它；不匹配或仅一方省略时拒绝认证。
 - `interactive()` 只在认证 HTTP 操作仍活动时暴露该主体。`current()` 标识起始认证分发，并可以沿异步上下文传递；它不会向脱离请求的工作授予交互权限。
 - `request()` 只接受凭据 loopback origin 上的绝对 `/internal/runtime/` 路径，加入私有 bearer token，并且只在调用方明确要求时转发浏览器 principal。
+- 执行输入和会话登记可使用当前 HTTP 操作的 UUID 关联耗时。UUID 不参与授权判定。
 - 流式请求体明确提供 `duplex: 'half'`；传输保留这一 Node fetch 选项，不缓冲请求体。
 - 私有 `/api/internal/gateway/readiness` 端点只接受 nonce、由启动 token 和精确运行时身份派生的 HMAC，并返回匹配的响应证明；运行时端口上的任意监听器都不能满足 Gateway 的就绪检查。 `requiredPlugins` 默认空列表；每个配置的 Loader 条目 id 必须恰好对应一个已激活条目。Loader 缺失、条目不存在、未激活或存在歧义均返回503。Gateway 组合要求模型治理、执行授权及已启用的目录守卫。
 - 凭据和 principal 断言在各自的解析与请求边界失败关闭。运行时 bearer token 不会通过公开服务字段暴露。
 - 读取私有 JSON 响应的 Consumer 使用带领域上限和可选 `AbortSignal` 的 `readGatewayResponseJson()`（或字节级配套函数）；分块 body 超过上限或收到取消信号时会被取消，因此保护不只依赖 `Content-Length`。读取失败会发起取消，无须等待清理确认即可保留原始错误并释放 reader 锁；传输所有者仍须独立确认实际连接已关闭。
+
+`runtime-asset` 用途将一次 GET 或 HEAD 绑定到精确的版本化资源 URL 和进程代次。资源解析器仅接受带修订的插件组合、已发布的 `client.*.js` 分块及源码映射，或带内容哈希的 `/assets/` 文件；任意 `rev` 参数不会授予权限。可撤销的 WebServer 守卫在 `/plugins/`、`/assets/` 和 `/favicon.svg` 处理器之前，应用 Connection 的 Host/Origin 检查和签名主体校验。资源断言不能访问 index、API、事件或升级连接，也不建立执行上下文。
 
 `plugin-admin` 用途仅允许已声明的 Profile 管理 HTTP 方法（包括聚合读取 `pluginManager/catalog`）以及 `settings.describe`、`settings.mutate`。设置方法会重新核验当前管理员权限；写入必须携带已读版本，且不能修改账户偏好。此用途不授予原生文档打开器、凭据 API、终端或会话执行权限。
 
@@ -62,9 +65,15 @@ kind: "package-reference"
 
 `modelAccessRequired` 同样保留在应用根上下文直到销毁。受管模型请求在准入和最终派发期间必须保有原策略所有者；卸载或替换提供方不会放行不受限调用。
 
-提供方在进入有界注册队列前，捕获 Session 范围、签名交互调用者或明确的基础设施归属。归属解析失败会立即拒绝。尚未发送的请求被取消时，会独立于此前的 HTTP 请求释放本地排队容量。已验证且仍有效的条目串行注册；已尝试注册的请求则保留精确的完成记账，直到得到确认。
+`modelTimings` 默认关闭。受管启动配置随 Gateway 性能诊断启用，将计时元数据写入 Runtime 日志或 systemd 单元日志。采样覆盖[输入与请求准备](../gateway-execution/README.zh.md#execution-authorization)、资源准入及模型尝试到首段文本。沿用现有日志保留策略。
+
+`model-resource-timing` 记录来源绑定、本地登记排队、提交与状态请求、排队响应次数和轮询间隔。内部响应可以附带入口验凭据、写入准入、处理器验凭据、操作授权和账务事务耗时。这些耗时包含在请求时间内，批量请求的样本共享其耗时。轮询间隔描述 Runtime 观察状态的时间。样本只包含时间戳、耗时、次数和结果。
+
+提供方在进入有界注册队列前，捕获 Session 范围、签名交互调用者或明确的基础设施归属。归属解析失败会立即拒绝。捕获调用方范围后，由 Runtime 服务负责注册、重复轮询和完成结算。尚未发送的请求被取消时，会独立于此前的 HTTP 请求释放本地排队容量。已验证且仍有效的条目串行注册；已尝试注册的请求则保留精确的完成记账，直到得到确认。
 
 它使用已提交的节点策略与串行操作身份。提供方在 Gateway 核验该精确操作后交付活跃许可。一次轮询涉及多笔操作时，提供方会在交付前逐笔复核活跃结果。`requestTimeoutMs` 默认为 5000，`cleanupTimeoutMs` 默认为 30000，清理预算必须大于单次请求。许可取消跟随提供方生命周期、调用方和操作，不依赖不确定确认后已移除的本地条目。销毁时取消所有者，在该预算内等待确认清理，并保留不确定占用。之后精确的原所有者仍可通过捕获的私有传输报告静止状态。
+
+模型适配器确认静止后，如果提交完成状态失败，可由 Runtime 提供方继续等待确认。回复可以先完成，提供方按请求超时间隔重新提交同一序号和操作 ID。PostgreSQL 保留预留，直到提交完成状态或确认精确 Runtime 代次已停止。明确拒绝会结束重试。提供方销毁时取消等待中的重试，并在现有清理预算内报告已知的静止状态。
 
 <a id="model-experience"></a>
 ## 模型体验

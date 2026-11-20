@@ -1,6 +1,7 @@
 /** Current personal authority through real Gateway HTTP, LocalLauncher, policy files and resource registration. */
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
 import { removeFixtureOrganization } from './postgres-fixture-cleanup.mjs'
 import { chmodSync, cpSync, readFileSync, existsSync, statSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
@@ -30,7 +31,11 @@ const [{ openDb }, { UserService }, { ProjectService }, { AuthService }, { Audit
   'principal', 'postgres/conversation-repository', 'postgres/collaboration-service', 'postgres/model-governance-service',
   'organization-model-credentials',
 ].map(load))
-const listen = server => new Promise((ready, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', ready) })
+async function listen(server) {
+  const listening = once(server, 'listening')
+  server.listen(0, '127.0.0.1')
+  await listening
+}
 const closeServer = server => new Promise((ready, reject) => {
   server.closeAllConnections(); server.close(error => error ? reject(error) : ready())
 })
@@ -155,18 +160,13 @@ try {
           downstream.once('close', () => upstream.destroy()); upstream.on('error', () => downstream.destroy())
           downstream.pipe(upstream).pipe(downstream)
         })
+        await listen(relay)
         cleanups.push(async () => {
           const closed = new Promise((ready, reject) => relay.close(error => error ? reject(error) : ready()))
           const connections = [...sockets].map(socket => new Promise(ready => { socket.once('close', ready); socket.destroy() }))
           await Promise.all([closed, ...connections])
         })
-        let port
-        for (;;) {
-          await listen(relay)
-          port = relay.address().port
-          if (port < cfg.instancePortBase) break
-          await new Promise((ready, reject) => relay.close(error => error ? reject(error) : ready()))
-        }
+        const port = relay.address().port
         if (context === undefined) db.prepare('UPDATE instances SET port=? WHERE user_id=?').run(port, placement.id)
         else await pool.query(`UPDATE harness.instances i SET port=$1 FROM harness.${placement.kind === 'user' ? 'users' : 'projects'} u WHERE u.id=${placement.kind === 'user' ? 'i.user_id' : 'i.project_id'}
           AND i.organization_id=$2 AND u.public_id=$3`, [port, context.organizationId, placement.id])

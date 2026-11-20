@@ -68,7 +68,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * live title — a terminal named after its shell, a chat after its first
      * line — registers here and reads its own store; one without registers
      * nothing and the chip shows the registry's `title(address)` text captured
-     * at open time.
+     * at open time. Render text inside an element such as `span`: the slot's
+     * `display: contents` wrapper cannot receive native touch clicks on bare text in Firefox.
      */
     'sidebar.right.pane.tab.title': {
       kind: 'keyed'

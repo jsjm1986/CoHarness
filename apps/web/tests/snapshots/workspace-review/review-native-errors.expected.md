@@ -1,0 +1,32 @@
+- button "Choose the file to review":
+  - text: review.txt
+  - img
+- text: +2 -1
+- button "Split view":
+  - img
+- button "Line wrap":
+  - img
+- button "Open review.txt in sidebar":
+  - img
+- button "Open review.txt in default app":
+  - img
+- tooltip "Could not open. Click to retry."
+- button "More file actions for review.txt":
+  - img
+- text: "@@ -1,1 +1,2 @@ 1 - before the turn 1 + after the turn 2 + and one more line"
+- button "Choose the file to review":
+  - text: review.txt
+  - img
+- text: +2 -1
+- button "Split view":
+  - img
+- button "Line wrap":
+  - img
+- button "Open review.txt in sidebar":
+  - img
+- button "Open review.txt in default app":
+  - img
+- tooltip "Could not open containing folder. Try again."
+- button "More file actions for review.txt":
+  - img
+- text: "@@ -1,1 +1,2 @@ 1 - before the turn 1 + after the turn 2 + and one more line"

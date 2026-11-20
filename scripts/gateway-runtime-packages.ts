@@ -15,6 +15,8 @@ export const GATEWAY_RUNTIME_PACKAGES: readonly { readonly directory: string; re
   { directory: 'packages/subprocess/subprocess-local', entry: 'lib/index.js' },
   { directory: 'packages/llm/llm', entry: 'lib/types/discovery.js' },
   { directory: 'packages/session/session-format', entry: 'lib/index.js' },
+  { directory: 'packages/session/session-persistence', entry: 'lib/index.js' },
+  { directory: 'packages/session/session-persistence-jsonl', entry: 'lib/index.js' },
   { directory: 'packages/core/session', entry: 'lib/index.js' },
   { directory: 'packages/session/session-format-catalog', entry: 'lib/index.js' },
   { directory: 'packages/util/home-paths', entry: 'lib/index.js' },

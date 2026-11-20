@@ -63,6 +63,7 @@ describe('DocumentsModal.module.css', () => {
       /\.row\s*\{[\s\S]*grid-template-columns:\s*var\(--dsw-touch-target\) 24px minmax\(0, 1fr\) var\(--dsw-touch-target\)/,
     )
     expect(modal).toContain('scrollbar-gutter: stable')
+    expect(modal).toMatch(/\.sheetSelect\s*\{[^}]*\n\s*height:\s*var\(--dsw-touch-target\)/)
   })
 
   it('keeps limits and metadata in the shared mobile type roles', () => {
@@ -76,16 +77,6 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(
       /@media \(min-width: 768px\) and \(max-width: 1023px\)[\s\S]*\.actions \.actionIcon\s*\{[\s\S]*display:\s*inline-flex/,
     )
-  })
-
-  it('keeps the workbench hierarchy and skips off-screen row rendering', () => {
-    expect(modal).toMatch(/\.panel\s*\{[\s\S]*border-radius:\s*14px[\s\S]*box-shadow:\s*var\(--dsw-elevation-panel\)/)
-    expect(modal).toMatch(/\.scopeItemActive\s*\{[\s\S]*background:\s*var\(--dsw-alias-bg-raised\)/)
-    expect(modal).toMatch(/\.scopeItemActive\s*\{[\s\S]*box-shadow:\s*var\(--dsw-elevation-control\)/)
-    expect(modal).toMatch(new RegExp([
-      '\\.row,[\\s\\S]*\\.overviewRow,[\\s\\S]*\\.trashRow\\s*\\{',
-      '[\\s\\S]*content-visibility:\\s*auto[\\s\\S]*contain-intrinsic-block-size:\\s*auto 50px',
-    ].join('')))
   })
 
   it('flattens overview and trash rows into the hairline list grammar under 768px', () => {

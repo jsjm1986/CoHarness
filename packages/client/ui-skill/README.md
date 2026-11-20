@@ -34,10 +34,14 @@ Choose a `/` suggestion or enter a skill name directly. User-only skills carry a
 
 Click a skill reference on a message that loaded it to read the current Markdown source. The preview uses that Session's runtime, working directory, and preset; global and provider-backed skills do not need a workspace file path. Reading the source does not expand arguments, run embedded commands, start a turn, or change history. Closing or replacing the preview cancels its read. Missing or hidden skills show an unavailable state; failed reads show an error and can be retried by reopening the preview.
 
+The preview wraps ordinary words at word boundaries and breaks long unspaced paths or tokens as needed. Copy preserves the complete source text.
+
 <a id="skill-tool-row"></a>
 ### Skill tool row
 
 Expand a completed Skill tool row to read its exact recorded output in a bounded `Instructions` card. Running calls show progress, failed calls summarize the first error line, and interrupted calls show a warning. `Inspect`, when available, opens the call in the trajectory.
+
+On touch screens, the disclosure and `Inspect` controls keep a minimum height of 44 CSS pixels at every viewport width. `Inspect` remains visible without hover. Error summaries and expanded explanations retain readable contrast in both color themes.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation

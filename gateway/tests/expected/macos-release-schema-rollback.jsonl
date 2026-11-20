@@ -1,0 +1,4 @@
+{"fallback":"compatible","applied":[1,2],"selected":"release-compatible","started":["release-candidate","release-compatible"],"healthy":true,"data":[{"value":"kept","generation":7}]}
+{"fallback":"older","applied":[1,2],"selected":"release-candidate","started":["release-candidate"],"healthy":false,"data":[{"value":"kept","generation":7}]}
+{"fallback":"older-content","applied":[1,2],"selected":"release-candidate","started":["release-candidate"],"healthy":false,"data":[{"value":"kept","generation":7}]}
+{"fallback":"legacy-source","applied":[1,2],"selected":"release-compatible","started":["release-candidate","release-compatible"],"healthy":true,"data":[{"value":"kept","generation":7}]}

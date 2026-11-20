@@ -10,6 +10,15 @@ import {
 } from '../src/config.ts'
 
 describe('loadConfig', () => {
+  it('bounds recovery inspection and review pages independently of backup installation', () => {
+    expect(loadConfig({}).recoveryInspection).toEqual({ maxRows: 100000, maxBytes: 64 << 20, pageSize: 50 })
+    expect(loadConfig({ HGW_RECOVERY_INSPECTION_MAX_ROWS: '2000', HGW_RECOVERY_INSPECTION_MAX_BYTES: '1048576',
+      HGW_RECOVERY_REVIEW_PAGE_SIZE: '100' }).recoveryInspection).toEqual({ maxRows: 2000, maxBytes: 1048576, pageSize: 100 })
+    for (const key of ['HGW_RECOVERY_INSPECTION_MAX_ROWS', 'HGW_RECOVERY_INSPECTION_MAX_BYTES', 'HGW_RECOVERY_REVIEW_PAGE_SIZE']) {
+      for (const value of ['0', '-1', '1.5', 'invalid']) expect(() => loadConfig({ [key]: value })).toThrow(key)
+    }
+    expect(() => loadConfig({ HGW_RECOVERY_REVIEW_PAGE_SIZE: '201' })).toThrow('HGW_RECOVERY_REVIEW_PAGE_SIZE')
+  })
   it('configures native PostgreSQL connection resolution and bounds wrapper readiness', () => {
     expect(loadConfig({}).pgConnectionCommand[0]).toMatch(/hgw-pg-client(?:\.exe)?$/u)
     expect(loadConfig({}).pgConnectionTimeoutMs).toBe(30000)
@@ -48,6 +57,11 @@ describe('loadConfig', () => {
     expect(loadConfig({ HGW_DRAIN_RUNTIMES_ON_SHUTDOWN: 'true' }).drainRuntimesOnShutdown).toBe(true)
     expect(loadConfig({ HGW_DRAIN_RUNTIMES_ON_SHUTDOWN: 'false' }).drainRuntimesOnShutdown).toBe(false)
     expect(() => loadConfig({ HGW_DRAIN_RUNTIMES_ON_SHUTDOWN: 'yes' })).toThrow('HGW_DRAIN_RUNTIMES_ON_SHUTDOWN')
+    expect(loadConfig({}).runtimeDrainTimeoutMs).toBe(60_000)
+    expect(loadConfig({ HGW_RUNTIME_DRAIN_TIMEOUT_MS: '90000' }).runtimeDrainTimeoutMs).toBe(90_000)
+    for (const value of ['0', '1.5', '2147483648']) {
+      expect(() => loadConfig({ HGW_RUNTIME_DRAIN_TIMEOUT_MS: value })).toThrow('HGW_RUNTIME_DRAIN_TIMEOUT_MS')
+    }
   })
 
   it('defaults runtime reconciliation on with bounded warmup and failure backoff', () => {
@@ -135,10 +149,16 @@ describe('loadConfig', () => {
   })
 
   it('validates production PostgreSQL pool capacity and checkout deadlines', () => {
-    expect(loadConfig({})).toMatchObject({ databaseMaxConnections: 10, databaseMaxCheckoutQueue: 256, databaseConnectionTimeoutMs: 5000 })
+    expect(loadConfig({})).toMatchObject({ databaseMaxConnections: 10, databaseMaxCheckoutQueue: 256, databaseConnectionTimeoutMs: 5000,
+      databaseControlMaxConnections: 2, databaseControlMaxCheckoutQueue: 32 })
     expect(loadConfig({ HGW_DATABASE_MAX_CONNECTIONS: '12', HGW_DATABASE_MAX_CHECKOUT_QUEUE: '20', HGW_DATABASE_CONNECTION_TIMEOUT_MS: '750' }))
       .toMatchObject({ databaseMaxConnections: 12, databaseMaxCheckoutQueue: 20, databaseConnectionTimeoutMs: 750 })
-    for (const key of ['HGW_DATABASE_MAX_CONNECTIONS', 'HGW_DATABASE_MAX_CHECKOUT_QUEUE', 'HGW_DATABASE_CONNECTION_TIMEOUT_MS']) {
+    expect(loadConfig({ HGW_DATABASE_MAX_CONNECTIONS: '1', HGW_DATABASE_CONTROL_MAX_CONNECTIONS: '3',
+      HGW_DATABASE_CONTROL_MAX_CHECKOUT_QUEUE: '8' })).toMatchObject({
+      databaseMaxConnections: 1, databaseControlMaxConnections: 3, databaseControlMaxCheckoutQueue: 8,
+    })
+    for (const key of ['HGW_DATABASE_MAX_CONNECTIONS', 'HGW_DATABASE_MAX_CHECKOUT_QUEUE', 'HGW_DATABASE_CONNECTION_TIMEOUT_MS',
+      'HGW_DATABASE_CONTROL_MAX_CONNECTIONS', 'HGW_DATABASE_CONTROL_MAX_CHECKOUT_QUEUE']) {
       for (const value of ['0', '-1', '1.5', 'invalid', '9007199254740992']) expect(() => loadConfig({ [key]: value })).toThrow(key)
     }
     expect(() => loadConfig({ HGW_DATABASE_CONNECTION_TIMEOUT_MS: String(MAX_TIMER_DELAY_MS + 1) })).toThrow('HGW_DATABASE_CONNECTION_TIMEOUT_MS')
@@ -229,6 +249,15 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ HGW_DESKTOP_ID: 'seat\u0001one' })).toThrow(/HGW_DESKTOP_ID/)
     expect(() => loadConfig({ HGW_DESKTOP_DRIVER_PACKAGE: 'relative/dir' }))
       .toThrow(/HGW_DESKTOP_DRIVER_PACKAGE must be an absolute path/)
+  })
+
+  it('requires an explicit on or off remote-desktop deployment setting', () => {
+    expect(loadConfig({}).remoteDesktopEnabled).toBe(true)
+    expect(loadConfig({ HGW_REMOTE_DESKTOP: 'on' }).remoteDesktopEnabled).toBe(true)
+    expect(loadConfig({ HGW_REMOTE_DESKTOP: 'off' }).remoteDesktopEnabled).toBe(false)
+    for (const value of ['', 'false', 'auto']) {
+      expect(() => loadConfig({ HGW_REMOTE_DESKTOP: value })).toThrow('HGW_REMOTE_DESKTOP must be on or off')
+    }
   })
 
   it('validates desktop driver process overrides', () => {

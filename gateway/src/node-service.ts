@@ -35,7 +35,7 @@ export interface NodeServiceRequest {
 
 /** A node connection opens only its operator-configured local Gateway. */
 export interface NodeServiceChannels {
-  requestService(nodeId: RuntimeNodeId, id: NodeProbeId, release: string | null,
+  requestService(nodeId: RuntimeNodeId, id: NodeProbeId,
     failed: (error: unknown) => void, signal: AbortSignal): Promise<NodeServiceRequest>
 }
 
@@ -100,11 +100,9 @@ export class GatewayNodeServices {
    * @param authority - current enrolled credential and exact lease verification.
    * @param channels - owned outbound node control channels.
    * @param config - validated connection admission and acquisition deadlines.
-   * @param release - center release identity; null permits source development compositions.
    */
   constructor(private readonly authority: Pick<PostgresNodeAccessService, 'authorizeChannel'>,
-    private readonly channels: NodeServiceChannels, private readonly config: NodeServiceConfig,
-    private readonly release: string | null) {}
+    private readonly channels: NodeServiceChannels, private readonly config: NodeServiceConfig) {}
 
   private track<T>(operation: Promise<T>): Promise<T> {
     this.work.add(operation)
@@ -182,7 +180,7 @@ export class GatewayNodeServices {
       this.connections.set(id, connection)
       this.perNode.set(nodeId, (this.perNode.get(nodeId) ?? 0) + 1)
       owner.addEventListener('abort', abort, { once: true })
-      void this.track(this.channels.requestService(nodeId, id, this.release, connection.fail, owner).then(request => {
+      void this.track(this.channels.requestService(nodeId, id, connection.fail, owner).then(request => {
         if (connection.finished) request.dispose()
         else { connection.lease = request.lease; connection.request = request }
       }, connection.fail))

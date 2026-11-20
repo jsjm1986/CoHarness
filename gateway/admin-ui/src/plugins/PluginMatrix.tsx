@@ -1,7 +1,7 @@
 /** Advanced composition view: the live/observed state and the saved startup state in one entry-level table. */
 import { useMemo, useState } from 'react'
 import type { PluginManagementState } from '../api.ts'
-import { Button, ErrorBanner, LoadingState, StatusBadge, Switch } from '../components/ui.tsx'
+import { Button, ErrorBanner, Field, LoadingState, StatusBadge, Switch } from '../components/ui.tsx'
 import { adminLanguage } from '../language.ts'
 import { translatePlugin, type Translate } from './presentation.ts'
 import { effective, ENTRY_CHOICES, type EntryChoice, type PluginComposition } from './composition.ts'
@@ -53,7 +53,7 @@ export function PluginMatrix({ composition }: { composition: PluginComposition }
   return <div className="pluginMatrix">
     <p className="muted">{storageDown ? t('matrixStorageDown') : statusLine(view ?? null, composition.applied, live, t)}</p>
     {entries.length + bundleRows.length > 8 ? <input className="input matrixFilter" placeholder={t('matrixFilter')} aria-label={t('matrixFilter')} value={filter} onChange={event => { setFilter(event.target.value) }} /> : null}
-    <div className="tableWrap">
+    <div className="tableWrap" role="region" aria-label={t('advancedTitle')} tabIndex={0}>
       <table className="dataTable">
         <thead><tr><th>{t('title')}</th><th>{t('listCurrent')}</th>{persist ? <><th>{t('listStartup')}</th><th /></> : null}</tr></thead>
         <tbody>
@@ -66,8 +66,8 @@ export function PluginMatrix({ composition }: { composition: PluginComposition }
                 : <Switch ariaLabel={t('listCurrentEnable', { name: row.name })} checked={row.live.enabled} disabled={composition.busyRow !== '' || row.live.readOnly}
                   onChange={checked => { void composition.applyLive(`bundle:${row.name}`, remote => remote.pluginManager.setBundleEnabled(row.name, checked)) }} />}</td>
               {persist ? <>
-                <td><input type="checkbox" aria-label={t('listStartupBundle', { name: row.name })} checked={row.desired}
-                  onChange={event => { composition.setBundleDesired(row.name, event.target.checked) }} /></td>
+                <td><label className="checkLabel checkboxTarget"><input type="checkbox" aria-label={t('listStartupBundle', { name: row.name })} checked={row.desired}
+                  onChange={event => { composition.setBundleDesired(row.name, event.target.checked) }} /></label></td>
                 <td>{row.desired === row.observed ? null : <StatusBadge tone="warning">{t('listPending')}</StatusBadge>}</td>
               </> : null}
             </tr>)}
@@ -101,8 +101,8 @@ export function PluginMatrix({ composition }: { composition: PluginComposition }
     {persist ? <details className="matrixAdvanced">
       <summary>{t('matrixManualAdd')}</summary>
       <div className="inlineFields">
-        <input className="input" placeholder={t('matrixEntryId')} value={newEntry.id} onChange={event => { setNewEntry({ ...newEntry, id: event.target.value }) }} />
-        <input className="input" placeholder={t('matrixModuleName')} value={newEntry.name} onChange={event => { setNewEntry({ ...newEntry, name: event.target.value }) }} />
+        <Field label={t('matrixEntryId')}><input className="input" value={newEntry.id} onChange={event => { setNewEntry({ ...newEntry, id: event.target.value }) }} /></Field>
+        <Field label={t('matrixModuleName')}><input className="input" value={newEntry.name} onChange={event => { setNewEntry({ ...newEntry, name: event.target.value }) }} /></Field>
         <Button disabled={newEntry.id.trim() === '' || knownEntries.some(item => item.id === newEntry.id.trim())} onClick={() => {
           const name = newEntry.name.trim()
           composition.setEntryDesired(newEntry.id.trim(), 'on', name === '' ? undefined : name)
@@ -110,7 +110,7 @@ export function PluginMatrix({ composition }: { composition: PluginComposition }
         }}>{t('matrixAddEntry')}</Button>
       </div>
       <div className="inlineFields">
-        <input className="input" placeholder={t('matrixBundleName')} value={newBundle} onChange={event => { setNewBundle(event.target.value) }} />
+        <Field label={t('matrixBundleName')}><input className="input" value={newBundle} onChange={event => { setNewBundle(event.target.value) }} /></Field>
         <Button disabled={newBundle.trim() === '' || bundleRows.some(row => row.name === newBundle.trim() && row.desired)} onClick={() => {
           composition.setBundleDesired(newBundle.trim(), true)
           setNewBundle('')

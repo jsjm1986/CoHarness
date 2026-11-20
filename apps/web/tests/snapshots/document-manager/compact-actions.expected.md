@@ -4,9 +4,6 @@
 - strong: brief.txt
 - text: 21 B · 2026-08-14
 - list:
-  - button "Add to conversation":
-    - img
-    - text: Add to conversation
   - button "Preview":
     - img
     - text: Preview

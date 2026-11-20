@@ -74,6 +74,17 @@ it('does not disable while a disconnected computer remains attached', async () =
   expect(screen.queryByRole('dialog')).toBeNull()
 })
 
+it('explains an isolated entry refusal while retaining the proposed primary address', async () => {
+  vi.mocked(api.saveDeploymentTopology).mockRejectedValue(new api.AdminRequestError(409, 'deployment/current-computer-quarantined'))
+  open()
+  fireEvent.click(await screen.findByRole('checkbox', { name: '启用多电脑' }))
+  fireEvent.change(screen.getByLabelText('主入口访问地址'), { target: { value: 'https://replacement.test' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存部署模式' }))
+  expect((await screen.findByRole('alert')).textContent).toContain('当前电脑因灾难恢复已隔离，不能作为主入口。')
+  expect((screen.getByLabelText('主入口访问地址') as HTMLInputElement).value).toBe('https://replacement.test')
+  expect(api.saveDeploymentTopology).toHaveBeenCalledTimes(1)
+})
+
 it('makes a secondary entry local and directs mode changes to the primary in a separate tab', async () => {
   vi.mocked(api.getDeploymentTopology).mockResolvedValue({ ...multi, role: 'computer', scope: 'local', entry: {
     nodeId: '10000000-0000-4000-8000-000000000002' as typeof single.entry.nodeId, name: 'B' } })

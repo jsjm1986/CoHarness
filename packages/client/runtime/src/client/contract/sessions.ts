@@ -27,6 +27,13 @@ export type { AgentContext } from '../scope.ts'
 /** Account Gateway target used to bind a workbench pane to one runtime. */
 export type SessionRuntimeTarget = ConnectionRuntimeTarget
 
+/** Request-local content results and independent outcomes of already connected Runtime searches. */
+export interface SessionSearchProgress {
+  readonly items: readonly SessionSearchResultItem[]
+  readonly hasMore: boolean
+  readonly targets: readonly { runtime: SessionRuntimeTarget; status: 'pending' | 'ready' | 'error' }[]
+}
+
 /** Known Session identity or durable direct-parent subagent address; an address owns no lifetime. */
 export type SessionTarget = SessionId | SubagentAddress
 
@@ -46,6 +53,8 @@ export interface SessionReference extends Disposable {
 export interface SessionRetainOptions {
   readonly source: SessionReferenceSource
   readonly signal?: AbortSignal | undefined
+  /** Use the prepared tail when initial Workspace selection admitted an active root and this document can verify its owner. */
+  readonly preferPreparedHistory?: true
 }
 
 /** Local ownership counts, independent of catalog membership and never persisted. */
@@ -190,11 +199,13 @@ export interface ISessions {
    * request-local; the list snapshot remains the metadata authority.
    * @param query - non-blank literal phrase.
    * @param signal - cancellation for a superseded search.
+   * @param progress - receives each connected Runtime's outcome without waiting for other computers; omitted keeps one final result.
    * @returns bounded results, or a business/transport error.
    */
   search(
     query: string,
     signal: AbortSignal,
+    progress?: (value: SessionSearchProgress) => void,
   ): Promise<RpcResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>>
   /**
    * Fork a session from a completed-turn prefix of the source; on resolution

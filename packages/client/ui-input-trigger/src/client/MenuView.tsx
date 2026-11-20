@@ -165,11 +165,13 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
                             onMouseMove={active ? undefined : () => { onHover(group.source, index) }}
                           >
                             {item.icon !== undefined && <span className={css.itemIcon} aria-hidden>{candidateIcon(item.icon)}</span>}
-                            <span className={css.itemName}>{item.label ?? item.name}</span>
-                            {item.label !== undefined && item.label.toLowerCase() !== item.name.toLowerCase() && (
-                              <span className={css.itemAlias}>{item.name}</span>
-                            )}
-                            {item.description !== undefined && <span className={css.itemDescription}>{item.description}</span>}
+                            <span className={css.itemContent}>
+                              <span className={css.itemName}>{item.label ?? item.name}</span>
+                              {item.label !== undefined && item.label.toLowerCase() !== item.name.toLowerCase() && (
+                                <span className={css.itemAlias}>{item.name}</span>
+                              )}
+                              {item.description !== undefined && <span className={css.itemDescription}>{item.description}</span>}
+                            </span>
                             {item.drill === true && (
                               <span className={css.trailing}>
                                 <span className={css.drillHintText} aria-hidden>{t('drill.hint')}</span>

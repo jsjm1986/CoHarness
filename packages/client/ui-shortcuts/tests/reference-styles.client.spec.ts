@@ -19,9 +19,12 @@ describe('Reference.module.css settings row', () => {
 
   it('lays the row out as text plus a trailing accessory on the phone', () => {
     const compact = compactBlock()
-    expect(compact).toMatch(/\.button\s*\{[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
     expect(compact).toMatch(/\.button\s*\{[\s\S]*background:\s*transparent/)
     expect(compact).toMatch(/\.chevron\s*\{[\s\S]*display:\s*inline-flex/)
     expect(compact).toMatch(/\.setting\s*\{[\s\S]*padding:\s*var\(--dsw-space-3\) 0/)
+  })
+
+  it('retains the touch target on phones and wider touchscreens', () => {
+    expect(css).toMatch(/@media \(max-width: 767px\), \(pointer: coarse\)\s*\{\s*\.button \{ min-block-size: var\(--dsw-touch-target\); \}/)
   })
 })

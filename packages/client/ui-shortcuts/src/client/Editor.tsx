@@ -172,7 +172,7 @@ EditorProps) {
         {captured && message === '' ? <ShortcutKeys keys={describeBinding(candidate).keys} className={css.recorded} /> : t('record')}
       </button>
     </div>
-    <span id={descriptionId} className={css.srOnly}>{message || (desktopChords ? '' : t(runtime === 'web'
+    <span id={descriptionId} className={message ? css.errorMessage : css.srOnly}>{message || (desktopChords ? '' : t(runtime === 'web'
       ? platform === 'windows' ? 'windows-web-help' : platform === 'macos' ? 'macos-web-help' : 'web-help' : 'record-help'))}</span>
     {review}
     {retry !== null && !stale && <button type="button" className={css.inlineAction} disabled={readonly}

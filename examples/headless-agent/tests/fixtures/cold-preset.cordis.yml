@@ -1,0 +1,29 @@
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+- id: agent
+  name: '@deepseek-ai/dsh-agent-spine-demo'
+  config:
+    agents: []
+    workspaceContext: false
+    skills:
+      enabled: false
+    toolBash: false
+    toolJobs: false
+    goals: false
+- id: persistence
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: ./sessions
+    compression: none
+- id: presets
+  name: '@deepseek-ai/dsh-agent-preset-registry'
+  config:
+    default: cold
+    includeUserRoot: false
+    roots:
+      - path: ./presets
+        trust: system
+- id: fixture
+  name: ./cold-preset-model.ts

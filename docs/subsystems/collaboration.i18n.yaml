@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/collaboration.md
 document:
-  en: 4fa112ceebbc4b111097fc30c35a43a9f103e5a4
-  zh: 274624eb4f68ff02dbd49c37268b345221627221
+  en: 24ef488cea3b520104f3b66f1012ae76d76739f4
+  zh: c892cb9a1e4977d3dc8e9bb7b386b8cab93989e6
 /project-collaboration:
   en: 4d3acd672679a1d4
   zh: 25864f324572c4e1

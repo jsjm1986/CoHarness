@@ -10,8 +10,9 @@
 //
 // Zero model calls: collapsing the sidebar and expanding the search are pure
 // client layout gestures; the scenario needs no session content at all.
+import { responsiveBrowser } from './responsive-browser.ts'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
@@ -27,7 +28,7 @@ describe('web e2e: rail search click survives its own document-level bubble', ()
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

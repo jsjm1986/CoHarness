@@ -28,6 +28,47 @@ afterEach(() => {
 })
 
 describe('JsonTree', () => {
+  it('offers leaf-row copy choices from keyboard navigation and returns focus to copy options on Escape', async () => {
+    render(<JsonTree data={{ scalar: 'hello', other: 42 }} />)
+    const rows = within(screen.getByRole('tree')).getAllByRole('treeitem')
+    act(() => { rows[0]?.focus() })
+    expect(screen.getByRole('button', { name: 'Copy value' })).toBeDefined()
+    fireEvent.keyDown(rows[0]!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(rows[1])
+    fireEvent.keyDown(rows[1]!, { key: 'F10', shiftKey: true })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Copy value' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy property path' }))
+    await waitFor(() => { expect(writeText).toHaveBeenLastCalledWith('$.other') })
+    act(() => { rows[1]?.focus() })
+    fireEvent.keyDown(rows[1]!, { key: 'ContextMenu' })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Copy options' })) })
+  })
+
+  it('offers a touch copy menu while leaving expansion and default copy independent', async () => {
+    render(<JsonTree data={{ nested: { value: 1 }, scalar: 'hello' }} />)
+    const nested = within(screen.getByRole('tree')).getAllByRole('treeitem')[0]!
+    fireEvent.pointerDown(nested, { pointerType: 'touch' })
+    expect(screen.getByRole('button', { name: 'Copy options' })).toBeDefined()
+    const expand = screen.getByRole('button', { name: 'Expand JSON node' })
+    expect(expand.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(expand)
+    expect(expand.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.keyDown(expand, { key: ' ' })
+    expect(expand.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(screen.getByRole('button', { name: 'Copy options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy pretty JSON' }))
+    await waitFor(() => { expect(writeText).toHaveBeenLastCalledWith('{\n  "value": 1\n}') })
+  })
+
+  it('makes an empty root copyable without pointer hover', async () => {
+    render(<JsonTree data={{}} />)
+    const root = screen.getByRole('button', { name: 'Copy options: JSON' })
+    act(() => { root.focus() })
+    fireEvent.keyDown(root, { key: 'Enter' })
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy pretty JSON' }))
+    await waitFor(() => { expect(writeText).toHaveBeenLastCalledWith('{}') })
+  })
   it('reads only the bounded preview of a collapsed large array', () => {
     let reads = 0
     const matches = new Proxy(Array.from({ length: 10_000 }, (_unused, index) => ({
@@ -189,7 +230,7 @@ describe('JsonTree', () => {
     expect(text).toContain('wideObject:{a: 1, b: 2, c: 3, d: 4, …}')
     expect(text).toContain('wideArray:[1, 2, 3, 4, 5, …]')
     expect(text).toContain('deep:{a: {b: {…}}}')
-    expect(screen.queryByRole('button', { name: /Copy/ })).toBeNull()
+    expect(document.querySelector('[data-json-copy-button]')).toBeNull()
     fireEvent.mouseOver(screen.getByRole('tree').parentElement as HTMLElement)
   })
 
@@ -247,10 +288,10 @@ describe('JsonTree', () => {
     }
     const hover = (prefix: string) => {
       fireEvent.mouseOver(row(prefix))
-      return screen.getByRole('button', { name: /Cop/ })
+      return document.querySelector('[data-json-copy-button]') as HTMLButtonElement
     }
     const select = (name: string) => {
-      const button = screen.getByRole('button', { name: /Cop/ })
+      const button = document.querySelector('[data-json-copy-button]') as HTMLButtonElement
       fireEvent.contextMenu(button)
       fireEvent.click(screen.getByRole('menuitem', { name }))
     }
@@ -335,7 +376,7 @@ describe('JsonTree', () => {
 
     fireEvent.mouseOver(firstRow)
     const copyButton = screen.getByRole('button', { name: 'Copy pretty JSON' })
-    expect((copyButton.closest('span')?.parentElement as HTMLElement).style.left).toBe('284px')
+    expect((copyButton.closest('span')?.parentElement as HTMLElement).style.left).toBe('304px')
     fireEvent.mouseOver(copyButton)
     expect(screen.getByRole('button', { name: 'Copy pretty JSON' })).toBeDefined()
     fireEvent.mouseOver(firstRow)
@@ -350,16 +391,18 @@ describe('JsonTree', () => {
     fireEvent.mouseLeave(root)
     expect(screen.getByRole('menu')).toBeDefined()
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('button', { name: /Copy/ })).toBeNull()
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.activeElement).toBe(copyButton)
 
     fireEvent.mouseOver(secondRow)
     expect(screen.getByRole('button', { name: 'Copy value' })).toBeDefined()
+    act(() => { (document.activeElement as HTMLElement).blur() })
     fireEvent.mouseOver(root)
-    expect(screen.queryByRole('button', { name: /Copy/ })).toBeNull()
+    expect(document.querySelector('[data-json-copy-button]')).toBeNull()
 
     fireEvent.scroll(root)
     view.rerender(<JsonTree data={{ replacement: 3 }} />)
-    expect(screen.queryByRole('button', { name: /Copy/ })).toBeNull()
+    expect(document.querySelector('[data-json-copy-button]')).toBeNull()
   })
 
   it('copies the fixed root and clears it when the pointer leaves', async () => {
@@ -373,6 +416,6 @@ describe('JsonTree', () => {
     await waitFor(() => { expect(writeText).toHaveBeenCalledWith('{\n  "value": 1\n}') })
 
     fireEvent.mouseLeave(root)
-    expect(screen.queryByRole('button', { name: /Copy/ })).toBeNull()
+    expect(document.querySelector('[data-json-copy-button]')).toBeNull()
   })
 })

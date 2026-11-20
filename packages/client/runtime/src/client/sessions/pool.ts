@@ -19,6 +19,7 @@ import type {
   AgentContext,
   ISessions,
   SessionRuntimeTarget,
+  SessionSearchProgress,
 } from '../contract/sessions.ts'
 import type {
   SessionBinding,
@@ -489,6 +490,9 @@ export class SessionRuntimePool implements ISessions {
         void entry.ready.then(born, born)
       }
       const loop = connection.start({
+        onResumeMuxEnvelope: (envelope, description, signal) => !this.accountInvalidated
+          && this.entries.get(establishedEntry.key) === establishedEntry
+          && runtime.resumeMuxEnvelope(envelope, description, signal),
         onMuxEnvelope: (envelope: Parameters<Runtime['handleMuxEnvelope']>[0]) => {
           if (this.accountInvalidated || this.entries.get(establishedEntry.key) !== establishedEntry) return
           runtime.handleMuxEnvelope(envelope)
@@ -882,6 +886,16 @@ export class SessionRuntimePool implements ISessions {
     }
   }
 
+  /** Forward authenticated reconnect frames to the bootstrap conversation owner.
+   * @param envelope - next Mux frame.
+   * @param description - verified replacement Host description.
+   * @param signal - generation lifetime.
+   * @returns whether the existing window consumed this frame.
+   */
+  resumeMuxEnvelope(envelope: Parameters<Runtime['handleMuxEnvelope']>[0], description: HostDescription, signal: AbortSignal): boolean {
+    return !this.accountInvalidated && this.base.resumeMuxEnvelope(envelope, description, signal)
+  }
+
   /** Route a mux frame to the base runtime.
    * @param envelope - decoded mux envelope.
    */
@@ -1060,12 +1074,13 @@ export class SessionRuntimePool implements ISessions {
     const established = this.baseTargetEstablished
     this.baseTargetEstablished = true
     if (targetKey(baseEntry.target) === targetKey(target)) {
-      // A verified descriptor carrying a different nodeId is a real migration:
-      // the identity fence already adopted it, and retaining the stale node
-      // leaves every prepared/explicit call pinning the wrong computer.
+      // Host descriptions can omit the node. The account directory supplies the current location.
+      if (target.nodeId === undefined && baseEntry.target.nodeId !== undefined) return
       if (baseEntry.target.nodeId !== target.nodeId || baseEntry.target.nodeName !== target.nodeName
         || target.kind === 'project' && target.projectName !== undefined && (baseEntry.target.kind !== 'project' || baseEntry.target.projectName !== target.projectName)) {
-        baseEntry.target = target; this.rebuild()
+        baseEntry.target = target
+        baseEntry.runtime.setRuntimeLocation(target)
+        this.rebuild()
       }
       return
     }
@@ -1388,27 +1403,36 @@ export class SessionRuntimePool implements ISessions {
     const owner = this.ownerFor(id)
     owner?.runtime.noteAgentPreset(this.originalId(id, owner), preset)
   }
-  async search(query: string, signal: AbortSignal): Promise<RpcResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>> {
-    // Every established target keeps its own search index, so the merged
-    // sidebar query fans out to all of them and re-keys each hit into
-    // presentation space. A target that refuses is dropped from this result
-    // unless every target failed, which reports the first error.
-    const settled = await Promise.all([...this.entries.values()].map(async (entry) => {
-      const result = await entry.runtime.search(query, signal)
-      return { entry, result }
-    }))
-    const items: SessionSearchResultItem[] = []
-    let hasMore = false
-    let failure: (typeof settled)[number]['result'] | undefined
-    for (const { entry, result } of settled) {
-      if (!result.ok) { failure ??= result; continue }
-      hasMore = hasMore || result.value.hasMore
-      for (const item of result.value.items) {
-        items.push({ ...item, sessionId: clientSessionKey(entry.target, item.sessionId) })
+  async search(
+    query: string, signal: AbortSignal, progress?: (value: SessionSearchProgress) => void,
+  ): Promise<RpcResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>> {
+    const active = AbortSignal.any([signal, this.lifetime.signal])
+    active.throwIfAborted()
+    const entries = [...this.entries.values()]
+    const results = new Map<RuntimeEntry, Awaited<ReturnType<Runtime['search']>>>()
+    const snapshot = (): SessionSearchProgress => {
+      const available = entries.filter(entry => !this.accountInvalidated && this.entries.get(entry.key) === entry)
+      return {
+        items: available.flatMap((entry) => {
+          const result = results.get(entry)
+          return result?.ok ? result.value.items.map(item => ({ ...item, sessionId: clientSessionKey(entry.target, item.sessionId) })) : []
+        }),
+        hasMore: available.some((entry) => { const result = results.get(entry); return result?.ok && result.value.hasMore }),
+        targets: available.map(entry => ({ runtime: entry.target, status: results.has(entry) ? results.get(entry)?.ok ? 'ready' : 'error' : 'pending' })),
       }
     }
+    progress?.(snapshot())
+    await Promise.all(entries.map(async (entry) => {
+      const result = await entry.runtime.search(query, active)
+      active.throwIfAborted()
+      results.set(entry, result)
+      progress?.(snapshot())
+    }))
+    active.throwIfAborted()
+    const { items, hasMore } = snapshot()
+    const failure = [...results.values()].find(result => !result.ok)
     if (items.length === 0 && !hasMore && failure !== undefined) return failure
-    return { ok: true, value: { items, hasMore } }
+    return { ok: true, value: { items: [...items], hasMore } }
   }
   fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId> {
     const owner = this.ownerFor(opts.sessionId)

@@ -90,9 +90,6 @@ function BrowserOccurrence(props: BrowserBodyProps): ReactNode {
   return (
     <div className={css.root}>
       <form className={css.toolbar} onSubmit={submit}>
-        <button type="button" className={css.tool} aria-label={t('back')} title={t('back')} disabled={!canBrowserGoBack(state)} onClick={() => { goBack(tab.id) }}><IconChevronLeftOutline14 /></button>
-        <button type="button" className={css.tool} aria-label={t('forward')} title={t('forward')} disabled={!canBrowserGoForward(state)} onClick={() => { goForward(tab.id) }}><IconChevronRightOutline14 /></button>
-        <button type="button" className={css.tool} aria-label={t('reload')} title={t('reload')} disabled={current === undefined} onClick={() => { reload(tab.id) }}><IconRefreshOutline14 /></button>
         <div className={css.addressBox}>
           <input
             className={`${css.address} ${navigationUnknown ? css.addressUnknown : ''}`}
@@ -100,11 +97,18 @@ function BrowserOccurrence(props: BrowserBodyProps): ReactNode {
             aria-label={t('address.placeholder')}
             placeholder={t('address.placeholder')}
             spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+            inputMode="url"
+            enterKeyHint="go"
             onChange={(event) => { setDraft(event.currentTarget.value) }}
           />
           {navigationUnknown && <span className={css.addressChanged}>{t('address.changed')}</span>}
           <button type="submit" className={`${css.tool} ${css.addressGo}`} aria-label={t('go')} title={t('go')}><IconLinkOutline14 /></button>
         </div>
+        <button type="button" className={css.tool} aria-label={t('back')} title={t('back')} disabled={!canBrowserGoBack(state)} onClick={() => { goBack(tab.id) }}><IconChevronLeftOutline14 /></button>
+        <button type="button" className={css.tool} aria-label={t('forward')} title={t('forward')} disabled={!canBrowserGoForward(state)} onClick={() => { goForward(tab.id) }}><IconChevronRightOutline14 /></button>
+        <button type="button" className={css.tool} aria-label={t('reload')} title={t('reload')} disabled={current === undefined} onClick={() => { reload(tab.id) }}><IconRefreshOutline14 /></button>
         <button
           type="button"
           className={css.tool}

@@ -3,11 +3,13 @@
 // send/settle/render cycles, including two real bash executions and one long,
 // multi-chunk final turn. Assertions stay semantic: no host timing, heap, or
 // mounted-row cardinality is treated as a correctness contract.
+import { auditWorkflowState, newWorkflowPage } from './workflow-responsive-state.ts'
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { expandAssistantStream, ToolCallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { ReplayEntry, ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay'
@@ -18,7 +20,7 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, conversationContextKey, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, conversationContextKey, saveFailureShot } from './support.ts'
 
 const MODE = webSnapshotMode()
 const TURN_COUNT = 12
@@ -192,8 +194,8 @@ describe('web e2e: continuous conversation grown through the composer', () => {
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => {
       sessionEvents.push(event)
     })
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser, 900)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser, 900)
     tripwire = watchConsole(page)
     page.on('console', (message) => {
       if (message.type() === 'warning') consoleWarnings.push(message.text())
@@ -258,6 +260,7 @@ describe('web e2e: continuous conversation grown through the composer', () => {
 
       await expect.poll(() => page.locator('[data-streaming="true"]').count(), { timeout: 15_000 }).toBe(0)
       await page.getByText(spec.doneMarker, { exact: false }).last().waitFor({ timeout: 15_000 })
+      if (spec.index === 1 || spec.index === TURN_COUNT) await auditWorkflowState(page, 'conversation', `settled-${spec.index}-turns`, page.locator('[data-conversation-scroll]'), [composer])
       await expect.poll(() => composer.inputValue(), { timeout: 10_000 }).toBe('')
       await expect.poll(() => composer.isEnabled(), { timeout: 10_000 }).toBe(true)
 

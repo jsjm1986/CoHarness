@@ -7,21 +7,28 @@
 // Replay is deterministic: the plan content arrives from replayed chunks, the
 // review wait is real, and the approve click is the test's own gesture (the
 // turn cannot complete without it, in record and replay alike).
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
+import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+import type { Browser, Locator, Page } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { deriveReplayScript, parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-user-questions'
+import type {} from '@deepseek-ai/dsh-plan-mode'
+import type {} from '@deepseek-ai/dsh-workspace'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, fixtureUserPrompts,
   launchWebScaffold, recordFixture, seedSession, waitForIdleSessionDot, watchConsole,
   webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { compareWorkflowGolden, auditWorkflowState, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { auditResponsiveControl } from './responsive-controls.ts'
+import { captureTextContrast, expectTextContrast } from './text-contrast.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/plan-review', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
@@ -41,6 +48,91 @@ const TASK = 'Plan a small change: add a --greeting flag to a CLI. Do not read o
   + 'Once the plan is approved, reply with the single word DONE and stop.'
 const LINE = `/plan ${TASK}`
 
+/** Measure the pending review heading against its opaque warning background in both themes. */
+async function auditPlanReviewContrast(page: Page, card: Locator): Promise<void> {
+  const originalTheme = await page.locator('body').getAttribute('data-ds-dark-theme')
+  const output = process.env.DSH_FEATURE_LAYOUT_SCREENSHOTS
+  const receipts = process.env.DSH_FEATURE_COVERAGE_OUTPUT
+  const viewport = page.viewportSize()
+  if (viewport === null) throw new Error('Plan contrast acceptance requires an explicit viewport')
+  const strip = card.locator(':scope > section > div').first()
+  try {
+    for (const dark of [false, true]) {
+      await page.evaluate(value => document.body.toggleAttribute('data-ds-dark-theme', value), dark)
+      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => {
+        requestAnimationFrame(() => { resolve() })
+      })))
+      await card.evaluate(async (element) => {
+        await Promise.all(element.getAnimations({ subtree: true })
+          .filter(animation => animation.effect?.getTiming().iterations !== Infinity)
+          .map(animation => animation.finished.catch(() => undefined)))
+      })
+      await auditResponsiveControl(page, strip, `plan/review-heading/${dark ? 'dark' : 'light'}`)
+      const measured = await strip.evaluate((element) => {
+        const canvas = document.createElement('canvas')
+        canvas.width = canvas.height = 1
+        const context = canvas.getContext('2d')
+        if (context === null) throw new Error('Plan contrast measurement requires a 2D canvas')
+        const rgba = (color: string): number[] => {
+          context.clearRect(0, 0, 1, 1)
+          context.fillStyle = color
+          context.fillRect(0, 0, 1, 1)
+          return [...context.getImageData(0, 0, 1, 1).data]
+        }
+        const luminance = (rgb: number[]): number => rgb.slice(0, 3)
+          .map(value => value / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
+          .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0)
+        const style = getComputedStyle(element)
+        const foreground = rgba(style.color), background = rgba(style.backgroundColor)
+        const first = luminance(foreground), second = luminance(background)
+        let opacity = 1
+        for (let ancestor: Element | null = element; ancestor !== null; ancestor = ancestor.parentElement) {
+          opacity *= Number.parseFloat(getComputedStyle(ancestor).opacity)
+        }
+        const text = [...element.childNodes].filter(node => node.nodeType === Node.TEXT_NODE)
+          .map(node => node.textContent).join('').trim()
+        return { foreground, background, opacity, fontSize: style.fontSize, text,
+          ratio: (Math.max(first, second) + .05) / (Math.min(first, second) + .05) }
+      })
+      let failure: string | undefined
+      try {
+        expect(measured.opacity, 'Plan heading is fully opaque').toBe(1)
+        expect(measured.foreground[3], 'Plan heading text is opaque').toBe(255)
+        expect(measured.background[3], 'Plan warning background is opaque').toBe(255)
+        expect(measured.ratio, `Plan review ${dark ? 'dark' : 'light'}: ${JSON.stringify(measured)}`).toBeGreaterThanOrEqual(4.5)
+      } catch (error) {
+        failure = String(error)
+        throw error
+      } finally {
+        if (output !== undefined) await page.screenshot({
+          path: join(output, `${responsiveBrowserName}-plan-review-contrast-${dark ? 'dark' : 'light'}-${viewport.width}x${viewport.height}.png`),
+          animations: 'disabled',
+        })
+        if (receipts !== undefined) await appendFile(join(receipts, `plan-contrast-${responsiveBrowserName}.jsonl`), JSON.stringify({
+          state: 'awaiting-review', viewport, dark, checks: ['text-contrast'], measured,
+          status: failure === undefined ? 'passed' : 'failed', ...(failure === undefined ? {} : { error: failure }),
+        }) + '\n')
+      }
+    }
+  } finally {
+    await page.evaluate((theme) => {
+      if (theme === null) document.body.removeAttribute('data-ds-dark-theme')
+      else document.body.setAttribute('data-ds-dark-theme', theme)
+    }, originalTheme)
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => {
+      requestAnimationFrame(() => { resolve() })
+    })))
+  }
+}
+
+async function revealPlanComposer(page: Page): Promise<void> {
+  const close = page.getByRole('button', { name: 'Collapse right sidebar', exact: true })
+  if (await close.isVisible()) {
+    if (workflowMatrixEnabled) await close.tap(); else await close.click()
+    await close.waitFor({ state: 'hidden' })
+  }
+}
+
 describe('web e2e: plan review takeover round trip', () => {
   let scaffold: WebScaffold
   let browser: Browser
@@ -51,10 +143,10 @@ describe('web e2e: plan review takeover round trip', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold(MODE === 'record' ? {} : { replayFixture: FIXTURE, paceMs: 15 })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     // English page: the decision copy is the surface under test, and the
     // golden pins one language.
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -75,7 +167,11 @@ describe('web e2e: plan review takeover round trip', () => {
     await input.waitFor({ timeout: 10_000 })
     const settled = scaffold.whenTurnSettled(MODE === 'record' ? 180_000 : 30_000)
     await input.fill(LINE)
-    await input.press('Enter')
+    // Firefox fill() inserts through the IME composition pipeline; its compositionend
+    // clears the composer's composing guard one tick late, so a racing Enter keydown is
+    // swallowed as a newline. The Send button resolves the same 'enter' submit mode
+    // without going through the keydown IME guard.
+    await page.getByRole('button', { name: 'Send message' }).click()
 
     // The card takes over the input area while exit_plan_mode blocks. Its
     // presence is a STABLE waiting state (it stays until answered), so a plain
@@ -92,9 +188,10 @@ describe('web e2e: plan review takeover round trip', () => {
 
     if (MODE !== 'record') {
       const snapshot = await captureStableAria(page, '[data-plan-review-key]', scaffold.workspaceCwd)
-      await compareOrRefreshGolden(REVIEW_EXPECTED, snapshot, MODE)
+      await compareWorkflowGolden(REVIEW_EXPECTED, snapshot, MODE)
       const sidebar = await captureStableAria(page, '[role="treeitem"][aria-selected="true"]', scaffold.workspaceCwd)
-      await compareOrRefreshGolden(SIDEBAR_EXPECTED, sidebar, MODE)
+      await compareWorkflowGolden(SIDEBAR_EXPECTED, sidebar, MODE)
+      await auditWorkflowState(page, 'plan', 'awaiting-review', card, [], () => revealPlanComposer(page), () => auditPlanReviewContrast(page, card))
     }
 
     await card.getByRole('button', { name: 'Approve' }).click()
@@ -114,7 +211,8 @@ describe('web e2e: plan review takeover round trip', () => {
     await expect.poll(() => page.locator('textarea').first().isEnabled(), { timeout: 10_000 }).toBe(true)
     await waitForIdleSessionDot(page)
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(APPROVED_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(APPROVED_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'plan', 'approved', page.locator('[class*="centerCol"]'), [], () => revealPlanComposer(page))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 200_000)
@@ -122,6 +220,7 @@ describe('web e2e: plan review takeover round trip', () => {
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
       'session.jsonl', 'review.expected.md', 'sidebar.expected.md', 'approved.expected.md',
+      'approve-transport-refused.expected.md', 'request-changes-transport-refused.expected.md',
     ])
   })
 })
@@ -211,8 +310,8 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Session 
     if (workspace === undefined) throw new Error('seeded workspace was not registered')
     await workspace.attachSession(planned)
     await workspace.attachSession(other)
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -232,6 +331,7 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Session 
     await whileReviewing(planned, '# Session review\n\nSubmitted while another Session was on screen.', async () => {
       await plannedRow().click()
       await expectReview('Submitted while another Session was on screen.')
+      await auditWorkflowState(page, 'plan', 'review-after-session-switch', page.locator('[data-plan-review-key]'), [], () => revealPlanComposer(page))
     })
     expect(tripwire.pageErrors).toEqual([])
   })
@@ -261,6 +361,7 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Session 
       await plannedRow().waitFor({ timeout: 15_000 })
       await plannedRow().click()
       await expectReview('Submitted to a Session with cleared UI state.')
+      await auditWorkflowState(page, 'plan', 'review-after-reload', page.locator('[data-plan-review-key]'), [], () => revealPlanComposer(page))
     } finally {
       controller.abort()
       await outcome
@@ -292,11 +393,89 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Session 
         await summary.focus()
         await summary.press('End')
         await expect.poll(() => summary.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+        await auditWorkflowState(page, 'plan', 'long-review', card, [], () => revealPlanComposer(page))
       })
     } finally {
       await page.setViewportSize({ width: 1280, height: 720 })
     }
   })
+
+  it.each(['Approve', 'Request changes'] as const)('retains a pending review when %s transport is refused', async (decision) => {
+    const ready = Promise.withResolvers<undefined>()
+    const requested = Promise.withResolvers<undefined>()
+    let refused = true
+    await page.route(/\/api\/respond(?:\?.*)?$/, async (route) => {
+      if (!refused) { await route.fallback(); return }
+      requested.resolve(undefined)
+      await ready.promise
+      await route.fulfill({ status: 503, body: 'Plan decision transport unavailable' })
+    })
+    try {
+      await whileReviewing(planned, '# Deployment review\n\nConfirm the release window before proceeding.', async () => {
+        await plannedRow().click()
+        const card = page.locator('[data-plan-review-key]')
+        const action = card.getByRole('button', { name: decision, exact: true })
+        try {
+          await action.click()
+          await requested.promise
+          expect(await card.locator('section[aria-busy="true"]').count()).toBe(1)
+          for (const name of ['Approve', 'Request changes']) {
+            expect(await card.getByRole('button', { name, exact: true }).isDisabled()).toBe(true)
+          }
+          const state = decision === 'Approve' ? 'approve' : 'request-changes'
+          try { await auditWorkflowState(page, 'plan', `${state}-pending`, card, [], () => revealPlanComposer(page)) }
+          finally { ready.resolve(undefined) }
+          await expect.poll(() => action.isEnabled()).toBe(true)
+          await expect.poll(() => card.getByRole('status').textContent()).toBe('Could not confirm your decision. Try again.')
+          await compareWorkflowGolden(join(SNAPSHOT_DIR, `${state}-transport-refused.expected.md`),
+            await captureStableAria(page, '[data-plan-review-key]', scaffold.workspaceCwd), MODE)
+          await auditWorkflowState(page, 'plan', `${state}-transport-refused`, card, [], () => revealPlanComposer(page), async () => {
+            const viewport = page.viewportSize()!
+            expectTextContrast(await captureTextContrast(page, [{ label: 'decision-failure', text: card.getByRole('status') }],
+              `plan-${state}-failure-${viewport.width}x${viewport.height}`))
+          })
+          refused = false
+          await action.click()
+          await card.waitFor({ state: 'hidden' })
+        } catch (error) {
+          refused = false; ready.resolve(undefined)
+          try {
+            await revealPlanComposer(page)
+            if (await card.isVisible()) {
+              const withdraw = card.getByRole('button', { name: 'Request changes', exact: true })
+              await expect.poll(() => withdraw.isEnabled(), { timeout: 10_000 }).toBe(true)
+              await withdraw.click()
+              await card.waitFor({ state: 'hidden' })
+            }
+          } catch (cleanupError) {
+            throw new AggregateError([error, cleanupError], 'Plan refusal scenario and review withdrawal failed')
+          }
+          throw error
+        }
+      })
+    } finally {
+      refused = false; ready.resolve(undefined)
+      await page.unrouteAll({ behavior: 'wait' })
+    }
+  }, workflowMatrixEnabled ? 300_000 : 60_000)
+
+  it('shows a heading-only review and an expired temporary preview after reload', async () => {
+    await whileReviewing(planned, '# Release readiness', async () => {
+      await plannedRow().click()
+      const card = page.locator('[data-plan-review-key]')
+      await card.getByRole('heading', { name: 'Release readiness', exact: true }).waitFor()
+      expect(await card.locator('[data-plan-review-scroll] p').count()).toBe(0)
+      await auditWorkflowState(page, 'plan', 'heading-only-review', card, [], () => revealPlanComposer(page))
+      await card.getByRole('button', { name: 'Open plan in sidebar', exact: true }).click()
+      await page.locator('[data-plan-preview]').getByRole('heading', { name: 'Release readiness', exact: true }).waitFor()
+    })
+    await page.reload({ waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    const expired = page.getByRole('status').filter({ hasText: 'This temporary plan preview has expired. Reopen it from the pending review card.' })
+    await expired.waitFor()
+    expect(await page.locator('[data-plan-review-key]').count()).toBe(0)
+    await auditWorkflowState(page, 'plan', 'temporary-preview-expired', expired)
+  }, workflowMatrixEnabled ? 180_000 : 60_000)
 })
 
 describe('web e2e: dismissed plan history', () => {
@@ -311,8 +490,8 @@ describe('web e2e: dismissed plan history', () => {
     const events: SessionEvent[] = []
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { events.push(event) })
     try {
-      browser = await chromium.launch()
-      const page = await newEnglishPage(browser)
+      browser = await responsiveBrowser.launch()
+      const page = await newWorkflowPage(browser)
       await page.setViewportSize({ width: 620, height: 900 })
       const tripwire = watchConsole(page)
       await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -320,7 +499,11 @@ describe('web e2e: dismissed plan history', () => {
       const input = page.locator('textarea').first()
       const settled = scaffold.whenTurnSettled(30_000)
       await input.fill(LINE)
-      await input.press('Enter')
+      // Firefox fill() inserts through the IME composition pipeline; its compositionend
+      // clears the composer's composing guard one tick late, so a racing Enter keydown is
+      // swallowed as a newline. The Send button resolves the same 'enter' submit mode
+      // without going through the keydown IME guard.
+      await page.getByRole('button', { name: 'Send message' }).click()
       const review = page.locator('[data-plan-review-key]')
       await review.waitFor({ state: 'visible' })
       await page.locator('[data-plan-preview]').waitFor({ state: 'visible' })
@@ -342,18 +525,51 @@ describe('web e2e: dismissed plan history', () => {
       await review.waitFor({ state: 'detached' })
       const card = page.locator('[data-plan-card]')
       await card.waitFor({ state: 'visible' })
+      await auditWorkflowState(page, 'plan', 'dismissed-card', card, [], () => revealPlanComposer(page))
       await card.click()
       await page.locator('[data-plan-preview]').waitFor({ state: 'visible' })
+      await auditWorkflowState(page, 'plan', 'dismissed-preview', page.locator('[data-plan-preview]'))
       await page.locator('[data-sidebar-right-toggle]').click()
       await card.click()
+      const firstReloadWarnings = tripwire.warnings.length
       await page.reload({ waitUntil: 'load' })
       await page.locator('[data-plan-card]').waitFor({ state: 'visible' })
       await page.locator('[data-plan-preview]').waitFor({ state: 'visible' })
+      acknowledgeReloadConnectionLoss(tripwire, firstReloadWarnings)
       expect(await page.locator('[data-plan-preview]').getByRole('heading', { level: 1 }).textContent()).toContain('--greeting')
       await page.locator('[data-sidebar-right-toggle]').click()
+      const secondReloadWarnings = tripwire.warnings.length
       await page.reload({ waitUntil: 'load' })
       await page.locator('[data-plan-card]').waitFor({ state: 'visible' })
+      acknowledgeReloadConnectionLoss(tripwire, secondReloadWarnings)
       expect(await page.locator('[data-plan-preview]').isVisible()).toBe(false)
+      const historyReady = Promise.withResolvers<undefined>()
+      await page.route(/\/api\/session\.history(?:\?.*)?$/, async (route) => {
+        const request = route.request().postDataJSON() as { payload: { toolCallId?: string } }
+        if (request.payload.toolCallId !== call?.data.callId) { await route.fallback(); return }
+        await historyReady.promise
+        await route.fulfill({ status: 503, body: 'Plan history is temporarily unavailable' })
+      })
+      try {
+        await page.locator('[data-plan-card]').click()
+        const loading = page.getByRole('status').filter({ hasText: 'Loading plan…' })
+        await loading.waitFor()
+        // The status message is the surface: its parent is a display:contents
+        // slot wrapper that never generates a box of its own.
+        await auditWorkflowState(page, 'plan', 'logged-preview-loading', loading)
+        historyReady.resolve(undefined)
+        const failed = page.getByRole('status').filter({ hasText: 'Could not load plan' })
+        await failed.waitFor()
+        expect(await failed.textContent()).toContain('503')
+        await auditWorkflowState(page, 'plan', 'logged-preview-refused-diagnostic', failed)
+      } finally {
+        historyReady.resolve(undefined)
+        await page.unrouteAll({ behavior: 'wait' })
+      }
+      const warningStart = tripwire.warnings.length
+      await page.reload({ waitUntil: 'load' })
+      await page.locator('[data-plan-preview]').waitFor({ state: 'visible' })
+      acknowledgeReloadConnectionLoss(tripwire, warningStart)
       expect(tripwire.pageErrors).toEqual([])
       expect(tripwire.warnings).toEqual([])
     } finally {

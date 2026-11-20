@@ -2,6 +2,7 @@ import { useDeploymentContext } from '../deployment-context.tsx'
 import { NodeContentMigrationSection } from './NodeContentMigrationSection.tsx'
 import { NodeContentSection } from './NodeContentSection.tsx'
 import { PeerBackupSection } from './PeerBackupSection.tsx'
+import { LocalRecoveryExecutionSection } from './LocalRecoveryExecutionSection.tsx'
 import { DeploymentTopologySection, NodeConnectionSection } from './DeploymentTopologySection.tsx'
 /** Deployment control: maintenance windows, node convergence, backups, restore requests, and the operation ledger. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -135,7 +136,7 @@ export function DeploymentPage() {
       {notice === '' ? null : <p role="status">{notice}</p>}
 
       <Section title={t('clusterTitle')} meta={state === null ? undefined : t('writeEpochMeta', { value: state.writeEpoch })}>
-        {state === null || mode === null ? <LoadingState label={t('loadingCluster')} /> : (
+        {state === null || mode === null ? error === '' ? <LoadingState label={t('loadingCluster')} /> : null : (
           <div className="deploymentStatus">
             <div className="statusRow">
               <StatusBadge tone={mode.tone}>{t(mode.labelKey)}</StatusBadge>
@@ -174,6 +175,7 @@ export function DeploymentPage() {
       {deployment.value?.mode === 'multi' && state && <NodeContentSection entry={deployment.value.entry} nodes={state.nodes}/>}
       {deployment.value?.mode === 'multi' && state && <NodeContentMigrationSection />}
       {deployment.value?.scope === 'organization' && state && <PeerBackupSection nodes={state.nodes}/>}
+      {deployment.value?.mode === 'single' && state && <LocalRecoveryExecutionSection key={deployment.value.entry.nodeId}/>}
       <NodeConnectionSection />
       <Section title={t('runtimeLimits')}><RuntimeAllocationPolicyEditor /></Section>
       {deployment.value?.scope === 'organization' && <NodeAccessSection />}
@@ -196,7 +198,7 @@ export function DeploymentPage() {
                     <td>{node.maintenanceAppliedEpoch}</td>
                     <td>{node.inflightWrites < 0 ? t('inflightUnreported') : node.inflightWrites}</td>
                     <td>{node.activeRuntimes}</td>
-                    <td>{node.quiesced ? t('yes') : t('no')}</td>
+                    <td>{node.externallyFenced ? t('externallyFenced') : node.quiesced ? t('yes') : t('no')}</td>
                     <td>
                       {node.status === 'active' ? (
                         <Button variant="ghost" disabled={acting}
@@ -240,7 +242,7 @@ export function DeploymentPage() {
         actions={<Button icon={DatabaseBackup} disabled={acting || state?.mode !== 'maintenance' || !state.writersQuiesced}
           onClick={() => void run(async () => { await createBackup() }, t('noticeBackupDone'))}>{t('backupNow')}</Button>}
       >
-        {backups === null ? <LoadingState label={t('loadingBackups')} /> : backups.length === 0 ? (
+        {backups === null ? error === '' ? <LoadingState label={t('loadingBackups')} /> : null : backups.length === 0 ? (
           <EmptyState title={t('backupsEmptyTitle')} detail={t('backupsEmptyDetail')} />
         ) : (
           <div className="tableWrap" role="region" aria-label={t('backupsTableAria')} tabIndex={0}>

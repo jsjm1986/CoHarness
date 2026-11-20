@@ -12,8 +12,8 @@
   border-radius: var(--dsh-sidebar-footer-row-radius, var(--dsw-radius-md));
   background: transparent;
   color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  line-height: 22px;
+  font-size: 0.8125rem;
+  line-height: 1.375rem;
   text-align: left;
   cursor: pointer;
   overflow: hidden;

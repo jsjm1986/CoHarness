@@ -1,0 +1,67 @@
+- dialog "Document Manager":
+  - banner:
+    - heading "Document Manager" [level=2]
+    - group "Document computer":
+      - img
+      - text: Windows computer
+    - button "Upload information":
+      - img
+    - button "Close":
+      - img
+  - complementary "Document scopes":
+    - img
+    - textbox "Find a space or computer"
+    - button "All accessible documents Metadata only":
+      - strong: All accessible documents
+      - text: Metadata only
+    - button "Personal documents Local computer":
+      - strong: Personal documents
+      - text: Local computer
+    - button "Personal documents Windows computer":
+      - strong: Personal documents
+      - text: Windows computer
+    - button "Personal documents Linux computer":
+      - strong: Personal documents
+      - text: Linux computer
+    - text: Scopes
+    - button "Trash":
+      - img
+      - text: Trash
+    - button "History"
+  - heading "Personal documents · Windows computer" [level=3]
+  - navigation "Document path":
+    - button "Root folder" [disabled]
+  - status: You can view, upload, and manage documents in this scope
+  - group "Document actions":
+    - button "New Folder":
+      - img
+      - text: New Folder
+    - button "Upload Document":
+      - img
+      - text: Upload Document
+    - button "More actions":
+      - img
+  - group "Document filters":
+    - img
+    - textbox "Search document name": windows
+    - combobox "Type":
+      - option "All types" [selected]
+      - option "Images"
+      - option "PDF"
+      - option "Text"
+      - option "Other"
+    - button "Sort":
+      - img
+      - text: Modified · Newest first
+      - img
+  - checkbox "Select this page"
+  - text: "Upload target: Personal documents · Windows computer Folders: 0 · Documents: 1"
+  - list "Document Manager":
+    - group "Upload date 2026-08-14":
+      - text: 2026-08-14
+      - listitem:
+        - checkbox "windows-report.txt"
+        - button "Preview windows-report.txt": windows-report.txt Text
+        - text: 21 B
+        - 'button "More actions: windows-report.txt"':
+          - img

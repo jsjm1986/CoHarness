@@ -361,6 +361,9 @@ it('coalesces repeated recording errors without extending the toast and immediat
     }
     act(() => { vi.advanceTimersByTime(500) })
     expect(screen.queryByRole('alert')).toBeNull()
+    const description = document.getElementById(recorder.getAttribute('aria-describedby')!)
+    expect(description?.textContent).toBe(en['modifier-required'])
+    expect(description?.closest('[role="group"]')).toBe(screen.getByRole('group', { name: 'Open settings' }))
     expect(f.edit).not.toHaveBeenCalled()
     press('i', 'KeyI')
     const nextError = screen.getByRole('alert')

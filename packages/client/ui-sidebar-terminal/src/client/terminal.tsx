@@ -4,17 +4,24 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { Button, IconPlusOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TerminalViewState, TerminalView } from '@deepseek-ai/dsh-api-terminal-controller/client'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
-import type { TerminalBodyInjected } from './face.ts'
 import type {} from './locales.ts'
 import '@xterm/xterm/css/xterm.css'
 import css from './terminal.module.css'
 import { TerminalTheme } from './terminal-theme.ts'
 import { observeTerminalCursor } from './terminal-cursor.ts'
 
-/** Standard sidebar owner share plus terminal model and localized copy. */
-export type TerminalBodyProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'sidebarTerminal'> & InjectFace<TerminalBodyInjected>
+type OpenTab = ReturnType<PropsRuntime<'sidebar.right.pane.tab'>['useTabInfo']>['tab']['actions']['openTab']
+type ScreenModel = Pick<TerminalView, 'write' | 'resize' | 'acknowledge'>
+
+/** The sidebar occurrence, state and commands used by the terminal screen. */
+export interface TerminalBodyProps extends PropsLocale<'sidebarTerminal'> {
+  useTabInfo: () => { tab: { id: string; visible: boolean; actions: { openTab: OpenTab } } }
+  useTerminal: (key: string) => TerminalViewState | undefined
+  useTheme: (select: (value: ThemeSnapshot) => ThemeSnapshot) => ThemeSnapshot
+  view: (key: string) => ScreenModel & Pick<TerminalView, 'mount' | 'refresh' | 'connect'>
+}
 
 /**
  * Render the retained terminal with the application theme.
@@ -73,7 +80,7 @@ export function TerminalBody({ useTabInfo, useTerminal, useTheme, view, t }: Ter
 /* oxlint-disable typescript/no-non-null-assertion -- React sets the DOM ref, then these effects initialize and use the emulator. */
 function TerminalScreen({ state, model, visible, label, theme }: {
   state: TerminalViewState
-  model: TerminalView
+  model: ScreenModel
   visible: boolean
   label: string
   theme: ThemeSnapshot
@@ -173,7 +180,7 @@ function terminalFontFamily(list: string): string {
   return list === '' ? TERMINAL_FONT_STACK : `${list}, ${TERMINAL_FONT_STACK}`
 }
 
-function fitScreen(xterm: Terminal, fit: FitAddon, state: TerminalViewState, model: TerminalView): void {
+function fitScreen(xterm: Terminal, fit: FitAddon, state: TerminalViewState, model: Pick<TerminalView, 'resize'>): void {
   const dimensions = fit.proposeDimensions()
   const environment = state.environment
   if (dimensions === undefined || environment === undefined) return

@@ -1,17 +1,19 @@
 // Keyless assembled-browser coverage for the @ directory drill path. The
 // scenario exercises the real file source, shared menu controller, breadcrumb
 // header, and Tab arbitration without issuing a model request.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  assertFixtureInventory, captureStableAria,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden as compareOrRefreshGolden, newWorkflowPage as newEnglishPage } from './workflow-responsive-state.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/reference-drill', import.meta.url))
 const UI_EXPECTED = join(SNAPSHOT_DIR, 'ui.expected.md')
@@ -25,7 +27,7 @@ describe.skipIf(MODE === 'record')('web e2e: @ directory drill and breadcrumb', 
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -48,6 +50,11 @@ describe.skipIf(MODE === 'record')('web e2e: @ directory drill and breadcrumb', 
     const folder = menu.getByRole('option', { name: /src\// })
     await folder.waitFor({ timeout: 15_000 })
     await folder.hover()
+    await auditWorkflowState(page, 'reference', 'drillable-directory', page.locator('[data-trigger-menu]'), [], undefined, async () => {
+      expect(await folder.getAttribute('aria-selected')).toBe('true')
+      expect(await folder.locator('kbd').isVisible()).toBe(false)
+      expect(await folder.getByText('Browse folder', { exact: true }).isVisible()).toBe(false)
+    })
     await input.press('Tab')
     await expect.poll(() => input.inputValue(), { timeout: 10_000 }).toBe('@src/')
 
@@ -60,6 +67,15 @@ describe.skipIf(MODE === 'record')('web e2e: @ directory drill and breadcrumb', 
     expect(snapshot).toContain('src')
     expect(snapshot).toContain('nested.txt')
     expect(await navigation.getByRole('button', { name: 'src' }).isDisabled()).toBe(true)
+    await auditWorkflowState(page, 'reference', 'nested-directory-breadcrumb', page.locator('[data-trigger-menu]'))
+    await navigation.getByRole('button', { name: 'Workspace', exact: true }).click()
+    await folder.waitFor()
+    await folder.getByRole('button', { name: 'Browse folder', exact: true }).click()
+    await menu.getByRole('option', { name: /nested\.txt/ }).waitFor()
+    await menu.getByRole('option', { name: /nested\.txt/ }).click()
+    await expect.poll(() => input.inputValue()).toBe('@nested.txt ')
+    expect(await page.locator('[data-reference-appearance="file"]').textContent()).toBe('@nested.txt')
+    await auditWorkflowState(page, 'reference', 'nested-file-inline-range', page.locator('[data-composer-card]'))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   })

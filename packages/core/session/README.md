@@ -42,6 +42,7 @@ Projection events retain original durable messages and sequence identities. `sur
 
 - `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` validates and detaches durable seed/header data, fills the version and id, defaults `createdAt` to now, publishes the session, and binds it to the calling fiber. A seeded header (`meta.isSeeded: true`) must supply both `seed` and the exact `inheritedEventCount`, because the constructor seed can contain child-owned setup events after the inherited prefix; an unseeded header rejects a nonzero cut. Persisted reconstruction supplies its original `createdAt`, lineage, and `delegationDepth`.
 - `ctx.sessions.flush(session)` dispatches the awaited parallel durability checkpoint through the session's captured scope. Every listener starts and the call waits for all to settle before reporting failure; unpublished, detached, and stale objects reject.
+- `ctx.sessions.sealForShutdown(session)` ends appends on the exact live Session after its work has settled and returns the final log length. The Session's attachment remains available for `flush` until its owner detaches it.
 - `ctx.sessions.fork(source, boundary?, childSessionId?): Session` — Resolve a live session object or id, select a seed through the inclusive `boundary` event seq (default: current last event), require that prefix to end outside an open turn, and create a live child session with lineage metadata.
 - `ctx.sessions.get(id: SessionId): Session | undefined`
 - `ctx.sessions.list(): Session[]`

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The Web turn tail shows recorded workspace changes and explicit file deliveries. Each changed-file row opens its historical comparison in the shared right sidebar; delivery cards open current files through the existing authorized Workspace preview. Turns without either event retain their successful-mutation file chips. Exact paths and unique basenames in closing prose link to produced or delivered files. The Host half contributes file-reference guidance.
+The Web turn tail shows recorded workspace changes and explicit file deliveries. Each changed-file row opens its historical comparison in the shared right sidebar; delivery cards open current files through the existing authorized Workspace preview. Turns without either event retain their successful-mutation file chips. Exact paths and unique basenames in closing prose link to produced or delivered files. The Host half contributes file-reference guidance. The file card uses the theme’s error label color for native-open failures.
 
 ## Table of Contents
 

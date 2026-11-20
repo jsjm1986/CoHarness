@@ -75,13 +75,14 @@ export function WorkspaceDocumentPreview({ request, resource, read, pdfT, office
   return <WorkspacePreviewChrome request={request} resource={resource} state={state}
     className={`${css.filePreview} ${css.filePreviewZoom}`} message={message} hasContent={result !== undefined}
     close={close} labels={{ ...labels, loading: officeT('loading') }}>
-    {!denied && data !== undefined && result !== undefined && <>
-      <FontNotice resourceAddress={request.address} sourceVersion={result.version} fonts={result.missingFonts} t={officeT} />
+    {!denied && data !== undefined && result !== undefined && (
       <Suspense fallback={<p role="status">{pdfT('loading')}</p>}>
         <PdfBody data={data} signal={lifetime.signal} t={pdfT} view={view}
+          notice={<FontNotice resourceAddress={request.address} sourceVersion={result.version}
+            fonts={result.missingFonts} t={officeT} />}
           ZoomViewport={ZoomViewport} zoomSurfaceClass={zoomSurfaceClass} />
       </Suspense>
-    </>}
+    )}
   </WorkspacePreviewChrome>
 }
 

@@ -1,0 +1,15 @@
+- region "All accessible documents":
+  - button "Choose upload scope":
+    - img
+    - text: Choose upload scope
+  - button "Refresh":
+    - img
+    - text: Refresh
+  - button "More actions · Filtered":
+    - img
+    - text: Filtered
+  - list:
+    - listitem:
+      - text: notes.txt Personal documents · 30.0 KB · Alice
+      - button "View"
+      - button "Copy to…"

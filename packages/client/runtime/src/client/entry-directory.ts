@@ -91,7 +91,7 @@ export class EntryDirectory {
     const pageCursor = next ? this.more : null
     if (next && pageCursor === null) return
     const governance = '/account/api/runtimes' + (pageCursor === null ? '' : `?cursor=${encodeURIComponent(pageCursor)}`)
-    const contextUrl = new URL('/account/api/context', globalThis.location.origin)
+    const contextUrl = new URL('/account/api/workbench/context', globalThis.location.origin)
     addressRuntimeUrl(contextUrl, bootstrap)
     const [raw, context] = await Promise.all([this.read(governance, signal), this.read(contextUrl.pathname + contextUrl.search, signal)])
     signal?.throwIfAborted()

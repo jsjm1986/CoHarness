@@ -1,0 +1,5 @@
+- radio "Custom address"
+- text: Custom address
+- textbox "Custom address":
+  - /placeholder: https://npm.example.com/
+- text: Enter an internal or private npm registry address starting with http:// or https://. If it requires a login, store the credentials in ~/.npmrc on this machine.

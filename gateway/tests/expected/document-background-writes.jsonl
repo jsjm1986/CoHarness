@@ -6,5 +6,6 @@
 {"case":"maintenance-catalog-read","status":200,"catalogCalls":1,"pendingWriters":1}
 {"case":"catalog-acknowledgement-interrupted","delivered":1,"writers":0}
 {"case":"catalog-acknowledged","status":200,"state":"complete"}
+{"case":"concurrent-browser-runtime-delivery","listing":200,"notification":200,"projectionOrder":["cursor","commit"],"identityPreserved":true}
 {"case":"scope-removed","closed":true,"contentsPreserved":true,"writers":0}
-{"case":"catalog-drained","writers":0,"delivered":1}
+{"case":"catalog-drained","writers":0,"delivered":2}

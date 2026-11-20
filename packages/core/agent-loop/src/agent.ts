@@ -125,6 +125,7 @@ export class ReactLoopAgent implements Agent {
   private readonly runtimeContext: RuntimeContextProjection
   /** Process-local revision of assistant frames for this attached Session. */
   private admissionClosed = false
+  private preserveInbox = false
   private assistantStreamRevision = 0
   private assistantAttemptCounter = 0
   private readonly systemPrompt: SystemPromptProjection
@@ -157,10 +158,14 @@ export class ReactLoopAgent implements Agent {
     return this.phase.kind === 'idle' || this.phase.kind === 'maintenance' ? 'idle' : 'running'
   }
 
-  /** Close input before the lifecycle owner awaits any teardown work. */
-  closeAdmission(): void {
+  /**
+   * Close input and maintenance before the lifecycle owner awaits teardown.
+   * @param preserveInbox - protect admitted human input and keep pending work through cancellation.
+   */
+  closeAdmission(preserveInbox = false): void {
     this.admissionClosed = true
-    this.inbox.closeAdmission()
+    this.preserveInbox ||= preserveInbox
+    this.inbox.closeAdmission(preserveInbox)
   }
 
   /** Refuse busy release without cancelling a turn, maintenance task, or queued input. */
@@ -215,7 +220,7 @@ export class ReactLoopAgent implements Agent {
   }
 
   cancel(cause: AgentCancelCause, options: CancelOptions = {}): void {
-    if (!options.keepInbox) this.inbox.clear()
+    if (!this.preserveInbox && !options.keepInbox) this.inbox.clear()
     if (this.phase.kind !== 'idle') this.phase.wakeRequested = false
     // Kept inbox work parks until the next waking send; a cancellation never
     // turns an already accepted wake into an automatic replay.

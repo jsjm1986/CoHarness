@@ -54,6 +54,8 @@ The provider records immutable execution scopes in `gateway/execution` events. A
 
 Before a model request or allowed tool call, the provider checks every participant in that exact execution scope. Ordinary execution requires current write access; Full and profile management require administrator authority, while Auto requires separate eligibility. Unknown input within the current chain prevents privileged execution. A fresh verified root request can proceed after unknown historical input. Preset selection checks the live selector; actual execution checks its complete chain again. [Permission presets](../../interaction/permission-presets/README.md) own selection and defaults.
 
+With [managed model timings](../gateway-runtime/README.md#resource-admission) enabled, `model-input-timing` records the last stamped input entering an initial assistant stream. It measures observed inbox wait, the interval from claim to entry, inheritance and entry authorization, and the request authorization and preparation before streaming. Replayed inputs can lack the original live inbox observation. Session identities and content are absent from these samples.
+
 This provider owns `pluginManagementAuthorization` and `permissionPresetAuthorization`. Interactive profile operations use a fresh Gateway administrator check; Agent-initiated operations use the Agent's full participant set. Missing authorization does not fall back to an earlier HTTP request or browser role. [Profile management authorization](../../../.agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.md) defines the protected operations and cancellation behavior.
 
 <a id="revocation-and-cancellation"></a>

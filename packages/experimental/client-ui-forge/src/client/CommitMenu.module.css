@@ -46,6 +46,13 @@
   flex: none;
 }
 
+@media (pointer: coarse), (hover: none) {
+  .trigger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .triggerName {
   min-width: 0;
   overflow: hidden;

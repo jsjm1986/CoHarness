@@ -22,10 +22,18 @@
       - img
       - text: Trash
     - button "History"
-  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
   - heading "Personal documents" [level=3]
   - navigation "Document path":
     - button "Root folder" [disabled]
+  - group "Document actions":
+    - button "New Folder":
+      - img
+      - text: New Folder
+    - button "Upload Document":
+      - img
+      - text: Upload Document
+    - button "More actions":
+      - img
   - group "Document filters":
     - img
     - textbox "Search document name"
@@ -39,17 +47,8 @@
       - img
       - text: Modified · Newest first
       - img
-  - group "Document actions":
-    - button "New Folder":
-      - img
-      - text: New Folder
-    - button "Upload Document":
-      - img
-      - text: Upload Document
-    - button "More actions":
-      - img
   - checkbox "Select this page"
-  - text: Visible only to you 1 folders · 2 documents
+  - text: "Visible only to you Folders: 1 · Documents: 2"
   - list "Document Manager":
     - listitem:
       - button "Open folder reports": reports
@@ -59,18 +58,16 @@
       - text: 2026-08-16
       - listitem:
         - checkbox "notes.txt"
-        - button "Preview notes.txt": notes.txt Text · 2026-08-16
+        - button "Preview notes.txt": notes.txt Text
         - text: 30.0 KB
-        - button "Add notes.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: notes.txt"':
           - img
     - group "Upload date 2026-08-14":
       - text: 2026-08-14
       - listitem:
         - checkbox "brief.txt"
-        - button "Preview brief.txt": brief.txt Text · 2026-08-14
+        - button "Preview brief.txt": brief.txt Text
         - text: 21 B
-        - button "Add brief.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: brief.txt"':
           - img
   - 'complementary "Preview: brief.txt"':
@@ -80,10 +77,6 @@
     - button "Close preview":
       - img
     - text: Preview fixture for the document manager.
-    - paragraph: Add to the original conversation draft
-    - button "Add to conversation":
-      - img
-      - text: Add to conversation
     - link "Download":
       - /url: /api/documents/content?id=2026-08-14%2Fbrief.txt
       - img

@@ -10,9 +10,9 @@ compact 对话使用面向桌面的标题栏和轨迹表格，低频工具占用
 
 ## 决策
 
-布局层拥有 session-scoped 的 `shell.mobile.header.actions` slot，并通过 conversation owner props 传递解析后的 compact 模式。AppFrame 在 44px 手机顶栏中渲染该 slot，桌面工具继续使用原有 session header slot。Session log 导出在桌面和移动 presenter 之间共享同一个 controller 与 dialog。
+布局层拥有 session-scoped 的 `shell.mobile.header.actions` slot，并通过 conversation owner props 传递解析后的 compact 模式。AppFrame 在 44px 手机顶栏中渲染该 slot，桌面工具继续使用原有 session header slot。Session log 导出在桌面和移动 presenter 之间共享同一个 controller 与 dialog。root-scoped keyed 标题 slot 允许各全局面板把自身本地化导航状态投影到紧凑顶栏。全局面板保留当前 Session，因此该 Session 不能决定已选插件或任务页面的标题；布局层不导入这些页面的导航实现。
 
-轨迹继续使用一份 record projection、选择 controller、历史分页器、搜索索引和虚拟行身份。桌面渲染现有 table；compact 渲染 `TrajectoryMobileFeed`，使用固定手机行高、主信息行、元数据行和相同的 record/request 选择回调。移动详情复用现有 inspector 字段并使用底部 Sheet，桌面继续使用可调整宽度的侧栏面板。
+轨迹继续使用一份 record projection、选择 controller、历史分页器、搜索索引和虚拟行身份。桌面渲染现有 table；compact 渲染 `TrajectoryMobileFeed`，使用固定手机行高、主信息行、元数据行和相同的 record/request 选择回调。移动详情复用现有 inspector 字段并使用底部 Sheet，桌面继续使用可调整宽度的侧栏面板。虚拟表格使用独立块确定滚动范围，让 WebKit 在测量行高和向前补页时保留锚点，并可滚动到最新记录。低高度横屏打开详情时，检查器取得可用高度，JSON 长字段在其滚动区域内折行。
 
 共享移动指标由 `ui-theme` 统一管理顶栏、工具栏、时间线、事件行、字号、图标和安全区。功能包只消费语义 token，不建立第二套颜色或逐行 elevation 系统。
 

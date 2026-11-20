@@ -6,7 +6,9 @@ import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { afterEach, expect, it as kernelTest } from 'vitest'
-import { LocalRuntimeOwnerStore, type LocalRuntimeOwnerLease, type LocalRuntimeOwnerRecord } from '../src/local-runtime-owner.ts'
+import { LocalRuntimeOwnerStore, localRuntimeOwnerStores, type LocalRuntimeOwnerLease, type LocalRuntimeOwnerRecord } from '../src/local-runtime-owner.ts'
+import { LocalRuntimeControl } from '../src/local-runtime-control.ts'
+import { localKernelBootId } from '../src/local-runtime-protocol.ts'
 
 const roots: string[] = [], leases: LocalRuntimeOwnerLease[] = []
 const it = kernelTest.skipIf(!['darwin', 'linux'].includes(process.platform))
@@ -35,6 +37,26 @@ it('retains one exclusive inode and immutable generation identity until its desc
   const recovered = await acquire(owner)
   expect((await owner.read())?.nonce).toBe(record.nonce)
   await expect(recovered.create(bootId)).rejects.toThrow('already fenced')
+})
+
+it('proves only stopped generations without cancelling or reaping a busy or unknown writer',async()=>{
+  const owner=await store(),lease=await acquire(owner),record=await lease.create(await localKernelBootId())
+  const control=new LocalRuntimeControl(owner,5000),before=await readFile(owner.recordPath,'utf8')
+  await expect(control.assertQuiescent()).rejects.toMatchObject({code:expect.stringMatching(/^E(?:AGAIN|WOULDBLOCK)$/u)})
+  await lease.close()
+  await expect(control.assertQuiescent()).rejects.toThrow('confirmed stopped receipt')
+  expect(await readFile(owner.recordPath,'utf8')).toBe(before)
+  await expect(readFile(owner.cancellationPath)).rejects.toMatchObject({code:'ENOENT'})
+  const stopped=await acquire(owner);await stopped.publish({...record,phase:'stopped'});await stopped.close()
+  const final=await readFile(owner.recordPath,'utf8')
+  await control.assertQuiescent()
+  expect(await readFile(owner.recordPath,'utf8')).toBe(final)
+  await expect(readFile(owner.cancellationPath)).rejects.toMatchObject({code:'ENOENT'})
+  const newer=new LocalRuntimeOwnerStore(owner.directory,{...identity,generation:9,credentialHash:'b'.repeat(64)})
+  const allocation=await acquire(newer);await allocation.create(record.bootId);await allocation.close()
+  const stores=await localRuntimeOwnerStores(owner.directory,identity)
+  expect(stores.map(store=>store.identity.generation).sort((a,b)=>a-b)).toEqual([2,9])
+  await expect(new LocalRuntimeControl(stores.find(store=>store.identity.generation===9)!,5000).assertQuiescent()).rejects.toThrow('confirmed stopped receipt')
 })
 
 it('keeps an inherited kernel lease after its Gateway descriptor closes', async () => {

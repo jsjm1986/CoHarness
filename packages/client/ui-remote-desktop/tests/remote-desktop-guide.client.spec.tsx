@@ -45,9 +45,29 @@ it('lists the caller\'s authorized targets in the menu and opens the chosen one'
   })
 })
 
-it('shows the empty item in the menu when the caller has no live grants', async () => {
+it('shows an empty-state explanation without an unavailable menu action', async () => {
   const { props } = fixture([])
   render(<RemoteDesktopGuide {...props} />)
   fireEvent.click(screen.getByRole('button', { name: en.connectDescription }))
   await waitFor(() => { expect(screen.getByText(en.targetsEmpty)).toBeTruthy() })
+  expect(screen.queryAllByRole('menuitem')).toHaveLength(0)
+  expect(screen.getByText(en.targetsEmpty).closest('button')).toBeNull()
+})
+
+it('keeps discovery feedback readable and exposes Retry as the only action on failure', async () => {
+  const { props } = fixture([])
+  const pending = Promise.withResolvers<never>()
+  const listTargets = vi.fn<RemoteDesktopGuideInjected['listTargets']>()
+    .mockReturnValueOnce(pending.promise).mockResolvedValueOnce(GRANTS)
+  render(<RemoteDesktopGuide {...props} listTargets={listTargets} />)
+  fireEvent.click(screen.getByRole('button', { name: en.connectDescription }))
+  expect(screen.getByText(en.targetsLoading).closest('button')).toBeNull()
+  expect(screen.queryAllByRole('menuitem')).toHaveLength(0)
+  pending.reject(new Error('Unavailable catalog'))
+  expect(await screen.findByRole('status')).toHaveProperty('textContent', en.targetsFailed)
+  const retry = screen.getByRole('menuitem', { name: en.retry })
+  expect(screen.getAllByRole('menuitem')).toHaveLength(1)
+  fireEvent.click(retry)
+  await screen.findByRole('menuitem', { name: 'mac-mini · Control' })
+  expect(screen.queryByText(en.targetsFailed)).toBeNull()
 })

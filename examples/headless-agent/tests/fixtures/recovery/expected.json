@@ -1,0 +1,25 @@
+{
+  "denied": [
+    "recovered-root",
+    "recovered-child"
+  ],
+  "oldHistoryUnchanged": true,
+  "history": [
+    {
+      "id": "recovered-root",
+      "events": [
+        "agent/inbox/spliced"
+      ]
+    },
+    {
+      "id": "recovered-child",
+      "events": [
+        "agent/inbox/spliced"
+      ]
+    }
+  ],
+  "modelRequests": 1,
+  "finalResponse": "New recovery conversation accepted.",
+  "finishReason": "completed",
+  "unreviewedPluginImports": 0
+}

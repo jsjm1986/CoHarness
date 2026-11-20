@@ -1,0 +1,40 @@
+- heading "More actions" [level=2]
+- button "Close":
+  - img
+- region "Document filters":
+  - heading "Document filters" [level=3]
+  - img
+  - textbox "Search document name"
+  - text: Type
+  - combobox "Type":
+    - option "All types" [selected]
+    - option "Images"
+    - option "PDF"
+    - option "Text"
+    - option "Other"
+  - group "Sort by":
+    - text: Sort by
+    - radio "Modified" [checked]
+    - text: Modified
+    - radio "Name"
+    - text: Name
+    - radio "Size"
+    - text: Size
+  - group "Order":
+    - text: Order
+    - radio "Newest first" [checked]
+    - text: Newest first
+    - radio "Oldest first"
+    - text: Oldest first
+- paragraph: "Folders: 0 · Documents: 3"
+- checkbox "Select this page"
+- text: Select this page
+- list:
+  - button "New Folder":
+    - img
+    - text: New Folder
+  - button "Refresh":
+    - img
+    - text: Refresh
+  - button "History"
+  - button "Trash"

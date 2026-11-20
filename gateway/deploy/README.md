@@ -14,7 +14,7 @@ Brings the gateway online on a Linux host with systemd kernel confinement and sw
 
 ## Install
 
-From the exact release checkout, run `pnpm install --frozen-lockfile && pnpm run build:production`. The production entry builds the Harness libraries and Web application, both tree-external plugins, and the Admin SPA; it typechecks the Gateway and rejects a release missing any required CLI, Web, Gateway, Admin, plugin, administrator-overlay, or collaboration-migration payload.
+From the exact release checkout, run `pnpm install --frozen-lockfile && DSH_BUILD_CLIENT_PROFILE=coharness pnpm run build:production`. The production build re-emits the referenced TypeScript projects before bundling Harness and Web. It builds the tree-external plugins and Admin SPA, typechecks the Gateway, and verifies the required CLI, Web, Gateway, Admin, plugin, and migration files against the release manifest.
 
 Nodes executing database backups or restores also need the matching PostgreSQL [private connection adapter](postgres/README.md#private-maintenance-connections); build it on that execution host before enabling maintenance commands. Normal Gateway and node-agent builds do not require a C toolchain.
 
@@ -28,6 +28,8 @@ Nodes executing database backups or restores also need the matching PostgreSQL [
 The Admin Archives channel is enabled by PostgreSQL migration 015. Set `HGW_ARCHIVE_RETENTION_DAYS` (default `30`) for the recoverable trash window. Runtime archive snapshots are reconciled through the private Gateway API; keep runtime homes and the Gateway archive index on the same backup plan. Personal transcript bodies remain in runtime-owned storage and are loaded on demand by an administrator view.
 
 Managed desktop is opt-in per node. Install the Cua Driver application on the host and grant it the OS desktop permissions, provision the published `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp` package directory (copy the built package to `packages/experimental/computer-use-cua-driver-mcp` under the release root, or point `HGW_DESKTOP_DRIVER_PACKAGE` at an absolute package directory), and set `HGW_DESKTOP_ID` to the node-local desktop identifier. Every launched runtime then mounts the computer-use service and that provider and publishes the managed desktop policy; `HGW_DESKTOP_DRIVER_COMMAND` and `HGW_DESKTOP_DRIVER_ARGS` replace the `cua-driver` lookup and `mcp` arguments when the deployment needs a pinned path or `--direct`. Administrators qualify users and projects on the Desktop coordination page, and each participant confirms the live root Session and desktop in the composer before a driver call runs. With `HGW_DESKTOP_ID` unset, runtimes mount no driver and the driver package is never read.
+
+Human VNC access is configured separately with `HGW_REMOTE_DESKTOP=on|off` (default `on`). Set `off` on nodes that do not serve configured VNC endpoints: new managed Runtime profiles disable the VNC provider and stream without referencing the Gateway’s private desktop files. The controller retains authenticated empty target lists and structured unavailable responses; desktop-environment metadata stays enabled. Keep `on` for explicitly configured external VNC servers even on headless hosts. This setting is available in node deployment configuration; saving does not apply it, and applying requires quiesced maintenance. Do not change file permissions or stop active tasks to work around missing desktop configuration.
 
 ## Per-user provisioning
 
@@ -151,16 +153,27 @@ The LaunchAgent uses only stable paths. Replace `ACCOUNT`, load the plist with `
 </plist>
 ```
 
-Activate a fully built release only through the controller:
+Enter maintenance and verify that every personal and project Runtime, long task, schedule and background writer has stopped before pausing launchd automatic launch and stopping the Gateway. An idle browser is not evidence of shutdown. Keep the job registered, disable its automatic launch with `launchctl disable gui/$(id -u)/com.maycran.harness-gateway`, and stop it only after that verification. The controller never stops a Gateway or Runtime. Activate a fully built release through the controller:
 
 ```sh
 CONTROL="$HOME/.local/libexec/harness-gateway/release-control.sh"
 RELEASE_NAME=coharness-REVISION
+"$CONTROL" preflight
 "$CONTROL" activate "$HOME/harness-gateway-releases/$RELEASE_NAME"
 "$CONTROL" status
 ```
 
-Activation validates the payload, holds an activation lock, atomically replaces `current`, restarts launchd, and accepts the release only when the job has a new PID, its cwd is the target Gateway directory, and `/healthz` reports the target release id. A failed activation switches `current` back and verifies the previous release before returning an error. Activation never deletes a release; cleanup is a separate explicit command that refuses the current directory, the live Gateway cwd, any process command referencing the directory, or any open file below it:
+Activation rejects a running Gateway, retained release Runtime processes or an unavailable process inventory. Under the activation lock, it checks the candidate's live governance migration ledger against the shipped checksums before changing `current`. A matching prefix lets the candidate apply pending forward migrations during startup. The configured [node content volume](node-content/README.md) must already match its own shipped migration sequence. The controller enables and starts the registered Gateway after those checks. Success requires the exact release, PID and cwd.
+
+Keep a fallback built for the database schemas expected after the upgrade. Pass it with `--rollback-target <directory>` or let the controller consider the previously selected release. After a failed candidate and its Runtime processes have exited, the controller pauses automatic launch. It verifies that the fallback uses the same configured databases and that their live migration names and checksums exactly match its packaged files. A compatible fallback can then start. An older or unverifiable fallback leaves the candidate selected with automatic launch paused. Stage a release compatible with the installed schemas and run `activate` again while still in maintenance. The probe reads ledgers and the failed activation leaves committed migrations in place. A candidate that still owns work or cannot be inspected stays selected without receiving a signal.
+
+Install the updated stable controller. The candidate, the previously selected release or the explicit fallback must supply `gateway/lib/release-schema-check.js`. The controller can use that verifier for an older compiled fallback or an implicitly selected source release when their installed code and migration files prove compatibility.
+
+After copying a Windows release, recreate its installation package junctions for the staged directory. Use the staged CLI package manifest as the installation anchor and resolve the managed Web profile through `createRuntimeResolution`. Check the real paths of installation packages against the staged release root before activation. An inherited junction to an earlier release can keep loading the previous Host or browser bundle even when the new Gateway reports ready.
+
+Windows manual `node-agent-task.ps1 -Restart` and `-Uninstall` require the task to contain exactly one action owned by that script. Other enabled tasks in the installation must be paused and all Gateway/Runtime processes confirmed stopped first; unknown inventory refuses the operation. Normal watchdog recovery is unchanged. Do not use older deployment helpers that call `taskkill /T /F`, stop Runtime supervisors, or sweep a Gateway process tree. When work cannot safely stop, validate a candidate with separate databases, identities, directories and ports instead of replacing production.
+
+Activation, automatic rollback and pruning share the release operation lock. Pruning refuses to run during an activation and protects the current release, process references and open files.
 
 ```sh
 OLD_RELEASE_NAME=coharness-OLD-REVISION

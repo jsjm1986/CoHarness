@@ -254,6 +254,24 @@ try {
       assert.equal(page.status, 200); assert.match(html, /<!doctype html>/iu)
       const before = await active.command('status'); assert.equal(before.state, 'ready'); assert.equal(before.resident, 1)
       transcript.push(`${scope}: signed-in Gateway serves the real Web profile after registered readiness.`)
+      let asset
+      if (directoryCase === undefined && documentCase === undefined) {
+        const resource = [...html.matchAll(/(?:src|href)="([^"]*plugins\/combo\.js\?\?[^"]+)"/gu)]
+          .map(match => match[1].replaceAll('&amp;', '&'))[0]
+        assert.ok(resource, 'The shipped Web profile advertises its revisioned plugin startup resource')
+        asset = new URL(resource, base)
+        const previous = await active.command('asset-state')
+        for (const method of ['GET', 'HEAD']) {
+          const reply = await fetch(asset, { method, headers: { cookie, referer: runtimeUrl('/').href } })
+          const body = await reply.text()
+          assert.equal(reply.status, 200, body.slice(0, 300))
+          assert.match(reply.headers.get('cache-control'), /immutable/u)
+          if (method === 'GET') assert.ok(body.length > 0)
+          else assert.equal(body, '')
+        }
+        assert.deepEqual(await active.command('asset-state'), previous)
+        transcript.push(`${scope}: revisioned plugin GET/HEAD uses the exact supervised generation without changing execution activity.`)
+      }
       async function directoryRpc(method, payload) {
         const response = await fetch(runtimeUrl(`/api/${method}`), { method: 'POST',
           headers: { origin: base, cookie, 'content-type': 'application/json' },
@@ -354,7 +372,9 @@ try {
       active = await startGateway()
       const recovered = await active.command('status')
       assert.equal(recovered.state, 'ready'); assert.equal(recovered.generation, before.generation)
-      const resumed = await fetch(runtimeUrl('/'), { headers: { cookie } }); assert.equal(resumed.status, 200); await resumed.arrayBuffer()
+      const resumed = await fetch(runtimeUrl('/'), { headers: { cookie } })
+      if (resumed.status !== 200) assert.fail(`${scope} replacement Gateway returned ${resumed.status}: ${(await resumed.text()).slice(0, 1000)}`)
+      await resumed.arrayBuffer()
       const after = await active.command('status'); assert.equal(after.generation, before.generation); assert.equal(after.admittedStarts, before.admittedStarts)
       transcript.push(`${scope}: replacement Gateway reuses the exact generation without another cold-start credit.`)
       if (scope === 'project') {
@@ -384,7 +404,19 @@ try {
       assert.equal((await active.command('status')).generation, before.generation)
       transcript.push(`${scope}: unavailable supervision returns 503, retains occupation, and resumes the same generation.`)
       if (directoryCase === undefined && documentCase === undefined) {
-        await active.command('stop-runtime')
+        const stopPath = scope === 'personal' ? `/admin/api/users/${active.ready.userId}/instance/stop`
+          : `/admin/api/projects/${active.ready.projectId}/instance/stop`
+        const stopUrl = new URL(stopPath, base)
+        stopUrl.searchParams.set('dshRuntime', active.ready.runtimeId)
+        const receipt = await fetch(stopUrl, { method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: '{}' })
+        assert.equal(receipt.status, 204)
+        assert.equal(receipt.headers.get('x-dsh-runtime-shutdown-outcome'), 'confirmed')
+        await receipt.arrayBuffer()
+        transcript.push(`${scope}: the managed Web profile confirms its Session checkpoint and process exit for the stopped generation.`)
+        const stoppedAssetState = await active.command('asset-state')
+        const stoppedAsset = await fetch(asset, { headers: { cookie, referer: runtimeUrl('/').href } })
+        assert.equal(stoppedAsset.status, 409); await stoppedAsset.arrayBuffer()
+        assert.deepEqual(await active.command('asset-state'), stoppedAssetState)
         const stoppedPage = await fetch(runtimeUrl('/'), { headers: { cookie, accept: 'text/html' } })
         assert.equal(stoppedPage.status, 200)
         const html = await stoppedPage.text()

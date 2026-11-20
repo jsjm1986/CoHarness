@@ -301,7 +301,7 @@ async function responseError(res: Response): Promise<AdminRequestError> {
   } catch {
     // Preserve the HTTP status when the upstream body is absent, invalid or too large.
   }
-  return new AdminRequestError(res.status, computerErrorMessage(message), code ?? message)
+  return new AdminRequestError(res.status, computerErrorMessage(message, code), code ?? message)
 }
 
 async function request<T>(url: string, init: RequestInit = {}, target?: 'computer' | 'organization'): Promise<T> {
@@ -322,9 +322,14 @@ export function personalPublication<T>(kind:'directory'|'documents', userId:numb
   return request(path+'?dshNode='+encodeURIComponent(nodeId),{signal,...(approval?{method:'POST',body:JSON.stringify(approval)}:{})},'organization')
 }
 
-/** Read shared account choices, or explicitly request the selected computer's instance columns. */
-export function listUsers(target: 'organization' | 'computer' = 'organization'): Promise<AdminUser[]> {
-  return request('/admin/api/users', {}, target)
+/**
+ * Read shared account choices or the selected computer's instance columns.
+ * @param target - requested account listing.
+ * @param signal - optional cancellation of the listing request.
+ * @returns the matching accounts.
+ */
+export function listUsers(target: 'organization' | 'computer' = 'organization', signal?: AbortSignal): Promise<AdminUser[]> {
+  return request('/admin/api/users', signal === undefined ? {} : { signal }, target)
 }
 
 export function getUser(id: number): Promise<AdminUser> {
@@ -1209,6 +1214,12 @@ export type ModelRegistrationReport = {
   rows: ModelRegistrationRow[]
 }
 
+/**
+ * Read the registration history matching the supplied filters.
+ * @param filter - requested scope and pagination.
+ * @param signal - optional cancellation when the view or filters change.
+ * @returns the matching events and counts.
+ */
 export function listModelRegistrations(filter: {
   userId?: number
   provider?: string
@@ -1218,13 +1229,13 @@ export function listModelRegistrations(filter: {
   to?: number
   offset?: number
   limit?: number
-} = {}): Promise<ModelRegistrationReport> {
+} = {}, signal?: AbortSignal): Promise<ModelRegistrationReport> {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(filter)) {
     if (value !== undefined && value !== '') query.set(key, String(value))
   }
   const suffix = query.toString()
-  return request(`/admin/api/model-registrations${suffix === '' ? '' : `?${suffix}`}`)
+  return request(`/admin/api/model-registrations${suffix === '' ? '' : `?${suffix}`}`, signal === undefined ? {} : { signal })
 }
 
 export function listModels(): Promise<ModelGovernanceRow[]> {
@@ -1413,6 +1424,62 @@ export interface PluginManagementOverviewRow {
 export function pluginManagementOverview(signal?: AbortSignal): Promise<PluginManagementOverviewRow[]> {
   return request('/admin/api/plugins/overview', { signal })
 }
+
+/** Localized display text a runtime reports for one bundle or entry. */
+export type PluginInventoryLocalizedText = string | ({ en: string } & Record<string, string>)
+/** Localizable display metadata in a reported inventory. */
+export interface PluginInventoryMeta {
+  title?: PluginInventoryLocalizedText
+  description?: PluginInventoryLocalizedText
+  icon?: string
+  error?: string
+}
+/** One composition row a reported bundle declares. */
+export interface PluginInventoryBundleRow { rowId: string; moduleName: string; meta?: PluginInventoryMeta; entryId?: string }
+/** One bundle as the reporting runtime's catalog lists it. */
+export interface PluginInventoryBundle {
+  name: string
+  version?: string
+  meta?: PluginInventoryMeta
+  description?: string
+  enabled: boolean
+  installed: boolean
+  optional: boolean
+  removable: boolean
+  readOnlyReason?: string
+  source?: string
+  error?: { code: string; diagnostic?: string }
+  rows: PluginInventoryBundleRow[]
+  overrides: string[]
+}
+/** One live runtime entry as the reporting runtime's catalog lists it. */
+export interface PluginInventoryPlugin {
+  entryId: string
+  moduleName: string
+  meta?: PluginInventoryMeta
+  enabled: boolean
+  fiberPhase: string | null
+  patchId?: string
+  readOnlyReason?: string
+}
+/** The composition one runtime last reported. */
+export interface PluginInventoryReport { bundles: PluginInventoryBundle[]; plugins: PluginInventoryPlugin[] }
+/** One space's inventory row as the cross-space list returns it. */
+export interface PluginInventorySpaceRow {
+  target: { kind: 'user' | 'project'; id: number; runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId; label: string; steward: boolean }
+  live: boolean
+  generation: number | null
+  /** Last report time; null while the runtime has never reported. */
+  reportedAt: string | null
+  /** The runtime's last reported catalog; null without a report. */
+  inventory: PluginInventoryReport | null
+  /** The saved desired composition, when an override exists. */
+  desired: PluginDesiredState | null
+}
+/** Every space's last reported plugin inventory on this node. */
+export function pluginInventoryList(signal?: AbortSignal): Promise<PluginInventorySpaceRow[]> {
+  return request('/admin/api/plugins/inventory', { signal })
+}
 export function pluginManagementSaveState(input: { target: { kind: 'user' | 'project'; id: number; runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId }; revision: string; state: PluginDesiredState | null }, signal?: AbortSignal): Promise<PluginManagementState> {
   return request('/admin/api/plugins/state', { method: 'POST', body: JSON.stringify(input), signal })
 }
@@ -1430,6 +1497,8 @@ export interface DeploymentNode {
   /** -1 means the node's build predates inflight reporting; it cannot quiesce. */
   inflightWrites: number
   activeRuntimes: number
+  /** Physical isolation confirmed separately from observed Runtime shutdown. */
+  externallyFenced?: true
   quiesced: boolean
 }
 

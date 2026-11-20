@@ -1,5 +1,6 @@
 import type { HostDescription, IApiClient, HostFrame, MuxFrame, RpcError, RpcRequest } from './api.ts'
 import { ApiTransportError } from './api.ts'
+import { runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { StreamTermination } from './stream-termination.ts'
 import { DEFAULT_ENTRY_REQUEST_LIMIT } from '../browser-timing.ts'
 
@@ -62,6 +63,17 @@ export function resolveConnectionConfig(config: ConnectionConfig): Required<Conn
     throw new RangeError('backoffMaxMs must be at least backoffBaseMs')
   }
   return resolved
+}
+
+/** Schedule one retry without aligning independent browser documents.
+ * @param config - resolved retry timings.
+ * @param attempt - consecutive failure count, starting at one.
+ * @returns a jittered delay within the configured cap.
+ */
+export function connectionBackoffDelay(config: Required<ConnectionConfig>, attempt: number): number {
+  const { backoffBaseMs, backoffFactor, backoffMaxMs } = config
+  const cap = Math.min(backoffMaxMs, backoffBaseMs * backoffFactor ** Math.max(0, attempt - 1))
+  return cap / 2 + Math.random() * (cap / 2)
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -148,6 +160,13 @@ class HandshakeRpcError extends Error {
 export interface ConnectionSinks {
   onMuxEnvelope?: (envelope: RpcRequest<MuxFrame>) => void
   onHostEnvelope?: (envelope: RpcRequest<HostFrame>) => void
+  /** Offer an authenticated reconnect's Mux frame to an existing read-only view before Host readiness.
+   * @param envelope - next validated Mux frame.
+   * @param description - fresh description of the same managed Runtime and computer.
+   * @param signal - lifetime of this connection generation.
+   * @returns true when consumed, so the normal replay skips this frame.
+   */
+  onResumeMuxEnvelope?: (envelope: RpcRequest<MuxFrame>, description: HostDescription, signal: AbortSignal) => boolean
   /** After each readiness handshake, including first connect, synchronously
    * withdraw prior-generation state before connected state or the Host description
    * is published. Buffered frames remain held until onConnected returns.
@@ -220,11 +239,6 @@ export class ConnectionController {
     this.backoff?.abort()
   }
 
-  private backoffDelay(attempt: number): number {
-    const { backoffBaseMs, backoffFactor, backoffMaxMs } = this.config
-    const cap = Math.min(backoffMaxMs, backoffBaseMs * backoffFactor ** Math.max(0, attempt - 1))
-    return cap / 2 + Math.random() * (cap / 2)
-  }
 
   /** Read through a method: stop() flips the flag across awaits, so narrowing from the loop condition must not stick. */
   private isRunning(token?: number): boolean {
@@ -237,6 +251,7 @@ export class ConnectionController {
   }
 
   private async loop(token: number): Promise<void> {
+    let verifiedMuxTarget: HostDescription['runtimeTarget']
     while (this.isRunning(token)) {
       const gen = ++this.generation
       const startedAt = performance.now()
@@ -257,24 +272,36 @@ export class ConnectionController {
       // flag also keeps those frames ordered behind the already-buffered replay.
       let releasing = false
       let generationLive = true
+      const isLive = () => generationLive && this.isGenerationActive(ac, token)
+      let muxResume: HostDescription | undefined
       const buffered: Array<
         | { kind: 'mux'; envelope: RpcRequest<MuxFrame> }
         | { kind: 'host'; envelope: RpcRequest<HostFrame> }
       > = []
+      const consumeResumedMux = (envelope: RpcRequest<MuxFrame>): boolean => {
+        if (muxResume === undefined) return false
+        const description = muxResume
+        let consumed = false
+        this.callSink(() => { consumed = this.sinks.onResumeMuxEnvelope?.(envelope, description, ac.signal) === true })
+        return consumed
+      }
       const dispatchMux = (envelope: RpcRequest<MuxFrame>): void => {
         if (!ready || releasing) {
-          if (generationLive && this.isGenerationActive(ac, token)) buffered.push({ kind: 'mux', envelope })
+          if (!isLive()) return
+          if ((releasing || !consumeResumedMux(envelope)) && this.isGenerationActive(ac, token)) {
+            buffered.push({ kind: 'mux', envelope })
+          }
           return
         }
-        if (!generationLive || !this.isGenerationActive(ac, token)) return
+        if (!isLive()) return
         this.callSink(() => { this.sinks.onMuxEnvelope?.(envelope) })
       }
       const dispatchHost = (envelope: RpcRequest<HostFrame>): void => {
         if (!ready || releasing) {
-          if (generationLive && this.isGenerationActive(ac, token)) buffered.push({ kind: 'host', envelope })
+          if (isLive()) buffered.push({ kind: 'host', envelope })
           return
         }
-        if (!generationLive || !this.isGenerationActive(ac, token)) return
+        if (!isLive()) return
         this.callSink(() => { this.sinks.onHostEnvelope?.(envelope) })
       }
 
@@ -283,13 +310,11 @@ export class ConnectionController {
       let muxOpened = (): void => {}
       /* v8 ignore next -- same placeholder pattern as muxOpened. */
       let hostOpened = (): void => {}
-      const streamsOpen = Promise.all([
-        new Promise<void>((resolve) => { muxOpened = resolve }),
-        new Promise<void>((resolve) => { hostOpened = resolve }),
-      ])
+      const muxOpen = new Promise<void>((resolve) => { muxOpened = resolve })
+      const hostOpen = new Promise<void>((resolve) => { hostOpened = resolve })
 
       const reportFailure = (failure: ConnectionFailure, source: ConnectionFailureDiagnostic['source']): void => {
-        if (firstFailure !== undefined || !generationLive || !this.isGenerationActive(ac, token)) return
+        if (firstFailure !== undefined || !isLive()) return
         const now = performance.now()
         const termination = failure.kind === 'transport' && failure.error instanceof StreamTermination ? failure.error : undefined
         const diagnostic: ConnectionFailureDiagnostic = {
@@ -335,16 +360,37 @@ export class ConnectionController {
         // only then may onConnected fire, so the resync it triggers cannot outrun the
         // subscribed baseline. The timeout guards against a carrier that never fires onOpen
         // (see ConnectionConfig.streamOpenTimeoutMs).
-        const describe = this.api.host.describe({}, ac.signal).catch((error: unknown) => {
-          readinessFailureSource = 'describe'
-          throw error
-        })
+        const describe = this.api.host.describe({}, ac.signal).then(({ result }) => {
+          if (!result.ok) throw new HandshakeRpcError(result.error)
+          if (result.value.executionAuthorityRequired === true && result.value.runtimeTarget === undefined) {
+            throw new Error('Managed Host did not declare its runtime identity')
+          }
+          return result.value
+        }).catch((error: unknown) => { readinessFailureSource = 'describe'; throw error })
         readinessFailureSource = 'readiness'
-        const handshake = Promise.all([
-          describe,
-          streamsOpen,
-        ])
-        void handshake.catch(() => {})
+        const muxReady = Promise.all([describe, muxOpen]).then(([description]) => {
+          const next = description.runtimeTarget
+          if (this.sinks.onResumeMuxEnvelope === undefined || description.executionAuthorityRequired !== true
+            || next?.runtimeId === undefined || next.nodeId === undefined
+            || !isLive()) return description
+          if (verifiedMuxTarget === undefined) {
+            verifiedMuxTarget = next
+            return description
+          }
+          if (next.nodeId !== verifiedMuxTarget.nodeId || runtimeTargetKey(next) !== runtimeTargetKey(verifiedMuxTarget)) return description
+          // Keep deferred Host and interaction frames in their original order.
+          muxResume = description
+          releasing = true
+          let retained = 0
+          for (const item of buffered) {
+            if (!isLive()) break
+            if (item.kind === 'host' || !consumeResumedMux(item.envelope)) buffered[retained++] = item
+          }
+          buffered.length = this.isGenerationActive(ac, token) ? retained : 0
+          releasing = false
+          return description
+        })
+        const handshake = Promise.all([muxReady, hostOpen])
         // A third-party unary carrier may ignore AbortSignal. Race the
         // handshake against the generation's failure edge so stop/reconnect
         // cannot leave the controller suspended behind that promise.
@@ -353,15 +399,8 @@ export class ConnectionController {
             Math.max(this.config.streamOpenTimeoutMs, this.config.generationReadyTimeoutMs), ac.signal),
           failed.then(() => { throw new Error('connection generation ended during readiness') }),
         ])
-        const descriptionResult = description.result
-        if (!descriptionResult.ok) {
-          throw new HandshakeRpcError(descriptionResult.error)
-        }
-        if (descriptionResult.value.executionAuthorityRequired === true && descriptionResult.value.runtimeTarget === undefined) {
-          throw new Error('Managed Host did not declare its runtime identity')
-        }
         if (ac.signal.aborted) throw new Error('generation aborted during readiness handshake')
-        this.callSink(() => { this.sinks.onBeforeConnected?.(descriptionResult.value) })
+        this.callSink(() => { this.sinks.onBeforeConnected?.(description) })
         if (this.isGenerationActive(ac, token)) {
           this.attempt = 0
           connectedAt = performance.now()
@@ -375,7 +414,7 @@ export class ConnectionController {
             // callback has returned and the captured replay is flushed.
             ready = true
             releasing = true
-            this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
+            this.callSink(() => { this.sinks.onConnected?.(description) })
             releasing = false
             if (this.isGenerationActive(ac, token)) {
               for (const item of buffered.splice(0)) {
@@ -410,7 +449,7 @@ export class ConnectionController {
       console.warn(`[web-runtime] connection lost, retry #${this.attempt}${firstFailure === undefined ? '' : ` ${JSON.stringify(firstFailure)}`}`)
       const idle = new AbortController()
       this.backoff = idle
-      await sleep(this.backoffDelay(this.attempt), idle.signal)
+      await sleep(connectionBackoffDelay(this.config, this.attempt), idle.signal)
       if (this.backoff === idle) this.backoff = null
     }
   }

@@ -9,6 +9,7 @@
  * @module
  */
 
+import { assertRecoveryMcpConnection } from '@deepseek-ai/dsh-app-boot'
 import { Client } from '@modelcontextprotocol/client'
 import type { Context } from '@deepseek-ai/cordis'
 import type { McpProbeFailure, McpProbeResult, McpProbeStage, McpProbeSuccess } from './types.ts'
@@ -63,6 +64,7 @@ export async function probeServer(ctx: Context, config: Config, options: McpProb
   const spec = resolveProbeOptions(options)
   const startedAt = Date.now()
   const remaining = (): number => spec.timeoutMs - (Date.now() - startedAt)
+  assertRecoveryMcpConnection(ctx, config)
   const binding = new McpTemplateBinding(ctx, config)
   const client = new Client({ name: 'dsh-mcp-probe', version: '0.0.1' }, { capabilities: {}, versionNegotiation: { mode: 'auto' } })
   // A stdio probe spawns through the same managed owner as a mounted client; its

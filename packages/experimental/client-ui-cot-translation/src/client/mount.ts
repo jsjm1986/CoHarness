@@ -81,9 +81,12 @@ async function registerUi(ctx: Context, lifetime: AbortController): Promise<void
   const scope: SettingsFormScope<CotTranslationPreferences> = {
     getSnapshot: () => bound.getSnapshot(),
     subscribe: listener => bound.subscribe(listener),
-    mutate: (ops, expectedRevision) => bound.mutate(ops.map(op => op.op === 'set'
-      ? { op: 'set', path: [...op.path], value: op.value as JsonValue }
-      : { op: 'unset', path: [...op.path] }), expectedRevision),
+    mutate: async (ops, expectedRevision) => {
+      await bound.mutate(ops.map(op => op.op === 'set'
+        ? { op: 'set', path: [...op.path], value: op.value as JsonValue }
+        : { op: 'unset', path: [...op.path] }), expectedRevision)
+      if (bound.getSnapshot().write.status !== 'idle') throw new Error('Translation preferences were not accepted')
+    },
   }
   ctx.effect(() => scope.subscribe(invalidate))
   ctx.effect(() => ctx.locale.register(NS, { en, zh }))

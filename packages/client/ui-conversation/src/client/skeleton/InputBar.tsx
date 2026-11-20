@@ -7,7 +7,8 @@
  * (running/removed/promptError) are self-selected via useSession. */
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode, RefObject } from 'react'
+import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
   IconBrowseOutline16, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
@@ -35,6 +36,7 @@ import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
 import { SessionSettingsSheet, type SessionSettingsSection, type SessionSettingsSectionId } from './SessionSettingsSheet.tsx'
 import { isSafariBrowser, repairSafariTextareaLayout } from './safari.ts'
+import { useComposerStatusLayout } from './useComposerStatusLayout.ts'
 import css from './InputBar.module.css'
 
 /** Decoration product of the no-session state (no machine, empty draft). */
@@ -152,74 +154,89 @@ function DocumentRail({
   )
 }
 
-/**
- * Clip-first seat for the composer tool row: a flex child that may receive
- * less than its content needs. While content overflows, the seat publishes
- * `data-clipped` on itself so descendants marked `data-clip-label` drop
- * their secondary text whole instead of letting the seat slice mid-glyph.
- * Restore probes are gated on the parent row's width, not the seat's own:
- * a clipped seat holds only icon content, so it cannot regrow on its own
- * and must watch the space the row releases. `floor` records the row width
- * at the last clip or failed probe — retrying at the same width would
- * re-render the children it observes and re-enter every frame. All
- * clears/re-sets settle inside one callback, which the browser paints
- * atomically, so toggling never flickers. An open floating menu inside the
- * seat inflates scrollWidth without being row content; the probe defers
- * until it closes.
- */
-function ClipSeat({ className, rowRef, children, ...rest }: { className: string | undefined; rowRef: RefObject<HTMLDivElement | null>; children?: ReactNode } & Record<`data-${string}`, string | undefined>) {
-  const ref = useRef<HTMLDivElement | null>(null)
-  useLayoutEffect(() => {
-    const seat = ref.current
-    const row = rowRef.current
-    if (seat === null || typeof ResizeObserver !== 'function') return
-    // Row width at the most recent clip or failed restore probe; -1 while
-    // unclipped so the gate below is inert.
-    let floor = -1
-    const publish = (): void => {
-      if (seat.querySelector('[role="menu"], [role="listbox"]') !== null) return
-      if (!seat.hasAttribute('data-clipped')) {
-        if (seat.scrollWidth > seat.clientWidth) {
-          seat.setAttribute('data-clipped', '')
-          floor = row?.clientWidth ?? seat.clientWidth
-        }
-        return
-      }
-      // Still clipped: a restore probe is meaningful only once the row is
-      // wider than at the last clip/failed probe — the row releases room to
-      // the seat under flex, so row growth is the observable.
-      const room = row?.clientWidth ?? seat.clientWidth
-      if (room <= floor) return
-      floor = room
-      seat.removeAttribute('data-clipped')
-      // The unclip relayout grows the seat back toward its label content;
-      // re-clip only if it still cannot fit.
-      if (seat.scrollWidth > seat.clientWidth) seat.setAttribute('data-clipped', '')
-      else floor = -1
-    }
-    const observer = new ResizeObserver(publish)
-    observer.observe(seat)
-    if (row !== null) observer.observe(row)
-    // Slot items arrive wrapped in display:contents elements, which carry no
-    // box and never fire resize entries — content edits reach the probe
-    // through a subtree mutation listener instead of child observers.
-    const mutations = new MutationObserver(publish)
-    mutations.observe(seat, { childList: true, subtree: true, characterData: true })
-    publish()
-    return () => { observer.disconnect(); mutations.disconnect() }
-  }, [children])
-  return <div ref={ref} className={className} data-clip-seat="" {...rest}>{children}</div>
-}
+const CLIP_SEAT = '[data-clip-seat]'
 
-/** Lane for items contributed into the composer tool row. */
-function ExtensionItems({ side, rowRef, children }: { side: 'left' | 'right'; rowRef: RefObject<HTMLDivElement | null>; children: ReactNode }) {
-  return <ClipSeat className={css.extensionItems} rowRef={rowRef} data-input-extension={side}>{children}</ClipSeat>
+/** Measure tool seats together before changing any clipping flags. */
+function observeToolRow(element: HTMLDivElement | null): (() => void) | undefined {
+  if (element === null || typeof ResizeObserver !== 'function') return undefined
+  const row = element
+  const floors = new Map<HTMLElement, number>()
+  let frame: number | undefined
+  function schedule(): void { frame ??= requestAnimationFrame(measure) }
+  const resize = new ResizeObserver(schedule)
+  resize.observe(row)
+
+  function syncSeats(): void {
+    const current = new Set(row.querySelectorAll<HTMLElement>(CLIP_SEAT))
+    for (const seat of floors.keys()) {
+      if (current.has(seat)) continue
+      resize.unobserve(seat)
+      floors.delete(seat)
+    }
+    for (const seat of current) {
+      if (floors.has(seat)) continue
+      floors.set(seat, -1)
+      resize.observe(seat)
+    }
+  }
+
+  function measure(): void {
+    frame = undefined
+    const width = row.clientWidth
+    const clip: HTMLElement[] = []
+    const restore: HTMLElement[] = []
+    for (const [seat, floor] of floors) {
+      if (seat.querySelector('[role="menu"], [role="listbox"]') !== null) continue
+      if (seat.hasAttribute('data-clipped')) {
+        if (width > floor) restore.push(seat)
+      } else if (seat.scrollWidth > seat.clientWidth) {
+        clip.push(seat)
+      }
+    }
+    for (const [index, seat] of clip.entries()) {
+      // The first collapse can make room for a neighbouring label.
+      floors.set(seat, index === 0 ? width : -1)
+      seat.setAttribute('data-clipped', '')
+    }
+    if (clip.length > 0) {
+      if (clip.length > 1 || restore.length > 0) schedule()
+      return
+    }
+    // A restore probe changes the space available to its neighbours.
+    // Probe one seat per frame and remember the width of a failed probe.
+    const candidate = restore[0]
+    if (candidate !== undefined) {
+      candidate.removeAttribute('data-clipped')
+      if (candidate.scrollWidth > candidate.clientWidth) {
+        candidate.setAttribute('data-clipped', '')
+        floors.set(candidate, width)
+      } else floors.set(candidate, -1)
+      if (restore.length > 1) schedule()
+    }
+  }
+
+  const mutations = new MutationObserver((records) => {
+    if (records.every(record => record.attributeName === 'data-clipped')) return
+    syncSeats()
+    // A sibling can release space without changing the row's overall width.
+    for (const seat of floors.keys()) floors.set(seat, -1)
+    schedule()
+  })
+  mutations.observe(row, { childList: true, subtree: true, characterData: true, attributes: true })
+  syncSeats()
+  schedule()
+  return () => {
+    resize.disconnect()
+    mutations.disconnect()
+    if (frame !== undefined) cancelAnimationFrame(frame)
+  }
 }
 
 export type InputBarProps = ComposerBarProps
 
 export const InputBar = memo(function InputBar({
-  useSession, useInput, inputActions, keyboard, addImages, addDocuments, removeImage, removeDocument, retryDocument, draftImages,
+  useSession, useInput, inputActions, keyboard, onFirstEditablePaint,
+  addImages, addDocuments, removeImage, removeDocument, retryDocument, draftImages,
   toggleCommandMenu, stop, command, t,
   renderSlot, useBusyEnter, useNotices, useLexicon, useMenuLauncher, useDocuments,
   usePermissionCatalog, usePermissionAvailability, useStopShortcut,
@@ -231,7 +248,15 @@ export const InputBar = memo(function InputBar({
   const busyEnter = useBusyEnter(value => value)
   const stopKeys = useStopShortcut(keys => keys)
   const viewportPhone = useMediaQuery('(max-width: 767px)')
+  const touchPrimary = useMediaQuery('(pointer: coarse)')
+  const landscapeSendKey = useMediaQuery('(pointer: coarse) and (orientation: landscape) and (max-height: 320px)')
   const phone = compact || viewportPhone
+  const rowRef = useRef<HTMLDivElement>(null)
+  const setToolRow = useCallback((row: HTMLDivElement | null) => {
+    rowRef.current = row
+    return observeToolRow(row)
+  }, [])
+  const { context: contextSeat, status: statusSeat } = useComposerStatusLayout(rowRef)
   const notice = useNotices(s => s)
   const lexicon = useLexicon(s => s)
   const commandMenuOpen = useMenuLauncher(source => source === 'command')
@@ -305,7 +330,6 @@ export const InputBar = memo(function InputBar({
   const cardRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const mirrorRef = useRef<HTMLDivElement | null>(null)
-  const toolsRowRef = useRef<HTMLDivElement | null>(null)
   const safari = useMemo(() => isSafariBrowser(navigator), [])
   const safariNativeShrinkRef = useRef(false)
   // IME guard: composition Enter picks a candidate, it must not send. The ref outlives renders;
@@ -348,6 +372,18 @@ export const InputBar = memo(function InputBar({
   // and keyboard users can reach the recovery action.
   const workspaceTrigger = inert && !removed && onRequestWorkspace !== undefined
   const textareaDisabled = removed || (locked && !workspaceTrigger)
+  useLayoutEffect(() => {
+    if (onFirstEditablePaint === undefined || !active || textareaDisabled || machineBusy || workspaceTrigger) return
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const field = inputRef.current
+        if (field === null || field.disabled || field.readOnly || field.closest('[inert], [hidden]') !== null
+          || field.getClientRects().length === 0 || getComputedStyle(field).visibility !== 'visible') return
+        onFirstEditablePaint()
+      })
+    })
+    return () => { cancelAnimationFrame(frame) }
+  }, [active, machineBusy, onFirstEditablePaint, textareaDisabled, workspaceTrigger])
   const steeringAvailable = subagent === null || continuable
   const canSteerQueue = !locked && !machineBusy && !commandMenuOpen && empty && running && steeringAvailable
     && input.queue.some(row => row.placement === 'queued')
@@ -421,26 +457,21 @@ export const InputBar = memo(function InputBar({
     revealCaret(caret)
   }
 
-  // Unlock (mount / session switch) returns focus to the box, and owns the
-  // reveal that comes with it. `preventScroll` because this focus is ours, not
-  // a gesture: the textarea is as tall as the draft, so the browser's reveal
-  // would walk up to the conversation scrollport and move the transcript under
-  // a user who only switched session. That leaves the caret to us — the DOM is
-  // reused across sessions, so switching to a longer draft keeps the previous
-  // offset while the value swap puts the caret at the new draft's end, which is
-  // off screen (measured on all three engines: offset 0 with the caret 940px
-  // down). Suppress the walk, then reveal in our own box.
+  // Touch users choose when to open the keyboard. Desktop unlock uses
+  // `preventScroll` to keep a tall draft from moving the transcript. A reused
+  // textarea keeps its previous scroll offset when the Session's draft changes.
   useEffect(() => {
     const el = inputRef.current
     if (!active || locked || el === null) return
     // Pane activation must preserve a user's focus on tabs, menus, or another
     // control. Automatic focus remains available on an otherwise empty page.
     const focused = document.activeElement
+    if (touchPrimary && focused !== el) return
     if (el.closest('[data-session-pane]') !== null && focused instanceof HTMLElement
       && focused !== document.body && focused !== el) return
-    el.focus({ preventScroll: true })
+    if (!touchPrimary) el.focus({ preventScroll: true })
     revealSelectionFocus(el)
-  }, [active, locked, sessionId])
+  }, [active, locked, sessionId, touchPrimary])
 
   // A persisted draft arrives AFTER the unlock effect: ConversationSession
   // adopts it in its own mount effect, and a parent's mount effect runs after
@@ -944,7 +975,7 @@ export const InputBar = memo(function InputBar({
   }
 
   return (
-    <div className={clsx(css.root, variant === 'hero' && css.hero)}>
+    <div className={clsx(css.root, variant === 'hero' && css.hero)} data-composer-tool-layout={touchPrimary ? 'compact' : 'default'}>
       {toast !== null && (
         <Toast
           key={toast.seq}
@@ -1014,6 +1045,7 @@ export const InputBar = memo(function InputBar({
               value={draft}
               disabled={textareaDisabled}
               readOnly={machineBusy || workspaceTrigger}
+              enterKeyHint={landscapeSendKey && !workspaceTrigger ? 'send' : undefined}
               aria-label={workspaceTrigger ? t('hero.chooseWorkspace') : undefined}
               aria-haspopup={workspaceTrigger ? 'menu' : undefined}
               aria-expanded={workspaceTrigger ? workspacePickerOpen : undefined}
@@ -1041,7 +1073,7 @@ export const InputBar = memo(function InputBar({
             <div ref={mirrorRef} aria-hidden className={css.mirror} data-input-mirror>{`${draft}\n`}</div>
           </div>
         </div>
-        <div ref={toolsRowRef} className={css.row}>
+        <div ref={setToolRow} className={css.row} data-composer-toolbar>
           <div className={css.tools}>
             <Tooltip label={t('document.attach')} side="top" delayMs={500}>
               <button
@@ -1095,17 +1127,18 @@ export const InputBar = memo(function InputBar({
                 <IconPlusOutline16 size={14} />
               </button>
             </Tooltip>
-            <ClipSeat className={css.modes} rowRef={toolsRowRef}>
+            <div className={css.modes} data-clip-seat="">
               {accessSelect}
               {renderSlot('conversation.input.plan', { locked })}
-            </ClipSeat>
+            </div>
+            <div ref={statusSeat.toolbar} className={clsx(css.extensionItems, css.toolbarStatus)} data-clip-seat="" />
             {leftItems != null && (
-              <ExtensionItems side="left" rowRef={toolsRowRef}>{leftItems}</ExtensionItems>
+              <div className={css.extensionItems} data-clip-seat="" data-input-extension="left">{leftItems}</div>
             )}
           </div>
           <div className={css.trailing}>
             {rightItems != null && (
-              <ExtensionItems side="right" rowRef={toolsRowRef}>{rightItems}</ExtensionItems>
+              <div className={css.extensionItems} data-clip-seat="" data-input-extension="right">{rightItems}</div>
             )}
             {renderSlot('conversation.input.model', {
               locked: modelSeatLocked,
@@ -1113,7 +1146,7 @@ export const InputBar = memo(function InputBar({
               settingsSection: 'model',
               onOpenSettings: openSessionSettings,
             })}
-            <ContextMeter useProjection={useProjection} t={t} />
+            <div ref={contextSeat.toolbar} className={css.statusHome} />
             {interruptible && (
               <Tooltip label={t('input.stop')} shortcutKeys={stopKeys} side="top" delayMs={500} disabled={stop === undefined}>
                 <button
@@ -1156,7 +1189,15 @@ export const InputBar = memo(function InputBar({
           onSectionChange={setSessionSettingsSection}
         />
       )}
-      {footer}
+      <div className={css.statusFooter} data-composer-footer>
+        {footer}
+        <div className={css.footerStatuses}>
+          <div ref={contextSeat.footer} className={css.statusHome} />
+          <div ref={statusSeat.footer} className={css.statusHome} />
+        </div>
+      </div>
+      {contextSeat.mount && createPortal(<ContextMeter useProjection={useProjection} t={t} />, contextSeat.mount)}
+      {statusSeat.mount && createPortal(renderSlot('conversation.input.status', {}), statusSeat.mount)}
     </div>
   )
 })

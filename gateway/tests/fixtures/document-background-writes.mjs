@@ -10,6 +10,7 @@ import { LocalUserDocFs } from '@deepseek-ai/dsh-userdoc-local'
 import { readManagedDataPaths } from '@deepseek-ai/dsh-managed-data'
 import { loadConfig } from '../../lib/config.js'
 import { LocalDocumentBroker } from '../../lib/documents-local.js'
+import { DocumentProjectionDelivery } from '../../lib/document-projection-delivery.js'
 import { DOCUMENT_TRANSFER_UPLOADS_PATH, DocumentTransferError } from '../../lib/document-transfer.js'
 import { GatewayPrincipalSigner } from '../../lib/principal.js'
 
@@ -35,6 +36,15 @@ async function wait(promise) {
 const entered = barrier(), release = barrier(), finished = barrier()
 const catalogEntered = barrier(), catalogRelease = barrier()
 const acknowledgementInterrupted = barrier(), failedDeliveryDrained = barrier()
+const cursorEntered = barrier(), cursorRelease = barrier(), concurrentDeliveryQueued = barrier()
+const pendingRequests = []
+const originalDelivery = DocumentProjectionDelivery.prototype.run
+let concurrencyPhase = false, queuedDeliveries = 0
+DocumentProjectionDelivery.prototype.run = function (operation) {
+  const pending = originalDelivery.call(this, operation)
+  if (concurrencyPhase && ++queuedDeliveries === 2) concurrentDeliveryQueued.resolve()
+  return pending
+}
 let broker, server, failure
 try {
   const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'),
@@ -48,6 +58,8 @@ try {
   let open = false, hold = false, writers = 0, catalogCalls = 0, cursorReads = 0
   let interruptAcknowledgement = false, interruptedAcknowledgement = false
   let ownerExists = true
+  let holdCursor = false
+  const projectionOrder = []
   const accessListeners = new Set()
   let cursor = { sequence: 0, ordinal: 0 }
   broker = new LocalDocumentBroker({ cfg, users: { async getById(id) { return ownerExists && id === user.id ? user : null } },
@@ -58,12 +70,23 @@ try {
     } },
     catalog: { async projection({ payload }) {
       if (payload.batch !== undefined) {
+        if (concurrencyPhase) projectionOrder.push('commit')
         catalogCalls += 1
         catalogEntered.resolve()
         await wait(catalogRelease.promise)
         cursor = payload.batch.next
         if (catalogCalls === 1) interruptAcknowledgement = true
-      } else cursorReads += 1
+      } else {
+        cursorReads += 1
+        if (concurrencyPhase) projectionOrder.push('cursor')
+        if (holdCursor) {
+          holdCursor = false
+          const captured = { ...cursor }
+          cursorEntered.resolve()
+          await wait(cursorRelease.promise)
+          return { version: 1, cursor: captured }
+        }
+      }
       return { version: 1, cursor }
     } },
     writes: {
@@ -104,7 +127,10 @@ try {
     void (async () => {
       const pathname = new URL(request.url, 'http://fixture').pathname
       const input = { user, request, scope: { kind: 'personal' }, signal: lifetime.signal }
-      const result = pathname === '/api/documents/scope'
+      const result = pathname === '/fixture/catalog-notification'
+        ? Response.json(await broker.reconcileRuntimeCatalog({ subject: { organizationId: 'background-writes', target: { kind: 'user', id: user.id } },
+          principal: { user, scope: { kind: 'personal' } }, payload: { version: 1, documents: [] } }))
+        : pathname === '/api/documents/scope'
         ? await broker.serveScope({ ...input, operation: 'list' })
         : await broker.serveUpload({ ...input, pathname })
       assert(result instanceof Response)
@@ -178,9 +204,40 @@ try {
   const acknowledged = await call(`${DOCUMENT_TRANSFER_UPLOADS_PATH}/${uploadId}`)
   assert.equal(acknowledged.status, 200); assert.equal((await acknowledged.json()).state, 'complete')
   transcript.push({ case: 'catalog-acknowledged', status: acknowledged.status, state: 'complete' })
-  const acknowledgedReads = cursorReads
+  let acknowledgedReads = cursorReads
   const retriedListing = await call('/api/documents/scope')
   assert.equal(retriedListing.status, 200); await retriedListing.arrayBuffer()
+  const drainedNotification = await call('/fixture/catalog-notification', { method: 'POST' })
+  assert.equal(drainedNotification.status, 200); await drainedNotification.arrayBuffer()
+  assert.equal(cursorReads, acknowledgedReads)
+  await writeFile(join(user.homePath, 'documents', 'concurrent.txt'), 'concurrent metadata')
+  concurrencyPhase = true; holdCursor = true
+  const concurrentListing = await call('/api/documents/scope')
+  assert.equal(concurrentListing.status, 200)
+  const concurrentDocuments = await concurrentListing.json()
+  const concurrentIdentity = concurrentDocuments.documents.find(document => document.docId === 'concurrent.txt')
+  assert(concurrentIdentity !== undefined)
+  await wait(cursorEntered.promise)
+  const notification = call('/fixture/catalog-notification', { method: 'POST' })
+  const notificationOutcome = Promise.allSettled([notification])
+  pendingRequests.push(notificationOutcome)
+  await wait(concurrentDeliveryQueued.promise)
+  assert.deepEqual(projectionOrder, ['cursor'])
+  cursorRelease.resolve()
+  const [notified] = await notificationOutcome
+  assert.equal(notified.status, 'fulfilled'); assert.equal(notified.value.status, 200)
+  await notified.value.arrayBuffer()
+  assert.deepEqual(projectionOrder, ['cursor', 'commit'])
+  const concurrentVerified = await call('/api/documents/scope')
+  assert.equal(concurrentVerified.status, 200)
+  const verifiedIdentity = (await concurrentVerified.json()).documents.find(document => document.docId === 'concurrent.txt')
+  assert.deepEqual(verifiedIdentity, concurrentIdentity)
+  const finalNotification = await call('/fixture/catalog-notification', { method: 'POST' })
+  assert.equal(finalNotification.status, 200); await finalNotification.arrayBuffer()
+  assert.deepEqual(projectionOrder, ['cursor', 'commit'])
+  transcript.push({ case: 'concurrent-browser-runtime-delivery', listing: concurrentListing.status,
+    notification: notified.value.status, projectionOrder, identityPreserved: true })
+  concurrencyPhase = false; acknowledgedReads = cursorReads
   const originalDispose = LocalUserDocFs.prototype.dispose
   let retiredEngine
   LocalUserDocFs.prototype.dispose = async function () { await originalDispose.call(this); retiredEngine = this }
@@ -205,9 +262,12 @@ try {
   failure = error
   throw error
 } finally {
-  clearTimeout(deadline); release.resolve(); catalogRelease.resolve(); lifetime.abort()
+  concurrencyPhase = false
+  DocumentProjectionDelivery.prototype.run = originalDelivery
+  clearTimeout(deadline); release.resolve(); catalogRelease.resolve(); cursorRelease.resolve(); lifetime.abort()
   server?.closeAllConnections()
   const closed = await Promise.allSettled([
+    ...pendingRequests,
     ...(broker === undefined ? [] : [broker.dispose()]),
     ...(server === undefined || !server.listening ? [] : [new Promise((resolve, reject) => {
       server.close(error => error ? reject(error) : resolve())

@@ -5,6 +5,8 @@
       - img
   - button "New tab":
     - img
+  - button "Tab actions":
+    - img
   - button "Split"
   - button "Fullscreen"
   - button "Collapse right sidebar":

@@ -59,18 +59,19 @@ export function apply(ctx: ClientContext): void {
   // loopback authority. Keep the browser mirror Host-backed even when the page
   // itself is served from a public origin; the Host privileged-method fence is
   // the authority for rejecting direct, unauthenticated remote requests.
-  const mirror = new SettingsDescribeMirror(connection.api)
+  const firstSubscription = connection.documentIdentity !== undefined && connection.hostDescription.getSnapshot() === undefined
+    ? Promise.withResolvers<boolean>() : undefined
+  const mirror = new SettingsDescribeMirror(connection.api, 'host', firstSubscription?.promise)
   const accountMirror = new AccountPreferencesMirror(connection.accountPreferences)
   ctx.effect(() => {
     const disposers = [
       (ctx.get('remote') as ClientContext['remote']).$forTarget().$on('settings/document-updated', () => { void mirror.load() }),
-      ctx.on('connection/reset', () => { void mirror.load() }),
+      ctx.on('connection/reset', () => {
+        firstSubscription?.resolve(true)
+        void mirror.load()
+      }),
       ctx.on('connection/reset', (initial) => { void (initial === true ? accountMirror.ensure() : accountMirror.load(true)) }),
     ]
-    // The first connection also emits connection/reset, so startup normally
-    // costs two reads (budgeted in startup-rpc-budget.e2e.ts). The in-flight
-    // fold does not merge them into one; it guarantees at most one pending
-    // read at a time and that no invalidation arriving mid-read is lost.
     void mirror.ensure()
     // Account invalidations must read the post-change answer, not join a read
     // issued before the change — focus, visibility, and later resets force a read.
@@ -81,6 +82,7 @@ export function apply(ctx: ClientContext): void {
     if (typeof window !== 'undefined') window.addEventListener('focus', onFocus)
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
     return async () => {
+      firstSubscription?.resolve(false)
       for (const dispose of disposers) dispose()
       if (typeof window !== 'undefined') window.removeEventListener('focus', onFocus)
       if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)

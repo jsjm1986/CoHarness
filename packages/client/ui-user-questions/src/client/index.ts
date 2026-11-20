@@ -330,19 +330,15 @@ interface WaitBinding {
 }
 
 /**
- * Answer a settled wire rejection on behalf of a card whose waterfall went
- * away: `delegate` hands the Host request a cancellation so a disposed
- * presentation releases the tool call instead of parking it forever.
+ * Send a rejected answer and require its receipt; the pending feed remains
+ * authoritative for whether the Host request has ended.
  */
-function respondRejection(wait: PendingWait<'question'>, code: WireRejection): void {
-  try {
-    void wait.respond({
-      ok: false,
-      error: { code: REJECTION_WIRE[code], message: REJECTION_DETAIL[code], details: {} },
-    })
-  } catch {
-    // A wait already settled by its resolved frame rejects nothing twice.
-  }
+async function respondRejection(wait: PendingWait<'question'>, code: WireRejection, refusedMessage: string): Promise<void> {
+  const receipt = await wait.respond({
+    ok: false,
+    error: { code: REJECTION_WIRE[code], message: REJECTION_DETAIL[code], details: {} },
+  })
+  if (!receipt.accepted) throw new Error(refusedMessage)
 }
 
 /**
@@ -363,14 +359,20 @@ function adoptWait(
   const waitInfo = (wait.payload as QuestionWaitPayload).wait
   const callId = waitInfo?.callId
   const claimLifetime = new AbortController()
+  const t = ctx.locale.bind(NS)
   let deadline: number | undefined
   const channel: QuestionWaterfallChannel = {
     get deadline() { return deadline },
-    resolve: (answer) => {
-      void wait.respond({ ok: true, value: { sessionId: wait.sessionId, answer } })
+    resolve: async (answer) => {
+      const receipt = await wait.respond({ ok: true, value: { sessionId: wait.sessionId, answer } })
+      if (!receipt.accepted) throw new Error(t('error.unavailable'))
     },
-    reject: (code) => { respondRejection(wait, code) },
-    delegate: () => { respondRejection(wait, 'ASK_CANCELLED') },
+    reject: code => respondRejection(wait, code, t('error.unavailable')),
+    delegate: () => {
+      void respondRejection(wait, 'ASK_CANCELLED', t('error.unavailable')).catch((error: unknown) => {
+        console.warn('[ui-user-questions] Cancellation was not confirmed while closing the question presentation.', error)
+      })
+    },
   }
   const claim = waitInfo?.timed === true && callId !== undefined
     ? ctx.remote.userQuestions.attachWait(sessionId, callId, claimLifetime.signal)

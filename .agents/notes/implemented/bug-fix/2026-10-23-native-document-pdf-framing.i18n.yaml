@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-23-native-document-pdf-framing.md
 document:
-  en: e6ce22663a69d68b5a01062c8955f942b640facb
-  zh: a72ff7c0036b1c6d0d3b73587ef369e84869f64e
+  en: 33158cdd6435fc9966ed91a8614bc4905461fe9a
+  zh: c14488594b0b6f52cc8e817bb63fb2a77dc34f64
 /agent-note-same-origin-native-document-pdf-framing:
   en: 252d9e03505766aa
   zh: 268cbb16f56e3004
@@ -21,5 +21,5 @@ document:
   en: 37b1b48c7fad5eb8
   zh: 5a4ffd20438aa4ce
 /agent-note-same-origin-native-document-pdf-framing/consequences:
-  en: 8ca5a45619826b73
-  zh: c75049c1c7b39120
+  en: bc3b6d4df72b1358
+  zh: 9f6905fc6c8c77fd

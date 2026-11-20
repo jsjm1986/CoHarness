@@ -239,6 +239,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
 
   async function confirmRemove() {
     if (removeTarget === null) return
+    setError('')
     setPending(`member:${removeTarget.id}`)
     try {
       await removeMember(projectId, removeTarget.id)
@@ -302,6 +303,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
   }
 
   async function onDelete() {
+    setError('')
     setPending('delete')
     try {
       await deleteProject(projectId)
@@ -379,7 +381,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
           setRenameError(''); renameInitial.current = project.name; setProjectName(project.name); setRenameOpen(true)
         }}>{t('rename')}</Button>}
       />
-      <ErrorBanner message={error} />
+      <ErrorBanner message={removeTarget === null && !deleteOpen ? error : ''} />
       {loading ? <Section><LoadingState label={t('loadingProject')} /></Section> : project === null ? (
         <Section><EmptyState title={t('loadFailedTitle')} detail={t('loadFailedDetail')} /></Section>
       ) : (
@@ -509,7 +511,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
               <>
                 <p className="sectionHint">{t('contributorsHint', { tokens: contributors.unattributed.totalTokens.toLocaleString() })}</p>
                 {contributors.rows.length === 0 ? <EmptyState title={t('contributorsEmptyTitle')} detail={t('contributorsEmptyDetail')} /> : (
-                  <div className="tableWrap">
+                  <div className="tableWrap" role="region" aria-label={t('contributorsTitle')} tabIndex={0}>
                     <table className="dataTable usageTable">
                       <thead><tr><th>{t('memberLabel')}</th><th>{t('callsColumn')}</th><th>Token</th><th>{t('projectsColumn')}</th><th>{t('priceLabel')}</th></tr></thead>
                       <tbody>{contributors.rows.map(row => (
@@ -558,7 +560,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
               <EmptyState icon={Sparkles} title={t('modelsEmptyTitle')} detail={t('modelsEmptyDetail')} />
             ) : (
               <>
-                <div className="tableWrap desktopOnly">
+                <div className="tableWrap desktopOnly" role="region" aria-label={t('modelAccessTitle')} tabIndex={0}>
                   <table className="dataTable projectModelAccessTable" aria-label={t('modelAccessTitle')}>
                     <thead><tr><th>{t('modelColumn')}</th><th>{t('statusColumn')}</th><th>{t('projectAccessColumn')}</th></tr></thead>
                     <tbody>{assignableModels.map(model => {
@@ -601,7 +603,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
               <EmptyState icon={Users} title={t('membersEmptyTitle')} detail={t('membersEmptyDetail')} />
             ) : (
               <>
-                <div className="tableWrap desktopOnly">
+                <div className="tableWrap desktopOnly" role="region" aria-label={t('membersTitle')} tabIndex={0}>
                   <table className="dataTable permissionTable">
                     <thead><tr><th>{t('userColumn')}</th><th>{t('accountColumn')}</th><th>{t('directoryAccessLabel')}</th></tr></thead>
                     <tbody>
@@ -641,7 +643,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
           <MemoryPermissions projectId={projectId} />
           <div className="dangerZone">
             <div><strong>{t('deleteProject')}</strong><p>{t('deleteHint')}</p></div>
-            <Button variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)}>{t('deleteProject')}</Button>
+            <Button variant="danger" icon={Trash2} onClick={() => { setError(''); setDeleteOpen(true) }}>{t('deleteProject')}</Button>
           </div>
         </>
       )}
@@ -728,6 +730,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
         title={t('removeMemberTitle')}
         description={t('removeMemberDescription', { name: removeTarget?.username ?? '' })}
         confirmLabel={t('confirmRemove')}
+        error={error}
         pending={removeTarget !== null && pending === `member:${removeTarget.id}`}
         onClose={() => { if (!pending.startsWith('member:')) setRemoveTarget(null) }}
         onConfirm={() => void confirmRemove()}
@@ -737,6 +740,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
         title={t('deleteProject')}
         description={t('deleteDialogDescription', { name: project?.name ?? '' })}
         confirmLabel={t('confirmDelete')}
+        error={error}
         pending={pending === 'delete'}
         onClose={() => { if (pending !== 'delete') setDeleteOpen(false) }}
         onConfirm={() => void onDelete()}

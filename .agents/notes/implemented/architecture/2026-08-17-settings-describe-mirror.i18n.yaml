@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-17-settings-describe-mirror.md
 document:
-  en: 3a397cd371bdf5a6541ebca6822ec829c1dd5e26
-  zh: a73b572e53872c267cabc785be28e20ce4b4f21c
+  en: c57ef0a96fa17b2b1e5bf772e1b771e99dc05694
+  zh: 5559c62b54513bfe511a3176ae805326fe2b50d8
 /agent-note-settings-describe-mirror:
   en: 89b89ebcb4dfa99d
   zh: 5b58dca7c5f5dbc3
@@ -12,11 +12,11 @@ document:
   en: b4de2801afd55f16
   zh: b2c9fb7d1ad5319c
 /agent-note-settings-describe-mirror/decision:
-  en: 17f60ed8b6d5356e
-  zh: ab9c5e22cba2d63b
+  en: a7872b21f0074581
+  zh: d807ab6dbfd2dbb4
 /agent-note-settings-describe-mirror/alternatives-considered:
-  en: 05b6df2185746f32
-  zh: 17a59636ee8d4d9c
+  en: d5c08fe782c18735
+  zh: 650afea6e42188a2
 /agent-note-settings-describe-mirror/consequences:
-  en: 19d0548018e7c946
-  zh: 9f70bd1d6367af9c
+  en: 3026ff704ba92f43
+  zh: 998555c9d8f339aa

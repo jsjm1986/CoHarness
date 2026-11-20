@@ -1356,6 +1356,23 @@ Meter a child runtime's model stream under the initiating parent's authority. Th
 
 Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
 
+<a id="llmmodel-attempt-timing--emit"></a>
+
+#### `llm/model-attempt-timing` — emit
+
+Observe one physical model attempt through its first visible text or closure.
+
+```ts cordis-catalog
+/**
+ * Observe one physical model attempt through its first visible text or closure.
+ * @param sample - wall-clock start, outcome, counts and elapsed times in milliseconds.
+ * @mode emit
+ */
+'llm/model-attempt-timing'(sample: ModelAttemptTiming): void
+```
+
+Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
+
 <a id="llmorchestration--waterfall"></a>
 
 #### `llm/orchestration` — waterfall

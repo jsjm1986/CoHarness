@@ -228,7 +228,9 @@ export class ConversationViewportController implements ConversationViewport {
   add(sessionId: SessionId): AddPaneResult {
     if (this.store.getSnapshot().pendingIdentity === true) return { ok: false, reason: 'unknown' }
     this.sessions.beginNavigation()
-    if (this.disposed || !validSession(this.sessions, sessionId, this.workspaces)) return { ok: false, reason: 'unknown' }
+    if (this.disposed) return { ok: false, reason: 'unknown' }
+    const valid = validSession(this.sessions, sessionId, this.workspaces)
+    if (!valid && !this.confirmedAbsent(sessionId)) return { ok: false, reason: 'unknown' }
     const state = this.store.getSnapshot()
     if (state.paneIds.includes(sessionId)) {
       this.focus(sessionId)
@@ -241,7 +243,7 @@ export class ConversationViewportController implements ConversationViewport {
       draft.paneRatios = normalizedRatios(draft.paneIds.length, [])
       draft.mode = 'workbench'
     })
-    this.select(sessionId)
+    this.openOrPark(sessionId, valid)
     return { ok: true }
   }
 
@@ -261,6 +263,7 @@ export class ConversationViewportController implements ConversationViewport {
       else draft.activePaneId = nextActive
       draft.paneRatios = normalizedRatios(nextIds.length, state.paneRatios.filter((_, i) => i !== index))
     })
+    this.unavailablePanes.delete(sessionId)
     if (nextActive !== undefined && validSession(this.sessions, nextActive, this.workspaces)) this.select(nextActive)
     else if (nextIds.length === 0) this.sessions.clear()
   }
@@ -314,7 +317,9 @@ export class ConversationViewportController implements ConversationViewport {
   replaceActive(sessionId: SessionId): AddPaneResult {
     if (this.store.getSnapshot().pendingIdentity === true) return { ok: false, reason: 'unknown' }
     this.sessions.beginNavigation()
-    if (this.disposed || !validSession(this.sessions, sessionId, this.workspaces)) return { ok: false, reason: 'unknown' }
+    if (this.disposed) return { ok: false, reason: 'unknown' }
+    const valid = validSession(this.sessions, sessionId, this.workspaces)
+    if (!valid && !this.confirmedAbsent(sessionId)) return { ok: false, reason: 'unknown' }
     const state = this.store.getSnapshot()
     if (state.paneIds.includes(sessionId)) {
       this.focus(sessionId)
@@ -326,11 +331,13 @@ export class ConversationViewportController implements ConversationViewport {
     const fallback = state.paneIds[0]
     if (fallback === undefined) return { ok: true }
     const index = Math.max(0, state.paneIds.indexOf(state.activePaneId ?? fallback))
+    const replaced = state.paneIds[index]
     this.store.update((draft) => {
       draft.paneIds[index] = sessionId
       draft.activePaneId = sessionId
     })
-    if (validSession(this.sessions, sessionId, this.workspaces)) this.select(sessionId)
+    if (replaced !== undefined && replaced !== sessionId) this.unavailablePanes.delete(replaced)
+    this.openOrPark(sessionId, valid)
     return { ok: true }
   }
 
@@ -695,6 +702,22 @@ export class ConversationViewportController implements ConversationViewport {
     if (this.enabled && this.baselineReady && state.mode === 'workbench' && state.pendingIdentity !== true
       && state.activePaneId !== undefined
       && validSession(this.sessions, state.activePaneId, this.workspaces)) this.select(state.activePaneId)
+  }
+
+  /** Whether the hydrated catalog proves the id absent. Absence is only
+   * decidable once both lists are ready; before that an unknown id may still
+   * be in flight, so it must not park an unavailable pane. */
+  private confirmedAbsent(sessionId: SessionId): boolean {
+    if (this.sessions.list.getSnapshot().phase !== 'ready') return false
+    if (this.workspaces !== undefined && this.workspaces.list.getSnapshot().phase !== 'ready') return false
+    return !this.sessions.list.getSnapshot().ids.includes(sessionId)
+  }
+
+  /** Open a live Session, or park a confirmed-absent id as an unavailable
+   * pane so the open intent still reports why the conversation cannot load. */
+  private openOrPark(sessionId: SessionId, valid: boolean): void {
+    if (valid) { this.select(sessionId); return }
+    this.unavailablePanes.add(sessionId)
   }
 
   private select(sessionId: SessionId): void {

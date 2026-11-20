@@ -40,6 +40,8 @@ The controller exposes `status`, `attach`, `listGrants`, `grant`, `setLevel`, `r
 <a id="authorization"></a>
 ## Authorization
 
+The Remote namespace remains available without a desktop provider. After caller authorization, `listGrants` returns an empty list; status, connection, audit and administrative operations return `remote-desktop/unavailable`. Anonymous managed requests and non-administrator mutations remain forbidden. An enabled provider retains its grant, consent and stream enforcement.
+
 `RemoteDesktopAccess` reads the request's verified Gateway principal through `gatewayRuntime.interactive()` in managed deployments (execution-authority present): `principal` is the claim's username and `admin` its role, so administrator-issued grants are the whole product permission — no user-terminal grant is required. Restricted-purpose and non-interactive callers are denied with `remote-desktop/forbidden`; standalone deployments fall back to a `local-operator` administrator. Service-side enforcement still applies — admin methods reject non-admin actors even if a deployment miswires the policies.
 
 <a id="client-half"></a>

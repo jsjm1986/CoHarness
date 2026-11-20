@@ -10,11 +10,12 @@
 // theme/layout golden: aria snapshots are color-blind (lane scope: the
 // browser-e2e-lane Agent Note); the hero's waiting state gets the one golden
 // here.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
@@ -47,7 +48,7 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
   beforeAll(async () => {
     scaffold = await launchWebScaffold(MODE === 'record' ? {} : { replayFixture: FIXTURE, paceMs: REPLAY_PACE_MS })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -244,6 +245,7 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
     // request would fail the scenario loudly at close().
     await expect.poll(() => page.getByText('LIGHTHOUSE', { exact: true }).count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(1)
     await expect.poll(() => page.locator('[role="treeitem"][aria-selected="true"]').count(), { timeout: 10_000 }).toBe(1)
+    await page.getByText('Standard mode', { exact: true }).waitFor({ timeout: 10_000 })
     // Golden of the recovered conversation region: rebuilt from the log, it
     // must render the same settled transcript the live turn produced.
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)

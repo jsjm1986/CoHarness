@@ -133,6 +133,8 @@ describe('SegmentedControl', () => {
     const { onChange } = mount('catalog')
     fireEvent.keyDown(tab('Catalog'), { key: 'Enter' })
     fireEvent.keyDown(tab('Catalog'), { key: 'a' })
+    fireEvent.keyDown(tab('Catalog'), { key: 'ArrowRight', isComposing: true })
+    fireEvent.keyDown(tab('Catalog'), { key: 'ArrowRight', ctrlKey: true })
     expect(onChange).not.toHaveBeenCalled()
   })
 

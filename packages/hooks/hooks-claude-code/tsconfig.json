@@ -46,6 +46,9 @@
     },
     {
       "path": "../hook-protocol"
+    },
+    {
+      "path": "../../boot/app-boot"
     }
   ]
 }

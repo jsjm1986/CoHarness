@@ -15,6 +15,8 @@ Revoking one computer hides its personal roots while retaining authorized roots 
 
 All spaces searches the authorized personal and project conversations already loaded in this tab. Choose a specific personal Runtime or project to search further pages. The account Runtime directory accepts `projectId` for a selected project outside the loaded pages. A new workbench pane uses the selected Runtime’s creation receipt and Workspace, while independent selections verify access before opening.
 
+The client reads account and project membership from the center’s `/account/api/workbench/context`. The endpoint validates the original Runtime and entry scope without forwarding to the bootstrap computer or starting a Runtime. Upgrade the browser assets and Gateway together; an older Gateway does not implement this endpoint. Sidebar content search reports each connected computer independently, retaining fast results while a peer is pending or unavailable.
+
 ## Migration
 
 1. Upgrade the complete Gateway and Runtime packages together. Apply PostgreSQL migration `104_personal_conversation_catalog.sql`; it adds nullable personal conversation metadata without changing Session generations, files or Runtime identities. Existing running personal Runtimes publish their summaries after restart; stopped Runtimes publish when explicitly started. Reading the chooser never starts them.

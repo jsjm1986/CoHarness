@@ -1,0 +1,7 @@
+- dialog "删除 移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789":
+  - heading "删除 移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789" [level=2]
+  - paragraph: 删除会同时移除全部项目共享；已挂载的连接在访问失效传播后被切断。
+  - button "关闭"
+  - alert: QA write refused. The reviewed record remains unchanged.
+  - button "取消"
+  - button "删除"

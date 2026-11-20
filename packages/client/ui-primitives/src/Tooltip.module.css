@@ -19,7 +19,7 @@
   white-space: pre-line;
   /* Unbreakable tokens (URLs, paths) must not push past max-width. */
   overflow-wrap: break-word;
-  pointer-events: none;
+  pointer-events: auto;
   /* transitions.dev tooltip timing: appear after an 80ms pause, then a 150ms
      ease-out entrance. The delay is pure CSS (animation-delay + backwards
      fill): the bubble still mounts and positions immediately, so leaving the
@@ -34,7 +34,14 @@
 }
 
 .bubble[data-portal] { z-index: 1100; }
-.bubble[data-pinned] { pointer-events: auto; }
+
+/* The hover bridge keeps the bubble alive when a pointer can cross into it.
+   Devices that cannot hover get no bridge, so the bubble must not intercept
+   their taps on controls it happens to float over. */
+@media (hover: none) {
+  .bubble { pointer-events: none; }
+}
+
 .label { min-width: 0; }
 
 /* A 16px keycap centered beside a 20px label has 5px of vertical clearance. */

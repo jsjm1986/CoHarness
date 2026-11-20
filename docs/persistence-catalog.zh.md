@@ -2498,7 +2498,7 @@ SHA-256: `2d0824a21ab540965bb50739bd53ead76c452e42a4ce9c4d31f94459a1e18223`
 
 SHA-256: `1e788d9e90f320b51cba113f9dbed35cae28a903fec07a9cd4c52605d2a0c0dd`
 
-来源：[`packages/attachment/userdoc/src/types.ts:469`](../packages/attachment/userdoc/src/types.ts)
+来源：[`packages/attachment/userdoc/src/types.ts:472`](../packages/attachment/userdoc/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -2511,7 +2511,7 @@ SHA-256: `1e788d9e90f320b51cba113f9dbed35cae28a903fec07a9cd4c52605d2a0c0dd`
 
 SHA-256: `275a4fcdb1adac21ee846fc5b6dcd16c6808a3969c53ca22008c6b076f729dfe`
 
-来源：[`packages/attachment/userdoc/src/types.ts:470`](../packages/attachment/userdoc/src/types.ts)
+来源：[`packages/attachment/userdoc/src/types.ts:473`](../packages/attachment/userdoc/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7110,7 +7110,7 @@ SHA-256: `a18793d20069aede5679021249b2f1adf2e8a52bbf90f4195ee78fbfd9dc2200`
 
 SHA-256: `6ac1c7d714001a06351d7d757961ef80283e57dcb27943feff64563ba5793716`
 
-来源：[`packages/attachment/userdoc/src/types.ts:473`](../packages/attachment/userdoc/src/types.ts)
+来源：[`packages/attachment/userdoc/src/types.ts:476`](../packages/attachment/userdoc/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7123,7 +7123,7 @@ SHA-256: `6ac1c7d714001a06351d7d757961ef80283e57dcb27943feff64563ba5793716`
 
 SHA-256: `c26f1a79f347ec7b53d88296f7f94ab1cdb173556ee93db6c57734e171839491`
 
-来源：[`packages/attachment/userdoc/src/types.ts:468`](../packages/attachment/userdoc/src/types.ts)
+来源：[`packages/attachment/userdoc/src/types.ts:471`](../packages/attachment/userdoc/src/types.ts)
 
 以下类型之一：
 
@@ -7908,7 +7908,7 @@ SHA-256: `ac21aa6c9ecfc9c18ab4e0a1759e1396e29be4f15b3e65250af5f6df01d31794`
 
 SHA-256: `f09e5e7acf5ff5ccd193ff2eeec015fa2ff7c29d98bc465f8c3302058d47e29b`
 
-来源：[`packages/host/apiproxy/src/api/sessions.ts:190`](../packages/host/apiproxy/src/api/sessions.ts)
+来源：[`packages/host/apiproxy/src/api/sessions.ts:192`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|

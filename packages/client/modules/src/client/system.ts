@@ -4,37 +4,13 @@
  * documented on the public interfaces in `./manifest.ts`; this file owns the
  * state tables and the load/materialize machinery.
  */
-import { stripClientSuffix } from './manifest.ts'
+import { atRevision, stripClientSuffix } from './manifest.ts'
 import { ClientEntries } from './entries.ts'
 import { removeOwnedStyles } from './entry-lifecycle.ts'
 import type {
   BootManifest, BootModuleRow, ClientBundleRegistration, ClientBundleRequire, ClientModuleLoader, ClientModuleRecord,
   ClientModuleSystemOptions,
 } from './manifest.ts'
-
-/** Default bundle-load hook: same-origin external classic script. */
-const defaultLoadBundle = (url: string): Promise<void> => new Promise((resolve, reject) => {
-  const el = document.createElement('script')
-  el.async = true
-  el.src = url
-  el.addEventListener('load', () => {
-    el.remove()
-    resolve()
-  }, { once: true })
-  el.addEventListener('error', () => {
-    el.remove()
-    reject(new Error(`client-modules: bundle script ${url} failed to load`))
-  }, { once: true })
-  document.head.append(el)
-})
-
-/** Replace the rev query while preserving absolute, protocol-relative, or path-relative form. */
-function atRevision(url: string, rev: string): string {
-  if (!/[?&]rev=[^&#]*/.test(url)) {
-    throw new Error(`client-modules: bundle URL ${url} has no revision`)
-  }
-  return url.replace(/([?&]rev=)[^&#]*/, `$1${encodeURIComponent(rev)}`)
-}
 
 const CLIENT_CHUNK = /^client\.[A-Za-z0-9][A-Za-z0-9._-]*\.js$/
 
@@ -107,7 +83,8 @@ export class ClientModuleSystem implements ClientModuleLoader {
   private readonly factories = new Map<string, { factory: ClientBundleRegistration['factory']; rev: string | undefined }>()
   private readonly bootstrapIds = new Set<string>()
   /** In-flight script transport per URL; every row in one batch shares it. */
-  private readonly pendingArrival = new Map<string, Promise<void>>()
+  private readonly pendingArrival = new Map<string, { promise: Promise<void>; signal: AbortSignal | undefined }>()
+  private readonly scriptLifetimes = new WeakMap<Element, AbortSignal>()
   /** One settlement per chunk prevents old-generation waiters from deleting a replacement factory. */
   private readonly pendingChunks = new Map<string, Promise<void>>()
   /** Owner generation captured by in-flight chunk requests and advanced on invalidation. */
@@ -117,7 +94,7 @@ export class ClientModuleSystem implements ClientModuleLoader {
   /** Materialization re-entrancy guard: factory-form CJS cannot deliver partial exports, so a cycle is fatal. */
   private readonly materializing = new Set<string>()
   private readonly graphRows = new Map<string, BootModuleRow>()
-  private readonly loadBundle: (url: string) => Promise<void>
+  private readonly loadBundle: (url: string, optional: boolean, signal?: AbortSignal) => Promise<void>
   /** Batch URLs whose transport or execution already failed, keyed to the first attempt's failure
    * lines; rows still missing from them go straight to their one-resource URL. */
   private readonly failedBundleUrls = new Map<string, readonly string[]>()
@@ -139,7 +116,10 @@ export class ClientModuleSystem implements ClientModuleLoader {
       prune: (roots) => { this.prune(roots) },
     })
     this.seed = new Map(Object.entries(options.staticModules))
-    this.loadBundle = options.loadBundle ?? defaultLoadBundle
+    const transport = options.loadBundle
+    this.loadBundle = transport === undefined
+      ? (url, optional, signal) => this.loadScript(url, optional, signal)
+      : (url, _optional, signal) => transport(url, signal)
 
     for (const row of options.manifest.modules) {
       this.graphRows.set(row.id, row)
@@ -168,6 +148,8 @@ export class ClientModuleSystem implements ClientModuleLoader {
 
   /** Register one bundle factory, rejecting a script that executes twice without invalidation. */
   private register(registration: ClientBundleRegistration): void {
+    const script = typeof document === 'undefined' ? null : document.currentScript
+    if (script !== null && this.scriptLifetimes.get(script)?.aborted) return
     const ownerId = stripClientSuffix(registration.id)
     if (registration.chunk !== undefined && !CLIENT_CHUNK.test(registration.chunk)) {
       throw new Error(`client-modules: invalid package-local chunk ${JSON.stringify(registration.chunk)}`)
@@ -183,16 +165,55 @@ export class ClientModuleSystem implements ClientModuleLoader {
     })
   }
 
+  /** Same-origin classic script delivery. A removed script can still execute and call register. */
+  private loadScript(url: string, optional: boolean, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      signal?.throwIfAborted()
+      const script = document.createElement('script')
+      script.async = true
+      if (optional) script.fetchPriority = 'low'
+      script.src = url
+      const clean = () => {
+        signal?.removeEventListener('abort', cancel)
+        script.removeEventListener('load', loaded)
+        script.removeEventListener('error', failed)
+        script.remove()
+      }
+      const cancel = () => { clean(); reject(this.loadAbortReason(signal)) }
+      const loaded = () => { clean(); resolve() }
+      const failed = () => { clean(); reject(new Error(`client-modules: bundle script ${url} failed to load`)) }
+      if (signal !== undefined) this.scriptLifetimes.set(script, signal)
+      signal?.addEventListener('abort', cancel, { once: true })
+      script.addEventListener('load', loaded, { once: true })
+      script.addEventListener('error', failed, { once: true })
+      document.head.append(script)
+    })
+  }
+
+  private loadAbortReason(signal?: AbortSignal): Error {
+    const reason: unknown = signal?.reason
+    return reason instanceof Error ? reason : new Error('Client bundle load aborted', { cause: reason })
+  }
+
   /** Run one bundle transport per URL; every row waiting on the same URL shares the in-flight request. */
-  private loadShared(url: string): Promise<void> {
-    let transport = this.pendingArrival.get(url)
-    if (transport === undefined) {
-      transport = this.loadBundle(url)
-        .then(() => { this.executedBundleUrls.add(url) })
-        .finally(() => { this.pendingArrival.delete(url) })
-      this.pendingArrival.set(url, transport)
-    }
-    return transport
+  private loadShared(url: string, optional: boolean, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    const existing = this.pendingArrival.get(url)
+    if (existing !== undefined && !existing.signal?.aborted) return existing.promise
+    let cancel: (() => void) | undefined
+    const promise = new Promise<void>((resolve, reject) => {
+      cancel = () => { reject(this.loadAbortReason(signal)) }
+      signal?.addEventListener('abort', cancel, { once: true })
+      void this.loadBundle(url, optional, signal).then(resolve, reject)
+    }).then(() => {
+      signal?.throwIfAborted()
+      this.executedBundleUrls.add(url)
+    }).finally(() => {
+      if (cancel !== undefined) signal?.removeEventListener('abort', cancel)
+      if (this.pendingArrival.get(url)?.promise === promise) this.pendingArrival.delete(url)
+    })
+    this.pendingArrival.set(url, { promise, signal })
+    return promise
   }
 
   /**
@@ -205,7 +226,7 @@ export class ClientModuleSystem implements ClientModuleLoader {
    * failure stays retryable. Recovery rationale lives in
    * `.agents/notes/implemented/architecture/2026-07-23-client-plugin-loading-model.md`.
    */
-  private async arrive(row: BootModuleRow): Promise<void> {
+  private async arrive(row: BootModuleRow, signal?: AbortSignal): Promise<void> {
     const { id } = row
     if (this.loadCache.has(id) || this.factories.has(id)) return
     const reload = this.reloadTargets.get(id)
@@ -214,8 +235,9 @@ export class ClientModuleSystem implements ClientModuleLoader {
     const failures: string[] = []
     const attempt = async (url: string): Promise<'registered' | 'transport-failed' | 'not-registered'> => {
       try {
-        await this.loadShared(url)
+        await this.loadShared(url, row.optional === true, signal)
       } catch (error) {
+        signal?.throwIfAborted()
         failures.push(`${url}: ${describeError(error)}`)
         return 'transport-failed'
       }
@@ -255,7 +277,9 @@ export class ClientModuleSystem implements ClientModuleLoader {
     row: BootModuleRow,
     open: readonly string[] = [],
     visited = new Set<string>(),
+    signal?: AbortSignal,
   ): Promise<void> {
+    signal?.throwIfAborted()
     const cycleStart = open.indexOf(row.id)
     if (cycleStart !== -1) {
       throw new Error(
@@ -270,13 +294,13 @@ export class ClientModuleSystem implements ClientModuleLoader {
       const id = stripClientSuffix(request)
       if (this.seed.has(request) || this.loadCache.has(id)) continue
       const dependency = this.graphRows.get(id)
-      if (dependency !== undefined) await this.arriveGraphRow(dependency, next, visited)
+      if (dependency !== undefined) await this.arriveGraphRow(dependency, next, visited, signal)
     }
     for (const packageName of row.inject) {
       const dependency = this.graphRows.get(packageName)
-      if (dependency !== undefined) await this.arriveGraphRow(dependency, [], visited)
+      if (dependency !== undefined) await this.arriveGraphRow(dependency, [], visited, signal)
     }
-    await this.arrive(row)
+    await this.arrive(row, signal)
   }
 
   /** Materialize a registered factory (synchronous; memoized in loadCache). */
@@ -310,6 +334,13 @@ export class ClientModuleSystem implements ClientModuleLoader {
   private makeRequire(ownerId: string, edges: Set<string>): ClientBundleRequire {
     const require = (spec: string): unknown => {
       edges.add(spec)
+      if (spec === './client.js') {
+        const owner = this.loadCache.get(ownerId)
+        if (owner === undefined) {
+          throw new Error(`client-modules: entry "${ownerId}" must be loaded before a chunk can require it`)
+        }
+        return owner.exports
+      }
       if (this.seed.has(spec)) return this.seed.get(spec)
       const id = stripClientSuffix(spec)
       const record = this.loadCache.get(id)
@@ -354,11 +385,7 @@ export class ClientModuleSystem implements ClientModuleLoader {
         throw new Error(`client-modules: chunk "${id}" is absent from its owner's published chunk table`)
       }
       const url = chunkUrl(row, fileName, chunkRevision ?? revision)
-      let transport = this.pendingArrival.get(url)
-      if (transport === undefined) {
-        transport = this.loadBundle(url).finally(() => { this.pendingArrival.delete(url) })
-        this.pendingArrival.set(url, transport)
-      }
+      const transport = this.loadShared(url, false)
       const arrival = transport.then(() => {
         if ((this.generations.get(ownerId) ?? 0) === generation && !this.factories.has(id)) {
           throw new Error(`client-modules: bundle ${url} loaded without registering "${id}" via __ModuleLoader__.load`)
@@ -394,12 +421,12 @@ export class ClientModuleSystem implements ClientModuleLoader {
     return this.materialize(id).exports
   }
 
-  async prefetch(id: string): Promise<void> {
+  async prefetch(id: string, signal?: AbortSignal): Promise<void> {
     const normalized = stripClientSuffix(id)
     if (this.loadCache.has(normalized)) return
     const row = this.graphRows.get(normalized)
     if (row === undefined) throw new Error(`client-modules: prefetch("${id}") — not a graph entry`)
-    await this.arriveGraphRow(row)
+    await this.arriveGraphRow(row, [], new Set<string>(), signal)
   }
 
   /** Refresh descriptors and unowned factory revisions before any entry imports its dependencies. */

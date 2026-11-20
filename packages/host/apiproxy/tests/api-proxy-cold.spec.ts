@@ -9,10 +9,10 @@ import { SESSION_FORMAT_VERSION, SessionSeq, SessionLogOffset } from '@deepseek-
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setImmediate as nextEventLoopTurn } from 'node:timers/promises'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore from '@deepseek-ai/dsh-session'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { installAgentExecutionAdmission } from '@deepseek-ai/dsh-agent'
 import { TypertLookupFailure } from '@deepseek-ai/dsh-typert-protocol'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import { createAssistantMessage, createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
@@ -338,6 +338,51 @@ describe('attached updatedAt tracks human prompts', () => {
 })
 
 describe('cold history recovery view', () => {
+  it('lists and reads restored history without mounting its preset or admitting old work', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    const sessionId = sid('disaster-restored-history')
+    installAgentExecutionAdmission(ctx, [sessionId])
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(UserQuestionService)
+    const meta = header(sessionId, 1000, { isSeeded: true })
+    const events = [userMessage(0, 'retained history')]
+    const original = JSON.stringify(events)
+    const inspect = vi.fn(async () => ({ meta, events }))
+    const standingKeyFor = vi.fn(async () => { throw new Error('restored preset must stay unmounted') })
+    ctx.provide('agentPresets', { standingKeyFor } as never)
+    ctx.provide('sessionPersistence', {
+      list: async () => [{ header: meta }], listHeaders: async () => [meta],
+      inspect, locate: () => undefined,
+    } as never)
+    const factory = { createAgent: vi.fn(), resume: vi.fn() }
+    ctx.agents.setFactory(factory)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+    const listing = await api.sessions.list(request({}))
+    expect(listing.result.ok && listing.result.value.items).toEqual([
+      expect.objectContaining({ sessionId, executionRestriction: 'recovery-read-only' }),
+    ])
+    for (const detail of ['conversation', 'full'] as const) {
+      const history = await api.sessions.history(request({ sessionId, detail }))
+      expect(history.result.ok && history.result.value).toMatchObject({
+        executionRestriction: 'recovery-read-only', events: [{ event: events[0] }],
+      })
+    }
+    for (const response of [
+      await api.sessions.create(request({ sessionId, cwd: '/proj' })),
+      await api.sessions.prompt(request({ sessionId, mode: 'queue', content: [{ type: 'text', text: 'must not execute' }] })),
+      await api.sessions.fork(request({ sessionId })),
+    ]) {
+      expect(response.result).toMatchObject({ ok: false, error: { code: 'recovery-read-only', details: { sessionId } } })
+    }
+    expect(standingKeyFor).not.toHaveBeenCalled()
+    expect(factory.createAgent).not.toHaveBeenCalled()
+    expect(factory.resume).not.toHaveBeenCalled()
+    expect(ctx.sessions.get(sessionId)).toBeUndefined()
+    expect(JSON.stringify(events)).toBe(original)
+  })
+
   it('maps bounded persistence cancellation and capacity failures without retrying', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

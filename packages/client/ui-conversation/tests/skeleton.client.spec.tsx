@@ -120,6 +120,8 @@ function mount(
     summaryPending?: boolean
     /** A composer block another plugin raised for this session. */
     composerBlock?: { reason: string }
+    /** Restored historical sessions keep drafts visible without accepting execution. */
+    executionRestriction?: 'recovery-read-only'
     /** Account scope policy driving the pane's steward placeholder. */
     projectPolicy?: ProjectUiPolicySnapshot
     /** Client-local Workspace hint retained while a blank draft awaits Host attachment. */
@@ -142,6 +144,7 @@ function mount(
     ...(options.summaryPending === true ? { pendingInteraction: 'approval' as const } : {}),
     ...(options.summaryWorkspaceId === undefined ? {} : { workspaceId: options.summaryWorkspaceId }),
     ...(options.summaryOrigin === undefined ? {} : { origin: options.summaryOrigin }),
+    ...(options.executionRestriction === undefined ? {} : { executionRestriction: options.executionRestriction }),
   }
   const listed = options.omitSummaryRow !== true
   const sessions = createSnapshotStore<SessionListState>({
@@ -351,6 +354,108 @@ describe('Hero chrome', () => {
 })
 
 describe('ConversationRoot resident composer', () => {
+  it('updates composer flow when its scrollport or height changes and releases measurements on unmount', () => {
+    const observers: { callback: ResizeObserverCallback; targets: Element[] }[] = []
+    vi.stubGlobal('ResizeObserver', class {
+      targets: Element[] = []
+      constructor(callback: ResizeObserverCallback) { observers.push({ callback, targets: this.targets }) }
+      observe(target: Element) { this.targets.push(target) }
+      unobserve() {}
+      disconnect() {}
+    })
+    const frames = new Map<number, FrameRequestCallback>()
+    let sequence = 0
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.set(++sequence, callback)
+      return sequence
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => { frames.delete(id) })
+    const { view } = mount(conversationSnapshot())
+    const seat = view.container.querySelector<HTMLElement>('[data-composer-seat]')!
+    const scroller = seat.parentElement!
+    const observer = observers.find(item => item.targets.includes(seat))!
+    let height = 120
+    let available = 600
+    const seatRead = vi.spyOn(seat, 'offsetHeight', 'get')
+    const scrollRead = vi.spyOn(scroller, 'clientHeight', 'get')
+    const sizes = (target: Element, pixels: number): ResizeObserverEntry => ({
+      target, contentRect: new DOMRectReadOnly(0, 0, 0, pixels),
+      borderBoxSize: [{ inlineSize: 0, blockSize: pixels }],
+      contentBoxSize: [], devicePixelContentBoxSize: [],
+    })
+    const deliver = (): void => {
+      observer.callback([sizes(seat, height), sizes(scroller, available)], {} as ResizeObserver)
+    }
+    expect(observer.targets).toContain(scroller)
+    deliver()
+    deliver()
+    expect(scroller.style.getPropertyValue('--dsh-composer-height')).toBe('')
+    const [id, callback] = [...frames.entries()].at(-1)!
+    frames.delete(id)
+    callback(0)
+    expect(scroller.style.getPropertyValue('--dsh-composer-height')).toBe('120px')
+    expect(scroller.hasAttribute('data-composer-flow')).toBe(false)
+    const resize = (): void => {
+      deliver()
+      const [nextId, next] = [...frames.entries()].at(-1)!
+      frames.delete(nextId)
+      next(0)
+    }
+    available = 100
+    resize()
+    expect(scroller.hasAttribute('data-composer-flow')).toBe(true)
+    available = 700
+    resize()
+    expect(scroller.hasAttribute('data-composer-flow')).toBe(false)
+    height = 700
+    resize()
+    expect(scroller.hasAttribute('data-composer-flow')).toBe(true)
+    available = 0
+    resize()
+    expect(scroller.hasAttribute('data-composer-flow')).toBe(false)
+    available = 300
+    resize()
+    deliver()
+    const pending = [...frames.keys()].at(-1)!
+    expect(seatRead).not.toHaveBeenCalled()
+    expect(scrollRead).not.toHaveBeenCalled()
+    view.unmount()
+    expect(frames.has(pending)).toBe(false)
+    expect(scroller.hasAttribute('data-composer-flow')).toBe(false)
+    expect(scroller.style.getPropertyValue('--dsh-composer-height')).toBe('')
+  })
+
+  it('keeps a recovered history draft in the resident composer while disabling execution', async () => {
+    const b = mount(conversationSnapshot())
+    const before = b.view.getByRole('textbox') as HTMLTextAreaElement
+    const draft = before.value
+    await act(async () => {
+      const state = b.sessions.getSnapshot()
+      b.sessions.set({ ...state, byId: { ...state.byId, [SID]: { ...state.byId[SID]!, executionRestriction: 'recovery-read-only' } } })
+    })
+    const input = b.view.getByRole('textbox') as HTMLTextAreaElement
+    expect(input).toBe(before)
+    expect(input.value).toBe(draft)
+    expect(input.disabled).toBe(true)
+    expect(input.placeholder).toBe(zh['placeholder.recoveryReadOnly'])
+    expect(b.view.getByText(zh['recovery.historyReadOnly']).getAttribute('role')).toBe('status')
+    const restored = b.sessions.getSnapshot().byId[SID]!
+    await act(async () => {
+      const { executionRestriction: _restriction, ...fresh } = restored
+      const state = b.sessions.getSnapshot()
+      b.sessions.set({ ...state, byId: { ...state.byId, [SID]: fresh } })
+    })
+    expect(input.value).toBe(draft)
+    expect(input.disabled).toBe(false)
+  })
+  it('does not present pending interaction overlays for a recovered read-only conversation', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      overlayTakeover: true, executionRestriction: 'recovery-read-only',
+    })
+    expect(b.view.queryByTestId('composer-takeover')).toBeNull()
+    expect((b.view.getByRole('textbox') as HTMLTextAreaElement).disabled).toBe(true)
+    expect(b.view.getByText(zh['recovery.historyReadOnly'])).toBeTruthy()
+  })
   it('holds only the originating composer while a new conversation opens and keeps Stop available', async () => {
     const b = mount(conversationSnapshot({ running: true }))
     const original = b.view.getByRole('textbox') as HTMLTextAreaElement
@@ -410,6 +515,35 @@ describe('ConversationRoot resident composer', () => {
   }
   const userWidth = (root: HTMLElement) => root.style.getPropertyValue('--dsh-chat-user-width')
   const flushFrames = async () => { await act(async () => { await new Promise(r => setTimeout(r, 25)) }) }
+
+  it('uses the delivered pane width to clamp content and restores the preference when the pane widens', () => {
+    const observers = new Map<Element, ResizeObserverCallback>()
+    vi.stubGlobal('ResizeObserver', class extends ResizeObserverStub {
+      constructor(private readonly callback: ResizeObserverCallback) { super() }
+      override observe(target?: Element): void {
+        if (target !== undefined) observers.set(target, this.callback)
+      }
+    })
+    const b = mount(conversationSnapshot())
+    const root = rootOf(b)
+    const observer = observers.get(root)!
+    const layoutRead = vi.spyOn(root, 'getBoundingClientRect')
+    const resize = (inlineSize: number) => {
+      observer([{
+        target: root,
+        contentRect: new DOMRectReadOnly(0, 0, inlineSize, 800),
+        borderBoxSize: [{ inlineSize, blockSize: 800 }],
+        contentBoxSize: [],
+        devicePixelContentBoxSize: [],
+      }], new ResizeObserverStub())
+    }
+    resize(800)
+    expect(userWidth(root)).toBe('624px')
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(748)
+    resize(1300)
+    expect(userWidth(root)).toBe('748px')
+    expect(layoutRead).not.toHaveBeenCalled()
+  })
 
   it('renders symmetric handles on both edges and resizes from either side', async () => {
     const b = mount(conversationSnapshot())
@@ -1085,7 +1219,20 @@ describe('ConversationContent pending intent', () => {
     expect(onRetry).toHaveBeenCalledWith('intent-1')
     b.view.getByText('返回').click()
     expect(onHide).toHaveBeenCalledOnce()
-    b.rerender({ pendingIntent: intent({ phase: 'unavailable', denied: true }) })
+    b.rerender({ pendingIntent: intent({ phase: 'unavailable', failure: 'denied' }) })
     expect(b.view.getByText('当前账号没有操作此对话的权限，草稿保留在此标签页')).toBeTruthy()
+  })
+
+  it('announces a preset failure beside the retained draft and retries only the same intent on request', () => {
+    const b = mount(conversationSnapshot())
+    const onRetry = vi.fn()
+    b.rerender({ pendingIntent: intent({ phase: 'unavailable', failure: 'preset-unavailable' }), onIntentRetry: onRetry })
+    const card = b.view.container.querySelector('[data-conversation-intent="intent-1"]')!
+    expect(card.getAttribute('data-intent-failure')).toBe('preset-unavailable')
+    expect(card.querySelector('[role="status"]')?.textContent).toBe('当前电脑的对话预设或插件未就绪，请联系管理员检查；草稿已保留')
+    expect(card.querySelector('textarea')?.value).toBe('keep this draft')
+    expect(onRetry).not.toHaveBeenCalled()
+    b.view.getByRole('button', { name: '检查后重试' }).click()
+    expect(onRetry).toHaveBeenCalledExactlyOnceWith('intent-1')
   })
 })

@@ -162,10 +162,10 @@
   background: currentColor;
 }
 
-.badge[data-tone='info'] { color: var(--dsw-alias-state-business-primary); }
-.badge[data-tone='success'] { color: var(--dsw-alias-state-success-primary); }
-.badge[data-tone='warning'] { color: var(--dsw-alias-state-warn-primary); }
-.badge[data-tone='error'] { color: var(--dsw-alias-state-error-primary); }
+.badge[data-tone='info'] { color: var(--dsw-alias-state-business-label); }
+.badge[data-tone='success'] { color: var(--dsw-alias-state-success-label); }
+.badge[data-tone='warning'] { color: var(--dsw-alias-state-warn-label); }
+.badge[data-tone='error'] { color: var(--dsw-alias-state-error-label); }
 
 .subtitle {
   margin-top: 3px;

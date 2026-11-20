@@ -106,7 +106,7 @@ function resolveLimit(value: number | undefined, name: string): number | undefin
  * @param limits - optional admission quota applied before each durable commit.
  */
 export class ReactLoopInbox implements InboxContract {
-  private admissionClosed = false
+  private admission: 'open' | 'inserts-closed' | 'draining' = 'open'
   private readonly maxMessages: number | undefined
   private readonly maxBytes: number | undefined
 
@@ -120,8 +120,14 @@ export class ReactLoopInbox implements InboxContract {
     this.maxBytes = resolveLimit(limits.maxBytes, 'inbox maxBytes')
   }
 
-  /** Refuse future inserted input while allowing disposal to clear pending messages. */
-  closeAdmission(): void { this.admissionClosed = true }
+  /**
+   * Close inbox admission for the remainder of the Agent lifetime.
+   * @param preserve - protect admitted human input while producers withdraw their own queued records.
+   */
+  closeAdmission(preserve = false): void {
+    if (preserve) this.admission = 'draining'
+    else if (this.admission === 'open') this.admission = 'inserts-closed'
+  }
 
   /** Prompts awaiting individual turns. */
   get nextTurn(): readonly UserMessage[] {
@@ -247,7 +253,9 @@ export class ReactLoopInbox implements InboxContract {
     inserted: UserMessage[],
     discardRemoved: boolean,
   ): UserMessage[] {
-    if (this.admissionClosed && inserted.length > 0) throw new Error(`agent "${this.session.id}" input is closed`)
+    if (this.admission !== 'open' && inserted.length > 0) {
+      throw new Error(`agent "${this.session.id}" input is closed`)
+    }
     const state = this.current()
     const inbox = state[target]
     const truncatedStart = Math.trunc(start)
@@ -261,6 +269,10 @@ export class ReactLoopInbox implements InboxContract {
       inbox.length - actualStart,
     )
     if (actualDeleteCount === 0 && inserted.length === 0) return []
+    const removed = inbox.slice(actualStart, actualStart + actualDeleteCount)
+    if (this.admission === 'draining' && removed.some(message => message.source.kind === 'user')) {
+      throw new Error(`agent "${this.session.id}" input is closed`)
+    }
     const candidate = inbox.toSpliced(actualStart, actualDeleteCount, ...inserted)
     const other = target === 'next-turn' ? state['next-step'] : state['next-turn']
     const pending = target === 'next-turn' ? [...candidate, ...other] : [...other, ...candidate]
@@ -285,7 +297,6 @@ export class ReactLoopInbox implements InboxContract {
       inserted,
       ...(outcome === undefined ? {} : { outcome }),
     }
-    const removed = inbox.slice(actualStart, actualStart + actualDeleteCount)
     const event = this.session.append('agent/inbox/spliced', splice)
     if (discardRemoved) {
       for (const message of removed) this.dispatch.emit('agent/inbox/discarded', { message })

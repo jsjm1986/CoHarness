@@ -15,7 +15,7 @@ chip 携带无障碍描述 "Plan mode on, press to turn off"。准入失败（`m
 
 模型通过稳定的 `exit_plan_mode` 工具退出 plan mode；其 plan 评审走已组合的 Web question 通道。
 
-已提交计划以隐藏的 `submitted-plan` Chat 节点持久化，按退出工具调用标识——原生 `tool/call` id 与 PTC `tool/ptc-dispatch` 的 `subCallId` 一致——因此每个已完成回合的末尾在 `conversation.chat.turnTail` 下按调用渲染一张卡片。卡片把 `dsh-resource://plan/<session>/<callId>`（直属子代理则是 `dsh-resource://plan/subagent/<parent>/<child>/<mode>/<callId>`）打开进可见 Session 的右侧边栏；`plan` 侧栏类型同时认领瞬态 `dsh-resource://plan-review/...` 地址，后者经导航参数携带未提交评审的 Markdown。持久文档经 `Session.readCallHistory` 恢复：解析所属 Session 或子代理，并经同一套 conversation 定义重组该调用的完整回合；`resourceSession` 从地址读出归属，使子代理计划在其父 Session 侧栏下仍通过归属校验。`conversation.plan-review.actions` 下的评审操作在 Session 挂载后自动打开一次评审——已关闭的评审不会重开——并保留手动入口；`sidebar.right.pane.tab` 及其标题座位渲染正文与恢复的标题。
+已提交计划以隐藏的 `submitted-plan` Chat 节点持久化，按退出工具调用标识——原生 `tool/call` id 与 PTC `tool/ptc-dispatch` 的 `subCallId` 一致——因此每个已完成回合的末尾在 `conversation.chat.turnTail` 下按调用渲染一张卡片。卡片把 `dsh-resource://plan/<session>/<callId>`（直属子代理则是 `dsh-resource://plan/subagent/<parent>/<child>/<mode>/<callId>`）打开进可见 Session 的右侧边栏；`plan` 侧栏类型同时认领瞬态 `dsh-resource://plan-review/...` 地址，后者经导航参数携带未提交评审的 Markdown。持久文档经 `Session.readCallHistory` 恢复：解析所属 Session 或子代理，并经同一套 conversation 定义重组该调用的完整回合；`resourceSession` 从地址读出归属，使子代理计划在其父 Session 侧栏下仍通过归属校验。`conversation.plan-review.actions` 下的评审操作在 Session 挂载后自动打开一次评审——已关闭的评审不会重开——并保留手动入口，粗指针设备上具有 44 CSS 像素的触控目标；`sidebar.right.pane.tab` 及其标题座位渲染正文与恢复的标题。
 
 ## 概述
 

@@ -47,7 +47,9 @@ interface GatewayPrincipalClaims {
   expiresAt: number
   nonce: string
   /** Optional capability purpose used by loopback-only runtime integrations. */
-  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch'
+  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch' | 'runtime-asset'
+  /** Exact resource coordinates; required only for a read-only asset assertion. */
+  asset?: { method: 'GET' | 'HEAD'; path: string }
 }
 ```
 
@@ -94,6 +96,8 @@ interface GatewayRuntimeCredential {
   gatewayUrl: string
   organization: string
   runtime: GatewayRuntimeIdentity
+  /** Registered computer supplied by the launcher. Legacy launch credentials omit it. */
+  nodeId?: Branded<'RuntimeNodeId'>
   token: string
   principalPublicKey: string
   /** Present only when this managed release enables private event-connection renewal. */

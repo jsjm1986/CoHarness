@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-17-project-name-privacy-preflight.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-project-name-privacy-preflight.md
+document:
+  en: 3e10ac88c936e54c36bf386e45a2b69da7ba6d48
+  zh: 7828b7677b41ed696a4532f3f08a0dae8ba7e5cd
+/agent-note-verify-project-name-privacy-with-the-deployed-database-role:
+  en: 8b9241e51daceac8
+  zh: c9ffaad9de8301d7
+/agent-note-verify-project-name-privacy-with-the-deployed-database-role/problem:
+  en: 4a7d260cc422d9eb
+  zh: f65c2c0812c8f0fc
+/agent-note-verify-project-name-privacy-with-the-deployed-database-role/decision:
+  en: f6956a617a785cf3
+  zh: 9d7fc972f9a6f1b2
+/agent-note-verify-project-name-privacy-with-the-deployed-database-role/alternatives-considered:
+  en: b0939107859c99c8
+  zh: cb8d6a1c79188ef5
+/agent-note-verify-project-name-privacy-with-the-deployed-database-role/consequences:
+  en: 75fca7d406942876
+  zh: e85a2f788d671fc2

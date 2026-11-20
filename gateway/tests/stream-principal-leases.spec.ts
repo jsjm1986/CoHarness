@@ -5,12 +5,13 @@ import { GatewayPrincipalSigner } from '../src/principal.ts'
 import { StreamPrincipalLeases, StreamPrincipalRequestError } from '../src/stream-principal-leases.ts'
 import type { GatewayRequestContext } from '../src/server.ts'
 import type { StreamSessionQualification, UserRow } from '../src/auth.ts'
+import type { RuntimeId } from '../src/runtime-catalog.ts'
 
 const user: UserRow = { id: 7, username: 'synthetic', displayName: 'Synthetic', role: 'user', status: 'active',
   homePath: '/synthetic/home', mustChangePassword: false, autoReviewEligible: false }
 const runtime = { target: { kind: 'user' as const, id: 7 }, generation: 2 }
 
-function fixture() {
+function fixture(runtimeId?: RuntimeId) {
   vi.useFakeTimers(); vi.setSystemTime(10_000)
   const signer = new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'synthetic-org', 30_000)
   const context: GatewayRequestContext = { user, scope: { kind: 'personal' }, runtime: user }
@@ -20,7 +21,7 @@ function fixture() {
   const registry = new StreamPrincipalLeases({ signer, qualify, synchronize, maxBatchSize: 2 })
   const register = () => {
     const assertion = signer.issueStream({ user, scope: context.scope,
-      runtime: { kind: 'user', id: 7, generation: 2 } })
+      runtime: { kind: 'user', id: 7, runtimeId, generation: 2 } })
     const signal = new AbortController()
     const cancel = vi.fn(() => { signal.abort() })
     registry.register({ assertion, token: 'synthetic-login', context, signal: signal.signal, cancel })
@@ -60,6 +61,22 @@ describe('registered event principal renewal', () => {
       }
       expect(f.qualify).not.toHaveBeenCalled()
       expect(socket.cancel).not.toHaveBeenCalled()
+    } finally { f.registry.close() }
+  })
+
+  it('requires the exact Runtime even when its sibling shares the owner and generation', async () => {
+    const expected = 'c81630fa-17f0-4ba7-921b-e890ddcc0010' as RuntimeId
+    const sibling = 'c81630fa-17f0-4ba7-921b-e890ddcc0011' as RuntimeId
+    const f = fixture(expected)
+    try {
+      const socket = f.register()
+      const request = { version: 1, leaseIds: [socket.id] }
+      const renew = (runtimeId: RuntimeId) => f.registry.renew({
+        ...runtime, target: { ...runtime.target, runtimeId },
+      }, request, async () => true)
+      expect((await renew(sibling)).leases).toEqual([{ leaseId: socket.id, status: 'denied' }])
+      expect(f.qualify).not.toHaveBeenCalled()
+      expect((await renew(expected)).leases[0]?.status).toBe('renewed')
     } finally { f.registry.close() }
   })
 

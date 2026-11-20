@@ -56,6 +56,17 @@ it('labels an explicit center address with its existing center option without na
   expect(select).toHaveBeenCalledExactlyOnceWith(node.nodeId)
 })
 
+it('retains the isolated target without offering it for new navigation or selecting a different computer', async () => {
+  vi.mocked(listNodeAccess).mockResolvedValue({ items: [{ ...node, status: 'quarantined' }], nextCursor: null })
+  const select = vi.fn()
+  render(<ComputerSelector nodeId={node.nodeId} onSelect={select} />)
+  const option = await screen.findByRole('option', { name: 'Computer B · 已隔离' }) as HTMLOptionElement
+  expect(option.disabled).toBe(true)
+  expect(option.selected).toBe(true)
+  expect((screen.getByRole('combobox', { name: '管理电脑' }) as HTMLSelectElement).value).toBe(node.nodeId)
+  expect(select).not.toHaveBeenCalled()
+})
+
 it('retains the explicit center address when its identity cannot be read', async () => {
   vi.mocked(getAdminComputerContext).mockRejectedValue(new Error('offline'))
   const select = vi.fn()

@@ -147,6 +147,14 @@ async function harness(services: HarnessServices = {}) {
 }
 
 describe('workbench navigation lifecycle', () => {
+  it('registers a root PDF reader factory and withdraws it with the plugin', async () => {
+    const h = await harness()
+    try {
+      expect(h.slots.snapshot('factory:document.pdf.preview')).toMatchObject([{ type: 'factory', name: 'document.pdf.preview', scope: 'root' }])
+    } finally { await h.ctx.fiber.dispose() }
+    expect(h.slots.snapshot('factory:document.pdf.preview')).toEqual([])
+  })
+
   it.each([
     { entry: 'toolbar', target: A, selection: 'same-current pane' },
     { entry: 'toolbar', target: 'q' as SessionId, selection: 'another pane' },

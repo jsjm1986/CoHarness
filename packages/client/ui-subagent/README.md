@@ -19,7 +19,7 @@ Subagent-origin Session rows are omitted from the ordinary sidebar, so the paren
 
 The `@` source remains deliberately separate and inert. Candidates are zero-RPC running children from `ctx.sessions.list`; picking one inserts literal `@label ` text, and the codec projects `@label`. It has no command-adjudication hooks and does not resolve labels into continuation addresses.
 
-On phone viewports the portalled catalog becomes a safe-area sheet with the shared backdrop and touch-sized rows; the tree's keyboard navigation and focus return remain unchanged.
+The catalog button opens by click, tap, or keyboard activation. Ancestor titles navigate directly, with a separate chevron button opening their sibling catalog. Hover opens and closes it only on devices that support hover. On phone viewports the portalled catalog becomes a safe-area sheet with the shared backdrop and touch-sized rows; the tree's keyboard navigation and focus return remain unchanged.
 
 ## Summary
 

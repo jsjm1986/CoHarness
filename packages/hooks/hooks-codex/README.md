@@ -60,6 +60,8 @@ The config is parsed **once** at load. `configPath` is **process-level** — a r
 
 The hooks themselves run in the agent's current Session directory: for the agent-scoped points the bridge resolves `ctx.workingDirectory.ensure(agent)` and passes it as the hook process's working directory and payload `cwd`, so `pwd`, `cwd`, and relative paths agree. A hook point with no matching commands skips the directory resolution entirely.
 
+In a disaster-recovered runtime, commands remain paused until individually approved in the [sealed execution review](../../boot/app-boot/README.md#previewing-the-effective-configuration). Before each execution, the bridge verifies the event, parsed command and complete source configuration file. An unapproved or changed file produces no hook invocation and does not block a new conversation. Ordinary runtimes retain their configured hook behavior.
+
 <a id="hook-points--typed-decisions"></a>
 ## Hook points → typed Decisions
 

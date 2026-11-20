@@ -7,21 +7,23 @@
 // the deterministic branch a golden can hold on every platform.
 //
 // Zero model calls: no replay fixture mounts, so a stray stream fails loud.
+import { responsiveBrowser, responsiveMobileEmulation } from './responsive-browser.ts'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { Locator } from 'playwright'
 import { resolveSessionPreset } from '@deepseek-ai/dsh-agent-preset-registry'
 import {
-  captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole,
+  captureStableAria, launchWebScaffold, watchConsole,
   webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { ZH_BROWSER_LOCALE, connectFreshWorkspaceZh, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden as compareOrRefreshGolden, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/agent-preset-authoring', import.meta.url))
 const SECTION_EXPECTED = join(SNAPSHOT_DIR, 'section.expected.md')
@@ -68,9 +70,10 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
         default: 'standard',
       },
     })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     // The scenario asserts the shipped Chinese copy, so the browser asks for it.
-    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
+    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE,
+      ...(workflowMatrixEnabled ? { hasTouch: true, isMobile: responsiveMobileEmulation } : {}) })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -95,6 +98,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
 
     await compareOrRefreshGolden(SECTION_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'agent-presets', 'shipped-roster', dialog)
     // The intro carries the guidance a create button used to imply, and the
     // shipped rows offer view/copy but never delete or a location — their
     // install is overwritten by upgrades and is not the user's to manage.
@@ -117,6 +121,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     const shipped = await readFile(join(SHIPPED_PRESETS, 'standard', 'agent.cordis.yml'), 'utf8')
     expect(await viewer.locator('pre').textContent()).toBe(shipped)
     expect(await viewer.getByRole('textbox').count()).toBe(0)
+    await auditWorkflowState(page, 'agent-presets', 'readonly-composition', viewer)
     // The header X and the footer button share the 关闭 name; the footer one
     // is last in the dialog.
     await viewer.getByRole('button', { name: '关闭' }).last().click()
@@ -140,6 +145,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
 
     await copyDialog.getByPlaceholder('my-agent').fill('my-agent')
     await copyDialog.getByPlaceholder('选择器中显示的名字，缺省用标识符').fill('我的模式')
+    await auditWorkflowState(page, 'agent-presets', 'copy-draft', copyDialog)
     await copyDialog.getByRole('button', { name: '创建' }).click()
     await copyDialog.waitFor({ state: 'detached', timeout: 10_000 })
 
@@ -154,6 +160,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     const snapshot = withPresetRoot(
       await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd))
     await compareOrRefreshGolden(CREATED_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'agent-presets', 'created-with-directory', dialog)
     expect(snapshot).toContain('{{presetRoot}}/my-agent')
 
     // The host copied the whole directory and rewrote only the display
@@ -174,6 +181,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     await dialog.getByRole('button', { name: '删除: 我的模式' }).click()
     const confirm = page.getByRole('dialog', { name: '删除该预设？' })
     await confirm.waitFor({ timeout: 10_000 })
+    await auditWorkflowState(page, 'agent-presets', 'delete-confirmation', confirm)
     await confirm.getByRole('button', { name: '删除', exact: true }).click()
     await confirm.waitFor({ state: 'detached', timeout: 10_000 })
 
@@ -204,6 +212,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     const snapshot = withPresetRoot(
       await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd))
     await compareOrRefreshGolden(DAMAGED_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'agent-presets', 'broken-and-missing-files', dialog)
     // Both damage shapes surface as marked, unselectable, uncopyable cards
     // that still carry their metadata and the discovery-reported reason.
     expect(snapshot).toContain('加载失败: broken-yaml')

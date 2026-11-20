@@ -55,9 +55,9 @@ async function readStartupModelAdmission(page: Page, sessionId: string) {
     const modules = observation.modules
     if (ctx === undefined || modules === undefined) throw new Error('Real Client composition was not observed')
     const runtime = modules.loadCache.get('@deepseek-ai/dsh-client-runtime')?.exports as {
-      clientSessionKey(target: { kind: 'personal' }, originalId: string): string
+      clientSessionKey(target: { kind: 'personal'; runtimeId: string }, originalId: string): string
     }
-    const key = runtime.clientSessionKey({ kind: 'personal' }, id)
+    const key = runtime.clientSessionKey({ kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' }, id)
     const sessions = ctx.get('sessions') as unknown as StartupSessionReadFace
     const connection = ctx.get('connection') as unknown as {
       readonly state: { getSnapshot(): string | undefined }
@@ -425,9 +425,9 @@ describe('web e2e: startup auto-selection', () => {
       await target.addInitScript((selectedId) => {
         if (window !== window.top) return
         Object.assign(globalThis, {
-          __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal' } },
+          __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' } },
         })
-        localStorage.setItem('dsh.sessions.current.v2.1.personal', JSON.stringify({ sessionId: selectedId }))
+        sessionStorage.setItem('dsh.sessions.current.v3.1.10000000-0000-4000-8000-000000000001.personal', JSON.stringify({ sessionId: selectedId }))
         const observation: StartupModelObservation = {}
         Reflect.set(globalThis, '__startupModelObservation', observation)
         Object.defineProperty(globalThis, '__ModuleLoader__', {
@@ -452,22 +452,22 @@ describe('web e2e: startup auto-selection', () => {
       await target.route(url => url.origin === origin && url.pathname === '/api/host.describe', async (route) => {
         const response = await route.fetch()
         const body = await response.json() as {
-          result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'personal' } } } | { ok: false }
+          result: { ok: true; value: { executionAuthorityRequired: boolean; runtimeTarget: { kind: 'personal'; runtimeId?: string } } } | { ok: false }
         }
         expect(body.result.ok).toBe(true)
         if (body.result.ok) {
           body.result.value.executionAuthorityRequired = true
-          body.result.value.runtimeTarget = { kind: 'personal' }
+          body.result.value.runtimeTarget = { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' }
         }
         await route.fulfill({ response, json: body })
       })
       await target.route(url => url.origin === origin && url.pathname === '/account/api/context', route => route.fulfill({ json: {
         user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
-        scope: { kind: 'personal' }, projects: [],
+        scope: { kind: 'personal' }, projects: [], environment: { id: '10000000-0000-4000-8000-000000000001', nodeId: '20000000-0000-4000-8000-000000000001' },
       } }))
       await target.route(url => url.origin === origin && url.pathname === '/account/api/workbench/catalog', route => route.fulfill({ json: {
-        personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: { kind: 'personal' }, projects: [],
-        items: [id, otherId].map(sessionId => ({ sessionId, runtime: { kind: 'personal' }, visibility: 'personal',
+        personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' }, projects: [],
+        items: [id, otherId].map(sessionId => ({ sessionId, runtime: { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' }, visibility: 'personal',
           creatorUserId: 1, creatorDisplayName: 'Fixture', updatedAt: 1, blank: false, canWrite: true })),
       } }))
       await target.route(url => url.origin === origin && url.pathname === '/api/session.list', (route) => {
@@ -556,11 +556,13 @@ describe('web e2e: startup auto-selection', () => {
       const targetScaffold = accountScaffold ?? scaffold
       if (accountScaffold !== undefined) targetPage = accountPage = await newEnglishPage(browser)
       const targetTripwire = accountScaffold === undefined ? tripwire : watchConsole(targetPage)
+      const runtimeTarget = { kind: 'personal' as const,
+        ...(composition === 'account scoped' ? { runtimeId: '10000000-0000-4000-8000-000000000001' } : {}) }
       if (accountScaffold !== undefined) {
         if (composition === 'account scoped') {
           await targetPage.addInitScript(() => {
             Object.assign(globalThis, {
-              __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal' } },
+              __DSH_DOCUMENT_IDENTITY__: { version: 1, principalId: 1, runtimeTarget: { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' } },
             })
           })
         }
@@ -574,7 +576,7 @@ describe('web e2e: startup auto-selection', () => {
           expect(body.result.ok).toBe(true)
           if (body.result.ok) {
             body.result.value.executionAuthorityRequired = true
-            body.result.value.runtimeTarget = { kind: 'personal' }
+            body.result.value.runtimeTarget = runtimeTarget
           }
           await route.fulfill({ response, json: body })
         })
@@ -582,13 +584,14 @@ describe('web e2e: startup auto-selection', () => {
           if (holdContext) await accountContextGate.promise
           await route.fulfill({ json: {
             user: { id: 1, username: 'fixture', displayName: 'Fixture', role: 'admin' },
-            scope: { kind: 'personal' }, projects: [],
+            scope: { kind: 'personal' }, projects: [], ...(runtimeTarget.runtimeId ? { environment: {
+              id: runtimeTarget.runtimeId, nodeId: '20000000-0000-4000-8000-000000000001' } } : {}),
           } })
         })
         await targetPage.route(/\/account\/api\/workbench\/catalog(?:\?.*)?$/, async (route) => {
           await route.fulfill({ json: {
-            personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: { kind: 'personal' }, projects: [],
-            items: [{ sessionId: SAVED_ID, runtime: { kind: 'personal' }, visibility: 'personal', title: 'Saved fixture',
+            personal: { id: 1, name: 'Fixture' }, personalComplete: true, activeRuntime: runtimeTarget, projects: [],
+            items: [{ sessionId: SAVED_ID, runtime: runtimeTarget, visibility: 'personal', title: 'Saved fixture',
               creatorUserId: 1, creatorDisplayName: 'Fixture', updatedAt: 1, blank: false, canWrite: true }],
           } })
         })
@@ -601,7 +604,8 @@ describe('web e2e: startup auto-selection', () => {
       await targetPage.evaluate(({ sessionId, scoped }) => {
         localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId: scoped ? 'other-space' : sessionId }))
         if (scoped) {
-          localStorage.setItem('dsh.sessions.current.v2.1.personal', JSON.stringify({ sessionId }))
+          sessionStorage.setItem('dsh.sessions.current.v3.1.10000000-0000-4000-8000-000000000001.personal', JSON.stringify({ sessionId }))
+          localStorage.setItem('dsh.sessions.current.v2.1.personal', JSON.stringify({ sessionId: 'other-computer' }))
           localStorage.setItem('dsh.sessions.current.v2.1.project-42', JSON.stringify({ sessionId: 'other-project' }))
           localStorage.setItem('dsh.sessions.current.v2.2.personal', JSON.stringify({ sessionId: 'other-account' }))
         }
@@ -681,7 +685,7 @@ describe('web e2e: startup auto-selection', () => {
             'dsh.sessions.current.v2.1.project-42', 'dsh.sessions.current.v2.2.personal',
           ].map(key => [key, (JSON.parse(localStorage.getItem(key) ?? '{}') as { sessionId?: string }).sessionId])))
           expect(selections).toEqual({
-            'dsh.sessions.current': 'other-space', 'dsh.sessions.current.v2.1.personal': id,
+            'dsh.sessions.current': 'other-space', 'dsh.sessions.current.v2.1.personal': 'other-computer',
             'dsh.sessions.current.v2.1.project-42': 'other-project', 'dsh.sessions.current.v2.2.personal': 'other-account',
           })
         }

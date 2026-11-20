@@ -11,7 +11,7 @@ import { stubDeveloperTools, stubMutationScope, TestRemote, usePinnedBrowserLang
 import type { SettingsMirrorSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
 import { apply, inject, NS, PANEL_ID } from '../src/client/index.ts'
-import { PluginManagerPage } from '../src/client/PluginManagerPage.tsx'
+import { PluginManagerTitle } from '../src/client/PluginManagerTitle.tsx'
 import { PluginRefreshToast, type PluginRefreshToastFace } from '../src/client/PluginRefreshToast.tsx'
 import { PluginsPanelIcon } from '../src/client/PluginsPanelIcon.tsx'
 import type { PluginManagerFace } from '../src/client/manager-store.ts'
@@ -74,6 +74,7 @@ function declare(slots: SlotRegistry): () => void {
     children: {
       'main': { kind: 'keyed', scope: 'root' },
       'shell.overlay': { kind: 'list', scope: 'root' },
+      'shell.mobile.header.title': { kind: 'keyed', scope: 'root' },
       'sidebar.panellist': { kind: 'list', scope: 'root' },
     },
   } as never, () => null)
@@ -159,7 +160,10 @@ describe('ui-plugin-manager browser plugin', () => {
     const entry = b.slots.entries('main')[0]!
     assert(entry.store && 'create' in entry.store)
     expect(entry.store.create().getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'package', name: 'dsh-navigation-test' } })
-    expect(entry.component).toBe(PluginManagerPage)
+    expect(typeof entry.component).toBe('function')
+    const title = b.slots.entries('shell.mobile.header.title')[0]!
+    expect(title.component).toBe(PluginManagerTitle)
+    expect(title.store).toBe(entry.store)
     expect(entry.options).toMatchObject({ key: PANEL_ID })
     expect(entry.locale).toBe(NS)
     // The sidebar entry addresses the page by the same id and speaks the dictionary.

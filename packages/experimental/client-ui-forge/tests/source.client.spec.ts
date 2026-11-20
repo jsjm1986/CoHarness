@@ -38,8 +38,9 @@ function source() {
     open: (signal): PanelStream => {
       const stream = feed()
       stream.signal = signal
+      signal.addEventListener('abort', () => { stream.dispose() }, { once: true })
       streams.push(stream)
-      return stream
+      return { [Symbol.asyncIterator]: () => stream[Symbol.asyncIterator]() }
     },
     subscribeReset: (listener) => {
       resets.add(listener)

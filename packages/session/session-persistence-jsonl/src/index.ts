@@ -1005,7 +1005,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     return {
       meta: stored.meta,
       inheritedEventCount: stored.inheritedEventCount,
-      filename: basename(path, logSuffix(this.compression)),
+      filename: `${basename(path, logSuffix(this.compression))}.jsonl`,
       content,
     }
   }

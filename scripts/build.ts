@@ -38,6 +38,8 @@ export interface BuildArguments {
   readonly scope: BuildScope
   /** Client build profile requested by `--profile`; `complete` and `artifacts` scopes only. */
   readonly profile: string | undefined
+  /** Re-emit package artifacts through the TypeScript builder. */
+  readonly forceEmit: boolean
 }
 
 /**
@@ -45,7 +47,7 @@ export interface BuildArguments {
  * @param args - Arguments after the script path.
  * @returns The selected scope and requested client build profile.
  * @throws If an option is unknown, the scope is not `artifacts`, `check`, or `typecheck`,
- *   or `--profile` accompanies `--scope check` or `--scope typecheck`.
+ *   or an artifact option accompanies `--scope check` or `--scope typecheck`.
  */
 export function parseBuildArguments(args: readonly string[]): BuildArguments {
   const { values } = parseArgs({
@@ -53,6 +55,7 @@ export function parseBuildArguments(args: readonly string[]): BuildArguments {
     options: {
       profile: { type: 'string' },
       scope: { type: 'string' },
+      'force-emit': { type: 'boolean' },
     },
     allowPositionals: false,
   })
@@ -63,7 +66,10 @@ export function parseBuildArguments(args: readonly string[]): BuildArguments {
   if ((scope === 'check' || scope === 'typecheck') && values.profile !== undefined) {
     throw new Error(`build: --profile selects artifact values and does not apply to --scope ${scope}`)
   }
-  return { scope, profile: values.profile }
+  if ((scope === 'check' || scope === 'typecheck') && values['force-emit']) {
+    throw new Error('build: --force-emit applies to complete and artifact builds')
+  }
+  return { scope, profile: values.profile, forceEmit: values['force-emit'] === true }
 }
 
 /**
@@ -79,6 +85,7 @@ export function parseBuildArguments(args: readonly string[]): BuildArguments {
  * @param root - Repository root containing the compiler and bundle configurations.
  * @param scope - Steps to include.
  * @param environment - Environment overlay applied to every step; the parent value of a key mapped to `undefined` is removed.
+ * @param forceEmit - Recompile the referenced package projects before bundling.
  * @returns The gate graph in report order.
  * @throws If an aggregate configuration is invalid.
  */
@@ -86,12 +93,13 @@ export function buildGates(
   root: string,
   scope: BuildScope,
   environment: Readonly<Record<string, string | undefined>> = {},
+  forceEmit = false,
 ): Gate[] {
   const env = { ...environment }
   const gates: Gate[] = []
   if (scope === 'complete' || scope === 'artifacts') {
     gates.push(pnpmGate('native', 'native addon', ['run', 'build:native-system'], [], env))
-    for (const step of libraryBuildSteps(root, 'all')) {
+    for (const step of libraryBuildSteps(root, 'all', forceEmit ? 'force-emit' : 'checked')) {
       gates.push(libraryGate(step, step.id === 'host-src' ? ['native'] : step.needs, env))
     }
     gates.push(pnpmGate('web', 'Web build', ['run', 'build:web'], ['client-bundle'], env))
@@ -155,7 +163,7 @@ async function main(): Promise<number> {
   if (!process.features.typescript) {
     throw new Error('build: Node.js TypeScript type stripping is unavailable in this Node.js process; remove --no-experimental-strip-types from NODE_OPTIONS or use a Node.js build with TypeScript support')
   }
-  const { scope, profile } = parseBuildArguments(process.argv.slice(2))
+  const { scope, profile, forceEmit } = parseBuildArguments(process.argv.slice(2))
   const root = resolve(import.meta.dirname, '..')
   const name = scope === 'complete' ? 'build' : scope === 'typecheck' ? 'typecheck' : `build:${scope}`
   const budget = defaultParallelism()
@@ -172,7 +180,7 @@ async function main(): Promise<number> {
   const clientEnvironment = resolveClientBuildEnvironment(repositoryEnvironment, profile ?? process.env[CLIENT_BUILD_PROFILE_SELECTOR])
   const environment = environmentOverlay(process.env, clientBuildProcessEnvironment(process.env, clientEnvironment))
   rmSync(resolve(root, CLIENT_BUILD_RECORD_PATH), { force: true })
-  const gates = buildGates(root, scope, environment)
+  const gates = buildGates(root, scope, environment, forceEmit)
   const exitCode = await runAggregate(name, gates, workers(gates))
   if (exitCode !== 0) return exitCode
   const record = writeClientBuildRecord(root, clientEnvironment)

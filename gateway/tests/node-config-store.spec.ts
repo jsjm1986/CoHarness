@@ -66,6 +66,20 @@ it('queues exactly the reviewed revision and prevents edits while an apply is pe
   await expect(f.store.save(f.identity, 1, initial.desired, 1)).rejects.toThrow('in-progress')
 })
 
+it('keeps remote desktop explicit, revisioned and compatible with existing node settings', async () => {
+  const f = await fixture(), initial = await f.store.view(1)
+  expect(initial.effective.HGW_REMOTE_DESKTOP).toBe('on')
+  const desired = { ...initial.desired, HGW_REMOTE_DESKTOP: 'off' }
+  await f.store.save(f.identity, initial.revision, desired, 1)
+  expect((await f.store.view(1))).toMatchObject({ desired: { HGW_REMOTE_DESKTOP: 'off' }, effective: { HGW_REMOTE_DESKTOP: 'on' } })
+  expect((await loadManagedNodeEnvironment(f.env)).HGW_REMOTE_DESKTOP).toBe('on')
+  const legacy = { ...desired } as Record<string, unknown>
+  delete legacy.HGW_REMOTE_DESKTOP
+  expect(parseNodeSettingValues(legacy, f.env).HGW_REMOTE_DESKTOP).toBe('on')
+  expect(parseNodeSettingValues(legacy, { ...f.env, HGW_REMOTE_DESKTOP: 'off' }).HGW_REMOTE_DESKTOP).toBe('off')
+  expect(() => parseNodeSettingValues({ ...desired, HGW_REMOTE_DESKTOP: 'auto' }, f.env)).toThrow('HGW_REMOTE_DESKTOP')
+})
+
 it('rejects commands, injected lines, invalid ports, origins and paths at the public input parser', async () => {
   const f = await fixture(), { desired } = await f.store.view(1)
   for (const invalid of [

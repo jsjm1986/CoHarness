@@ -13,7 +13,7 @@ import { en, zh } from '../src/client/locales.ts'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 
 const SID = 's1' as SessionId
@@ -381,6 +381,7 @@ describe('QuestionComposer', () => {
   })
 
   it('surfaces cancellation failures and re-arms the controls', async () => {
+    const diagnostics = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { carrier, dismiss } = wait()
     dismiss
       .mockRejectedValueOnce(new Error('第一次取消失败'))
@@ -388,14 +389,18 @@ describe('QuestionComposer', () => {
     render(<QuestionComposer matched={carrier} {...kit} />)
 
     fireEvent.click(screen.getByRole('button', { name: '放弃整组问题' }))
-    expect(await screen.findByText('第一次取消失败')).toBeTruthy()
+    expect(await screen.findByText(zh['error.dismiss'])).toBeTruthy()
+    expect(screen.queryByText('第一次取消失败')).toBeNull()
+    expect(diagnostics).toHaveBeenLastCalledWith('[ui-user-questions] Question cancellation was not confirmed.', expect.objectContaining({ message: '第一次取消失败' }))
     expect(screen.getByRole<HTMLButtonElement>('button', { name: '跳过' }).disabled).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: '放弃整组问题' }))
-    expect(await screen.findByText('第二次取消失败')).toBeTruthy()
+    expect(await screen.findByText(zh['error.dismiss'])).toBeTruthy()
+    expect(diagnostics).toHaveBeenCalledTimes(2)
   })
 
   it('surfaces answer rejection and resets local drafts for a different request', async () => {
+    const diagnostics = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const first = wait()
     const view = render(<QuestionComposer matched={first.carrier} {...kit} />)
 
@@ -419,11 +424,14 @@ describe('QuestionComposer', () => {
       { id: 'detail', selected: [], custom: 'x' },
       { id: 'signals', selected: ['系统设计'] },
     ]))
-    expect(await screen.findByText('网络中断')).toBeTruthy()
+    expect(await screen.findByText(zh['error.submit'])).toBeTruthy()
+    expect(screen.queryByText('网络中断')).toBeNull()
+    expect(diagnostics).toHaveBeenLastCalledWith('[ui-user-questions] Question submission was not confirmed.', expect.objectContaining({ message: '网络中断' }))
     expect(screen.getByRole<HTMLButtonElement>('button', { name: '提交' }).disabled).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: '提交' }))
-    expect(await screen.findByText('字符串错误')).toBeTruthy()
+    expect(await screen.findByText(zh['error.submit'])).toBeTruthy()
+    expect(diagnostics).toHaveBeenLastCalledWith('[ui-user-questions] Question submission was not confirmed.', '字符串错误')
   })
 
   it('renders chrome copy through the English dictionary', () => {
@@ -544,7 +552,7 @@ describe('timed card', () => {
         expect(carrier.snapshot().countdown).toEqual({ remainingMs: 2_000, running: true })
       }
     } finally {
-      act(() => { request.channel.resolve({ answers: [{ id: 'free', selected: [] }] }) })
+      await act(async () => { await request.channel.resolve({ answers: [{ id: 'free', selected: [] }] }) })
       await request.result
       cleanup()
       carrier.close()

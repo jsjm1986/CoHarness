@@ -1,11 +1,12 @@
 /** Gateway-owned authority for already admitted event WebSockets. */
 import type { StreamSessionQualification } from './auth.ts'
+import type { RuntimeTarget } from './instances.ts'
 import type { GatewayRequestContext } from './server.ts'
 import type { GatewayPrincipalClaims, GatewayPrincipalSigner, PrincipalScope } from './principal.ts'
 
 /** Runtime identity verified by the existing private bearer-token admission. */
 export interface StreamLeaseRuntime {
-  target: { kind: 'user' | 'project'; id: number }
+  target: RuntimeTarget
   generation: number
 }
 
@@ -152,7 +153,7 @@ export class StreamPrincipalLeases {
     return entry !== undefined && !this.closed && !entry.signal.aborted
       && this.entries.get(entry.id) === entry && entry.expiresAt > Date.now()
       && entry.claims.runtime.kind === runtime.target.kind && entry.claims.runtime.id === runtime.target.id
-      && entry.claims.runtime.generation === runtime.generation
+      && entry.claims.runtime.runtimeId === runtime.target.runtimeId && entry.claims.runtime.generation === runtime.generation
   }
 
   private arm(entry: Entry): void {

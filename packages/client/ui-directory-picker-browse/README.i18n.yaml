@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-directory-picker-browse/README.md
 document:
-  en: 46f3fb40b81e81b59c895f9ab70b50a9a0e8d050
-  zh: 014613a03ae0db9a1e428808f08275bcf8b22579
+  en: 6a178511e244464e57add39f0f4b68548e0772e1
+  zh: ec43b53470631f88d1d213775437efbc4037f4bf
 /:
   en: ca81a9216ffd7357
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-ui-directory-picker-browse:
-  en: 3f79f8422e9c328c
-  zh: e18e0bf999897496
+  en: 6edaeeae334c84a1
+  zh: 972e98b979bcee9b
 /deepseek-ai-dsh-client-ui-directory-picker-browse/summary:
   en: bc47bb4e84459d7f
   zh: 321afd2438ac00e0

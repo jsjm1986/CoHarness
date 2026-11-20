@@ -15,10 +15,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import { TerminalGuideIcon } from './TerminalIcon.tsx'
 import { TerminalGuide, type TerminalGuideInjected } from './TerminalGuide.tsx'
 import { LazyTerminalBody } from './LazyTerminalBody.tsx'
-import { TerminalTitle } from './TerminalTitle.tsx'
+import { TerminalTitle, TerminalRenameItem } from './TerminalTitle.tsx'
 import { TerminalRecovery, type TerminalRecoveryInjected } from './TerminalRecovery.tsx'
 import { TerminalCleanup, type TerminalCleanupInjected } from './TerminalCleanup.tsx'
-import type { TerminalBodyInjected, TerminalInjected } from './face.ts'
+import type { TerminalBodyInjected, TerminalInjected, TerminalRenameInjected, TerminalTitleInjected } from './face.ts'
 import { en, zh } from './locales.ts'
 
 /** Services needed by the terminal's two sidebar seats. */
@@ -31,8 +31,9 @@ export const inject = ['slots', 'locale', 'sidebarRight', 'sidebarRightTabs', 'w
 export function apply(ctx: Context): void {
   let disposed = false
   const recovered = new Map<SessionId, { owner: string; consumers: Set<AbortSignal>; promise: Promise<void> }>()
+  const renameTitles = new Map<SessionId, Map<string, () => void>>()
   const connection = ctx.get('connection') as ConnectionHandle
-  ctx.effect(() => () => { disposed = true; recovered.clear() }, 'ui-sidebar-terminal.lifetime')
+  ctx.effect(() => () => { disposed = true; recovered.clear(); renameTitles.clear() }, 'ui-sidebar-terminal.lifetime')
   ctx.effect(() => {
     const sync = (): void => { ctx.webTerminals.retainTabs(ctx.sidebarRight.openTabs.getSnapshot().filter(tab => tab.kind === 'terminal')) }
     const unsubscribe = ctx.sidebarRight.openTabs.subscribe(sync)
@@ -84,7 +85,19 @@ export function apply(ctx: Context): void {
     }, LazyTerminalBody,
   )), 'ui-sidebar-terminal.body')
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
-    { name: 'sidebar.right.pane.tab.title', key: id, locale: namespace, inject }, TerminalTitle,
+    { name: 'sidebar.right.pane.tab.title', key: id, locale: namespace,
+      inject: (sessionId): TerminalTitleInjected => ({ ...inject(sessionId), bindRename: (key, edit) => {
+        let titles = renameTitles.get(sessionId)
+        if (titles === undefined) { titles = new Map(); renameTitles.set(sessionId, titles) }
+        const current = titles
+        current.set(key, edit)
+        return () => {
+          if (current.get(key) !== edit) return
+          current.delete(key)
+          if (current.size === 0) renameTitles.delete(sessionId)
+        }
+      } }),
+    }, TerminalTitle,
   )), 'ui-sidebar-terminal.title')
   ctx.effect(() => ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
     name: 'conversation.input.left', id, locale: namespace,
@@ -113,14 +126,16 @@ export function apply(ctx: Context): void {
           const canPublish = (): boolean => ownership.getSnapshot() === owner && recovered.get(sessionId)?.promise === promise
             && [...consumers].some(consumer => !consumer.aborted)
           const promise: Promise<void> = (async () => {
-            for (const tab of ctx.sidebarRight.tabsIn(sessionId)) {
-              if (tab.kind === 'terminal') view(sessionId, tab.id)
-            }
+            const saved = ctx.sidebarRight.tabsIn(sessionId).filter(tab => tab.kind === 'terminal').map(tab => view(sessionId, tab.id))
             const terminals = await ctx.webTerminals.recover(sessionId)
             if (!canPublish()) return
             for (const info of terminals) ctx.sidebarRight.openTabIn(sessionId, 'terminal', {
               params: { terminalId: info.id },
             })
+            await Promise.all(saved.map(async (model) => {
+              const state = model.state.getSnapshot()
+              if (state.phase === 'failed' && state.info === undefined && state.issue === undefined) await model.refresh()
+            }))
           })().catch((error: unknown) => { if (canPublish()) throw error })
             .finally(() => { if (recovered.get(sessionId)?.promise === promise) recovered.delete(sessionId) })
           pending = { owner, consumers, promise }
@@ -138,4 +153,10 @@ export function apply(ctx: Context): void {
       retryClose: (terminalId) => { ctx.webTerminals.retryClose(terminalId) },
     }),
   }, TerminalCleanup)), 'ui-sidebar-terminal.cleanup')
+  ctx.effect(() => ctx.slots.inject('sidebar.right.tab.menu.item', () => ctx.slots.register({
+    name: 'sidebar.right.tab.menu.item', id, locale: namespace,
+    inject: (sessionId): TerminalRenameInjected => ({
+      renameTitle: (key) => { renameTitles.get(sessionId)?.get(key)?.() },
+    }),
+  }, TerminalRenameItem)), 'ui-sidebar-terminal.rename-menu')
 }

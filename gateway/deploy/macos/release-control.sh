@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-ACTIVATION_LOCK=''
+RELEASE_LOCK=''
 
 fail() {
   printf 'harness-gateway release control: %s\n' "$*" >&2
@@ -24,6 +24,7 @@ load_environment() {
   source "$env_file"
   set +a
 
+  RELEASES_CONFIGURED="${HGW_RELEASES_ROOT:-$HOME/harness-gateway-releases}"
   RELEASES_ROOT="$(canonical_directory "${HGW_RELEASES_ROOT:-$HOME/harness-gateway-releases}")" \
     || fail "release root not found: ${HGW_RELEASES_ROOT:-$HOME/harness-gateway-releases}"
   NODE="${HGW_NODE:-}"
@@ -43,6 +44,12 @@ load_environment() {
   fi
 }
 
+lock_release_operations() {
+  RELEASE_LOCK="$RELEASES_ROOT/.activation.lock"
+  mkdir "$RELEASE_LOCK" 2>/dev/null || fail "another release operation holds $RELEASE_LOCK"
+  trap 'rmdir "$RELEASE_LOCK" 2>/dev/null || true' EXIT
+}
+
 assert_direct_release() {
   local release="$1"
   [[ "$(dirname "$release")" == "$RELEASES_ROOT" ]] \
@@ -54,6 +61,31 @@ validate_release() {
   local release="$1"
   local allow_legacy="${2:-false}"
   local required
+  local manifest="$release/gateway/deploy/required-release-files.txt"
+  if [[ -f "$release/gateway/lib/launch-stamp.js" ]] \
+    && grep -qF './runtime-dependency-fingerprint.js' "$release/gateway/lib/launch-stamp.js"; then
+    for required in "$manifest" "$release/gateway/lib/runtime-dependencies.json" "$release/gateway/lib/runtime-dependency-fingerprint.js"; do
+      [[ -f "$required" && -s "$required" ]] || fail "release payload is missing or empty: $required"
+    done
+  fi
+  if [[ -e "$manifest" ]]; then
+    [[ -f "$manifest" && -s "$manifest" ]] || fail "release manifest is missing or invalid: $manifest"
+    local has_supervisor=false
+    while IFS= read -r required || [[ -n "$required" ]]; do
+      [[ "$required" =~ ^[A-Za-z0-9_-][A-Za-z0-9_./-]*$ && "/$required/" != *'/../'* && "/$required/" != *'/./'* && "$required" != *'//'* && "$required" != */ ]] \
+        || fail "release manifest contains an invalid path: $manifest"
+      [[ -f "$release/$required" && -s "$release/$required" ]] || fail "release payload is missing or empty: $release/$required"
+      if [[ "$required" == 'gateway/lib/local-runtime-supervisor.js' ]]; then has_supervisor=true; fi
+    done < "$manifest"
+    [[ "$has_supervisor" == true ]] || fail "release manifest omits the local Runtime supervisor: $manifest"
+    if [[ "$allow_legacy" == false && -s "$release/gateway/lib/runtime-dependencies.json" ]]; then
+      "$NODE" "$release/gateway/lib/runtime-dependency-fingerprint.js" --verify-release "$release" \
+        || fail "release Runtime dependencies differ from the built fingerprint: $release"
+    fi
+  elif [[ -f "$release/gateway/lib/launcher.js" ]] && grep -qF 'local-runtime-supervisor.' "$release/gateway/lib/launcher.js"; then
+    [[ -f "$release/gateway/lib/local-runtime-supervisor.js" && -s "$release/gateway/lib/local-runtime-supervisor.js" ]] \
+      || fail "release payload is missing or empty: $release/gateway/lib/local-runtime-supervisor.js"
+  fi
   for required in \
     apps/cli/lib/bin.js \
     apps/web/dist/index.html \
@@ -233,40 +265,32 @@ process_cwd() {
   lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
 }
 
-descendant_pids() {
-  local root="$1"
-  local parent
-  local pid
-  local ppid
-  local -a queue=("$root")
-  local -a found=()
-
-  while ((${#queue[@]} > 0)); do
-    parent="${queue[0]}"
-    queue=("${queue[@]:1}")
-    while read -r pid ppid; do
-      [[ -n "$pid" && "$ppid" == "$parent" ]] || continue
-      [[ "$pid" == "$$" || "$pid" == "$PPID" ]] && continue
-      found+=("$pid")
-      queue+=("$pid")
-    done < <(ps -axo pid=,ppid=)
-  done
-
-  if ((${#found[@]} > 0)); then printf '%s\n' "${found[@]}"; fi
+assert_stopped_deployment() {
+  local state=''
+  state="$(launchctl print "$DOMAIN/$LABEL" 2>/dev/null)" \
+    || fail 'cannot inspect the registered Gateway job; no release or process was changed'
+  local pid=''
+  pid="$(printf '%s\n' "$state" | awk '$1 == "pid" && $2 == "=" { print $3; exit }')"
+  [[ -z "$pid" ]] || fail "Gateway pid $pid is running; enter maintenance, verify Runtime and scheduled-work shutdown, then stop the Gateway before activation; no process was stopped"
+  local processes=''
+  processes="$(ps -axo pid=,command=)" || fail 'cannot inspect Runtime processes; activation refused'
+  local process_pid command
+  while read -r process_pid command; do
+    [[ "$process_pid" == "$$" || "$process_pid" == "$PPID" ]] && continue
+    case "$command" in
+      *"$RELEASES_ROOT/"*|*"$RELEASES_CONFIGURED/"*)
+        case "$command" in
+          *local-runtime-supervisor*|*apps/cli/lib/bin.js*|*gateway/lib/index.js*)
+            fail "release process $process_pid is still running; retained Runtime work may include long tasks and schedules; no process was stopped" ;;
+        esac ;;
+    esac
+  done <<< "$processes"
 }
 
-terminate_pids() {
-  local pids="$1"
-  local pid
-  while read -r pid; do
-    [[ -n "$pid" ]] || continue
-    kill -TERM "$pid" 2>/dev/null || true
-  done <<< "$pids"
-  sleep 1
-  while read -r pid; do
-    [[ -n "$pid" ]] || continue
-    kill -KILL "$pid" 2>/dev/null || true
-  done <<< "$pids"
+preflight() {
+  load_environment
+  assert_stopped_deployment
+  printf 'Gateway and release Runtime processes are stopped; activation does not stop work or establish a maintenance window\n'
 }
 
 health_release() {
@@ -313,6 +337,29 @@ switch_current() {
     "$temporary" "$RELEASES_ROOT/current"
 }
 
+release_schema_checker() {
+  local owner
+  for owner in "$@"; do
+    if [[ -n "$owner" && "$(dirname "$owner")" == "$RELEASES_ROOT" && -s "$owner/gateway/lib/release-schema-check.js" ]]; then
+      printf '%s\n' "$owner/gateway/lib/release-schema-check.js"
+      return 0
+    fi
+  done
+  return 1
+}
+
+check_release_schema() (
+  local checker="$1" mode="$2" candidate="$3" selected="$4"
+  unset HGW_DSH_COMMAND HGW_DSH_REPO_ROOT HGW_MODEL_GOVERNANCE_PACKAGE HGW_GATEWAY_DIR
+  if [[ "${HGW_GUARD_PATCH:-}" != 'off' ]]; then unset HGW_GUARD_PATCH; fi
+  cd "$selected/gateway" || return 1
+  if [[ -s "$selected/gateway/lib/index.js" ]]; then
+    "$NODE" "$checker" "$mode" "$candidate" "$selected"
+  else
+    "$NODE" --import tsx/esm "$checker" "$mode" "$candidate" "$selected"
+  fi
+)
+
 run_gateway() {
   load_environment
   local release
@@ -356,6 +403,7 @@ activate_release() {
     *) fail 'usage: release-control.sh activate <release-directory> [--rollback-target <release-directory>]' ;;
   esac
   load_environment
+  lock_release_operations
   local release
   release="$(activation_target "$1")"
   local rollback=''
@@ -364,31 +412,20 @@ activate_release() {
     [[ "$rollback" != "$release" ]] || fail 'rollback target must differ from the activated release'
   fi
 
-  ACTIVATION_LOCK="$RELEASES_ROOT/.activation.lock"
-  mkdir "$ACTIVATION_LOCK" 2>/dev/null || fail "another release operation holds $ACTIVATION_LOCK"
-  trap 'rmdir "$ACTIVATION_LOCK" 2>/dev/null || true' EXIT
-
   local previous=''
-  local previous_pid=''
-  local previous_children=''
   previous="$(current_release || true)"
-  if [[ -z "$rollback" ]]; then rollback="$previous"; fi
-  previous_pid="$(launch_pid || true)"
-  if [[ -n "$previous_pid" ]]; then previous_children="$(descendant_pids "$previous_pid")"; fi
+  if [[ -z "$rollback" && "$previous" != "$release" ]]; then rollback="$previous"; fi
+  assert_stopped_deployment
+  local checker
+  checker="$(release_schema_checker "$release" "$previous" "$rollback")" \
+    || fail 'no installed release schema checker is available; stage a release that provides it'
+  check_release_schema "$checker" activate "$release" "$release" \
+    || fail "activation refused because database schema compatibility for $(basename "$release") could not be proved"
+  assert_stopped_deployment
   switch_current "$release"
 
-  if launchctl kickstart -k "$DOMAIN/$LABEL"; then
-    terminate_pids "$previous_children"
-  fi
-  if [[ -n "$previous_pid" ]] \
-    && [[ -n "$(launch_pid || true)" ]] \
-    && [[ "$(launch_pid || true)" == "$previous_pid" ]]; then
-    kill -TERM "$previous_pid" 2>/dev/null || true
-    sleep 1
-    kill -KILL "$previous_pid" 2>/dev/null || true
-  fi
-  if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 \
-    && wait_for_release "$release" "$previous_pid"; then
+  # Without -k, a concurrent launch is never terminated to force activation.
+  if launchctl enable "$DOMAIN/$LABEL" && launchctl kickstart "$DOMAIN/$LABEL" && wait_for_release "$release" ''; then
     if launchctl print "$DOMAIN/$LABEL-config" >/dev/null 2>&1; then
       launchctl kickstart -k "$DOMAIN/$LABEL-config" || fail 'Gateway activated but the configuration applier could not restart'
     fi
@@ -396,20 +433,23 @@ activate_release() {
     return 0
   fi
 
-  local failed_pid=''
-  failed_pid="$(launch_pid || true)"
-  local failed_children=''
-  if [[ -n "$failed_pid" ]]; then failed_children="$(descendant_pids "$failed_pid")"; fi
-  terminate_pids "$failed_children"
-  if [[ -z "$rollback" ]]; then
-    fail "release $(basename "$release") failed health verification and no previous release exists"
+  # An unhealthy candidate can already own work. A live or unobservable process
+  # keeps its release selected; rollback must not signal it or its descendants.
+  if ! (assert_stopped_deployment); then
+    fail "release $(basename "$release") failed health verification; candidate retained because shutdown is not confirmed; no process was stopped"
   fi
+  [[ -n "$rollback" ]] || fail "release $(basename "$release") failed health verification and no previous release exists"
+  # launchd can retry a failed KeepAlive job while the database is being checked.
+  launchctl disable "$DOMAIN/$LABEL" \
+    || fail "release $(basename "$release") failed health verification; rollback refused because automatic Gateway launch could not be paused"
+  if ! (assert_direct_release "$rollback" && validate_release "$rollback" true \
+    && check_release_schema "$checker" rollback "$release" "$rollback"); then
+    fail "release $(basename "$release") failed health verification; rollback $(basename "$rollback") refused because compatibility with the installed database schemas could not be proved; current remains selected and automatic Gateway launch is paused"
+  fi
+  assert_stopped_deployment
+  [[ "$(current_release || true)" == "$release" ]] || fail 'current changed during database schema verification; rollback refused'
   switch_current "$rollback"
-  if launchctl kickstart -k "$DOMAIN/$LABEL"; then
-    terminate_pids "$failed_children"
-  fi
-  if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 \
-    && wait_for_release "$rollback" "$failed_pid"; then
+  if launchctl enable "$DOMAIN/$LABEL" && launchctl kickstart "$DOMAIN/$LABEL" && wait_for_release "$rollback" ''; then
     fail "release $(basename "$release") failed health verification; restored $(basename "$rollback")"
   fi
   fail "release $(basename "$release") failed health verification and rollback $(basename "$rollback") did not become healthy"
@@ -418,6 +458,7 @@ activate_release() {
 prune_release() {
   [[ $# -eq 1 ]] || fail 'usage: release-control.sh prune <release-directory>'
   load_environment
+  lock_release_operations
   local release
   release="$(canonical_directory "$1")" || fail "release directory not found: $1"
   assert_direct_release "$release"
@@ -471,5 +512,6 @@ case "${1:-}" in
   activate) shift; activate_release "$@" ;;
   prune) shift; prune_release "$@" ;;
   status) shift; [[ $# -eq 0 ]] || fail 'status accepts no arguments'; status ;;
-  *) fail 'usage: release-control.sh {run|config <watch|status|apply|recover>|activate <release> [--rollback-target <release>]|prune <release>|status}' ;;
+  preflight) shift; [[ $# -eq 0 ]] || fail 'preflight accepts no arguments'; preflight ;;
+  *) fail 'usage: release-control.sh {run|config <watch|status|apply|recover>|activate <release> [--rollback-target <release>]|prune <release>|status|preflight}' ;;
 esac

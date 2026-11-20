@@ -1,0 +1,7 @@
+- dialog "确认移入回收站":
+  - heading "确认移入回收站" [level=2]
+  - paragraph: 文档会从作用域中移入可恢复回收站，并写入审计日志。保留期结束后才会永久清理。
+  - button "关闭"
+  - alert: QA write refused. The reviewed record remains unchanged.
+  - button "取消"
+  - button "移入回收站"

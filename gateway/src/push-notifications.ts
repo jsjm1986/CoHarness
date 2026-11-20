@@ -24,6 +24,22 @@ async function pushErrorBody(response: Response): Promise<string> {
   }
 }
 
+async function acceptedPushReceipt(response: Response, field: 'name' | 'msg_id' | 'id'): Promise<PushSendReceipt> {
+  if (!response.headers.get('content-type')?.toLowerCase().includes('application/json')) {
+    try { await response.body?.cancel() }
+    catch (error) { console.error('[gateway] accepted push response cleanup failed:', error) }
+    return {}
+  }
+  try {
+    const parsed = object(JSON.parse(await pushErrorBody(response)))
+    const messageId = nonEmptyString(parsed?.[field])
+    return messageId === undefined ? {} : { messageId }
+  } catch {
+    // HTTP acceptance remains sufficient when the provider omits a correlation id.
+    return {}
+  }
+}
+
 /** Provider used to address one Android push registration. */
 export type PushProvider = 'fcm' | 'jpush' | 'unifiedpush'
 
@@ -40,6 +56,7 @@ export interface PushDeviceRegistration {
 export interface PushReceiptInput {
   provider: PushProvider
   token: string
+  runtimeId?: RuntimeId
   sessionId: string
   eventSeq: number
   kind: 'arrived' | 'opened'
@@ -109,8 +126,8 @@ export interface GatewayPushService {
   /**
    * Record a device-reported arrival or open against the accepted delivery owned by that device.
    * @param userId - server-authenticated public account id; the device must still belong to this account.
-   * @param input - validated receipt carrying the provider token, session id, event sequence, and outcome kind.
-   * @returns `recorded` when a matching accepted delivery was marked (or was already marked), `missing` otherwise.
+   * @param input - device, optional exact Runtime, Session, event sequence, and outcome.
+   * @returns `recorded` for one owned delivery, or `missing` for an absent or ambiguous delivery.
    */
   recordReceipt(userId: number, input: PushReceiptInput): Promise<'recorded' | 'missing'>
   /**
@@ -295,16 +312,7 @@ export class FcmHttpV1Sender implements PushSender {
         }),
       },
     )
-    if (response.ok) {
-      try {
-        const parsed = object(JSON.parse(await pushErrorBody(response)))
-        const messageId = nonEmptyString(parsed?.name)
-        return messageId === undefined ? {} : { messageId }
-      } catch {
-        // An accepted send stays accepted when the provider omits a parseable message name.
-        return {}
-      }
-    }
+    if (response.ok) return acceptedPushReceipt(response, 'name')
     const body = await pushErrorBody(response)
     let code: string | undefined
     try {
@@ -383,16 +391,7 @@ export class JpushRestSender implements PushSender {
         },
       }),
     })
-    if (response.ok) {
-      try {
-        const parsed = object(JSON.parse(await pushErrorBody(response)))
-        const messageId = nonEmptyString(parsed?.msg_id)
-        return messageId === undefined ? {} : { messageId }
-      } catch {
-        // An accepted send stays accepted when the provider omits a parseable msg_id.
-        return {}
-      }
-    }
+    if (response.ok) return acceptedPushReceipt(response, 'msg_id')
     const body = await pushErrorBody(response)
     const invalidToken = response.status === 400
       && /(registration[_ -]?id|invalid audience|invalid registration|1003|1004)/i.test(body)
@@ -426,6 +425,7 @@ export class UnifiedPushEndpointSender implements PushSender {
     }
     const response = await this.request(endpoint.toString(), {
       method: 'POST',
+      redirect: 'error',
       signal,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -436,17 +436,8 @@ export class UnifiedPushEndpointSender implements PushSender {
         eventSeq: String(input.eventSeq),
       }),
     })
-    if (response.ok) {
-      try {
-        const parsed = object(JSON.parse(await pushErrorBody(response)))
-        const messageId = nonEmptyString(parsed?.id)
-        return messageId === undefined ? {} : { messageId }
-      } catch {
-        // An accepted send stays accepted when the push server omits a parseable id.
-        return {}
-      }
-    }
-    const body = await pushErrorBody(response)
+    if (response.ok) return acceptedPushReceipt(response, 'id')
+    await pushErrorBody(response)
     throw new PushSendError(`UnifiedPush send failed with HTTP ${String(response.status)}`, response.status === 400)
   }
 }
@@ -545,7 +536,10 @@ export class PostgresPushService implements GatewayPushService {
       const account = await lockActiveAccount(client, this.context, userId)
       const result = await client.query<PushDeviceRow & { last_delivery: PushDeliveryRow | null }>(`SELECT
         device.id::text,device.provider,device.device_id,device.app_version,device.created_at,device.updated_at,device.last_seen_at,
-        (SELECT row_to_json(latest) FROM (SELECT * FROM harness.push_deliveries delivery
+        (SELECT row_to_json(latest) FROM (SELECT delivery.* FROM harness.push_deliveries delivery
+          JOIN harness.conversation_sessions session ON session.organization_id=delivery.organization_id
+            AND session.runtime_namespace=delivery.runtime_namespace AND session.id=delivery.session_id
+            AND session.creator_user_id=device.user_id
           WHERE delivery.organization_id=device.organization_id AND delivery.device_id=device.id
           ORDER BY delivery.updated_at DESC LIMIT 1) latest) last_delivery
         FROM harness.push_devices device
@@ -562,20 +556,23 @@ export class PostgresPushService implements GatewayPushService {
         WHERE organization_id=$1 AND provider=$2 AND token=$3 AND user_id=$4 FOR SHARE`,
       [this.context.organizationId, input.provider, input.token, account.id])).rows[0]
       if (device === undefined) return 'missing'
-      const marked = input.kind === 'arrived'
-        ? await client.query(`UPDATE harness.push_deliveries SET
-            delivered_at=clock_timestamp(),updated_at=clock_timestamp()
-            WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4 AND delivered_at IS NULL`,
-          [this.context.organizationId, input.sessionId, input.eventSeq, device.id])
-        : await client.query(`UPDATE harness.push_deliveries SET
-            delivered_at=COALESCE(delivered_at,clock_timestamp()),opened_at=clock_timestamp(),updated_at=clock_timestamp()
-            WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4 AND opened_at IS NULL`,
-          [this.context.organizationId, input.sessionId, input.eventSeq, device.id])
-      if (marked.rowCount === 1) return 'recorded'
-      const existing = await client.query(`SELECT 1 FROM harness.push_deliveries
-        WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4`,
-        [this.context.organizationId, input.sessionId, input.eventSeq, device.id])
-      return existing.rowCount === 1 ? 'recorded' : 'missing'
+      const identity = [this.context.organizationId, input.sessionId, input.eventSeq, device.id] as const
+      const deliveries = await client.query<Pick<PushDeliveryRow, 'delivered_at' | 'opened_at'> & { runtime_namespace: string }>(`
+        SELECT delivery.runtime_namespace,delivery.delivered_at,delivery.opened_at
+        FROM harness.push_deliveries delivery
+        JOIN harness.conversation_sessions session ON session.organization_id=delivery.organization_id
+          AND session.runtime_namespace=delivery.runtime_namespace AND session.id=delivery.session_id
+        WHERE delivery.organization_id=$1 AND delivery.session_id=$2 AND delivery.event_seq=$3 AND delivery.device_id=$4
+          AND ($5::text IS NULL OR delivery.runtime_namespace=$5) AND session.creator_user_id=$6
+        LIMIT 2 FOR UPDATE OF delivery`, [...identity, input.runtimeId ?? null, account.id])
+      const [delivery] = deliveries.rows
+      if (delivery === undefined || deliveries.rows.length !== 1) return 'missing'
+      if ((input.kind === 'opened' ? delivery.opened_at : delivery.delivered_at) !== null) return 'recorded'
+      await client.query(`UPDATE harness.push_deliveries SET delivered_at=COALESCE(delivered_at,clock_timestamp()),
+        opened_at=CASE WHEN $6::boolean THEN clock_timestamp() ELSE opened_at END,updated_at=clock_timestamp()
+        WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4 AND runtime_namespace=$5`,
+      [...identity, delivery.runtime_namespace, input.kind === 'opened'])
+      return 'recorded'
     })
   }
 

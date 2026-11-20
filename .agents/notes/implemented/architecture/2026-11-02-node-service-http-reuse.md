@@ -12,6 +12,8 @@ High database round-trip time amplifies connection setup and serial permission r
 
 The primary Gateway owns a bounded pool of idle HTTP service connections for each computer. A connection serves one HTTP request at a time. Browser WebSockets retain their separate, exclusively owned streams. Idle capacity and expiry use the existing node-service configuration owner and count toward its connection limits.
 
+The Runtime HTTP proxy removes connection-specific fields and fields named by the upstream `Connection` header. The downstream HTTP server sets its own framing and connection lifetime. This lets a completed response reuse the node-service connection when the local Runtime closes its upstream hop. An incomplete response closes the borrowed connection.
+
 HTTP acquisition waits for owned borrowers or physical retirement when a burst reaches the service limit. The queue has explicit pending-request and elapsed-time limits; completed responses hand their connection to waiting borrowers, which renew authority before use. Cancellation withdraws only that waiter. Shutdown closes admission and joins waiters and active transports. A full budget consisting only of unrelated active streams retains its busy refusal. Queue wakeups do not replay an HTTP operation.
 
 Transport reuse preserves authorization on both Gateways. Each borrower rechecks the exact node credential, connection UUID and lease epoch at the primary, while the destination retains its account, computer, project and Runtime checks. Withdrawal, channel replacement and shutdown close affected streams. Cancelling a request closes its borrowed connection without cancelling another request. Release and destruction retire the borrower once; a late callback from that borrower cannot close a successor's connection. Forwarded operations are never replayed after a failed reused connection.
@@ -31,3 +33,5 @@ Transport reuse removes repeated destination identity handshakes without retaini
 ## Verification
 
 Socket tests cover reuse, bounded idle retention, expiry, cancellation, credential revocation, channel replacement, independent WebSocket streams, detach and shutdown. PostgreSQL tests exercise credential replacement, revocation, epoch and organization changes during lock waits, including a lease that expires without any row update. User acceptance measures the deployed Gateway path separately from model response time and verifies independent computer, Runtime, Workspace and browser-tab identities.
+
+The Gateway proxy test consumes repeated chunked responses from a Runtime that closes each upstream connection. It checks that response bodies are complete, connection-specific fields stay within their hop and the downstream client uses one socket.

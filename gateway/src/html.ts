@@ -1,3 +1,5 @@
+import { MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH } from './password.ts'
+
 /** Escape one value before inserting it into Gateway-owned HTML. */
 export function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
@@ -30,6 +32,8 @@ const GATE_COPY = {
     waitingTitle: '正在启动 - COHARNESS', waitingHeading: '正在启动您的工作台…',
     waitingBody: '正在准备工作台服务，页面会自动连接。', waitingProgress: '工作台启动进度',
     waitingHint: '通常需要几秒钟，页面会自动刷新。',
+    observingHeading: '正在确认工作台状态…', observingBody: '启动请求已发出，正在确认原工作环境是否就绪。',
+    observingHint: '无需重复启动；就绪后会自动打开。',
     stoppedTitle: '工作台已停止 - COHARNESS', stoppedHeading: '工作台已手动停止',
     stoppedBody: '后台请求不会自动启动。您可以主动启动并打开工作台。', stoppedStart: '启动并打开',
     startFailureTitle: '无法打开工作台 - COHARNESS', startFailureHeading: '工作台未能打开',
@@ -40,6 +44,7 @@ const GATE_COPY = {
     startFailureChanged: '此工作环境的状态已变化，请返回空间列表检查后再试',
     startFailureInvalid: '启动信息无效，请返回空间列表重新选择工作环境',
     startFailureUnknown: '启动未能完成，请返回空间列表检查状态或联系管理员',
+    startFailurePending: '暂时无法确认启动结果。后台启动可能仍在继续，请在空间列表查看原工作环境的状态。',
     startFailureRetry: '重试启动', startFailureChoose: '返回空间列表',
     environmentsTitle: '选择工作环境 - COHARNESS', environmentsHeading: '选择工作环境',
     environmentsBody: '每个标签页保留自己的工作环境，可在新标签页中并行打开其他环境',
@@ -56,6 +61,8 @@ const GATE_COPY = {
     waitingTitle: 'Starting - COHARNESS', waitingHeading: 'Starting your workbench…',
     waitingBody: 'Preparing the workbench service; this page connects automatically.', waitingProgress: 'Workbench startup progress',
     waitingHint: 'This usually takes a few seconds; the page refreshes itself.',
+    observingHeading: 'Checking your workbench…', observingBody: 'The start request was sent. Checking whether the selected environment is ready.',
+    observingHint: 'No need to start again; this page opens the workbench when it is ready.',
     stoppedTitle: 'Workbench stopped - COHARNESS', stoppedHeading: 'The workbench was stopped manually',
     stoppedBody: 'Background requests will not start it. Start it yourself to open the workbench.', stoppedStart: 'Start and open',
     startFailureTitle: 'Unable to open the workbench - COHARNESS', startFailureHeading: 'The workbench could not open',
@@ -66,6 +73,7 @@ const GATE_COPY = {
     startFailureChanged: 'The environment state has changed. Check it in the space list before trying again.',
     startFailureInvalid: 'The startup information is invalid. Choose the environment again from the space list.',
     startFailureUnknown: 'Startup did not complete. Check its state in the space list or contact an administrator.',
+    startFailurePending: 'The startup result is still unknown. Startup may continue in the background. Check the original environment in the space list.',
     startFailureRetry: 'Retry startup', startFailureChoose: 'Back to spaces',
     environmentsTitle: 'Choose an environment - COHARNESS', environmentsHeading: 'Choose an environment',
     environmentsBody: 'Each tab keeps its own environment. Open another environment in a new tab to work in parallel.',
@@ -118,29 +126,35 @@ export function gateCopy(language: GatePageLanguage): (key: GateCopyKey, paramet
 export function layout(title: string, body: string, head = '', language: GatePageLanguage = 'zh'): string {
   return `<!doctype html><html lang="${language === 'en' ? 'en' : 'zh-CN'}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="text-scale" content="scale">
 <title>${escapeHtml(title)}</title>
 ${head}
 <style>
-body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#f5f5f7;color:#1d1d1f}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#f5f5f7;color:#1d1d1f;line-height:1.5;overflow-wrap:anywhere}
 main{max-width:960px;margin:48px auto;padding:0 24px}
 .card{background:#fff;border-radius:12px;padding:32px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:24px}
-h1{font-size:22px;margin:0 0 16px}h2{font-size:17px;margin:0 0 12px}
+h1{font-size:1.375rem;margin:0 0 16px}h2{font-size:1.0625rem;margin:0 0 12px}
 input,select{font:inherit;padding:8px 10px;border:1px solid #d2d2d7;border-radius:8px;margin:4px 8px 4px 0}
-button{font:inherit;padding:8px 16px;border:0;border-radius:8px;background:#0071e3;color:#fff;cursor:pointer}
+button{font:inherit;min-height:44px;padding:8px 16px;border:0;border-radius:8px;background:#0071e3;color:#fff;cursor:pointer;max-width:100%;overflow-wrap:anywhere}
+:focus-visible{outline:3px solid #0071e3;outline-offset:3px}
 button.danger{background:#d70015}
-table{width:100%;border-collapse:collapse;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:0.875rem}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #e5e5ea}
-.error{color:#d70015;margin:8px 0}.muted{color:#86868b;font-size:13px}
+.error{color:#d70015;margin:8px 0}.muted{color:#63636a;font-size:0.8125rem}
 nav a{margin-right:16px;color:#0071e3;text-decoration:none}
-.brand{display:flex;align-items:center;gap:10px;margin:0 0 18px;font-size:15px}
-.brand svg{display:block}
+.navigation-action{display:inline-flex;align-items:center;min-width:44px;min-height:44px}
+.brand{display:flex;align-items:center;gap:10px;margin:0 0 18px;font-size:0.9375rem}
+.brand svg{display:block;flex-shrink:0}
 .brand .brand-word{font-weight:600;letter-spacing:.05em}
 .brand.center{justify-content:center}
+.card.auth-card{margin:80px auto}
+@media(max-width:480px){main{margin:24px auto;padding:0 12px}.card{padding:20px}.card.auth-card{margin:24px auto}}
 </style></head><body><main>${body}</main></body></html>`
 }
 
 const AUTH_STYLES = `<style>
-.auth-field{display:block;margin:16px 0}.auth-field span{display:block;margin-bottom:6px;font-size:14px}
+.auth-field{display:block;margin:16px 0}.auth-field span{display:block;margin-bottom:6px;font-size:0.875rem}
 .auth-field input{box-sizing:border-box;width:100%;min-height:44px;margin:0}
 .auth-submit{box-sizing:border-box;width:100%;min-height:44px}
 </style>`
@@ -154,13 +168,13 @@ const AUTH_STYLES = `<style>
  */
 export function loginPage(error = '', language: GatePageLanguage = 'zh', returnTo = '/'): string {
   const t = gateCopy(language)
-  return layout(t('loginTitle'), `<div class="card" style="max-width:380px;margin:80px auto">
+  return layout(t('loginTitle'), `<div class="card auth-card" style="max-width:380px">
 <h1 class="brand">${BRAND_LOCK}</h1>
-${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
+${error === '' ? '' : `<p class="error" id="auth-error" role="alert">${escapeHtml(error)}</p>`}
 <form method="post" action="/login">
 <input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}">
-<label class="auth-field"><span>${t('username')}</span><input name="username" autocomplete="username" required></label>
-<label class="auth-field"><span>${t('password')}</span><input name="password" type="password" autocomplete="current-password" required></label>
+<label class="auth-field"><span>${t('username')}</span><input name="username" autocomplete="username" autocapitalize="none" spellcheck="false"${error === '' ? '' : ' aria-describedby="auth-error"'} required></label>
+<label class="auth-field"><span>${t('password')}</span><input name="password" type="password" autocomplete="current-password"${error === '' ? '' : ' aria-describedby="auth-error"'} required></label>
 <p><button class="auth-submit">${t('signIn')}</button></p>
 </form></div>`, AUTH_STYLES, language)
 }
@@ -174,37 +188,42 @@ ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
  */
 export function passwordPage(error = '', language: GatePageLanguage = 'zh', returnTo = '/'): string {
   const t = gateCopy(language)
-  return layout(t('passwordTitle'), `<div class="card" style="max-width:380px;margin:80px auto">
+  return layout(t('passwordTitle'), `<div class="card auth-card" style="max-width:380px">
 <div class="brand">${BRAND_LOCK}</div>
 <h1>${t('passwordHeading')}</h1>
-${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
+${error === '' ? '' : `<p class="error" id="auth-error" role="alert">${escapeHtml(error)}</p>`}
 <form method="post" action="/account/password">
 <input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}">
-<label class="auth-field"><span>${t('newPassword')}</span><input name="password" type="password" autocomplete="new-password" required></label>
+<label class="auth-field"><span>${t('newPassword')}</span><input name="password" type="password" autocomplete="new-password" minlength="${MIN_PASSWORD_LENGTH}" maxlength="${MAX_PASSWORD_LENGTH}"${error === '' ? '' : ' aria-describedby="auth-error"'} required></label>
 <p><button class="auth-submit">${t('saveContinue')}</button></p>
 </form></div>`, AUTH_STYLES, language)
 }
 
-/** Render the retry page shown while a personal or project runtime starts. */
-export function waitingPage(language: GatePageLanguage = 'zh'): string {
+/**
+ * Render the existing gate page; refresh only GET routes that cannot replay a start.
+ * @param language - browser gate language.
+ * @param mode - local startup or bounded read-only observation of an unknown remote result.
+ * @returns a self-refreshing document retaining its current request URL.
+ */
+export function waitingPage(language: GatePageLanguage = 'zh', mode: 'start' | 'observe' = 'start'): string {
   const t = gateCopy(language)
   return layout(t('waitingTitle'), `<div class="card" style="max-width:380px;margin:80px auto;text-align:center">
 <div role="status" aria-live="polite" aria-busy="true">
 <div class="brand center">${BRAND_LOCK}</div>
 <div class="startup-spinner" aria-hidden="true"></div>
-<h1>${t('waitingHeading')}</h1>
-<p class="muted">${t('waitingBody')}</p>
+<h1>${t(mode === 'observe' ? 'observingHeading' : 'waitingHeading')}</h1>
+<p class="muted">${t(mode === 'observe' ? 'observingBody' : 'waitingBody')}</p>
 <div class="startup-progress" role="progressbar" aria-label="${t('waitingProgress')}"><span></span></div>
-<p class="muted startup-wait">${t('waitingHint')}</p>
+<p class="muted startup-wait">${t(mode === 'observe' ? 'observingHint' : 'waitingHint')}</p>
 </div></div>`,
   `<meta http-equiv="refresh" content="2"><style>
-.startup-spinner{width:28px;height:28px;margin:0 auto 18px;border:3px solid #d2d2d7;border-top-color:#0071e3;border-radius:50%;animation:startup-spin .8s linear infinite}
+.startup-spinner{width:28px;height:28px;margin:0 auto 18px;border:3px solid #d2d2d7;border-top-color:#0071e3;border-radius:50%}
 .startup-progress{height:6px;margin:18px 0 10px;overflow:hidden;border-radius:3px;background:#e5e5ea}
-.startup-progress span{display:block;width:38%;height:100%;border-radius:inherit;background:#0071e3;animation:startup-progress 1.4s ease-in-out infinite}
+.startup-progress span{display:block;width:38%;height:100%;border-radius:inherit;background:#0071e3}
 .startup-wait{margin-bottom:0}
 @keyframes startup-spin{to{transform:rotate(360deg)}}
 @keyframes startup-progress{0%{transform:translateX(-110%)}60%,100%{transform:translateX(290%)}}
-@media (prefers-reduced-motion:reduce){.startup-spinner,.startup-progress span{animation-duration:2.4s}}
+@media (prefers-reduced-motion:no-preference){.startup-spinner{animation:startup-spin .8s linear infinite}.startup-progress span{animation:startup-progress 1.4s ease-in-out infinite}}
 </style>`, language)
 }
 
@@ -227,7 +246,7 @@ ${target.kind === 'project' ? `<input type="hidden" name="projectId" value="${es
 }
 
 /** Safe browser copy for a failed or incomplete workbench start. */
-export type RuntimeStartFailureReason = 'busy' | 'account' | 'denied' | 'unavailable' | 'changed' | 'invalid' | 'unknown'
+export type RuntimeStartFailureReason = 'busy' | 'account' | 'denied' | 'unavailable' | 'changed' | 'invalid' | 'unknown' | 'pending'
 
 /** Original validated form selection; its action retains the tab's explicit Runtime query. */
 export type RuntimeStartRetry = { action: string } & ({ kind: 'personal' } | { kind: 'project'; projectId: number })
@@ -243,7 +262,7 @@ export function runtimeStartFailurePage(reason: RuntimeStartFailureReason, retry
   const t = gateCopy(language)
   const messages: Record<RuntimeStartFailureReason, GateCopyKey> = {
     busy: 'startFailureBusy', account: 'startFailureAccount', denied: 'startFailureDenied',
-    unavailable: 'startFailureUnavailable', changed: 'startFailureChanged', invalid: 'startFailureInvalid', unknown: 'startFailureUnknown',
+    unavailable: 'startFailureUnavailable', changed: 'startFailureChanged', invalid: 'startFailureInvalid', unknown: 'startFailureUnknown', pending: 'startFailurePending',
   }
   const form = retry === null ? '' : `<form method="post" action="${escapeHtml(retry.action)}">
 <input type="hidden" name="kind" value="${retry.kind}">
@@ -252,7 +271,7 @@ ${retry.kind === 'project' ? `<input type="hidden" name="projectId" value="${esc
   return layout(t('startFailureTitle'), `<div class="card">
 <div class="brand">${BRAND_LOCK}</div>
 <h1>${t('startFailureHeading')}</h1><p role="alert">${t(messages[reason])}</p>
-${form}<p><a href="/?environments=1">${t('startFailureChoose')}</a></p></div>`, '', language)
+${form}<p><a class="navigation-action" href="/?environments=1">${t('startFailureChoose')}</a></p></div>`, '', language)
 }
 
 /**
@@ -270,5 +289,5 @@ export function environmentsPage(page: import('./runtime-catalog.ts').RuntimeCat
 ${item.owner.kind === 'project' ? `<input type="hidden" name="projectId" value="${item.owner.id}">` : ''}
 <button type="submit">${t('environmentsOpen')}</button></form></div>`).join('')
   return layout(t('environmentsTitle'), `<h1>${t('environmentsHeading')}</h1><p>${t('environmentsBody')}</p>
-${rows || `<p>${t('environmentsEmpty')}</p>`}${page.nextCursor === null ? '' : `<a href="/?environments=1&amp;cursor=${encodeURIComponent(page.nextCursor)}">${t('environmentsMore')}</a>`}`, '', language)
+${rows || `<p>${t('environmentsEmpty')}</p>`}${page.nextCursor === null ? '' : `<a class="navigation-action" href="/?environments=1&amp;cursor=${encodeURIComponent(page.nextCursor)}">${t('environmentsMore')}</a>`}`, '', language)
 }
