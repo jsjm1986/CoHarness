@@ -25,6 +25,7 @@ import { createPostgresPool, runMigrations, migrationPlan } from '../src/postgre
 import { DesktopCoordinator } from '../src/desktop-coordinator.ts'
 import { PostgresDesktopCoordinatorRepository } from '../src/postgres/desktop-coordinator-repository.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
+import { PostgresMaintenanceService } from '../src/postgres/maintenance-service.ts'
 import {
   PostgresModelGovernanceService,
   projectProviderCredentialRef,
@@ -2250,6 +2251,29 @@ describePg('PostgreSQL baseline', () => {
     }
     },
   )
+
+  it('refuses Gateway readiness after the write epoch advances or the computer drains', async () => {
+    const slug = `readiness-${randomUUID()}`
+    const name = 'readiness-node'
+    await pool.query(`WITH organization AS (
+      INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Readiness fixture') RETURNING id
+    ) INSERT INTO harness.compute_nodes(organization_id,name)
+      SELECT id,$2 FROM organization`, [slug, name])
+    try {
+      const context = await resolvePostgresRuntimeContext(pool, slug, name)
+      const maintenance = new PostgresMaintenanceService(context, 30_000)
+      await expect(maintenance.checkGatewayReadiness(1n)).resolves.toBeUndefined()
+      await pool.query('INSERT INTO harness.cluster_control(organization_id,write_epoch) VALUES($1,2)', [context.organizationId])
+      await expect(maintenance.checkGatewayReadiness(1n)).rejects.toThrow('write epoch differs')
+      await expect(maintenance.checkGatewayReadiness(2n)).resolves.toBeUndefined()
+      await pool.query(`UPDATE harness.compute_nodes SET status='draining' WHERE id=$1`, [context.nodeId])
+      await expect(maintenance.checkGatewayReadiness(2n)).rejects.toThrow('organization or compute node is not active')
+    } finally {
+      await pool.query(`DELETE FROM harness.compute_nodes n USING harness.organizations o
+        WHERE n.organization_id=o.id AND o.slug=$1`, [slug])
+      await pool.query('DELETE FROM harness.organizations WHERE slug=$1', [slug])
+    }
+  })
 
   it('runs the complete Gateway control plane against PostgreSQL', async () => {
     const root = await mkdtemp(join(tmpdir(), 'hgw-postgres-runtime-'))

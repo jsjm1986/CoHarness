@@ -36,6 +36,7 @@ interface PoolState {
   total: number
   idle: number
   waiting: number
+  readinessControlReads: number
 }
 
 async function within<T>(operation: Promise<T>, message: string): Promise<T> {
@@ -260,6 +261,8 @@ export async function gatewayControlSaturationTranscript(databaseUrl: string): P
     const readiness = await fetchDeadline('/healthz/ready')
     expect(await readiness.json()).toMatchObject({ ok: true })
     expect(readiness.status).toBe(200)
+    const { readinessControlReads } = await deployed.call('state')
+    expect(readinessControlReads).toBe(1)
     const accessAckPending = (await pool.query(`SELECT n.access_applied_revision<o.access_revision AS pending
       FROM harness.compute_nodes n JOIN harness.organizations o ON o.id=n.organization_id WHERE n.id=$1`,
     [context.nodeId])).rows[0]?.pending
@@ -300,6 +303,7 @@ export async function gatewayControlSaturationTranscript(databaseUrl: string): P
     const observation = {
       business: { held: held.backendPids.length, max: held.max, waiting: true, usedByControl: false, recovered: true },
       readinessDuringRuntimeCleanup: readiness.status,
+      readinessControlReads,
       accessAckPending,
       admittedStream: { open: true, renewal: browserRenewal.status, wrongBearer: foreignBrowser.status, browserClose: browserClose.code, upstreamClose: closedBeforeRelease, resumed: false },
       lease: { staleStatus: rejected.status, servingStatus: serving.status, maintenanceStatus: renewed.status, sameEpoch: true },

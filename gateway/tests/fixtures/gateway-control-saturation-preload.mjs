@@ -1,4 +1,6 @@
 /** Observe and lease real Gateway pool connections while owning only the synthetic Runtime transport. */
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { Server as HttpServer } from 'node:http'
 import { Server } from 'node:net'
 import pg from 'pg'
 import { LocalLauncher } from '../../src/launcher.ts'
@@ -10,6 +12,23 @@ Server.prototype.listen = function (...args) {
     this.once('listening', () => process.send?.({ kind: 'gateway-listening', port: this.address().port }))
   } else if (args[0] === 8900) args[0] = 0
   return Reflect.apply(listen, this, args)
+}
+
+const readinessRequest = new AsyncLocalStorage()
+let readinessControlReads = 0
+const emit = HttpServer.prototype.emit
+HttpServer.prototype.emit = function (event, ...args) {
+  if (event === 'request' && args[0].url === '/healthz/ready') {
+    return readinessRequest.run(true, () => Reflect.apply(emit, this, [event, ...args]))
+  }
+  return Reflect.apply(emit, this, [event, ...args])
+}
+const query = pg.Client.prototype.query
+pg.Client.prototype.query = function (...args) {
+  if (readinessRequest.getStore() && this.connectionParameters.application_name?.startsWith('hgw-control:')) {
+    readinessControlReads++
+  }
+  return Reflect.apply(query, this, args)
 }
 
 const pools = new Map()
@@ -46,7 +65,7 @@ process.on('message', async ({ id, action }) => {
     } else if (action !== 'state') throw new Error('Unknown saturation fixture action')
     process.send?.({ id, value: {
       backendPids: held.map(client => client.processID), max: pool.options.max,
-      total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount,
+      total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount, readinessControlReads,
     } })
   } catch (error) {
     process.send?.({ id, error: error instanceof Error ? error.message : String(error) })

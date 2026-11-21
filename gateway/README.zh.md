@@ -165,7 +165,7 @@ Runtime 分发器在认证运行时令牌后，将文档流式操作交给 Gatew
 
 `GET /admin/api/performance` 要求已登录管理员身份，返回不缓存的累计快照：HTTP、内部 HTTP 和 WebSocket 生命周期、错误及在途计数；固定时长分桶及近似分位数上界；Gateway 事件循环延迟／利用率和进程内存；原生数据库连接池计数；以及 Runtime 准入计数。快照包含自身读取请求的在途占用，不保留请求路径、账户名或 Session 标识。采样区间可比较计数与分桶差值；累计分位数、最大值和内存快照不能通过相减得到区间统计。WebSocket 时长衡量连接生命周期，不是逐帧投递延迟；Gateway 内存不包括 Runtime 子进程和 PostgreSQL。
 
-业务池支持单连接。访问撤销使用一个独立连接接收 PostgreSQL 通知并读取持久 outbox。就绪检查、写者心跳、节点租约和已建立 Runtime 流的续期使用有界控制池。Runtime 和投影尚在清理时，就绪检查验证监听器能否观察已提交的变化并发出取消通知。清理完成后才确认持久版本。如果清理等待期间提交了新的撤权，监听器先阻断已准入流量，清理结束后再追赶持久版本。续期重新检查目标 Runtime 的精确凭据、当前写入代次、账号和电脑权限。项目流还检查活跃项目范围。性能快照在业务池计数之外提供 `databasePool.control` 和 `databasePool.accessListener`。每个 Gateway 分别计入这些连接预算。参见[控制池决策](../.agents/notes/implemented/architecture/2026-11-20-gateway-postgres-control-pools.zh.md)。
+业务池支持单连接。访问撤销使用一个独立连接接收 PostgreSQL 通知并读取持久 outbox。就绪检查、写者心跳、节点租约和已建立 Runtime 流的续期使用有界控制池。Runtime 和投影尚在清理时，就绪检查验证监听器能否观察已提交的变化并发出取消通知。随后通过控制池的一条查询检查节点资格和启动写入代次。清理完成后才确认持久版本。如果清理等待期间提交了新的撤权，监听器先阻断已准入流量，清理结束后再追赶持久版本。续期重新检查目标 Runtime 的精确凭据、当前写入代次、账号和电脑权限。项目流还检查活跃项目范围。性能快照在业务池计数之外提供 `databasePool.control` 和 `databasePool.accessListener`。每个 Gateway 分别计入这些连接预算。参见[控制池决策](../.agents/notes/implemented/architecture/2026-11-20-gateway-postgres-control-pools.zh.md)。
 
 Gateway 将浏览器请求、事件流建立、就绪期限与服务端计时选项一同写入每个受管 Connection 插件。指定 Runtime 的页面使用所属电脑的配置。版本化对话诊断在保留就绪代次时，将 `runtimeQueue` 和 `runtimeLiveness` 记入 `admit`。在两端 Gateway 使用 `GET /admin/api/performance/operations?id=<uuid>` 对照所属端排队、本机进程监督、治理 SQL 和节点传输，按同一个操作 ID 匹配记录。各阶段耗时可能重叠。模型生成和浏览器绘制单独计时。
 

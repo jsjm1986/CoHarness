@@ -71,7 +71,7 @@ import {
 } from './organization-model-credentials.ts'
 import { PostgresProjectService } from './postgres/project-service.ts'
 import { StewardQueryService } from './postgres/steward-query.ts'
-import { checkPostgresReadiness, resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
+import { resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { PostgresSshTargetService } from './postgres/ssh-target-service.ts'
 import { PostgresMaintenanceService, type WriteGateVerdict } from './postgres/maintenance-service.ts'
@@ -609,10 +609,9 @@ const deps: GatewayDeps = {
     ...poolUsage(pool), control: poolUsage(controlPool), accessListener: poolUsage(accessListenerPool),
   }),
   readiness: async (signal) => {
-    await checkPostgresReadiness(controlContext, signal)
-    await accessMonitor.checkControlReadiness()
     signal?.throwIfAborted()
-    await assertCurrentDataEpoch()
+    await accessMonitor.checkControlReadiness()
+    await controlMaintenance.checkGatewayReadiness(baselineWriteEpoch, signal)
   },
 }
 

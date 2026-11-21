@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-20-gateway-postgres-control-pools.md
 document:
-  en: 156fbce214c218db4fdfcf82f6587a492108ab97
-  zh: d1af45c8764dad7905bae82c1b468a8f66d1dc24
+  en: e2d58ff4df7cc96b3bc81157cc20c2dbf4bb8971
+  zh: 399be63aee6e8bc89b33b4abcc3ae65f74dc5376
 /agent-note-gateway-reserves-postgresql-capacity-for-control-traffic:
   en: df16ba0cbec6fb86
   zh: 07aad477be57217f
@@ -12,8 +12,8 @@ document:
   en: 1229779f0f54e968
   zh: 83440e0fd545e309
 /agent-note-gateway-reserves-postgresql-capacity-for-control-traffic/decision:
-  en: 5440e9c3e7e03a14
-  zh: 149c891b5433d973
+  en: 1eb796296ad7caa1
+  zh: 5a9a042a9310ac8e
 /agent-note-gateway-reserves-postgresql-capacity-for-control-traffic/alternatives-considered:
   en: 9b3b14edfb6a2781
   zh: b51cbecb11988726
@@ -21,5 +21,5 @@ document:
   en: 44f597e85170e218
   zh: 10e24aec5200ceb6
 /agent-note-gateway-reserves-postgresql-capacity-for-control-traffic/verification:
-  en: 31352e623833a256
-  zh: 7fef2566aef5916c
+  en: 7e2ad8513aa42101
+  zh: c541bdf729687371

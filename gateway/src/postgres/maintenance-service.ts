@@ -220,6 +220,25 @@ export class PostgresMaintenanceService {
   }
 
   /**
+   * Verify active Gateway placement and the startup write epoch in one PostgreSQL snapshot.
+   * @param startupWriteEpoch - write epoch captured before loading the Gateway's cached dependencies.
+   * @param signal - cancellation checked before the connection is borrowed and after the query.
+   */
+  async checkGatewayReadiness(startupWriteEpoch: bigint, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    const { pool, organizationId, nodeId } = this.context
+    const result = await pool.query<{ write_epoch: string }>(`SELECT COALESCE(c.write_epoch, 1)::text AS write_epoch
+      FROM harness.organizations o
+      JOIN harness.compute_nodes n ON n.organization_id=o.id
+      LEFT JOIN harness.cluster_control c ON c.organization_id=o.id
+      WHERE o.id=$1 AND o.status='active' AND n.id=$2 AND n.status='active'`, [organizationId, nodeId])
+    signal?.throwIfAborted()
+    const row = result.rows[0]
+    if (row === undefined) throw new Error('PostgreSQL organization or compute node is not active')
+    if (BigInt(row.write_epoch) !== startupWriteEpoch) throw new Error('PostgreSQL write epoch differs from the Gateway startup epoch')
+  }
+
+  /**
    * Acknowledge the maintenance epoch this node's write gate has already
    * observed, publish the node's in-flight writer count, and refresh
    * `last_heartbeat_at`. Acknowledging only the observed epoch keeps a
