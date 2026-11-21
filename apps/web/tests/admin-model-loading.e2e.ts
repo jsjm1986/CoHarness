@@ -24,7 +24,7 @@ it.skipIf(MODE === 'record')('preloads model details from catalog readiness and 
   const context = onDevice ? connection.browser.contexts()[0] : await connection.browser.newContext({
     locale: 'zh-CN', viewport: { width: 1400, height: 900 },
   })
-  if (context === undefined) throw new Error('Android browser did not expose a default context')
+  if (context === undefined) throw new Error('Android CDP did not expose an active browser context')
   const page = await context.newPage()
   onTestFinished(() => page.close())
   await page.bringToFront()

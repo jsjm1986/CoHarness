@@ -2,7 +2,7 @@
 import { lazy, useMemo, type ComponentType } from 'react'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { en as chromeEn, zh as chromeZh } from '../chrome.copy.ts'
-import { Button, ErrorBanner } from './ui.tsx'
+import { Button, ErrorBanner, PageHeader } from './ui.tsx'
 
 type BackgroundScheduler = {
   postTask(run: () => void, options: { priority: 'background'; signal: AbortSignal }): Promise<void>
@@ -84,6 +84,7 @@ export function PageLoading() {
 export function PageLoadFailure() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
   return <div className="page">
+    <PageHeader title={t('pageUnavailable')} />
     <ErrorBanner message={t('pageLoadFailed')} />
     <Button onClick={() => window.location.reload()}>{t('reloadPage')}</Button>
   </div>

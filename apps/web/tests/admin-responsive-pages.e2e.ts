@@ -127,7 +127,8 @@ for (const [engine, launcher] of Object.entries(launchers)) {
     })
     for (const scenario of scenarios) it(`${scenario.id}: loaded, actions and failure at each viewport`, async () => {
       for (const [emulatedWidth, emulatedHeight] of viewports) {
-        fixture.state.mode = 'loaded'; fixture.state.recovery = 'loaded'; fixture.state.scope = 'local'
+        fixture.state.mode = 'loaded'; fixture.state.recovery = 'loaded'
+        fixture.state.scope = scenario.id === 'deployment' ? 'organization' : 'local'
         const context = adminAndroidEndpoint !== undefined ? browser.contexts()[0]
           : await browser.newContext({ viewport: { width: emulatedWidth, height: emulatedHeight },
             hasTouch: emulatedWidth < 1024, isMobile: engine !== 'firefox' && emulatedWidth < 1024,
@@ -179,6 +180,33 @@ for (const [engine, launcher] of Object.entries(launchers)) {
           expect(await page.getByRole('heading', { level: 1, name: scenario.title }).count(), `${scenario.id}: heading`).toBe(1)
           expect(await page.locator('.errorBanner:visible').allTextContents(), `${scenario.id}: loaded errors`).toEqual([])
           await checkpoint('loaded', width >= 1024)
+          if (scenario.id === 'deployment') {
+            const content = page.locator('section', { has: page.getByRole('heading', { name: '项目内容库', exact: true }) })
+            const computer = content.getByRole('combobox', { name: '电脑', exact: true })
+            const verify = content.getByRole('button', { name: '核验存储位置', exact: true })
+            await computer.waitFor()
+            const [field, action] = await Promise.all([computer.boundingBox(), verify.boundingBox()])
+            if (field === null || action === null) throw new Error('Missing content storage controls')
+            expect(action.height, 'content storage control heights').toBeCloseTo(field.height, 0)
+            if (action.x > field.x + field.width - 1) {
+              expect(action.x - field.x - field.width, 'content storage horizontal gap').toBeGreaterThanOrEqual(9)
+              expect(action.y, 'content storage row alignment').toBeCloseTo(field.y, 0)
+            } else {
+              expect(action.y - field.y - field.height, 'content storage vertical gap').toBeGreaterThanOrEqual(9)
+            }
+            await computer.selectOption(fixture.remoteNodeId)
+            const receipt = page.waitForResponse((reply) => {
+              const url = new URL(reply.url())
+              return url.pathname === '/admin/api/deployment/node-content' && url.searchParams.get('dshNode') === fixture.remoteNodeId
+            })
+            await activateAdminControl(verify)
+            expect((await receipt).status()).toBe(503)
+            await content.getByRole('alert').waitFor()
+            await computer.selectOption(fixture.nodeId)
+            await activateAdminControl(verify)
+            await content.getByRole('status').getByText(fixture.contentDirectory, { exact: true }).waitFor()
+            await checkpoint('content-storage-verified')
+          }
           if (width === 390) await page.addStyleTag({ content: 'body *{line-height:1.5!important;letter-spacing:.12em!important;word-spacing:.16em!important}p{margin-bottom:2em!important}' })
           await fits(page, `${scenario.id} ${width} loaded`)
           expect(await page.title()).toContain(await page.getByRole('heading', { level: 1 }).innerText())
@@ -301,7 +329,36 @@ for (const [engine, launcher] of Object.entries(launchers)) {
             await checkpoint('local-computer')
             fixture.state.scope = 'organization'
             await page.reload(); await settle(page)
-            await page.getByRole('combobox', { name: '管理电脑', exact: true }).waitFor({ state: 'visible' })
+            const computerControl = page.locator('.pageHeaderComputer')
+            const computer = computerControl.getByRole('button', { name: /^管理电脑：/u })
+            const refresh = computerControl.getByRole('button', { name: '刷新电脑列表', exact: true })
+            await computer.waitFor({ state: 'visible' })
+            expect(await refresh.isVisible()).toBe(false)
+            await activateAdminControl(computer)
+            const openPanel = computerControl.locator('.computerPanel:visible, dialog[open]')
+            await refresh.waitFor({ state: 'visible' })
+            await expect.poll(() => refresh.getAttribute('aria-disabled')).toBeNull()
+            const center = openPanel.getByRole('button', { name: /中心电脑/u })
+            await center.waitFor({ state: 'visible' })
+            expect(await center.getAttribute('aria-current')).toBe('true')
+            await openPanel.getByRole('button', { name: `${fixture.remoteName} 未连接` }).waitFor({ state: 'visible' })
+            const replied = page.waitForResponse(reply => new URL(reply.url()).pathname.endsWith('/deployment/nodes/access'))
+            await activateAdminControl(refresh)
+            expect((await replied).ok()).toBe(true)
+            const overflow = await openPanel.evaluate((element) => {
+              const { top, bottom, left, right } = element.getBoundingClientRect()
+              const viewport = window.visualViewport
+              const x = viewport?.offsetLeft ?? 0, y = viewport?.offsetTop ?? 0
+              return Math.max(
+                x - left,
+                y - top,
+                right - x - (viewport?.width ?? innerWidth),
+                bottom - y - (viewport?.height ?? innerHeight),
+              )
+            })
+            expect(overflow).toBeLessThanOrEqual(1)
+            await activateAdminControl(center)
+            await refresh.waitFor({ state: 'hidden' })
             await fits(page, `${scenario.id} organization computer`)
             await screenshot(page, engine, scenario.id, width, 'organization')
             await checkpoint('organization-computer')
@@ -375,7 +432,7 @@ for (const [engine, launcher] of Object.entries(launchers)) {
             }
             await page.goto(`${fixture.base}/admin/computers/${fixture.remoteNodeId}/documents`)
             await settle(page)
-            expect(await page.getByRole('combobox', { name: '管理电脑', exact: true }).inputValue()).toBe(fixture.remoteNodeId)
+            await page.getByRole('button', { name: `管理电脑：${fixture.remoteName}`, exact: true }).waitFor({ state: 'visible' })
             expect((await page.locator('.errorBanner:visible').allTextContents()).join(' ')).toContain('无法连接所选电脑')
             await fits(page, 'offline computer')
             await screenshot(page, engine, scenario.id, width, 'offline')

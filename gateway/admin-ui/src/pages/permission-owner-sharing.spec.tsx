@@ -9,8 +9,7 @@ import { TerminalsPage } from './TerminalsPage.tsx'
 import { TerminalPermissions } from '../components/TerminalPermissions.tsx'
 
 vi.mock('../api.ts', () => ({
-  listUsers: vi.fn(), listProjects: vi.fn(), listSshTargets: vi.fn(), pluginManagementOverview: vi.fn(),
-  pluginInventoryList: vi.fn(),
+  listUsers: vi.fn(), listProjects: vi.fn(), listSshTargets: vi.fn(), pluginManagementOverview: vi.fn(), pluginInventoryList: vi.fn(),
   getPluginPolicy: vi.fn(), getTerminalPolicy: vi.fn(), getSshPolicy: vi.fn(),
   setPluginPolicy: vi.fn(), setTerminalPolicy: vi.fn(), setSshPolicy: vi.fn(),
 }))

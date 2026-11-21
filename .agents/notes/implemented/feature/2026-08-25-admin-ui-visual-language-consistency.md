@@ -14,6 +14,8 @@ Admin dashboards use the shared `Metric` component and its `.metric` state class
 
 ## Alternatives considered
 
+**Read the computer directory from each heading.** The document owns the directory, selected target and cursor across page changes. The heading owns only its interactive panel, including focus and dismissal. Refresh and pagination use the existing bounded metadata reads.
+
 **Add a second stylesheet for the Documents metric.** This would hide the class mismatch while leaving two metric contracts that could diverge again, so the page now consumes the existing shared component.
 
 **Keep live registration filtering on every input event.** This makes the page noisy on slow links and differs from the other admin filters, so the draft/apply split owns one deliberate request per filter change.
@@ -21,5 +23,11 @@ Admin dashboards use the shared `Metric` component and its `.metric` state class
 **Translate Provider, BYOK, API, and Token into approximate Chinese terms.** These are product or protocol terms used across the runtime, so they remain stable technical names; only the inconsistent lowercase `model` presentation is localized to `模型`.
 
 ## Consequences
+
+The organization-only computer panel sits beside the page heading, with list refresh and read feedback inside the panel. The account action row shows the current locale beside Sign out. A locale switch checks for pending edits before persisting the preference and reloading.
+
+The project content database card uses the same field and management action styles as other Admin pickers. Its computer and verification controls align on one row when space permits and maintain a gap when they wrap. Verification feedback appears below the controls.
+
+Long page titles can take the full line before the computer control wraps. On short touch landscapes the compact header keeps account actions in view, and the computer list can open beside its trigger. A plugin space card gives the details disclosure and management action distinct touch targets.
 
 The Documents and Usage metric cards now share height, typography, warning tone, and responsive behavior. The Models page has a predictable filter layout at desktop, narrow desktop, and mobile widths, with visible labels and a keyboard-accessible segmented control that remains one row on compact screens. Registration queries are reduced while users type, at the cost of one explicit apply action; date parsing is local and fail-fast. The six-item mobile navigation stays on one row at the supported compact width, and visible enum values no longer leak English identifiers. Gateway entry pages and the admin console present one product identity. Gateway HTML and admin UI unit suites cover the product brand, shared metric class, filter submission and date validation boundaries, document-source labels, and the ready-state label.

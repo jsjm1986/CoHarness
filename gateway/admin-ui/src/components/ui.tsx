@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import {
   cloneElement,
+  createContext,
+  useContext,
   useEffect,
   useId,
   useMemo,
@@ -18,6 +20,14 @@ import {
 import { adminLanguage, translateCopy } from '../language.ts'
 import { zh as chromeZh, en as chromeEn } from '../chrome.copy.ts'
 
+/** Organization-scoped control displayed beside each Admin page title. */
+export const PageHeaderComputerContext = createContext<ReactNode>(null)
+
+/**
+ * Render the Admin title and its document-scoped computer control.
+ * @param props - Title, description, metadata and actions supplied by the page.
+ * @returns The page header.
+ */
 export function PageHeader({
   title,
   description,
@@ -29,9 +39,10 @@ export function PageHeader({
   meta?: ReactNode
   actions?: ReactNode
 }) {
+  const computer = useContext(PageHeaderComputerContext)
   useEffect(() => { document.title = `${title} — COHARNESS` }, [title])
   return (
-    <header className="pageHeader">
+    <header className={computer === null ? 'pageHeader' : 'pageHeader pageHeaderWithComputer'}>
       <div className="pageHeading">
         <div className="pageTitleLine">
           <h1>{title}</h1>
@@ -39,6 +50,7 @@ export function PageHeader({
         </div>
         {description === undefined ? null : <p>{description}</p>}
       </div>
+      {computer === null ? null : <div className="pageHeaderComputer">{computer}</div>}
       {actions === undefined ? null : <div className="pageActions">{actions}</div>}
     </header>
   )

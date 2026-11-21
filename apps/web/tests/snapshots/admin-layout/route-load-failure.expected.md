@@ -1,3 +1,4 @@
 - main:
+  - heading "页面暂不可用" [level=1]
   - alert: 页面加载失败，请重新加载
   - button "重新加载页面"

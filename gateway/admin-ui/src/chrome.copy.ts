@@ -1,10 +1,11 @@
 /** Shell chrome copy: navigation, brand, footer, and shared UI defaults. */
 
 export const zh = {
-  shellTitle: '管理中心',
   brandSub: '管理端',
   logout: '退出登录',
-  languageAria: '界面语言',
+  languageAria: '中文，切换为 English',
+  languageAction: '切换为 English',
+  languageMark: '中',
   navAria: '管理导航',
   moreAria: '更多管理功能',
   moreTitle: '更多管理功能',
@@ -25,6 +26,7 @@ export const zh = {
   navRemoteDesktops: '远程桌面',
   navAudit: '审计',
   loading: '正在加载',
+  pageUnavailable: '页面暂不可用',
   pageLoadFailed: '页面加载失败，请重新加载',
   reloadPage: '重新加载页面',
   pageNotFound: '找不到此管理页面',
@@ -38,10 +40,11 @@ export const zh = {
 export type ChromeCopyKey = keyof typeof zh
 
 export const en = {
-  shellTitle: 'Administration',
   brandSub: 'Admin',
   logout: 'Sign out',
-  languageAria: 'Interface language',
+  languageAria: 'English, switch to Chinese',
+  languageAction: 'Switch to Chinese',
+  languageMark: 'EN',
   navAria: 'Administration navigation',
   moreAria: 'More administration features',
   moreTitle: 'More administration features',
@@ -62,6 +65,7 @@ export const en = {
   navRemoteDesktops: 'Remote desktops',
   navAudit: 'Audit',
   loading: 'Loading',
+  pageUnavailable: 'Page unavailable',
   pageLoadFailed: 'The page could not be loaded. Reload to try again.',
   reloadPage: 'Reload page',
   pageNotFound: 'Admin page not found',

@@ -321,20 +321,41 @@ summary {
 }
 
 .sidebarFooter {
-  display: flex;
   flex-shrink: 0;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  color: var(--text-tertiary);
+  padding: 8px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.accountActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.button.languageButton {
+  min-width: 36px;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+.languageMark {
+  display: grid;
+  place-items: center;
+  inline-size: 24px;
+  min-block-size: 21px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1;
 }
 
 .logoutForm {
   margin: 0;
 }
 
-.logoutButton {
+.button.logoutButton {
   justify-content: flex-start;
   width: 100%;
   color: var(--text-secondary);
@@ -347,7 +368,8 @@ summary {
   }
 }
 
-.logoutButtonCompact {
+.logoutButton.logoutButtonCompact {
+  justify-content: center;
   width: 40px;
   padding: 0;
 }
@@ -371,24 +393,159 @@ summary {
   margin: 0 auto;
 }
 
-.computerBar {
-  margin-bottom: var(--dsw-space-4);
+.adminEntryNotice {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
-.computerBar .targetPicker {
-  max-width: 100%;
-  width: 320px;
-  gap: var(--dsw-space-2);
+.adminEntryNotice > .errorBanner {
+  justify-self: stretch;
+  margin: 0;
 }
 
-.computerBar .fieldLabel {
-  font-weight: 500;
+.pageHeader.pageHeaderWithComputer {
+  align-items: center;
+  gap: 4px 12px;
 }
 
-.computerBar .fieldHint {
-  min-height: 1.5em;
-  margin: var(--dsw-space-2) 0 0;
+.pageHeaderWithComputer > .pageHeading {
+  display: contents;
+}
+
+.pageHeaderWithComputer > .pageHeading > .pageTitleLine {
+  flex: 1 1 max-content;
+}
+
+.pageHeaderWithComputer > .pageHeading > p {
+  order: 1;
+  flex-basis: 100%;
+  margin-top: 0;
+}
+
+.pageHeaderComputer {
+  flex: none;
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.button.computerTrigger {
+  justify-content: flex-start;
+  max-width: min(15rem, 34vw);
+  min-height: 38px;
+  padding: 3px 10px;
+  gap: 6px;
+  font-size: 0.8125rem;
+}
+
+.computerName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.computerChevron { color: var(--text-tertiary); }
+.computerWarning { color: var(--warning-ink); }
+.computerTrigger[aria-expanded="true"] { background: var(--surface-subtle); }
+.computerTrigger[aria-expanded="true"] .computerChevron { transform: rotate(180deg); }
+.computerTrigger[aria-expanded="false"] + .computerPanel { visibility: hidden; }
+
+.computerPanel {
+  position: fixed;
+  width: min(18rem, var(--computer-panel-available-width, calc(100vw - 24px)));
+  max-height: min(22rem, var(--computer-panel-available-height, calc(100dvh - 16px)));
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--dsw-radius-xl);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-dialog);
+}
+
+@supports (position-area: block-end span-inline-start) and (position-try-fallbacks: flip-block) {
+  .computerPanel:not([data-measured]) {
+    position-area: block-end span-inline-start;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+    inset: auto;
+    justify-self: end;
+    margin: 7px 0;
+  }
+}
+
+.computerPanel[data-measured] {
+  inset: var(--computer-panel-y) auto auto var(--computer-panel-x);
+  margin: 0;
+}
+
+.computerPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline: 8px 3px;
+}
+
+.computerPanelHeader h2 {
+  margin: 0;
   color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.computerRefreshing svg { animation: spin 0.8s linear infinite; }
+
+.computerNotice {
+  padding: 6px 8px;
+  color: var(--warning-ink);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.computerOptions {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  margin: 3px 0 0;
+  list-style: none;
+}
+
+.computerOption {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  text-align: start;
+}
+
+.computerOption svg { width: 16px; height: 16px; }
+.computerOption span { overflow-wrap: anywhere; }
+.computerOption small { display: block; color: var(--text-secondary); font-size: 0.75rem; }
+.computerOption[aria-current="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.computerOption[aria-current="true"] small { color: inherit; }
+.computerOption:disabled { color: var(--text-secondary); cursor: not-allowed; }
+.computerOption:focus-visible { outline-offset: -2px; }
+
+@media (hover: hover) {
+  .computerOption:hover:not(:disabled):not([aria-current]) { background: var(--surface-subtle); }
+}
+
+.computerPagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
 }
 
 .organizationModelsEditor {
@@ -481,6 +638,16 @@ summary {
   flex: none;
   flex-wrap: wrap;
   max-width: 100%;
+}
+
+.userListSection > .sectionHeader > .sectionActions { display: none; }
+
+@media (max-width: 1060px) {
+  .pageHeaderWithComputer > .pageActions {
+    order: 2;
+    flex-basis: 100%;
+    padding-top: 4px;
+  }
 }
 
 .section {
@@ -983,6 +1150,7 @@ summary {
 }
 
 .formActions {
+  flex-wrap: wrap;
   justify-content: flex-end;
   margin-top: 20px;
 }
@@ -2686,8 +2854,7 @@ summary {
 .breadcrumb {
   display: inline-flex;
   align-items: center;
-  min-inline-size: 24px;
-  min-block-size: 24px;
+  min-height: 28px;
   gap: 6px;
   margin-bottom: 12px;
   color: var(--text-secondary);
@@ -3341,10 +3508,11 @@ summary {
   }
 }
 
-@media (max-width: 840px) {
+@media (max-width: 840px), (pointer: coarse) and (orientation: landscape) and (max-width: 1024px) and (max-height: 420px) {
   html {
     /* Scroll-into-view landings (caret, focus, DOM APIs) must clear the fixed
        mobile navigation instead of parking content underneath it. */
+    scroll-padding-top: calc(64px + env(safe-area-inset-top, 0px));
     scroll-padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 8px);
   }
 
@@ -3376,6 +3544,19 @@ summary {
     height: 55px;
     padding: 0 4px;
   }
+
+  .accountActions .languageButton,
+  .accountActions .logoutButtonCompact {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .button.computerTrigger { max-width: min(13rem, 47vw); min-height: 44px; padding-inline: 9px; }
+  .computerOption, .computerPanelHeader .iconButton { min-height: 44px; }
+  .computerPanelHeader .iconButton { min-width: 44px; }
+  .usersPage .pageActions { display: none; }
+  .usersPage .pageMeta { display: none; }
+  .userListSection > .sectionHeader > .sectionActions { display: flex; }
 
   .mobileNav {
     position: fixed;
@@ -3847,6 +4028,12 @@ summary {
 }
 
 @media (pointer: coarse) {
+  .button.languageButton,
+  .button.computerTrigger,
+  .computerOption {
+    min-width: 44px;
+    min-height: 44px;
+  }
   .button,
   .input,
   .monthPicker .input,
@@ -3897,6 +4084,7 @@ summary {
   .tableLink,
   .archiveMobileOpen,
   .userLink,
+  .backLink,
   .breadcrumb,
   .tunnelUrl a,
   .linkButton,
@@ -3915,6 +4103,7 @@ summary {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .computerRefreshing svg { animation: none; }
   *,
   *::before,
   *::after {
@@ -4121,8 +4310,6 @@ summary {
 .backLink {
   display: inline-flex;
   align-items: center;
-  min-inline-size: 24px;
-  min-block-size: 24px;
   gap: 6px;
   margin-bottom: 4px;
   color: var(--text-tertiary);
@@ -4130,11 +4317,8 @@ summary {
   text-decoration: none;
 }
 
-@media (pointer: coarse) {
-  .backLink {
-    min-inline-size: var(--dsw-touch-target);
-    min-block-size: var(--dsw-touch-target);
-  }
+@media not (pointer: coarse) {
+  .backLink { min-height: 28px; }
 }
 
 @media (hover: hover) {
@@ -4327,6 +4511,35 @@ summary {
   min-width: 0;
 }
 
+.nodeContentCheck {
+  display: grid;
+  gap: 12px;
+}
+
+.nodeContentCheck > .targetPicker {
+  max-width: 40rem;
+}
+
+.nodeContentCheck .targetPicker > .field {
+  flex-basis: 12rem;
+}
+
+.nodeContentCheck .targetPicker > .button {
+  min-height: 38px;
+}
+
+.nodeContentCheck > .fieldHint,
+.nodeContentCheck > .errorBanner {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (pointer: coarse) {
+  .nodeContentCheck .targetPicker > .button {
+    min-height: 44px;
+  }
+}
+
 .targetPolicy {
   margin-top: 14px;
   padding-top: 12px;
@@ -4388,48 +4601,62 @@ summary {
   overflow-wrap: anywhere;
 }
 
-.spaceCard > summary {
+.spaceCardHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+}
+
+.spaceCardToggle {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  cursor: pointer;
-  list-style: none;
   flex-wrap: wrap;
+  min-height: 44px;
+  min-width: 0;
+  gap: 6px 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  text-align: start;
 }
 
-.spaceCard > summary::-webkit-details-marker {
-  display: none;
+@media (hover: hover) {
+  .spaceCardToggle:hover { background: var(--surface-subtle); }
 }
 
-.spaceCard > summary::before {
-  content: '▸';
+.spaceCardChevron {
+  width: 14px;
+  height: 14px;
   color: var(--text-tertiary);
-  font-size: 0.6875rem;
   flex: none;
 }
 
-.spaceCard[open] > summary::before {
-  content: '▾';
+.spaceCardToggle[aria-expanded="true"] .spaceCardChevron {
+  transform: rotate(90deg);
 }
 
 .spaceCardTitle {
   display: inline-flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
 }
 
 .spaceCardSummary {
-  flex: 1;
-  min-width: 140px;
+  flex: 1 1 9rem;
+  min-width: 0;
 }
 
 .spaceCardTime {
   font-size: 0.75rem;
 }
 
-.spaceCardBody {
+.spaceCardBody:not([hidden]) {
   border-top: 1px solid var(--border);
   padding: 12px 14px;
   display: flex;

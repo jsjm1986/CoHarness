@@ -54,7 +54,7 @@ it('lists every space with its reported composition summary and saved-state fall
   expect(screen.getAllByText(/保存的组合/).length).toBeGreaterThan(0)
 })
 
-it('expands a space into bundle cards with installation sources and live row phases', async () => {
+it('expands a space to show bundle install sources and live row phases', async () => {
   const user = userEvent.setup()
   render(<SpacesInventory t={t} onPick={() => {}} />)
   const summary = await screen.findByText('owner')
@@ -89,6 +89,8 @@ it('binds the target picker through the manage action without expanding the card
   const picks: string[] = []
   render(<SpacesInventory t={t} onPick={key => picks.push(key)} />)
   await waitFor(() => expect(screen.getByText('owner')).toBeTruthy())
+  const disclosure = screen.getByRole('button', { name: /owner/u })
   await user.click(screen.getAllByText('管理')[0]!)
   expect(picks).toEqual(['user:1'])
+  expect(disclosure.getAttribute('aria-expanded')).toBe('false')
 })

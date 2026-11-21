@@ -29,13 +29,14 @@ import { installCloudflared } from '../../../gateway/src/tunnel-supervisor.ts'
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
 import { responsiveBrowser, responsiveMobileEmulation } from './responsive-browser.ts'
 import { auditAdminState } from './admin-responsive-state.ts'
+import { testConfig } from '../../../gateway/tests/test-config.ts'
 
 const matrix = process.env.DSH_FEATURE_MATRIX === '1'
 
 const DIRECTORY = fileURLToPath(new URL('./snapshots/admin-form-values', import.meta.url))
 const GOLDENS = [
   'archive-pending.expected.md', 'archive-purged.expected.md', 'archive-refused.expected.md',
-  'audit-metadata.expected.md', 'model-price.expected.md', 'more-navigation.expected.md',
+  'audit-metadata.expected.md', 'mobile-account-actions.expected.md', 'model-price.expected.md', 'more-navigation.expected.md',
   'node-config-conflict.expected.md', 'node-config-fields.expected.md', 'node-config-review.expected.md', 'pending-edits.expected.md', 'personal-document.expected.md',
   'project-quota.expected.md', 'project-rename-error.expected.md', 'project-runtime-stop.expected.md', 'runtime-account-missing.expected.md', 'runtime-stopped.expected.md',
   'ssh-reference.expected.md', 'webhook-error.expected.md', 'webhook-visibility.expected.md',
@@ -46,7 +47,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
   const cleanup: Array<() => unknown> = [() => rm(root, { recursive: true, force: true })]
   try {
     const db = openDb(join(root, 'gateway.sqlite')); cleanup.push(() => db.close())
-    const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_STATE_ROOT: join(root, 'state') })
+    const cfg = testConfig(root)
     await mkdir(cfg.projectsRoot, { recursive: true })
     const governance = new ModelGovernanceService(db)
     const deps: GatewayDeps = { cfg, instances: new InstanceManager(db, cfg), auth: new AuthService(db, cfg),
@@ -444,8 +445,15 @@ it('preserves stored values through built forms and keeps every mobile destinati
     })
     if (!await more.isVisible()) await page.getByRole('button', { name: '更多管理功能', exact: true }).click()
     expect(await more.getByRole('link').count()).toBe(10)
-    await more.getByLabel('界面语言', { exact: true }).selectOption('en')
+    await page.keyboard.press('Escape')
+    await more.waitFor({ state: 'hidden' })
+    const mobileAccount = page.locator('.mobileHeader .accountActions')
+    const language = mobileAccount.getByRole('button', { name: '中文，切换为 English', exact: true })
+    expect(await language.innerText()).toBe('中')
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'mobile-account-actions.expected.md'), await mobileAccount.ariaSnapshot(), webSnapshotMode())
+    await language.click()
     await page.getByRole('button', { name: 'More administration features', exact: true }).waitFor()
+    expect(await mobileAccount.getByRole('button', { name: 'English, switch to Chinese', exact: true }).innerText()).toBe('EN')
     expect(await page.evaluate(() => localStorage.getItem('coharness-admin-language'))).toBe('en')
     expect(await page.evaluate(() => document.documentElement.lang)).toBe('en')
     expect(await page.evaluate(() => document.cookie.includes('hgw_lang=en'))).toBe(true)
@@ -456,9 +464,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
       .getByRole('option', { name: /Renamed fixture/u }).waitFor({ state: 'attached' })
     expect(adminReads.get('/admin/terminals /admin/api/projects')).toBe(1)
     await page.getByRole('heading', { name: 'Terminals', exact: true }).waitFor()
-    await page.getByRole('button', { name: 'More administration features', exact: true }).click()
-    await page.getByRole('dialog', { name: 'More administration features', exact: true })
-      .getByLabel('Interface language', { exact: true }).selectOption('zh')
+    await mobileAccount.getByRole('button', { name: 'English, switch to Chinese', exact: true }).click()
     await page.getByRole('heading', { name: '终端', exact: true }).waitFor()
     expect(await page.evaluate(() => document.documentElement.lang)).toBe('zh')
 

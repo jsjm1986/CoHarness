@@ -33,22 +33,30 @@ export function NodeContentSection({ entry, nodes }: { entry: { nodeId: string; 
     } finally { if (!owner.signal.aborted) setBusy(false) }
   }
   return <Section title={zh ? '项目内容库' : 'Project content database'}>
-    {!pinned && nodes.length > 1 && <Field label={zh ? '电脑' : 'Computer'}>
-      <select value={selected} onChange={event => {
-        pending.current?.abort()
-        setChoice(event.target.value)
-        setBusy(false)
-        setView(undefined)
-        setError('')
-      }}>{nodes.map(node => <option value={node.nodeId} key={node.nodeId}>{node.name}</option>)}</select>
-    </Field>}
-    <Button disabled={busy} onClick={() => { void check() }}>{busy ? (zh ? '正在核验…' : 'Verifying…') : (zh ? '核验存储位置' : 'Verify storage location')}</Button>
-    {error && <ErrorBanner message={error}/>}
-    {view && view.nodeId === selected && <p className="fieldHint" role="status">
-      {view.status === 'unconfigured' ? (zh ? '此电脑尚未配置本地项目内容库。' : 'This computer has no local project content database configured.')
-        : view.status === 'unavailable' ? (zh ? '无法验证内容卷，请检查节点数据库和数据目录。' : 'The content volume could not be verified. Check the database and data directory.')
-        : (zh ? '已验证本机 PostgreSQL 数据卷。' : 'Local PostgreSQL data volume verified.')}
-      {view.status === 'verified' && <> <code>{view.dataDirectory}</code></>}
-    </p>}
+    <div className="nodeContentCheck">
+      <div className="targetPicker">
+        {!pinned && nodes.length > 1 && <Field label={zh ? '电脑' : 'Computer'}>
+          <select className="select" value={selected} onChange={event => {
+            pending.current?.abort()
+            setChoice(event.currentTarget.value)
+            setBusy(false)
+            setView(undefined)
+            setError('')
+          }}>
+            {nodes.map(node => <option value={node.nodeId} key={node.nodeId}>{node.name}</option>)}
+          </select>
+        </Field>}
+        <Button type="button" loading={busy} onClick={() => { void check() }}>
+          {busy ? (zh ? '正在核验…' : 'Verifying…') : (zh ? '核验存储位置' : 'Verify storage location')}
+        </Button>
+      </div>
+      <ErrorBanner message={error} />
+      {view && view.nodeId === selected && <p className="fieldHint" role="status">
+        {view.status === 'unconfigured' ? (zh ? '此电脑尚未配置本地项目内容库。' : 'This computer has no local project content database configured.')
+          : view.status === 'unavailable' ? (zh ? '无法验证内容卷，请检查节点数据库和数据目录。' : 'The content volume could not be verified. Check the database and data directory.')
+          : (zh ? '已验证本机 PostgreSQL 数据卷。' : 'Local PostgreSQL data volume verified.')}
+        {view.status === 'verified' && <> <code>{view.dataDirectory}</code></>}
+      </p>}
+    </div>
   </Section>
 }

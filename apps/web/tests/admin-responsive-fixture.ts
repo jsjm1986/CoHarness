@@ -3,7 +3,6 @@ import { cp, mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { AddressInfo } from 'node:net'
-import { loadConfig } from '../../../gateway/src/config.ts'
 import { openDb } from '../../../gateway/src/db.ts'
 import { AuthService } from '../../../gateway/src/auth.ts'
 import { UserService } from '../../../gateway/src/users.ts'
@@ -17,6 +16,7 @@ import { createProxyHandlers } from '../../../gateway/src/proxy.ts'
 import { createAdminApiHandler } from '../../../gateway/src/admin-api.ts'
 import { NodeConfigurationStore } from '../../../gateway/src/node-config-store.ts'
 import { isolatedNodeConfigurationAuthority } from '../../../gateway/tests/node-config-fixture.ts'
+import { testConfig } from '../../../gateway/tests/test-config.ts'
 import { installAdminComputerFixture } from './admin-computer-fixture.ts'
 import type { RuntimeCatalogEntry, RuntimeNodeId, RuntimeId } from '../../../gateway/src/runtime-catalog.ts'
 import type { DeploymentContext } from '../../../gateway/src/deployment-protocol.ts'
@@ -28,6 +28,8 @@ const RUNTIME = '33000000-0000-4000-8000-000000000033' as RuntimeId
 const ARCHIVE = '22000000-0000-4000-8000-000000000022'
 const DOCUMENT = '11111111-1111-4111-8111-111111111111'
 const LONG = '移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789'
+const REMOTE_NAME = '远端验收电脑 · LongComputerIdentifierWithoutBreaks012345678901'
+const CONTENT_DIRECTORY = '/fixture/content-volume/postgresql/data'
 const NOW = Date.UTC(2026, 10, 16, 1)
 const zero = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0,
   totalTokens: 0, estimatedCostMicros: 0, companyCostMicros: 0, calls: 0, missingUsageCalls: 0 }
@@ -44,8 +46,7 @@ export async function startAdminResponsiveFixture(host = '127.0.0.1') {
   const adminRoot = join(root, 'admin')
   await cp(process.env.DSH_ADMIN_ASSET_ROOT ?? resolve('gateway/public/admin'), adminRoot, { recursive: true })
   const db = openDb(join(root, 'gateway.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects'),
-    HGW_STATE_ROOT: join(root, 'state') })
+  const cfg = testConfig(root)
   await mkdir(cfg.projectsRoot, { recursive: true })
   const governance = new ModelGovernanceService(db)
   const deps: GatewayDeps = { cfg, instances: new InstanceManager(db, cfg), auth: new AuthService(db, cfg),
@@ -58,7 +59,7 @@ export async function startAdminResponsiveFixture(host = '127.0.0.1') {
     assertNode: async (nodeId: string) => {
       if (nodeId !== NODE && state.scope === 'local') throw new NodeServiceError(503, 'node-service/unavailable')
     } })
-  Object.assign(deps.nodeAccess!, { list: async () => ({ items: [{ nodeId: REMOTE, name: LONG, revision: '1',
+  Object.assign(deps.nodeAccess!, { list: async () => ({ items: [{ nodeId: REMOTE, name: REMOTE_NAME, revision: 1,
     status: 'disconnected', platform: 'linux', architecture: 'arm64', lastSeenAt: null, leaseExpiresAt: null, executionReady: false }], nextCursor: null }) })
   const nodeConfiguration = new NodeConfigurationStore({ organizationId: 'responsive-fixture', nodeId: NODE }, cfg, {}, isolatedNodeConfigurationAuthority)
   await nodeConfiguration.initialize()
@@ -68,6 +69,11 @@ export async function startAdminResponsiveFixture(host = '127.0.0.1') {
   const project = await deps.projects.create({ name: LONG, createdBy: admin.id })
   const deployment = { mode: 'serving', maintenanceEpoch: '1', writeEpoch: '1', reason: null,
     enteredAt: null, updatedAt: '2026-11-16', nodes: [], writersQuiesced: false, operations: [], migrations: null }
+  const deploymentNodes = [
+    { nodeId: NODE, name: 'fixture-computer', status: 'active' },
+    { nodeId: REMOTE, name: REMOTE_NAME, status: 'offline' },
+  ].map(node => ({ ...node, lastHeartbeatAt: null, heartbeatAgeMs: null,
+    maintenanceAppliedEpoch: '1', inflightWrites: 0, activeRuntimes: 0, quiesced: true }))
   const summary = { ...zero, month: '2026-11', tokenLimit: 12345, companyCostMicrosLimit: 8500000, alerts: [] }
   const userRow = { id: admin.id, username: 'admin', displayName: LONG, role: 'admin', status: 'active',
     homePath: join(root, LONG), mustChangePassword: false, autoReviewEligible: true, port: null, instanceState: 'stopped' }
@@ -180,8 +186,14 @@ export async function startAdminResponsiveFixture(host = '127.0.0.1') {
   const server = createGatewayServer(deps, {
     ...proxy, adminRoot,
     peerBackups: { admin: async (req, res) => {
-      if (req.method !== 'GET' || req.url !== '/admin/api/peer-backups/recoveries/local-execution') return false
-      res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"items":[]}'); return true
+      if (req.method !== 'GET') return false
+      const path = new URL(req.url ?? '/', 'http://fixture').pathname
+      const value = path === '/admin/api/peer-backups' ? { policies: [], localWorkerConfigured: true, recoveryConfigured: true }
+        : path === '/admin/api/peer-backups/recoveries/local-execution' ? { items: [] } : undefined
+      if (value === undefined) return false
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(value))
+      return true
     }, internal: async () => false },
     governanceRecovery: { admin: async (req, res) => {
       res.writeHead(state.recovery === 'error' ? 403 : 200, { 'content-type': 'application/json' })
@@ -197,6 +209,14 @@ export async function startAdminResponsiveFixture(host = '127.0.0.1') {
         res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'unavailable' })); return true
       }
       let value = req.method === 'GET' ? (state.mode === 'empty' && suffix in emptyData ? emptyData[suffix] : data[suffix]) : undefined
+      if (req.method === 'GET' && state.scope === 'organization' && suffix === '/deployment') {
+        value = { ...deployment, nodes: deploymentNodes }
+      }
+      if (req.method === 'GET' && suffix === '/deployment/node-content') {
+        const nodeId = new URL(req.url!, 'http://fixture').searchParams.get('dshNode')
+        if (nodeId === NODE) value = { protocol: 1, nodeId, status: 'verified',
+          volumeId: '44000000-0000-4000-8000-000000000044', dataDirectory: CONTENT_DIRECTORY }
+      }
       if (req.method === 'GET' && /\/(?:desktops|terminals|ssh|plugins|memory|steward)\/permissions$/.test(suffix)) {
         const query = new URL(req.url!, 'http://fixture').searchParams
         value = { kind: query.get('kind') ?? 'user', id: Number(query.get('id') ?? admin.id), enabled: true, revision: '1' }
@@ -212,6 +232,7 @@ export async function startAdminResponsiveFixture(host = '127.0.0.1') {
   const base = `http://${host}:${(server.address() as AddressInfo).port}`
   cfg.publicOrigins.push(base)
   return { base, state, adminId: admin.id, projectId: project.id, nodeId: NODE, remoteNodeId: REMOTE,
+    remoteName: REMOTE_NAME, contentDirectory: CONTENT_DIRECTORY,
     close: async () => {
       server.closeAllConnections()
       await new Promise<void>((done, reject) => server.close((error) => { if (error) reject(error); else done() }))

@@ -132,22 +132,25 @@ export function UsersPage({ prepareNextPage }: { prepareNextPage?: () => (() => 
     if (saved) setDeleteTarget(null)
   }
 
+  const openCreate = () => { setActionError(''); setCreateOpen(true) }
   return (
-    <div className="page">
+    <div className="page usersPage">
       <PageHeader
         title={t('pageTitle')}
         description={t('pageDescription')}
         meta={loading || (users.length === 0 && error !== '') ? undefined : t('userCount', { count: String(users.length) })}
-        actions={<Button variant="primary" icon={Plus} onClick={() => { setActionError(''); setCreateOpen(true) }}>{t('createUser')}</Button>}
+        actions={<Button variant="primary" icon={Plus} onClick={openCreate}>{t('createUser')}</Button>}
       />
       <ErrorBanner message={error} />
-      <Section flush className="responsiveSection" title={t('sectionTitle')} meta={loading || (users.length === 0 && error !== '') ? undefined : t('recordCount', { count: String(users.length) })}>
+      <Section flush className="responsiveSection userListSection" title={t('sectionTitle')}
+        meta={loading || (users.length === 0 && error !== '') ? undefined : t('recordCount', { count: String(users.length) })}
+        actions={<Button variant="primary" icon={Plus} onClick={openCreate}>{t('createUser')}</Button>}>
         {loading ? <LoadingState label={t('loadingUsers')} /> : users.length === 0 && error !== '' ? null : users.length === 0 ? (
           <EmptyState
             icon={Users}
             title={t('emptyTitle')}
             detail={t('emptyDetail')}
-            action={<Button variant="primary" icon={Plus} onClick={() => { setActionError(''); setCreateOpen(true) }}>{t('createUser')}</Button>}
+            action={<Button variant="primary" icon={Plus} onClick={openCreate}>{t('createUser')}</Button>}
           />
         ) : (
           <>

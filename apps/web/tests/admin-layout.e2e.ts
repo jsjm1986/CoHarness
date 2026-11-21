@@ -10,7 +10,6 @@ import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
 import { installAdminComputerFixture } from './admin-computer-fixture.ts'
 import { startAdminResponsiveFixture } from './admin-responsive-fixture.ts'
-import { loadConfig } from '../../../gateway/src/config.ts'
 import { openDb } from '../../../gateway/src/db.ts'
 import { AuthService } from '../../../gateway/src/auth.ts'
 import { UserService } from '../../../gateway/src/users.ts'
@@ -23,6 +22,7 @@ import { createProxyHandlers } from '../../../gateway/src/proxy.ts'
 import { createAdminApiHandler } from '../../../gateway/src/admin-api.ts'
 import { NodeConfigurationStore } from '../../../gateway/src/node-config-store.ts'
 import { isolatedNodeConfigurationAuthority } from '../../../gateway/tests/node-config-fixture.ts'
+import { testConfig } from '../../../gateway/tests/test-config.ts'
 import type { RuntimeTarget } from '../../../gateway/src/instances.ts'
 import { assertFixtureInventory, captureStableAria, compareOrRefreshGolden, webSnapshotMode } from './scaffold.ts'
 
@@ -88,7 +88,7 @@ it('keeps admin controls inside their sections and navigation reachable on short
   const cleanup: Array<() => unknown> = [() => rm(root, { recursive: true, force: true })]
   try {
     const db = openDb(join(root, 'gateway.sqlite')); cleanup.push(() => db.close())
-    const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_STATE_ROOT: join(root, 'state') })
+    const cfg = testConfig(root)
     await mkdir(cfg.projectsRoot, { recursive: true })
     const governance = new ModelGovernanceService(db)
     const deps: GatewayDeps = { cfg, instances: new InstanceManager(db, cfg), auth: new AuthService(db, cfg),
@@ -128,7 +128,7 @@ it('keeps admin controls inside their sections and navigation reachable on short
     installAdminComputerFixture(deps)
     const server = createGatewayServer(deps, {
       ...proxy,
-      adminRoot: resolve('gateway/public/admin'),
+      adminRoot: resolve(process.env.DSH_ADMIN_ASSET_ROOT ?? 'gateway/public/admin'),
       admin: async (req, res, user, path, body) => adminHandler(req, res, user, path, body),
     })
     await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
@@ -246,6 +246,8 @@ it('keeps admin controls inside their sections and navigation reachable on short
     const storageState = await page.context().storageState()
     for (const variant of touchViewports) {
       const viewport = { width: variant.width, height: variant.height }
+      const compact = viewport.width <= 840
+        || (viewport.width <= 1024 && viewport.width > viewport.height && viewport.height <= 420)
       const label = `${viewport.width}x${viewport.height} ${variant.colorScheme}`
       const textSpacing = 'textSpacing' in variant && variant.textSpacing
       const context = await browser.newContext({ viewport, storageState, hasTouch: true, isMobile: true,
@@ -256,10 +258,16 @@ it('keeps admin controls inside their sections and navigation reachable on short
         await touchPage.goto(`${base}/admin/users`)
         const newUser = touchPage.getByRole('button', { name: '新建用户', exact: true })
         await newUser.waitFor()
-        await touchPage.getByRole('button', { name: viewport.width > 840 ? '删除用户' : '删除', exact: true }).first().waitFor()
+        await touchPage.getByRole('button', { name: compact ? '删除' : '删除用户', exact: true }).first().waitFor()
         if (textSpacing) await applyTextSpacing(touchPage)
         expect(await touchPage.evaluate(() => matchMedia('(pointer: coarse)').matches && matchMedia('(hover: none)').matches), label).toBe(true)
         await expectPageFits(touchPage, viewport.width, `${label}: users`)
+        const accountActions = touchPage.locator(compact ? '.mobileHeader .accountActions' : '.sidebarFooter .accountActions')
+        const language = await boxOf(accountActions.getByRole('button', { name: '中文，切换为 English', exact: true }))
+        const signOut = await boxOf(accountActions.getByRole('button', { name: '退出登录', exact: true }))
+        inside(language, { x: 0, y: 0, ...viewport })
+        inside(signOut, { x: 0, y: 0, ...viewport })
+        expect(language.y, label).toBe(signOut.y)
         const actionTargets = await touchPage.locator('.compactActions .iconButton:visible').all()
         expect(actionTargets.length, label).toBeGreaterThan(0)
         for (const action of actionTargets) {
@@ -267,7 +275,7 @@ it('keeps admin controls inside their sections and navigation reachable on short
           expect(box.width, label).toBeGreaterThanOrEqual(44)
           expect(box.height, label).toBeGreaterThanOrEqual(44)
         }
-        if (viewport.width > 840) {
+        if (!compact) {
           const table = touchPage.locator('.tableWrap.desktopOnly')
           const edit = table.getByRole('button', { name: '编辑用户', exact: true }).first()
           await edit.tap()
@@ -302,7 +310,7 @@ it('keeps admin controls inside their sections and navigation reachable on short
         }
         await create.getByRole('button', { name: '取消', exact: true }).tap()
         await touchPage.setViewportSize(viewport)
-        if (viewport.width <= 840) {
+        if (compact) {
           const nav = touchPage.locator('.mobileNav')
           inside(await boxOf(nav), { x: 0, y: 0, ...viewport })
           await nav.getByRole('button', { name: '更多管理功能' }).tap()
@@ -466,9 +474,7 @@ it('preloads model resources after each owning view renders and reuses the secon
       usersRendered: performance.getEntriesByName('admin-users-rendered')[0]?.startTime,
       modelRequest: performance.getEntriesByName(url, 'resource')[0]?.startTime,
     }), preloaded.url())
-    if (timing.usersRendered === undefined || timing.modelRequest === undefined) {
-      throw new Error('Missing render or script resource timing')
-    }
+    if (timing.usersRendered === undefined || timing.modelRequest === undefined) throw new Error('Missing Users render or Models request timing')
     expect(timing.modelRequest).toBeGreaterThanOrEqual(timing.usersRendered)
     expect(modelReads).toEqual([])
 
@@ -489,9 +495,7 @@ it('preloads model resources after each owning view renders and reuses the secon
       catalogRendered: performance.getEntriesByName('admin-catalog-rendered')[0]?.startTime,
       detailsRequest: performance.getEntriesByName(url, 'resource')[0]?.startTime,
     }), prepared.url())
-    if (detailsTiming.catalogRendered === undefined || detailsTiming.detailsRequest === undefined) {
-      throw new Error('Missing render or script resource timing')
-    }
+    if (detailsTiming.catalogRendered === undefined || detailsTiming.detailsRequest === undefined) throw new Error('Missing catalog render or model detail request timing')
     expect(detailsTiming.detailsRequest).toBeGreaterThanOrEqual(detailsTiming.catalogRendered)
     expect(tabReads).toEqual([])
     await page.getByRole('button', { name: '权限与计价', exact: true }).click()

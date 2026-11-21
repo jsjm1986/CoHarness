@@ -156,7 +156,10 @@ export function RemoteDesktopPage() {
     }
   }
 
-  if (endpoints === null) return error === null ? <LoadingState label={t('loading')} /> : <ErrorBanner message={error} />
+  if (endpoints === null) return <div className="page">
+    <PageHeader title={t('pageTitle')} />
+    {error === null ? <LoadingState label={t('loading')} /> : <ErrorBanner message={error} />}
+  </div>
 
   return (
     <div>

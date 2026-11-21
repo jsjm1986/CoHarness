@@ -1,7 +1,8 @@
 /** The cross-space plugin inventory: every space's reported composition, expandable to its bundles and live entries. */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { pluginInventoryList, type PluginInventoryBundle, type PluginInventoryLocalizedText, type PluginInventoryPlugin, type PluginInventorySpaceRow, type PluginDesiredState } from '../api.ts'
-import { ErrorBanner, Section, StatusBadge } from '../components/ui.tsx'
+import { Button, ErrorBanner, Section, StatusBadge } from '../components/ui.tsx'
 import { adminLanguage } from '../language.ts'
 import { packageText, resolveLocalized, rowText, type Translate } from './presentation.ts'
 import type { PluginManagerLocaleKey } from './locales.ts'
@@ -35,7 +36,7 @@ function sourceLabel(source: string | undefined, t: Translate): string {
   return t('sourceRegistry')
 }
 
-/** One reported bundle: its display name, version, installation source, state, and declared rows with live phases. */
+/** A reported bundle's install source and version alongside the live phases of its declared rows. */
 function BundleCard({ bundle, live, resolveText, t }: {
   readonly bundle: PluginInventoryBundle
   readonly live: ReadonlyMap<string, PluginInventoryPlugin>
@@ -93,27 +94,31 @@ function SpaceCard({ row, resolveText, t, onPick }: {
   const inventory = row.inventory
   const failed = inventory?.plugins.filter(plugin => plugin.fiberPhase === 'failed').length ?? 0
   const live = useMemo(() => new Map((inventory?.plugins ?? []).map(plugin => [plugin.entryId, plugin])), [inventory])
-  return <details className="spaceCard">
-    <summary>
-      <span className="spaceCardTitle">
-        <strong>{row.target.label}</strong>
-        <small className="muted">{row.target.kind === 'user' ? t('spacesKindUser') : t('spacesKindProject')}</small>
-        {row.target.steward ? <StatusBadge tone="info">{t('spacesSteward')}</StatusBadge> : null}
-      </span>
-      <span className="spaceCardSummary muted">
-        {inventory === null
-          ? (row.desired === null ? t('spacesNoReport') : `${t('spacesBundles', { count: `${row.desired.bundles.length}` })} · ${t('spacesSavedOnly')}`)
-          : `${t('spacesBundles', { count: `${inventory.bundles.length}` })} · ${t('spacesEntries', { count: `${inventory.plugins.length}` })}${failed === 0 ? '' : ` · ${t('partsCountFailed', { count: `${failed}` })}`}`}
-      </span>
-      {row.live ? <StatusBadge tone="success">{t('spaceRunning')}</StatusBadge> : <StatusBadge>{t('spaceStopped')}</StatusBadge>}
-      <span className="muted spaceCardTime">
-        {row.reportedAt === null ? '' : <time dateTime={row.reportedAt}>{new Date(row.reportedAt).toLocaleString()}</time>}
-      </span>
-      <button type="button" className="tableLink" onClick={(event) => { event.preventDefault(); onPick(`${row.target.kind}:${String(row.target.id)}`) }}>
-        <strong>{t('spacesManage')}</strong>
+  const [expanded, setExpanded] = useState(false)
+  const contentId = useId()
+  return <div className="spaceCard">
+    <div className="spaceCardHeader">
+      <button type="button" className="spaceCardToggle" aria-expanded={expanded} aria-controls={contentId}
+        onClick={() => setExpanded(value => !value)}>
+        <ChevronRight className="spaceCardChevron" aria-hidden="true" />
+        <span className="spaceCardTitle">
+          <strong>{row.target.label}</strong>
+          <small className="muted">{row.target.kind === 'user' ? t('spacesKindUser') : t('spacesKindProject')}</small>
+          {row.target.steward ? <StatusBadge tone="info">{t('spacesSteward')}</StatusBadge> : null}
+        </span>
+        <span className="spaceCardSummary muted">
+          {inventory === null
+            ? (row.desired === null ? t('spacesNoReport') : `${t('spacesBundles', { count: `${row.desired.bundles.length}` })} · ${t('spacesSavedOnly')}`)
+            : `${t('spacesBundles', { count: `${inventory.bundles.length}` })} · ${t('spacesEntries', { count: `${inventory.plugins.length}` })}${failed === 0 ? '' : ` · ${t('partsCountFailed', { count: `${failed}` })}`}`}
+        </span>
+        {row.live ? <StatusBadge tone="success">{t('spaceRunning')}</StatusBadge> : <StatusBadge>{t('spaceStopped')}</StatusBadge>}
+        {row.reportedAt === null ? null : <time className="muted spaceCardTime" dateTime={row.reportedAt}>{new Date(row.reportedAt).toLocaleString()}</time>}
       </button>
-    </summary>
-    <div className="spaceCardBody">
+      <Button type="button" variant="ghost" onClick={() => onPick(`${row.target.kind}:${String(row.target.id)}`)}>
+        {t('spacesManage')}
+      </Button>
+    </div>
+    <div className="spaceCardBody" id={contentId} hidden={!expanded}>
       {inventory === null
         ? (row.desired === null ? <p className="muted">{t('spacesNoReport')}</p> : <SavedComposition desired={row.desired} t={t} />)
         : <>
@@ -134,7 +139,7 @@ function SpaceCard({ row, resolveText, t, onPick }: {
             </details>
           </>}
     </div>
-  </details>
+  </div>
 }
 
 /** Whether a space's label, bundle names, titles, or module names contain the filter needle. */

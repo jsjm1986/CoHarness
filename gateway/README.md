@@ -256,6 +256,8 @@ Discovery, version probes and extraction share the child environment filter. Sto
 
 ## Admin console and project grants
 
+The language button beside Sign out shows **中** or **EN** for the current interface language. Compact screens place both controls in the top bar. In organization mode, open the current computer beside the page title to choose a computer or refresh the directory.
+
 The Admin shell includes the default Users page. Once the user list has rendered, the browser can prepare the organization model catalog resources in the background. Model data loads when Models opens. The ready organization catalog can prepare the shared bundle for Access & pricing and Personal registrations in a background task after its first rendering opportunity. Opening either tab starts its data request in parallel with any remaining bundle load. The remaining pages download their resources when opened. If a page bundle fails to load, the page offers to reload its current URL. The ordinary Admin navigation stays available.
 
 The production Admin build includes smaller gzip variants of its larger JavaScript and CSS files. The Gateway serves a matching variant at the original asset URL when the client accepts gzip. The original file serves older builds and clients that request it. The private cache distinguishes the two encodings.

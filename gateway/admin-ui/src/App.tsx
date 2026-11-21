@@ -24,9 +24,9 @@ import { UsersPage } from './pages/UsersPage.tsx'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { createPageImport, lazyPage, PageLoading } from './components/async-route.tsx'
 import { Button, Dialog, ErrorBanner, PageHeader } from './components/ui.tsx'
-import { adminLanguage, setAdminLanguage, translateCopy, type AdminLanguage } from './language.ts'
+import { adminLanguage, setAdminLanguage, translateCopy } from './language.ts'
 import { zh as chromeZh, en as chromeEn, type ChromeCopyKey } from './chrome.copy.ts'
-import { ComputerSelector } from './ComputerSelector.tsx'
+import { ComputerSelectorProvider } from './ComputerSelector.tsx'
 import { adminComputerBase, adminComputerTarget } from './computer-target.ts'
 import { PendingEditsProvider, useProtectedNavigation } from './pending-edits.tsx'
 import { zh as computerZh, en as computerEn } from './computer.copy.ts'
@@ -80,8 +80,8 @@ function OrdinaryAdminApp() {
     return () => { owned.dispose() }
   }, [computer])
   if (computer.invalid) return <main className="mainContent">
-    <div className="page">
-      <p role="alert">{t('invalid')}</p>
+    <div className="page adminEntryNotice">
+      <ErrorBanner message={t('invalid')} />
       <a className="button button-secondary" href="/admin/">{t('returnCenter')}</a>
     </div>
   </main>
@@ -106,51 +106,53 @@ function AdminDocument({ nodeId }: { nodeId: ReturnType<typeof adminComputerTarg
           <Brand />
           <AdminNav className="sidebarNav" />
           <div className="sidebarFooter">
-            <ShellTitle />
-            <LanguageSelect />
-            <LogoutButton />
+            <AccountActions />
           </div>
         </aside>
         <header className="mobileHeader">
           <Brand compact />
-          <LogoutButton compact />
+          <AccountActions compact />
         </header>
         <main className="mainContent">
-          {deployment.value?.scope === 'organization' && <ComputerSelector nodeId={nodeId} onSelect={nextNodeId => {
-            navigation.navigate(`${adminComputerBase(nextNodeId)}${location.pathname}${location.search}${location.hash}`)
-          }} />}
-          {deployment.error && location.pathname !== '/deployment' && <div className="page"><ErrorBanner message={t('policyFailed')} /><Button onClick={() => void deployment.refresh()}>{t('retryPolicy')}</Button></div>}
-          {unavailable && <div className="page">
-            <p role="alert">{t('entryUnavailable')}</p>
+          {deployment.error && location.pathname !== '/deployment' && <div className="page adminEntryNotice">
+            <ErrorBanner message={t('policyFailed')} />
+            <Button onClick={() => void deployment.refresh()}>{t('retryPolicy')}</Button>
+          </div>}
+          {unavailable && <div className="page adminEntryNotice">
+            <ErrorBanner message={t('entryUnavailable')} />
             <a className="button button-secondary" href="/admin/" target="_blank" rel="noopener noreferrer">{t('openLocal')}</a>
           </div>}
-          <div className="adminRouteContent" inert={unavailable || undefined} aria-disabled={unavailable || undefined}>
-            <Suspense fallback={<PageLoading />}>
-              <Routes>
-                <Route path="/" element={<UsersPage prepareNextPage={
-                  deployment.value !== null && !deployment.error && !unavailable ? modelCatalog.prepare : undefined
-                } />} />
-                <Route path="/users" element={<Navigate to="/" replace />} />
-                <Route path="/users/:id" element={<UserDetailPage />} />
-                <Route path="/projects" element={<ProjectListPage />} />
-                <Route path="/projects/:id" element={<ProjectDetailPage />} />
-                <Route path="/plugins" element={<PluginsPage />} />
-                <Route path="/models" element={<ModelsPage />} />
-                <Route path="/usage" element={<UsagePage />} />
-                <Route path="/documents" element={<DocumentsPage />} />
-                <Route path="/archives" element={<ArchivesPage />} />
-                <Route path="/terminals" element={<TerminalsPage />} />
-                <Route path="/ssh" element={<SshPage />} />
-                <Route path="/deployment" element={<DeploymentPage />} />
-                <Route path="/steward" element={<StewardPage />} />
-                <Route path="/webhooks" element={<WebhooksPage />} />
-                <Route path="/desktops" element={<DesktopsPage />} />
-                <Route path="/remote-desktops" element={<RemoteDesktopPage />} />
-                <Route path="/audit" element={<AuditPage />} />
-                <Route path="*" element={<AdminPageNotFound />} />
-              </Routes>
-            </Suspense>
-          </div>
+          <ComputerSelectorProvider enabled={deployment.value?.scope === 'organization'} nodeId={nodeId} onSelect={nextNodeId => {
+            navigation.navigate(`${adminComputerBase(nextNodeId)}${location.pathname}${location.search}${location.hash}`)
+          }}>
+            <div className="adminRouteContent" inert={unavailable || undefined} aria-disabled={unavailable || undefined}>
+              <Suspense fallback={<PageLoading />}>
+                <Routes>
+                  <Route path="/" element={<UsersPage prepareNextPage={
+                    deployment.value !== null && !deployment.error && !unavailable ? modelCatalog.prepare : undefined
+                  } />} />
+                  <Route path="/users" element={<Navigate to="/" replace />} />
+                  <Route path="/users/:id" element={<UserDetailPage />} />
+                  <Route path="/projects" element={<ProjectListPage />} />
+                  <Route path="/projects/:id" element={<ProjectDetailPage />} />
+                  <Route path="/plugins" element={<PluginsPage />} />
+                  <Route path="/models" element={<ModelsPage />} />
+                  <Route path="/usage" element={<UsagePage />} />
+                  <Route path="/documents" element={<DocumentsPage />} />
+                  <Route path="/archives" element={<ArchivesPage />} />
+                  <Route path="/terminals" element={<TerminalsPage />} />
+                  <Route path="/ssh" element={<SshPage />} />
+                  <Route path="/deployment" element={<DeploymentPage />} />
+                  <Route path="/steward" element={<StewardPage />} />
+                  <Route path="/webhooks" element={<WebhooksPage />} />
+                  <Route path="/desktops" element={<DesktopsPage />} />
+                  <Route path="/remote-desktops" element={<RemoteDesktopPage />} />
+                  <Route path="/audit" element={<AuditPage />} />
+                  <Route path="*" element={<AdminPageNotFound />} />
+                </Routes>
+              </Suspense>
+            </div>
+          </ComputerSelectorProvider>
         </main>
         <AdminNav className="mobileNav" />
       </div>
@@ -175,11 +177,6 @@ const NAV_ITEMS: Array<{ to: string; labelKey: ChromeCopyKey; icon: LucideIcon; 
   { to: '/remote-desktops', labelKey: 'navRemoteDesktops', icon: ScreenShare },
   { to: '/audit', labelKey: 'navAudit', icon: ScrollText },
 ]
-
-function ShellTitle() {
-  const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
-  return <span>{t('shellTitle')}</span>
-}
 
 function AdminPageNotFound() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
@@ -222,14 +219,21 @@ function Brand({ compact = false }: { compact?: boolean }) {
   )
 }
 
-/** The persisted surface-language choice; it writes localStorage and the `hgw_lang` cookie, then reloads to apply everywhere. */
-function LanguageSelect() {
-  const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
-  return <select className="select selectCompact languageSelect" aria-label={t('languageAria')} value={adminLanguage()}
-    onChange={event => { setAdminLanguage(event.target.value as AdminLanguage); window.location.reload() }}>
-    <option value="zh">中文</option>
-    <option value="en">English</option>
-  </select>
+function AccountActions({ compact = false }: { compact?: boolean }) {
+  const language = adminLanguage()
+  const t = translateCopy(language, { zh: chromeZh, en: chromeEn })
+  const navigation = useProtectedNavigation()
+  return <div className="accountActions">
+    <Button type="button" variant="ghost" className="languageButton" aria-label={t('languageAria')} title={t('languageAction')}
+      onClick={() => {
+        if (!navigation.canReplace()) return
+        setAdminLanguage(language === 'zh' ? 'en' : 'zh')
+        window.location.reload()
+      }}>
+      <span className="languageMark" aria-hidden="true">{t('languageMark')}</span>
+    </Button>
+    <LogoutButton compact={compact} />
+  </div>
 }
 
 function LogoutButton({ compact = false }: { compact?: boolean }) {
@@ -278,7 +282,6 @@ function AdminNav({ className }: { className: string }) {
             <Icon aria-hidden="true" /><span>{t(labelKey)}</span>
           </NavLink>)}
         </nav>
-        <LanguageSelect />
       </Dialog> : null}
     </>
   )

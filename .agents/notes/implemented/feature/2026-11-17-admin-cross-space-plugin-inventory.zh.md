@@ -18,7 +18,7 @@ Status: implemented
 
 **Gateway。** `PostgresPluginInventory.report` 复用 `resolvePluginRuntimeOwner`——实例行必须仍匹配凭据的所有者、运行时、节点与代次，陈旧进程不能覆盖其后继——然后按所有者内容归属 upsert 进 harness 或 node_content。线上报文解析对条数、字符串、图标做了上限约束并丢弃未知字段。`GET /admin/api/plugins/inventory` 列出本节点上每个实例行（用户、项目、steward；不限于持有 `plugin_states` 的空间），同时关联最近一次上报与已保存的期望组合；损坏的存储载荷降级为缺失而不是隐藏该空间。读取绝不启动已停止的运行时。
 
-**呈现。** `SpacesInventory` 为每个空间渲染一张可展开卡片：运行/停止状态、上报时间、组合包/条目/失败数、带本地化标题与来源徽标（内置、npm、git、本地·自研、归档包）的组合包卡片、关联到存活 fiber 阶段的声明行，以及明确标注"已保存·非观测"的 `SavedComposition` 回退。筛选匹配空间名、组合包名、模块名与本地化标题，v1 即回答"谁装了 X"。管理按钮绑定现有目标选择器；steward 行沿用现有策略保持只读。
+**呈现。** `SpacesInventory` 为每个空间渲染一张可展开卡片：运行/停止状态、上报时间、组合包/条目/失败数、带本地化标题与安装来源徽标（内置、npm、git、本地·自研、归档包）的组合包卡片、关联到存活 fiber 阶段的声明行，以及明确标注"已保存·非观测"的 `SavedComposition` 回退。筛选匹配空间名、组合包名、模块名与本地化标题，v1 即回答"谁装了 X"。管理按钮绑定现有目标选择器；steward 行沿用现有策略保持只读。
 
 ## Alternatives considered
 
@@ -40,4 +40,4 @@ Status: implemented
 - `gateway/tests/plugin-inventory.spec.ts` 覆盖线上校验、上报/列出往返、陈旧代次拒绝与未上报项目的期望态回退（PostgreSQL 套件）。
 - `packages/boot/plugin-manager/tests/manager.spec.ts` 覆盖启动上报、变更后上报与存储不可达降级。
 - `packages/context/gateway-execution/tests/plugin-management.spec.ts` 覆盖转发契约。
-- `gateway/admin-ui/src/plugins/SpacesInventory.spec.tsx` 覆盖列出、展开、来源与阶段徽标、筛选与目标绑定。
+- `gateway/admin-ui/src/plugins/SpacesInventory.spec.tsx` 覆盖列出、展开、安装来源与阶段徽标、筛选与目标绑定。
