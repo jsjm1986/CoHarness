@@ -27,8 +27,17 @@ const settings=z.discriminatedUnion('provider',[
 ])
 type Description=Omit<PeerFileRootMap['roots'][number],'snapshotRoot'>
 const unavailable=()=>new PeerBackupError(503,'peer-backup/project-snapshot-unavailable')
+const modelPolicyFile='model-governance.json'
 function within(root:string,path:string):boolean{const rest=relative(root,path);return rest==='' || rest!=='..'&&!rest.startsWith('..'+sep)&&!isAbsolute(rest)}
 async function present(path:string){try{return await lstat(path)}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return;throw error}}
+
+// The Gateway reissues this policy and its intake credential from governance on launch.
+async function hasPrivateProjectPolicy(snapshotHome:string):Promise<boolean>{
+  const owner=await present(snapshotHome)
+  if(!owner?.isDirectory())return false
+  const info=await present(join(snapshotHome,modelPolicyFile))
+  return info?.isFile()===true && info.nlink===1 && (info.mode&0o777)===0o600 && info.uid===owner.uid && info.gid===owner.gid
+}
 
 /** The document provider resolves the public and private roots that share the published UserDoc identity. */
 export interface PeerDocumentFileRoots {
@@ -64,7 +73,7 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
       AND b.writer_epoch=$5 AND b.volume_id=$6 AND p.status='active'`,[b.organizationId,b.projectId,b.runtimeId,b.nodeId,b.writerEpoch,b.volumeId])).rows[0]
     if(!project)throw unavailable()
     const current=()=>this.store.read(b,async tx=>{
-      const space=(await tx.query<{root_path:string;revision:string;root_id:string;sequence:string;ordinal:number}>(`SELECT s.root_path,s.revision::text,d.root_id,d.sequence::text,d.ordinal
+      const space=(await tx.query<{root_path:string;revision:string;runtime_generation:string;root_id:string;sequence:string;ordinal:number}>(`SELECT s.root_path,s.revision::text,s.runtime_generation::text,d.root_id,d.sequence::text,d.ordinal
         FROM node_content.spaces s JOIN node_content.document_roots d USING(organization_id,runtime_id,volume_id,writer_epoch)
         WHERE s.organization_id=$1 AND s.project_id=$2 AND s.runtime_id=$3 AND d.scope_id=s.project_id AND d.scope_kind='project'`,
       [b.organizationId,b.projectId,b.runtimeId])).rows[0]
@@ -102,6 +111,9 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
         for(const gap of profile.gaps)gaps.add(gap)
         for(const row of profile.roots)inputs.push({role:'plugin',owner:row.owner,kind:row.kind,logicalRoot:row.path})
       }else gaps.add('runtime:outside-snapshot')
+      const snapshotHome=within(selected.source,home)?snapshot.map(home):undefined
+      const projection=selected.provider==='btrfs' && snapshotHome!==undefined && await hasPrivateProjectPolicy(snapshotHome)
+        ? join(home,modelPolicyFile) : undefined
       const manifest=join(home,'managed-data.jsonl')
       if(!within(selected.source,manifest))gaps.add('runtime:outside-snapshot')
       else {
@@ -113,14 +125,25 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
             if(record.path===home || !within(home,record.path) && !within(space.root_path,record.path)){
               gaps.add('plugin:external-data');continue
             }
+            if(record.path===projection && record.kind==='file')continue
             if(inputs.some(r=>r.logicalRoot===record.path && r.owner===record.owner))continue
             inputs.push({role:'plugin',owner:record.owner,kind:record.kind,logicalRoot:record.path})
           }
-        } else if(await present(snapshot.map(home)))gaps.add('runtime:undeclared-files')
+        } else if(selected.provider==='btrfs' && space.runtime_generation!=='0'){
+          gaps.add('runtime:undeclared-files')
+        } else if(snapshotHome!==undefined && await present(snapshotHome)){
+          if(selected.provider==='vss')gaps.add('runtime:undeclared-files')
+          else for await(const item of await opendir(snapshotHome,{bufferSize:2})){
+            if(projection!==undefined && item.name===modelPolicyFile)continue
+            gaps.add('runtime:undeclared-files')
+            break
+          }
+        }
       }
       if('inspect' in snapshot)await snapshot.inspect(inputs.map(row=>row.logicalRoot),maxEntries)
-      if(within(selected.source,home) && await present(snapshot.map(home))) {
+      if(snapshotHome!==undefined && await present(snapshotHome)) {
         const known=inputs.map(item=>item.logicalRoot)
+        if(projection!==undefined)known.push(projection)
         const unowned=async(path:string):Promise<boolean>=>{
           if(known.some(root=>within(root,path)))return false
           if(!known.some(root=>within(path,root)))return true

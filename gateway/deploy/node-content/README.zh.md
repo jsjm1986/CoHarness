@@ -36,6 +36,8 @@ Linux 项目电脑配有独立本地 Btrfs 卷时，异机备份可以包含运�
 
 将 `HGW_PEER_PROJECT_SNAPSHOTS_FILE` 设为仅文件所有者可访问的 JSON 文件的规范绝对路径。文件包含 `version: 1`、`organizationId`、`nodeId`、`provider: "btrfs"` 和 `projects` 数组。数组每项给出内部项目 UUID `projectId`、源子卷绝对路径 `subvolume` 和快照目录绝对路径 `snapshotDirectory`。后台进程导出获准的项目目录，核验数据库和 UserDoc 水位后释放专用文件快照。备份进程异常退出后，同一 PID 命名空间中的后续备份会核对原进程身份、源文件系统、父子卷和快照 UUID，再回收遗留快照。嵌套文件系统、插件未登记的文件或缺少快照能力都会阻止生成完整恢复点。退役原备份前请核对各策略的实际覆盖情况。
 
+Gateway 在 Runtime 启动时重建本机模型策略和上报凭据。Linux 项目快照会略过这份私有投影。仅含该投影的 Runtime 主目录可在首次启动前取得完整备份。有已记录代次的 Runtime 仍须提供托管文件清单。
+
 ## 在 Windows 上备份运行中的项目文件
 
 Windows 项目电脑使用独立的本地固定 NTFS 数据卷。在同一份快照配置中将 `provider` 设为 `"vss"`。每个项目填入 `projectId`、项目数据子树的规范路径 `source`、原卷 GUID `volume` 及位于子树之外的 Gateway 私有目录 `snapshotDirectory`。可用 `Get-Volume` 查询卷 GUID。所选子树应包含工作区、Runtime 存储和两个 UserDoc 私有目录。`commandTimeoutMs` 指定本机检查卷和创建卷影副本的时限。

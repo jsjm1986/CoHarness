@@ -1,7 +1,7 @@
 /** Verify an online project checkpoint with an OS snapshot, published content DB and UserDoc identity. */
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { lstat,mkdir,mkdtemp,readFile,readdir,rm,writeFile } from 'node:fs/promises'
+import { chmod,lstat,mkdir,mkdtemp,readFile,readdir,rm,writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -33,6 +33,31 @@ export async function verifyNativeProjectPoint({lib,temp,config,context,store,pr
       rootId:input.rootId,cursor:input.cursor}))
     const live=join(workspace,'ongoing-work.txt'),home=join(config.projectRuntimesRoot,String(project),'dsh'),storage=join(home,'storages'),profile=join(home,'profiles','web')
     const b=(await context.pool.query('SELECT harness.project_content_key($1,$2) AS b',[context.organizationId,projectUuid])).rows[0].b
+    const limits={maxRows:10000,maxBytes:32<<20}
+    if(!windowsVolume){
+      await mkdir(home,{recursive:true,mode:0o700})
+      const projection=join(home,'model-governance.json')
+      await writeFile(projection,JSON.stringify({version:1,intakeToken:'isolated-cache-only'}),{mode:0o600})
+      await files.verify(b)
+      const cold=new PeerProjectExporter({control:context.pool,store,...limits,files:provider})
+      const checkpoint=join(directory,'initial-point');await mkdir(checkpoint)
+      const initial=await cold.capture(policy,checkpoint,signal)
+      assert.deepEqual(initial.gaps,[])
+      await cold.validate(policy,initial,checkpoint,signal)
+      const recovered=await verifiedPeerFileRoots(policy,checkpoint,true)
+      assert.ok(recovered.roots.every(row=>row.logicalRoot!==projection))
+      const initialManifest=JSON.parse(await readFile(join(checkpoint,'managed','manifest.json'),'utf8'))
+      assert.ok(initialManifest.snapshot.files.every(row=>!row.sourcePath.endsWith('/model-governance.json')))
+      await chmod(projection,0o644)
+      const loose=join(directory,'unprotected-projection');await mkdir(loose)
+      assert.ok((await cold.capture(policy,loose,signal)).gaps.includes('runtime:undeclared-files'))
+      await chmod(projection,0o600)
+      await store.write(b,async()=>{},1)
+      const afterStart=join(directory,'previously-started');await mkdir(afterStart)
+      assert.ok((await cold.capture(policy,afterStart,signal)).gaps.includes('runtime:undeclared-files'))
+      console.log(JSON.stringify({provider:providerName,unstartedProjectComplete:true,policyCredentialOmitted:true,
+        unsafePolicyFileReported:true,priorRuntimeMissingInventoryReported:true}))
+    }
     await mkdir(profile,{recursive:true,mode:0o700})
     await writeFile(join(profile,'package.json'),JSON.stringify({name:'private-native-project-fixture',private:true,type:'module',
       dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-web-app']}}})+'\n',{flag:'wx',mode:0o600})
@@ -48,7 +73,6 @@ export async function verifyNativeProjectPoint({lib,temp,config,context,store,pr
     await writeFile(join(storage,'scheduled.json'),timer,{mode:0o600})
     await writeFile(join(home,'managed-data.jsonl'),JSON.stringify({version:1,owner:'@deepseek-ai/dsh-storage-json',kind:'directory',path:storage})+'\n',{flag:'a',mode:0o600})
     await files.verify(b)
-    const limits={maxRows:10000,maxBytes:32<<20}
     const exporter=new PeerProjectExporter({control:context.pool,store,...limits,files:{
       async acquire(...args){
         const view=await provider.acquire(...args)

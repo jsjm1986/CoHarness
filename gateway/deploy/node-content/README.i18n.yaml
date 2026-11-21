@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/node-content/README.md
 document:
-  en: 33735a8e2d860fa14aeba4624dca596ee7d7e90b
-  zh: d4e1b683fe42035e772e7ee9370117fb0ddaf909
+  en: 9d93b0236655ddd5daf886dc68d66746c7b38ab4
+  zh: 18b0ba2abb862a7dea5bb6d325b592869c1d6201
 /postgresql-storage-for-one-project-computer:
   en: 3bc3cbdb3cd88dc1
   zh: ce4b4edb374d5c0c
@@ -15,8 +15,8 @@ document:
   en: a27d343cbb0deb07
   zh: 2ec64108285c50f8
 /postgresql-storage-for-one-project-computer/protect-live-project-files-on-linux:
-  en: 2f0b8de26223b576
-  zh: 743736d682c3b63c
+  en: 6a227ba167925650
+  zh: 85c8043ffc097bc7
 /postgresql-storage-for-one-project-computer/protect-live-project-files-on-windows:
   en: 4fe4f548e33cb714
   zh: 82454ed54fb23764
