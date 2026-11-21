@@ -8,9 +8,12 @@ import {
   NodeAccessError, nodeCredentialSchema, nodeEnrollmentTokenSchema, nodeUuidSchema,
   type NodeAccessConfig, type NodeAccessEntry, type NodeAccessPage, type NodeControlOperation,
   type NodeEnrollment, type NodeEnrollmentId, type NodeEnrollmentToken, type NodeIdentity, type NodeLease,
+  type NodeRemovalBlocker, type NodeRemovalCheck, type NodeRemovalReceipt,
 } from '../node-access.ts'
 import type { RuntimeCatalogLimits, RuntimeNodeId } from '../runtime-catalog.ts'
 import { transaction, type Queryable } from './database.ts'
+import { PostgresAuditService } from './audit-service.ts'
+import { nodeRemovalBindings } from './node-removal-bindings.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 const issueSchema = z.object({
@@ -23,6 +26,7 @@ const mutationSchema = z.object({
   revision: z.number().int().positive().safe(),
   requestId: nodeUuidSchema.optional(),
 }).strict()
+const removalSchema = z.object({ revision: z.number().int().positive().safe() }).strict()
 const enrollmentSchema = z.object({
   protocolVersion: z.literal(1), credential: nodeCredentialSchema,
   platform: z.enum(['darwin', 'linux', 'win32']), architecture: z.enum(['x64', 'arm64']),
@@ -87,11 +91,11 @@ export class PostgresNodeAccessService {
     return id
   }
 
-  private async primary(tx: Queryable, write = true): Promise<void> {
+  private async primary(tx: Queryable, mode: 'write' | 'read' | 'strict-read' = 'write'): Promise<void> {
     const row = await tx.query(`SELECT 1 FROM harness.deployment_topology
       WHERE organization_id=$1 AND ((enabled AND primary_node_id=$2)
         OR ($3 AND legacy_initialization_required AND NOT EXISTS(SELECT 1 FROM harness.node_agents a
-          WHERE a.organization_id=$1 AND a.node_id=$2))) FOR ${write ? 'UPDATE' : 'SHARE'}`, [this.context.organizationId, this.context.nodeId, !write])
+          WHERE a.organization_id=$1 AND a.node_id=$2))) FOR ${mode === 'write' ? 'UPDATE' : 'SHARE'}`, [this.context.organizationId, this.context.nodeId, mode === 'read'])
     if (row.rowCount !== 1) throw new NodeAccessError(409, 'node-access/mode-disabled')
   }
 
@@ -189,6 +193,93 @@ export class PostgresNodeAccessService {
     })
   }
 
+  private async removalTarget(tx: Queryable, nodeId: RuntimeNodeId, lock: boolean) {
+    if (nodeId === this.context.nodeId) throw new NodeAccessError(409, 'node-access/removal-attached')
+    const result = await tx.query<{
+      revision: string; attachment_state: AgentRow['attachment_state']; unclaimed: boolean; connected: boolean;
+    }>(`SELECT a.revision::text,a.attachment_state,a.connection_id IS NOT NULL AS connected,
+      a.credential_hash IS NULL AND NOT EXISTS (SELECT FROM harness.node_agent_enrollments e
+        WHERE e.node_id=a.node_id AND e.organization_id=a.organization_id AND e.consumed_at IS NOT NULL) AS unclaimed
+      FROM harness.node_agents a WHERE a.organization_id=$1 AND a.node_id=$2${lock ? ' FOR UPDATE' : ''}`,
+    [this.context.organizationId, nodeId])
+    const agent = result.rows[0]
+    if (agent === undefined) throw new NodeAccessError(404, 'node-access/not-found')
+    const resultNode = await tx.query<{ name: string; busy: boolean }>(`SELECT name::text,
+      status<>'offline' OR inflight_writes>0 OR (last_heartbeat_at IS NOT NULL AND inflight_writes<0) AS busy
+      FROM harness.compute_nodes WHERE organization_id=$1 AND id=$2${lock ? ' FOR UPDATE' : ''}`,
+    [this.context.organizationId, nodeId])
+    const node = resultNode.rows[0]
+    if (node === undefined) throw new NodeAccessError(404, 'node-access/not-found')
+    const quarantine = await tx.query('SELECT FROM harness.node_recovery_quarantines WHERE organization_id=$1 AND node_id=$2',
+      [this.context.organizationId, nodeId])
+    if (quarantine.rowCount !== 0) throw new NodeAccessError(409, 'node-access/quarantined')
+    return { ...agent, ...node, revision: publicNumber(agent.revision, 'Node credential revision') }
+  }
+
+  private async removalBlockers(tx: Queryable, nodeId: RuntimeNodeId, agent: Awaited<ReturnType<PostgresNodeAccessService['removalTarget']>>,
+    lock: boolean): Promise<NodeRemovalBlocker[]> {
+    const blockers: NodeRemovalBlocker[] = []
+    if (agent.connected || agent.busy) blockers.push('node-access/removal-in-use')
+    else if (agent.attachment_state !== 'detached' && !(agent.attachment_state === 'pending' && agent.unclaimed)) {
+      blockers.push('node-access/removal-attached')
+    }
+    const references = await nodeRemovalBindings(tx, this.context.organizationId, nodeId, agent.name, lock)
+    return [...new Set([...blockers, ...references])]
+  }
+
+  /**
+   * Explain which current associations prevent removing a computer.
+   * @param actor - administrator rechecked at the primary.
+   * @param rawId - UUID from the requested registry entry.
+   * @returns node revision and current blockers. Confirmation requires a second, locked check.
+   */
+  async checkRemoval(actor: UserRow, rawId: string): Promise<NodeRemovalCheck> {
+    const nodeId = parse(nodeUuidSchema, rawId) as RuntimeNodeId
+    return transaction(this.context.pool, async tx => {
+      await this.administrator(tx, actor)
+      await this.primary(tx, 'strict-read')
+      const node = await this.removalTarget(tx, nodeId, false)
+      return { nodeId, revision: node.revision, blockers: await this.removalBlockers(tx, nodeId, node, false) }
+    })
+  }
+
+  /**
+   * Remove an unbound detached computer or an unclaimed enrollment reservation.
+   * @param actor - administrator rechecked in the removal transaction.
+   * @param rawId - exact computer UUID from the request path.
+   * @param input - untrusted confirmation containing the reviewed revision.
+   * @param ip - audit source address observed by the Gateway.
+   * @returns a committed removal receipt. No command is sent to the computer.
+   */
+  async remove(actor: UserRow, rawId: string, input: unknown, ip: string): Promise<NodeRemovalReceipt> {
+    const nodeId = parse(nodeUuidSchema, rawId) as RuntimeNodeId
+    const { revision } = parse(removalSchema, input)
+    try {
+      return await transaction(this.context.pool, async tx => {
+        await this.administrator(tx, actor)
+        await this.retainServingEpoch(tx)
+        await this.primary(tx)
+        const node = await this.removalTarget(tx, nodeId, true)
+        if (node.revision !== revision || !Number.isSafeInteger(revision + 1)) throw new NodeAccessError(409, 'node-access/revision-conflict')
+        const [blocker] = await this.removalBlockers(tx, nodeId, node, true)
+        if (blocker !== undefined) throw new NodeAccessError(409, blocker)
+        await tx.query('DELETE FROM harness.compute_nodes WHERE organization_id=$1 AND id=$2', [this.context.organizationId, nodeId])
+        const topology = await tx.query<{ revision: string }>(
+          'UPDATE harness.deployment_topology SET revision=revision+1 WHERE organization_id=$1 RETURNING revision::text', [this.context.organizationId])
+        await new PostgresAuditService(this.context).write({
+          userId: actor.id, action: 'admin.deployment.nodes.remove', status: 200, ip,
+          detail: JSON.stringify({ nodeId, name: node.name, revision: revision + 1 }),
+        }, tx)
+        return { nodeId, revision: revision + 1, status: 'removed', topologyRevision: topology.rows[0]!.revision }
+      })
+    } catch (error) {
+      if (error !== null && typeof error === 'object' && 'code' in error && ['55P03', '40P01', '23503'].includes(String(error.code))) {
+        throw new NodeAccessError(409, 'node-access/removal-changing')
+      }
+      throw error
+    }
+  }
+
   /**
    * Read cached connection metadata with current administrator authority and bounded keyset pages.
    * @param actor - administrator candidate.
@@ -202,7 +293,7 @@ export class PostgresNodeAccessService {
       || limit < 1 || limit > this.directoryLimits.pageSize) throw new NodeAccessError(400, 'node-access/invalid-request')
     return transaction(this.context.pool, async tx => {
       await this.administrator(tx, actor)
-      await this.primary(tx, false)
+      await this.primary(tx, 'read')
       const result = await tx.query<{ node_id: RuntimeNodeId; name: string; revision: string;
         status: NodeAccessEntry['status']; platform: NodeAccessEntry['platform']; architecture: NodeAccessEntry['architecture'];
         last_seen_at: Date | null; lease_expires_at: Date | null; execution_ready: boolean }>(`SELECT a.node_id,n.name::text,a.revision::text,
@@ -253,7 +344,7 @@ export class PostgresNodeAccessService {
     return transaction(this.context.pool, async tx => {
       await this.primary(tx)
       const target = await tx.query<{ node_id: string }>(`SELECT node_id FROM harness.node_agent_enrollments
-        WHERE organization_id=$1 AND token_hash=$2`, [this.context.organizationId, digest(ticket)])
+        WHERE organization_id=$1 AND token_hash=$2 AND node_id IS NOT NULL`, [this.context.organizationId, digest(ticket)])
       const nodeId = target.rows[0]?.node_id
       if (nodeId === undefined) throw new NodeAccessError(401, 'node-access/unauthorized')
       const row = await this.lockAgent(tx, { kind: 'node', id: nodeId })

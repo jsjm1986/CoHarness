@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/docs/peer-backup/README.md
 document:
-  en: 986f19a879e4f809153e58a17e3497c19b18314d
-  zh: 42e2bbfcf297c0ea7eb373a3c0992aa86a2b4140
+  en: 309d07362f32bec22105f27775162641cbd385e2
+  zh: 5ed80672ef7b49f99cdf499ba726e7c84a738abd
 /:
   en: e768d8cac8185627
   zh: 9f7dd5a651d67f36
@@ -39,8 +39,8 @@ document:
   en: 3431e223fb4afeb3
   zh: c163f50fed98df40
 /encrypted-computer-backups/rebuild-organization-governance:
-  en: 412640554fc021d3
-  zh: eb08621fd241f011
+  en: f7de51747360652d
+  zh: 863d705bf90e3f42
 /encrypted-computer-backups/snapshot-providers:
   en: 3280287c812459bd
   zh: 6f65b3791bf36f83

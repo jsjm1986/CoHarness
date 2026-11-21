@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import type { ProjectNameKeyring } from './project-name-keyring.ts'
 
-export const GOVERNANCE_REBUILD_SCHEMA_VERSION = 145
+export const GOVERNANCE_REBUILD_SCHEMA_VERSION = 146
 const dispositions = {safe:'restore-safe',reset:'reset-and-review',node:'node-owned',ephemeral:'ephemeral'} as const
 export type GovernanceColumnDisposition = typeof dispositions[keyof typeof dispositions]
 export interface GovernanceRebuildColumn {name:string;disposition:GovernanceColumnDisposition}
@@ -215,7 +215,7 @@ export function governanceRebuildInventory(version:number){
     :version===136||version===137||version===138?schema136Inventory
     :version===139||version===140||version===141||version===142?schema139Inventory
     :version===143?schema143Inventory
-    :version===144||version===GOVERNANCE_REBUILD_SCHEMA_VERSION?currentInventory:undefined
+    :version===144||version===145||version===GOVERNANCE_REBUILD_SCHEMA_VERSION?currentInventory:undefined
 }
 /** Stable per-column decisions also accompany the encrypted package for administrator review. */
 export const governanceRebuildDispositions = currentInventory.dispositions

@@ -27,6 +27,14 @@ export interface NodeAccessConfig {
   maxInFlight: number
 }
 
+const removalBlockerCodes = [
+  'node-access/removal-attached', 'node-access/removal-in-use', 'node-access/removal-projects',
+  'node-access/removal-runtimes', 'node-access/removal-backups', 'node-access/removal-other-bindings',
+] as const
+
+/** Stable reasons why a computer must remain in the organization registry. */
+export type NodeRemovalBlocker = typeof removalBlockerCodes[number]
+
 /** Stable wire refusals accepted by the node agent. */
 export const NODE_ACCESS_ERROR_CODES = [
   'node-access/invalid-request', 'node-access/unauthorized', 'node-access/forbidden', 'node-access/not-found',
@@ -43,7 +51,7 @@ export class NodeAccessError extends Error {
    * @param code - stable reason for the receiving application.
    */
   constructor(readonly status: 400 | 401 | 403 | 404 | 409 | 413 | 422 | 503,
-    readonly code: typeof NODE_ACCESS_ERROR_CODES[number]) {
+    readonly code: typeof NODE_ACCESS_ERROR_CODES[number] | NodeRemovalBlocker | 'node-access/removal-changing') {
     super(code)
     this.name = 'NodeAccessError'
   }
@@ -137,3 +145,17 @@ export const nodeRevocationSchema = z.object({ nodeId: runtimeNodeIdSchema, revi
 /** Confirmed exit from managed execution; the computer retains its independent local data. */
 export const nodeDetachmentSchema = z.object({ nodeId: runtimeNodeIdSchema, revision: revisionSchema,
   status: z.literal('detached'), topologyRevision: z.string().regex(/^(0|[1-9][0-9]*)$/u) }).strict()
+
+/** Current removal eligibility for one exact directory revision. */
+export const nodeRemovalCheckSchema = z.object({
+  nodeId: runtimeNodeIdSchema, revision: revisionSchema, blockers: z.array(z.enum(removalBlockerCodes)).max(removalBlockerCodes.length),
+}).strict()
+
+/** Read-only assessment used to enable the Admin confirmation. */
+export type NodeRemovalCheck = z.infer<typeof nodeRemovalCheckSchema>
+
+/** Receipt returned only after the directory removal and audit event commit. */
+export const nodeRemovalReceiptSchema = nodeDetachmentSchema.extend({ status: z.literal('removed') })
+
+/** Committed removal of the center's record for one computer. */
+export type NodeRemovalReceipt = z.infer<typeof nodeRemovalReceiptSchema>

@@ -1564,7 +1564,7 @@ export function setDeploymentNodeStatus(nodeId: string, status: DeploymentNodeSt
   return request('/admin/api/deployment/nodes/status', { method: 'POST', body: JSON.stringify({ nodeId, status }) })
 }
 
-export type { NodeAccessEntry, NodeAccessPage, NodeEnrollment } from '../../src/node-access.ts'
+export type { NodeAccessEntry, NodeAccessPage, NodeEnrollment, NodeRemovalCheck } from '../../src/node-access.ts'
 
 /** A success response did not identify the requested node operation; its effect remains unconfirmed. */
 export class NodeAccessResponseError extends Error {
@@ -1813,14 +1813,16 @@ export async function getDeploymentTopology(signal?: AbortSignal): Promise<Deplo
 /** Save a reviewed mode without changing the current browser selection or form state. */
 export async function saveDeploymentTopology(input: { revision: string; enabled: boolean; primaryOrigin?: string }): Promise<DeploymentContext> {
   const result = deploymentContextSchema.parse(await request<unknown>('/admin/api/deployment/topology', { method: 'PUT', body: JSON.stringify(input) }))
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('hgw-deployment-policy-changed'))
-    if (typeof BroadcastChannel !== 'undefined') {
-      const channel = new BroadcastChannel('hgw-deployment-policy')
-      channel.postMessage({ revision: result.revision }); channel.close()
-    }
-  }
+  publishDeploymentPolicy(result.revision)
   return result
+}
+
+function publishDeploymentPolicy(revision: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('hgw-deployment-policy-changed'))
+  if (typeof BroadcastChannel === 'undefined') return
+  const channel = new BroadcastChannel('hgw-deployment-policy')
+  channel.postMessage({ revision }); channel.close()
 }
 
 /** Inspect the retained attachments that prevent disabling multi-computer mode. */
@@ -1850,10 +1852,37 @@ export async function detachNodeAccess(node: import('../../src/node-access.ts').
   })
   const result = (await import('../../src/node-access.ts')).nodeDetachmentSchema.parse(value)
   if (result.nodeId !== node.nodeId || result.revision !== node.revision + 1) throw new NodeAccessResponseError()
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('hgw-deployment-policy-changed'))
-    if (typeof BroadcastChannel !== 'undefined') { const channel = new BroadcastChannel('hgw-deployment-policy'); channel.postMessage({ revision: result.topologyRevision }); channel.close() }
-  }
+  publishDeploymentPolicy(result.topologyRevision)
+}
+
+/**
+ * Inspect current blockers for the computer the administrator selected.
+ * @param node - exact directory selection and its displayed revision.
+ * @param signal - cancellation owned by the confirmation panel.
+ * @returns the validated current assessment for that selection.
+ */
+export async function checkNodeRemoval(node: import('../../src/node-access.ts').NodeAccessEntry,
+  signal: AbortSignal): Promise<import('../../src/node-access.ts').NodeRemovalCheck> {
+  const value = await request<unknown>(`/admin/api/deployment/nodes/access/${encodeURIComponent(node.nodeId)}/removal`, {
+    cache: 'no-store', signal,
+  })
+  const result = (await import('../../src/node-access.ts')).nodeRemovalCheckSchema.parse(value)
+  if (result.nodeId !== node.nodeId) throw new NodeAccessResponseError()
+  if (result.revision !== node.revision) throw new AdminRequestError(409, 'node-access/revision-conflict')
+  return result
+}
+
+/**
+ * Confirm removal once against the reviewed revision.
+ * @param node - the computer whose removal eligibility the administrator reviewed.
+ */
+export async function removeNodeAccess(node: import('../../src/node-access.ts').NodeAccessEntry): Promise<void> {
+  const value = await request<unknown>(`/admin/api/deployment/nodes/access/${encodeURIComponent(node.nodeId)}/removal`, {
+    method: 'POST', body: JSON.stringify({ revision: node.revision }),
+  })
+  const result = (await import('../../src/node-access.ts')).nodeRemovalReceiptSchema.parse(value)
+  if (result.nodeId !== node.nodeId || result.revision !== node.revision + 1) throw new NodeAccessResponseError()
+  publishDeploymentPolicy(result.topologyRevision)
 }
 
 /** Read one bounded page of already deployed identities without making an enrollment decision. */

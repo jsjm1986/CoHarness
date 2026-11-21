@@ -31,6 +31,15 @@ export function ComputerSelectorProvider({ enabled, nodeId, onSelect, children }
   const [contextError, setContextError] = useState('')
 
   useEffect(() => {
+    if (!enabled) return
+    const reread = () => setRefresh(value => value + 1)
+    const channel = typeof BroadcastChannel === 'undefined' ? undefined : new BroadcastChannel('hgw-deployment-policy')
+    channel?.addEventListener('message', reread)
+    window.addEventListener('hgw-deployment-policy-changed', reread)
+    return () => { window.removeEventListener('hgw-deployment-policy-changed', reread); channel?.close() }
+  }, [enabled])
+
+  useEffect(() => {
     if (!enabled) {
       setContext(null)
       setContextError('')

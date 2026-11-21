@@ -14,6 +14,7 @@
   "access-confirmation.e2e.ts": "shell",
   "account-init-reconnect.e2e.ts": "lifecycle",
   "account-preferences-startup.e2e.ts": "lifecycle",
+  "admin-computer-removal.e2e.ts": "settings",
   "admin-dialog-states.e2e.ts": "settings",
   "admin-form-values.e2e.ts": "settings",
   "admin-layout.e2e.ts": "settings",

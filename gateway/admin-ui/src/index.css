@@ -4193,10 +4193,36 @@ summary {
   line-height: 1.6;
 }
 
-.nodeAccessName {
+.dataTable .nodeAccessName {
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: normal;
+  white-space: normal;
   min-width: 10ch;
   max-width: 28ch;
   overflow-wrap: anywhere;
+}
+
+.dataTable tbody tr:last-child .nodeAccessName { border-bottom: 0; }
+
+.nodeAccessTable tbody td:nth-child(3),
+.nodeAccessTable tbody td:nth-child(4) {
+  white-space: nowrap;
+}
+
+.nodeRemovalReasons {
+  display: grid;
+  gap: 8px;
+}
+
+.nodeRemovalReasons p,
+.nodeRemovalReasons ul { margin: 0; }
+
+.nodeRemovalReasons ul {
+  display: grid;
+  gap: 8px;
+  padding-inline-start: 1.25rem;
 }
 
 .nodeAccessTicket {

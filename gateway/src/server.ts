@@ -139,7 +139,7 @@ export interface GatewayDeps {
   /** Placement and local owner resolution; metadata-only compositions may omit execution routing. */
   runtimeRouter?: Pick<GatewayRuntimeRouter, 'resolve' | 'placement' | 'landing'>
   /** Center-owned node credentials and control-only outbound connection leases. */
-  nodeAccess?: Pick<import('./postgres/node-access-service.ts').PostgresNodeAccessService, 'issue' | 'mutate' | 'list' | 'enroll' | 'connect' | 'heartbeat' | 'disconnect'>
+  nodeAccess?: Pick<import('./postgres/node-access-service.ts').PostgresNodeAccessService, 'issue' | 'mutate' | 'list' | 'enroll' | 'connect' | 'heartbeat' | 'disconnect' | 'checkRemoval' | 'remove'>
   /** Ordinary-maintenance lease admission bound to this process's write epoch and shutdown state. */
   maintainNodeConnection?: (operation: import('./node-access.ts').NodeControlOperation, token: string, input: unknown) => Promise<import('./node-access.ts').NodeLease | void>
   /** Optional outbound control-channel owner; its supplying lifecycle closes it before the PostgreSQL pool. */

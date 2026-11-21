@@ -578,6 +578,20 @@ async function dispatch(
     } finally { res.removeListener('close', cancel) }
     return true
   }
+  const nodeRemoval = /^\/admin\/api\/deployment\/nodes\/access\/([^/]+)\/removal$/u.exec(pathname)
+  if (nodeRemoval !== null && (method === 'GET' || method === 'POST')) {
+    res.setHeader('cache-control', 'no-store')
+    if (deps.nodeAccess === undefined) { await reply.error(503, 'node-access/unavailable'); return true }
+    const nodeId = nodeRemoval[1]!
+    if (method === 'GET') await reply.json(200, await deps.nodeAccess.checkRemoval(admin, nodeId))
+    else {
+      const result = await deps.nodeAccess.remove(admin, nodeId, parseObject(body), ip)
+      deps.nodeChannels?.revoke(result.nodeId)
+      deps.nodeServices?.revoke(result.nodeId)
+      await reply.json(200, result)
+    }
+    return true
+  }
   const nodeAccess = /^\/admin\/api\/deployment\/nodes\/access\/([^/]+)$/u.exec(pathname)
   if (nodeAccess !== null && method === 'POST') {
     res.setHeader('cache-control', 'no-store')

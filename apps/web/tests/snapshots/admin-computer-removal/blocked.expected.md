@@ -1,0 +1,12 @@
+- dialog "移除电脑 绑定电脑":
+  - heading "移除电脑 绑定电脑" [level=2]
+  - button "关闭"
+  - status:
+    - paragraph: 这台电脑暂不能移除
+    - list:
+      - listitem: 电脑仍在线、有接入连接，或有未确认完成的工作。请完成排空、设为离线并退出接入。
+      - listitem: 电脑仍有关联的项目或工作区。请先处理项目归属。
+      - listitem: 电脑仍有 Runtime、运行资源或分配记录。请停止相关 Runtime 并处理所属绑定。
+      - listitem: 电脑仍关联备份策略、备份任务或恢复记录。请先处理这些关联。
+  - button "取消"
+  - button "确认移除" [disabled]

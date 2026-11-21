@@ -20,7 +20,8 @@ it('retains the shipped schema-135 inventory and excludes transient recovery app
   expect(governanceRebuildInventory(142)).toEqual(governanceRebuildInventory(141))
   expect(governanceRebuildInventory(143)?.digest).toBe('9f441b2c745143ea68d2a7bc9f6457d50570a1e6ab4f36bcf75b77905ada0f93')
   expect(governanceRebuildInventory(144)).toEqual(governanceRebuildInventory(145))
-  for(const version of [134,146])expect(governanceRebuildInventory(version)).toBeUndefined()
+  expect(governanceRebuildInventory(145)).toEqual(governanceRebuildInventory(146))
+  for(const version of [134,147])expect(governanceRebuildInventory(version)).toBeUndefined()
   for(const name of ['provider_msg_id','delivered_at','opened_at']){
     expect(governanceRebuildInventory(143)?.tables.push_deliveries).not.toContainEqual({name,disposition:'ephemeral'})
     expect(governanceRebuildInventory(145)?.tables.push_deliveries).toContainEqual({name,disposition:'ephemeral'})

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-22-admin-computer-removal.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-22-admin-computer-removal.md
+document:
+  en: 44dc56bc7aa9bc55a79de51bde76da7cb5bc18b1
+  zh: 2850018526886a7ea9ffa052950736e1638d4308
+/agent-note-remove-unused-computer-registrations:
+  en: 8ab49388c4c31694
+  zh: ceaf4d397aa2ee00
+/agent-note-remove-unused-computer-registrations/problem:
+  en: da383cf8f90f48d5
+  zh: 6b1a1f56dd00f7c7
+/agent-note-remove-unused-computer-registrations/decision:
+  en: a23ff64bb5a4a42d
+  zh: e1d3bb38aa2db155
+/agent-note-remove-unused-computer-registrations/alternatives-considered:
+  en: 91cdd95d5f38c302
+  zh: e8a15fec7195e462
+/agent-note-remove-unused-computer-registrations/consequences:
+  en: 5f816359c45ff77c
+  zh: d898d2d40f1ad758

@@ -160,7 +160,7 @@ node lib/peer-backup-rehearse-main.js /escrow/selected-point.json
 
 `governance-rebuild-v1` 恢复点包含逐列审核的管理数据包。未知的表或列会阻止完整捕获。导出器排除业务正文和本地路径，保留账号、Runtime、项目身份及配额用量，并包含原有项目名称查重密钥。旧版本 1–7 治理清单只支持隔离检查，不能授权重建。
 
-当前导出需要应用至迁移 145。替换电脑可以导入审核过的 Schema 135 至 145 所生成的 `governance-rebuild-v1` 恢复点，迁移校验值须与已安装序列的对应部分一致。重建后设备需要重新注册，投递结果从新通知开始记录。即使源库从未进入维护，导入也会将目标库保持在 `restoring` 模式。
+当前导出需要应用至迁移 146。替换电脑可以导入审核过的 Schema 135 至 146 所生成的 `governance-rebuild-v1` 恢复点，迁移校验值须与已安装序列的对应部分一致。重建后设备需要重新注册，投递结果从新通知开始记录。即使源库从未进入维护，导入也会将目标库保持在 `restoring` 模式。
 
 物理隔离损坏的主入口并保留确认凭据。在替换电脑上先使用离线演练命令解密并验证恢复点。针对全新的 PostgreSQL 数据库运行 `node gateway/lib/governance-rebuild-main.js /private/governance-rebuild.json`。仅所有者可读的配置包含 `version: 1`、`action: "import"`、`databaseUrlFile`、演练返回的 `packageDirectory`、`bootstrapPasswordFile`、`operationId`、新的 `targetNodeId`、`targetNodeName`、原管理员的 `bootstrapUserId`、`isolationMethod`、`evidenceReference`、`acknowledgeDataLoss: true`、`maxBytes`、`maxRows` 和 `timeoutMs`。恢复点包含已登记查重密钥时还需提供 `projectNameKeyFile`。路径使用绝对路径，秘密值不进入命令参数。命令应用已安装的迁移，拒绝非空数据库，不启动任何服务。
 
