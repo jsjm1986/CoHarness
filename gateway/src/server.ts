@@ -855,6 +855,8 @@ export interface GatewayHandlers {
   runtimePersonalExecutionStopGate?: () => WriteGateVerdict
   /** Deployment maintenance and write-epoch checks for one authenticated planned-stop checkpoint. */
   runtimeShutdownStorageWriteGate?: () => Promise<WriteGateVerdict>
+  /** Check the write epoch before accepting an authenticated resource completion in maintenance. */
+  runtimeResourceCompletionWriteGate?: () => Promise<WriteGateVerdict>
   runtime?: GatewayRuntimeHandler
   /** Override `serveAdmin` root (tests); default `gateway/public/admin`. */
   adminRoot?: string
@@ -1322,9 +1324,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (handlers.runtime?.stream !== undefined
         && await handlers.runtime.stream(req, res, pathname, () => writeVerdict(req, res, pathname, true))) return
       const streamControl = isRuntimeStreamControlRequest(pathname, req.method)
-      const controlSubject = typeof authorized === 'object' && (streamControl || isRuntimeResourceCompletionRequest(pathname, req.method))
+      const resourceCompletion = isRuntimeResourceCompletionRequest(pathname, req.method)
+      const controlSubject = typeof authorized === 'object' && (streamControl || resourceCompletion)
         ? authorized : undefined
       const gate = authorized === 'shutdown-storage' ? handlers.runtimeShutdownStorageWriteGate
+        : resourceCompletion && controlSubject !== undefined ? handlers.runtimeResourceCompletionWriteGate
         : streamControl ? deps.leaseControlGate : undefined
       const executionWrite: PersonalExecutionWriteAdmission | undefined = typeof authorized === 'object' && stopGate !== undefined
         && handlers.runtime?.defersPersonalExecutionWrite?.(authorized, pathname, req.method) === true

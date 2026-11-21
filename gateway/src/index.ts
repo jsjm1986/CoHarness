@@ -773,6 +773,12 @@ const server = createGatewayServer(deps, {
     return instanceRepository.personalExecutionCandidate(value.slice('Bearer '.length))
   },
   runtimeShutdownStorageWriteGate: async () => (await maintenance.writeGate(baselineWriteEpoch)).verdict,
+  runtimeResourceCompletionWriteGate: async () => {
+    const verdict = await maintenanceGate()
+    if (verdict !== 'maintenance') return verdict
+    const gate = await controlMaintenance.writeGate(baselineWriteEpoch)
+    return gate.verdict === 'maintenance' ? 'open' : gate.verdict
+  },
   documentTransferList: createGatewayDocumentTransferListHandler({
     instances: deps.instances,
     users,

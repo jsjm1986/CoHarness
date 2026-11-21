@@ -1043,6 +1043,37 @@ describe('gateway server', () => {
     expect(runtime).not.toHaveBeenCalled()
   })
 
+  it('accepts authenticated resource completion under the matching write epoch during maintenance', async () => {
+    const completionGate = vi.fn<NonNullable<GatewayHandlers['runtimeResourceCompletionWriteGate']>>()
+      .mockResolvedValue('open')
+    const runtime = vi.fn<GatewayRuntimeHandler>(async (_req, res) => {
+      res.writeHead(200)
+      res.end('{}')
+      return true
+    })
+    const { base, deps } = await setup({}, {
+      runtime,
+      runtimeResourceCompletionWriteGate: completionGate,
+      runtimeAuthorize: req => req.headers.authorization === 'Bearer fixture'
+        ? { organizationId: 'org', target: { kind: 'project', id: 7 }, generation: 1 } : false,
+    })
+    deps.maintenanceGate = async () => 'maintenance'
+    const request = (route: string, bearer = 'fixture') => fetch(`${base}/internal/runtime/${route}`, {
+      method: 'POST', headers: { authorization: `Bearer ${bearer}` }, body: '{}',
+    })
+    expect((await request('resources/finish', 'unverified')).status).toBe(401)
+    expect((await request('resources/request')).status).toBe(503)
+    expect((await request('session/append')).status).toBe(503)
+    expect(completionGate).not.toHaveBeenCalled()
+    expect((await request('resources/finish')).status).toBe(200)
+    completionGate.mockResolvedValue('stale-epoch')
+    const stale = await request('resources/finish')
+    expect(stale.status).toBe(503)
+    expect(await stale.json()).toEqual({ error: 'stale-epoch' })
+    expect(completionGate).toHaveBeenCalledTimes(2)
+    expect(runtime).toHaveBeenCalledOnce()
+  })
+
   it('reports resource ingress timings after the same bearer and maintenance checks', async () => {
     const runtime = vi.fn<GatewayRuntimeHandler>(async (_req, res) => { res.writeHead(200); res.end('{}'); return true })
     const { base, deps } = await setup({ HGW_PERFORMANCE_ENABLED: 'true' }, {

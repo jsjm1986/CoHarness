@@ -163,6 +163,8 @@ RELEASE_NAME=coharness-REVISION
 "$CONTROL" status
 ```
 
+During maintenance the Gateway accepts an authenticated resource completion from the generation that owns the reservation when the database write epoch matches. The Runtime can then settle its reserved capacity before exit.
+
 Activation rejects a running Gateway, retained release Runtime processes or an unavailable process inventory. Under the activation lock, it checks the candidate's live governance migration ledger against the shipped checksums before changing `current`. A matching prefix lets the candidate apply pending forward migrations during startup. The configured [node content volume](node-content/README.md) must already match its own shipped migration sequence. The controller enables and starts the registered Gateway after those checks. Success requires the exact release, PID and cwd.
 
 Keep a fallback built for the database schemas expected after the upgrade. Pass it with `--rollback-target <directory>` or let the controller consider the previously selected release. After a failed candidate and its Runtime processes have exited, the controller pauses automatic launch. It verifies that the fallback uses the same configured databases and that their live migration names and checksums exactly match its packaged files. A compatible fallback can then start. An older or unverifiable fallback leaves the candidate selected with automatic launch paused. Stage a release compatible with the installed schemas and run `activate` again while still in maintenance. The probe reads ledgers and the failed activation leaves committed migrations in place. A candidate that still owns work or cannot be inspected stays selected without receiving a signal.
