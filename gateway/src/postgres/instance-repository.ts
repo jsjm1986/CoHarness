@@ -691,7 +691,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
   /**
    * Authenticate an existing project's final Session append or suffix readback during planned stop.
    * @param token - current generation's private Runtime bearer.
-   * @returns exact node, generation and content scope while its planned stop still owns the write placement.
+   * @returns exact node, generation and content scope while its planned stop still owns the write placement, including during a node drain.
    */
   async authenticateRuntimeShutdownToken(token: string): Promise<RuntimeCredentialSubject | null> {
     return this.authenticateTokenQuery(createHash('sha256').update(token).digest(), 'shutdown-storage')
@@ -744,7 +744,17 @@ export class PostgresInstanceRepository implements InstanceRepository {
         AND (cp.project_id IS NULL OR (cp.node_id=i.assigned_node_id AND cp.runtime_id=i.runtime_id))
         AND (($4='cleanup' AND i.observed_state IN ('starting','ready','stopping'))
           OR ($4 IN ('run','shutdown-storage') AND o.status='active' AND i.provisioning_state='ready'
-            AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
+            AND (harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
+              OR ($4='shutdown-storage' AND EXISTS (
+                SELECT 1 FROM harness.compute_nodes node
+                LEFT JOIN harness.node_agents agent ON agent.organization_id=node.organization_id AND agent.node_id=node.id
+                WHERE node.organization_id=i.organization_id AND node.id=i.assigned_node_id AND node.status='draining'
+                  AND NOT EXISTS (SELECT 1 FROM harness.node_recovery_quarantines q WHERE q.organization_id=node.organization_id AND q.node_id=node.id)
+                  AND ((agent.attachment_state IS DISTINCT FROM 'managed' AND i.node_connection_id IS NULL AND i.node_connection_epoch IS NULL)
+                    OR (agent.attachment_state='managed' AND agent.revoked_at IS NULL AND agent.credential_hash IS NOT NULL
+                      AND (agent.connection_id,agent.connection_epoch)=(i.node_connection_id,i.node_connection_epoch)
+                      AND agent.lease_expires_at>clock_timestamp() AND EXISTS (SELECT 1 FROM harness.deployment_topology t
+                        WHERE t.organization_id=node.organization_id AND (t.enabled OR t.legacy_initialization_required)))))))
             AND (($4='run' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
               AND ((u.id IS NOT NULL AND u.status='active' AND u.deleted_at IS NULL AND m.status='active'
                 AND harness.computer_use_allowed(u.organization_id,u.id,i.assigned_node_id)) OR p.status='active'))

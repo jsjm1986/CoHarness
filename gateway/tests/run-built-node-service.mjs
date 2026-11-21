@@ -609,8 +609,21 @@ async function verify(){
   assert.match(primaryHtml, /"streamOpenTimeoutMs"\s*:\s*3000/u)
   assert.match(primaryHtml, /__DSH_CONNECTION_RPC_TIMEOUT_MS__[\s\S]{0,8}30000/u)
   transcript.push('Browser recovery deadlines follow computer B’s configuration while primary-local defaults remain unchanged.')
-  const stoppedRemote = await adminRequest(`/admin/api/runtimes/${environment.id}/stop`, { generation: Number((await pool.query('SELECT generation FROM harness.instances WHERE runtime_id=$1', [environment.id])).rows[0].generation) })
-  assert.equal(stoppedRemote.status, 200, await stoppedRemote.text())
+  const remoteGeneration = Number((await pool.query('SELECT generation FROM harness.instances WHERE runtime_id=$1', [environment.id])).rows[0].generation)
+  await pool.query("UPDATE harness.compute_nodes SET status='draining' WHERE organization_id=$1 AND id=$2", [organization, a.nodeId])
+  try {
+    const refusedStart = await adminRequest(`/admin/api/runtimes/${environment.id}/start`, {})
+    assert.equal(refusedStart.status, 503)
+    assert.deepEqual(await refusedStart.json(), { error: 'access-node-draining' })
+    const stoppedRemote = await adminRequest(`/admin/api/runtimes/${environment.id}/stop`, { generation: remoteGeneration })
+    assert.equal(stoppedRemote.status, 200, await stoppedRemote.clone().text())
+    await stoppedRemote.arrayBuffer()
+    const state = (await pool.query('SELECT desired_state,observed_state FROM harness.instances WHERE runtime_id=$1 AND generation=$2', [environment.id, remoteGeneration])).rows[0]
+    assert.deepEqual(state, { desired_state: 'stopped', observed_state: 'stopped' })
+  } finally {
+    await pool.query("UPDATE harness.compute_nodes SET status='active' WHERE organization_id=$1 AND id=$2", [organization, a.nodeId])
+  }
+  transcript.push('A draining entry refuses new starts and forwards the exact Runtime stop to its owner.')
   const startedRemote = await adminRequest(`/admin/api/runtimes/${environment.id}/start`, {})
   assert.equal(startedRemote.status, 200, await startedRemote.clone().text()); await startedRemote.arrayBuffer()
   const describePrimary = await fetch(`${a.base}/api/host.describe?dshRuntime=${localEnvironment.id}`, { method: 'POST', headers: { cookie: centralAdminCookie, origin: a.base, 'content-type': 'application/json' },

@@ -173,7 +173,15 @@ describe.skipIf(skip)('physical project content PostgreSQL', () => {
         }) })
         return { status: response.status, body: await response.json() }
       }
+      const connectionId = randomUUID()
+      await transaction(control, async tx => {
+        await tx.query("UPDATE harness.deployment_topology SET legacy_initialization_required=true WHERE organization_id=$1", [org])
+        await tx.query(`INSERT INTO harness.node_agents(organization_id,node_id,credential_hash,connection_id,connection_epoch,lease_expires_at,execution_ready)
+          VALUES($1,$2,$3,$4,1,clock_timestamp()+interval '5 minutes',true)`, [org,node,Buffer.alloc(32,1),connectionId])
+        await tx.query('UPDATE harness.instances SET node_connection_id=$2,node_connection_epoch=1 WHERE runtime_id=$1', [b.runtimeId,connectionId])
+      })
       expect(await instances.markStopping(runtime, 1, 'manual')).toBe(true)
+      await control.query("UPDATE harness.compute_nodes SET status='draining' WHERE id=$1", [node])
       try {
         expect(await instances.authenticateRuntimeToken(token)).toBeNull()
         expect(await checkpointAppend({ creationAuthorization: 'not-an-existing-Session' }))
@@ -185,13 +193,21 @@ describe.skipIf(skip)('physical project content PostgreSQL', () => {
         const unrelated = await fetch(endpoint + `meta?sessionId=${checkpointSession}`, { headers })
         expect(unrelated.status).toBe(401)
         await unrelated.arrayBuffer()
+        await control.query(`UPDATE harness.node_agents SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE node_id=$1`, [node])
+        expect(await instances.authenticateRuntimeShutdownToken(token)).toBeNull()
+        await control.query(`UPDATE harness.node_agents SET lease_expires_at=clock_timestamp()+interval '5 minutes' WHERE node_id=$1`, [node])
         await control.query("UPDATE harness.instances SET stop_reason='access-change' WHERE runtime_id=$1", [b.runtimeId])
         expect(await checkpointAppend({})).toMatchObject({ status: 401 })
         expect(await instances.markStopped(runtime, 1)).toBe(true)
         expect(await instances.authenticateRuntimeShutdownToken(token)).toBeNull()
       } finally {
-        await control.query(`UPDATE harness.instances SET desired_state='running',observed_state='ready',stop_reason=NULL,
-          runtime_token_hash=$2,runtime_token_issued_at=now() WHERE runtime_id=$1`, [b.runtimeId,createHash('sha256').update(token).digest()])
+        await transaction(control, async tx => {
+          await tx.query("UPDATE harness.compute_nodes SET status='active' WHERE id=$1", [node])
+          await tx.query('DELETE FROM harness.node_agents WHERE node_id=$1', [node])
+          await tx.query('UPDATE harness.deployment_topology SET legacy_initialization_required=false WHERE organization_id=$1', [org])
+          await tx.query(`UPDATE harness.instances SET desired_state='running',observed_state='ready',stop_reason=NULL,node_connection_id=NULL,
+            node_connection_epoch=NULL,runtime_token_hash=$2,runtime_token_issued_at=now() WHERE runtime_id=$1`, [b.runtimeId,createHash('sha256').update(token).digest()])
+        })
       }
       const principal = principals.issue({ user:{id:Number(owner.public_id),username:'owner',displayName:'Owner',role:'user',
         status:'active',homePath:'/owner',mustChangePassword:false,autoReviewEligible:false},

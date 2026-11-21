@@ -78,10 +78,11 @@ export class NodeServiceHttpPool {
   private closing?: Promise<void>
   private revision = 0
   private readonly waiters = new Set<PendingAcquisition>()
+  private readonly waitingByNode = new Map<RuntimeNodeId, number>()
 
   /**
    * @param services - existing global/per-computer connection admission and lease owner.
-   * @param config - validated idle retention bounds; active streams retain the existing service limits.
+   * @param config - validated idle retention and waiting request limits.
    */
   constructor(private readonly services: Pick<GatewayNodeServices, 'open' | 'revalidate' | 'released' | 'capacity'>,
     private readonly config: NodeServiceConfig) {}
@@ -147,13 +148,20 @@ export class NodeServiceHttpPool {
     const releasable = [...this.entries, ...this.transports.keys()].some(entry =>
       pressure === 'global' || entry.nodeId === nodeId && (interactive || !entry.interactive) && (entry.busy || entry.owner.signal.aborted))
     if (!releasable) return Promise.reject(new NodeServiceError(503, 'node-service/busy'))
-    if (this.waiters.size >= this.config.httpMaxPendingRequests) return Promise.reject(new NodeServiceError(503, 'node-service/busy'))
+    const waitingOnNode = this.waitingByNode.get(nodeId) ?? 0
+    if (this.waiters.size >= this.config.httpMaxPendingRequests || waitingOnNode >= this.config.httpMaxPendingPerNode) {
+      return Promise.reject(new NodeServiceError(503, 'node-service/busy'))
+    }
     const remaining = deadline - performance.now()
     if (remaining <= 0) return Promise.reject(new NodeServiceError(504, 'node-service/timeout'))
     const stopWaiting = operationPhase('nodeQueue')
     return new Promise<Acquisition>((resolve, reject) => {
       const finish = (): void => {
-        this.waiters.delete(waiter); clearTimeout(timer); signal.removeEventListener('abort', cancel)
+        if (!this.waiters.delete(waiter)) return
+        const remainingOnNode = this.waitingByNode.get(nodeId)! - 1
+        if (remainingOnNode === 0) this.waitingByNode.delete(nodeId)
+        else this.waitingByNode.set(nodeId, remainingOnNode)
+        clearTimeout(timer); signal.removeEventListener('abort', cancel)
         stopWaiting()
       }
       const waiter: PendingAcquisition = {
@@ -171,6 +179,7 @@ export class NodeServiceHttpPool {
       const timer = setTimeout(() => { waiter.reject(new NodeServiceError(504, 'node-service/timeout')) }, remaining)
       timer.unref()
       this.waiters.add(waiter)
+      this.waitingByNode.set(nodeId, waitingOnNode + 1)
       signal.addEventListener('abort', cancel, { once: true })
       if (signal.aborted) cancel()
       else this.dispatch()

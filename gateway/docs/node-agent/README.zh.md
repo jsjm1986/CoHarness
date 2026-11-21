@@ -161,7 +161,8 @@ Webhook 配置绑定精确 Runtime 及电脑。除非提交其他明确 Runtime�
 | `HGW_NODE_SERVICE_HTTP_IDLE_TIMEOUT_MS` | 30000 | 可复用 HTTP 服务连接的最长空闲时间 |
 | `HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS` | 16 | 全局空闲 HTTP 连接上限，受服务连接总上限约束 |
 | `HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE` | 2 | 单电脑空闲 HTTP 连接上限，受全局空闲和单电脑服务连接上限共同约束 |
-| `HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS` | 256 | 等待已持有连接的 HTTP 请求数量上限 |
+| `HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS` | 256 | 所有电脑的 HTTP 等待请求总数上限 |
+| `HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE` | 32 与总上限中的较小值 | 单台电脑的 HTTP 等待请求上限，最大为总上限 |
 | `HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS` | 60000 | HTTP 连接获取队列的最长等待时间 |
 
 节点在获取文件或网络连接前解析设置。

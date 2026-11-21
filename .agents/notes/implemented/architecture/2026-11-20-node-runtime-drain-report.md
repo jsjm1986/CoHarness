@@ -10,7 +10,7 @@ A Gateway can stop its own services without verifying whether each managed Runti
 
 ## Decision
 
-Default Gateway shutdown retains Runtime processes while refusing new starts. Opting in with `HGW_DRAIN_RUNTIMES_ON_SHUTDOWN` closes admission, joins pending starts, and inventories the tracked and assigned generations, including supervisor-owned systemd units. The Gateway reuses each generation's process and storage fences for at most eight concurrent stops. The aggregate retains the independent Session receipt through stopped-state accounting. Gateway exit status requires complete inventory, confirmed process and Session outcomes, and completion before the node deadline.
+Default Gateway shutdown retains Runtime processes while refusing new starts. Opting in with `HGW_DRAIN_RUNTIMES_ON_SHUTDOWN` closes admission, joins pending starts, and inventories the tracked and assigned generations, including supervisor-owned systemd units. The Gateway reuses each generation's process and storage fences for at most eight concurrent stops. A computer in the draining state fences new Runtime traffic. The administrator's explicit stop can still reach its owner, and the current stopping generation retains checkpoint access while it owns the placement and its managed lease remains valid. This lets a committed stop finish the Session log before termination. The aggregate retains the independent Session receipt through stopped-state accounting. Gateway exit status requires complete inventory, confirmed process and Session outcomes, and completion before the node deadline.
 
 ## Alternatives considered
 

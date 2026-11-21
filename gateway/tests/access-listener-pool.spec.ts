@@ -15,9 +15,8 @@ it('fences admitted traffic while an earlier Runtime cleanup still holds acknowl
     query: vi.fn(async (sql: string, values: string[] = []) => {
       if (sql.includes('set_config') || sql.startsWith('LISTEN')) return { rows: [] }
       if (sql.includes('n.access_applied_revision')) {
-        return { rows: [{ access_revision: String(revision), access_applied_revision: String(acknowledged), status: 'active' }] }
+        return { rows: [{ access_revision: String(revision), access_applied_revision: String(acknowledged), node_status: 'active' }] }
       }
-      if (sql.startsWith('SELECT access_revision::text')) return { rows: [{ access_revision: String(revision) }] }
       if (sql.includes('FROM harness.outbox')) return {
         rows: Array.from({ length: Number(values[2]) - Number(values[1]) }, (_, index) => {
           const id = Number(values[1]) + index + 1

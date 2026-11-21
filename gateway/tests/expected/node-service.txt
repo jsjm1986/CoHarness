@@ -27,6 +27,7 @@ Organization model and quota management remain available while the execution com
 A renewed node connection rejects old credentials and resumes the same Runtime only after confirmed stop in a fresh generation.
 Entry-owned policy keeps direct secondary access local and rejects reverse computer selection.
 Browser recovery deadlines follow computer B’s configuration while primary-local defaults remain unchanged.
+A draining entry refuses new starts and forwards the exact Runtime stop to its owner.
 Computer conversation creation attaches the selected Runtime Workspace, registers its default directory, and keeps other computers separate.
 Captured Client Remote calls retain their Runtime, reject foreign Sessions, and stop sending after namespace withdrawal.
 Composer-owned blank conversations remain observable without opening another Runtime.

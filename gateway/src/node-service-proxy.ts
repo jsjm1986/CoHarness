@@ -151,7 +151,8 @@ export class GatewayNodeServiceProxy {
     if (url.pathname.startsWith('/admin/api/') && (runtime !== null || node !== null || managedRuntime !== undefined)) {
       if (actor.role !== 'admin') throw new NodeServiceError(403, 'node-service/invalid-target')
       if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
-      await this.monitor?.synchronize()
+      const stop = method === 'POST' && managedRuntime !== undefined && url.pathname.endsWith('/stop')
+      await this.monitor?.synchronize(stop ? 'runtime-stop' : undefined)
       if (runtime !== null || managedRuntime !== undefined) {
         if (runtime !== null && managedRuntime !== undefined && runtime !== managedRuntime) throw new NodeServiceError(400, 'node-service/invalid-target')
         if (this.directory.resolveForAdministrator === undefined) throw new NodeServiceError(503, 'node-service/unavailable')

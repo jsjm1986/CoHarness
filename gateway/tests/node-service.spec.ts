@@ -384,11 +384,15 @@ it('validates fixed local origins and service capacity before network acquisitio
   }
   for (const value of ['0', '-1', '1.5', '2147483648']) expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_MAX_CONNECTIONS: value })).toThrow()
   expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_MAX_CONNECTIONS: '1', HGW_NODE_SERVICE_MAX_PER_NODE: '2' })).toThrow()
+  expect(loadNodeServiceConfig({}).httpMaxPendingPerNode).toBe(32)
+  expect(loadNodeServiceConfig({ HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS: '2' }).httpMaxPendingPerNode).toBe(2)
+  expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS: '2',
+    HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE: '3' })).toThrow()
   expect(loadNodeServiceConfig({}).forwarding).toBe(false)
   expect(loadNodeServiceConfig({ HGW_NODE_SERVICE_FORWARDING: 'on' }).forwarding).toBe(true)
   expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_FORWARDING: 'true' })).toThrow()
   for (const key of ['HGW_NODE_SERVICE_HTTP_IDLE_TIMEOUT_MS', 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS', 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE',
-    'HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS', 'HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS']) {
+    'HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS', 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE', 'HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS']) {
     expect(() => loadNodeServiceConfig({ [key]: '0' })).toThrow()
   }
   expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_MAX_CONNECTIONS: '2', HGW_NODE_SERVICE_MAX_PER_NODE: '1',
@@ -1264,6 +1268,34 @@ it('hands a prepared conversation connection to the next action while ordinary r
     owner.abort()
     await Promise.allSettled([background, send])
   }
+})
+
+it('keeps another computer eligible to queue when one computer fills its waiting allowance', async () => {
+  const a = randomUUID() as RuntimeNodeId, b = randomUUID() as RuntimeNodeId
+  const f = capacityPoolFixture(2, 1, undefined, undefined, { HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS: '2',
+    HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE: '1' })
+  const signal = new AbortController().signal
+  const activeA = await f.pool.acquire(a, signal)
+  const activeB = await f.pool.acquire(b, signal)
+  const cancelled = new AbortController()
+  const waitingA = f.pool.acquire(a, cancelled.signal)
+  const cancellation = expect(waitingA).rejects.toMatchObject({ code: 'node-service/cancelled' })
+  try {
+    await expect(f.pool.acquire(a, AbortSignal.timeout(1_000))).rejects.toMatchObject({ code: 'node-service/busy' })
+    const waitingB = f.pool.acquire(b, signal)
+    activeB.release()
+    const servedB = await waitingB
+    expect(servedB.agent).toBe(activeB.agent)
+    servedB.release()
+  } finally {
+    cancelled.abort()
+    await cancellation
+  }
+  const nextA = f.pool.acquire(a, signal)
+  activeA.release()
+  const servedA = await nextA
+  expect(servedA.agent).toBe(activeA.agent)
+  servedA.release()
 })
 
 it('counts acquisitions waiting for physical transport release against the pending limit', async () => {

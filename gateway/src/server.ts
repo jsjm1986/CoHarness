@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { AccessNodeDrainingError } from './access-invalidation.ts'
 import { RESOURCE_INGRESS_TIMING_HEADER, isResourceAdmissionRequest } from '@deepseek-ai/dsh-resource-budget/wire'
 import { checkDocumentAttachmentTarget } from './node-content-documents-target.ts'
 import { NodeContentUnavailable } from './node-content-store.ts'
@@ -991,7 +992,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             code: error.code,
             message: 'The server is at its database capacity. Try again later.',
           } }), 'application/json')
-        } else if (error instanceof RuntimeCatalogError || error instanceof NodeAccessError || error instanceof NodeServiceError || error instanceof NodeChannelError || error instanceof ComputerAccessError || error instanceof DeploymentTopologyError) {
+        } else if (error instanceof AccessNodeDrainingError || error instanceof RuntimeCatalogError || error instanceof NodeAccessError || error instanceof NodeServiceError || error instanceof NodeChannelError || error instanceof ComputerAccessError || error instanceof DeploymentTopologyError) {
           res.setHeader('cache-control', 'no-store')
           send(res, error.status, JSON.stringify({ error: error.code }), 'application/json')
         } else if (error instanceof RuntimeAccountError) {
@@ -1028,7 +1029,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           send(res, 500, 'internal error', 'text/plain')
         }
       }
-      if (!(error instanceof BodyTooLargeError) && !(error instanceof RuntimeCapacityError) && !(error instanceof RuntimeCatalogError) && !(error instanceof NodeAccessError)
+      if (!(error instanceof AccessNodeDrainingError) && !(error instanceof BodyTooLargeError) && !(error instanceof RuntimeCapacityError) && !(error instanceof RuntimeCatalogError) && !(error instanceof NodeAccessError)
         && !(error instanceof NodeServiceError) && !(error instanceof NodeChannelError) && !(error instanceof ComputerAccessError) && !(error instanceof DeploymentTopologyError) && !(error instanceof WebhookEndpointError) && !(error instanceof PostgresCheckoutQueueFullError)) console.error('[gateway] request failed:', error)
     }).finally(() => { writerReleases.get(res)?.(); writerReleases.delete(res) })
   })

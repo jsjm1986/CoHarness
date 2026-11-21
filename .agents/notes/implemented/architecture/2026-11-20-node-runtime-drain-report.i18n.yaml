@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-20-node-runtime-drain-report.md
 document:
-  en: a9ec169a690957c2fb62e744cf9ca47f4f52be48
-  zh: 6d95f4887974b5472ad89544bd934e34ae7c6f8d
+  en: 8247ac5e66aef3a56ba335ef59bc71c59dfb7237
+  zh: 4a784343c69985d80f69e9258b2d771ee7699e86
 /agent-note-confirm-every-runtime-in-an-opted-in-node-drain:
   en: 8c78b0ed587fb5c1
   zh: ea095db86a3d34fd
@@ -12,8 +12,8 @@ document:
   en: 82663de278246b39
   zh: cfb33acc24a1c83e
 /agent-note-confirm-every-runtime-in-an-opted-in-node-drain/decision:
-  en: 24cd383a6748af3e
-  zh: 9eacea35ee94d143
+  en: fb2f574673cc7310
+  zh: 49993fdb63877444
 /agent-note-confirm-every-runtime-in-an-opted-in-node-drain/alternatives-considered:
   en: efcdc99012448799
   zh: 41d43c251809015b

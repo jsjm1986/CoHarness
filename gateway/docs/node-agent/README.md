@@ -161,7 +161,8 @@ Center settings are validated at startup. Node directory pages share the [Gatewa
 | `HGW_NODE_SERVICE_HTTP_IDLE_TIMEOUT_MS` | 30000 | Maximum idle lifetime of a reusable HTTP service connection |
 | `HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS` | 16 | Global idle HTTP connection limit, bounded by the total service limit |
 | `HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE` | 2 | Per-computer idle HTTP connection limit, bounded by both global idle and per-computer service limits |
-| `HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS` | 256 | Maximum HTTP borrowers waiting for owned connections |
+| `HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS` | 256 | Maximum HTTP requests waiting across all computers |
+| `HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE` | The smaller of 32 and the global limit | Maximum HTTP requests waiting for one computer, bounded by the global limit |
 | `HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS` | 60000 | Maximum HTTP acquisition queue wait |
 
 Node settings are resolved before file or network acquisition.

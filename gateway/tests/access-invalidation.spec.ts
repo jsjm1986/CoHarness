@@ -203,6 +203,21 @@ describePg('cross-Gateway access invalidation', () => {
   })
   afterAll(async () => { await pool?.end() })
 
+  it('allows the planned stop to synchronize after the computer stops admitting traffic', async () => {
+    const f = await fixture()
+    const [first, second] = f.gateways
+    expect(first!.monitor.available).toBe(true)
+    const cancelled = barrier()
+    cleanup.push(first!.monitor.subscribe(cancelled.resolve))
+    await pool.query("UPDATE harness.compute_nodes SET status='draining' WHERE id=$1", [first!.owner.nodeId])
+    await expect(first!.monitor.synchronize()).rejects.toMatchObject({ code: 'access-node-draining', status: 503 })
+    await cancelled.promise
+    expect(first!.monitor.available).toBe(false)
+    await expect(first!.monitor.synchronize('runtime-stop')).resolves.toBeUndefined()
+    await expect(first!.monitor.synchronizeTo(BigInt(await f.revision()))).rejects.toMatchObject({ code: 'access-node-draining' })
+    await expect(second!.monitor.synchronize()).resolves.toBeUndefined()
+  })
+
   it.each([true, false])('settles a retired local assignment only with process evidence (tracked: %s)', async tracked => {
     const terminated = vi.fn(async () => 'confirmed' as const)
     const stopped = vi.fn<NonNullable<ConstructorParameters<typeof InstanceManager>[4]>['stopped']>()

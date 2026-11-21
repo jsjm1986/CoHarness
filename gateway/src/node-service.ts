@@ -24,6 +24,7 @@ export interface NodeServiceConfig {
   httpMaxIdleConnections: number
   httpMaxIdlePerNode: number
   httpMaxPendingRequests: number
+  httpMaxPendingPerNode: number
   httpQueueTimeoutMs: number
 }
 
@@ -76,10 +77,12 @@ export function loadNodeServiceConfig(env: NodeJS.ProcessEnv): NodeServiceConfig
   if (httpMaxIdleConnections > maxConnections || httpMaxIdlePerNode > maxPerNode || httpMaxIdlePerNode > httpMaxIdleConnections) {
     throw new Error('Node service HTTP idle limits must fit the global and per-node connection limits')
   }
+  const httpMaxPendingRequests = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS', 256)
+  const httpMaxPendingPerNode = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE', Math.min(httpMaxPendingRequests, 32))
+  if (httpMaxPendingPerNode > httpMaxPendingRequests) throw new Error('HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE must not exceed HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS')
   return { forwarding: forwarding === 'on', maxConnections, maxPerNode, connectTimeoutMs: setting(env, 'HGW_NODE_SERVICE_CONNECT_TIMEOUT_MS', 10_000),
     httpIdleTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_IDLE_TIMEOUT_MS', 30_000), httpMaxIdleConnections, httpMaxIdlePerNode,
-    httpMaxPendingRequests: setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS', 256),
-    httpQueueTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS', 60_000) }
+    httpMaxPendingRequests, httpMaxPendingPerNode, httpQueueTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS', 60_000) }
 }
 
 /** One center's transport owner; HTTP/user authorization belongs to the existing Gateway request path. */
