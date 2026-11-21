@@ -15,12 +15,15 @@ const repo = fileURLToPath(new URL('../../../../../../', import.meta.url))
 
 it.each([
   { transport: 'ipc', failure: undefined },
+  { transport: 'ipc', failure: undefined, graceMs: 15_000 },
   { transport: 'signal', failure: undefined },
   { transport: 'ipc', failure: 'checkpoint' },
   { transport: 'ipc', failure: 'scope cleanup' },
   { transport: 'ipc', failure: 'timeout' },
   { transport: 'signal', failure: 'forced' },
-] as const)('reports planned Web shutdown after the final checkpoint ($transport, failure $failure)', async ({ transport, failure }) => {
+] as const)('reports planned Web shutdown after the final checkpoint ($transport, failure $failure, grace $graceMs)', async (scenario) => {
+  const { transport, failure } = scenario
+  const graceMs = 'graceMs' in scenario ? scenario.graceMs : undefined
   const root = await mkdtemp(join(tmpdir(), 'dsh-managed-web-shutdown-'))
   onTestFinished(async () => { await rm(root, { recursive: true, force: true }) })
   const patch = join(root, 'shutdown.patch.yml')
@@ -68,7 +71,7 @@ it.each([
     return received.has(kind)
   }, { timeout }).toBe(true)
   const requestStop = (): void => {
-    if (transport === 'ipc') child.send({ kind: 'dsh-runtime-stop' })
+    if (transport === 'ipc') child.send(graceMs === undefined ? { kind: 'dsh-runtime-stop' } : { kind: 'dsh-runtime-stop', graceMs })
     else if (process.platform === 'win32') child.send('signal-fixture-stop')
     else child.kill('SIGTERM')
   }
@@ -77,6 +80,12 @@ it.each([
     await waitFor('shutdown-fixture-ready', 60_000)
     requestStop()
     await waitFor('shutdown-fixture-aborted', 3_000)
+    if (graceMs !== undefined) {
+      await expect(Promise.race([
+        complete.then(() => 'exited'),
+        new Promise(resolve => setTimeout(() => { resolve('waiting') }, 5_250)),
+      ])).resolves.toBe('waiting')
+    }
     expect(received.has('dsh-runtime-stopped')).toBe(false)
     if (failure === 'forced') requestStop()
     else if (failure !== 'timeout') child.send('release-fixture-turn')

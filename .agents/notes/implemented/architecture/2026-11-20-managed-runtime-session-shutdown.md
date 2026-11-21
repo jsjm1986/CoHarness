@@ -14,6 +14,8 @@ The [managed profile launcher](../../../../apps/cli/reference/README.md#managed-
 
 [Gateway](../../../../gateway/README.md#performance-and-runtime-admission) confirms process-range termination and Session durability separately. The local owner records a negotiated child result under the allocation lease. For systemd, the Runtime publishes a receipt signed with the exact generation's launch credential, and Gateway validates it after process termination. The project storage verifier uses current placement, writer rights, and write epoch for final appends and suffix reads of existing Sessions while the generation is stopping.
 
+The local supervisor passes the stop budget to the managed Host over the inherited IPC channel. This lets an admitted checkpoint finish beyond the five-second signal fallback while the supervisor still forces process-range exit at its deadline. The node drain applies its own deadline across all batches and reports incomplete evidence if that budget expires.
+
 ## Alternatives considered
 
 Reordering bundle rows leaves sibling unload concurrent. A `turn/end` event or Agent `idle` notification proves local progress while persistence may still be pending. Awaiting the write handle's `close` alone can miss events when its routing listener has already detached. Moving every normal turn flush to a stronger synchronous checkpoint would add cost to model interaction without fixing teardown order.

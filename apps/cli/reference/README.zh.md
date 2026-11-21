@@ -13,6 +13,8 @@
 
 托管启动通过私有父进程 IPC 通道发布 `dsh-runtime-stop-ready`。收到 `dsh-runtime-stop` 后，进程关闭 Agent 准入，等待[计划停止 Agent 与 Session](../../../packages/core/agent-loop/README.zh.md#planned-shutdown)，然后释放 profile。`dsh-runtime-stopped` 报告 `confirmed`、`failed` 或 `timeout`。经 IPC 确认停止时，回执送达后以 0 退出。托管进程收到 `SIGTERM` 后用退出码 80 表示已确认、81 表示失败、82 表示超时、83 表示第二次信号强制退出。监督进程设置 `DSH_GATEWAY_SHUTDOWN_RECEIPT` 时，托管进程还会为 `SIGTERM` 独占写入回执，内容含停止结果及由私有启动凭据文件计算的 HMAC。回执发布失败时以 81 退出。
 
+监督进程可在私有停止消息中传入正整数 `graceMs`。启动器在该期限内完成检查点和 profile 清理。信号停止或停止消息未带可用期限时，按五秒处理。
+
 ## Profile 启动
 
 `dsh <name>` 是 `dsh --profile <name>` 的简写，启动位于 `$DSH_HOME/profiles/<name>` 的 profile。简写中的名称必须紧跟 `dsh`；`plugin` 仍为插件管理命令，因此启动同名 profile 时须使用 `dsh --profile plugin`。生效配置树以空根节点为起点，依次叠加 profile manifest（元数据清单）的 `dsh.profile.bundles` 列表中指定的各组合包 patch、profile 自身的 `cordis.patch.yml`、home 级的 `$DSH_HOME/cordis.patch.yml`（这是各 profile 共享的机器本地偏好，因此优先于逐 profile 配置层），以及按 argv 顺序指定的各个 `--patch <path>` 覆盖层。对同一配置行，后应用的层优先。patch 会替换目标行的整个 `config` 值，而不是深度合并其中的键；patch 也可以插入新行。最终 YAML 组合决定是否由 `dsh-hmr` 监视配置；未启用 HMR 时，更改需要重启。配置解析、schema 校验、模块解析或插件启动失败时，系统会报告错误并以非零状态退出。收到 SIGINT 或 SIGTERM 时，挂载的根节点会先 dispose（资源释放）再退出。

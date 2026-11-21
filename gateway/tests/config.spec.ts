@@ -62,6 +62,9 @@ describe('loadConfig', () => {
     for (const value of ['0', '1.5', '2147483648']) {
       expect(() => loadConfig({ HGW_RUNTIME_DRAIN_TIMEOUT_MS: value })).toThrow('HGW_RUNTIME_DRAIN_TIMEOUT_MS')
     }
+    expect(loadConfig({}).localRuntimeShutdownGraceMs).toBe(15_000)
+    expect(loadConfig({ HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS: '12000' }).localRuntimeShutdownGraceMs).toBe(12_000)
+    expect(() => loadConfig({ HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS: '86400001' })).toThrow('HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS')
   })
 
   it('defaults runtime reconciliation on with bounded warmup and failure backoff', () => {

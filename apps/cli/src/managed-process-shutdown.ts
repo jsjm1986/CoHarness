@@ -77,10 +77,10 @@ export function installManagedProcessShutdown(
     })
   }
 
-  const start = (request: Source): void => {
+  const start = (request: Source, graceMs = PROCESS_SHUTDOWN_TIMEOUT_MS): void => {
     if (source !== undefined) return
     source = request
-    timeout = setTimeout(() => { finish('timeout') }, PROCESS_SHUTDOWN_TIMEOUT_MS)
+    timeout = setTimeout(() => { finish('timeout') }, graceMs)
     void (async () => {
       try { await drain() } catch (error: unknown) {
         if (finishing) return
@@ -104,7 +104,9 @@ export function installManagedProcessShutdown(
   if (process.connected && process.send !== undefined) {
     const requestFromOwner = (message: unknown): void => {
       if (message !== null && typeof message === 'object' && 'kind' in message && message.kind === 'dsh-runtime-stop') {
-        start('ipc')
+        const graceMs = 'graceMs' in message ? message.graceMs : undefined
+        start('ipc', typeof graceMs === 'number' && Number.isSafeInteger(graceMs)
+          && graceMs > 0 && graceMs <= 2_147_483_647 ? graceMs : undefined)
       }
     }
     process.on('message', requestFromOwner)

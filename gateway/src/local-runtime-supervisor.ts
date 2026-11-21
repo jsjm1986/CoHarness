@@ -126,7 +126,7 @@ async function supervise(input: unknown): Promise<void> {
       }
       if (checkpointReady && runtime.connected) {
         checkpointRequested = 'ipc'
-        runtime.send({ kind: 'dsh-runtime-stop' }, error => { if (error !== null) signalRuntime(runtime) })
+        runtime.send({ kind: 'dsh-runtime-stop', graceMs }, error => { if (error !== null) signalRuntime(runtime) })
       } else signalRuntime(runtime)
       setTimeout(() => killOwnedGroup(runtime.exitCode === null && runtime.signalCode === null
         ? checkpointRequested === undefined ? 'forced' : 'timeout' : undefined), graceMs)

@@ -189,6 +189,8 @@ export interface GatewayConfig {
   drainRuntimesOnShutdown: boolean
   /** Wall-clock budget for all batches of an opted-in node Runtime drain. */
   runtimeDrainTimeoutMs: number
+  /** Time a local Runtime has to checkpoint during a planned stop (HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS). */
+  localRuntimeShutdownGraceMs: number
   /**
    * Periodic desired-state reconciliation on this node (HGW_RECONCILE_*).
    * Crashed ready runtimes are published failed and recently used stopped
@@ -827,6 +829,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     return value === 'true'
   })()
   const runtimeDrainTimeoutMs = timerDelay(env.HGW_RUNTIME_DRAIN_TIMEOUT_MS, 60_000, 'HGW_RUNTIME_DRAIN_TIMEOUT_MS')
+  const localRuntimeShutdownGraceMs = timerDelay(env.HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS, 15_000, 'HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS')
+  if (localRuntimeShutdownGraceMs > 86_400_000) throw new Error('HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS must not exceed 86400000')
   const reconcile = {
     enabled: (() => {
       const value = env.HGW_RECONCILE ?? 'on'
@@ -1054,6 +1058,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     readinessTimeoutMs,
     drainRuntimesOnShutdown,
     runtimeDrainTimeoutMs,
+    localRuntimeShutdownGraceMs,
     reconcile,
     sessionTtlMs,
     sessionAbsoluteTtlMs,

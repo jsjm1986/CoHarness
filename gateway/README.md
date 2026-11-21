@@ -108,6 +108,7 @@ API requests can select an authorized environment with `dshRuntime=<environment 
 | `HGW_RUNTIME_CLEANUP_TIMEOUT_MS` | 30 s | Managed Runtime resource-accounting cleanup deadline; must exceed the request deadline; uncertain cleanup retains occupation |
 | `HGW_DRAIN_RUNTIMES_ON_SHUTDOWN` | `false` | Stop tracked and recovered Runtime generations on this node during Gateway shutdown, including local and systemd processes |
 | `HGW_RUNTIME_DRAIN_TIMEOUT_MS` | 60 s | Shared deadline for discovery and all Runtime stop batches when the drain is enabled |
+| `HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS` | 15 s | Time a local Runtime has to checkpoint after a manual stop or when its Gateway drains |
 | `HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS` | 15 s | Managed browser connection readiness deadline, including Host metadata and event streams |
 | `HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS` | 3 s | Managed browser event-stream opening deadline |
 | `HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS` | 30 s | Managed browser bounded unary RPC deadline; user-paced calls and streams retain their existing lifetime |

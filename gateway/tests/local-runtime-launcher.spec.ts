@@ -68,6 +68,7 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     expect(() => process.kill(runtime.pid, 0)).toThrow()
     if (outcome === 'confirmed' || outcome === 'failed') {
       expect(await readFile(join(f.root, 'ready.json.checkpoint'), 'utf8')).toBe(`${outcome}\n`)
+      expect(await readFile(join(f.root, 'ready.json.grace-ms'), 'utf8')).toBe(String(graceMs))
     }
     await expect(handle.terminate(0)).resolves.toBe(outcome)
   }, 30_000)

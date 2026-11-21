@@ -19,6 +19,7 @@ if (mode === 'descendant') {
       if (mode === 'checkpoint-forged-early') { process.exit(0); return }
       const outcome = mode === 'checkpoint-confirmed' ? 'confirmed' : 'failed'
       writeFileSync(`${marker}.checkpoint`, `${outcome}\n`, { flush: true })
+      writeFileSync(`${marker}.grace-ms`, String(message.graceMs))
       process.send({ kind: 'dsh-runtime-stopped', outcome }, () => { process.exit(outcome === 'confirmed' ? 0 : 1) })
     })
     if (mode === 'checkpoint-forged-early') process.send({ kind: 'dsh-runtime-stopped', outcome: 'confirmed' })

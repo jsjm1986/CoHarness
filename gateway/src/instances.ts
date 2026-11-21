@@ -2314,7 +2314,9 @@ export class InstanceManager {
       throw new Error(`Runtime ${key} termination cannot be confirmed`)
     }
     if (drain?.expired() === true) return undefined
-    const shutdownOutcome = await proc?.terminate(STOP_GRACE_MS) ?? 'unconfirmed'
+    const graceMs = this.cfg.launcher === 'local' && (reason === 'manual' || reason === 'shutdown')
+      ? this.cfg.localRuntimeShutdownGraceMs : STOP_GRACE_MS
+    const shutdownOutcome = await proc?.terminate(graceMs) ?? 'unconfirmed'
     drain?.terminated(shutdownOutcome)
     await this.resources?.stopped(target, generation, 'retain')
     const published = current && (holdStopping || await this.repository.markStopped(target, generation))

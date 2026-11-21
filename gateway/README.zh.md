@@ -108,6 +108,7 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_RUNTIME_CLEANUP_TIMEOUT_MS` | 30 秒 | 受管 Runtime 资源结算期限，必须长于请求期限；无法确认结算时保留占用 |
 | `HGW_DRAIN_RUNTIMES_ON_SHUTDOWN` | `false` | Gateway 关闭时停止本节点已追踪或恢复的 Runtime 代次，涵盖本地和 systemd 进程 |
 | `HGW_RUNTIME_DRAIN_TIMEOUT_MS` | 60 秒 | 启用排空时，Runtime 发现和全部停止批次共用的期限 |
+| `HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS` | 15 秒 | 本地 Runtime 手动停止或 Gateway 排空时完成检查点的期限 |
 | `HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS` | 15 秒 | 受管浏览器连接就绪期限，包括 Host 元数据和事件流 |
 | `HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS` | 3 秒 | 受管浏览器事件流建立期限 |
 | `HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS` | 30 秒 | 受管浏览器有界 RPC 期限；由用户控制完成的调用及持续流保留原有生命周期 |
