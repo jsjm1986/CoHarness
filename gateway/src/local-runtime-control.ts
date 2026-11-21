@@ -128,10 +128,7 @@ export class LocalRuntimeControl implements InstanceProc {
         // record-bound spawn allocation, so leader death proves the survivors
         // belong to this generation — reap them instead of reporting
         // 'occupied' forever. Windows sweeps orphans by parent link below.
-        if (process.platform !== 'win32' && this.leaderDead(current.groupPid)) {
-          try { process.kill(-current.groupPid, 'SIGKILL') } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
-          }
+        if (process.platform !== 'win32' && this.leaderDead(current.groupPid) && this.signalGroup(current.groupPid)) {
           await new Promise(resolve => setTimeout(resolve, POLL_MS))
         }
         if (this.groupExists(current.groupPid)) return false
@@ -232,10 +229,15 @@ export class LocalRuntimeControl implements InstanceProc {
     // PID reuse.
     if (record === undefined || record.bootId !== bootId || record.groupPid === undefined
       || !this.leaderDead(record.groupPid) || !this.groupExists(record.groupPid)) return false
-    try { process.kill(-record.groupPid, 'SIGKILL') } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
+    return this.signalGroup(record.groupPid)
+  }
+
+  private signalGroup(pid: number): boolean {
+    try { process.kill(-pid, 'SIGKILL'); return true } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code === 'ESRCH' || code === 'EPERM') return false
+      throw error
     }
-    return true
   }
 
   /** Whether the process-group leader itself is gone while members may remain. */

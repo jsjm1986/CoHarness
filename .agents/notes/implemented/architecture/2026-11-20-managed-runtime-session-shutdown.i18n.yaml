@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-20-managed-runtime-session-shutdown.md
 document:
-  en: 1827a66d98e9aaacbac31ef696bed112829c5d1e
-  zh: 64c73e215953727292fe2328ed71e333b8d450ef
+  en: 508c56c80bff7fd38aa1446dd852268275761065
+  zh: 30cc99a6cab449e925e2f1d0b16ae6901e414db6
 /agent-note-verify-session-durability-during-managed-runtime-shutdown:
   en: 0f1b45a893c57b30
   zh: e5a349fa2496f960
@@ -12,8 +12,8 @@ document:
   en: 5fa1f563960de4c8
   zh: fa3bbb717b9819ed
 /agent-note-verify-session-durability-during-managed-runtime-shutdown/decision:
-  en: cdfec5eb3669a9b9
-  zh: d0cb5b8739c676a7
+  en: 57bb3ed6fdf06fd9
+  zh: 23619ed3e8d9edaa
 /agent-note-verify-session-durability-during-managed-runtime-shutdown/alternatives-considered:
   en: a97fbd15ed7eafa8
   zh: 96b80fae94b0205f

@@ -234,6 +234,34 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     } finally { probe.mockRestore() }
   })
 
+  it('requires proof of exit after an orphan group signal is denied', async () => {
+    const f = await fixture(), handle = await start(f)
+    await ready(f.root)
+    const record = (await f.store.read())!
+    const group = record.groupPid!
+    await writeFile(f.store.recordPath, JSON.stringify({ ...record, url: 'http://127.0.0.1:0/' }))
+    const nativeKill = process.kill
+    let denied = 0
+    const signal = vi.spyOn(process, 'kill').mockImplementation((pid, op) => {
+      if (pid === group && op === 0) throw Object.assign(new Error('Leader exited'), { code: 'ESRCH' })
+      if (pid === -group && op === 'SIGKILL') {
+        denied++
+        throw Object.assign(new Error('Group signal denied'), { code: 'EPERM' })
+      }
+      return nativeKill(pid, op)
+    })
+    try {
+      const recovered = new LocalRuntimeControl(f.store, 120)
+      await expect(recovered.terminate(0)).rejects.toThrow('capacity remains occupied')
+      expect(denied).toBeGreaterThan(0)
+      expect(recovered.hasExited()).toBe(false)
+    } finally {
+      signal.mockRestore()
+      await writeFile(f.store.recordPath, JSON.stringify(record))
+    }
+    await handle.terminate(0)
+  })
+
   it('fences a queued allocation when stop intent arrives before its admission resolves', async () => {
     const f = await fixture()
     let release!: () => void, entered!: () => void
