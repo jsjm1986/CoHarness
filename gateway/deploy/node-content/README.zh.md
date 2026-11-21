@@ -38,6 +38,12 @@ Linux 项目电脑配有独立本地 Btrfs 卷时，异机备份可以包含运�
 
 Gateway 在 Runtime 启动时重建本机模型策略和上报凭据。Linux 项目快照会略过这份私有投影。仅含该投影的 Runtime 主目录可在首次启动前取得完整备份。有已记录代次的 Runtime 仍须提供托管文件清单。
 
+项目目录使用绑定挂载时，在对应的 Btrfs 配置项中添加 `bindMounts`。每项给出规范的现役挂载 `path` 和严格位于源子卷内的规范 `sourcePath`。Gateway 在创建快照前后核验挂载身份和目录 inode。挂载缺失、被替换或包含嵌套挂载时，采集会拒绝。未设置 `bindMounts` 时，配置从源子卷内直接读取项目文件。
+
+同节点将已发布项目迁入 Btrfs 时，先保留原目录并暂停所有相关写入。公开 UserDoc 目录与私有对象目录须通过同一个挂载点访问，Linux 才能创建硬链接。核对该挂载中的所有已登记文档域，在恢复服务前重新绑定其复制的元数据和对象。离线重新绑定会核验原 inode 凭证、文件字节、权限、项目放置和 UserDoc 游标。内容修订号递增时，Runtime、内容卷和写入代次仍归属同一项目。
+
+Gateway 在迁移后的卷上启动前，先核验记录的 Linux 文件系统和子卷 UUID。仅当 inode 与挂载映射仍一致时，才更新变化的内核设备号。发布后如需回退，保持写入暂停，从保留的 Btrfs 复制最新数据到独立的 ext4 目录，再在登记路径重新绑定核验通过的副本。保留原 ext4 和 Btrfs 数据。
+
 ## 在 Windows 上备份运行中的项目文件
 
 Windows 项目电脑使用独立的本地固定 NTFS 数据卷。在同一份快照配置中将 `provider` 设为 `"vss"`。每个项目填入 `projectId`、项目数据子树的规范路径 `source`、原卷 GUID `volume` 及位于子树之外的 Gateway 私有目录 `snapshotDirectory`。可用 `Get-Volume` 查询卷 GUID。所选子树应包含工作区、Runtime 存储和两个 UserDoc 私有目录。`commandTimeoutMs` 指定本机检查卷和创建卷影副本的时限。

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-05-project-recovery-reauthorization.md
 document:
-  en: 43ab2688e4b64d7e008eceef83db3b8f0f2e508b
-  zh: 80a7b1bea5110b0a0879a00f303850cc98374aba
+  en: 590f4a4cdf82b37ecb9aad5c6088b9db74efd90f
+  zh: df36612e0e530c46eeeb2f9aa4024b8b8f403487
 /agent-note-scoped-backup-coverage-and-recovery-reauthorization:
   en: 675e0fc57bfa6f9e
   zh: 3adef5ba2230c1a6
@@ -12,8 +12,8 @@ document:
   en: 7c8c3e6796056eab
   zh: 9cef2238491bcc4b
 /agent-note-scoped-backup-coverage-and-recovery-reauthorization/decision:
-  en: ee05db08ee67d70c
-  zh: a060eba96bc7b4a1
+  en: 055c7dbcbf83c054
+  zh: 62851378031afba0
 /agent-note-scoped-backup-coverage-and-recovery-reauthorization/alternatives-considered:
   en: 9fb0377d7f48fd4e
   zh: 60879c73dbb16239

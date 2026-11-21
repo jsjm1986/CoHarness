@@ -19,7 +19,21 @@
 #endif
 
 #ifdef __linux__
+#include <sys/ioctl.h>
+#include <sys/statfs.h>
 #define DIRECTORY_ACCESS O_PATH
+
+/* The 64-bit Linux BTRFS_IOC_GET_SUBVOL_INFO UAPI also builds with musl's libc headers. */
+struct btrfs_subvolume_info {
+  uint64_t tree_id;
+  char name[256];
+  uint64_t parent_id, directory_inode, generation, flags;
+  unsigned char uuid[16];
+  unsigned char other_metadata[192];
+};
+#define BTRFS_SUPER_MAGIC 0x9123683eUL
+#define BTRFS_GET_SUBVOL_INFO _IOR(0x94, 60, struct btrfs_subvolume_info)
+_Static_assert(sizeof(struct btrfs_subvolume_info) == 504, "Unexpected Btrfs ioctl layout");
 #else
 #define DIRECTORY_ACCESS O_SEARCH
 #endif
@@ -149,10 +163,23 @@ static void execute_directory(napi_env env, void *data) {
       }
       if (result.length != sizeof(result)) { request->error = EIO; return; }
       memcpy(request->volume, result.uuid, sizeof(request->volume));
+#elif defined(__linux__)
+      struct statfs filesystem;
+      if (fstatfs(handle->fd, &filesystem) != 0) { request->error = errno; return; }
+      if ((unsigned long)filesystem.f_type != BTRFS_SUPER_MAGIC) return;
+      int fd = openat(handle->fd, ".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+      if (fd < 0) { request->error = errno; return; }
+      struct btrfs_subvolume_info result = {0};
+      int status = ioctl(fd, BTRFS_GET_SUBVOL_INFO, &result);
+      int error = status == 0 ? 0 : errno;
+      (void)close(fd);
+      if (error == ENOTTY) return;
+      if (error != 0) { request->error = error; return; }
+      memcpy(request->volume, result.uuid, sizeof(request->volume));
+#endif
       for (size_t i = 0; i < sizeof(request->volume); i++) {
         if (request->volume[i] != 0) request->has_volume = true;
       }
-#endif
       return;
     }
     case READ:

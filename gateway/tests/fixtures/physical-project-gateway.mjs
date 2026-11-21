@@ -22,8 +22,10 @@ const {createProjectNameKeyring}=await lib('project-name-keyring')
 const windowsVolume=process.env.HGW_TEST_VSS_VOLUME
 const nativeRoot=windowsVolume?process.env.HGW_TEST_VSS_SOURCE:process.env.HGW_TEST_BTRFS_SOURCE
 const nativeStage=windowsVolume?process.env.HGW_TEST_VSS_STAGING:process.env.HGW_TEST_BTRFS_STAGING
+const relocation=process.env.HGW_TEST_BTRFS_RELOCATION==='1'
 if(nativeRoot)assert.ok(process.platform===(windowsVolume?'win32':'linux') && nativeStage && await realpath(nativeRoot)===nativeRoot)
-const temp=await mkdtemp(join(nativeRoot??await realpath(tmpdir()),'hgw-live-instance-'))
+if(relocation)assert.ok(nativeRoot&&!windowsVolume&&process.getuid?.()===0)
+const temp=await mkdtemp(join((relocation?undefined:nativeRoot)??await realpath(tmpdir()),'hgw-live-instance-'))
 const env=process.env, dbUrl=env.HGW_TEST_DATABASE_URL,nodeUrl=env.HGW_TEST_NODE_CONTENT_DATABASE_URL
 assert.match(new URL(dbUrl).pathname,/_test$/);assert.match(new URL(nodeUrl).pathname,/_test$/)
 assert.notEqual(dbUrl,nodeUrl)
@@ -58,16 +60,18 @@ try {
  await Promise.all(sockets.map(s=>new Promise(ok=>s.close(ok))))
  child=spawn(process.execPath,[join(base,'lib/index.js')],{env:cfgEnv,cwd:temp,stdio:['ignore','pipe','pipe']})
  closed=once(child,'close')
- const counts={startup:0,degraded:0}
+ const counts={startup:0,degraded:0},bootLog=[]
  for(const source of [child.stdout,child.stderr])source.on('data',bytes=>{
    for(const line of bytes.toString().split('\n')) {
      if(line.includes('[gateway]'))counts.startup++
      if(line.includes('degraded') || line.includes('permanently'))counts.degraded++
+     if(relocation&&line){bootLog.push(line);if(bootLog.length>16)bootLog.shift()}
    }
  })
  let ok=false
- for(let i=0;i<100;i++){if(child.exitCode!==null)break;try{if((await fetch(origin+'/healthz',{signal:AbortSignal.timeout(1800)})).ok){ok=true;break}}catch{};await delay(150)}
- assert.ok(ok,'candidate boot '+JSON.stringify(counts))
+ const bootDeadline=Date.now()+(relocation?45000:15000)
+ while(Date.now()<bootDeadline){if(child.exitCode!==null)break;try{if((await fetch(origin+'/healthz',{signal:AbortSignal.timeout(1800)})).ok){ok=true;break}}catch{};await delay(150)}
+ assert.ok(ok,'candidate boot '+JSON.stringify({counts,exitCode:child.exitCode,bootLog}))
  const login=await fetch(origin+'/login',{method:'POST',redirect:'manual',headers:{origin,'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({username:'fixture-admin',password:pass})})
  assert.equal(login.status,302);const cookie=login.headers.getSetCookie()[0]?.split(';')[0];assert.ok(cookie?.startsWith('hgw_session='))
  const request=async(url,method,body)=>{const r=await fetch(origin+url,{method,credentials:'omit',redirect:'manual',headers:{origin,cookie,'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});const value=await r.json().catch(()=>null);return {status:r.status,value}}
@@ -113,7 +117,31 @@ try {
  const expected=JSON.parse(await readFile(new URL('../expected/physical-project-gateway.jsonl',import.meta.url),'utf8'))
  assert.deepEqual(transcript,expected)
  console.log(JSON.stringify(transcript))
- if(nativeRoot){
+ if(relocation){
+   const peer=await request('/account/api/projects?dshNode='+node,'POST',{name:'Neighbor '+randomUUID()})
+   assert.equal(peer.status,201)
+   const neighbor=(await control.query(`SELECT p.id,b.runtime_id,sp.root_id,m.local_path
+     FROM harness.projects p JOIN harness.project_content_placement b ON b.project_id=p.id
+     JOIN harness.project_mounts m ON m.project_id=p.id JOIN harness.document_scope_placement sp ON sp.scope_id=p.id
+     WHERE p.organization_id=$1 AND p.public_id=$2`,[org,peer.value.id])).rows[0]
+   const document={name:'same-node-relocation.txt',text:'UserDoc retained identity across volumes'}
+   const bytes=Buffer.from(document.text), sha256=createHash('sha256').update(bytes).digest('hex')
+   const upload='/api/documents/transfer/uploads'
+   const query='?'+new URLSearchParams({scope:'project:'+id,dshRuntime:coord.runtime_id,dshNode:node})
+   const created=await request(upload+query,'POST',{version:1,name:document.name,directory:'',bytes:bytes.length,fingerprint:sha256})
+   assert.equal(created.status,200,JSON.stringify(created.value))
+   const session=upload+'/'+created.value.uploadId
+   const chunk=await fetch(origin+session+'/chunks/0'+query,{method:'PUT',headers:{origin,cookie,
+     'content-range':'bytes 0-'+(bytes.length-1)+'/'+bytes.length,'x-dsh-chunk-sha256':sha256},body:bytes})
+   assert.equal(chunk.status,200,await chunk.text())
+   let complete=await request(session+'/complete'+query,'POST',{version:1,sha256})
+   for(let i=0;complete.value?.state==='verifying'&&i<120;i++){await delay(25);complete=await request(session+query,'GET')}
+   assert.equal(complete.value?.state,'complete',JSON.stringify(complete.value))
+   child.kill('SIGTERM');await closed
+   const {verifyNativeProjectRelocation}=await import('./native-project-relocation.mjs')
+   await verifyNativeProjectRelocation({lib,temp,config:cfg,context:ctx,store,project:id,projectUuid:coord.id,
+     workspace:stored.root_path,source:nativeRoot,staging:nativeStage,document,neighbor:{...neighbor,publicId:peer.value.id}})
+ }else if(nativeRoot){
    const {verifyNativeProjectPoint}=await import('./native-project-point.mjs')
    await verifyNativeProjectPoint({lib,temp,config:cfg,context:ctx,store,project:id,projectUuid:coord.id,
      workspace:stored.root_path,source:nativeRoot,staging:nativeStage,windowsVolume})

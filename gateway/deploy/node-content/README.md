@@ -38,6 +38,12 @@ Set `HGW_PEER_PROJECT_SNAPSHOTS_FILE` to the canonical path of an owner-only JSO
 
 The Gateway recreates the node-local model policy and its intake credential at Runtime startup. Linux project snapshots omit that private projection. An unused Runtime home containing only this projection can be fully backed up before its first start. A Runtime with persisted generation history still requires its managed-file inventory.
 
+For a project with bind-mounted directories, add `bindMounts` to its Btrfs entry. Each pair gives the canonical live mount `path` and the corresponding canonical `sourcePath` strictly inside the source subvolume. The Gateway verifies the mount identity and directory inode before and after creating the snapshot. A missing, replaced or nested mount rejects the capture. A configuration without `bindMounts` reads project files directly beneath the source subvolume.
+
+To move a published project to Btrfs on the same node, retain the original directories and quiesce every writer under the moved roots. Mount the public UserDoc directory and its private object directory through one common mount so Linux can create their hard links. Check every registered domain under that mount and reattach its copied metadata and objects before serving requests. The offline project reattachment verifies the previous inode witnesses, file bytes, permissions, project placement and UserDoc cursor. The Runtime, content volume and writer epoch stay bound to the same project as its content revision advances.
+
+Before starting the Gateway on an already moved volume, verify the recorded Linux filesystem and subvolume UUIDs. Refresh changed kernel device numbers only when the recorded inodes and mount mappings still agree. For rollback after publication, keep writers closed, copy the latest retained Btrfs data to separate ext4 directories, and reattach the verified copies at the registered paths. Keep the original ext4 and Btrfs data available.
+
 ## Protect live project files on Windows
 
 For a Windows project computer, use a dedicated fixed NTFS data volume. Set `provider` to `"vss"` in the same snapshot configuration. Each project entry contains `projectId`, the canonical project data subtree `source`, the original volume GUID `volume` and a Gateway-private `snapshotDirectory` outside that subtree. The volume GUID is available from `Get-Volume`. Include the workspace, Runtime storage and the two UserDoc private roots in the selected subtree. Set `commandTimeoutMs` to the local deadline for volume inspection and shadow creation.

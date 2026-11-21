@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { once } from 'node:events';
 import { fstatSync, readdirSync } from 'node:fs';
-import { mkdir, mkdtemp, realpath, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rename, rm, stat, statfs, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -68,8 +68,10 @@ test('reads a retained filesystem identity without changing directory identity o
   await mkdir(original);
   const handle = scope.keep(await DirectoryHandle.open(original)), before = handle.identity;
   const volume = await handle.volumeIdentity();
-  if (process.platform === 'darwin') assert.match(volume, /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/);
-  else assert.equal(volume, undefined);
+  if (process.platform === 'darwin' || volume !== undefined) {
+    assert.match(volume, /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/);
+  }
+  if (process.platform === 'linux' && (await statfs(original)).type !== 0x9123683e) assert.equal(volume, undefined);
   await rename(original, moved);
   await mkdir(original);
   assert.equal(await handle.volumeIdentity(), volume);

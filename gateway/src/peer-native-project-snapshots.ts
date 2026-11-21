@@ -21,8 +21,9 @@ import { watchPeerSourcePaths, type PeerSourceWrites } from './peer-backup-sourc
 const absolute=z.string().min(1).max(4096).refine(isAbsolute)
 const identity=z.object({version:z.literal(1),organizationId:z.uuid(),nodeId:z.uuid(),commandTimeoutMs:z.number().int().positive().max(2147483647).optional()})
 const location=z.object({projectId:z.uuid(),snapshotDirectory:absolute})
+const bindMount=z.object({path:absolute,sourcePath:absolute}).strict()
 const settings=z.discriminatedUnion('provider',[
-  identity.extend({provider:z.literal('btrfs'),projects:z.array(location.extend({subvolume:absolute}).strict()).min(1).max(1024)}).strict(),
+  identity.extend({provider:z.literal('btrfs'),projects:z.array(location.extend({subvolume:absolute,bindMounts:z.array(bindMount).max(16).optional()}).strict()).min(1).max(1024)}).strict(),
   identity.extend({provider:z.literal('vss'),projects:z.array(location.extend({source:absolute,volume:z.guid()}).strict()).min(1).max(1024)}).strict(),
 ])
 type Description=Omit<PeerFileRootMap['roots'][number],'snapshotRoot'>
@@ -60,7 +61,7 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
       if(cfg.organizationId!==b.organizationId || cfg.nodeId!==b.nodeId || items.length!==1) throw unavailable()
       const item=items[0]!
       const timeout=cfg.commandTimeoutMs??this.timeout
-      return 'subvolume' in item?{provider:'btrfs' as const,source:item.subvolume,directory:item.snapshotDirectory,timeout}:
+      return 'subvolume' in item?{provider:'btrfs' as const,source:item.subvolume,directory:item.snapshotDirectory,timeout,bindMounts:item.bindMounts}:
         {provider:'vss' as const,source:item.source,directory:item.snapshotDirectory,volume:item.volume,timeout}
     } finally {await handle.close()}
   }
@@ -99,23 +100,24 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
     ]
     const capturedAt=new Date().toISOString()
     const unwatch=await watchPeerSourcePaths(sourceSpace,[selected.source,selected.directory])
-    const snapshot=await (selected.provider==='btrfs'?openPeerBtrfsSnapshot(selected.source,selected.directory,selected.timeout,signal):
+    const snapshot=await (selected.provider==='btrfs'?openPeerBtrfsSnapshot(selected.source,selected.directory,selected.timeout,signal,selected.bindMounts):
       openPeerVssSnapshot(selected.source,selected.volume,selected.directory,selected.timeout,signal)).catch(error=>{unwatch();throw error})
     const release=async()=>{try{await snapshot.release()}finally{unwatch()}}
+    const covers=(path:string)=>'covers' in snapshot?snapshot.covers(path):within(selected.source,path)
     try {
       await sourceSpace?.check(selected.source)
       const checked='verifiedPath' in snapshot?snapshot.verifiedPath:undefined
       const gaps=new Set<string>()
-      if(within(selected.source,home)){
+      if(covers(home)){
         const profile=await nativeRuntimeProfileData(home,path=>snapshot.map(path),maxEntries,signal)
         for(const gap of profile.gaps)gaps.add(gap)
         for(const row of profile.roots)inputs.push({role:'plugin',owner:row.owner,kind:row.kind,logicalRoot:row.path})
       }else gaps.add('runtime:outside-snapshot')
-      const snapshotHome=within(selected.source,home)?snapshot.map(home):undefined
+      const snapshotHome=covers(home)?snapshot.map(home):undefined
       const projection=selected.provider==='btrfs' && snapshotHome!==undefined && await hasPrivateProjectPolicy(snapshotHome)
         ? join(home,modelPolicyFile) : undefined
       const manifest=join(home,'managed-data.jsonl')
-      if(!within(selected.source,manifest))gaps.add('runtime:outside-snapshot')
+      if(!covers(manifest))gaps.add('runtime:outside-snapshot')
       else {
         if('inspect' in snapshot)await snapshot.inspect([manifest],maxEntries)
         const stored=snapshot.map(manifest)
@@ -155,7 +157,7 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
       }
       const roots:PeerFileRootMap['roots']=[]
       for(const item of inputs){
-        if(!within(selected.source,item.logicalRoot)){gaps.add(item.role+':outside-snapshot');continue}
+        if(!covers(item.logicalRoot)){gaps.add(item.role+':outside-snapshot');continue}
         const target=snapshot.map(item.logicalRoot)
         const info=await present(target)
         if(info && ((checked?checked(target):await realpath(target))!==target || (item.kind==='directory'?!info.isDirectory():!info.isFile())))throw unavailable()
