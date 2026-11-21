@@ -7908,7 +7908,7 @@ SHA-256: `ac21aa6c9ecfc9c18ab4e0a1759e1396e29be4f15b3e65250af5f6df01d31794`
 
 SHA-256: `f09e5e7acf5ff5ccd193ff2eeec015fa2ff7c29d98bc465f8c3302058d47e29b`
 
-来源：[`packages/host/apiproxy/src/api/sessions.ts:197`](../packages/host/apiproxy/src/api/sessions.ts)
+来源：[`packages/host/apiproxy/src/api/sessions.ts:199`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|

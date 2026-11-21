@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-catalog.md
 document:
-  en: ff8388aa5f71bf9d2a6dbcc7cfebdb21f3fbe17d
-  zh: f6a0c4654323c02c65a76339153006c7a55c0cf8
+  en: f467bc12202bc69130f33294b56d22a506208d19
+  zh: 2b80e5ef715f596e44b6926e0fb2e9e56db45893
 /:
   en: a11f106978c9dce7
   zh: a11f106978c9dce7
@@ -1995,8 +1995,8 @@ document:
   en: 34294db2d520e8c2
   zh: 9746877943f7a083
 /session-persistence-event-catalog/resolved-persistence-types/packages-host-apiproxy-src-api-sessions-ts-modelselection:
-  en: c6317c25b4a0afa5
-  zh: 95656e4ceb8b7462
+  en: fa339ac561a5c723
+  zh: 8d8a6d4fe10714eb
 /session-persistence-event-catalog/resolved-persistence-types/packages-interaction-commands-src-types-ts-commandsource:
   en: 54011737af646f70
   zh: 2513511e3c18d7e1

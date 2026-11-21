@@ -565,6 +565,8 @@ export interface ConnectionConfig {
    * message group may exceed it.
    */
   historyPageTargetBytes?: number
+  /** Cap the first prepared conversation page. Omission uses the request's existing size. */
+  preparedHistoryMessages?: number
   /** Interval between host-side WebSocket Ping control frames. */
   websocketHeartbeatIntervalMs?: number
 }

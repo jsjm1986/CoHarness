@@ -7906,7 +7906,7 @@ Sources: [`packages/host/apiproxy/src/api/sessions.ts:27`](../packages/host/apip
 
 SHA-256: `f09e5e7acf5ff5ccd193ff2eeec015fa2ff7c29d98bc465f8c3302058d47e29b`
 
-Sources: [`packages/host/apiproxy/src/api/sessions.ts:197`](../packages/host/apiproxy/src/api/sessions.ts)
+Sources: [`packages/host/apiproxy/src/api/sessions.ts:199`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | Property | Presence | Type |
 |---|---|---|
