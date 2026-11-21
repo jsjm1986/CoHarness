@@ -47,6 +47,7 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_DATABASE_MAX_CHECKOUT_QUEUE` | 256 | query、callback 与 promise 调用共享的业务池未完成连接获取上限 |
 | `HGW_DATABASE_CONTROL_MAX_CONNECTIONS` | 2 | 就绪检查、租约控制及写入代次检查的保留池连接数上限 |
 | `HGW_DATABASE_CONTROL_MAX_CHECKOUT_QUEUE` | 32 | 保留控制池的未完成连接获取上限 |
+| `HGW_DATABASE_CONTROL_TUNNEL_PORT` | 未设置 | 控制池和访问失效监听池专用的 PostgreSQL 回环转发端口。两个转发必须指向同一数据库。 |
 | `HGW_DATABASE_CONNECTION_TIMEOUT_MS` | 5 秒 | 各连接池的最长连接获取等待时间 |
 | `HGW_ORGANIZATION_SLUG` | `default` | 本进程选择的现有活跃 PostgreSQL 企业 |
 | `HGW_COMPUTE_NODE_NAME` | `local` | 拥有挂载、端口和实例状态的现有活跃计算节点 |

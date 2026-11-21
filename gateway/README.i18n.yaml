@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/README.md
 document:
-  en: aa6cb20a10d60347881183ea1dec36fd35a94e38
-  zh: b186b6cad290c8b2bca9e0b558d3c0ec4150dec7
+  en: c68d72eb9b5e90c5d2d5e477e44615870509746d
+  zh: 31f3b06e09a987c8289d523098ba917bc7ed3110
 /harness-gateway:
   en: d06b73ef2a831bb8
   zh: 8a3e3f0d5c13677e
@@ -12,8 +12,8 @@ document:
   en: 2d58166d305a8406
   zh: fe2e9aba92e51dcb
 /harness-gateway/configuration-environment-variables-see-src-config-ts:
-  en: e4787c261f9a1d18
-  zh: a5839a3e7f6fd98c
+  en: 868bc15541522a97
+  zh: 8aec04db33dd3c41
 /harness-gateway/performance-and-runtime-admission:
   en: 8353116b6ee46e0d
   zh: 6caa581d7e81d3f1

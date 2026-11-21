@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-22-postgres-control-tunnel.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-22-postgres-control-tunnel.md
+document:
+  en: 7af7db06d04fb0d97e33fa520aee8c2b679950ea
+  zh: 9a127f78618a5300c52239f52e185716485544b0
+/agent-note-dedicated-postgresql-control-forward:
+  en: d35c1f378c6fe0af
+  zh: 7f9caa99450b0651
+/agent-note-dedicated-postgresql-control-forward/problem:
+  en: 758c3afc55945781
+  zh: bb9c306841333179
+/agent-note-dedicated-postgresql-control-forward/decision:
+  en: e78c2851791c6e99
+  zh: 5f97bb8dd1b57990
+/agent-note-dedicated-postgresql-control-forward/alternatives-considered:
+  en: 2560bdc45657bdb4
+  zh: 810b501ad43f727d
+/agent-note-dedicated-postgresql-control-forward/consequences:
+  en: 1a81bf1cc89ffab3
+  zh: 7f50c3556863b4eb
+/agent-note-dedicated-postgresql-control-forward/verification:
+  en: dad252dee0f8cbeb
+  zh: 581eaeaa1a3faa5d

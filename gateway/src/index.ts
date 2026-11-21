@@ -52,6 +52,7 @@ import { PostgresProgressService } from './postgres/progress-service.ts'
 import { PostgresProgressUsage } from './postgres/progress-usage.ts'
 import {
   createPostgresPool,
+  databaseControlUrl,
   databaseUrlFromFile,
   errorCodeForDiagnostics,
   poolAdmissionSnapshot,
@@ -150,19 +151,20 @@ const effectiveEnvironment = await loadManagedNodeEnvironment(process.env)
 const cfg = loadConfig(effectiveEnvironment)
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
 const databaseUrl = await databaseUrlFromFile(effectiveEnvironment)
+const controlDatabaseUrl = databaseControlUrl(databaseUrl, effectiveEnvironment.HGW_DATABASE_CONTROL_TUNNEL_PORT)
 const pool = createPostgresPool(databaseUrl, {
   max: cfg.databaseMaxConnections,
   min: cfg.databaseMinConnections,
   maxCheckoutQueue: cfg.databaseMaxCheckoutQueue,
   connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
 })
-const controlPool = createPostgresPool(databaseUrl, {
+const controlPool = createPostgresPool(controlDatabaseUrl, {
   max: cfg.databaseControlMaxConnections,
   maxCheckoutQueue: cfg.databaseControlMaxCheckoutQueue,
   connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
   application_name: `hgw-control:${cfg.computeNodeName}`,
 })
-const accessListenerPool = createPostgresPool(databaseUrl, {
+const accessListenerPool = createPostgresPool(controlDatabaseUrl, {
   max: 1, maxCheckoutQueue: 1,
   connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
   application_name: `hgw-access:${cfg.computeNodeName}`,

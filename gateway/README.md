@@ -47,6 +47,7 @@ API requests can select an authorized environment with `dshRuntime=<environment 
 | `HGW_DATABASE_MAX_CHECKOUT_QUEUE` | 256 | Unresolved business pool checkouts across query, callback and promise callers |
 | `HGW_DATABASE_CONTROL_MAX_CONNECTIONS` | 2 | Reserved pool connection limit for readiness, lease control and write-epoch checks |
 | `HGW_DATABASE_CONTROL_MAX_CHECKOUT_QUEUE` | 32 | Unresolved checkouts on the reserved control pool |
+| `HGW_DATABASE_CONTROL_TUNNEL_PORT` | unset | Independent loopback PostgreSQL forward for the control and access-listener pools. Both forwards must target the same database. |
 | `HGW_DATABASE_CONNECTION_TIMEOUT_MS` | 5 s | Maximum wait for a connection from each pool |
 | `HGW_ORGANIZATION_SLUG` | `default` | Existing active PostgreSQL organization selected by this process |
 | `HGW_COMPUTE_NODE_NAME` | `local` | Existing active compute node owning mounts, ports, and instance state |

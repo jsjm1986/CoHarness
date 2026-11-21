@@ -218,6 +218,28 @@ export async function databaseUrlFromFile(env: NodeJS.ProcessEnv = process.env):
   return value
 }
 
+/**
+ * Resolve the PostgreSQL endpoint used by the reserved control and access-listener pools.
+ * @param connectionString - the business pool URL for the same PostgreSQL database.
+ * @param tunnelPort - optional port of an independent loopback forward to that database.
+ * @returns the configured URL, with only the authority port replaced when a forward is configured.
+ */
+export function databaseControlUrl(connectionString: string, tunnelPort: string | undefined): string {
+  if (tunnelPort === undefined) return connectionString
+  if (!/^[1-9][0-9]{0,4}$/u.test(tunnelPort) || Number(tunnelPort) > 65_535) {
+    throw new Error('HGW_DATABASE_CONTROL_TUNNEL_PORT must be a TCP port from 1 to 65535')
+  }
+  const url = URL.parse(connectionString)
+  if (url === null || (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:')
+    || !['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname)
+    || url.searchParams.has('host') || url.searchParams.has('port')) {
+    throw new Error('HGW_DATABASE_CONTROL_TUNNEL_PORT requires a loopback PostgreSQL URL with its host and port in the authority')
+  }
+  if ((url.port || '5432') === tunnelPort) throw new Error('HGW_DATABASE_CONTROL_TUNNEL_PORT must differ from the business database port')
+  url.port = tunnelPort
+  return url.href
+}
+
 export function createPostgresPool(connectionString: string, overrides: GatewayPoolConfig = {}): Pool {
   const { maxCheckoutQueue, traceRole='governance', ...poolOverrides } = overrides
   const checkoutQueueLimit = checkoutLimit(maxCheckoutQueue)
