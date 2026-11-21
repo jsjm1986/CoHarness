@@ -193,11 +193,14 @@ export function policyPatchText(cfg: GatewayConfig, variant: LaunchVariant): str
   patchText += `- id: gateway-runtime\n  config:\n    requiredPlugins: ${JSON.stringify(readinessPlugins)}\n    modelTimings: ${String(cfg.performanceEnabled)}\n`
   patchText += `- id: gateway-resource-budget\n  config:\n    requestTimeoutMs: ${String(cfg.runtimeRequestTimeoutMs)}\n    cleanupTimeoutMs: ${String(cfg.runtimeCleanupTimeoutMs)}\n`
   // Cordis replaces the connection config as a whole for each patch row.
+  const historyLimit = cfg.runtimePreparedHistoryMessages === undefined
+    ? ''
+    : `    preparedHistoryMessages: ${String(cfg.runtimePreparedHistoryMessages)}\n`
   patchText += `- id: connection
   config:
     serverTiming: ${String(cfg.performanceEnabled)}
     rpcTimeoutMs: ${String(cfg.runtimeBrowserRpcTimeoutMs)}
-    recovery:
+${historyLimit}    recovery:
       streamOpenTimeoutMs: ${String(cfg.runtimeBrowserStreamTimeoutMs)}
       generationReadyTimeoutMs: ${String(cfg.runtimeBrowserReadyTimeoutMs)}
 `

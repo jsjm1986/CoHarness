@@ -228,6 +228,7 @@ export function validHistorySelection(request: {
 export const sessionHistoryRequestSchema = z.object({
   sessionId: sessionIdSchema,
   onlyActive: z.literal(true).optional(),
+  restoreSelection: z.literal(true).optional(),
   toolCallId: historyToolCallIdSchema.optional(),
   beforeSeq: z.number().int().nonnegative().optional(),
   maxMessages: z.number().int().positive().optional(),
@@ -317,6 +318,7 @@ export function sessionCreateResultSchema(history: z.ZodType<Wire<ResponseValue<
 /** Logical session.create response. HTTP carriers decode the optional page from their bounded record representation. */
 export const sessionCreateValueSchema: z.ZodType<Wire<ResponseValue<'session.create'>>> = sessionCreateResultSchema(z.object({
   executionRestriction: z.literal('recovery-read-only').optional(),
+  restoredSelection: sessionSummarySchema.optional(),
   events: z.array(historyEntrySchema), hasMore: z.boolean(), projections: sessionProjectionsBlockSchema.optional(),
   omittedSpans: z.array(historyOmittedSpanSchema).optional(),
 }))

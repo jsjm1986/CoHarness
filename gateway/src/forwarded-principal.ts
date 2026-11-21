@@ -1,10 +1,24 @@
 import { createHash, createPublicKey, type KeyObject } from 'node:crypto'
+import { z } from 'zod'
 import type { UserRow } from './auth.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import { nodeUuidSchema } from './node-access.ts'
+import type { NodePrincipalDirectory } from './postgres/node-principal-directory.ts'
 import { verifiedPayload } from './principal.ts'
 
 export const FORWARDED_PRINCIPAL_HEADER = 'x-dsh-gateway-forward'
+
+const personalHistoryAdmissionSchema = z.object({
+  generation: z.number().int().positive(),
+  port: z.number().int().min(1).max(65535),
+  launchStamp: z.string().max(256).nullable(),
+  startedAt: z.number().int().nonnegative(),
+  accessRevision: z.string().regex(/^[0-9]{1,20}$/u),
+  expiresAt: z.number().int().positive(),
+}).strict()
+
+/** Exact supervised generation and current revision approved by the primary for personal history. */
+export type PersonalHistoryAdmission = z.infer<typeof personalHistoryAdmissionSchema>
 
 /**
  * Claims a forwarding Gateway already proved for one request aimed at
@@ -34,6 +48,7 @@ export interface GatewayForwardClaims {
    */
   context?: {
     environment: { id: RuntimeId; nodeId: RuntimeNodeId; nodeName?: string }
+    personalHistory?: PersonalHistoryAdmission
   }
   /**
    * The exact request this assertion was issued for. Without it the assertion
@@ -54,6 +69,54 @@ export interface GatewayForwardSessionCandidate {
   readonly issuerPublicKey: string
   /** @returns whether the nonce was consumed while the assertion was still live. */
   consume(): boolean
+}
+
+/** Verification functions and replay state owned by one Gateway process. */
+interface ForwardAuthority {
+  forwardedSessionPrincipal(assertion: string): GatewayForwardSessionCandidate | null
+  forwardedPrincipal(assertion: string): Promise<GatewayForwardClaims | null>
+}
+
+/**
+ * Verify forwarded browser identities against the current node's audience and issuer directory.
+ * @param directory - published issuer keys and their live authority.
+ * @param audience - exact receiving node and organization.
+ * @param ttlMs - maximum lifetime retained by the process-local nonce ledger.
+ * @returns verification callbacks for the ordinary and retained Session admission paths.
+ */
+export function createGatewayForwardAuthority(directory: NodePrincipalDirectory, audience: {
+  audienceNode: RuntimeNodeId; organization: string
+}, ttlMs: number): ForwardAuthority {
+  const nonces = new Map<string, number>()
+  const consume = (claims: GatewayForwardClaims): boolean => {
+    const now = Date.now()
+    if (claims.expiresAt <= now) return false
+    for (const [nonce, expiry] of nonces) if (expiry <= now) nonces.delete(nonce)
+    if (nonces.has(claims.nonce)) return false
+    if (nonces.size >= 4096) nonces.clear()
+    nonces.set(claims.nonce, Math.min(claims.expiresAt, now + ttlMs))
+    return true
+  }
+  return {
+    forwardedSessionPrincipal(assertion) {
+      const issuer = forwardIssuerOf(assertion)
+      const issuerPublicKey = issuer === null ? null : directory.publishedKeyCandidate(issuer)
+      if (issuerPublicKey === null) return null
+      const claims = verifyGatewayForward(assertion, issuerPublicKey, audience)
+      return claims === null ? null : { claims, issuerPublicKey, consume: () => consume(claims) }
+    },
+    async forwardedPrincipal(assertion) {
+      try {
+        const issuer = forwardIssuerOf(assertion)
+        const key = issuer === null ? null : await directory.issuerKey(issuer)
+        const claims = key === null ? null : verifyGatewayForward(assertion, key, audience)
+        return claims !== null && consume(claims) ? claims : null
+      } catch {
+        // An unavailable issuer directory leaves the request to regular browser authentication.
+        return null
+      }
+    },
+  }
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -95,7 +158,8 @@ function forwardClaims(value: unknown): GatewayForwardClaims {
     const context = record(claims.context), environment = record(context?.environment)
     if (context === undefined || environment === undefined || typeof environment.id !== 'string'
       || typeof environment.nodeId !== 'string'
-      || (environment.nodeName !== undefined && typeof environment.nodeName !== 'string')) {
+      || (environment.nodeName !== undefined && typeof environment.nodeName !== 'string')
+      || context.personalHistory !== undefined && !personalHistoryAdmissionSchema.safeParse(context.personalHistory).success) {
       throw new Error('invalid forwarded principal claims')
     }
   }

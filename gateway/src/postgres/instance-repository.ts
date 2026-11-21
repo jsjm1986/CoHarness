@@ -663,9 +663,25 @@ export class PostgresInstanceRepository implements InstanceRepository {
       homePath: local?.homePath??row.home_path,...(local?.dshHome===undefined?{}:{dshHome:local.dshHome}), role: row.role === 'admin' ? 'admin' : 'user', status: 'active', runtimeId: row.runtime_id, storageLayout: row.storage_layout }
   }
 
-  /** Resolve a live runtime credential to its current generation and owner ids. */
-  async authenticateRuntimeToken(token: string): Promise<RuntimeCredentialSubject | null> {
-    return this.authenticateToken(token, false)
+  /**
+   * Resolve a live Runtime credential to its generation and owner.
+   * @param token - private Runtime bearer.
+   * @param fresh - bypass any cached authorization result.
+   * @returns Runtime authority or null if it cannot be authenticated.
+   */
+  async authenticateRuntimeToken(token: string, fresh = false): Promise<RuntimeCredentialSubject | null> {
+    return fresh ? this.authenticateTokenQuery(createHash('sha256').update(token).digest(), 'run') : this.authenticateToken(token, false)
+  }
+
+  /**
+   * Recover coordinates from a verified personal bearer for a write that rechecks authority in PostgreSQL.
+   * @param token - private Runtime bearer.
+   * @returns Previously verified personal identity, potentially older than the authorization cache lifetime, or null.
+   */
+  personalExecutionCandidate(token: string): RuntimeCredentialSubject | null {
+    const hash = createHash('sha256').update(token).digest('hex')
+    const subject = this.tokenCache.get(`run:${hash}`)?.subject
+    return subject?.target.kind === 'user' && subject.target.runtimeId !== undefined ? subject : null
   }
 
   /**

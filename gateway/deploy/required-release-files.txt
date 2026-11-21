@@ -28,6 +28,9 @@ gateway/lib/launch-stamp.js
 gateway/lib/launcher.js
 gateway/lib/local-runtime-supervisor.js
 gateway/lib/node-config-cli.js
+gateway/lib/node-content-file-relocation.js
+gateway/lib/peer-btrfs-snapshot.js
+gateway/lib/peer-native-project-snapshots.js
 gateway/lib/release-schema-check.js
 gateway/lib/runtime-api.js
 gateway/lib/runtime-dependencies.json

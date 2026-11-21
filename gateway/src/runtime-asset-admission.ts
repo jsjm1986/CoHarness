@@ -1,6 +1,7 @@
 /** Current governance authority for an exact, already-running Runtime. */
 import { createHash } from 'node:crypto'
 import type { UserRow } from './auth.ts'
+import type { PersonalHistoryAdmission } from './forwarded-principal.ts'
 import type { RuntimeInstanceSnapshot } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
@@ -79,6 +80,25 @@ interface SessionAdmissionRow {
   issuer_lease_exp?: Date | null
 }
 
+const admissionSnapshot = 'harness.browser_runtime_admission_snapshot($1,$2,$3,$4,$5)'
+
+function retainedPersonalAdmissionSql(issuer: string): string {
+  const snapshotWithIssuer = issuer === '' ? '' : ', issuer_revision, issuer_lease_exp'
+  return `WITH ${issuer === '' ? '' : `${issuer}, `}initial AS MATERIALIZED (
+      SELECT ${admissionSnapshot} snapshot${snapshotWithIssuer}${issuer === '' ? '' : ' FROM issuer'}
+    ), locked AS MATERIALIZED (
+      SELECT i.runtime_id FROM initial
+      JOIN harness.instances i ON i.organization_id=$1 AND i.runtime_id=$4 AND i.assigned_node_id=$6 AND i.generation=$7
+      WHERE (initial.snapshot->>'available')::boolean AND initial.snapshot->>'owner_kind'='user' AND $8::text='personal'
+        AND initial.snapshot->>'cluster_mode'='serving' AND (initial.snapshot->>'write_epoch')::bigint=$9
+        AND i.observed_state='ready' AND i.provisioning_state='ready'
+      FOR SHARE OF i
+    ) SELECT jsonb_build_object('initial', initial.snapshot,
+      'accepted', CASE WHEN locked.runtime_id IS NOT NULL THEN true END,
+      'current', CASE WHEN locked.runtime_id IS NOT NULL THEN ${admissionSnapshot} END
+    ) admission${snapshotWithIssuer} FROM initial LEFT JOIN locked ON true`
+}
+
 /** PostgreSQL read qualification with the same organization, computer and project predicates as browser admission. */
 export class PostgresRuntimeAssetAdmission {
   constructor(private readonly context: PostgresRuntimeContext, private readonly writeEpoch: bigint) {}
@@ -90,30 +110,63 @@ export class PostgresRuntimeAssetAdmission {
    */
   async admit(request: RuntimeAssetRequest): Promise<RuntimeAssetAdmission> {
     const result = await this.context.pool.query<{ snapshot: Row | null }>(
-      'SELECT harness.browser_runtime_admission_snapshot($1,$2,$3,$4,$5) snapshot', this.parameters(request))
+      `SELECT ${admissionSnapshot} snapshot`, this.parameters(request))
     return this.admission(request, result.rows[0]!.snapshot ?? undefined)
   }
 
   /**
-   * Record protected activity and recheck after the instance lock in one database round trip.
+   * Qualify one personal history request at the organization database's primary Gateway.
+   * @param request - exact target and browser identity for this forwarding attempt.
+   * @param issuerPublicKey - public part of the key this Gateway uses to sign the request.
+   * @returns the ready generation and current revision, or null when normal routing is required.
+   */
+  async approvePersonalHistory(request: RuntimeAssetRequest & { nodeId: RuntimeNodeId; target: 'personal' },
+    issuerPublicKey: string): Promise<PersonalHistoryAdmission | null> {
+    const { rows: [result] } = await this.context.pool.query<{ snapshot: Row | null; lease_exp: Date | null }>(`
+      SELECT ${admissionSnapshot} snapshot, issuer.lease_exp
+      FROM harness.deployment_topology topology
+      JOIN (${nodePrincipalKeyQuery(5)}) issuer ON issuer.pem=$6
+      WHERE topology.organization_id=$1 AND topology.enabled AND topology.primary_node_id=$5`,
+    [...this.parameters({ ...request, entryNodeId: this.context.nodeId as RuntimeNodeId }), issuerPublicKey])
+    try {
+      const row = result?.snapshot ?? undefined
+      this.assertServing(row)
+      const admission = this.admission(request, row)
+      const { state, generation, port, launchStamp, startedAt } = admission.snapshot
+      const expiresAt = Math.min(admission.expiresAt, result?.lease_exp?.getTime() ?? Infinity)
+      if (state !== 'ready' || admission.scope.kind !== 'personal' || expiresAt <= Date.now()) return null
+      return { generation, port, launchStamp, startedAt, expiresAt, accessRevision: admission.accessRevision }
+    } catch (error) {
+      if (error instanceof RuntimeAssetUnavailableError) return null
+      throw error
+    }
+  }
+
+  /**
+   * Recheck browser authority after locking the retained instance in one database round trip.
    * @param request - authenticated browser request for this computer and one exact Runtime and scope.
    * @param generation - generation owned by the local supervisor after queued lifecycle work.
    * @param issuer - verified signature key and issuer UUID requiring current publication in this statement.
+   * @param recordStartActivity - defaults to recording activity at admission. Prepared personal requests can
+   *   share the instance lock with directory publication while a local reference protects the Runtime through completion.
    * @returns current authority or null when the existing general preparation route must handle this request.
    */
   async admitSession(request: RuntimeAssetRequest & { nodeId: RuntimeNodeId; target: RuntimePlacement['target'] },
-    generation: number, issuer?: { nodeId: RuntimeNodeId; publicKey: string }): Promise<RuntimeAssetAdmission | null> {
+    generation: number, issuer?: { nodeId: RuntimeNodeId; publicKey: string }, recordStartActivity = true): Promise<RuntimeAssetAdmission | null> {
+    const retainedPersonal = !recordStartActivity && request.target === 'personal'
     const parameters = [...this.parameters(issuer === undefined ? request : { ...request, entryNodeId: issuer.nodeId }),
-      request.nodeId, generation, request.target, Date.now(), String(this.writeEpoch)]
+      request.nodeId, generation, request.target, ...(retainedPersonal ? [] : [Date.now()]), String(this.writeEpoch)]
     const admit = 'SELECT harness.admit_ready_browser_runtime($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) admission'
-    const { rows: [result] } = issuer === undefined
-      ? await this.context.pool.query<SessionAdmissionRow>(admit, parameters)
-      : await this.context.pool.query<SessionAdmissionRow>(`WITH issuer AS MATERIALIZED (
+    const issuerSql = issuer === undefined ? '' : `issuer AS MATERIALIZED (
           SELECT o.access_revision::text issuer_revision, key.lease_exp issuer_lease_exp
           FROM (${nodePrincipalKeyQuery(5)}) key
           JOIN harness.organizations o ON o.id=$1 AND o.status='active'
-          WHERE key.pem=$11
-        ) ${admit}, issuer_revision, issuer_lease_exp FROM issuer`, [...parameters, issuer.publicKey])
+          WHERE key.pem=$${parameters.length + 1}
+        )`
+    const sql = retainedPersonal ? retainedPersonalAdmissionSql(issuerSql)
+      : issuer === undefined ? admit : `WITH ${issuerSql} ${admit}, issuer_revision, issuer_lease_exp FROM issuer`
+    const { rows: [result] } = await this.context.pool.query<SessionAdmissionRow>(sql,
+      issuer === undefined ? parameters : [...parameters, issuer.publicKey])
     if (result === undefined) throw new RuntimeAssetUnavailableError(403, 'access-revoked')
     const { initial, current, accepted } = result.admission
     this.assertServing(initial ?? undefined)

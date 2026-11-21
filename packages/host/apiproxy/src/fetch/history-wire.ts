@@ -16,13 +16,14 @@ import type { RpcId, ServerResponse } from '../api/rpc.ts'
 import type { ResponseValue } from '../api/rpc-map.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import type { HistoryEntry, HistoryOmittedSpan, SessionProjectionsBlock } from '../api/sessions.ts'
-import { historyEntrySchema, historyOmittedSpanSchema, sessionProjectionsBlockSchema } from '../api/sessions.schema.ts'
+import { historyEntrySchema, historyOmittedSpanSchema, sessionProjectionsBlockSchema, sessionSummarySchema } from '../api/sessions.schema.ts'
 import { appendOriginGroupStart, clipOmittedSpans } from './history-detail.ts'
 
 type HistoryValue = ResponseValue<'session.history'>
 
 interface HistoryWireValue {
   executionRestriction?: 'recovery-read-only'
+  restoredSelection?: HistoryValue['restoredSelection']
   records: HistoryEntry[]
   hasMore: boolean
   projections?: SessionProjectionsBlock
@@ -58,10 +59,12 @@ function toWireValue(
   projections: SessionProjectionsBlock | undefined,
   omittedSpans: readonly HistoryOmittedSpan[] | undefined,
   executionRestriction: HistoryValue['executionRestriction'],
+  restoredSelection: HistoryValue['restoredSelection'],
 ): HistoryWireValue {
   return {
     records: [...entries],
     ...executionRestriction === undefined ? {} : { executionRestriction },
+    ...restoredSelection === undefined ? {} : { restoredSelection },
     hasMore,
     ...projections === undefined ? {} : { projections },
     ...omittedSpans === undefined || omittedSpans.length === 0 ? {} : { omittedSpans },
@@ -104,6 +107,7 @@ function candidate(
     value.projections,
     cutSeq === undefined ? value.omittedSpans : clipOmittedSpans(value.omittedSpans, cutSeq),
     value.executionRestriction,
+    value.restoredSelection,
   ))
 }
 
@@ -203,12 +207,14 @@ function expandWireRecord(record: unknown): Wire<HistoryEntry> {
  */
 export const historyWireValueSchema: z.ZodType<Wire<HistoryValue>> = z.object({
   executionRestriction: z.literal('recovery-read-only').optional(),
+  restoredSelection: sessionSummarySchema.optional(),
   records: z.array(z.unknown()),
   hasMore: z.boolean(),
   projections: sessionProjectionsBlockSchema.optional(),
   omittedSpans: z.array(historyOmittedSpanSchema).optional(),
 }).transform(value => ({
   ...value.executionRestriction === undefined ? {} : { executionRestriction: value.executionRestriction },
+  ...value.restoredSelection === undefined ? {} : { restoredSelection: value.restoredSelection },
   events: value.records.map(expandWireRecord),
   hasMore: value.hasMore,
   ...value.projections === undefined ? {} : { projections: value.projections },

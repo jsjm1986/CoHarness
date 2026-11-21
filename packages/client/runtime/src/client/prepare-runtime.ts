@@ -61,11 +61,17 @@ function waitForRetry(ms: number, signal: AbortSignal, wake?: {
 
 /** Authenticated unary prepare operations supported by a versioned managed Gateway. */
 export class PreparedSessionApi extends AbstractApiClient {
-  /** @param connection - document's bounded transport and interaction policy. @param allocation - exact authorized target. */
+  /**
+   * @param connection - document's bounded transport and interaction policy.
+   * @param allocation - exact authorized target.
+   * @param principal - account bound to the document.
+   * @param historyReadiness - require an existing Runtime for startup history when specified.
+   */
   constructor(
     private readonly connection: ConnectionHandle,
     private readonly allocation: SessionRuntimeTarget,
     private readonly principal: number,
+    private readonly historyReadiness?: 'existing',
   ) {
     super(connection.metadataTiming.requestTimeoutMs, undefined, allocation, connection.interactions)
     if (allocation.runtimeId === undefined) throw new Error('Session preparation requires an exact Runtime')
@@ -96,6 +102,7 @@ export class PreparedSessionApi extends AbstractApiClient {
       default: throw new Error('Unsupported explicit Session operation')
     }
     if (this.receiptNode) url.searchParams.set('dshNode', this.receiptNode)
+    if (path === '/api/session.history' && this.historyReadiness === 'existing') url.searchParams.set('dshRestore', '1')
     return url
   }
 

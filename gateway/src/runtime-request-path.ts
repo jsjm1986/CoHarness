@@ -1,7 +1,7 @@
 /** Gateway selectors are removed only after authorization, preserving opaque Runtime query bytes. */
 import type { RuntimeId } from './runtime-catalog.ts'
 
-const SELECTORS = new Set(['dshRuntime', 'dshTarget', 'dshNode', 'dshPrincipal'])
+const SELECTORS = new Set(['dshRuntime', 'dshTarget', 'dshNode', 'dshPrincipal', 'dshRestore'])
 const IMMUTABLE_ASSET = /^\/assets\/[^/?%\\]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9.]+$/u
 const PLUGIN_PACKAGE = '(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*'
 const COMBO_RESOURCE = new RegExp(`^${PLUGIN_PACKAGE}/client\\.js(\\.map)?$`, 'u')
@@ -44,10 +44,35 @@ export function isRuntimeAssetRequest(method: string | undefined, pathname: stri
 /**
  * @param method - original HTTP method.
  * @param pathname - path without query parameters.
+ * @returns whether the request prepares a new Session or reads the history of an active Session.
+ */
+export function isPreparedSessionRequest(method: string | undefined, pathname: string): boolean {
+  return method === 'POST' && (pathname === '/api/prepare/v1/session.create' || pathname === '/api/prepare/v1/session.history')
+}
+
+/**
+ * @param method - original HTTP method.
+ * @param pathname - path without query parameters.
  * @returns whether this request requires an exact authorized conversation allocation.
  */
 export function isExplicitSessionRequest(method: string | undefined, pathname: string): boolean {
-  return method === 'POST' && /^\/api\/(?:prepare\/v1\/session\.(?:create|history)|admit\/v1\/session\.(?:prompt|status))$/u.test(pathname)
+  return isPreparedSessionRequest(method, pathname)
+    || method === 'POST' && (pathname === '/api/admit/v1/session.prompt' || pathname === '/api/admit/v1/session.status')
+}
+
+/**
+ * @param method - original HTTP method.
+ * @param url - browser request coordinates.
+ * @returns whether a Runtime read may share prepared admission for a ready generation.
+ */
+export function isReadyRuntimeRead(method: string | undefined, url: URL): boolean {
+  if (method === 'POST') {
+    return url.pathname === '/api/host.describe' || url.pathname === '/api/session.list'
+      || url.pathname === '/api/workspace.list' || url.pathname === '/api/session.history'
+  }
+  if (method !== 'GET' || url.pathname !== '/') return false
+  const bootstrap = url.searchParams.getAll('dshBootstrap')
+  return bootstrap.length === 1 && bootstrap[0] === '1'
 }
 
 /** @param method - original HTTP method. @param url - original request coordinates. @returns whether a scope change explicitly prepares an allocation. */
@@ -86,6 +111,17 @@ export function isRuntimeStreamControlRequest(pathname: string, method: string |
  */
 export function isRuntimeResourceCompletionRequest(pathname: string, method: string | undefined): boolean {
   return pathname === '/internal/runtime/resources/finish' && method === 'POST'
+}
+
+/**
+ * Select requests that can qualify an exact personal Runtime in the same SQL statement as the write.
+ * @param pathname - parsed internal request path.
+ * @param method - HTTP method.
+ * @returns whether to consider the statement's personal execution admission.
+ */
+export function isPersonalExecutionWriteRequest(pathname: string, method: string | undefined): boolean {
+  return method === 'POST'
+    && (pathname === '/internal/runtime/execution/register-session' || pathname === '/internal/runtime/execution/input')
 }
 
 /**

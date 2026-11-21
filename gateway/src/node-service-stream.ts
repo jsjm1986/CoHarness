@@ -19,6 +19,8 @@ export const NODE_SERVICE_STREAM_PROTOCOL = `dsh-node-service-v${NODE_SERVICE_PR
 export const NODE_SERVICE_IDENTITY_PATH = '/internal/nodes/service'
 /** Request fence checked by a Gateway before processing a forwarded operation. */
 export const NODE_SERVICE_TARGET_HEADER = 'x-dsh-target-node'
+/** Port of the unopened loopback data socket this authenticated local probe owns. */
+export const NODE_SERVICE_LOCAL_PORT_HEADER = 'x-dsh-node-service-local-port'
 /** Maximum binary message size; arbitrary source chunks are split before transmission. */
 export const NODE_SERVICE_FRAME_BYTES = 65_536
 
@@ -115,20 +117,34 @@ async function localSocket(url: URL, signal: AbortSignal): Promise<Socket> {
  */
 export async function runNodeServiceBridge(config: NodeServiceBridgeConfig, id: NodeProbeId, signal: AbortSignal): Promise<void> {
   const local = new URL(nodeServiceLocalOrigin(config.localUrl))
-  const headers = { authorization: `Bearer ${config.credential}`, [NODE_CONNECTION_HEADER]: config.lease.connectionId, [NODE_EPOCH_HEADER]: config.lease.epoch }
   const handshake = AbortSignal.any([signal, AbortSignal.timeout(config.requestTimeoutMs)])
-  const response = await fetch(new URL(NODE_SERVICE_IDENTITY_PATH, local), { headers, signal: handshake, redirect: 'manual' })
-  if (!response.ok) { await response.body?.cancel(); throw new NodeServiceError(503, 'node-service/unavailable') }
-  const identity = nodeServiceIdentitySchema.safeParse(await readResponseJson(response, 4096))
-  if (!identity.success || identity.data.nodeId !== config.lease.nodeId || identity.data.organizationId !== config.lease.organizationId
-    || config.release !== null && identity.data.release !== config.release) {
-    throw new NodeServiceError(409, 'node-service/mismatch')
-  }
   const gateway = await localSocket(local, handshake)
+  let releaseWire: (() => void) | undefined
+  const gatewayClosed = gateway.closed ? Promise.resolve() : new Promise<void>(resolve => {
+    gateway.once('close', () => { releaseWire?.(); resolve() })
+  })
   // Hold an error listener through WebSocket acquisition, before pipeline owns the TCP stream.
   let earlyError: Error | undefined
   const observe = (error: Error) => { earlyError = error }
   gateway.on('error', observe)
+  const headers = { authorization: `Bearer ${config.credential}`, [NODE_CONNECTION_HEADER]: config.lease.connectionId, [NODE_EPOCH_HEADER]: config.lease.epoch }
+  try {
+    const response = await fetch(new URL(NODE_SERVICE_IDENTITY_PATH, local), {
+      headers: { ...headers, [NODE_SERVICE_LOCAL_PORT_HEADER]: String(gateway.localPort) }, signal: handshake, redirect: 'manual',
+    })
+    if (!response.ok) { await response.body?.cancel(); throw new NodeServiceError(503, 'node-service/unavailable') }
+    const identity = nodeServiceIdentitySchema.safeParse(await readResponseJson(response, 4096))
+    if (!identity.success || identity.data.nodeId !== config.lease.nodeId || identity.data.organizationId !== config.lease.organizationId
+      || config.release !== null && identity.data.release !== config.release) {
+      throw new NodeServiceError(409, 'node-service/mismatch')
+    }
+    if (gateway.destroyed) throw earlyError ?? new NodeServiceError(503, 'node-service/unavailable')
+  } catch (error) {
+    gateway.destroy()
+    await gatewayClosed
+    gateway.removeListener('error', observe)
+    throw error
+  }
   const origin = config.dialer.current()
   const url = new URL(`${NODE_SERVICE_STREAM_PATH}${id}`, origin)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -143,11 +159,9 @@ export async function runNodeServiceBridge(config: NodeServiceBridgeConfig, id: 
   const observeWire = (error: Error) => { earlyError = error; gateway.destroy() }
   wire.on('error', observeWire)
   const closed = new Promise<void>(resolve => { socket.once('close', () => { resolve() }) })
-  const gatewayClosed = new Promise<void>(resolve => { gateway.once('close', () => { resolve() }) })
   const abort = () => { wire.destroy(); gateway.destroy(); socket.terminate() }
   signal.addEventListener('abort', abort, { once: true })
-  const interrupted = () => { if (!gateway.readableEnded) wire.destroy() }
-  gateway.once('close', interrupted)
+  releaseWire = () => { if (!gateway.readableEnded) wire.destroy() }
   try {
     if (signal.aborted) abort()
     await new Promise<void>((resolve, reject) => {

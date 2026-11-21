@@ -1,5 +1,6 @@
-import { observeOperationSql } from '../operation-timing.ts'
+import { observeOperationCheckout, observeOperationSql, type ConnectionCheckout } from '../operation-timing.ts'
 import { backfillConversationQueryFieldsV1 } from './conversation-query-migration-v1.ts'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -97,11 +98,63 @@ type CheckoutCallback = Parameters<Pool['connect']>[0]
 /** pg.query uses this.connect, so one override owns admission for every native checkout entry. */
 class GatewayPostgresPool extends Pool {
   private readonly checkout: CheckoutState
+  private readonly freshSetup = new WeakMap<PoolClient, number>()
+  private readonly keepsWarmClients: boolean
+  private readonly awaitingReuse = new Set<() => void>()
+  private handoffScheduled = false
 
-  constructor(options: PoolConfig, limit: number, private readonly traceRole:'governance'|'content') {
+  constructor(options: PoolConfig, limit: number, private readonly traceRole: 'governance' | 'content') {
     super(options)
     this.checkout = { pending: 0, limit, rejected: 0 }
+    this.keepsWarmClients = (this.options.min ?? 0) > 0
     checkoutStates.set(this, this.checkout)
+    this.on('connect', client => {
+      if (client instanceof GatewayPostgresClient) this.freshSetup.set(client, performance.now() - client.setupStartedAt)
+    })
+    if (this.keepsWarmClients) this.on('release', () => this.scheduleHandoff())
+  }
+
+  private scheduleHandoff(): void {
+    if (this.handoffScheduled || this.ending || this.awaitingReuse.size === 0) return
+    this.handoffScheduled = true
+    // pg publishes release before it returns the client to idle or to its native queue.
+    queueMicrotask(() => {
+      this.handoffScheduled = false
+      for (const borrow of this.awaitingReuse) {
+        if (this.ending || this.idleCount <= this.waitingCount) break
+        this.awaitingReuse.delete(borrow)
+        borrow()
+      }
+    })
+  }
+
+  private acquire(callback: CheckoutCallback, record: (result: ConnectionCheckout) => void): void {
+    const shouldOfferHandoff = this.keepsWarmClients && this.idleCount === 0 && this.waitingCount === 0
+      && this.totalCount > 0 && this.totalCount < this.options.max
+    const deliver = shouldOfferHandoff ? AsyncLocalStorage.bind(callback) : callback
+    let delivered = false
+    const finish = (error: Error | undefined, client: PoolClient | undefined, release: Parameters<CheckoutCallback>[2], handoff = false): void => {
+      const setupMs = client === undefined ? undefined : this.freshSetup.get(client)
+      if (client !== undefined) this.freshSetup.delete(client)
+      if (delivered) {
+        if (client !== undefined) release()
+        return
+      }
+      if (handoff && error) return
+      delivered = true
+      this.awaitingReuse.delete(borrowReturnedClient)
+      record(error ? { kind: 'failed' } : setupMs === undefined ? { kind: handoff ? 'handoff' : 'reused' }
+        : { kind: 'opened', setupMs })
+      deliver(error, client === undefined ? undefined : guardCheckedOutClient(client, this.traceRole), release)
+    }
+    const borrowReturnedClient = (): void => {
+      super.connect((error, client, release) => finish(error, client, release, true))
+    }
+    if (shouldOfferHandoff) this.awaitingReuse.add(borrowReturnedClient)
+    try { super.connect(finish) } catch (error) {
+      this.awaitingReuse.delete(borrowReturnedClient)
+      throw error
+    }
   }
 
   override connect(): Promise<PoolClient>
@@ -115,36 +168,28 @@ class GatewayPostgresPool extends Pool {
       return
     }
     this.checkout.pending += 1
+    const stopCheckout = observeOperationCheckout(this.traceRole)
     let settled = false
-    const settle = (): void => {
+    const settle = (result: ConnectionCheckout): void => {
       if (settled) return
       settled = true
       this.checkout.pending -= 1
+      stopCheckout(result)
     }
     if (callback !== undefined) {
-      try {
-        super.connect((error, client, release) => {
-          settle()
-          callback(error, client === undefined ? undefined : guardCheckedOutClient(client,this.traceRole), release)
-        })
-      } catch (error) {
-        settle()
+      try { this.acquire(callback, settle) } catch (error) {
+        settle({ kind: 'failed' })
         throw error
       }
       return
     }
-    let connecting: Promise<PoolClient>
-    try { connecting = super.connect() } catch (error) {
-      settle()
-      return Promise.reject(error)
-    }
-    return connecting.then(client => {
-      settle()
-      return guardCheckedOutClient(client,this.traceRole)
-    }, error => {
-      settle()
-      throw error
-    })
+    const PromiseImplementation = this.options.Promise ?? Promise
+    return new PromiseImplementation<PoolClient>((resolve, reject) => {
+      try { this.acquire((error, client) => { if (error) reject(error); else resolve(client!) }, settle) } catch (error) {
+        settle({ kind: 'failed' })
+        reject(error)
+      }
+    }) as Promise<PoolClient>
   }
 }
 
@@ -187,7 +232,7 @@ export function createPostgresPool(connectionString: string, overrides: GatewayP
     idle_in_transaction_session_timeout: DEFAULT_DATABASE_IDLE_TRANSACTION_TIMEOUT_MS,
     Client: GatewayPostgresClient,
     ...poolOverrides,
-  }, checkoutQueueLimit,traceRole)
+  }, checkoutQueueLimit, traceRole)
   // `pg.Pool` emits an `error` event when an idle client is terminated by the
   // server or network.  Without a listener Node treats that event as
   // uncaught and takes the Gateway down, even though a later checkout could

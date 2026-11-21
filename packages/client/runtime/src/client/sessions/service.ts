@@ -462,7 +462,12 @@ export class SessionRuntime implements ISessions {
       conversation,
       (forRecovery = false) => {
         const connection = this.rootCtx.get('connection') as ConnectionHandle | undefined
-        const managed = this.rootCtx.get('deploymentContext')?.getSnapshot().context?.mode === 'multi'
+        const mode = this.rootCtx.get('deploymentContext')?.getSnapshot().context?.mode
+        const remoteStartup = this.rootCtx.get('startupDraft') !== undefined && this.hostDescription === connection?.hostDescription
+        const managed = mode === 'multi' || mode === undefined && remoteStartup
+        if (!forRecovery && remoteStartup && connection?.hostDescription.getSnapshot() === undefined) {
+          throw new PromptTargetUnverified('Cannot verify this conversation’s account and Runtime')
+        }
         if (!managed && !forRecovery) return undefined
         const account = this.rootCtx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
         const target = this.runtimeTarget ?? options.runtimeTarget ?? options.hostDescription?.getSnapshot()?.runtimeTarget
@@ -857,10 +862,24 @@ export class SessionRuntime implements ISessions {
   handleConnected(): void {
     this.manager.handleConnected()
     this.prefetchRestoredHistory()
+    const prefetch = this.restoredHistory
+    if (prefetch !== undefined) void this.manager.refreshList().then(() => {
+      if (this.restoredHistory === prefetch) this.cancelRestoredHistory()
+    })
   }
 
-  /** Read one saved root window without admitting a view or allocating its Client scope. */
-  private prefetchRestoredHistory(): void {
+  /**
+   * Start the authenticated startup document's read while realtime connections are opening.
+   * @param connection - exact identity-fenced browser transport.
+   * @param target - the startup document's personal Runtime and computer.
+   * @param account - account verified for the startup document.
+   */
+  prefetchStartupHistory(connection: ConnectionHandle, target: import('../contract/sessions.ts').SessionRuntimeTarget,
+    account: number): void {
+    this.prefetchRestoredHistory({ connection, target, account })
+  }
+
+  private prefetchRestoredHistory(startup?: { connection: ConnectionHandle; target: import('../contract/sessions.ts').SessionRuntimeTarget; account: number }): void {
     const id = this.restoredHistoryId
     this.restoredHistoryId = undefined
     if (this.closed || id === undefined || this.selection.getSnapshot().sessionId !== id
@@ -868,14 +887,35 @@ export class SessionRuntime implements ISessions {
       return
     }
     const session = this.manager.get(id)
-    const prefetch = { session, opening: session.open(this.preparedInitialHistory(id)) }
+    let restored: Awaited<ReturnType<IApiClient['sessions']['history']>> | undefined
+    const read = startup === undefined ? this.preparedInitialHistory(id) : async (signal: AbortSignal) => {
+      const api = new PreparedSessionApi(startup.connection, startup.target, startup.account, 'existing')
+      const response = await api.sessions.history({ sessionId: id, maxMessages: PAGE_MESSAGES, detail: 'conversation', restoreSelection: true }, signal)
+      signal.throwIfAborted()
+      const verified = this.rootCtx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
+      if (verified !== undefined && verified !== startup.account
+        || this.rootCtx.get('deploymentContext')?.getSnapshot().context?.mode === 'single') {
+        throw new Error('History preparation lost its Runtime authority')
+      }
+      restored = response
+      return response
+    }
+    const prefetch = { session, opening: session.open(read) }
     this.restoredHistory = prefetch
     this.trackDisposal(id, prefetch.opening)
-    // The baseline still admits the selection. A denied, missing, or failed
-    // baseline releases an unclaimed window after its projection publishes.
-    void this.manager.refreshList().then(() => {
-      if (this.restoredHistory === prefetch) this.cancelRestoredHistory()
-    })
+    if (startup !== undefined) void prefetch.opening.then(() => {
+      if (this.restoredHistory !== prefetch) return
+      if (restored?.result.ok) {
+        const selection = restored.result.value.restoredSelection
+        if (selection?.sessionId === id && !selection.blank && selection.origin === undefined
+          && selection.parentSessionId === undefined && restored.result.value.executionRestriction === undefined) {
+          this.manager.acceptRestoredSelection(selection)
+        }
+      } else if (session.getSnapshot().openState === 'error' && this.hostDescription?.getSnapshot() === undefined) {
+        this.cancelRestoredHistory()
+        this.restoredHistoryId = id
+      }
+    }).catch((error: unknown) => { this.rootCtx.logger.error(error) })
   }
 
   /** Only the authenticated document's subscribed Runtime can use the initial prepared reader. */

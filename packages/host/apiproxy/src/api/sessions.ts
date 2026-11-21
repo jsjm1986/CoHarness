@@ -138,6 +138,8 @@ export interface HistoryOmittedSpan {
 export interface SessionHistoryPage {
   /** The exact historical target is readable but cannot resume its prior execution. */
   executionRestriction?: 'recovery-read-only'
+  /** The owning Host can restore this active personal root before the Session directory loads. */
+  restoredSelection?: SessionSummary
   events: HistoryEntry[]
   hasMore: boolean
   projections?: SessionProjectionsBlock
@@ -468,6 +470,8 @@ export interface SessionsApi {
     sessionId: SessionId
     /** Require a currently openable conversation when preparing a pane. */
     onlyActive?: true
+    /** Request the current root's selection metadata with an active conversation tail. */
+    restoreSelection?: true
     toolCallId?: ToolCallId
     beforeSeq?: number
     maxMessages?: number

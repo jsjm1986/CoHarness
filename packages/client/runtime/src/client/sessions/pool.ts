@@ -1,5 +1,6 @@
 /** Account-scoped pool of SessionRuntime instances used by the workbench. */
 import { clientSessionKey, parseClientSessionKey, runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+import type { ClientComputerId } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { Context, Fiber } from '@deepseek-ai/cordis'
 import { prepareGatewayRuntime, PreparedSessionApi } from '../prepare-runtime.ts'
 import { PAGE_MESSAGES } from './session.ts'
@@ -1028,6 +1029,20 @@ export class SessionRuntimePool implements ISessions {
       )
     }
     registry.connected(target)
+  }
+
+  /** Prepare the exact saved personal Session from a verified remote startup document. */
+  prefetchStartupHistory(): void {
+    const document = this.baseConnection.documentIdentity
+    const target = document?.runtimeTarget
+    const entry = this.rootCtx.get('startupDraft')
+    if (document === undefined || target?.kind !== 'personal' || target.runtimeId === undefined
+      || entry?.savedSessionId === undefined || entry.scope !== 'personal' || entry.principalId !== document.principalId
+      || entry.runtimeId !== target.runtimeId || target.nodeId !== undefined && entry.nodeId !== target.nodeId) return
+    // The remote entry parser verified this computer's UUID before mounting the startup draft.
+    const owner = { ...target, nodeId: entry.nodeId as ClientComputerId }
+    this.setBaseRuntimeTarget(owner)
+    this.base.prefetchStartupHistory(this.baseConnection, owner, document.principalId)
   }
 
   private addressOwner(id: SessionId): RuntimeEntry | undefined {

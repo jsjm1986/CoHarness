@@ -70,6 +70,8 @@ export interface GatewayConfig {
   runtimeBrowserStreamTimeoutMs: number
   /** Deadline for bounded browser RPC calls to managed Runtimes. */
   runtimeBrowserRpcTimeoutMs: number
+  /** Optional limit on append-origin messages in prepared first history pages. */
+  runtimePreparedHistoryMessages: number | undefined
   /** Idle keep-alive lifetime of the public HTTP listener; must outlive the front proxy's origin pool. */
   keepAliveTimeoutMs: number
   /** Maximum interval between durable access-revocation reads and listener reconnects. */
@@ -749,6 +751,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const runtimeBrowserReadyTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS, 15000, 'HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS')
   const runtimeBrowserStreamTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS, 3000, 'HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS')
   const runtimeBrowserRpcTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS, 30000, 'HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS')
+  const historyMessages = env.HGW_RUNTIME_PREPARED_HISTORY_MESSAGES
+  const runtimePreparedHistoryMessages = historyMessages === undefined ? undefined
+    : positiveSafeInteger(historyMessages, 1, 'HGW_RUNTIME_PREPARED_HISTORY_MESSAGES')
   const upstreamResponseLimitBytes = positiveSafeInteger(
     env.HGW_UPSTREAM_RESPONSE_LIMIT_BYTES,
     DEFAULT_UPSTREAM_RESPONSE_LIMIT_BYTES,
@@ -979,6 +984,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     runtimeBrowserReadyTimeoutMs,
     runtimeBrowserStreamTimeoutMs,
     runtimeBrowserRpcTimeoutMs,
+    runtimePreparedHistoryMessages,
     keepAliveTimeoutMs,
     upstreamResponseLimitBytes,
     runtimeLogCapBytes,

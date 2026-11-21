@@ -125,6 +125,7 @@ export class Session implements SessionFace {
   private openState: OpenState = 'cold'
   private openError: RpcError | null = null
   private openPromise: Promise<void> | null = null
+  private preparedOpen: Promise<void> | null = null
   /** Bumped by resync to invalidate an in-flight doOpen: a reconnect must rebuild, never adopt
    *  a pre-disconnect open whose history request is already doomed. Stale doOpen
    *  passes drop all writes once the generation moves on. */
@@ -754,8 +755,10 @@ export class Session implements SessionFace {
     const promise = this.doOpen(this.openGeneration, prepared).finally(() => {
       // Identity-guarded: a superseded open must not null out the promise resync just started.
       if (this.openPromise === promise) this.openPromise = null
+      if (this.preparedOpen === promise) this.preparedOpen = null
     })
     this.openPromise = promise
+    if (prepared !== undefined) this.preparedOpen = promise
     return promise
   }
 
@@ -869,6 +872,11 @@ export class Session implements SessionFace {
    * @param firstConnection - no previous stream or disconnect occurred for this Runtime.
    */
   async resync(firstConnection = false): Promise<void> {
+    if (firstConnection && this.preparedOpen !== null && this.openPromise === this.preparedOpen) {
+      const generation = this.openGeneration
+      await this.preparedOpen
+      if (generation !== this.openGeneration) return
+    }
     // An authenticated HTTP tail can precede the first mux handshake. Its subscribed watermark still repairs any missing events.
     if (firstConnection && this.openState === 'open' && this.openedFromPreparedTail) return
     this.openedFromPreparedTail = false

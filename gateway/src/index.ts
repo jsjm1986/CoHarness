@@ -7,7 +7,7 @@ import { NodeAccessError } from './node-access.ts'
 import { GatewayNodeChannels } from './node-channel.ts'
 import { GatewayNodeServices } from './node-service.ts'
 import { GatewayNodeServiceProxy } from './node-service-proxy.ts'
-import { forwardIssuerOf, verifyGatewayForward, type GatewayForwardClaims } from './forwarded-principal.ts'
+import { createGatewayForwardAuthority } from './forwarded-principal.ts'
 import { NodeResourceBudget } from './node-resource-budget.ts'
 import { NodeResourcePressure } from './node-resource-pressure.ts'
 import { GatewayModelBudget } from './gateway-model-budget.ts'
@@ -147,7 +147,6 @@ import type { GatewayModelGovernanceService } from './services.ts'
 
 const effectiveEnvironment = await loadManagedNodeEnvironment(process.env)
 /** Consumed nonces of accepted forwarded assertions: nonce → expiresAt. */
-const forwardNonceLedger = new Map<string, number>()
 const cfg = loadConfig(effectiveEnvironment)
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
 const databaseUrl = await databaseUrlFromFile(effectiveEnvironment)
@@ -338,16 +337,8 @@ const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationP
 startupDatabaseConsumers.push(() => accessMonitor.close())
 const localAccessMonitor = scopeAccessMonitor(accessMonitor, context.nodeId as RuntimeNodeId)
 const principalDirectory = new NodePrincipalDirectory(context, cfg.runtimeTokenCacheMs)
-const forwardAudience = { audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug }
-function consumeForwardNonce(claims: GatewayForwardClaims): boolean {
-  const now = Date.now()
-  if (claims.expiresAt <= now) return false
-  for (const [nonce, expiry] of forwardNonceLedger) if (expiry <= now) forwardNonceLedger.delete(nonce)
-  if (forwardNonceLedger.has(claims.nonce)) return false
-  if (forwardNonceLedger.size >= 4096) forwardNonceLedger.clear()
-  forwardNonceLedger.set(claims.nonce, Math.min(claims.expiresAt, now + cfg.principalAssertionTtlMs))
-  return true
-}
+const forwardAuthority = createGatewayForwardAuthority(principalDirectory,
+  { audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug }, cfg.principalAssertionTtlMs)
 localAccessMonitor.subscribe(() => {
   instanceRepository.invalidateRuntimeTokenCache()
 })
@@ -499,6 +490,7 @@ const computerAccess = new PostgresComputerAccess(context, cfg.runtimeCatalog, c
 const topology = new PostgresDeploymentTopology(context, { legacyForwarding: cfg.nodeService.forwarding,
   refreshAfterMs: cfg.deploymentContextRefreshMs, pageSize: cfg.runtimeCatalog.pageSize, maxBytes: cfg.runtimeCatalog.maxBytes,
   allowedOrigins: cfg.publicOrigins })
+const runtimeAdmission = new PostgresRuntimeAssetAdmission(context, baselineWriteEpoch)
 const nodeServiceProxy = new GatewayNodeServiceProxy({
   assertNode: id => topology.assertNode(id),
   localNodeId: context.nodeId as RuntimeNodeId,
@@ -508,8 +500,12 @@ const nodeServiceProxy = new GatewayNodeServiceProxy({
   resetScopeCookie: () => scopeCookie('personal', cfg),
   authorizeAdministratorNode: (actor, id) => nodeAccess.authorizeAdministratorNode(actor, id),
   authorizeAccountNode: (actor, id) => computerAccess.authorize(actor.id, id),
+  ...(cfg.nodeService.preparedReadDelegation === true ? {
+    approvePersonalHistory: (request: Parameters<typeof runtimeAdmission.approvePersonalHistory>[0]) =>
+      runtimeAdmission.approvePersonalHistory(request, principalKeys.publicKeyPem),
+  } : {}),
 }, nodeServices, cfg.upstreamTimeoutMs, cfg.nodeService, accessMonitor,
-async (target, user, request) => {
+async (target, user, request, personalHistory) => {
   // Attach the placement this Gateway already authorized so the destination
   // can adopt it as a checked placement; scope and runtime storage are
   // node-local data the destination resolves itself.
@@ -518,7 +514,9 @@ async (target, user, request) => {
     issuerNode: context.nodeId, audienceNode: target.nodeId, user,
     selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
     ...(environment === undefined || target.resolvedTarget === undefined
-      ? {} : { context: { environment: { id: environment.id, nodeId: environment.node.id, nodeName: environment.node.name } } }),
+      ? {} : { context: { environment: { id: environment.id, nodeId: environment.node.id, nodeName: environment.node.name },
+        ...(personalHistory === undefined ? {} : { personalHistory }),
+      } }),
     request,
   })
 })
@@ -557,26 +555,7 @@ const deps: GatewayDeps = {
     nodeId: context.nodeId as RuntimeNodeId, organizationId: context.organizationId,
     authorize: (token, input) => nodeAccess.authorizeChannel(token, input),
   },
-  forwardedSessionPrincipal: assertion => {
-    const issuer = forwardIssuerOf(assertion)
-    const issuerPublicKey = issuer === null ? null : principalDirectory.publishedKeyCandidate(issuer)
-    if (issuerPublicKey === null) return null
-    const claims = verifyGatewayForward(assertion, issuerPublicKey, forwardAudience)
-    return claims === null ? null : { claims, issuerPublicKey, consume: () => consumeForwardNonce(claims) }
-  },
-  forwardedPrincipal: async assertion => {
-    // Any failure here — malformed assertion, directory outage, bad issuer —
-    // resolves to null so the request falls back to ordinary session
-    // validation; a broken forward path must not become a 500.
-    try {
-      const issuerNode = forwardIssuerOf(assertion)
-      const issuerKey = issuerNode === null ? null : await principalDirectory.issuerKey(issuerNode)
-      const claims = issuerKey === null ? null : verifyGatewayForward(assertion, issuerKey, forwardAudience)
-      return claims !== null && consumeForwardNonce(claims) ? claims : null
-    } catch {
-      return null
-    }
-  },
+  ...forwardAuthority,
   runtimeRouter,
   performance: performanceObserver,
   cfg,
@@ -661,7 +640,6 @@ try {
   if (!(error instanceof RuntimeStartBlockedError) || error.reason !== 'maintenance') throw error
 }
 
-const runtimeAdmission = new PostgresRuntimeAssetAdmission(context, baselineWriteEpoch)
 const proxyHandlers = createProxyHandlers(deps, principalKeys.signer, runtimeAdmission)
 const runtimeAssets = new RuntimeAssets({
   cfg, localNodeId: context.nodeId as RuntimeNodeId, admission: runtimeAdmission,
@@ -790,6 +768,11 @@ const server = createGatewayServer(deps, {
     }
   },
   runtimePersonalExecutionStopGate: () => stoppingWriters ? 'maintenance' : 'open',
+  runtimePersonalExecutionCandidate: req => {
+    const value = req.headers.authorization
+    if (typeof value !== 'string' || !value.startsWith('Bearer ')) return null
+    return instanceRepository.personalExecutionCandidate(value.slice('Bearer '.length))
+  },
   runtimeShutdownStorageWriteGate: async () => (await maintenance.writeGate(baselineWriteEpoch)).verdict,
   documentTransferList: createGatewayDocumentTransferListHandler({
     instances: deps.instances,

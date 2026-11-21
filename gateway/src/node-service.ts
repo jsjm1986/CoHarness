@@ -17,6 +17,8 @@ import type { PostgresNodeAccessService } from './postgres/node-access-service.t
 /** Independent connection budgets leave the control channel available during bulk transfer. */
 export interface NodeServiceConfig {
   forwarding: boolean
+  /** The current primary can authorize and revalidate personal history on its managed transport. */
+  preparedReadDelegation?: true
   maxConnections: number
   maxPerNode: number
   connectTimeoutMs: number
@@ -69,6 +71,8 @@ function setting(env: NodeJS.ProcessEnv, key: string, fallback: number): number 
 export function loadNodeServiceConfig(env: NodeJS.ProcessEnv): NodeServiceConfig {
   const forwarding = env.HGW_NODE_SERVICE_FORWARDING ?? 'off'
   if (forwarding !== 'on' && forwarding !== 'off') throw new Error('HGW_NODE_SERVICE_FORWARDING must be on or off')
+  const prepared = env.HGW_NODE_SERVICE_PREPARED_READ_DELEGATION ?? 'off'
+  if (prepared !== 'on' && prepared !== 'off') throw new Error('HGW_NODE_SERVICE_PREPARED_READ_DELEGATION must be on or off')
   const maxConnections = setting(env, 'HGW_NODE_SERVICE_MAX_CONNECTIONS', 64)
   const maxPerNode = setting(env, 'HGW_NODE_SERVICE_MAX_PER_NODE', 16)
   if (maxPerNode > maxConnections) throw new Error('HGW_NODE_SERVICE_MAX_PER_NODE must not exceed HGW_NODE_SERVICE_MAX_CONNECTIONS')
@@ -80,7 +84,8 @@ export function loadNodeServiceConfig(env: NodeJS.ProcessEnv): NodeServiceConfig
   const httpMaxPendingRequests = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS', 256)
   const httpMaxPendingPerNode = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE', Math.min(httpMaxPendingRequests, 32))
   if (httpMaxPendingPerNode > httpMaxPendingRequests) throw new Error('HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE must not exceed HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS')
-  return { forwarding: forwarding === 'on', maxConnections, maxPerNode, connectTimeoutMs: setting(env, 'HGW_NODE_SERVICE_CONNECT_TIMEOUT_MS', 10_000),
+  return { forwarding: forwarding === 'on', ...(prepared === 'on' ? { preparedReadDelegation: true as const } : {}),
+    maxConnections, maxPerNode, connectTimeoutMs: setting(env, 'HGW_NODE_SERVICE_CONNECT_TIMEOUT_MS', 10_000),
     httpIdleTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_IDLE_TIMEOUT_MS', 30_000), httpMaxIdleConnections, httpMaxIdlePerNode,
     httpMaxPendingRequests, httpMaxPendingPerNode, httpQueueTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS', 60_000) }
 }

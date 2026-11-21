@@ -32,6 +32,12 @@ export interface GatewayAccessMonitor {
    * @returns true only while the connected monitor has applied exactly that revision; a newer revision requires a new admission.
    */
   synchronizeTo?(revision: bigint): Promise<boolean>
+  /**
+   * Compare the connected monitor's applied revision without querying the database.
+   * @param revision - revision approved by the current primary.
+   * @returns whether the local monitor still admits that exact revision.
+   */
+  matchesRevision?(revision: bigint): boolean
   /** Register cancellation/projection work, awaited before its revision is acknowledged. */
   subscribe(listener: (subject: AccessInvalidationSubject) => void | Promise<void>): () => void
 }
@@ -64,6 +70,7 @@ export function scopeAccessMonitor(monitor: GatewayAccessMonitor, nodeId: Runtim
     get available() { return monitor.available },
     synchronize: purpose => monitor.synchronize(purpose),
     ...(monitor.synchronizeTo === undefined ? {} : { synchronizeTo: (revision: bigint) => monitor.synchronizeTo!(revision) }),
+    ...(monitor.matchesRevision === undefined ? {} : { matchesRevision: (revision: bigint) => monitor.matchesRevision!(revision) }),
     subscribe: listener => monitor.subscribe(subject => subject.nodeId === undefined || subject.nodeId === nodeId ? listener(subject) : undefined),
   }
 }
@@ -169,8 +176,14 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
    */
   async synchronizeTo(revision: bigint): Promise<boolean> {
     if (!this.available || this.cursor === undefined || this.cursor < revision) await this.synchronize()
-    return this.available && this.cursor === revision
+    return this.matchesRevision(revision)
   }
+
+  /**
+   * @param revision - primary-approved revision.
+   * @returns whether listeners have applied it and the monitor remains available.
+   */
+  matchesRevision(revision: bigint): boolean { return this.available && this.cursor === revision }
 
   private readFresh(): NonNullable<PostgresAccessMonitor['flight']> {
     if (this.closed) throw new Error('access monitor is closed')

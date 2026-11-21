@@ -12,6 +12,8 @@ interface ChatStorePersistence {
   key(sessionId: SessionId, intent?: 'forget'): string | undefined
   /** Verified managed owner, pending verification, or legacy local persistence. */
   nodeOwner?(sessionId: SessionId): NodeDraftOwner | 'pending' | undefined
+  /** Identify the saved Session's owner from the authenticated startup document while Host verification is pending. */
+  pendingEntryOwner?(sessionId: SessionId): NodeDraftOwner | undefined
   /** Observe account, runtime, and visible-Session ownership changes. */
   subscribe(listener: () => void): () => void
   /** Register cleanup with the owning plugin. */
@@ -177,6 +179,7 @@ export function createChatStore(persistence?: ChatStorePersistence): ChatStoreHa
     let forgetKey = persistence.key(scopeKey as SessionId, 'forget')
     const id = scopeKey as SessionId
     let owner = persistence.nodeOwner?.(id)
+    let pendingEntry = owner === 'pending' ? persistence.pendingEntryOwner?.(id) : undefined
     const privateInputs = new Map<string, ChatStoreState['draft']>()
     let node: NodeDraft | undefined
     let restoring = false
@@ -268,7 +271,20 @@ export function createChatStore(persistence?: ChatStorePersistence): ChatStoreHa
       const next = currentKey()
       const nextForget = persistence.key(scopeKey as SessionId, 'forget')
       const nextOwner = persistence.nodeOwner?.(id)
-      if (next === key && nextForget === forgetKey && sameDraftOwner(owner, nextOwner)
+      const entry = pendingEntry
+      if (entry !== undefined) {
+        const sameEntry = sameDraftOwner(entry, persistence.pendingEntryOwner?.(id))
+        if (sameEntry && nextOwner === 'pending') {
+          key = next
+          forgetKey = nextForget
+          return
+        }
+        pendingEntry = undefined
+        if (sameEntry && editedHere && next !== undefined && sameDraftOwner(entry, nextOwner)) {
+          privateInputs.set(next, instance.getSnapshot().draft)
+        }
+      }
+      if (entry === undefined && next === key && nextForget === forgetKey && sameDraftOwner(owner, nextOwner)
         && (renewal === undefined || persistence.retainDuringRenewal?.(id, renewal.owner) === true)) return
       const priorNodeOwner = typeof owner === 'object' ? owner : renewal?.owner
       let tabDraft: ChatStoreState['draft'] | undefined

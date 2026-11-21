@@ -1068,7 +1068,7 @@ export class InstanceManager {
   /**
    * Retain an existing exact generation across one explicitly selected Session operation.
    * @param target - requested Runtime and owner, resolved by the normal route if absent locally.
-   * @param qualify - authorize and record activity for the generation after the local supervisor check.
+   * @param qualify - authorize the generation after the local supervisor check, with optional start activity.
    * @returns a release that records completion activity, or null if ordinary preparation is necessary.
    */
   async retainReadySession<T extends { snapshot: RuntimeInstanceSnapshot }>(

@@ -2,6 +2,8 @@
 
 import { spawnSync } from 'node:child_process'
 import {
+  accessSync,
+  constants,
   existsSync,
   readFileSync,
   readdirSync,
@@ -19,6 +21,7 @@ interface BuildStep {
 }
 
 const root = resolve(import.meta.dirname, '..')
+const linuxWitness = 'gateway/libexec/hgw-btrfs-witness'
 function run(step: BuildStep): void {
   console.log(`build-production: ${step.label}`)
   const invocation = pnpmInvocation(step.args)
@@ -51,6 +54,11 @@ function verifyArtifacts(): void {
     throw new Error('build-production: invalid Gateway release manifest')
   }
   for (const path of paths) requireFile(resolve(root, path), failures)
+  if (process.platform === 'linux') {
+    const witness = resolve(root, linuxWitness)
+    requireFile(witness, failures)
+    if (!failures.includes(witness)) accessSync(witness, constants.X_OK)
+  }
   if (!gatewayRuntimePackageLinksValid(root)) {
     failures.push(resolve(root, 'gateway/node_modules/@deepseek-ai'))
   }
@@ -84,6 +92,11 @@ if (!verifyOnly) {
       args: ['run', 'build'],
     },
     { label: 'Gateway artifact', cwd: resolve(root, 'gateway'), args: ['run', 'build'] },
+    ...(process.platform === 'linux' ? [{
+      label: 'Linux Btrfs witness',
+      cwd: resolve(root, 'gateway'),
+      args: ['run', 'build:btrfs-witness'],
+    }] : []),
     { label: 'Gateway typecheck', cwd: resolve(root, 'gateway'), args: ['run', 'typecheck'] },
     { label: 'Gateway built document authority', cwd: resolve(root, 'gateway'), args: ['run', 'test:built-document-authority'] },
     { label: 'Gateway built document maintenance', cwd: resolve(root, 'gateway'), args: ['run', 'test:built-document-maintenance'] },

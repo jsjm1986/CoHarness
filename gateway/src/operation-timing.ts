@@ -9,18 +9,30 @@ const method = new Map([
   ['/internal/runtime/execution/input','executionInput'],['/internal/runtime/execution/register-session','executionRegister'],
 ] as const)
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
-export type OperationPhase='authorize'|'prepare'|'admit'|'runtimeQueue'|'runtimeLiveness'|'nodeConnection'|'nodeQueue'|'nodeLeaseCheck'|'nodeServiceOpen'|'upstream'
+export type OperationPhase='authorize'|'prepare'|'admit'|'accessSync'|'runtimeQueue'|'runtimeLiveness'|'nodeConnection'|'nodeQueue'|'nodeLeaseCheck'|'nodeServiceOpen'|'upstream'
+  |'entryReadApproval'|'entryReadRelease'|'nodePreparedRead'
+  | 'governanceCheckout' | 'contentCheckout'
 type Method='create'|'history'|'send'|'status'|'executionInput'|'executionRegister'
 type SqlRole='governance'|'content'
+/** Result of acquiring one exclusive PostgreSQL client. */
+export type ConnectionCheckout = { kind: 'opened'; setupMs: number } | { kind: 'reused' | 'handoff' | 'failed' }
+interface CheckoutSpans {
+  opened: number; reused: number; handoffs: number; failed: number
+  setupMs: number; waitMs: number; failedMs: number
+}
 type NodeTransport='opened'|'reused'
 type ForwardingMark='leaseAcquired'|'assertionReady'|'socketAssigned'|'requestWritten'|'responseHeaders'
 const admissionPhases=['sessionAuthority','agentReadiness','admissionWait','executionStamp','inboxAppend','flushReceipt','readReceipt'] as const
 type HostAdmission=Partial<Record<typeof admissionPhases[number],number>>
+const preparationPhases = ['bodyMs', 'sessionMs', 'initialHistoryMs'] as const
+type HostPreparation = Partial<Record<typeof preparationPhases[number], number>>
 interface Sample {
   id:string; operation:Method; startedAtMs:number; durationMs:number; responseHeadersMs?:number
   status:number; aborted:boolean; sentBytes:number|null; receivedBytes:number|null
   forwarding?:Partial<Record<ForwardingMark,number>>
-  phases:Partial<Record<OperationPhase,number>>; sql:Record<SqlRole,{count:number;elapsedMs:number}>; hostMs?:number; hostAdmission?:HostAdmission; nodeTransport?:NodeTransport
+  databaseCheckout?:Partial<Record<SqlRole,CheckoutSpans>>
+  phases:Partial<Record<OperationPhase,number>>; sql:Record<SqlRole,{count:number;elapsedMs:number}>
+  hostMs?:number; hostAdmission?:HostAdmission; hostPreparation?:HostPreparation; nodeTransport?:NodeTransport
 }
 interface Flight {sample:Sample; start:number; closed:boolean}
 const current=new AsyncLocalStorage<Flight>()
@@ -31,13 +43,13 @@ function length(value:string|string[]|number|undefined):number|null {
   return Number.isSafeInteger(n)?n:null
 }
 
-function hostAdmission(value:unknown):HostAdmission|undefined {
+function hostPhases<Phase extends string>(value: unknown, phases: readonly Phase[]): Partial<Record<Phase, number>> | undefined {
   if(typeof value!=='string' || value.length>512) return undefined
   let decoded:unknown
   try { decoded=JSON.parse(value) } catch { return undefined }
   if (typeof decoded!=='object' || decoded===null || Array.isArray(decoded)) return undefined
-  const fields=decoded as Record<string,unknown>, result:HostAdmission={}
-  for(const phase of admissionPhases) {
+  const fields=decoded as Record<string,unknown>, result:Partial<Record<Phase, number>>={}
+  for(const phase of phases) {
     const ms=fields[phase]
     if(typeof ms==='number' && Number.isFinite(ms) && ms>=0 && ms<=1e8) result[phase]=rounded(ms)
   }
@@ -81,6 +93,38 @@ export function forwardingMarks():(mark:ForwardingMark)=>void {
   const marks=flight.sample.forwarding ??= {}
   return mark=>{
     if(!flight.closed) marks[mark] ??= rounded(performance.now()-flight.start)
+  }
+}
+
+/**
+ * Capture one pool acquisition separately from SQL issued on the resulting connection.
+ * @param role - configured data plane.
+ * @returns Recorder for the checkout outcome. A failed checkout reports only its elapsed time.
+ */
+export function observeOperationCheckout(role: SqlRole): (result: ConnectionCheckout) => void {
+  const flight = current.getStore()
+  if (!flight || flight.closed) return () => {}
+  const start = performance.now()
+  const phase = role === 'governance' ? 'governanceCheckout' : 'contentCheckout'
+  return result => {
+    if (flight.closed) return
+    const elapsed = performance.now() - start
+    flight.sample.phases[phase] = rounded((flight.sample.phases[phase] ?? 0) + elapsed)
+    const all = flight.sample.databaseCheckout ??= {}
+    const spans = all[role] ??= { opened: 0, reused: 0, handoffs: 0, failed: 0, setupMs: 0, waitMs: 0, failedMs: 0 }
+    if (result.kind === 'failed') {
+      spans.failed++
+      spans.failedMs = rounded(spans.failedMs + elapsed)
+      return
+    }
+    const setup = result.kind === 'opened' ? Math.min(elapsed, result.setupMs) : 0
+    spans.setupMs = rounded(spans.setupMs + setup)
+    spans.waitMs = rounded(spans.waitMs + elapsed - setup)
+    if (result.kind === 'opened') spans.opened++
+    else {
+      spans.reused++
+      if (result.kind === 'handoff') spans.handoffs++
+    }
   }
 }
 
@@ -141,8 +185,12 @@ export class OperationTimings {
       sample.sentBytes=length(res.getHeader('content-length'))
       const host=res.getHeader('x-dsh-host-duration-ms')
       if(typeof host==='string' && /^\d{1,8}(?:\.\d{1,3})?$/u.test(host)) sample.hostMs=Number(host)
-      const admissions=action==='send' ? hostAdmission(res.getHeader('x-dsh-host-admission-ms')) : undefined
+      const admissions=action==='send' ? hostPhases(res.getHeader('x-dsh-host-admission-ms'), admissionPhases) : undefined
       if(admissions!==undefined) sample.hostAdmission=admissions
+      if(action==='create' || action==='history') {
+        const preparation = hostPhases(res.getHeader('x-dsh-host-prepare-ms'), preparationPhases)
+        if (preparation !== undefined) sample.hostPreparation = preparation
+      }
       if(this.history.length<this.capacity) this.history.push(sample)
       else {this.history[this.position]=sample;this.position=(this.position+1)%this.capacity}
     }

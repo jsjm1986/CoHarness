@@ -9,6 +9,7 @@
     "dev": "tsx --tsconfig tsconfig.run.json src/index.ts",
     "node:agent": "tsx --tsconfig tsconfig.run.json src/node-agent-main.ts",
     "build": "tsc -p tsconfig.build.json",
+    "build:btrfs-witness": "node scripts/build-btrfs-witness.mjs",
     "build:pg-client": "npm run build && node scripts/build-pg-client.mjs",
     "build:check": "tsc -p tsconfig.ci.json",
     "build:admin": "npm run build --prefix admin-ui",

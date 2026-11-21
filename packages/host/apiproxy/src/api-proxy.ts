@@ -1613,6 +1613,7 @@ interface HistoryTailCacheEntry {
 /** The value returned by one successful history implementation before carrier encoding. */
 interface HistoryValue {
   executionRestriction?: 'recovery-read-only'
+  restoredSelection?: SessionSummary
   events: HistoryEntry[]
   hasMore: boolean
   projections?: SessionProjectionsBlock
@@ -4686,15 +4687,28 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async history(request, signal) {
         const { sessionId, toolCallId, beforeSeq, maxMessages, detail } = request.payload
-        const reply = (value: HistoryValue) => {
+        const restoreSelection = request.payload.restoreSelection === true && request.payload.onlyActive === true
+          && beforeSeq === undefined && toolCallId === undefined && detail === 'conversation'
+        const reply = (value: HistoryValue): RpcResponse<HistoryValue> => {
           const restriction = ctx.get('agentExecutionAdmission')?.restriction(sessionId)
-          return ok(request, restriction === undefined ? value : { ...value, executionRestriction: restriction.code })
+          const { restoredSelection, ...page } = value
+          if (restorePersonal && restoredSelection !== undefined) {
+            const archived = archivedInputError(sessionId)
+            if (archived !== undefined) return err(request, archived)
+          }
+          return ok(request, { ...page,
+            ...(restriction === undefined ? {} : { executionRestriction: restriction.code }),
+            ...(restorePersonal && restoredSelection !== undefined ? { restoredSelection: {
+              ...restoredSelection, running: ctx.agents.get(sessionId)?.status === 'running',
+            } } : {}),
+          })
         }
         if (signal?.aborted) {
           return err(request, { code: 'cancelled', message: 'history read was cancelled', details: {} })
         }
         const authorized = await authorizeSession(sessionId, 'read')
         if ('error' in authorized) return err(request, authorized.error)
+        const restorePersonal = restoreSelection && authorized.authority?.participant.scope.kind !== 'project'
         if (request.payload.onlyActive === true) {
           const archived = archivedInputError(sessionId)
           if (archived !== undefined) return err(request, archived)
@@ -4725,7 +4739,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 const cached = readHistoryTailCache(
                   sessionId, 'detached', undefined, normalizedMaxMessages, projectionRevision, detachedRevisionBefore,
                 )
-                if (cached !== undefined && projectionRevisionOf(ctx) === projectionRevision) {
+                if (cached !== undefined && projectionRevisionOf(ctx) === projectionRevision
+                  && (!restorePersonal || cached.restoredSelection !== undefined)) {
                   return reply(cached)
                 }
               }
@@ -4751,6 +4766,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               sessionId, source.kind, sourceSignature, normalizedMaxMessages, projectionRevision, undefined,
             )
             if (cached !== undefined
+              && (!restorePersonal || cached.restoredSelection !== undefined)
               && projectionRevisionOf(ctx) === projectionRevision
               && sourceSignature === historySourceSignature(source)) {
               return reply(cached)
@@ -4795,10 +4811,17 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
           const cut = historyCutOf(source, beforeSeq === undefined, detachedBaseline)
           const page = historyPage(ctx, cut.events, beforeSeq, maxMessages, scope)
-          const value = historyValue({
+          const value: HistoryValue = historyValue({
             events: page.events,
             hasMore: page.hasMore || (source.kind === 'detached' && source.hasMore),
           }, detail, cut.projections)
+          const header = sourceSession(source).header
+          if (restorePersonal && header.parentSession === undefined && header.origin === undefined && header.cwd !== undefined) {
+            const metadata = sessionListMetadata(page.events.map(entry => entry.event))
+            if (!metadata.blank) value.restoredSelection = {
+              sessionId, updatedAt: sessionListUpdatedAt(header, metadata), running: false, blank: false, cwd: header.cwd,
+            }
+          }
           if (tailRequest
             && sourceSignature === historySourceSignature(source)
             && projectionRevision === projectionRevisionOf(ctx)) {

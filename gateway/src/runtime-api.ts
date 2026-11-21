@@ -18,7 +18,7 @@ import { CollaborationDeniedError } from './collaboration.ts'
 import { DesktopCoordinationError, type DesktopCoordinator } from './desktop-coordinator.ts'
 import type { RuntimeTarget } from './instances.ts'
 import { isRuntimeShutdownStorageRequest } from './runtime-shutdown.ts'
-import { isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest } from './runtime-request-path.ts'
+import { isPersonalExecutionWriteRequest, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest } from './runtime-request-path.ts'
 import { NodeContentUnavailable, type NodeContentBinding } from './node-content-store.ts'
 import {
   PRINCIPAL_HEADER,
@@ -503,12 +503,12 @@ export function createRuntimeApiHandler(
   deps: RuntimeApiDependencies,
 ): GatewayRuntimeHandler {
   const execution = deps.executionIdentity ?? new GatewayExecutionIdentity(deps.context.pool, deps.context.nodeId, deps.nodeContent)
-  const authenticate = async (req: IncomingMessage, cleanup: boolean, control = false): Promise<RuntimeCredentialSubject | null> => {
+  const authenticate = async (req: IncomingMessage, cleanup: boolean, control = false, fresh = false): Promise<RuntimeCredentialSubject | null> => {
     const token = authorizationToken(req)
     if (token === undefined) return null
     if (control && deps.authenticateRuntimeControlToken !== undefined) return deps.authenticateRuntimeControlToken(token)
     return cleanup && deps.instances.authenticateRuntimeCleanupToken !== undefined
-      ? deps.instances.authenticateRuntimeCleanupToken(token) : deps.instances.authenticateRuntimeToken(token)
+      ? deps.instances.authenticateRuntimeCleanupToken(token) : deps.instances.authenticateRuntimeToken(token, fresh)
   }
 
   const currentAssertion = async (req: IncomingMessage, subject: RuntimeCredentialSubject, required: boolean,
@@ -780,7 +780,8 @@ export function createRuntimeApiHandler(
       const streamControl = isRuntimeStreamControlRequest(pathname, req.method)
       const bearerStarted = deps.performanceEnabled === true && isResourceAdmissionRequest(pathname, req.method)
         ? performance.now() : undefined
-      const active = fencedSubject ?? controlSubject ?? await authenticate(req, isRuntimeResourceCompletionRequest(pathname, req.method), streamControl)
+      const active = fencedSubject ?? controlSubject ?? await authenticate(req,
+        isRuntimeResourceCompletionRequest(pathname, req.method), streamControl, executionWrite?.fromCandidate)
       const bearerMs = bearerStarted === undefined ? undefined : performance.now() - bearerStarted
       const token = authorizationToken(req)
       const shutdown = active === null && token !== undefined && isRuntimeShutdownStorageRequest(pathname, req.method)
@@ -1888,6 +1889,10 @@ export function createRuntimeApiHandler(
 
       return false
     } catch (error) {
+      if (executionWrite?.fromCandidate && await authenticate(req, false, false, true) === null) {
+        send(res, 401, { error: 'invalid-runtime-token' })
+        return true
+      }
       if (error instanceof PeerBackupError) {
         send(res, error.status, { error: error.code })
         return true
@@ -1957,8 +1962,7 @@ export function createRuntimeApiHandler(
     }
   }
   handler.defersPersonalExecutionWrite = (subject, pathname, method) => deps.executionWriteEpoch !== undefined
-    && subject.target.kind === 'user' && subject.target.runtimeId !== undefined && method === 'POST'
-    && (pathname === '/internal/runtime/execution/register-session' || pathname === '/internal/runtime/execution/input')
+    && subject.target.kind === 'user' && subject.target.runtimeId !== undefined && isPersonalExecutionWriteRequest(pathname, method)
   if (deps.documentStore === undefined) return handler
   if (deps.accessMonitor === undefined) throw new Error('Runtime document backend requires a document access monitor.')
   return Object.assign(handler, { stream: createRuntimeDocumentStoreStream({

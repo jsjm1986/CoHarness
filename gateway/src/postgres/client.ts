@@ -16,6 +16,9 @@ function observePeerEof(stream: Duplex): void {
 
 /** Preserve structured peer-disconnection failures through pg's connect and query APIs. */
 export class GatewayPostgresClient extends Client {
+  /** Monotonic start of a new client's setup, before transport startup. */
+  readonly setupStartedAt = performance.now()
+
   /** @param config - pg connection options; omitted options retain pg defaults. */
   constructor(config?: ClientConfig) {
     super(config)

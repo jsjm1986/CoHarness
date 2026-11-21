@@ -32,7 +32,7 @@ node gateway/lib/node-content-provision-main.js
 
 ## 在 Linux 上备份运行中的项目文件
 
-Linux 项目电脑配有独立本地 Btrfs 卷时，异机备份可以包含运行中项目的文件。将项目工作区、Runtime 存储和 UserDoc 的两个私有目录放在同一个源子卷中。在同一文件系统、源子卷之外准备仅供 Gateway 访问的快照目录。以普通账号运行 Gateway 时，挂载选项应包含 `user_subvol_rm_allowed`。在该电脑执行 `node gateway/scripts/build-btrfs-witness.mjs` 编译内核探针，并保护发行目录免受 Runtime 账号修改。
+Linux 项目电脑配有独立本地 Btrfs 卷时，异机备份可以包含运行中项目的文件。将项目工作区、Runtime 存储和 UserDoc 的两个私有目录放在同一个源子卷中。在同一文件系统、源子卷之外准备仅供 Gateway 访问的快照目录。以普通账号运行 Gateway 时，挂载选项应包含 `user_subvol_rm_allowed`。在 Linux 的发布工作树中执行 `pnpm run build:production`，将生成的 `gateway/libexec/hgw-btrfs-witness` 随 Gateway 发布，并保护发布目录免受 Runtime 账号修改。
 
 将 `HGW_PEER_PROJECT_SNAPSHOTS_FILE` 设为仅文件所有者可访问的 JSON 文件的规范绝对路径。文件包含 `version: 1`、`organizationId`、`nodeId`、`provider: "btrfs"` 和 `projects` 数组。数组每项给出内部项目 UUID `projectId`、源子卷绝对路径 `subvolume` 和快照目录绝对路径 `snapshotDirectory`。后台进程导出获准的项目目录，核验数据库和 UserDoc 水位后释放专用文件快照。备份进程异常退出后，同一 PID 命名空间中的后续备份会核对原进程身份、源文件系统、父子卷和快照 UUID，再回收遗留快照。嵌套文件系统、插件未登记的文件或缺少快照能力都会阻止生成完整恢复点。退役原备份前请核对各策略的实际覆盖情况。
 
@@ -42,7 +42,7 @@ Gateway 在 Runtime 启动时重建本机模型策略和上报凭据。Linux 项
 
 同节点将已发布项目迁入 Btrfs 时，先保留原目录并暂停所有相关写入。公开 UserDoc 目录与私有对象目录须通过同一个挂载点访问，Linux 才能创建硬链接。核对该挂载中的所有已登记文档域，在恢复服务前重新绑定其复制的元数据和对象。离线重新绑定会核验原 inode 凭证、文件字节、权限、项目放置和 UserDoc 游标。内容修订号递增时，Runtime、内容卷和写入代次仍归属同一项目。
 
-Gateway 在迁移后的卷上启动前，先核验记录的 Linux 文件系统和子卷 UUID。仅当 inode 与挂载映射仍一致时，才更新变化的内核设备号。发布后如需回退，保持写入暂停，从保留的 Btrfs 复制最新数据到独立的 ext4 目录，再在登记路径重新绑定核验通过的副本。保留原 ext4 和 Btrfs 数据。
+Gateway 在迁移后的卷上启动前，先核验记录的 Linux 文件系统和子卷 UUID。仅当 inode 与挂载映射仍一致时，才更新变化的内核设备号。保留 Btrfs 挂载回退发布版本时，目标 Gateway 必须能读取已登记的 UserDoc 身份并核验挂载。回退文件迁移时，保持写入暂停，从保留的 Btrfs 复制最新数据到独立的 ext4 目录，再在登记路径重新绑定核验通过的副本。保留原 ext4 和 Btrfs 数据。
 
 ## 在 Windows 上备份运行中的项目文件
 

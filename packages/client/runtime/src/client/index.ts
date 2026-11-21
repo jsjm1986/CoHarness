@@ -477,6 +477,7 @@ export function apply(ctx: Context): void {
     () => workspaces.startInitialSelection(),
     'runtime: initial Workspace selection',
   )
+  sessions.prefetchStartupHistory()
   let initialConnection = true
   const loop = connection.start({
     onResumeMuxEnvelope: (envelope, description, signal) => sessions.resumeMuxEnvelope(envelope, description, signal),

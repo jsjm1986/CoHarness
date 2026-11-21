@@ -1,4 +1,4 @@
-import { timeOperation } from './operation-timing.ts'
+import { operationPhase, timeOperation } from './operation-timing.ts'
 import { ServerResponse, type IncomingMessage } from 'node:http'
 import { dirname } from 'node:path'
 import { isIP } from 'node:net'
@@ -17,14 +17,14 @@ import type { EffectiveGrant } from './projects.ts'
 import { gateCopy, gateLanguage, stoppedPage, waitingPage, type GatePageLanguage } from './html.ts'
 import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, runtimeTargetOf, type ProjectRuntime, type RuntimeTarget, type RuntimePreparationId } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner, type PrincipalScope } from './principal.ts'
-import { isExplicitSessionRequest, isRuntimeAssetRequest, runtimeRequestPath } from './runtime-request-path.ts'
+import { isExplicitSessionRequest, isPreparedSessionRequest, isReadyRuntimeRead, isRuntimeAssetRequest, runtimeRequestPath } from './runtime-request-path.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { StreamPrincipalLeases } from './stream-principal-leases.ts'
 import { NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
 import { ComputerAccessError } from './computer-access.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
 import { RuntimeAssetUnavailableError, type PostgresRuntimeAssetAdmission } from './runtime-asset-admission.ts'
-import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ReadySessionHandler, type ProxyHandler, type UpgradeHandler } from './server.ts'
+import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ReadyEventHandler, type ReadySessionHandler, type ProxyHandler, type UpgradeHandler } from './server.ts'
 
 function wantsHtml(req: IncomingMessage): boolean {
   return (req.headers.accept ?? '').includes('text/html')
@@ -98,14 +98,14 @@ const STREAMING_MEDIA_TYPES = new Set(['text/event-stream', 'application/x-ndjso
  * Own Runtime HTTP and upgraded connections and their authority revocation.
  * @param deps - Gateway lifecycle and authorization providers.
  * @param principalSigner - signer for the receiving Runtime's request identity.
- * @param sessionAdmission - optional fresh authority for already-supervised Session operations.
+ * @param sessionAdmission - optional fresh authority for Session operations and event connections on a supervised Runtime.
  * @returns the Runtime dispatchers and their lifecycle controls.
  */
 export function createProxyHandlers(
   deps: GatewayDeps,
   principalSigner?: GatewayPrincipalSigner,
   sessionAdmission?: Pick<PostgresRuntimeAssetAdmission, 'admitSession'>,
-): { proxy: ProxyHandler; readySession: ReadySessionHandler; upgrade: UpgradeHandler; invalidateAccess: GatewayAccessInvalidation; streamPrincipals?: StreamPrincipalLeases; close(): void } {
+): { proxy: ProxyHandler; readySession: ReadySessionHandler; readyEvent: ReadyEventHandler; upgrade: UpgradeHandler; invalidateAccess: GatewayAccessInvalidation; streamPrincipals?: StreamPrincipalLeases; close(): void } {
   const { cfg, instances, audit, projects } = deps
   const server = httpProxy.createProxyServer({
     xfwd: true,
@@ -309,6 +309,18 @@ export function createProxyHandlers(
         return null
       }
       res?.setHeader('x-dsh-runtime-id', context.environment.id)
+      if (selection.pathname === '/api/prepare/v1/session.history' && selection.searchParams.has('dshRestore')) {
+        if (selection.searchParams.getAll('dshRestore').length !== 1 || selection.searchParams.get('dshRestore') !== '1') {
+          res?.writeHead(400, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end('{"error":"invalid-restore-request"}')
+          return null
+        }
+        const ready = await instances.liveEndpoint(target)
+        if (ready !== null) return { ...ready, target }
+        res?.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify({
+          error: { code: 'INSTANCE_UNAVAILABLE', message: 'Restoring history requires a ready Runtime.' },
+        }))
+        return null
+      }
       if (selection.pathname.startsWith('/api/prepare/v1/')) {
         const continuation = req.headers['x-dsh-prepare-continuation']
         delete req.headers['x-dsh-prepare-continuation']
@@ -553,32 +565,51 @@ export function createProxyHandlers(
     })
   }
 
-  const readySession: ReadySessionHandler = async (req, res, { actor, forwarded, ...selection }) => {
+  const readySession: ReadySessionHandler = async (req, res, { actor, forwarded, managedPersonalRead, ...selection }) => {
     const monitor = deps.accessMonitor
     if (sessionAdmission === undefined || principalSigner === undefined || instances.retainReadySession === undefined
       || monitor?.synchronizeTo === undefined || !monitor.available) return false
     const target = selection.target === 'personal'
       ? { kind: 'user' as const, id: actor.id, runtimeId: selection.runtimeId }
       : { kind: 'project' as const, id: Number(selection.target.slice('project:'.length)), runtimeId: selection.runtimeId }
+    const originalUrl = req.url
+    const url = new URL(originalUrl ?? '/', 'http://gateway')
+    const runtimeRead = isReadyRuntimeRead(req.method, url)
     const cancel = (): void => { if (!res.writableFinished) res.destroy() }
     const operation = { userId: actor.id, ...(target.kind === 'project' ? { projectId: target.id } : {}), cancel }
     active.add(operation)
-    const originalUrl = req.url
     let release: (() => Promise<void>) | undefined
     let expiry: NodeJS.Timeout | undefined
     try {
       const issuer = forwarded === undefined ? undefined : { nodeId: forwarded.claims.issuerNode, publicKey: forwarded.issuerPublicKey }
-      const retained = await timeOperation('admit', () => instances.retainReadySession!(target,
-        generation => res.destroyed ? Promise.resolve(null) : sessionAdmission.admitSession({ ...selection, actorId: actor.id }, generation, issuer)))
+      const approved = managedPersonalRead === true ? forwarded?.claims.context?.personalHistory : undefined
+      const delegated = approved !== undefined && approved.expiresAt > Date.now()
+        && monitor.matchesRevision?.(BigInt(approved.accessRevision)) === true ? approved : undefined
+      const recordStartActivity = !runtimeRead && !isPreparedSessionRequest(req.method, url.pathname)
+      const retained = await timeOperation('admit', () => instances.retainReadySession!(target, async (generation) => {
+        if (res.destroyed) return null
+        if (delegated === undefined) {
+          return sessionAdmission.admitSession({ ...selection, actorId: actor.id }, generation, issuer, recordStartActivity)
+        }
+        if (delegated.generation !== generation || !monitor.matchesRevision?.(BigInt(delegated.accessRevision))) {
+          return null
+        }
+        const { port, launchStamp, startedAt, ...authority } = delegated
+        operationPhase('nodePreparedRead')()
+        return { ...authority, user: actor, scope: { kind: 'personal' as const },
+          snapshot: { target, port, generation, launchStamp, startedAt, state: 'ready' } }
+      }))
       release = retained?.release
       if (res.destroyed) return true
       if (retained === null) return false
-      const { user, scope, snapshot, placement, accessRevision } = retained.admission
+      const { user, scope, snapshot, accessRevision } = retained.admission
       const expiresAt = Math.min(retained.admission.expiresAt, forwarded?.claims.expiresAt ?? Infinity)
       if (scope.kind === 'personal' && (user.homePath !== actor.homePath || user.role !== actor.role)) {
         throw new RuntimeAssetUnavailableError(403, 'access-revoked')
       }
-      const authorityCurrent = await monitor.synchronizeTo(BigInt(accessRevision))
+      const authorityCurrent = delegated === undefined
+        ? await timeOperation('accessSync', () => monitor.synchronizeTo!(BigInt(accessRevision)))
+        : monitor.matchesRevision?.(BigInt(accessRevision)) === true
       if (!authorityCurrent || expiresAt <= Date.now()) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
       if (res.destroyed) return true
       if (forwarded !== undefined && !forwarded.consume()) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
@@ -587,12 +618,13 @@ export function createProxyHandlers(
       delete req.headers[PRINCIPAL_HEADER]
       scrubRuntimeHeaders(req)
       res.setHeader('x-dsh-principal-id', String(user.id))
-      res.setHeader('x-dsh-runtime-id', placement.environment.id)
+      res.setHeader('x-dsh-runtime-id', selection.runtimeId)
       await forwardRuntime(req, res, { user, scope, environment: { id: selection.runtimeId, nodeId: selection.nodeId } }, snapshot, expiresAt)
       return true
     } catch (error) {
       if (res.destroyed) return true
       if (error instanceof RuntimeAssetUnavailableError) {
+        if (runtimeRead && req.method === 'GET' && error.code === 'maintenance') return false
         req.resume()
         res.writeHead(error.status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         res.end(JSON.stringify({ error: error.code === 'maintenance' || error.code === 'stale-epoch' ? error.code
@@ -610,11 +642,66 @@ export function createProxyHandlers(
     }
   }
 
+  const forwardUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer, context: GatewayRequestContext,
+    ready: { port: number; generation: number; target: RuntimeTarget }, event: boolean, token?: string, expiresAt?: number): void => {
+    const input = { user: context.user, scope: context.scope, runtime: { ...ready.target, generation: ready.generation } }
+    const principal = event ? principalSigner?.issueStream(input, expiresAt) : principalSigner?.issue(input)
+    if (event && principal !== undefined && token !== undefined && streamPrincipals !== undefined) {
+      const lifetime = new AbortController()
+      const close = (): void => { lifetime.abort() }
+      socket.once('close', close)
+      socket.once('error', close)
+      streamPrincipals.register({ assertion: principal, token, context, signal: lifetime.signal, cancel: () => { socket.destroy() } })
+      if (socket.destroyed) lifetime.abort()
+    }
+    server.ws(req, socket as Duplex & NodeJS.WritableStream, head, targetOptions(ready.port, principal), () => socket.destroy())
+  }
+
+  const readyEvent: ReadyEventHandler = async (req, socket, head, { actor, sessionToken, forwarded, ...selection }) => {
+    const monitor = deps.accessMonitor
+    if (sessionAdmission === undefined || principalSigner === undefined || instances.retainReadySession === undefined
+      || monitor?.synchronizeTo === undefined || !monitor.available) return false
+    const target = { kind: 'user' as const, id: actor.id, runtimeId: selection.runtimeId }
+    const releaseAccess = retainUpgrade(socket, actor.id)
+    let accepted = false
+    try {
+      const issuer = forwarded === undefined ? undefined : { nodeId: forwarded.claims.issuerNode, publicKey: forwarded.issuerPublicKey }
+      const retained = await instances.retainReadySession(target, generation => socket.destroyed ? Promise.resolve(null)
+        : sessionAdmission.admitSession({ ...selection, target: 'personal', sessionToken, actorId: actor.id }, generation, issuer))
+      if (retained === null) return false
+      accepted = true
+      const releaseRuntime = (): void => {
+        void retained.release().catch(error => { console.error('[gateway] WebSocket activity update failed:', error) })
+      }
+      if (socket.destroyed) { releaseRuntime(); return true }
+      socket.once('close', releaseRuntime)
+      const { user, scope, accessRevision, expiresAt, snapshot, placement } = retained.admission
+      if (scope.kind !== 'personal' || user.role !== actor.role || user.homePath !== actor.homePath
+        || !await monitor.synchronizeTo(BigInt(accessRevision)) || expiresAt <= Date.now()
+        || forwarded !== undefined && !forwarded.consume()) socket.destroy()
+      else if (!socket.destroyed) {
+        delete req.headers[PRINCIPAL_HEADER]
+        scrubRuntimeHeaders(req)
+        const environment = placement.environment
+        forwardUpgrade(req, socket, head, { user, scope, runtime: { ...user, runtimeId: selection.runtimeId },
+          environment: { id: environment.id, nodeId: environment.node.id } }, snapshot, true, sessionToken, expiresAt)
+      }
+      return true
+    } catch (error) {
+      if (error instanceof RuntimeLeaseUnavailableError) return false
+      socket.destroy()
+      throw error
+    } finally {
+      if (!accepted || socket.destroyed) releaseAccess()
+    }
+  }
+
   const upgradeRequest: UpgradeHandler = async (req, socket, head, context) => {
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     const lang = gateLanguage(req.headers.cookie)
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
+    const eventConnection = ['/api/events.mux', '/api/events.host'].includes(new URL(req.url ?? '/', 'http://gateway.invalid').pathname)
     let ready: { port: number; generation: number; target: RuntimeTarget }
     try {
       await deps.accessMonitor?.synchronize()
@@ -661,7 +748,6 @@ export function createProxyHandlers(
         socket.destroy()
         return
       }
-      const eventConnection = ['/api/events.mux', '/api/events.host'].includes(new URL(req.url ?? '/', 'http://gateway.invalid').pathname)
       let streamLogin: Awaited<ReturnType<typeof qualifyStream>> | undefined
       if (eventConnection && principalSigner !== undefined) {
         streamLogin = token === undefined ? null : await qualifyStream(token, context)
@@ -674,21 +760,7 @@ export function createProxyHandlers(
         context.user = streamLogin.user
         context.scope = streamLogin.scope
       }
-      const principalInput = {
-        user: context.user,
-        scope: context.scope,
-        runtime: { ...ready.target, generation: ready.generation },
-      }
-      const principal = eventConnection ? principalSigner?.issueStream(principalInput, streamLogin?.expiresAt) : principalSigner?.issue(principalInput)
-      if (eventConnection && principal !== undefined && token !== undefined && streamPrincipals !== undefined) {
-        const lifetime = new AbortController()
-        const close = (): void => { lifetime.abort() }
-        socket.once('close', close)
-        socket.once('error', close)
-        streamPrincipals.register({ assertion: principal, token, context, signal: lifetime.signal, cancel: () => { socket.destroy() } })
-        if (socket.destroyed) lifetime.abort()
-      }
-      server.ws(req, socket as Duplex & NodeJS.WritableStream, head, targetOptions(ready.port, principal), () => socket.destroy())
+      forwardUpgrade(req, socket, head, context, ready, eventConnection, token, streamLogin?.expiresAt)
     } catch (error: unknown) {
       releaseWebSocketLease()
       socket.destroy(error instanceof Error ? error : undefined)
@@ -702,13 +774,20 @@ export function createProxyHandlers(
     active.add(operation)
     try { await proxyRequest(req, res, context) } finally { active.delete(operation) }
   }
+  function retainUpgrade(socket: Duplex, userId: number, projectId?: number): () => void {
+    const operation = { userId, projectId, cancel: (): void => { socket.destroy() } }
+    active.add(operation)
+    const release = (): void => {
+      socket.removeListener('close', release)
+      active.delete(operation)
+    }
+    socket.once('close', release)
+    return release
+  }
+
   const upgrade: UpgradeHandler = async (req, socket, head, context) => {
     await deps.computerAccess?.authorize(context.user.id)
-    const operation = { userId: context.user.id, projectId: context.scope.kind === 'project' ? context.scope.projectId : undefined,
-      cancel: (): void => { socket.destroy() } }
-    active.add(operation)
-    const release = (): void => { active.delete(operation) }
-    socket.once('close', release)
+    const release = retainUpgrade(socket, context.user.id, context.scope.kind === 'project' ? context.scope.projectId : undefined)
     try { await upgradeRequest(req, socket, head, context) } catch (error: unknown) {
       release()
       socket.destroy()
@@ -716,7 +795,7 @@ export function createProxyHandlers(
     }
     if (socket.destroyed) release()
   }
-  return { proxy, readySession, upgrade, invalidateAccess, streamPrincipals, close: () => {
+  return { proxy, readySession, readyEvent, upgrade, invalidateAccess, streamPrincipals, close: () => {
     streamPrincipals?.close()
     unsubscribeAccess?.()
     invalidateAccess({})

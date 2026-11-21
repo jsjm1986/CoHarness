@@ -149,6 +149,8 @@ export interface ConnectionConfig {
    * message group may exceed it.
    */
   historyPageTargetBytes?: number
+  /** Cap the first prepared conversation page. Omission uses the request's existing size. */
+  preparedHistoryMessages?: number
   /** Interval between host-side WebSocket Ping control frames. */
   websocketHeartbeatIntervalMs?: number
 }
@@ -177,6 +179,7 @@ export const Config: z<ConnectionConfig> = z.object({
   cookieMaxAgeDays: z.natural().min(1).default(30),
   maxRequestBodyBytes: z.natural().min(1).default(DEFAULT_MAX_REQUEST_BODY_BYTES),
   historyPageTargetBytes: z.natural().min(1).default(DEFAULT_HISTORY_PAGE_TARGET_BYTES),
+  preparedHistoryMessages: z.natural().min(1).max(Number.MAX_SAFE_INTEGER),
   websocketHeartbeatIntervalMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(30_000),
 })
 
@@ -257,6 +260,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   const serverTiming = config?.serverTiming ?? false
   const historyPageTargetBytes =
     config?.historyPageTargetBytes ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
+  const preparedHistoryMessages = config?.preparedHistoryMessages
   const websocketHeartbeatIntervalMs = config?.websocketHeartbeatIntervalMs ?? 30_000
   const recovery = config?.recovery ?? {}
   const rpcTimeoutMs = config?.rpcTimeoutMs ?? DEFAULT_BROWSER_RPC_TIMEOUT_MS
@@ -268,6 +272,9 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   }
   if (!Number.isSafeInteger(historyPageTargetBytes) || historyPageTargetBytes < 1) {
     throw new Error('client-connection historyPageTargetBytes must be a positive safe integer')
+  }
+  if (preparedHistoryMessages !== undefined && (!Number.isSafeInteger(preparedHistoryMessages) || preparedHistoryMessages < 1)) {
+    throw new Error('client-connection preparedHistoryMessages must be a positive safe integer')
   }
   if (!Number.isSafeInteger(websocketHeartbeatIntervalMs)
     || websocketHeartbeatIntervalMs < 1
@@ -319,6 +326,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           carrier = toFetchHandler(apiProxy, {
             serverTiming,
             historyPageTargetBytes,
+            ...(preparedHistoryMessages === undefined ? {} : { preparedHistoryMessages }),
             requestBodyMaxBytes: maxRequestBodyBytes,
           })
           fetchHandlers.set(apiProxy, carrier)

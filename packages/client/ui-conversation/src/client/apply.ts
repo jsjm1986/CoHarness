@@ -233,6 +233,20 @@ export function apply(ctx: Context): void {
       && (current.nodeId === undefined || current.nodeId === owner.target.nodeId))
   }
   const chatStore = createChatStore({
+    pendingEntryOwner: (id) => {
+      const entry = ctx.get('startupDraft')
+      const document = connection.documentIdentity
+      const account = ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
+      const address = parseClientSessionKey(id)
+      const target = sessions.runtimeIdentityFor?.(id)
+      if (accountWithdrawn || entry?.savedSessionId === undefined || entry.scope !== 'personal'
+        || document?.principalId !== entry.principalId || document.runtimeTarget.kind !== 'personal'
+        || document.runtimeTarget.runtimeId !== entry.runtimeId || account !== undefined && account !== entry.principalId
+        || address?.sessionId !== entry.savedSessionId || target?.kind !== 'personal'
+        || target.runtimeId !== entry.runtimeId || target.nodeId !== entry.nodeId) return undefined
+      return { accountId: entry.principalId, target, sessionId: address.sessionId,
+        requestTimeoutMs: connection.metadataTiming.requestTimeoutMs }
+    },
     nodeOwner: (id) => {
       const description = connection.hostDescription.getSnapshot()
       if (description?.executionAuthorityRequired === false) return undefined

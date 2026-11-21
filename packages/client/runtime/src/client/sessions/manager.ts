@@ -820,6 +820,18 @@ export class SessionManager {
   }
 
   /**
+   * Present the selected, active root certified by the owning Host before the first list arrives.
+   * @param summary - exact selection returned with its prepared history.
+   */
+  acceptRestoredSelection(summary: WireSessionSummary): void {
+    if (this.listPhase !== 'pending' || this.selected !== summary.sessionId || this.addresses.has(summary.sessionId)
+      || this.summaries.some(item => item.sessionId === summary.sessionId)) return
+    this.summaries = [...this.summaries, summary]
+    this.sessions.get(summary.sessionId)?.handleRunning(summary.running)
+    this.notifier.notifyNow()
+  }
+
+  /**
    * Insert-or-enrich a locally synthesized summary: a new id prepends; an
    * existing entry only gains fields it lacks (the session-added frame and the
    * create() echo race — whichever lands second must fill the placeholder's
