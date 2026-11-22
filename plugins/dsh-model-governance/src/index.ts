@@ -164,8 +164,8 @@ export function apply(ctx: Context): void {
     message => ctx.logger.warn(message))
   let personalRuntime = policy.userDeclaredAllowed
   let applied: typeof policy | undefined = policy
-  let activeRefresh: Promise<void> | undefined
-  let queuedRefresh: Promise<void> | undefined
+  let refreshTail = Promise.resolve()
+  let pendingRefresh: Promise<void> | undefined
   const runRefresh = async (): Promise<void> => {
     if (stopped) return
     try {
@@ -189,35 +189,21 @@ export function apply(ctx: Context): void {
   }
   const refreshPolicy = (): Promise<void> => {
     if (stopped) return Promise.resolve()
-    if (activeRefresh === undefined) {
-      const task = runRefresh().finally(() => {
-        if (activeRefresh === task) activeRefresh = undefined
-      })
-      activeRefresh = task
-      return task
-    }
-    if (queuedRefresh === undefined) {
-      const task = activeRefresh.then(() => {
-        if (queuedRefresh === task) queuedRefresh = undefined
-        if (stopped) return undefined
-        const next = runRefresh().finally(() => {
-          if (activeRefresh === next) activeRefresh = undefined
-        })
-        activeRefresh = next
-        return next
-      })
-      queuedRefresh = task
-    }
-    return queuedRefresh
+    if (pendingRefresh !== undefined) return pendingRefresh
+    const task = refreshTail.then(() => {
+      pendingRefresh = undefined
+      return runRefresh()
+    })
+    pendingRefresh = task
+    refreshTail = task.then(() => undefined, () => undefined)
+    return task
   }
   let reloader: PolicyReloader | undefined
   ctx.effect(() => async () => {
     stopped = true
     access.unavailable()
     await reloader?.close()
-    while (activeRefresh !== undefined || queuedRefresh !== undefined) {
-      await (queuedRefresh ?? activeRefresh)
-    }
+    await refreshTail
     await outbox.close()
   }, 'model-governance: drain policy reload and usage outbox')
   reloader = new PolicyReloader({

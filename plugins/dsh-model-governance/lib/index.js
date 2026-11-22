@@ -145,8 +145,8 @@ export function apply(ctx) {
     const outbox = new UsageOutbox(join(home, 'model-governance-outbox'), policy.intakeUrl, policy.intakeToken, message => ctx.logger.warn(message));
     let personalRuntime = policy.userDeclaredAllowed;
     let applied = policy;
-    let activeRefresh;
-    let queuedRefresh;
+    let refreshTail = Promise.resolve();
+    let pendingRefresh;
     const runRefresh = async () => {
         if (stopped)
             return;
@@ -176,39 +176,22 @@ export function apply(ctx) {
     const refreshPolicy = () => {
         if (stopped)
             return Promise.resolve();
-        if (activeRefresh === undefined) {
-            const task = runRefresh().finally(() => {
-                if (activeRefresh === task)
-                    activeRefresh = undefined;
-            });
-            activeRefresh = task;
-            return task;
-        }
-        if (queuedRefresh === undefined) {
-            const task = activeRefresh.then(() => {
-                if (queuedRefresh === task)
-                    queuedRefresh = undefined;
-                if (stopped)
-                    return undefined;
-                const next = runRefresh().finally(() => {
-                    if (activeRefresh === next)
-                        activeRefresh = undefined;
-                });
-                activeRefresh = next;
-                return next;
-            });
-            queuedRefresh = task;
-        }
-        return queuedRefresh;
+        if (pendingRefresh !== undefined)
+            return pendingRefresh;
+        const task = refreshTail.then(() => {
+            pendingRefresh = undefined;
+            return runRefresh();
+        });
+        pendingRefresh = task;
+        refreshTail = task.then(() => undefined, () => undefined);
+        return task;
     };
     let reloader;
     ctx.effect(() => async () => {
         stopped = true;
         access.unavailable();
         await reloader?.close();
-        while (activeRefresh !== undefined || queuedRefresh !== undefined) {
-            await (queuedRefresh ?? activeRefresh);
-        }
+        await refreshTail;
         await outbox.close();
     }, 'model-governance: drain policy reload and usage outbox');
     reloader = new PolicyReloader({
