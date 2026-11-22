@@ -6,10 +6,8 @@ import { basename, dirname } from 'node:path';
  * working after the policy inode changes.
  */
 export class PolicyReloader {
-    readPolicy;
+    refresh;
     target;
-    onValid;
-    onInvalid;
     onWatcherError;
     watcher;
     operations = Promise.resolve();
@@ -19,10 +17,8 @@ export class PolicyReloader {
      * @param options - policy path, lifecycle callbacks, and optional watcher factory.
      */
     constructor(options) {
-        this.readPolicy = options.readPolicy;
+        this.refresh = options.refresh;
         this.target = basename(options.filename);
-        this.onValid = options.onValid;
-        this.onInvalid = options.onInvalid;
         this.onWatcherError = options.onWatcherError;
         const watchDirectory = options.watchDirectory ?? watch;
         this.watcher = watchDirectory(dirname(options.filename), { persistent: false }, (_eventType, filename) => {
@@ -49,19 +45,9 @@ export class PolicyReloader {
         this.reloadQueued = true;
         const task = this.operations.then(() => {
             this.reloadQueued = false;
-            return this.reload();
+            return this.closed ? undefined : this.refresh();
         });
         this.operations = task.then(() => undefined, () => undefined);
         void task.catch(error => { this.onWatcherError(error); });
-    }
-    reload() {
-        if (this.closed)
-            return;
-        try {
-            this.onValid(this.readPolicy());
-        }
-        catch (error) {
-            this.onInvalid(error);
-        }
     }
 }

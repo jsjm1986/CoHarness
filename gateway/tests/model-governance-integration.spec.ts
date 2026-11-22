@@ -19,6 +19,7 @@ import { createUsageIntakeServer } from '../src/usage-intake.ts'
 import { UserService } from '../src/users.ts'
 import { GatewayPerformanceObserver } from '../src/performance-observer.ts'
 import { PostgresCheckoutQueueFullError } from '../src/postgres/database.ts'
+import { NodeContentUnavailable } from '../src/node-content-error.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
 
 const closers: Array<() => Promise<void>> = []
@@ -518,7 +519,9 @@ describe('model governance integration', () => {
     ['ingestion', new PostgresCheckoutQueueFullError(1), 'DB_CHECKOUT_QUEUE_FULL'],
     ['ingestion connection', Object.assign(new Error('database disconnected'), { code: '08006' }), 'database-unavailable'],
     ['ingestion lock', Object.assign(new Error('database lock timeout'), { code: '55P03' }), 'database-unavailable'],
-  ] as const)('keeps a valid bill retryable after temporary %s failure', async (stage, failure, code) => {
+    ['ingestion content volume', new NodeContentUnavailable(), 'node-content/unavailable'],
+    ['ingestion unexpected', new Error('unavailable accounting service'), null],
+  ] as const)('keeps a valid bill retryable after %s fails', async (stage, failure, code) => {
     const { user, governance } = await fixture()
     const token = governance.issueIntakeToken({ kind: 'user', id: user.id })
     const ingest = governance.ingest.bind(governance)
@@ -535,8 +538,9 @@ describe('model governance integration', () => {
       body: JSON.stringify(deniedEvent('capacity-retry')),
     })
     const overloaded = await post()
-    expect(overloaded.status).toBe(503)
-    expect(await overloaded.json()).toEqual({ error: code })
+    expect(overloaded.status).toBe(code === null ? 500 : 503)
+    if (code === null) expect(await overloaded.text()).toBe('')
+    else expect(await overloaded.json()).toEqual({ error: code })
     governance.ingest = ingest
     governance.subjectForIntakeToken = authenticate
     const retried = await post()
@@ -564,7 +568,9 @@ describe('model governance integration', () => {
     expect((await post(deniedEvent())).status).toBe(200)
     expect(audit.query({ action: 'model.denied' })).toHaveLength(1)
     const spoofed = { ...deniedEvent('spoof'), status: 'succeeded', credentialSource: 'file', credentialClass: 'company' }
-    expect((await post(spoofed)).status).toBe(400)
+    const rejected = await post(spoofed)
+    expect(rejected.status).toBe(400)
+    expect(await rejected.json()).toEqual({ error: 'credentialClass does not match credentialSource' })
     expect(observation.snapshot(null).operationClasses.internal).toMatchObject({
       started: 4, completed: 4, inflight: 0, clientErrors: 2,
     })

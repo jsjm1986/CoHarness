@@ -42,9 +42,13 @@ async function fixture(rejected: GovernanceRecord, status: number) {
   })
   cleanups.push(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())))
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
-  const outbox = new UsageOutbox(root, `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/usage`, 'fixture-token')
-  cleanups.push(() => outbox.close())
-  return { root, received, first, outbox, accepted }
+  const url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/usage`
+  const open = () => {
+    const outbox = new UsageOutbox(root, url, 'fixture-token', () => {})
+    cleanups.push(() => outbox.close())
+    return outbox
+  }
+  return { root, received, first, outbox: open(), open, accepted }
 }
 
 describe('independent outbox delivery', () => {
@@ -52,12 +56,22 @@ describe('independent outbox delivery', () => {
     { ...usage('a-rejected'), actorUserId: 7, executionInputIds: ['verified-input'] },
     usage('a-rejected'),
     { kind: 'model-registration', eventId: 'a-rejected', occurredAt: 1, provider: 'p', action: 'provider-created', scope: 'personal' },
-  ])('retains a rejected record while delivering later valid records (%#)', async rejected => {
+  ])('preserves a rejected record outside the delivery queue across restart (%#)', async rejected => {
     const f = await fixture(rejected, 400)
-    await vi.waitFor(async () => { expect(await readdir(f.root)).toEqual(['a-rejected.json']) }, { timeout: 2_000 })
+    await vi.waitFor(async () => { expect(await readdir(f.root)).toEqual(['rejected']) }, { timeout: 2_000 })
     await f.outbox.close()
     expect(f.received).toEqual([rejected, f.accepted])
-    expect(JSON.parse(await readFile(join(f.root, 'a-rejected.json'), 'utf8'))).toEqual(rejected)
+    const rejectedDir = join(f.root, 'rejected')
+    const files = await readdir(rejectedDir)
+    expect(files).toHaveLength(1)
+    expect(JSON.parse(await readFile(join(rejectedDir, files[0]!), 'utf8'))).toEqual(rejected)
+
+    const later = usage('c-later')
+    const reopened = f.open()
+    reopened.enqueue(later)
+    await vi.waitFor(async () => { expect(await readdir(f.root)).toEqual(['rejected']) }, { timeout: 2_000 })
+    await reopened.close()
+    expect(f.received).toEqual([rejected, f.accepted, later])
   })
 
   it('retains the remaining batch when the intake is unavailable', async () => {

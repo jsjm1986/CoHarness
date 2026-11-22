@@ -20,7 +20,7 @@ function read(provider: Record<string, unknown>): GovernancePolicyFile {
   const home = mkdtempSync(join(tmpdir(), 'dsh-project-policy-'))
   const path = join(home, 'model-governance.json')
   writeFileSync(path, JSON.stringify(policy(provider)))
-  return policyReader(path)()
+  return policyReader(path).load()
 }
 
 describe('project model policy', () => {

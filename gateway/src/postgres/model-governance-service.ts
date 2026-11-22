@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { decimalToMicros, microsToDecimal } from '../money.ts'
-import { verifyExecutionAttribution, type PersonalExecutionWriteFence } from '../execution-identity.ts'
+import { ExecutionIdentityError, verifyExecutionAttribution, type PersonalExecutionWriteFence } from '../execution-identity.ts'
 import type { RuntimeCredentialSubject } from '../runtime-api.ts'
 import type { UserRow } from '../auth.ts'
 import { CollaborationDeniedError } from '../collaboration.ts'
@@ -37,6 +37,7 @@ import type {
 } from '../model-governance.ts'
 import { ORGANIZATION_PROVIDER_PATTERN, ProjectModelSettingsConflictError } from '../model-governance.ts'
 import { OrganizationModelCredentialCipher } from '../organization-model-credentials.ts'
+import { ModelUsageRejection, usageCount, usageText } from '../model-usage-rejection.ts'
 import { modelEndpointCandidates } from '@deepseek-ai/dsh-llm/discovery'
 import type { Queryable } from './database.ts'
 import { transaction } from './database.ts'
@@ -1598,45 +1599,57 @@ export class PostgresModelGovernanceService {
    * @returns whether the event was inserted and the number of resulting quota alerts.
    */
   async ingest(subject: ModelIntakeSubject, event: UsageEvent): Promise<{ inserted: boolean; alerts: number }> {
-    if (event === null || typeof event !== 'object') throw new Error('usage event must be an object')
-    nonEmpty(event.eventId, 'eventId')
+    if (event === null || typeof event !== 'object') throw new ModelUsageRejection('usage event must be an object')
+    usageText(event.eventId, 'eventId')
     if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) {
-      throw new Error('occurredAt must be a non-negative safe integer')
+      throw new ModelUsageRejection('occurredAt must be a non-negative safe integer')
     }
     if (event.actorUserId !== undefined && (!Number.isSafeInteger(event.actorUserId) || event.actorUserId <= 0)) {
-      throw new Error('actorUserId must be a positive safe integer')
+      throw new ModelUsageRejection('actorUserId must be a positive safe integer')
     }
     if (event.actorProjectId !== undefined && (!Number.isSafeInteger(event.actorProjectId) || event.actorProjectId <= 0)) {
-      throw new Error('actorProjectId must be a positive safe integer')
+      throw new ModelUsageRejection('actorProjectId must be a positive safe integer')
     }
     if (event.actorProjectId !== undefined && event.actorUserId === undefined) {
-      throw new Error('actorProjectId requires actorUserId')
+      throw new ModelUsageRejection('actorProjectId requires actorUserId')
     }
-    if (!['company', 'personal', 'unknown'].includes(event.credentialClass)) throw new Error('invalid credentialClass')
+    if (!['company', 'personal', 'unknown'].includes(event.credentialClass)) throw new ModelUsageRejection('invalid credentialClass')
     if (!['succeeded', 'failed', 'cancelled', 'missing-usage', 'denied'].includes(event.status)) {
-      throw new Error('invalid status')
+      throw new ModelUsageRejection('invalid status')
     }
-    if (typeof event.credentialSource !== 'string') throw new Error('credentialSource must be a string')
+    if (typeof event.credentialSource !== 'string' || event.credentialSource.includes('\0')) {
+      throw new ModelUsageRejection('credentialSource must be a string')
+    }
+    if (event.sessionId != null && (typeof event.sessionId !== 'string' || event.sessionId.includes('\0'))) {
+      throw new ModelUsageRejection('sessionId must be a string')
+    }
     const credentialClass = credentialClassOf(event.credentialSource)
-    if (event.credentialClass !== credentialClass) throw new Error('credentialClass does not match credentialSource')
+    if (event.credentialClass !== credentialClass) throw new ModelUsageRejection('credentialClass does not match credentialSource')
     const usage = event.usage
     const buckets = {
-      input: nonnegative(usage?.inputTokens ?? 0, 'inputTokens'),
-      output: nonnegative(usage?.outputTokens ?? 0, 'outputTokens'),
-      read: nonnegative(usage?.cacheReadTokens ?? 0, 'cacheReadTokens'),
-      write: nonnegative(usage?.cacheWriteTokens ?? 0, 'cacheWriteTokens'),
+      input: usageCount(usage?.inputTokens ?? 0, 'inputTokens'),
+      output: usageCount(usage?.outputTokens ?? 0, 'outputTokens'),
+      read: usageCount(usage?.cacheReadTokens ?? 0, 'cacheReadTokens'),
+      write: usageCount(usage?.cacheWriteTokens ?? 0, 'cacheWriteTokens'),
     }
-    const provider = nonEmpty(event.provider, 'provider')
-    const model = nonEmpty(event.model, 'model')
+    const provider = usageText(event.provider, 'provider')
+    const model = usageText(event.model, 'model')
     return transaction(this.context.pool, async (client) => {
       const hasExecutionInputs = Object.hasOwn(event, 'executionInputIds')
       if (hasExecutionInputs) {
         if (!Array.isArray(event.executionInputIds) || typeof event.sessionId !== 'string'
-          || event.actorUserId === undefined) throw new Error('execution attribution requires input ids, Session, and primary actor')
-        await verifyExecutionAttribution(client, {
-          organizationId: this.context.organizationId, runtime: subject,
-          sessionId: event.sessionId, inputIds: event.executionInputIds, primaryActorUserId: event.actorUserId,
-        }, this.nodeContent)
+          || event.actorUserId === undefined) throw new ModelUsageRejection('execution attribution requires input ids, Session, and primary actor')
+        try {
+          await verifyExecutionAttribution(client, {
+            organizationId: this.context.organizationId, runtime: subject,
+            sessionId: event.sessionId, inputIds: event.executionInputIds, primaryActorUserId: event.actorUserId,
+          }, this.nodeContent)
+        } catch (error) {
+          if (error instanceof ExecutionIdentityError && (error.status === 400 || error.status === 403)) {
+            throw new ModelUsageRejection(error.message, { cause: error })
+          }
+          throw error
+        }
       }
       const billingUserId = async (id: number): Promise<string | null> => {
         if (!hasExecutionInputs) return internalUserId(client, this.context.organizationId, id)
@@ -1650,17 +1663,17 @@ export class PostgresModelGovernanceService {
         ? await internalProjectId(client, this.context.organizationId, subject.id)
         : null
       const billingOwner = subject.kind === 'user' ? user : project
-      if (billingOwner === null) throw new Error(`unknown ${subject.kind} ${String(subject.id)}`)
+      if (billingOwner === null) throw new ModelUsageRejection(`unknown ${subject.kind} ${String(subject.id)}`)
       // Actor attribution is an activity projection for shared projects only;
       // personal billing rows must not duplicate their billing user here.
       let actor: string | null = null
       if (subject.kind === 'project') {
         if (event.actorProjectId !== undefined && event.actorProjectId !== subject.id) {
-          throw new Error('actorProjectId must match the project usage subject')
+          throw new ModelUsageRejection('actorProjectId must match the project usage subject')
         }
         if (event.actorUserId !== undefined) {
           actor = await billingUserId(event.actorUserId)
-          if (actor === null) throw new Error(`unknown usage actor ${String(event.actorUserId)}`)
+          if (actor === null) throw new ModelUsageRejection(`unknown usage actor ${String(event.actorUserId)}`)
           if (!hasExecutionInputs) {
             const member = await client.query<{ allowed: boolean }>(`SELECT EXISTS(
             SELECT 1 FROM harness.users u
@@ -1671,15 +1684,15 @@ export class PostgresModelGovernanceService {
             WHERE u.organization_id=$1 AND u.id=$3 AND u.status='active'
               AND (membership.role='admin' OR member.access_mode='rw')
           ) allowed`, [this.context.organizationId, project, actor])
-            if (member.rows[0]?.allowed !== true) throw new Error(`usage actor ${String(event.actorUserId)} is not an active project writer`)
+            if (member.rows[0]?.allowed !== true) throw new ModelUsageRejection(`usage actor ${String(event.actorUserId)} is not an active project writer`)
           }
         }
       } else {
         if (event.actorUserId !== undefined && event.actorUserId !== subject.id) {
-          throw new Error('actorUserId must match the personal usage subject')
+          throw new ModelUsageRejection('actorUserId must match the personal usage subject')
         }
         if (event.actorProjectId !== undefined) {
-          throw new Error('actorProjectId is not valid for personal usage')
+          throw new ModelUsageRejection('actorProjectId is not valid for personal usage')
         }
       }
       const catalog = await client.query<{
@@ -1724,7 +1737,7 @@ export class PostgresModelGovernanceService {
         price?.id ?? null,
         provider,
         model,
-        nonEmpty(event.purpose, 'purpose'),
+        usageText(event.purpose, 'purpose'),
         event.sessionId ?? null,
         event.credentialSource,
         credentialClass,
@@ -1745,26 +1758,26 @@ export class PostgresModelGovernanceService {
   }
 
   async ingestRegistration(subject: ModelUsageSubject, event: ModelRegistrationEvent): Promise<{ inserted: boolean }> {
-    if (subject.kind !== 'user') throw new Error('model registration events require a personal user runtime')
+    if (subject.kind !== 'user') throw new ModelUsageRejection('model registration events require a personal user runtime')
     if (event === null || typeof event !== 'object' || event.kind !== 'model-registration') {
-      throw new Error('model registration event must have kind model-registration')
+      throw new ModelUsageRejection('model registration event must have kind model-registration')
     }
-    nonEmpty(event.eventId, 'eventId')
+    usageText(event.eventId, 'eventId')
     if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) {
-      throw new Error('occurredAt must be a non-negative safe integer')
+      throw new ModelUsageRejection('occurredAt must be a non-negative safe integer')
     }
     const actions: ModelRegistrationEvent['action'][] = [
       'provider-created', 'provider-modified', 'provider-deleted',
       'model-created', 'model-modified', 'model-deleted',
     ]
-    if (!actions.includes(event.action)) throw new Error('invalid model registration action')
-    if (event.scope !== 'personal') throw new Error('model registration scope must be personal')
-    const provider = nonEmpty(event.provider, 'provider')
+    if (!actions.includes(event.action)) throw new ModelUsageRejection('invalid model registration action')
+    if (event.scope !== 'personal') throw new ModelUsageRejection('model registration scope must be personal')
+    const provider = usageText(event.provider, 'provider')
     const modelAction = event.action.startsWith('model-')
-    const model = modelAction ? nonEmpty(event.model ?? '', 'model') : null
-    if (!modelAction && event.model !== undefined) throw new Error('provider registration events cannot name a model')
+    const model = modelAction ? usageText(event.model ?? '', 'model') : null
+    if (!modelAction && event.model !== undefined) throw new ModelUsageRejection('provider registration events cannot name a model')
     const user = await internalUserId(this.context.pool, this.context.organizationId, subject.id)
-    if (user === null) throw new Error(`unknown user ${String(subject.id)}`)
+    if (user === null) throw new ModelUsageRejection(`unknown user ${String(subject.id)}`)
     const inserted = await this.context.pool.query<{ event_id: string }>(`INSERT INTO harness.model_registration_events(
       event_id,organization_id,user_id,occurred_at,received_at,provider_key,model_key,action,scope
     ) VALUES($1,$2,$3,to_timestamp($4/1000.0),now(),$5,$6,$7,$8)

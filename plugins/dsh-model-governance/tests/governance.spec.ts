@@ -30,8 +30,8 @@ class Adapter extends LlmAdapter {
 async function drain(source: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
   const result: StreamChunk[] = []; for await (const chunk of source) result.push(chunk); return result
 }
-function policy(home: string, allowed: boolean, userDeclaredAllowed = false): void {
-  writeFileSync(join(home, 'model-governance.json'), JSON.stringify({ version: 1, defaultAllowed: false,
+function policy(home: string, allowed: boolean, userDeclaredAllowed = false, version = 1): void {
+  writeFileSync(join(home, 'model-governance.json'), JSON.stringify({ version, defaultAllowed: false,
     userDeclaredAllowed,
     models: [{ provider: 'p', model: 'm', allowed }], providers: [],
     intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
@@ -96,7 +96,7 @@ describe('instance model governance', () => {
   it('fails closed on malformed policy and enforces denial before adapter dispatch', async () => {
     const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home
     writeFileSync(join(home, 'model-governance.json'), '{}')
-    expect(() => policyReader(join(home, 'model-governance.json'))()).toThrow(/version/)
+    expect(() => policyReader(join(home, 'model-governance.json')).load()).toThrow(/version/)
     policy(home, false)
     const ctx = new Context(); await ctx.plugin(LlmRuntime)
     const adapter = new Adapter(); ctx.llm.registerAdapter(['p'], adapter)
@@ -120,7 +120,7 @@ describe('instance model governance', () => {
       async *stream(_options: GenerateOptions, dispatch?: LlmOperationDispatch): AsyncIterable<StreamChunk> {
         if (mutate) {
           mutate = false
-          if (change === 'in-place change') policy(home, false)
+          if (change === 'in-place change') policy(home, false, false, 2)
           else rmSync(filename)
         }
         if (dispatch === undefined) throw new Error('Missing physical dispatch guard')
@@ -136,9 +136,12 @@ describe('instance model governance', () => {
       const stream = () => drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [] }))
       expect((await stream()).at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'MODEL_FORBIDDEN' } } })
       expect(send).not.toHaveBeenCalled()
+      expect(ctx.modelAccess.decide({ provider: 'p', model: 'm' }).allowed).toBe(false)
+      expect(ctx.modelProviderConfig.snapshot().revision).toBe(change === 'in-place change' ? 2 : 1)
       writeFileSync(filename, previous)
       expect((await stream()).at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
       expect(send).toHaveBeenCalledOnce()
+      expect(ctx.modelProviderConfig.snapshot().revision).toBe(1)
     } finally {
       await ctx.fiber.dispose()
       rmSync(home, { recursive: true, force: true })
@@ -257,14 +260,14 @@ describe('instance model governance', () => {
 
   it('keeps a failed delivery on disk and drains it after restart', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-outbox-'))
-    const first = new UsageOutbox(dir, 'http://127.0.0.1:1/usage', 't')
+    const first = new UsageOutbox(dir, 'http://127.0.0.1:1/usage', 't', () => {})
     first.enqueue({ eventId: 'e', occurredAt: 1, provider: 'p', model: 'm', purpose: 'assistant',
       credentialSource: 'unknown', credentialClass: 'unknown', status: 'missing-usage' })
     await new Promise(resolve => setTimeout(resolve, 30)); await first.close()
     expect(readdirSync(dir)).toContain('e.json')
     const server = createServer((_req, res) => { res.writeHead(200).end('{}') })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-    const second = new UsageOutbox(dir, `http://127.0.0.1:${(server.address() as AddressInfo).port}/usage`, 't')
+    const second = new UsageOutbox(dir, `http://127.0.0.1:${(server.address() as AddressInfo).port}/usage`, 't', () => {})
     for (let i = 0; i < 30 && readdirSync(dir).includes('e.json'); i++) await new Promise(resolve => setTimeout(resolve, 10))
     await second.close(); await new Promise<void>(resolve => server.close(() => resolve()))
     expect(readdirSync(dir)).not.toContain('e.json')
@@ -282,7 +285,7 @@ describe('instance model governance', () => {
       else res.writeHead(200).end('{}')
     })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-    const outbox = new UsageOutbox(dir, `http://127.0.0.1:${(server.address() as AddressInfo).port}/usage`, 't')
+    const outbox = new UsageOutbox(dir, `http://127.0.0.1:${(server.address() as AddressInfo).port}/usage`, 't', () => {})
     outbox.enqueue({ eventId: 'actor-fallback', occurredAt: 1, provider: 'p', model: 'm', purpose: 'assistant',
       actorUserId: 7, actorProjectId: 3, credentialSource: 'organization', credentialClass: 'company', status: 'succeeded' })
     for (let i = 0; i < 30 && readdirSync(dir).includes('actor-fallback.json'); i++) await new Promise(resolve => setTimeout(resolve, 10))

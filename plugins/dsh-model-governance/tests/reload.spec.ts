@@ -50,11 +50,12 @@ describe('PolicyReloader', () => {
     const watchDirectory = fakeWatch as unknown as WatchDirectory
     const valid: GovernancePolicyFile[] = []
     const invalid: unknown[] = []
+    const reader = policyReader(filename)
     const reloader = new PolicyReloader({
       filename,
-      readPolicy: policyReader(filename),
-      onValid: next => { valid.push(next) },
-      onInvalid: error => { invalid.push(error) },
+      refresh: async () => {
+        try { valid.push(await reader.read()) } catch (error) { invalid.push(error) }
+      },
       onWatcherError: vi.fn(),
       watchDirectory,
     })
@@ -86,9 +87,7 @@ describe('PolicyReloader', () => {
     const onWatcherError = vi.fn()
     const reloader = new PolicyReloader({
       filename,
-      readPolicy: policyReader(filename),
-      onValid: vi.fn(),
-      onInvalid: vi.fn(),
+      refresh: async () => {},
       onWatcherError,
       watchDirectory: (() => watcher) as unknown as WatchDirectory,
     })

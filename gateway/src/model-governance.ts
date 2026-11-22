@@ -5,6 +5,7 @@ import { CollaborationDeniedError } from './collaboration.ts'
 import { requireSqliteAdministrator } from './administrator-authority.ts'
 import { clearSqliteUserQuotaAliases } from './sqlite-user-quota.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
+import { ModelUsageRejection, usageCount, usageText } from './model-usage-rejection.ts'
 
 export type CredentialClass = 'company' | 'personal' | 'unknown'
 export type UsageStatus = 'succeeded' | 'failed' | 'cancelled' | 'missing-usage' | 'denied'
@@ -752,25 +753,30 @@ export class ModelGovernanceService {
 
   ingest(subject: ModelUsageSubject, event: UsageEvent): { inserted: boolean; alerts: number } {
     const userId = this.userId(subject)
-    if (event === null || typeof event !== 'object') throw new Error('usage event must be an object')
-    if (Object.hasOwn(event, 'executionInputIds')) throw new Error('execution attribution requires the PostgreSQL intake')
-    nonEmpty(event.eventId, 'eventId')
-    if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) throw new Error('occurredAt must be a non-negative safe integer')
+    if (event === null || typeof event !== 'object') throw new ModelUsageRejection('usage event must be an object')
+    if (Object.hasOwn(event, 'executionInputIds')) throw new ModelUsageRejection('execution attribution requires the PostgreSQL intake')
+    usageText(event.eventId, 'eventId')
+    if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) throw new ModelUsageRejection('occurredAt must be a non-negative safe integer')
     if (event.actorUserId !== undefined && (!Number.isSafeInteger(event.actorUserId) || event.actorUserId <= 0 || event.actorUserId !== userId)) {
-      throw new Error('actorUserId must match the personal usage subject')
+      throw new ModelUsageRejection('actorUserId must match the personal usage subject')
     }
-    if (event.actorProjectId !== undefined) throw new Error('actorProjectId is not valid for personal usage')
-    if (!['company', 'personal', 'unknown'].includes(event.credentialClass)) throw new Error('invalid credentialClass')
-    if (!['succeeded', 'failed', 'cancelled', 'missing-usage', 'denied'].includes(event.status)) throw new Error('invalid status')
-    if (typeof event.credentialSource !== 'string') throw new Error('credentialSource must be a string')
+    if (event.actorProjectId !== undefined) throw new ModelUsageRejection('actorProjectId is not valid for personal usage')
+    if (!['company', 'personal', 'unknown'].includes(event.credentialClass)) throw new ModelUsageRejection('invalid credentialClass')
+    if (!['succeeded', 'failed', 'cancelled', 'missing-usage', 'denied'].includes(event.status)) throw new ModelUsageRejection('invalid status')
+    if (typeof event.credentialSource !== 'string' || event.credentialSource.includes('\0')) {
+      throw new ModelUsageRejection('credentialSource must be a string')
+    }
+    if (event.sessionId != null && (typeof event.sessionId !== 'string' || event.sessionId.includes('\0'))) {
+      throw new ModelUsageRejection('sessionId must be a string')
+    }
     const credentialClass = credentialClassOf(event.credentialSource)
-    if (event.credentialClass !== credentialClass) throw new Error('credentialClass does not match credentialSource')
+    if (event.credentialClass !== credentialClass) throw new ModelUsageRejection('credentialClass does not match credentialSource')
     const usage = event.usage
     const buckets = {
-      input: nonnegative(usage?.inputTokens ?? 0, 'inputTokens'),
-      output: nonnegative(usage?.outputTokens ?? 0, 'outputTokens'),
-      read: nonnegative(usage?.cacheReadTokens ?? 0, 'cacheReadTokens'),
-      write: nonnegative(usage?.cacheWriteTokens ?? 0, 'cacheWriteTokens'),
+      input: usageCount(usage?.inputTokens ?? 0, 'inputTokens'),
+      output: usageCount(usage?.outputTokens ?? 0, 'outputTokens'),
+      read: usageCount(usage?.cacheReadTokens ?? 0, 'cacheReadTokens'),
+      write: usageCount(usage?.cacheWriteTokens ?? 0, 'cacheWriteTokens'),
     }
     const price = this.db.prepare(`SELECT * FROM model_prices WHERE provider=? AND model=? AND effective_at<=?
       ORDER BY effective_at DESC,id DESC LIMIT 1`).get(event.provider, event.model, event.occurredAt) as
@@ -785,8 +791,8 @@ export class ModelGovernanceService {
     const insert = this.db.prepare(`INSERT OR IGNORE INTO model_usage(event_id,user_id,occurred_at,received_at,provider,model,
       purpose,session_id,credential_source,credential_class,status,input_tokens,output_tokens,cache_read_tokens,
       cache_write_tokens,estimated_cost_micros,company_cost_micros) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(event.eventId, userId, event.occurredAt, Date.now(), nonEmpty(event.provider, 'provider'),
-        nonEmpty(event.model, 'model'), nonEmpty(event.purpose, 'purpose'), event.sessionId ?? null,
+      .run(event.eventId, userId, event.occurredAt, Date.now(), usageText(event.provider, 'provider'),
+        usageText(event.model, 'model'), usageText(event.purpose, 'purpose'), event.sessionId ?? null,
         event.credentialSource, credentialClass, event.status, buckets.input, buckets.output, buckets.read,
         buckets.write, estimated, companyCost)
     if (insert.changes === 0) return { inserted: false, alerts: 0 }
@@ -796,22 +802,22 @@ export class ModelGovernanceService {
   ingestRegistration(subject: ModelUsageSubject, event: ModelRegistrationEvent): { inserted: boolean } {
     const userId = this.userId(subject)
     if (event === null || typeof event !== 'object' || event.kind !== 'model-registration') {
-      throw new Error('model registration event must have kind model-registration')
+      throw new ModelUsageRejection('model registration event must have kind model-registration')
     }
-    nonEmpty(event.eventId, 'eventId')
+    usageText(event.eventId, 'eventId')
     if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) {
-      throw new Error('occurredAt must be a non-negative safe integer')
+      throw new ModelUsageRejection('occurredAt must be a non-negative safe integer')
     }
-    const provider = nonEmpty(event.provider, 'provider')
+    const provider = usageText(event.provider, 'provider')
     const actions: ModelRegistrationEvent['action'][] = [
       'provider-created', 'provider-modified', 'provider-deleted',
       'model-created', 'model-modified', 'model-deleted',
     ]
-    if (!actions.includes(event.action)) throw new Error('invalid model registration action')
-    if (event.scope !== 'personal') throw new Error('model registration scope must be personal')
+    if (!actions.includes(event.action)) throw new ModelUsageRejection('invalid model registration action')
+    if (event.scope !== 'personal') throw new ModelUsageRejection('model registration scope must be personal')
     const modelAction = event.action.startsWith('model-')
-    const model = modelAction ? nonEmpty(event.model ?? '', 'model') : null
-    if (!modelAction && event.model !== undefined) throw new Error('provider registration events cannot name a model')
+    const model = modelAction ? usageText(event.model ?? '', 'model') : null
+    if (!modelAction && event.model !== undefined) throw new ModelUsageRejection('provider registration events cannot name a model')
     const result = this.db.prepare(`INSERT OR IGNORE INTO model_registration_events(
       event_id,user_id,occurred_at,received_at,provider,model,action,scope
     ) VALUES(?,?,?,?,?,?,?,?)`).run(

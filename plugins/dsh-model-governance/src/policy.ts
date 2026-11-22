@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 import type {
   ManagedModelCompat,
@@ -431,25 +432,31 @@ function providerProfiles(value: unknown): ManagedModelProviderProfile[] {
   })
 }
 
-function readPolicySource(filename: string): Buffer {
-  try { return readFileSync(filename) } catch (error) {
-    throw new Error(`model-governance: cannot load policy ${filename}: ${String(error)}`)
-  }
-}
-
 /**
  * Reuse validation only when a fresh file read returns identical bytes.
  * @param filename - deployed policy file checked on every call.
- * @returns a reader that throws for missing or invalid policy and returns the same snapshot for unchanged content.
+ * @returns a synchronous boot reader and an asynchronous live reader with shared validation.
  */
-export function policyReader(filename: string): () => GovernancePolicyFile {
+export function policyReader(filename: string): {
+  load: () => GovernancePolicyFile
+  read: () => Promise<GovernancePolicyFile>
+} {
   let previous: { bytes: Buffer; policy: GovernancePolicyFile } | undefined
-  return () => {
-    const bytes = readPolicySource(filename)
+  const validate = (bytes: Buffer): GovernancePolicyFile => {
     if (previous !== undefined && bytes.equals(previous.bytes)) return previous.policy
     const policy = parsePolicy(bytes, filename)
     previous = { bytes, policy }
     return policy
+  }
+  const unableToRead = (error: unknown): Error =>
+    new Error(`model-governance: cannot load policy ${filename}: ${String(error)}`, { cause: error })
+  return {
+    load: () => {
+      let bytes: Buffer
+      try { bytes = readFileSync(filename) } catch (error) { throw unableToRead(error) }
+      return validate(bytes)
+    },
+    read: async () => validate(await readFile(filename).catch(error => { throw unableToRead(error) })),
   }
 }
 

@@ -101,7 +101,7 @@ function completeModel(overrides: Record<string, unknown> = {}): Record<string, 
 describe('model-governance policy projection', () => {
   it('retains the complete organization Provider and model profile', () => {
     const raw = completePolicy()
-    const loaded = policyReader(writePolicy(raw))()
+    const loaded = policyReader(writePolicy(raw)).load()
     expect(loaded.providers).toEqual(raw.providers)
     expect(loaded.providers[0]?.profile).toEqual((raw.providers as Array<Record<string, unknown>>)[0]?.profile)
   })
@@ -113,7 +113,7 @@ describe('model-governance policy projection', () => {
       profile: completeProfile({ api: 'openai-responses', compat: {}, models: [model] }),
       models: [model],
     })
-    expect(policyReader(writePolicy(completePolicy({ providers: [provider] })))().providers[0])
+    expect(policyReader(writePolicy(completePolicy({ providers: [provider] }))).load().providers[0])
       .toMatchObject({ protocol: 'openai-responses', profile: { compat: {} }, models: [{ compat: {} }] })
   })
 
@@ -159,6 +159,6 @@ describe('model-governance policy projection', () => {
       })],
     }],
   ] satisfies Array<[string, Record<string, unknown>]>)('rejects %s before publishing a Provider snapshot', (_name, overrides) => {
-    expect(() => policyReader(writePolicy(completePolicy(overrides)))()).toThrow(/model-governance/)
+    expect(() => policyReader(writePolicy(completePolicy(overrides))).load()).toThrow(/model-governance/)
   })
 })

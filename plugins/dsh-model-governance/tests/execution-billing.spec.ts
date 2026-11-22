@@ -811,13 +811,15 @@ describe('verified execution billing', () => {
     })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
     cleanups.push(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())))
-    const outbox = new UsageOutbox(root, `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/usage`, 'fixture-token')
+    const outbox = new UsageOutbox(root, `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/usage`, 'fixture-token', () => {})
     cleanups.push(() => outbox.close())
     const record: UsageRecord = { eventId: 'proof-rejection', occurredAt: 1, provider: 'p', model: 'm', purpose: 'auto-review', sessionId: 'session', actorUserId: 7, executionInputIds: ['input-a'], credentialSource: 'organization', credentialClass: 'company', status: 'succeeded' }
     outbox.enqueue(record)
     await received
     await outbox.close()
     expect(bodies).toEqual([record])
-    expect(JSON.parse(await readFile(join(root, 'proof-rejection.json'), 'utf8'))).toEqual(record)
+    const rejected = await readdir(join(root, 'rejected'))
+    expect(rejected).toHaveLength(1)
+    expect(JSON.parse(await readFile(join(root, 'rejected', rejected[0]!), 'utf8'))).toEqual(record)
   })
 })
