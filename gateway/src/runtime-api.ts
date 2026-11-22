@@ -145,7 +145,7 @@ interface RuntimeApiDependencies {
   principals: GatewayPrincipalSigner
   governance: Pick<GatewayModelGovernanceService, 'resolveOrganizationCredential'>
     & Partial<Pick<GatewayModelGovernanceService, 'resolveManagedCredential'>>
-    & Partial<Pick<import('./postgres/model-governance-service.ts').PostgresModelGovernanceService, 'resolvePersonalRuntimeCredential'>>
+    & Partial<Pick<import('./postgres/model-governance-service.ts').PostgresModelGovernanceService, 'resolvePersonalRuntimeCredential' | 'resolveRuntimeCredential'>>
   /** Optional FCM delivery; omitted in keyless/unit-test compositions. */
   push?: Pick<GatewayPushService, 'notifyCompleted'>
   /** Optional cross-scope document broker; absent in standalone test compositions. */
@@ -795,10 +795,13 @@ export function createRuntimeApiHandler(
       let attemptedPersonalEntry = false
       if (executionWrite !== undefined) {
         if (pathname === '/internal/runtime/model-credential' && writeFence !== undefined
-          && deps.governance.resolvePersonalRuntimeCredential !== undefined) {
+          && (deps.governance.resolveRuntimeCredential !== undefined
+            || (executionWrite.subject.target.kind === 'user' && deps.governance.resolvePersonalRuntimeCredential !== undefined))) {
           if (!await executionWrite.admit(true)) return true
-          const result = await deps.governance.resolvePersonalRuntimeCredential(executionWrite.subject,
-            managedCredentialRef(executionBody), writeFence)
+          const resolveCredential = deps.governance.resolveRuntimeCredential !== undefined
+            ? deps.governance.resolveRuntimeCredential.bind(deps.governance)
+            : deps.governance.resolvePersonalRuntimeCredential!.bind(deps.governance)
+          const result = await resolveCredential(executionWrite.subject, managedCredentialRef(executionBody), writeFence)
           if (result.status === 'ok') sendManagedCredential(res, result.value)
           else send(res, result.status === 'invalid-runtime-token' ? 401 : 503, { error: result.status })
           return true
@@ -2087,10 +2090,16 @@ export function createRuntimeApiHandler(
       disposeRequestSignals(res)
     }
   }
-  handler.defersPersonalExecutionWrite = (subject, pathname, method, activeModelCheck) => deps.executionWriteEpoch !== undefined
-    && subject.target.kind === 'user' && subject.target.runtimeId !== undefined && subject.contentBinding === undefined
-    && (pathname !== '/internal/runtime/model-credential' || deps.governance.resolvePersonalRuntimeCredential !== undefined)
-    && isPersonalExecutionWriteRequest(pathname, method, activeModelCheck)
+  handler.defersPersonalExecutionWrite = (subject, pathname, method, activeModelCheck) => {
+    if (deps.executionWriteEpoch === undefined || subject.target.runtimeId === undefined) return false
+    if (!isPersonalExecutionWriteRequest(pathname, method, activeModelCheck)) return false
+    if (pathname === '/internal/runtime/model-credential') {
+      if (deps.governance.resolveRuntimeCredential !== undefined) return true
+      return subject.target.kind === 'user' && subject.contentBinding === undefined
+        && deps.governance.resolvePersonalRuntimeCredential !== undefined
+    }
+    return subject.target.kind === 'user' && subject.contentBinding === undefined
+  }
   if (deps.documentStore === undefined) return handler
   if (deps.accessMonitor === undefined) throw new Error('Runtime document backend requires a document access monitor.')
   return Object.assign(handler, { stream: createRuntimeDocumentStoreStream({

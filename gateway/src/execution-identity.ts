@@ -646,8 +646,7 @@ export class GatewayExecutionIdentity {
     }
     return this.inRuntime(subject, async (client, subject) => {
       if (scopeId !== undefined) {
-        const captured = await this.readScope(client, subject, sessionId, scopeId)
-        const actors = await this.scopeActors(subject, captured)
+        const { scope: captured, actors } = await this.readScopeWithActors(subject, sessionId, scopeId)
         if (actors.length === 0 || captured.primary_actor_user_id === null || (capability !== 'execute' && captured.unverified)) {
           throw new ExecutionIdentityError(403, 'execution authority has no verified complete actor set')
         }
@@ -963,6 +962,29 @@ export class GatewayExecutionIdentity {
     return row
   }
 
+  /** Read an immutable execution scope and its distinct witness actors in one SQL round trip. */
+  private async readScopeWithActors(subject: ExecutionRuntimeSubject, sessionId: string, id: string): Promise<{
+    scope: ExecutionScopeRow; actors: string[]
+  }> {
+    const { schema, db } = subject.storage
+    const rows = await db.query<ExecutionScopeRow & { matched_inputs: number; actors: string[] }>(
+      `SELECT s.id,s.revision::text,s.input_ids,s.primary_actor_user_id,s.unverified,
+        (SELECT count(*)::int FROM ${schema}.execution_inputs i
+          WHERE i.id=ANY(s.input_ids) AND i.organization_id=$1 AND i.runtime_kind=$2
+            AND i.runtime_public_id=$3 AND i.runtime_id=$5) AS matched_inputs,
+        COALESCE((SELECT array_agg(DISTINCT actor) FROM ${schema}.execution_inputs i, LATERAL unnest(i.actor_user_ids) actor
+          WHERE i.id=ANY(s.input_ids) AND i.organization_id=$1 AND i.runtime_kind=$2
+            AND i.runtime_public_id=$3 AND i.runtime_id=$5), ARRAY[]::uuid[]) AS actors
+      FROM ${schema}.execution_scopes s WHERE ${SESSION_SCOPE} AND s.id=$6`,
+      [...scope(subject, sessionId), id],
+    )
+    const row = rows.rows[0]
+    if (row === undefined) throw new ExecutionIdentityError(403, 'execution scope belongs to another Session or runtime')
+    const distinctIds = new Set(row.input_ids).size
+    if (row.matched_inputs !== distinctIds) throw new ExecutionIdentityError(403, 'execution input belongs to another Session or runtime')
+    return { scope: row, actors: row.actors }
+  }
+
   private async scopeState(client: PoolClient, subject: ExecutionRuntimeSubject, captured: ExecutionScopeRow,
     entered?: SessionRow, witness?: InputRow): Promise<ExecutionIdentityState> {
     const actors = witness !== undefined && captured.input_ids.length === 1 && captured.input_ids[0] === witness.id
@@ -1230,13 +1252,40 @@ export class GatewayExecutionIdentity {
       return result.rows
     }
     const { schema, db } = subject.storage
+    let nodeProjectGate: { steward_ok: boolean; members: Array<{ user_id: string; access_mode: string }> } | undefined
     if (schema === 'node_content') {
-      const active = await client.query(`SELECT 1 FROM harness.projects p JOIN harness.project_content_placement b
-        ON (b.organization_id,b.project_id)=(p.organization_id,p.id)
-        WHERE p.organization_id=$1 AND p.id=$2 AND p.status='active' AND b.runtime_id=$3 AND b.node_id=$4
-        AND b.volume_id=$5 AND b.writer_epoch=$6 FOR SHARE OF p,b`,
-      [subject.organizationId,subject.projectInternalId,subject.target.runtimeId,this.nodeId,subject.contentBinding!.volumeId,subject.contentBinding!.writerEpoch])
-      if (active.rowCount !== 1) throw new ExecutionIdentityError(403, 'project execution placement is unavailable')
+      // Combine placement binding, project active + steward qualification, and project_members FOR SHARE
+      // into one governance round trip before reading the node-local content store.
+      const gate = await client.query<{
+        placement_ok: boolean
+        steward_ok: boolean
+        members: Array<{ user_id: string; access_mode: string }>
+      }>(`WITH project_check AS MATERIALIZED (
+          SELECT (b.runtime_id IS NOT NULL) AS placement_ok,
+            (p.kind='standard' OR (
+              SELECT count(*) FROM harness.steward_access_policies sp
+              JOIN harness.memberships m ON m.organization_id=sp.organization_id AND m.user_id=sp.user_id
+              WHERE sp.organization_id=p.organization_id AND sp.node_id=$4 AND sp.enabled
+                AND sp.user_id=ANY($3::uuid[]) AND m.role='admin'
+            )=cardinality($3::uuid[])) AS steward_ok
+          FROM harness.projects p
+          LEFT JOIN harness.project_content_placement b
+            ON (b.organization_id,b.project_id)=(p.organization_id,p.id)
+            AND b.runtime_id=$5 AND b.node_id=$4 AND b.volume_id=$6 AND b.writer_epoch=$7
+          WHERE p.organization_id=$1 AND p.id=$2 AND p.status='active'
+          FOR SHARE OF p,b
+        ), members AS MATERIALIZED (
+          SELECT pm.user_id,pm.access_mode FROM harness.project_members pm
+          WHERE pm.organization_id=$1 AND pm.project_id=$2 AND pm.user_id=ANY($3::uuid[])
+          FOR SHARE OF pm
+        ) SELECT project_check.placement_ok, project_check.steward_ok,
+          COALESCE((SELECT jsonb_agg(jsonb_build_object('user_id',m.user_id,'access_mode',m.access_mode)) FROM members m),'[]'::jsonb) AS members
+          FROM project_check`,
+      [subject.organizationId, subject.projectInternalId, actorIds, this.nodeId,
+        subject.target.runtimeId, subject.contentBinding!.volumeId, subject.contentBinding!.writerEpoch])
+      const row = gate.rows[0]
+      if (row === undefined || !row.placement_ok) throw new ExecutionIdentityError(403, 'project execution placement is unavailable')
+      nodeProjectGate = row
     }
     const projectJoin = (table: 'c' | 'd'): string => schema === 'harness'
       ? `JOIN harness.projects p ON p.id=${table}.project_id AND p.organization_id=${table}.organization_id AND p.status='active'` : ''
@@ -1259,20 +1308,36 @@ export class GatewayExecutionIdentity {
         FOR SHARE OF d${projectLock}`, [subject.organizationId, sessionId, subject.projectInternalId, subject.target.runtimeId])).rows[0]
     if (session === undefined) throw new ExecutionIdentityError(403, 'execution Session is not writable in this runtime')
     // Steward policy writers serialize with the actor locks held by this transaction.
-    const project = await client.query(`SELECT 1 FROM harness.projects p
-      WHERE p.organization_id=$1 AND p.id=$2 AND p.status='active'
-        AND (p.kind='standard' OR (
-          SELECT count(*) FROM harness.steward_access_policies sp
-          JOIN harness.memberships m ON m.organization_id=sp.organization_id AND m.user_id=sp.user_id
-          WHERE sp.organization_id=p.organization_id AND sp.node_id=$4 AND sp.enabled
-            AND sp.user_id=ANY($3::uuid[]) AND m.role='admin'
-        )=cardinality($3::uuid[]))`, [subject.organizationId, subject.projectInternalId, actorIds, this.nodeId])
-    if (project.rowCount !== 1) throw new ExecutionIdentityError(403, 'project execution qualification is unavailable')
+    let projectMembers: Array<{ user_id: string; access_mode: string }>
+    if (nodeProjectGate !== undefined) {
+      if (!nodeProjectGate.steward_ok) throw new ExecutionIdentityError(403, 'project execution qualification is unavailable')
+      projectMembers = nodeProjectGate.members
+    } else {
+      const gate = await client.query<{
+        steward_ok: boolean
+        members: Array<{ user_id: string; access_mode: string }>
+      }>(`WITH project_check AS MATERIALIZED (
+          SELECT (p.kind='standard' OR (
+            SELECT count(*) FROM harness.steward_access_policies sp
+            JOIN harness.memberships m ON m.organization_id=sp.organization_id AND m.user_id=sp.user_id
+            WHERE sp.organization_id=p.organization_id AND sp.node_id=$4 AND sp.enabled
+              AND sp.user_id=ANY($3::uuid[]) AND m.role='admin'
+          )=cardinality($3::uuid[])) AS steward_ok
+          FROM harness.projects p
+          WHERE p.organization_id=$1 AND p.id=$2 AND p.status='active'
+        ), members AS MATERIALIZED (
+          SELECT pm.user_id,pm.access_mode FROM harness.project_members pm
+          WHERE pm.organization_id=$1 AND pm.project_id=$2 AND pm.user_id=ANY($3::uuid[])
+          FOR SHARE OF pm
+        ) SELECT project_check.steward_ok,
+          COALESCE((SELECT jsonb_agg(jsonb_build_object('user_id',m.user_id,'access_mode',m.access_mode)) FROM members m),'[]'::jsonb) AS members
+          FROM project_check`, [subject.organizationId, subject.projectInternalId, actorIds, this.nodeId])
+      const row = gate.rows[0]
+      if (row === undefined || !row.steward_ok) throw new ExecutionIdentityError(403, 'project execution qualification is unavailable')
+      projectMembers = row.members
+    }
     if (capability === 'memory' && session.visibility === 'private') throw new ExecutionIdentityError(403, 'project memory is read-only in private conversations')
-    const members = await client.query<{ user_id: string; access_mode: string }>(`SELECT user_id,access_mode FROM harness.project_members
-      WHERE organization_id=$1 AND project_id=$2 AND user_id=ANY($3::uuid[]) FOR SHARE`,
-    [subject.organizationId, subject.projectInternalId, actorIds])
-    const writers = new Set(members.rows.filter(row => row.access_mode === 'rw').map(row => row.user_id))
+    const writers = new Set(projectMembers.filter(row => row.access_mode === 'rw').map(row => row.user_id))
     if (result.rows.some(actor => (capability === 'desktop' || capability === 'user-terminal' || actor.role !== 'admin') && (!writers.has(actor.id)
       || (session.visibility === 'private' && session.creator_user_id !== actor.id)))) {
       throw new ExecutionIdentityError(403, 'an execution actor cannot write this Session')

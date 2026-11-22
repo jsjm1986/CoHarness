@@ -1291,6 +1291,63 @@ export class PostgresModelGovernanceService {
   }
 
   /**
+   * Read the current personal or project Runtime, serving state and managed credential in one database snapshot.
+   * Covers both organization-managed and project-owned (`DSH_PROJECT_*`) credentials without separate bearer or write-gate queries.
+   * @param subject - recognized personal or project Runtime coordinates.
+   * @param ref - managed Provider's credential reference.
+   * @param fence - exact Runtime bearer and the Gateway's write epoch.
+   * @returns The credential result, an invalid Runtime, or a closed maintenance gate.
+   */
+  async resolveRuntimeCredential(subject: RuntimeCredentialSubject, ref: string, fence: PersonalExecutionWriteFence):
+    Promise<{ status: 'ok'; value: string | null } | { status: 'invalid-runtime-token' | 'stale-epoch' | 'maintenance' }> {
+    if (subject.target.kind === 'user') return this.resolvePersonalRuntimeCredential(subject, ref, fence)
+    if (subject.organizationId !== this.context.organizationId || subject.target.runtimeId === undefined) {
+      return { status: 'invalid-runtime-token' }
+    }
+    const bearerHash = createHash('sha256').update(fence.bearer).digest()
+    const row = ref.startsWith('DSH_PROJECT_')
+      ? await this.readProjectRuntimeCredential(subject.target.id, ref, {
+        runtimeId: subject.target.runtimeId, generation: subject.generation, bearerHash, epoch: fence.epoch,
+      })
+      : await this.readOrganizationCredential(subject.target, ref, {
+        runtimeId: subject.target.runtimeId, generation: subject.generation, bearerHash, epoch: fence.epoch,
+      })
+    if (row === undefined) return { status: 'invalid-runtime-token' }
+    if (row.verdict !== 'open') return { status: row.verdict }
+    return { status: 'ok', value: this.decryptOrganizationCredential(row) }
+  }
+
+  private async readProjectRuntimeCredential(projectId: number, ref: string,
+    runtime: { runtimeId: RuntimeId; generation: number; bearerHash: Buffer; epoch: bigint }): Promise<OrganizationCredentialLookup | undefined> {
+    const result = await this.context.pool.query<OrganizationCredentialLookup>(`WITH authority AS MATERIALIZED (
+        SELECT owner.id AS project_id,
+          CASE WHEN COALESCE(control.write_epoch,1)<>$8 THEN 'stale-epoch'
+            WHEN COALESCE(control.mode,'serving')<>'serving' THEN 'maintenance' ELSE 'open' END AS verdict
+        FROM harness.instances i
+        JOIN harness.projects owner ON (owner.organization_id,owner.id)=(i.organization_id,i.project_id)
+          AND owner.public_id=$3 AND owner.status='active'
+        LEFT JOIN harness.cluster_control control ON control.organization_id=i.organization_id
+        WHERE i.organization_id=$1 AND i.assigned_node_id=$4 AND i.runtime_id=$5 AND i.generation=$6 AND i.runtime_token_hash=$7
+          AND i.provisioning_state='ready' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
+          AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
+      ) SELECT authority.verdict,credential.* FROM authority
+        LEFT JOIN LATERAL (
+          SELECT provider.id provider_id,credential.key_version,credential.nonce,
+            credential.ciphertext,credential.auth_tag
+          FROM harness.project_model_providers provider
+          JOIN harness.project_model_credentials credential ON credential.organization_id=provider.organization_id
+            AND credential.project_id=provider.project_id AND credential.provider_id=provider.id
+          JOIN harness.project_model_catalog model ON model.organization_id=provider.organization_id
+            AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
+          WHERE provider.organization_id=$1 AND provider.project_id=authority.project_id AND provider.credential_ref=$2
+            AND provider.status='enabled' LIMIT 1
+        ) credential ON authority.verdict='open'`,
+    [this.context.organizationId, ref, projectId, this.context.nodeId,
+      runtime.runtimeId, runtime.generation, runtime.bearerHash, String(runtime.epoch)])
+    return result.rows[0]
+  }
+
+  /**
    * Read the current Runtime, serving state and organization credential in one database snapshot.
    * @param subject - recognized personal Runtime coordinates.
    * @param ref - managed Provider's credential reference.
@@ -1340,18 +1397,23 @@ export class PostgresModelGovernanceService {
         AND provider.source='managed' AND provider.status='enabled' AND ${authorization}
       LIMIT 1`
     const coordinates = [this.context.organizationId, ref, subject.id]
+    const ownerCheck = subject.kind === 'user'
+      ? `JOIN harness.users owner ON (owner.organization_id,owner.id)=(i.organization_id,i.user_id) AND owner.public_id=$3`
+      : `JOIN harness.projects owner ON (owner.organization_id,owner.id)=(i.organization_id,i.project_id) AND owner.public_id=$3 AND owner.status='active'`
+    const userComputerCheck = subject.kind === 'user'
+      ? `AND harness.computer_use_allowed(i.organization_id,i.user_id,i.assigned_node_id)` : ''
     const result = runtime === undefined
       ? await this.context.pool.query<OrganizationCredentialLookup>(`SELECT 'open' verdict,credential.* FROM (${credential}) credential`, coordinates)
       : await this.context.pool.query<OrganizationCredentialLookup>(`WITH authority AS MATERIALIZED (
           SELECT CASE WHEN COALESCE(control.write_epoch,1)<>$8 THEN 'stale-epoch'
             WHEN COALESCE(control.mode,'serving')<>'serving' THEN 'maintenance' ELSE 'open' END AS verdict
           FROM harness.instances i
-          JOIN harness.users owner ON (owner.organization_id,owner.id)=(i.organization_id,i.user_id) AND owner.public_id=$3
+          ${ownerCheck}
           LEFT JOIN harness.cluster_control control ON control.organization_id=i.organization_id
           WHERE i.organization_id=$1 AND i.assigned_node_id=$4 AND i.runtime_id=$5 AND i.generation=$6 AND i.runtime_token_hash=$7
             AND i.provisioning_state='ready' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
             AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
-            AND harness.computer_use_allowed(i.organization_id,i.user_id,i.assigned_node_id)
+            ${userComputerCheck}
         ) SELECT authority.verdict,credential.* FROM authority
           LEFT JOIN LATERAL (${credential}) credential ON authority.verdict='open'`,
         [...coordinates, this.context.nodeId, runtime.runtimeId, runtime.generation, runtime.bearerHash, String(runtime.epoch)])
@@ -2581,8 +2643,6 @@ export class PostgresModelGovernanceService {
 
   /** Resolve one project-owned encrypted credential after policy authorization. */
   private async resolveProjectCredential(projectId: number, ref: string): Promise<string | null> {
-    const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
-    if (project === null) return null
     const result = await this.context.pool.query<{
       provider_id: string
       key_version: number
@@ -2590,13 +2650,15 @@ export class PostgresModelGovernanceService {
       ciphertext: Buffer
       auth_tag: Buffer
     }>(`SELECT provider.id provider_id,credential.key_version,credential.nonce,credential.ciphertext,credential.auth_tag
-      FROM harness.project_model_providers provider
+      FROM harness.projects project
+      JOIN harness.project_model_providers provider ON provider.organization_id=project.organization_id
+        AND provider.project_id=project.id
       JOIN harness.project_model_credentials credential ON credential.organization_id=provider.organization_id
         AND credential.project_id=provider.project_id AND credential.provider_id=provider.id
       JOIN harness.project_model_catalog model ON model.organization_id=provider.organization_id
         AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
-      WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.credential_ref=$3
-        AND provider.status='enabled' LIMIT 1`, [this.context.organizationId, project, ref])
+      WHERE project.organization_id=$1 AND project.public_id=$2 AND provider.credential_ref=$3
+        AND provider.status='enabled' LIMIT 1`, [this.context.organizationId, projectId, ref])
     const row = result.rows[0]
     if (row === undefined) return null
     return this.credentialCipher.decrypt(this.context.organizationId, row.provider_id, {

@@ -186,17 +186,33 @@ export async function handleRuntimeResourceApi(
         const request = deps.fencedRequest ?? resourceRequestSchema.parse(payload)
         const started = timing === undefined ? 0 : performance.now()
         const fence = deps.fencedRequest === undefined ? undefined : deps.personalFence
-        const cursor = fence !== undefined && deps.waitForQueued === true ? deps.budget.changeCursor : undefined
+        const scopedModel = request.kind === 'model' && request.origin.kind === 'session' && request.origin.scopeId !== undefined
+        const cursor = deps.waitForQueued === true && (fence !== undefined || scopedModel) ? deps.budget.changeCursor : undefined
         const attribution = fence === undefined ? await actor(deps, subject, request.origin)
           : { actorId: subject.target.id, administrative: false }
         const authorized = timing === undefined ? 0 : performance.now()
-        const status = await deps.budget.request(subject, {
+        let status = await deps.budget.request(subject, {
           sequence: request.sequence, requestId: request.requestId, kind: request.kind, ...attribution, origin: request.origin.kind,
           projectId: subject.target.kind === 'project' ? subject.target.id : 0,
           ...(request.origin.kind === 'session' ? { sessionId: request.origin.sessionId, scopeId: request.origin.scopeId } : {}),
         }, fence)
         if (cursor !== undefined && status.state === 'queued') res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
-        if (fence !== undefined && status.state === 'active') res.setHeader(RESOURCE_QUALIFIED_GRANT_HEADER, '1')
+        if (fence !== undefined && status.state === 'active') {
+          res.setHeader(RESOURCE_QUALIFIED_GRANT_HEADER, '1')
+        } else if (fence === undefined && scopedModel && status.state === 'active' && request.origin.kind === 'session') {
+          // Confirm post-reservation scope authority in-process so project and
+          // node_content model grants avoid a second /resources/statuses HTTP round trip.
+          try {
+            await authorizeSession(deps, subject, request.origin)
+            res.setHeader(RESOURCE_QUALIFIED_GRANT_HEADER, '1')
+          } catch (error) {
+            if (error instanceof ExecutionIdentityError && (error.status === 403 || error.status === 404)) {
+              status = { state: 'refused', reason: 'authority-unavailable' }
+            } else {
+              throw error
+            }
+          }
+        }
         timing?.(authorized - started, performance.now() - authorized)
         send(200, status)
         return true

@@ -801,7 +801,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
       return subject
     }
     if (row.project_internal_id !== null && row.project_public_id !== null) {
-      return {
+      const subject: RuntimeCredentialSubject = {
         organizationId: row.organization_id,
         target: { kind: 'project', id: publicNumber(row.project_public_id, 'project'), runtimeId: row.runtime_id },
         generation: Number(row.generation),
@@ -811,6 +811,15 @@ export class PostgresInstanceRepository implements InstanceRepository {
           nodeId: this.context.nodeId, runtimeId: row.runtime_id, volumeId: row.volume_id, writerEpoch: row.writer_epoch,
         } }),
       }
+      if (use === 'run') {
+        const key = hash.toString('hex')
+        this.personalExecutionCandidates.delete(key)
+        if (this.personalExecutionCandidates.size === RUNTIME_TOKEN_CACHE_CAPACITY) {
+          this.personalExecutionCandidates.delete(this.personalExecutionCandidates.keys().next().value!)
+        }
+        this.personalExecutionCandidates.set(key, subject)
+      }
+      return subject
     }
     throw new Error('runtime credential resolved an ownerless instance')
   }
