@@ -1,7 +1,8 @@
 /** Dynamic HTTP response compression for Gateway JSON and HTML payloads. */
 import type { IncomingMessage, OutgoingHttpHeaders, ServerResponse } from 'node:http'
+import type { Transform } from 'node:stream'
 import { promisify } from 'node:util'
-import { brotliCompress, constants, gzip } from 'node:zlib'
+import { brotliCompress, constants, createBrotliCompress, createGzip, gzip } from 'node:zlib'
 
 const brotli = promisify(brotliCompress)
 const deflate = promisify(gzip)
@@ -86,19 +87,38 @@ export function compressBuffer(raw: Buffer, coding: ContentCoding): Promise<Buff
 }
 
 /**
+ * Create a streaming Brotli or gzip compressor for proxied HTTP responses without full-body buffering.
+ * @param coding - negotiated content coding.
+ * @returns transform stream using the same interactive quality settings as {@link compressBuffer}.
+ */
+export function createStreamCompressor(coding: ContentCoding): Transform {
+  return coding === 'br'
+    ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY } })
+    : createGzip({ level: GZIP_LEVEL })
+}
+
+/**
+ * Merge one header token into an existing `vary` header value without duplicating tokens.
+ * @param existing - current `vary` header value, if any.
+ * @param token - header name to ensure is present (for example `'accept-encoding'`).
+ * @returns normalized comma-separated `vary` header value.
+ */
+export function mergeVaryValue(existing: string | string[] | number | undefined, token: string): string {
+  const values = (Array.isArray(existing) ? existing.join(',') : typeof existing === 'string' ? existing : '')
+    .split(',')
+    .map(part => part.trim())
+    .filter(part => part !== '')
+  if (!values.some(part => part.toLowerCase() === token.toLowerCase())) values.push(token)
+  return values.join(', ')
+}
+
+/**
  * Append one header name to a response's `vary` header without clobbering existing tokens.
  * @param res - response whose `vary` header is updated prior to `writeHead`.
  * @param token - header name to include (for example `'accept-encoding'`).
  */
 export function appendVary(res: ServerResponse, token: string): void {
-  const existing = res.getHeader('vary')
-  const values = (Array.isArray(existing) ? existing.join(',') : typeof existing === 'string' ? existing : '')
-    .split(',')
-    .map(part => part.trim())
-    .filter(part => part !== '')
-  if (values.some(part => part.toLowerCase() === token.toLowerCase())) return
-  values.push(token)
-  res.setHeader('vary', values.join(', '))
+  res.setHeader('vary', mergeVaryValue(res.getHeader('vary'), token))
 }
 
 /**

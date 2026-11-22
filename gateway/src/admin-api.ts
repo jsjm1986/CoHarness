@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { createAdministratorResponse, AdministratorReadUnavailableError, type AdministratorResponse, type AdministratorResponseHeaders } from './admin-response.ts'
+import { sendCompressed } from './http-compression.ts'
 import { NodeMigrationConflict } from './node-content-migration-admin.ts'
 import { nodeMigrationPublishSchema, nodeMigrationTargetSchema, nodeRetirementOpenSchema, nodeRetirementFinalizeSchema } from './node-content-migration-protocol.ts'
 import { NodeContentUnavailable } from './node-content-store.ts'
@@ -243,7 +244,7 @@ export function createAdminApiHandler(
   return async (req: IncomingMessage, res: ServerResponse, admin: UserRow, pathname: string, body: string): Promise<boolean> => {
     if (!pathname.startsWith('/admin/api')) return false
     const reply = createAdministratorResponse(deps.users, admin.id, req.method ?? 'GET',
-      (status, value, headers) => sendJson(res, status, value, headers))
+      (status, value, headers) => sendCompressed(req, res, status, JSON.stringify(value), 'application/json', headers))
     try {
       if (pathname==='/admin/api/deployment/project-content-migrations') {
         res.setHeader('cache-control','no-store')

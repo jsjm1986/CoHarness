@@ -18,6 +18,7 @@ import type { GatewayNodeServices } from './node-service.ts'
 import type { NodeServiceConfig } from './node-service.ts'
 import { NodeServiceHttpPool, type NodeServiceHttpPoolDiagnostics } from './node-service-http-pool.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
+import { createStreamCompressor, isCompressibleContentType, mergeVaryValue, MIN_COMPRESS_BYTES, preferredCompression } from './http-compression.ts'
 
 /** Organization directory and current Admin authority; paths remain owned by the selected Gateway. */
 export interface NodeServiceProxyDirectory {
@@ -448,11 +449,26 @@ export class GatewayNodeServiceProxy {
                   capturedChunks.push(buf)
                 })
               }
+              const contentType = typeof response.headers['content-type'] === 'string'
+                ? response.headers['content-type'] : 'application/octet-stream'
+              const streamCoding = status === 200 && req.method !== 'HEAD' && req.headers.range === undefined
+                && response.headers['content-encoding'] === undefined
+                && declaredLength !== undefined && Number.isSafeInteger(declaredLength) && declaredLength >= MIN_COMPRESS_BYTES
+                && isCompressibleContentType(contentType)
+                ? preferredCompression(req.headers['accept-encoding'])
+                : undefined
+              if (streamCoding !== undefined) {
+                delete forwardedHeaders['content-length']
+                forwardedHeaders['content-encoding'] = streamCoding
+                forwardedHeaders.vary = mergeVaryValue(forwardedHeaders.vary, 'accept-encoding')
+                if (typeof forwardedHeaders.etag === 'string' && !forwardedHeaders.etag.startsWith('W/')) {
+                  forwardedHeaders.etag = `W/${forwardedHeaders.etag}`
+                }
+              }
               res.writeHead(status, forwardedHeaders)
-              await pipeline(response, res)
+              if (streamCoding !== undefined) await pipeline(response, createStreamCompressor(streamCoding), res)
+              else await pipeline(response, res)
               if (capturedChunks !== undefined && !signal.aborted) {
-                const contentType = typeof response.headers['content-type'] === 'string'
-                  ? response.headers['content-type'] : 'application/octet-stream'
                 const etag = typeof response.headers.etag === 'string' ? response.headers.etag : undefined
                 const cacheControl = typeof response.headers['cache-control'] === 'string'
                   ? response.headers['cache-control'] : undefined
