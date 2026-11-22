@@ -6,7 +6,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import { defineContentToolFixture, executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
+import { defineContentToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -153,14 +153,17 @@ describe('next-step input during a background result wait', () => {
 
   it('releases for already-pending input without waiting for another insertion', async () => {
     const h = await setup()
+    const off = h.ctx.on('tools/pre-execute', (execution, next) => {
+      if (execution.name === 'job_output') h.agent.steer(message('ALREADY_PENDING'))
+      return next()
+    })
     try {
-      h.agent.inbox.append('next-step', message('ALREADY_PENDING'))
-      const result = await executeToolFixture(h.ctx, { name: 'job_output', callId: ToolCallId('pending'), arguments: { job_id: h.id, wait: true }, agent: h.agent, signal: new AbortController().signal })
-      expect(result.isError).not.toBe(true)
-      expect(JSON.stringify(result.content)).toContain('[status: running, user steered]')
-      expect(h.agent.inbox.nextStep).toHaveLength(1)
+      h.agent.followup(message('start'))
+      await h.agent.whenIdle()
+      expect(JSON.stringify(h.adapter.requests[1]?.messages)).toContain('[status: running, user steered]')
+      expect(JSON.stringify(h.adapter.requests[1]?.messages)).toContain('ALREADY_PENDING')
       expect(h.cancel).not.toHaveBeenCalled()
-    } finally { await h.dispose() }
+    } finally { off(); await h.dispose() }
   })
 
   it('does not lose input inserted during waiter registration', async () => {
@@ -169,12 +172,29 @@ describe('next-step input during a background result wait', () => {
       const waitSpy = vi.spyOn(h.ctx.jobs, 'wait')
       const originalWait = waitSpy.getMockImplementation()!
       waitSpy.mockImplementation((...args) => {
-        h.agent.inbox.append('next-step', message('REGISTRATION_RACE'))
+        h.agent.steer(message('REGISTRATION_RACE'))
         return originalWait(...args)
       })
-      const result = await executeToolFixture(h.ctx, { name: 'job_output', callId: ToolCallId('race'), arguments: { job_id: h.id, wait: true }, agent: h.agent, signal: new AbortController().signal })
-      expect(result.isError).not.toBe(true)
-      expect(JSON.stringify(result.content)).toContain('[status: running, user steered]')
+      h.agent.followup(message('start'))
+      await h.agent.whenIdle()
+      expect(JSON.stringify(h.adapter.requests[1]?.messages)).toContain('[status: running, user steered]')
+      expect(h.cancel).not.toHaveBeenCalled()
+    } finally { await h.dispose() }
+  })
+
+  it('keeps waiting when a plugin injects passive context with a user source', async () => {
+    const h = await setup()
+    try {
+      h.agent.followup(message('start'))
+      await h.registered.promise
+      h.agent.inject(message('PASSIVE_NEXT_STEP'))
+      let released = false
+      void h.released.promise.then(() => { released = true })
+      await setImmediate()
+      expect(released).toBe(false)
+      h.done.resolve({ status: 'completed' })
+      await h.agent.whenIdle()
+      expect(JSON.stringify(h.adapter.requests[1]?.messages)).toContain('PASSIVE_NEXT_STEP')
       expect(h.cancel).not.toHaveBeenCalled()
     } finally { await h.dispose() }
   })

@@ -305,6 +305,31 @@ describe('ReactLoopInbox', () => {
     expect(() => { tiny.inbox.append('next-turn', first) }).toThrow('inbox byte limit reached')
   })
 
+  it('applies the UTF-8 quota to a replacement committed by another inbox writer', async () => {
+    const original = createUserMessage({ content: [{ type: 'text', text: '原文' }], source: { kind: 'user' } })
+    const extra = createUserMessage({ content: [{ type: 'text', text: '附录' }], source: { kind: 'user' } })
+    const replacement = freezeMessage({ ...original, content: [{ type: 'text', text: '替换后的原文' }] })
+    const maxBytes = Buffer.byteLength(JSON.stringify(original)) + Buffer.byteLength(JSON.stringify(extra))
+    const { ctx, session, inbox } = await inboxAgent('bounded-inbox-after-replacement', { maxBytes })
+    try {
+      inbox.append('next-turn', original)
+      inbox.append('next-step', extra)
+      inbox.remove(extra.id)
+      session.append('agent/inbox/spliced', {
+        target: 'next-turn', start: 0, removedCount: 1, inserted: [replacement],
+      })
+
+      expect(() => { inbox.append('next-step', extra) }).toThrow('inbox byte limit reached')
+      expect(inbox.nextTurn).toEqual([replacement])
+      expect(inbox.nextStep).toEqual([])
+      inbox.remove(replacement.id)
+      inbox.append('next-step', extra)
+      expect(inbox.nextStep).toEqual([extra])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('keeps identity lookup correct after prepend, remove, and replacement', async () => {
     const { agent, inbox } = await inboxAgent('indexed-inbox')
     const first = createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } })

@@ -101,7 +101,7 @@ Each LLM service records [requests assembled by its loops](../packages/llm/llm/R
 
 Recovery admission belongs to the root composition: the Agent registry and default driver reject historical identities before preset loading, Agent construction or inbox consumption. Read-only history requires no Agent. [The Agent service](../packages/core/agent/README.md#create-or-resume-an-agent) defines this extension point; [recovery composition](../packages/boot/app-boot/README.md) controls which plugins may mount.
 
-Input reaches the driver through one inbox. Some messages wake it immediately; injected context waits in the inbox until another message does.
+Input reaches the driver through one inbox. Some messages wake it immediately, while injected context waits for another message to wake it. A tool waiting for background output can inspect pending user steering delivered with a wake. Releasing the wait leaves the producer running.
 
 `agent/pre-step` decides what the model sees. Listeners may rewrite the claimed messages or reject them outright; a rejected or empty first claim still closes a durable turn that spent no step, so the log records the attempt. Each step reads the prompt sections and tool schemas that plugins registered, and each request-admission attempt refreshes registered runtime context — the accepted assembly's sections, schemas, and variables stay bound while provider-supplied context text is re-evaluated and committed as a fresh snapshot.
 

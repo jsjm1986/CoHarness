@@ -65,7 +65,7 @@ This package lets applications persist and resume session event logs through a b
 
 - **Append-only; a crashed turn is closed, not truncated.** Flushed events are never rewritten. A crash can leave an unclosed final turn whose events are real and possibly large; `load` preserves them and durably appends synthetic closers (a risk-classified error `tool/result` per unanswered assistant call, then `step/end?`+`turn/end {interrupted}`) to balance the log and keep the rehydrated history a valid provider transcript. Only a never-fully-written torn tail fragment is discarded.
 - **Contiguous seq.** `load` rejects a `seq` gap/parse error in the MIDDLE of the log; `append`'s first `seq` must equal the stored next-seq.
-- **JSON-serializable data.** `append` materializes each direct/replay batch through the shared one-pass lossless-JSON boundary. Live `Session` events are already deep-frozen, but the write coordinator still copies each event into a persistence-owned buffer.
+- **JSON-serializable data.** `append` validates and detaches each direct or replay batch in one lossless JSON pass. The live write queue borrows the Session's deeply frozen committed events. It counts their exact UTF-8 JSON bytes before accepting them.
 - **Durability.** `append` returns only once the batch is durable.
 
 <a id="the-write-coordinator"></a>

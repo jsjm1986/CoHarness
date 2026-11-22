@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../core/agent"
+    },
+    {
       "path": "../../core/session"
     },
     {

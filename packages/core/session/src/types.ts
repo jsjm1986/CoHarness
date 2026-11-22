@@ -87,8 +87,8 @@ export type OptionalSessionSeq = SessionSeq | null
  * The on-disk session format version, stamped into every newly-written {@link SessionHeader}
  * and enforced by every persistence backend on load. The single source of truth for the
  * version — write sites and the load-time check all read it.
- * The current build stamps `3`; supported historical generations are migrated
- * by the persistence format catalog before a provider exposes a Session.
+ * The persistence format catalog migrates supported historical generations
+ * before a provider exposes a Session.
  *
  * The version is a single monotonic integer with no major/minor split. Whether
  * a bump is needed is decided by what the WRITER emits, never by what a newer

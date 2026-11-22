@@ -13,7 +13,7 @@ export interface SessionWriteBehindOptions {
   readonly maxPendingEvents?: number
   /** Maximum UTF-8 JSON bytes retained across the pending queue and active write. */
   readonly maxPendingBytes?: number
-  /** Persist one stable ordered prefix; resolves only after backend durability. */
+  /** Persist one ordered prefix of immutable events. Resolve after backend durability. */
   readonly write: (events: readonly SessionEvent[]) => Promise<void>
   /** Observe a detached background write failure without rejecting the producer. */
   readonly reportBackgroundFailure: (error: unknown) => void
@@ -71,22 +71,19 @@ export class SessionWriteBehind {
   }
 
   /**
-   * Copy one event into the persistence-owned queue and start a fixed deadline
-   * when the automatic path is idle.
-   * @param event - frozen live event to retain independently of its producer.
+   * Queue one committed event and start a fixed deadline when idle.
+   * @param event - deeply frozen event published by the live Session.
    * @throws the first retention failure on this and every later admission; flush retains that failure.
    */
   enqueue(event: SessionEvent): void {
     if (this.admissionFailure !== undefined) throw this.admissionFailure
-    // Measure before cloning so an event that cannot fit is rejected without
-    // first allocating another copy of a potentially very large payload.
-    const eventBytes = serializedBytes(event)
     if (this.pending.length + this.activeBatchSize >= this.maxPendingEvents) {
       const error = new Error(`session write-behind pending-event limit exceeded (${String(this.maxPendingEvents)})`)
       this.admissionFailure = error
       this.options.reportBackgroundFailure(error)
       throw error
     }
+    const eventBytes = serializedBytes(event)
     const available = this.maxPendingBytes - this.pendingBytes - this.activeBatchBytes
     if (eventBytes > available) {
       const error = new Error(`session write-behind pending-byte limit exceeded (${String(this.maxPendingBytes)})`)
@@ -94,9 +91,8 @@ export class SessionWriteBehind {
       this.options.reportBackgroundFailure(error)
       throw error
     }
-    const retained = structuredClone(event)
     const wasEmpty = this.pending.length === 0
-    this.pending.push(retained)
+    this.pending.push(event)
     this.pendingBytes += eventBytes
     if (this.barrier !== undefined) return
     if (this.automaticPaused) {

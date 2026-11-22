@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-projection-cache/README.md
 document:
-  en: 87b887f062ee46038f8260a4c2f7fbf688ae27e6
-  zh: b061254baf4b6ba56bb0bf29029206b7f359fb1c
+  en: 1df89cdfd084fd84fca667058d0e61ddce86bc9c
+  zh: 6e6ce2f04c2dcad2f9edad05a5bb16a4c7b8271b
 /:
   en: 28998fd034337b27
   zh: 61495d48365178df
 /deepseek-ai-dsh-session-projection-cache:
-  en: 91a97e5854a0ae5a
-  zh: 36ec7aefecb760d9
+  en: 740b83fe2b787c88
+  zh: a2b3b74f6c397dbf
 /deepseek-ai-dsh-session-projection-cache/summary:
   en: bf8d9303afdc56ad
   zh: b6d54b39b6411be5
@@ -18,8 +18,8 @@ document:
   en: 3ebac8b64f3609b7
   zh: 008a8a2a96b25d20
 /deepseek-ai-dsh-session-projection-cache/write-policy:
-  en: 0eeb76feed438508
-  zh: def21d82b70876cb
+  en: f3a0d021dba98df3
+  zh: 6db9b65fe586424f
 /deepseek-ai-dsh-session-projection-cache/listing-read-cachedsnapshot-meta-inheritedeventcount-keys:
   en: bf16cbb71d5e4476
   zh: 49e64fc7cb005ad1

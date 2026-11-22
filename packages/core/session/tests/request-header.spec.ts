@@ -58,6 +58,23 @@ describe('headerEquals', () => {
   it('treats absent and empty tool arrays as equivalent canonical absence', () => {
     expect(headerEquals({ config: CONFIG }, { config: CONFIG, tools: [] })).toBe(true)
   })
+
+  it('distinguishes schema value types and serialization order', () => {
+    const ordered = { config: CONFIG, tools: [{ ...tool('a'), parameters: { object: { a: 1, b: 2 } } }] }
+    const schema = (object: unknown): EpochHeader =>
+      ({ config: CONFIG, tools: [{ ...tool('a'), parameters: { object } }] })
+    expect(headerEquals(ordered, schema({ a: 1, b: 2 }))).toBe(true)
+    expect(headerEquals(ordered, schema({ b: 2, a: 1 }))).toBe(false)
+    expect(headerEquals(ordered, schema({ a: 1, b: 3 }))).toBe(false)
+    expect(headerEquals(ordered, schema({ a: 1 }))).toBe(false)
+    expect(headerEquals(schema([1]), schema({ 0: 1 }))).toBe(false)
+    expect(headerEquals(schema([1, 2]), schema([2, 1]))).toBe(false)
+    expect(headerEquals(schema([1]), schema(Array.from({ length: 2 }, () => 1)))).toBe(false)
+    expect(headerEquals(schema({}), schema(new Date(0)))).toBe(false)
+    expect(headerEquals(schema({ nested: {}, list: [] }), schema({ nested: new Date(0), list: [] }))).toBe(false)
+    const shared = { required: ['path'] }
+    expect(headerEquals(schema({ a: shared, b: shared }), schema({ a: { ...shared }, b: shared }))).toBe(true)
+  })
 })
 
 describe('foldRequestHeader', () => {

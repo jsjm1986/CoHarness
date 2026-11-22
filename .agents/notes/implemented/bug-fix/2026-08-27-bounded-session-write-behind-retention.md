@@ -10,7 +10,7 @@ The write-behind controller retained failed batches and events arriving while a 
 
 ## Decision
 
-`SessionWriteBehind` enforces two admission limits across the pending queue and the active batch: `maxPendingEvents` and `maxPendingBytes`. The byte limit measures each retained event's UTF-8 JSON encoding, before the controller takes its persistence-owned structured clone. The defaults are 100,000 events and 64 MiB per live session.
+`SessionWriteBehind` enforces `maxPendingEvents` and `maxPendingBytes` across the pending queue and the active batch. It checks the count before encoding the event to measure its UTF-8 JSON bytes. It retains the exact deeply frozen event published by the live Session. The defaults are 100,000 events and 64 MiB per live session.
 
 The active batch remains counted until its durable write settles. A failed batch is restored before newer pending events and its event and byte totals remain counted, so retries cannot bypass either limit. An admission that would exceed either limit reports the failure and throws before changing the queue. The controller retains that failure so Session observer containment cannot hide a missing event; the [admission-failure decision](2026-10-23-write-behind-admission-failure.md) owns its terminal barrier behavior.
 
@@ -34,4 +34,4 @@ The shared [`PersistenceCoordinator`](../architecture/2026-06-18-shared-persiste
 
 Each live session has a deterministic upper bound on queued write-behind event count and serialized payload bytes, including a batch waiting on a slow or failed backend. Admission errors remain explicit at direct controller calls and at every later durability barrier. A live Session whose observer could not retain an accepted event cannot recover that lifecycle by merely draining its controller; deployments must address the limit before accepting further work.
 
-The controller serializes each admitted event once for its retained byte estimate in addition to the existing persistence-owned clone. The quota does not bound backend I/O duration, total durable history, or aggregate memory across sessions; deployments still need session and process-level capacity controls.
+The controller owns the pending and active batch lists. Each batch shares the immutable events with its live Session, and storage adapters borrow those events read-only. Direct persistence callers still pass through lossless JSON validation and detachment. Backend I/O duration, total durable history, and aggregate memory across sessions require separate capacity controls.

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/agent-loop/README.md
 document:
-  en: f1f80aa9340d42b08a99878dec7de05f0e54e2c7
-  zh: 0e242496e3d825391c4c5622fe90e4d06e6a7e5b
+  en: bcbca88e5466ed496b8fac5db6d6c507e5b0fe56
+  zh: 8c1cddf4715747c54c146f4b7191bc0b6a55e4f2
 /:
   en: c66a79e8f336e414
   zh: 61495d48365178df
@@ -30,8 +30,8 @@ document:
   en: c757ba891d021ae0
   zh: 6adb6753afe1f6d1
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/internal-concrete-driver:
-  en: 0378d519bc91e176
-  zh: ff3aed78cdfd385a
+  en: f2637e5400cd8dff
+  zh: fcff45c17821e768
 /dsh-agent-loop/service-agentloop-ctx-key-agentloop/loop-lifecycle-agent-ts:
   en: b27bbabb34a140ac
   zh: f91ef8e2ef970750

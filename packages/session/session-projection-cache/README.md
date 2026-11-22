@@ -14,7 +14,7 @@ A stored row `(key → {ver, seq, val})` is a fold shortcut, never an authority:
 - **Every background write is fail-soft.** A failed durable write logs a warning and keeps the cache stale; the next write or cold read self-heals. A crash between writes costs a longer tail replay, never a wrong value.
 - **A `ver` mismatch against the live unit's `stateVersion` discards, never migrates.** A unit bump invalidates its rows at read time; the key refolds from the log.
 - **A row must pass the live unit's `stateSchema`.** A malformed row is omitted from the zero-I/O view and rejected by restore so the cold-read ladder refolds it from the log.
-- **Whole-record writes.** Each write replaces the session's full checkpoint (the registry cut is always complete), snapshotted through the lossless-JSON boundary — a unit state violating the plain-JSON contract fails loud.
+- **Whole-record writes.** Each write replaces the Session's complete checkpoint and validates lossless JSON. Live writes use the registry's already detached checkpoint. Cold write-back takes a separate copy before queuing storage.
 - **Opaque state reads.** Domain validation uses the same lossless JSON rules and retains every state property, including own `__proto__` keys. Each unit's `stateSchema` still decides which states it accepts.
 - **Records are bound to a log lifecycle, not just an id.** Each record stores the complete lifecycle identity (`formatVersion`, `createdAt`, `cwd`, `isSeeded`, and the exact `inheritedEventCount`) it was folded from, so a row initialized under another Session format generation or fork cut cannot seed the caller; every read validates it (the live or stored header is the witness) before accepting a row, so a deleted-then-recreated id or a persistence store swapped under a surviving cache discards the unrelated record instead of seeding phantom values.
 - **The log leads, the cache follows.** A live checkpoint flushes the session's buffered events durably BEFORE the cache row lands, so a crash can leave the cache behind the log (a longer tail replay) but never ahead of it.
@@ -49,7 +49,7 @@ Three mandatory points, throttled in between:
 | `writeEveryEvents` committed events | Config throttle (count). |
 | `writeIntervalMs` since the first dirty event | Config throttle (interval). |
 
-Both `Config` fields are required (no defaults): flush cadence is a deployment choice with no universally correct value, stated in cordis.yml.
+Set both required fields in cordis.yml. Interval callbacks run without an initiating Agent when the Agent service is installed. Checkpoints still bind to the Session supplied by the committed event.
 
 <a id="listing-read-cachedsnapshotmeta-inheritedeventcount-keys"></a>
 ## Listing read (`cachedSnapshot(meta, inheritedEventCount, keys?)`)

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-22-local-session-storage-reconciliation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-22-local-session-storage-reconciliation.md
+document:
+  en: c5e731802519b512ff3fcc3af02076ffc1e6c220
+  zh: f96a4994cfb72f1568f162c98d482095ac968456
+/agent-note-reuse-verified-local-session-observations:
+  en: e3853f8443a55b0f
+  zh: 9b876d1d47fc46f7
+/agent-note-reuse-verified-local-session-observations/problem:
+  en: 7a70b059314f6291
+  zh: fbab0c0ce1751b4c
+/agent-note-reuse-verified-local-session-observations/decision:
+  en: f4d68fcb24062f7b
+  zh: 28510285df671a06
+/agent-note-reuse-verified-local-session-observations/alternatives-considered:
+  en: fe444c4089e82997
+  zh: 81f73912032e6971
+/agent-note-reuse-verified-local-session-observations/consequences:
+  en: abc7d998028d491d
+  zh: c3f1f7d4690565f8

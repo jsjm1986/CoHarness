@@ -65,7 +65,7 @@ kind: "package-reference"
 
 - **仅追加；崩溃轮次会被关闭，而非截断。** 已 flush 事件绝不重写。崩溃可留下未关闭最终轮次，其事件真实且可能很大；`load` 保留它们，并持久追加合成 closer（为每个未获回答的 assistant 调用添加一个带风险分类错误的 `tool/result`，再添加 `step/end?`+`turn/end {interrupted}`），以平衡日志，并确保重新载入的历史仍是有效的提供方 transcript（文本记录）。只丢弃从未完整写入的撕裂尾部碎片。
 - **连续 seq。**`load` 拒绝日志中间的 `seq` 缺口/解析错误；`append` 的第一个 `seq` 必须等于已存储 next-seq。
-- **JSON 可序列化数据。**`append` 通过共享单遍无损 JSON 边界实体化每个直接/回放批次。活动 `Session` 事件已深度冻结，但写入协调器仍将每个事件复制到持久化自有缓冲区。
+- **JSON 可序列化数据。**`append` 在一次无损 JSON 遍历中校验并分离直接追加或回放的批次。活动写入队列借用 Session 已提交且深度冻结的事件，在接纳前计算准确的 UTF-8 JSON 字节数。
 - **持久性。**`append` 只在批次持久后返回。
 
 <a id="the-write-coordinator"></a>

@@ -145,7 +145,13 @@ export class ReactLoopAgent implements Agent {
     this.ctx = this.scope.ctx
     this.inbox = new ReactLoopInbox(this.ctx.sessionProjections, session, this.dispatch, inboxLimits)
     // Wake bookkeeping follows the durable inbox outcome, not the splice request.
-    this.ctx.on('agent/inbox/discarded', ({ message }) => { this.pendingWakes.delete(message.id) })
+    this.ctx.on('agent/inbox/discarded', ({ message }) => {
+      if (this.pendingWakes.has(message.id)
+        && !this.inbox.nextTurn.some(item => item.id === message.id)
+        && !this.inbox.nextStep.some(item => item.id === message.id)) {
+        this.pendingWakes.delete(message.id)
+      }
+    })
     this.ctx.on('agent/inbox/claimed', ({ message }) => { this.pendingWakes.delete(message.id) })
     /* v8 ignore next -- the loop registers its own turnBoundary unit, so the key is always present */
     const lastTurn = this.loopCtx.sessionProjections.stateOf(session, 'turnBoundary')?.lastTurn ?? 0
@@ -156,6 +162,10 @@ export class ReactLoopAgent implements Agent {
 
   get status(): AgentStatus {
     return this.phase.kind === 'idle' || this.phase.kind === 'maintenance' ? 'idle' : 'running'
+  }
+
+  get hasPendingUserSteer(): boolean {
+    return this.inbox.nextStep.some(message => message.source.kind === 'user' && this.pendingWakes.has(message.id))
   }
 
   /**
@@ -197,11 +207,12 @@ export class ReactLoopAgent implements Agent {
     const resolvedTarget = wakingAfterAbort ? 'next-turn' : target
     // Register before splice: a synchronous discard/claim observer can then
     // remove the identity, while a refused splice rolls it back below.
-    if (wakeup) this.pendingWakes.add(message.id)
+    const registersWake = wakeup && !this.pendingWakes.has(message.id)
+    if (registersWake) this.pendingWakes.add(message.id)
     try {
       this.inbox.splice(resolvedTarget, Infinity, 0, [message])
     } catch (error: unknown) {
-      this.pendingWakes.delete(message.id)
+      if (registersWake) this.pendingWakes.delete(message.id)
       throw error
     }
     if (wakeup) this.wakeDriver(wakingAfterAbort)

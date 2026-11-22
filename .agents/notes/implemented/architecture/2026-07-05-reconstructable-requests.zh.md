@@ -24,6 +24,8 @@ Status: implemented
 
 `EpochHeader` 记录请求的非历史状态：调用配置和工具 schema，空值规范化为缺失。渲染后的系统提示词属于派生历史——循环在用户消息进入 surface 之前写入的 `system/message` surface 事件，因此提示词像其他 surface 节点一样计价、压缩和回放。`request/header` 始终写入完整快照：首个循环实例使用 reason `initial`，后续实例使用 `resume`，实例内变更使用 `change`。`foldRequestHeader` 选择最新快照。旧的 `request/header-delta` 事件和已移除的 `fallback` reason 在追加或加载时都会被拒绝。
 
+相等判断按 JSON 序列化顺序遍历规范工具 schema。对象属性顺序也参与比较，因为顺序变化可能更改发给模型供应方的请求字节。
+
 每个拟议步骤先领取其 inbox 批次，再运行 `agent/pre-step`。reject 不打开步骤；enter 打开 `step/start`，并把最终消息批次记录为 `user/message` 事件。随后步骤组装系统提示词与工具，`agent/request` 只能替换冻结的调用配置种子。循环记录所需的完整 header 快照，从派生消息与该 header 构建 `GenerateOptions`，对其深度冻结但保持 `AbortSignal` 活跃。首次调用配置从显式的 `AgentOptions` 出发，保留 fork 覆盖和恢复重配置；后续调用从折叠后的 header 出发。
 
 **已打开步骤是重建边界。** 进入步骤的 `user/message` 批次与任何新写入的 `request/header` 都位于请求分派之前。原子领取后发生的注入加入后续请求；必须影响本次请求的监听器则通过 `agent/pre-step` 返回消息。header 重建选择该步骤的 `request/header`，或在无新 header 写入时沿用前一个快照。

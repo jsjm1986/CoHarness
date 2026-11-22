@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SessionSeq, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { Session, SessionId, SessionSeq, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionWriteBehind } from '../src/write-behind.ts'
 
 /** Minimal ordered event fixture; batching does not interpret event vocabulary. */
@@ -29,18 +29,20 @@ describe('SessionWriteBehind', () => {
     })).toThrow(/must be a positive safe integer/)
   })
 
-  it('uses one fixed window from the first queued event and owns its copy', async () => {
+  it('uses one fixed window and persists the original immutable Session events', async () => {
     vi.useFakeTimers()
-    const batches: SessionEvent[][] = []
+    const batches: Array<readonly SessionEvent[]> = []
     const controller = new SessionWriteBehind({
       maxDelayMs: 200,
-      write: async (events) => { batches.push(structuredClone(events) as SessionEvent[]) },
+      write: async (events) => { batches.push(events) },
       reportBackgroundFailure: vi.fn(),
     })
-    const first = event(SessionSeq(0))
+    const session = Session.create(SessionId('write-behind-window'))
+    const input = { turn: 1 }
+    const first = session.append('turn/start', input)
 
     controller.enqueue(first)
-    first.data.turn = 99
+    input.turn = 99
     await vi.advanceTimersByTimeAsync(150)
     controller.enqueue(event(SessionSeq(1)))
     await vi.advanceTimersByTimeAsync(49)
@@ -51,6 +53,7 @@ describe('SessionWriteBehind', () => {
       expect.objectContaining({ seq: 0, data: { turn: 1 } }),
       expect.objectContaining({ seq: 1 }),
     ]])
+    expect(batches[0]?.[0]).toBe(first)
     expect(controller.hasWork).toBe(false)
   })
 

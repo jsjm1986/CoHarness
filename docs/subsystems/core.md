@@ -115,6 +115,11 @@ interface Agent {
      */
   send(message: UserMessage, target: InboxTarget, wakeup: boolean): void
   /**
+     * True while user-authored input submitted with a wake at the next-step
+     * boundary remains pending. Drivers without this live capability omit it.
+     */
+  readonly hasPendingUserSteer?: boolean
+  /**
      * Queue an ordinary follow-up turn and wake the driver. The item becomes the
      * sole ordinary message of its own turn.
      * @param message - identified prompt content and the source that supplied it.

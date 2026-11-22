@@ -456,6 +456,9 @@ describe('PersistenceCoordinator seed ownership', () => {
       await ctx.sessions.flush(session)
       const stored = backend.store.get(session.id)
       expect(stored?.events).toEqual([seed, deferred, receipt])
+      expect(backend.lastAppendedBatch?.[0]).toBe(seed)
+      expect(backend.lastAppendedBatch?.[1]).toBe(deferred)
+      expect(backend.lastAppendedBatch?.[2]).toBe(receipt)
       expect(stored?.meta.draft).toBe(true)
 
       session.append('user/message', message, { surfaceOp: 'append' })

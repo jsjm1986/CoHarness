@@ -67,8 +67,6 @@ export const inboxProjectionDefinition = {
   stateVersion: 1,
 } satisfies ProjectionDefinition<'inbox', InboxState>
 
-const textEncoder = new TextEncoder()
-
 /** Estimate the durable JSON footprint used by the inbox byte budget. */
 function messageBytes(message: UserMessage): number {
   let serialized: string
@@ -77,7 +75,7 @@ function messageBytes(message: UserMessage): number {
   } catch (error: unknown) {
     throw new Error('non-JSON-serializable inbox message', { cause: error })
   }
-  return textEncoder.encode(serialized).byteLength
+  return Buffer.byteLength(serialized, 'utf8')
 }
 
 /** Optional admission limits for one live inbox. Omitted limits are unlimited. */
@@ -109,6 +107,7 @@ export class ReactLoopInbox implements InboxContract {
   private admission: 'open' | 'inserts-closed' | 'draining' = 'open'
   private readonly maxMessages: number | undefined
   private readonly maxBytes: number | undefined
+  private pendingMessageSizes = new WeakMap<UserMessage, number>()
 
   constructor(
     private readonly projections: SessionProjectionRegistry,
@@ -277,11 +276,16 @@ export class ReactLoopInbox implements InboxContract {
     const other = target === 'next-turn' ? state['next-step'] : state['next-turn']
     const pending = target === 'next-turn' ? [...candidate, ...other] : [...other, ...candidate]
     const ids = new Set<string>()
+    const newMessages = new Set(inserted)
+    const retainedSizes = new WeakMap<UserMessage, number>()
     let pendingBytes = 0
     for (const message of pending) {
       if (ids.has(message.id)) throw new Error(`message "${message.id}" is already pending`)
       ids.add(message.id)
-      pendingBytes += messageBytes(message)
+      const bytes = this.pendingMessageSizes.get(message) ?? messageBytes(message)
+      pendingBytes += bytes
+      // Messages from the committed projection are safe to cache by identity.
+      if (!newMessages.has(message)) retainedSizes.set(message, bytes)
     }
     if (this.maxMessages !== undefined && pending.length > this.maxMessages) {
       throw new Error(`inbox message limit reached (limit: ${this.maxMessages})`)
@@ -298,6 +302,7 @@ export class ReactLoopInbox implements InboxContract {
       ...(outcome === undefined ? {} : { outcome }),
     }
     const event = this.session.append('agent/inbox/spliced', splice)
+    this.pendingMessageSizes = retainedSizes
     if (discardRemoved) {
       for (const message of removed) this.dispatch.emit('agent/inbox/discarded', { message })
     }

@@ -29,13 +29,46 @@ export function canonicalHeader(header: EpochHeader): EpochHeader {
   }
 }
 
-/** Canonical JSON equality for tool schemas assembled through the same path. */
+/** Compare lossless JSON schemas in serialization order without encoding their text. */
 function sameSchema(a: ToolSchema, b: ToolSchema): boolean {
-  return JSON.stringify(a) === JSON.stringify(b)
+  const pending: Array<readonly [unknown, unknown]> = [[a, b]]
+  const visited = new WeakSet<object>()
+  for (let pair = pending.pop(); pair !== undefined; pair = pending.pop()) {
+    const [left, right] = pair
+    if (left === right) continue
+    if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) return false
+    const leftArray = Array.isArray(left)
+    if (leftArray !== Array.isArray(right)) return false
+    if (leftArray) {
+      if (left.length !== (right as unknown[]).length) return false
+    } else {
+      const leftPrototype: unknown = Object.getPrototypeOf(left)
+      const rightPrototype: unknown = Object.getPrototypeOf(right)
+      if ((leftPrototype !== Object.prototype && leftPrototype !== null)
+        || (rightPrototype !== Object.prototype && rightPrototype !== null)) {
+        return JSON.stringify(a) === JSON.stringify(b)
+      }
+    }
+    // The canonical snapshot has no repeated nodes. Preserve serialization for a shared noncanonical graph.
+    if (visited.has(left)) return JSON.stringify(a) === JSON.stringify(b)
+    visited.add(left)
+    const leftKeys = Object.keys(left)
+    const rightKeys = Object.keys(right)
+    if (leftKeys.length !== rightKeys.length) return false
+    let index = 0
+    for (const key of leftKeys) {
+      if (key !== rightKeys[index++]) return false
+      const leftValue = (left as Record<string, unknown>)[key]
+      const rightValue = (right as Record<string, unknown>)[key]
+      if (leftValue !== rightValue) pending.push([leftValue, rightValue])
+    }
+  }
+  return true
 }
 
 /**
- * Field-wise equality over canonical headers. Tool schemas compare in order.
+ * Field-wise equality over canonical headers. Tool schemas use lossless JSON
+ * values and compare both tool order and object property order.
  * @param a - one canonical header.
  * @param b - the other.
  * @returns whether config and tools all match.
