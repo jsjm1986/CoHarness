@@ -1,8 +1,11 @@
 /** Current governance authority for an exact, already-running Runtime. */
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import type { UserRow } from './auth.ts'
+import type { ProjectThemePolicy } from './collaboration.ts'
 import type { PersonalReadAdmission } from './forwarded-principal.ts'
 import type { RuntimeInstanceSnapshot } from './instances.ts'
+import type { NodeProjectMetadata, ProjectContentRef } from './node-content-projects.ts'
 import type { PrincipalScope } from './principal.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import type { RuntimePlacement } from './runtime-router.ts'
@@ -23,7 +26,7 @@ export interface RuntimeAssetRequest {
   entryNodeId?: RuntimeNodeId
 }
 
-/** A single fresh read supplies identity, placement, lifecycle coordinates and the revocation watermark. */
+/** Qualified identity, placement, Runtime generation and revocation watermark for dispatch. */
 export interface RuntimeAssetAdmission {
   user: UserRow
   scope: PrincipalScope
@@ -70,6 +73,8 @@ interface Row {
   can_manage: boolean
   legacy_project_name: string | null
   legacy_project_path: string | null
+  project_content: ProjectContentRef['content']
+  project_theme_policy: ProjectThemePolicy | null
   cluster_mode: ClusterMode
   write_epoch: string
 }
@@ -82,14 +87,17 @@ interface SessionAdmissionRow {
 
 const admissionSnapshot = 'harness.browser_runtime_admission_snapshot($1,$2,$3,$4,$5)'
 
-function retainedPersonalAdmissionSql(issuer: string): string {
+function sharedSessionAdmissionSql(issuer: string): string {
   const snapshotWithIssuer = issuer === '' ? '' : ', issuer_revision, issuer_lease_exp'
   return `WITH ${issuer === '' ? '' : `${issuer}, `}initial AS MATERIALIZED (
       SELECT ${admissionSnapshot} snapshot${snapshotWithIssuer}${issuer === '' ? '' : ' FROM issuer'}
     ), locked AS MATERIALIZED (
       SELECT i.runtime_id FROM initial
       JOIN harness.instances i ON i.organization_id=$1 AND i.runtime_id=$4 AND i.assigned_node_id=$6 AND i.generation=$7
-      WHERE (initial.snapshot->>'available')::boolean AND initial.snapshot->>'owner_kind'='user' AND $8::text='personal'
+      WHERE (initial.snapshot->>'available')::boolean
+        AND (initial.snapshot->>'owner_kind'='user' AND $8::text='personal'
+          OR initial.snapshot->>'owner_kind'='project'
+            AND $8::text='project:'||(initial.snapshot->>'owner_public_id'))
         AND initial.snapshot->>'cluster_mode'='serving' AND (initial.snapshot->>'write_epoch')::bigint=$9
         AND i.observed_state='ready' AND i.provisioning_state='ready'
       FOR SHARE OF i
@@ -101,7 +109,8 @@ function retainedPersonalAdmissionSql(issuer: string): string {
 
 /** PostgreSQL read qualification with the same organization, computer and project predicates as browser admission. */
 export class PostgresRuntimeAssetAdmission {
-  constructor(private readonly context: PostgresRuntimeContext, private readonly writeEpoch: bigint) {}
+  constructor(private readonly context: PostgresRuntimeContext, private readonly writeEpoch: bigint,
+    private readonly nodeProjects?: Pick<NodeProjectMetadata, 'lookup'>) {}
 
   /**
    * Read current session, owner, computer, project, generation and lease authority in one statement.
@@ -143,19 +152,21 @@ export class PostgresRuntimeAssetAdmission {
   }
 
   /**
-   * Recheck browser authority after locking the retained instance in one database round trip.
+   * Recheck browser authority after locking the retained instance. A node-local
+   * project read also verifies its volume and rechecks governance before dispatch.
    * @param request - authenticated browser request for this computer and one exact Runtime and scope.
    * @param generation - generation owned by the local supervisor after queued lifecycle work.
    * @param issuer - verified signature key and issuer UUID requiring current publication in this statement.
-   * @param recordStartActivity - defaults to recording activity at admission. Prepared personal requests can
-   *   share the instance lock with directory publication while a local reference protects the Runtime through completion.
+   * @param recordStartActivity - defaults to recording activity at admission. Prepared personal requests and project
+   *   reads can use a shared lock while the supervisor retains the Runtime through completion.
    * @returns current authority or null when the existing general preparation route must handle this request.
    */
   async admitSession(request: RuntimeAssetRequest & { nodeId: RuntimeNodeId; target: RuntimePlacement['target'] },
     generation: number, issuer?: { nodeId: RuntimeNodeId; publicKey: string }, recordStartActivity = true): Promise<RuntimeAssetAdmission | null> {
-    const retainedPersonal = !recordStartActivity && request.target === 'personal'
+    const nodeProjects = issuer === undefined && request.target !== 'personal' && !recordStartActivity ? this.nodeProjects : undefined
+    const shareInstanceLock = !recordStartActivity && (request.target === 'personal' || nodeProjects !== undefined)
     const parameters = [...this.parameters(issuer === undefined ? request : { ...request, entryNodeId: issuer.nodeId }),
-      request.nodeId, generation, request.target, ...(retainedPersonal ? [] : [Date.now()]), String(this.writeEpoch)]
+      request.nodeId, generation, request.target, ...(shareInstanceLock ? [] : [Date.now()]), String(this.writeEpoch)]
     const admit = 'SELECT harness.admit_ready_browser_runtime($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) admission'
     const issuerSql = issuer === undefined ? '' : `issuer AS MATERIALIZED (
           SELECT o.access_revision::text issuer_revision, key.lease_exp issuer_lease_exp
@@ -163,7 +174,7 @@ export class PostgresRuntimeAssetAdmission {
           JOIN harness.organizations o ON o.id=$1 AND o.status='active'
           WHERE key.pem=$${parameters.length + 1}
         )`
-    const sql = retainedPersonal ? retainedPersonalAdmissionSql(issuerSql)
+    const sql = shareInstanceLock ? sharedSessionAdmissionSql(issuerSql)
       : issuer === undefined ? admit : `WITH ${issuerSql} ${admit}, issuer_revision, issuer_lease_exp FROM issuer`
     const { rows: [result] } = await this.context.pool.query<SessionAdmissionRow>(sql,
       issuer === undefined ? parameters : [...parameters, issuer.publicKey])
@@ -181,10 +192,40 @@ export class PostgresRuntimeAssetAdmission {
     if (admission.snapshot.generation !== generation) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
     if (result.issuer_lease_exp != null) admission.expiresAt = Math.min(admission.expiresAt, result.issuer_lease_exp.getTime())
     if (admission.scope.kind === 'personal') return admission
-    // Published local content resolves the current project name and path on its own node.
+    if (row?.project_content != null && nodeProjects !== undefined) {
+      return this.admitNodeProjectRead(request, admission, initial ?? undefined, row.project_content, nodeProjects)
+    }
     if (row?.legacy_project_name == null) return null
     if (row.legacy_project_path !== initial?.legacy_project_path) throw new RuntimeAssetUnavailableError(403, 'access-revoked')
     return { ...admission, scope: { ...admission.scope, projectName: row.legacy_project_name } }
+  }
+
+  private async admitNodeProjectRead(request: RuntimeAssetRequest, admitted: RuntimeAssetAdmission, initial: Row | undefined,
+    binding: NonNullable<ProjectContentRef['content']>, nodeProjects: Pick<NodeProjectMetadata, 'lookup'>): Promise<RuntimeAssetAdmission> {
+    const retained = admitted.snapshot
+    if (!admitted.placement.local || binding.runtimeId !== request.runtimeId || binding.nodeId !== request.nodeId
+      || !isDeepStrictEqual(initial?.project_content, binding)) {
+      throw new RuntimeAssetUnavailableError(403, 'access-revoked')
+    }
+    const display = (await nodeProjects.lookup([{ content: binding }], retained.generation)).get(binding.projectId)!
+    // No governance connection remains locked while the node reads its volume.
+    const { rows: [result] } = await this.context.pool.query<{ snapshot: Row | null }>(
+      `SELECT ${admissionSnapshot} snapshot`, this.parameters(request))
+    const row = result?.snapshot ?? undefined
+    this.assertServing(row)
+    if (!isDeepStrictEqual(row?.project_content, binding)) {
+      throw new RuntimeAssetUnavailableError(403, 'access-revoked')
+    }
+    const current = this.admission(request, row)
+    if (current.accessRevision !== admitted.accessRevision || current.scope.kind !== 'project'
+      || current.snapshot.generation !== retained.generation
+      || current.snapshot.port !== retained.port || current.snapshot.launchStamp !== retained.launchStamp
+      || current.snapshot.startedAt !== retained.startedAt) {
+      throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
+    }
+    const theme = row?.project_theme_policy
+    return { ...current, expiresAt: Math.min(admitted.expiresAt, current.expiresAt),
+      scope: { ...current.scope, projectName: display.name, ...(theme == null ? {} : { uiThemePolicy: theme }) } }
   }
 
   private assertServing(row: Row | undefined): void {

@@ -28,9 +28,14 @@ export interface NodeProjectCreation {
 export class NodeProjectMetadata {
   constructor(private readonly context:PostgresRuntimeContext,private readonly store:Pick<NodeContentStore,'read'|'write'>) {}
 
-  /** @param rows - already authorized control bindings for this computer. @returns local names and roots keyed by internal project ID. */
-  async lookup(rows:readonly ProjectContentRef[]):Promise<Map<string,{name:string;rootPath:string}>> {
+  /**
+   * @param rows - already authorized control bindings for this computer.
+   * @param generation - retained Runtime generation for a single-project read.
+   * @returns local names and roots keyed by internal project ID.
+   */
+  async lookup(rows:readonly ProjectContentRef[],generation?:number):Promise<Map<string,{name:string;rootPath:string}>> {
     const bindings=[...new Map(rows.flatMap(row=>row.content?[[row.content.projectId,row.content] as const]:[])).values()]
+    if (generation!==undefined && bindings.length!==1) throw new NodeContentUnavailable('A Runtime generation applies to one project.')
     if (!bindings.length) return new Map()
     if (bindings.some(b=>b.organizationId!==this.context.organizationId || b.nodeId!==this.context.nodeId || !b.nameVersion)) throw new NodeContentUnavailable('Project metadata requires its owning computer.')
     const first=bindings[0]!
@@ -38,7 +43,7 @@ export class NodeProjectMetadata {
       FROM jsonb_to_recordset($1::jsonb) k("organizationId" uuid,"projectId" uuid,"nodeId" uuid,"runtimeId" uuid,"volumeId" uuid,"writerEpoch" bigint,"nameVersion" uuid)
       JOIN node_content.spaces s ON (s.organization_id,s.project_id,s.node_id,s.runtime_id,s.volume_id,s.writer_epoch)=
         (k."organizationId",k."projectId",k."nodeId",k."runtimeId",k."volumeId",k."writerEpoch") AND s.publication_state<>'retired' AND NOT EXISTS(SELECT FROM node_content.recovery_candidates rc
-           WHERE rc.organization_id=s.organization_id AND rc.runtime_id=s.runtime_id AND rc.phase<>'active')`,[JSON.stringify(bindings)])).rows)
+           WHERE rc.organization_id=s.organization_id AND rc.runtime_id=s.runtime_id AND rc.phase<>'active')`,[JSON.stringify(bindings)])).rows,undefined,generation)
     if (data.length!==bindings.length) throw new NodeContentUnavailable('A project does not match its active volume.')
     return new Map(data.map(row=>[row.project_id,{name:row.name,rootPath:row.root_path}]))
   }

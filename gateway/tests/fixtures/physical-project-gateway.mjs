@@ -10,6 +10,67 @@ import {resolve,join} from 'node:path'
 import {fileURLToPath,pathToFileURL} from 'node:url'
 import {setTimeout as delay} from 'node:timers/promises'
 
+async function verifyReadyProjectAdmission({lib,context,cfg,store,coord,projectId,name,cookie}) {
+ const {PostgresInstanceRepository}=await lib('postgres/instance-repository')
+ const {NodeResourceBudget}=await lib('node-resource-budget')
+ const {NodeProjectMetadata}=await lib('node-content-projects')
+ const {PostgresRuntimeAssetAdmission,RuntimeAssetUnavailableError}=await lib('runtime-asset-admission')
+ const {PostgresMaintenanceService}=await lib('postgres/maintenance-service')
+ const {pool,organizationId,nodeId}=context
+ const {rows:[primary]}=await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'fixture-primary') RETURNING id`,[organizationId])
+ await pool.query(`UPDATE harness.deployment_topology SET enabled=true,primary_node_id=$2,primary_origin='https://fixture.invalid'
+   WHERE organization_id=$1`,[organizationId,primary.id])
+ const {rows:[lease]}=await pool.query(`INSERT INTO harness.node_agents(organization_id,node_id,credential_hash,attachment_state,
+   connection_id,connection_epoch,lease_expires_at,execution_ready)
+   VALUES($1,$2,$3,'managed',$4,1,clock_timestamp()+interval '5 minutes',true) RETURNING lease_expires_at`,
+ [organizationId,nodeId,createHash('sha256').update(randomUUID()).digest(),randomUUID()])
+ const repository=new PostgresInstanceRepository(context,cfg.instancePortBase)
+ const budget=new NodeResourceBudget(pool,organizationId,nodeId,cfg.resourceBudget)
+ const runtime={kind:'project',id:projectId,runtimeId:coord.runtime_id}
+ const generation=await repository.beginStart(runtime,Date.now(),createHash('sha256').update(randomUUID()).digest(),'explicit',undefined,true,'fixture-stamp')
+ await repository.markReady(runtime,generation)
+ await budget.register({organizationId,target:runtime,generation})
+ const epoch=await new PostgresMaintenanceService(context,cfg.nodeStaleMs).currentWriteEpoch()
+ const sessionToken=cookie.slice('hgw_session='.length)
+ const tokenHash=createHash('sha256').update(sessionToken).digest()
+ const {rows:[actor]}=await pool.query(`SELECT u.public_id FROM harness.auth_sessions s
+   JOIN harness.users u ON u.id=s.user_id AND u.organization_id=s.organization_id WHERE s.organization_id=$1 AND s.token_hash=$2`,
+ [organizationId,tokenHash])
+ const request={actorId:Number(actor.public_id),sessionToken,runtimeId:coord.runtime_id,nodeId,entryNodeId:primary.id,target:'project:'+projectId}
+ const metadata=new NodeProjectMetadata(context,store)
+ const admit=(lookup=metadata.lookup.bind(metadata),recordActivity=false)=>
+   new PostgresRuntimeAssetAdmission(context,epoch,{lookup}).admitSession(request,generation,undefined,recordActivity)
+ const admitted=await admit()
+ assert.equal(admitted.snapshot.generation,generation)
+ assert.deepEqual(admitted.scope,{kind:'project',projectId,projectName:name,mode:'rw',canManage:true,uiThemePolicy:'follow-user'})
+ assert.ok(admitted.expiresAt<=lease.lease_expires_at.getTime())
+ assert.equal(await admit(undefined,true),null)
+ await assert.rejects(admit((rows,wantedGeneration)=>metadata.lookup(
+   rows.map(({content})=>({content:{...content,volumeId:randomUUID()}})),wantedGeneration)),{code:'node-content/unavailable'})
+
+ const duringMetadata=change=>async(rows,wantedGeneration)=>{
+   const resolved=await metadata.lookup(rows,wantedGeneration)
+   await change()
+   return resolved
+ }
+ const refused=code=>error=>error instanceof RuntimeAssetUnavailableError&&error.code===code
+ await assert.rejects(admit(duringMetadata(()=>pool.query(
+   "UPDATE harness.project_mounts SET status='missing' WHERE organization_id=$1 AND project_id=$2 AND node_id=$3",[organizationId,coord.id,nodeId]))),
+ refused('access-revoked'))
+ await pool.query("UPDATE harness.project_mounts SET status='active' WHERE organization_id=$1 AND project_id=$2 AND node_id=$3",
+   [organizationId,coord.id,nodeId])
+
+ await assert.rejects(admit(duringMetadata(()=>pool.query(
+   'UPDATE harness.node_agents SET lease_expires_at=clock_timestamp() WHERE organization_id=$1 AND node_id=$2',[organizationId,nodeId]))),
+ refused('runtime-asset/unavailable'))
+ await pool.query('UPDATE harness.node_agents SET lease_expires_at=$3 WHERE organization_id=$1 AND node_id=$2',
+   [organizationId,nodeId,lease.lease_expires_at])
+
+ await assert.rejects(admit(duringMetadata(()=>pool.query(
+   'UPDATE harness.auth_sessions SET revoked_at=clock_timestamp() WHERE organization_id=$1 AND token_hash=$2',[organizationId,tokenHash]))),
+ refused('access-revoked'))
+}
+
 const gateway=fileURLToPath(new URL('../../',import.meta.url)),root=process.env.HGW_TEST_RELEASE_ROOT??resolve(gateway,'..')
 const base=gateway,lib=async name=>import(pathToFileURL(join(base,'lib',name+'.js')).href)
 const {createPostgresPool,runMigrations}=await lib('postgres/database')
@@ -145,6 +206,9 @@ try {
    const {verifyNativeProjectPoint}=await import('./native-project-point.mjs')
    await verifyNativeProjectPoint({lib,temp,config:cfg,context:ctx,store,project:id,projectUuid:coord.id,
      workspace:stored.root_path,source:nativeRoot,staging:nativeStage,windowsVolume})
+ }else{
+   child.kill('SIGTERM');await closed
+   await verifyReadyProjectAdmission({lib,context:ctx,cfg,store,coord,projectId:id,name:title,cookie})
  }
 } finally {
  if(child && child.exitCode===null && child.signalCode===null){child.kill('SIGTERM');await closed}

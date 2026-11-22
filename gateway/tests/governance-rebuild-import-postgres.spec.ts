@@ -23,7 +23,7 @@ const historicalDigests = new Map([
   [143, '9f441b2c745143ea68d2a7bc9f6457d50570a1e6ab4f36bcf75b77905ada0f93'],
 ])
 
-it.skipIf(databaseUrl===undefined).each([135,136,137,138,142,143,144,145,146])('rebuilds schema-%s evidence into a current empty database with closed node/runtime admission',async sourceVersion=>{
+it.skipIf(databaseUrl===undefined).each([135,136,137,138,142,143,144,145,146,147])('rebuilds schema-%s evidence into a current empty database with closed node/runtime admission',async sourceVersion=>{
   const url=databaseUrl!,pool=createPostgresPool(url),roots:string[]=[]
   const targetName='governance_rebuild_'+randomUUID().replaceAll('-',''),migrations=resolve(import.meta.dirname,'../deploy/postgres/migrations')
   let target:ReturnType<typeof createPostgresPool>|undefined,created=false

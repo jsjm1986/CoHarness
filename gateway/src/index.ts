@@ -492,7 +492,7 @@ const computerAccess = new PostgresComputerAccess(context, cfg.runtimeCatalog, c
 const topology = new PostgresDeploymentTopology(context, { legacyForwarding: cfg.nodeService.forwarding,
   refreshAfterMs: cfg.deploymentContextRefreshMs, pageSize: cfg.runtimeCatalog.pageSize, maxBytes: cfg.runtimeCatalog.maxBytes,
   allowedOrigins: cfg.publicOrigins })
-const runtimeAdmission = new PostgresRuntimeAssetAdmission(context, baselineWriteEpoch)
+const runtimeAdmission = new PostgresRuntimeAssetAdmission(context, baselineWriteEpoch, cfg.nodeContent === undefined ? undefined : nodeProjects)
 const nodeServiceProxy = new GatewayNodeServiceProxy({
   assertNode: id => topology.assertNode(id),
   localNodeId: context.nodeId as RuntimeNodeId,

@@ -606,7 +606,10 @@ export function createProxyHandlers(
       const approved = managedPersonalRead === true ? forwarded?.claims.context?.personalRead : undefined
       const delegated = approved !== undefined && approved.expiresAt > Date.now()
         && monitor.matchesRevision?.(BigInt(approved.accessRevision)) === true ? approved : undefined
-      const recordStartActivity = !runtimeRead && !isPreparedSessionRequest(req.method, url.pathname)
+      const projectRead = req.method === 'POST' && (runtimeRead
+        || url.pathname === '/api/prepare/v1/session.history' && !url.searchParams.has('dshRestore'))
+      const recordStartActivity = target.kind === 'project' ? !projectRead
+        : !runtimeRead && !isPreparedSessionRequest(req.method, url.pathname)
       const retained = await timeOperation('admit', () => instances.retainReadySession!(target, async (generation) => {
         if (res.destroyed) return null
         if (delegated === undefined) {
