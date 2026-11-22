@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { Link, NavLink, Navigate, Route, createBrowserRouter, RouterProvider, Routes, useLocation } from 'react-router-dom'
 import { UsersPage } from './pages/UsersPage.tsx'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { createPageImport, lazyPage, PageLoading } from './components/async-route.tsx'
 import { Button, Dialog, ErrorBanner, PageHeader } from './components/ui.tsx'
 import { adminLanguage, setAdminLanguage, translateCopy } from './language.ts'
@@ -64,36 +64,74 @@ export function App() {
   return <OrdinaryAdminApp />
 }
 
+function readComputerTarget(pathname: string): { nodeId: ReturnType<typeof adminComputerTarget>; invalid: boolean } {
+  try { return { nodeId: adminComputerTarget(pathname), invalid: false } }
+  catch { return { nodeId: undefined, invalid: true } }
+}
+
 function OrdinaryAdminApp() {
-  const [computer] = useState(() => {
-    try { return { nodeId: adminComputerTarget(window.location.pathname), invalid: false } }
-    catch { return { nodeId: undefined, invalid: true } }
-  })
+  const [computer, setComputer] = useState(() => readComputerTarget(window.location.pathname))
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: computerZh, en: computerEn }), [])
-  const [router, setRouter] = useState<ReturnType<typeof createBrowserRouter>>()
+  const switchComputer = useCallback((nextNodeId: ReturnType<typeof adminComputerTarget>, nextUrl: string) => {
+    window.history.pushState(null, '', nextUrl)
+    setComputer({ nodeId: nextNodeId, invalid: false })
+  }, [])
   useEffect(() => {
-    if (computer.invalid) return
-    const owned = createBrowserRouter([{ path: '*', element: <PendingEditsProvider protectHistory>
-      <DeploymentContextProvider><AdminDocument nodeId={computer.nodeId} /></DeploymentContextProvider>
-    </PendingEditsProvider> }], { basename: adminComputerBase(computer.nodeId) })
-    setRouter(owned)
-    return () => { owned.dispose() }
-  }, [computer])
+    const syncFromHistory = (): void => {
+      const next = readComputerTarget(window.location.pathname)
+      setComputer(current => current.nodeId === next.nodeId && current.invalid === next.invalid ? current : next)
+    }
+    window.addEventListener('popstate', syncFromHistory)
+    return () => { window.removeEventListener('popstate', syncFromHistory) }
+  }, [])
   if (computer.invalid) return <main className="mainContent">
     <div className="page adminEntryNotice">
       <ErrorBanner message={t('invalid')} />
       <a className="button button-secondary" href="/admin/">{t('returnCenter')}</a>
     </div>
   </main>
-  return router === undefined ? <PageLoading /> : <RouterProvider router={router} />
+  return <DeploymentContextProvider>
+    <AdminWorkspace nodeId={computer.nodeId} onSwitchComputer={switchComputer} />
+  </DeploymentContextProvider>
 }
 
-function AdminDocument({ nodeId }: { nodeId: ReturnType<typeof adminComputerTarget> }) {
+function AdminWorkspace({ nodeId, onSwitchComputer }: {
+  nodeId: ReturnType<typeof adminComputerTarget>
+  onSwitchComputer(nextNodeId: ReturnType<typeof adminComputerTarget>, nextUrl: string): void
+}) {
+  const deployment = useDeploymentContext()
+  const selectComputerRef = useRef<(nextNodeId?: ReturnType<typeof adminComputerTarget>) => void>(() => {})
+  const expectedBase = adminComputerBase(nodeId)
+  const [router, setRouter] = useState<{ base: string; instance: ReturnType<typeof createBrowserRouter> }>()
+  useEffect(() => {
+    const owned = createBrowserRouter([{ path: '*', element: <PendingEditsProvider protectHistory>
+      <AdminDocument nodeId={nodeId} onSwitchComputer={onSwitchComputer} selectComputerRef={selectComputerRef} />
+    </PendingEditsProvider> }], { basename: expectedBase })
+    setRouter({ base: expectedBase, instance: owned })
+    return () => { owned.dispose() }
+  }, [expectedBase, nodeId, onSwitchComputer])
+  return <ComputerSelectorProvider enabled={deployment.value?.scope === 'organization'} nodeId={nodeId}
+    onSelect={nextNodeId => selectComputerRef.current(nextNodeId)}>
+    {router === undefined || router.base !== expectedBase ? <PageLoading /> : <RouterProvider key={router.base} router={router.instance} />}
+  </ComputerSelectorProvider>
+}
+
+function AdminDocument({ nodeId, onSwitchComputer, selectComputerRef }: {
+  nodeId: ReturnType<typeof adminComputerTarget>
+  onSwitchComputer(nextNodeId: ReturnType<typeof adminComputerTarget>, nextUrl: string): void
+  selectComputerRef: MutableRefObject<(nextNodeId?: ReturnType<typeof adminComputerTarget>) => void>
+}) {
   const navigation = useProtectedNavigation()
   const deployment = useDeploymentContext()
   const location = useLocation()
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: computerZh, en: computerEn }), [])
   const unavailable = nodeId !== undefined && deployment.value !== null && deployment.value.scope === 'local' && nodeId !== deployment.value.entry.nodeId
+  useLayoutEffect(() => {
+    selectComputerRef.current = nextNodeId => {
+      const nextUrl = `${adminComputerBase(nextNodeId)}${location.pathname}${location.search}${location.hash}`
+      navigation.navigate(nextUrl, () => onSwitchComputer(nextNodeId, nextUrl))
+    }
+  }, [location.hash, location.pathname, location.search, navigation, onSwitchComputer, selectComputerRef])
   useEffect(() => {
     const previous = document.documentElement.lang
     document.documentElement.lang = adminLanguage()
@@ -122,37 +160,33 @@ function AdminDocument({ nodeId }: { nodeId: ReturnType<typeof adminComputerTarg
             <ErrorBanner message={t('entryUnavailable')} />
             <a className="button button-secondary" href="/admin/" target="_blank" rel="noopener noreferrer">{t('openLocal')}</a>
           </div>}
-          <ComputerSelectorProvider enabled={deployment.value?.scope === 'organization'} nodeId={nodeId} onSelect={nextNodeId => {
-            navigation.navigate(`${adminComputerBase(nextNodeId)}${location.pathname}${location.search}${location.hash}`)
-          }}>
-            <div className="adminRouteContent" inert={unavailable || undefined} aria-disabled={unavailable || undefined}>
-              <Suspense fallback={<PageLoading />}>
-                <Routes>
-                  <Route path="/" element={<UsersPage prepareNextPage={
-                    deployment.value !== null && !deployment.error && !unavailable ? modelCatalog.prepare : undefined
-                  } />} />
-                  <Route path="/users" element={<Navigate to="/" replace />} />
-                  <Route path="/users/:id" element={<UserDetailPage />} />
-                  <Route path="/projects" element={<ProjectListPage />} />
-                  <Route path="/projects/:id" element={<ProjectDetailPage />} />
-                  <Route path="/plugins" element={<PluginsPage />} />
-                  <Route path="/models" element={<ModelsPage />} />
-                  <Route path="/usage" element={<UsagePage />} />
-                  <Route path="/documents" element={<DocumentsPage />} />
-                  <Route path="/archives" element={<ArchivesPage />} />
-                  <Route path="/terminals" element={<TerminalsPage />} />
-                  <Route path="/ssh" element={<SshPage />} />
-                  <Route path="/deployment" element={<DeploymentPage />} />
-                  <Route path="/steward" element={<StewardPage />} />
-                  <Route path="/webhooks" element={<WebhooksPage />} />
-                  <Route path="/desktops" element={<DesktopsPage />} />
-                  <Route path="/remote-desktops" element={<RemoteDesktopPage />} />
-                  <Route path="/audit" element={<AuditPage />} />
-                  <Route path="*" element={<AdminPageNotFound />} />
-                </Routes>
-              </Suspense>
-            </div>
-          </ComputerSelectorProvider>
+          <div className="adminRouteContent" inert={unavailable || undefined} aria-disabled={unavailable || undefined}>
+            <Suspense fallback={<PageLoading />}>
+              <Routes>
+                <Route path="/" element={<UsersPage prepareNextPage={
+                  deployment.value !== null && !deployment.error && !unavailable ? modelCatalog.prepare : undefined
+                } />} />
+                <Route path="/users" element={<Navigate to="/" replace />} />
+                <Route path="/users/:id" element={<UserDetailPage />} />
+                <Route path="/projects" element={<ProjectListPage />} />
+                <Route path="/projects/:id" element={<ProjectDetailPage />} />
+                <Route path="/plugins" element={<PluginsPage />} />
+                <Route path="/models" element={<ModelsPage />} />
+                <Route path="/usage" element={<UsagePage />} />
+                <Route path="/documents" element={<DocumentsPage />} />
+                <Route path="/archives" element={<ArchivesPage />} />
+                <Route path="/terminals" element={<TerminalsPage />} />
+                <Route path="/ssh" element={<SshPage />} />
+                <Route path="/deployment" element={<DeploymentPage />} />
+                <Route path="/steward" element={<StewardPage />} />
+                <Route path="/webhooks" element={<WebhooksPage />} />
+                <Route path="/desktops" element={<DesktopsPage />} />
+                <Route path="/remote-desktops" element={<RemoteDesktopPage />} />
+                <Route path="/audit" element={<AuditPage />} />
+                <Route path="*" element={<AdminPageNotFound />} />
+              </Routes>
+            </Suspense>
+          </div>
         </main>
         <AdminNav className="mobileNav" />
       </div>

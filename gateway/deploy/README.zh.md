@@ -58,21 +58,37 @@ Gateway 发送端需要把 JPush Master Secret 和 Firebase service-account JSON
 把公网域名指向网关，并关闭实例直连端口。`/admin` 部署页可以直接管理 Cloudflare Tunnel——无需账号的临时链接，或自有 Cloudflare zone 上的固定域名——替代下面的手工 Nginx 路径；隧道模式也不要求你持有域名。Nginx server 块要点：
 
 ```nginx
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  '' '';
+}
+
+upstream harness_gateway {
+  server 127.0.0.1:8899;
+  keepalive 64;
+}
+
 server {
   listen 443 ssl;
+  http2 on;
   server_name harness.maycran.com;
+  gzip on;
+  gzip_types application/json application/javascript text/css image/svg+xml text/plain;
   location / {
-    proxy_pass http://127.0.0.1:8899;
+    proxy_pass http://harness_gateway;
     proxy_http_version 1.1;
+    proxy_buffering off;
     proxy_set_header Host $host;
     proxy_set_header Origin $http_origin;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
+    proxy_set_header Connection $connection_upgrade;
     proxy_read_timeout 300s;
   }
 }
 ```
+
+跨高延迟 PostgreSQL 隧道的多电脑部署可设置 `HGW_DATABASE_MIN_CONNECTIONS`（例如远端电脑设为 `2`）维持暖连接池，在 `LISTEN` 连通时通过 `HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS`（默认 `15000`）降低空闲权限失效轮询频率，通过 `HGW_NODE_SERVICE_IDENTITY_CACHE_MS`（默认 `5000`）缓存远端桥接节点身份校验，通过 `HGW_RUNTIME_ASSET_CACHE_MAX_BYTES`（默认 `33554432`）在中心节点缓存已鉴权的远端不可变插件包，并通过 `HGW_RUNTIME_PREPARE_WAIT_MS`（默认 `1500`）吸收短时冷启动等待。
 
 登录失败只会让该用户名在产生失败的客户端来源上被锁定；同一来源跨用户名累计 20 次失败会锁定该来源；IPv6 来源按 /64 归组。Gateway 从 `X-Forwarded-For` 中最右侧且不在 `HGW_TRUSTED_PROXIES`（默认 `127.0.0.1,::1`）内的一跳读取客户端地址，因此入口必须像上面那样追加该请求头；Cloudflare Tunnel 已自带该请求头。缺少该请求头时，所有请求共用回环来源，只有按用户名的锁定生效。
 

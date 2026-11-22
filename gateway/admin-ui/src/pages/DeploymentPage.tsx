@@ -71,6 +71,7 @@ export function DeploymentPage() {
   const lifetime = useRef<AbortController | undefined>(undefined)
   const flight = useRef<Promise<void> | undefined>(undefined)
   const queued = useRef<Promise<void> | undefined>(undefined)
+  const lastFetchedAt = useRef(0)
 
   const refresh = useCallback((): Promise<void> => {
     const owner = lifetime.current
@@ -86,6 +87,7 @@ export function DeploymentPage() {
     }
     const request = Promise.all([getDeployment(owner.signal), listBackups(owner.signal)]).then(([next, list]) => {
       if (owner.signal.aborted) return
+      lastFetchedAt.current = Date.now()
       setState(next); setBackups(list.backups); setError('')
     }).catch(cause => {
       if (!owner.signal.aborted) setError(messageOf(cause))
@@ -99,7 +101,11 @@ export function DeploymentPage() {
     const owner = new AbortController()
     lifetime.current = owner
     void refresh()
-    const whenVisible = () => { if (document.visibilityState !== 'hidden' && flight.current === undefined) void refresh() }
+    const whenVisible = () => {
+      if (document.visibilityState === 'hidden' || flight.current !== undefined) return
+      if (Date.now() - lastFetchedAt.current < 2_000) return
+      void refresh()
+    }
     const timer = setInterval(whenVisible, 10_000)
     document.addEventListener('visibilitychange', whenVisible)
     return () => {

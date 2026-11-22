@@ -58,21 +58,37 @@ Build the shell against the deployed Web UI with a Java/Android SDK toolchain. F
 Point the public domain at the gateway and close the direct instance port. The `/admin` deployment page can manage Cloudflare Tunnel directly — a zero-account quick link or a fixed hostname on your own Cloudflare zone — instead of the manual Nginx path below; tunnel mode also works without a domain you control. Nginx server block essentials:
 
 ```nginx
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  '' '';
+}
+
+upstream harness_gateway {
+  server 127.0.0.1:8899;
+  keepalive 64;
+}
+
 server {
   listen 443 ssl;
+  http2 on;
   server_name harness.maycran.com;
+  gzip on;
+  gzip_types application/json application/javascript text/css image/svg+xml text/plain;
   location / {
-    proxy_pass http://127.0.0.1:8899;
+    proxy_pass http://harness_gateway;
     proxy_http_version 1.1;
+    proxy_buffering off;
     proxy_set_header Host $host;
     proxy_set_header Origin $http_origin;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
+    proxy_set_header Connection $connection_upgrade;
     proxy_read_timeout 300s;
   }
 }
 ```
+
+Multi-computer deployments over high-latency PostgreSQL tunnels keep warm pool connections with `HGW_DATABASE_MIN_CONNECTIONS` (for example `2` on remote computers), relax idle access-invalidation polling while `LISTEN` is connected via `HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS` (default `15000`), cache remote bridge node attestations via `HGW_NODE_SERVICE_IDENTITY_CACHE_MS` (default `5000`), cache authorized remote immutable plugin bundles on the center via `HGW_RUNTIME_ASSET_CACHE_MAX_BYTES` (default `33554432`), and absorb short cold-start waits via `HGW_RUNTIME_PREPARE_WAIT_MS` (default `1500`).
 
 Login failures lock a username only for the client source that produced them, and 20 failures from one source across usernames lock that source; IPv6 sources are grouped per /64. The Gateway reads the client address from the rightmost `X-Forwarded-For` hop not listed in `HGW_TRUSTED_PROXIES` (default `127.0.0.1,::1`), so the entry must append that header as above; Cloudflare Tunnel supplies it already. Without it, every request shares the loopback source and only the per-username lock applies.
 

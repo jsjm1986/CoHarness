@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-23-multi-computer-latency-and-ux-optimization.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-23-multi-computer-latency-and-ux-optimization.md
+document:
+  en: f45cc7e169468663722a84031a96c993127d661d
+  zh: 2f443b2ca493f84ce8936649850720387254f39f
+/agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching:
+  en: 4ae553e40f50246c
+  zh: e0ce5641f9c31a86
+/agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching/problem:
+  en: 76442cd7ff2010bb
+  zh: 75d6ec8c7d5a723a
+/agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching/decision:
+  en: edd5e7b0c6a1f7ac
+  zh: 12304b6999a21fd3
+/agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching/alternatives-considered:
+  en: c1b5f24f733b8b4f
+  zh: 6ba0d035d6f984b6
+/agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching/consequences:
+  en: 48ee80e8deea9ee5
+  zh: 51585ea3ed8d2737
+/agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching/verification:
+  en: 75b06f1e2e2f1b4a
+  zh: b518b8a5ca41a7d4

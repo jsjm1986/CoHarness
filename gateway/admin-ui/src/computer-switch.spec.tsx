@@ -51,3 +51,29 @@ it.each([
   expect(screen.getByRole('textbox', { name: 'Unsaved quota' })).toBe(input)
   expect(input).toHaveProperty('value', '12345')
 })
+
+it('switches computers in-SPA without a full page reload or directory refetch when there are no pending edits', async () => {
+  vi.mocked(getAdminComputerContext).mockClear()
+  vi.mocked(listNodeAccess).mockClear()
+  vi.mocked(getAdminComputerContext).mockResolvedValue({ nodeId: center, name: 'Center', forwardingEnabled: true })
+  vi.mocked(listNodeAccess).mockResolvedValue({ items: [{ nodeId: secondary, name: 'Secondary', revision: 1,
+    status: 'connected', platform: 'linux', architecture: 'arm64', lastSeenAt: null, leaseExpiresAt: null, executionReady: false }], nextCursor: null })
+  const assign = vi.spyOn(window.location, 'assign')
+  try {
+    window.history.replaceState({}, '', '/admin/users/23?from=qa#quota')
+    render(<App />)
+    await screen.findByRole('textbox', { name: 'Unsaved quota' })
+    fireEvent.click(screen.getByRole('button', { name: /^管理电脑：/u }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Secondary' }))
+    expect(assign).not.toHaveBeenCalled()
+    expect(window.location.pathname).toBe(`/admin/computers/${secondary}/users/23`)
+    expect(window.location.search).toBe('?from=qa')
+    expect(window.location.hash).toBe('#quota')
+    await screen.findByRole('textbox', { name: 'Unsaved quota' })
+    expect(vi.mocked(getAdminComputerContext)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(listNodeAccess)).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: '管理电脑：Secondary' })).toBeTruthy()
+  } finally {
+    assign.mockRestore()
+  }
+})

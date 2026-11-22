@@ -13,6 +13,7 @@ export function DeploymentContextProvider({ children }: { children: ReactNode })
   const lifetime = useRef<AbortController | undefined>(undefined)
   const flight = useRef<Promise<void> | undefined>(undefined)
   const queued = useRef<Promise<void> | undefined>(undefined)
+  const lastFetchedAt = useRef(0)
   const refresh = useCallback((): Promise<void> => {
     const owner = lifetime.current
     if (owner === undefined || owner.signal.aborted) return Promise.resolve()
@@ -27,7 +28,7 @@ export function DeploymentContextProvider({ children }: { children: ReactNode })
     }
     const signal = AbortSignal.any([owner.signal, AbortSignal.timeout(10_000)])
     const request = getDeploymentTopology(signal).then(next => {
-      if (!owner.signal.aborted) { setValue(next); setError(false) }
+      if (!owner.signal.aborted) { lastFetchedAt.current = Date.now(); setValue(next); setError(false) }
     }).catch(() => { if (!owner.signal.aborted) setError(true) }).finally(() => { if (flight.current === request) flight.current = undefined })
     flight.current = request
     return request
@@ -36,17 +37,22 @@ export function DeploymentContextProvider({ children }: { children: ReactNode })
     const controller = new AbortController()
     lifetime.current = controller
     void refresh()
-    const focus = () => { if (document.visibilityState !== 'hidden') void refresh() }
+    const passiveRefresh = () => {
+      if (document.visibilityState === 'hidden' || flight.current !== undefined) return
+      if (Date.now() - lastFetchedAt.current < 2_000) return
+      void refresh()
+    }
+    const explicitChange = () => { if (document.visibilityState !== 'hidden') void refresh() }
     const channel = typeof BroadcastChannel === 'undefined' ? undefined : new BroadcastChannel('hgw-deployment-policy')
-    if (channel !== undefined) channel.onmessage = focus
-    window.addEventListener('focus', focus)
-    window.addEventListener('hgw-deployment-policy-changed', focus)
-    document.addEventListener('visibilitychange', focus)
+    if (channel !== undefined) channel.onmessage = explicitChange
+    window.addEventListener('focus', passiveRefresh)
+    window.addEventListener('hgw-deployment-policy-changed', explicitChange)
+    document.addEventListener('visibilitychange', passiveRefresh)
     return () => {
       controller.abort(); channel?.close()
       if (lifetime.current === controller) { lifetime.current = undefined; flight.current = undefined; queued.current = undefined }
-      window.removeEventListener('focus', focus); window.removeEventListener('hgw-deployment-policy-changed', focus)
-      document.removeEventListener('visibilitychange', focus)
+      window.removeEventListener('focus', passiveRefresh); window.removeEventListener('hgw-deployment-policy-changed', explicitChange)
+      document.removeEventListener('visibilitychange', passiveRefresh)
     }
   }, [refresh])
   useEffect(() => {

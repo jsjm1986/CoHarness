@@ -17,7 +17,7 @@ const en: Record<keyof typeof zh, string> = {
 
 interface PendingEdits {
   set(owner: symbol, dirty: boolean): void
-  navigate(url: string): void
+  navigate(url: string, perform?: () => void): void
   canReplace(): boolean
 }
 const PendingEditsContext = createContext<PendingEdits | undefined>(undefined)
@@ -30,7 +30,11 @@ export function PendingEditsProvider({ children, protectHistory = false }: { chi
   const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const protection = useMemo<PendingEdits>(() => ({
     set(owner, dirty) { if (dirty) owners.current.add(owner); else owners.current.delete(owner) },
-    navigate(url) { if (owners.current.size > 0) setDestination(url); else window.location.assign(url) },
+    navigate(url, perform) {
+      if (owners.current.size > 0) setDestination(url)
+      else if (perform !== undefined) perform()
+      else window.location.assign(url)
+    },
     canReplace() { if (owners.current.size === 0) return true; setDestination(null); return false },
   }), [])
   useEffect(() => {
@@ -88,5 +92,8 @@ export function usePendingEdits(dirty: boolean): void {
 /** @returns document-local navigation protection; standalone page previews use their existing navigation. */
 export function useProtectedNavigation(): Pick<PendingEdits, 'navigate' | 'canReplace'> {
   const protection = useContext(PendingEditsContext)
-  return protection ?? { navigate: url => { window.location.assign(url) }, canReplace: () => true }
+  return protection ?? {
+    navigate: (url, perform) => { if (perform !== undefined) perform(); else window.location.assign(url) },
+    canReplace: () => true,
+  }
 }

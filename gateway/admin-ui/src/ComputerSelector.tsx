@@ -72,8 +72,6 @@ export function ComputerSelectorProvider({ enabled, nodeId, onSelect, children }
     void listNodeAccess(cursor, controller.signal).then(value => {
       if (controller.signal.aborted) return
       setPage(value); setError('')
-      const active = value.items.find(item => item.nodeId === nodeId)
-      if (active !== undefined) setSelected(active)
     }).catch((cause: unknown) => {
       if (controller.signal.aborted) return
       if (cause instanceof AdminRequestError && [401, 403].includes(cause.status)) {
@@ -81,12 +79,18 @@ export function ComputerSelectorProvider({ enabled, nodeId, onSelect, children }
       } else setError(t('readFailed'))
     }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => { controller.abort() }
-  }, [enabled, cursor, refresh, nodeId, t])
+  }, [enabled, cursor, refresh, t])
+
+  useEffect(() => {
+    if (nodeId === undefined || page === null) return
+    const match = page.items.find(item => item.nodeId === nodeId)
+    if (match !== undefined) setSelected(match)
+  }, [nodeId, page])
 
   const items = page?.items ?? []
   const selection = nodeId === context?.nodeId ? undefined : nodeId
   const active = items.find(item => item.nodeId === selection)
-  const current = active ?? selected
+  const current = active ?? (selected?.nodeId === selection ? selected : null)
   const centerName = context?.name ?? t('center')
   const currentName = selection === undefined ? centerName : current?.name ?? t('selected', { id: selection.slice(0, 8) })
   const notice = error || contextError || (context !== null && !context.forwardingEnabled ? t('disabled') : '')
