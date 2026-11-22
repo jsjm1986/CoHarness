@@ -326,11 +326,7 @@ export class SessionProjectionCache extends Service {
         return
       }
       if (state.timer === undefined) {
-        const arm = () => setTimeout(() => {
-          void this.flushSoft(session, 'interval')
-        }, this.config.writeIntervalMs)
-        const agents = this.ctx.get('agents')
-        state.timer = agents === undefined ? arm() : agents.withoutInitiator(arm)
+        state.timer = this.armIntervalTimer(session)
       }
     })
 
@@ -364,6 +360,22 @@ export class SessionProjectionCache extends Service {
       }
       this.dirty.clear()
     }, 'sessionProjectionCache.timers')
+  }
+
+  /** Arm the interval write timer outside any active Agent initiator when the registry is open. */
+  private armIntervalTimer(session: Session): ReturnType<typeof setTimeout> {
+    const arm = () => setTimeout(() => {
+      void this.flushSoft(session, 'interval')
+    }, this.config.writeIntervalMs)
+    const agents = this.ctx.get('agents')
+    if (agents === undefined) return arm()
+    try {
+      return agents.withoutInitiator(arm)
+    } catch {
+      // AgentRegistry rejects new initiator scopes once unloading starts;
+      // the cache still arms its own interval flush until the cache disposes.
+      return arm()
+    }
   }
 
   /**

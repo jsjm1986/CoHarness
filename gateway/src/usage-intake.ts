@@ -7,8 +7,24 @@ import { NodeContentUnavailable } from './node-content-error.ts'
 import { ModelUsageRejection } from './model-usage-rejection.ts'
 
 async function body(req: IncomingMessage, limit = 256 * 1024): Promise<string> {
+  const declared = req.headers['content-length']
+  if (typeof declared === 'string') {
+    const length = Number(declared)
+    if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
+      req.resume()
+      throw new ModelUsageRejection('body too large')
+    }
+  }
   const chunks: Buffer[] = []; let size = 0
-  for await (const chunk of req) { const value = Buffer.from(chunk as Uint8Array); size += value.length; if (size > limit) throw new ModelUsageRejection('body too large'); chunks.push(value) }
+  for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+    const value = Buffer.from(chunk as Uint8Array)
+    size += value.length
+    if (size > limit) {
+      req.resume()
+      throw new ModelUsageRejection('body too large')
+    }
+    chunks.push(value)
+  }
   return Buffer.concat(chunks).toString('utf8')
 }
 
@@ -92,7 +108,9 @@ export function createUsageIntakeServer(
     } catch (error) {
       if (unavailable(res, error)) return
       if (!(error instanceof ModelUsageRejection)) throw error
-      res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error.message }))
+      const headers: Record<string, string> = { 'content-type': 'application/json' }
+      if (!req.complete) headers.connection = 'close'
+      res.writeHead(400, headers).end(JSON.stringify({ error: error.message }))
     }
   })().catch((error: unknown) => {
     if (res.writableEnded) return

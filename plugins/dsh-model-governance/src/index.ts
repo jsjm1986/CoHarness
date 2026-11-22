@@ -164,39 +164,60 @@ export function apply(ctx: Context): void {
     message => ctx.logger.warn(message))
   let personalRuntime = policy.userDeclaredAllowed
   let applied: typeof policy | undefined = policy
-  let policyReads = Promise.resolve()
+  let activeRefresh: Promise<void> | undefined
+  let queuedRefresh: Promise<void> | undefined
+  const runRefresh = async (): Promise<void> => {
+    if (stopped) return
+    try {
+      const next = await reader.read()
+      if (stopped || next === applied) return
+      const configuration = { revision: next.version, providers: next.providers }
+      providerConfig.replace(stagedProviderSnapshot(providerConfig.snapshot(), configuration))
+      access.replace(next)
+      outbox.setEndpoint(next.intakeUrl, next.intakeToken)
+      personalRuntime = next.userDeclaredAllowed
+      providerConfig.replace(configuration)
+      applied = next
+    } catch (error) {
+      if (stopped) return
+      access.unavailable()
+      if (applied === undefined) return
+      applied = undefined
+      ctx.logger.warn(`model-governance: policy reload failed at ${policyPath}. New model requests are blocked.`)
+      ctx.logger.warn(error)
+    }
+  }
   const refreshPolicy = (): Promise<void> => {
     if (stopped) return Promise.resolve()
-    const task = policyReads.then(async () => {
-      if (stopped) return
-      try {
-        const next = await reader.read()
-        if (stopped || next === applied) return
-        const configuration = { revision: next.version, providers: next.providers }
-        providerConfig.replace(stagedProviderSnapshot(providerConfig.snapshot(), configuration))
-        access.replace(next)
-        outbox.setEndpoint(next.intakeUrl, next.intakeToken)
-        personalRuntime = next.userDeclaredAllowed
-        providerConfig.replace(configuration)
-        applied = next
-      } catch (error) {
-        if (stopped) return
-        access.unavailable()
-        if (applied === undefined) return
-        applied = undefined
-        ctx.logger.warn(`model-governance: policy reload failed at ${policyPath}. New model requests are blocked.`)
-        ctx.logger.warn(error)
-      }
-    })
-    policyReads = task.then(() => undefined, () => undefined)
-    return task
+    if (activeRefresh === undefined) {
+      const task = runRefresh().finally(() => {
+        if (activeRefresh === task) activeRefresh = undefined
+      })
+      activeRefresh = task
+      return task
+    }
+    if (queuedRefresh === undefined) {
+      const task = activeRefresh.then(() => {
+        if (queuedRefresh === task) queuedRefresh = undefined
+        if (stopped) return undefined
+        const next = runRefresh().finally(() => {
+          if (activeRefresh === next) activeRefresh = undefined
+        })
+        activeRefresh = next
+        return next
+      })
+      queuedRefresh = task
+    }
+    return queuedRefresh
   }
   let reloader: PolicyReloader | undefined
   ctx.effect(() => async () => {
     stopped = true
     access.unavailable()
     await reloader?.close()
-    await policyReads
+    while (activeRefresh !== undefined || queuedRefresh !== undefined) {
+      await (queuedRefresh ?? activeRefresh)
+    }
     await outbox.close()
   }, 'model-governance: drain policy reload and usage outbox')
   reloader = new PolicyReloader({
@@ -250,8 +271,29 @@ export function apply(ctx: Context): void {
       }
     })
   })
-  const currentAccess = async (target: Pick<GenerateOptions, 'provider' | 'model'>) => {
-    await refreshPolicy()
+  const awaitRefresh = (signal?: AbortSignal): Promise<void> => {
+    signal?.throwIfAborted()
+    const task = refreshPolicy()
+    if (signal === undefined) return task
+    return new Promise<void>((resolve, reject) => {
+      const onAbort = (): void => {
+        try { signal.throwIfAborted() } catch (error: unknown) { reject(error) }
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+      void task.then(
+        () => {
+          signal.removeEventListener('abort', onAbort)
+          resolve()
+        },
+        (error: unknown) => {
+          signal.removeEventListener('abort', onAbort)
+          reject(error)
+        },
+      )
+    })
+  }
+  const currentAccess = async (target: Pick<GenerateOptions, 'provider' | 'model'>, signal?: AbortSignal) => {
+    await awaitRefresh(signal)
     return stopped ? { allowed: false as const, reason: POLICY_UNAVAILABLE_REASON } : access.decide(target)
   }
   ctx.on('llm/pre-dispatch', async (options, next) => {
@@ -259,6 +301,10 @@ export function apply(ctx: Context): void {
     const execution = requests.getStore()
     if (execution === undefined) throw new LlmError('The model request has no retained execution owner.', 'MODEL_EXECUTION_IDENTITY_FAILED')
     assertExecutionIssuer(ctx, execution)
+    const initialDecision = await currentAccess(options, options.signal)
+    options.signal?.throwIfAborted()
+    assertExecutionIssuer(ctx, execution)
+    if (!initialDecision.allowed) throw new LlmError(initialDecision.reason, 'MODEL_FORBIDDEN')
     const authority = execution.authority
     if (authority !== undefined && (options.purpose === 'auto-review' || options.resourceOrigin !== 'infrastructure')) {
       authority.current()
@@ -278,7 +324,7 @@ export function apply(ctx: Context): void {
       }
     }
     await next()
-    const decision = await currentAccess(options)
+    const decision = await currentAccess(options, options.signal)
     options.signal?.throwIfAborted()
     assertExecutionIssuer(ctx, execution)
     if (!decision.allowed) throw new LlmError(decision.reason, 'MODEL_FORBIDDEN')
@@ -318,7 +364,7 @@ export function apply(ctx: Context): void {
           const captured = infrastructure ? undefined : authority?.current()
           agent = billingAgent ?? (explicitId === undefined && captured !== undefined ? agents?.get(captured.parentSessionId) : undefined)
           execution = await billingExecution(options, billingAgent, authority)
-          decision = await currentAccess(options)
+          decision = await currentAccess(options, options.signal)
           options.signal?.throwIfAborted()
           assertExecutionIssuer(ctx, { authority, deployment })
         } catch {

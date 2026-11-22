@@ -29,8 +29,13 @@ export function canonicalHeader(header: EpochHeader): EpochHeader {
   }
 }
 
-/** Compare lossless JSON schemas in serialization order without encoding their text. */
-function sameSchema(a: ToolSchema, b: ToolSchema): boolean {
+/**
+ * Compare lossless JSON tool schemas in serialization order without encoding their text.
+ * @param a - one tool schema.
+ * @param b - the other tool schema.
+ * @returns whether both schemas have identical structure and property order.
+ */
+export function sameToolSchema(a: ToolSchema, b: ToolSchema): boolean {
   const pending: Array<readonly [unknown, unknown]> = [[a, b]]
   const visited = new WeakSet<object>()
   for (let pair = pending.pop(); pair !== undefined; pair = pending.pop()) {
@@ -81,7 +86,7 @@ export function headerEquals(a: EpochHeader, b: EpochHeader): boolean {
   ) return false
   const at = a.tools ?? []
   const bt = b.tools ?? []
-  return at.length === bt.length && at.every((tool, i) => sameSchema(tool, bt[i] as ToolSchema))
+  return at.length === bt.length && at.every((tool, i) => sameToolSchema(tool, bt[i] as ToolSchema))
 }
 
 /**

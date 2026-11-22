@@ -369,6 +369,9 @@ describePg('PostgreSQL steward space', () => {
     })).rejects.toMatchObject({ status: 403, code: 'steward-approval-required' })
     await expect(stewardQueries.query(subject, {
       sql: 'EXPLAIN ANALYZE UPDATE harness.projects SET name=name WHERE false', dryRun: false, rowLimit: 500,
+    })).rejects.toMatchObject({ status: 403, code: 'steward-approval-required' })
+    await expect(stewardQueries.query(subject, {
+      sql: 'SELECT id FROM harness.projects WHERE false FOR UPDATE', dryRun: false, rowLimit: 500,
     })).rejects.toThrow(/read-only transaction/)
 
     const journal = await pool.query<{ count: string }>(
@@ -379,7 +382,7 @@ describePg('PostgreSQL steward space', () => {
 
   it('denies read-lane statements that call session-escaping functions', async () => {
     const subject = { organizationId, projectInternalId: stewardInternalId, runtimeId: stewardRuntimeId, generation: 1 }
-    for (const sql of [
+    const deniedStatements = [
       `SELECT set_config('search_path','public',false)`,
       'SELECT pg_terminate_backend(1)',
       'SELECT pg_cancel_backend(1)',
@@ -387,7 +390,11 @@ describePg('PostgreSQL steward space', () => {
       'SELECT pg_sleep(60)',
       "SELECT pg_read_file('/etc/passwd')",
       "SELECT * FROM dblink('dbname=x','SELECT 1') AS d(v int)",
-    ]) {
+      "SELECT '/* ', pg_sleep(60), ' */'",
+      "SELECT E'\\'', pg_sleep(60), ''",
+      'SELECT U&"pg_\\0073leep"(60)',
+    ]
+    for (const sql of deniedStatements) {
       await expect(stewardQueries.query(subject, { sql, dryRun: false, rowLimit: 1 }))
         .rejects.toMatchObject({ status: 403, code: 'steward-statement-forbidden' })
     }
@@ -400,7 +407,7 @@ describePg('PostgreSQL steward space', () => {
     const journal = await pool.query<{ count: string }>(
       `SELECT COUNT(*)::text count FROM harness.steward_query_log
       WHERE organization_id=$1 AND status='denied' AND error='statement-forbidden'`, [organizationId])
-    expect(Number(journal.rows[0]!.count)).toBe(7)
+    expect(Number(journal.rows[0]!.count)).toBe(deniedStatements.length)
   })
 
   it('keeps dry-run EXPLAIN pinned to planning: option tricks and the deny-list still apply', async () => {

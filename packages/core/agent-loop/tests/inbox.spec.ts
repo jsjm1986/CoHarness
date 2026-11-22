@@ -4,7 +4,7 @@ import { createUserMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { inboxProjectionDefinition, ReactLoopInbox } from '../src/inbox.ts'
 
 function unsupportedInbox(): Agent['inbox'] {
@@ -344,5 +344,22 @@ describe('ReactLoopInbox', () => {
     expect(agent.inbox.remove(third.id)).toBe(true)
     expect(agent.inbox.remove(first.id)).toBe(true)
     expect(inbox.hasPending).toBe(false)
+  })
+
+  it('caches newly inserted message sizes on their committed snapshots', async () => {
+    const { agent } = await inboxAgent('cached-inbox-sizes', { maxBytes: 10_000 })
+    const first = createUserMessage({ content: [{ type: 'text', text: 'first-cached' }], source: { kind: 'user' } })
+    const second = createUserMessage({ content: [{ type: 'text', text: 'second-cached' }], source: { kind: 'user' } })
+    const stringify = vi.spyOn(JSON, 'stringify')
+    try {
+      agent.inbox.append('next-turn', first)
+      const callsAfterFirst = stringify.mock.calls.length
+      agent.inbox.append('next-turn', second)
+      const callsOnSecond = stringify.mock.calls.length - callsAfterFirst
+      expect(callsAfterFirst).toBe(1)
+      expect(callsOnSecond).toBe(1)
+    } finally {
+      stringify.mockRestore()
+    }
   })
 })

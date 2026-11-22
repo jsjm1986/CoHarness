@@ -258,6 +258,36 @@ describe('instance model governance', () => {
     await ctx.fiber.dispose()
   })
 
+  it('coalesces concurrent policy refreshes and honors request cancellation during refresh', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-coalesce-'))
+    process.env.DSH_HOME = home
+    policy(home, true)
+    const ctx = new Context()
+    try {
+      await ctx.plugin(LlmRuntime)
+      const adapter = new Adapter()
+      ctx.llm.registerAdapter(['p'], adapter)
+      await ctx.plugin(Governance)
+
+      const controller = new AbortController()
+      controller.abort()
+      const aborted = await drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [], signal: controller.signal }))
+      expect(aborted.at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'ABORTED' } } })
+      expect(adapter.calls).toBe(0)
+
+      const burst = await Promise.all(
+        Array.from({ length: 6 }, () => drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [] }))),
+      )
+      for (const chunks of burst) {
+        expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+      }
+      expect(adapter.calls).toBe(6)
+    } finally {
+      await ctx.fiber.dispose()
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('keeps a failed delivery on disk and drains it after restart', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-outbox-'))
     const first = new UsageOutbox(dir, 'http://127.0.0.1:1/usage', 't', () => {})

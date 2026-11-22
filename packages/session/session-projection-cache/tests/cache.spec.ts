@@ -331,6 +331,34 @@ describe('SessionProjectionCache write policy', () => {
     expect((await storedRows(root, id))?.['cache-test/marks']?.val).toEqual({ marks: ['background'] })
   })
 
+  it('still arms interval writes when AgentRegistry is closing', async () => {
+    const { ctx, root } = await harness({ config: { writeEveryEvents: 100, writeIntervalMs: 1 } })
+    const id = SessionId('closing-registry-interval')
+    const created = whenWritten(ctx, id)
+    const session = ctx.sessions.create(id)
+    await created
+    const warn = vi.spyOn(ctx.logger, 'warn')
+    let markedDuringClose = false
+    const scope = ctx.plugin((inner) => {
+      inner.plugin(AgentRegistry)
+      inner.effect(() => () => {
+        // Ancestor unloading has already moved AgentRegistry to closing while
+        // the service is still present for sibling teardown work.
+        expect(() => { ctx.agents.withoutInitiator(() => undefined) }).toThrow('agent initiator scope is disposed')
+        mark(session, ['during-close'])
+        markedDuringClose = true
+      })
+    })
+    await scope
+    const written = whenWritten(ctx, id)
+    await scope.dispose()
+    await written
+
+    expect(markedDuringClose).toBe(true)
+    expect(warn).not.toHaveBeenCalled()
+    expect((await storedRows(root, id))?.['cache-test/marks']?.val).toEqual({ marks: ['during-close'] })
+  })
+
   it('write() on a never-dirty session checkpoints directly and rejects a non-JSON unit state', async () => {
     const { ctx, root } = await harness()
     // Never dirtied: no events — write() still lands the init-derived cut.

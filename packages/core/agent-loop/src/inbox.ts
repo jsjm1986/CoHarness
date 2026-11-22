@@ -107,7 +107,7 @@ export class ReactLoopInbox implements InboxContract {
   private admission: 'open' | 'inserts-closed' | 'draining' = 'open'
   private readonly maxMessages: number | undefined
   private readonly maxBytes: number | undefined
-  private pendingMessageSizes = new WeakMap<UserMessage, number>()
+  private pendingMessageSizes = new WeakMap<UserMessage, number | undefined>()
 
   constructor(
     private readonly projections: SessionProjectionRegistry,
@@ -277,15 +277,18 @@ export class ReactLoopInbox implements InboxContract {
     const pending = target === 'next-turn' ? [...candidate, ...other] : [...other, ...candidate]
     const ids = new Set<string>()
     const newMessages = new Set(inserted)
-    const retainedSizes = new WeakMap<UserMessage, number>()
+    const insertedSizes = new Map<MessageId, number>()
+    const retainedSizes = new WeakMap<UserMessage, number | undefined>()
     let pendingBytes = 0
     for (const message of pending) {
       if (ids.has(message.id)) throw new Error(`message "${message.id}" is already pending`)
       ids.add(message.id)
       const bytes = this.pendingMessageSizes.get(message) ?? messageBytes(message)
       pendingBytes += bytes
-      // Messages from the committed projection are safe to cache by identity.
-      if (!newMessages.has(message)) retainedSizes.set(message, bytes)
+      // Messages from the committed projection are safe to cache by identity;
+      // newly inserted sizes attach to the frozen snapshots committed below.
+      if (newMessages.has(message)) insertedSizes.set(message.id, bytes)
+      else retainedSizes.set(message, bytes)
     }
     if (this.maxMessages !== undefined && pending.length > this.maxMessages) {
       throw new Error(`inbox message limit reached (limit: ${this.maxMessages})`)
@@ -302,6 +305,9 @@ export class ReactLoopInbox implements InboxContract {
       ...(outcome === undefined ? {} : { outcome }),
     }
     const event = this.session.append('agent/inbox/spliced', splice)
+    for (const committed of event.data.inserted) {
+      retainedSizes.set(committed, insertedSizes.get(committed.id))
+    }
     this.pendingMessageSizes = retainedSizes
     if (discardRemoved) {
       for (const message of removed) this.dispatch.emit('agent/inbox/discarded', { message })

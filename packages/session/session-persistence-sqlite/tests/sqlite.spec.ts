@@ -606,7 +606,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
     const path = await freshDbPath('dsh-sqlite-schema-spacing-')
     const db = new DatabaseSync(path)
     try {
-      db.exec(sql('schema').replace('CREATE TABLE sessions (', 'CREATE TABLE sessions  ('))
+      db.exec(testSql('create-spaced-schema'))
       db.prepare(sql('insert-persistence-state')).run('00000000-0000-4000-8000-000000000001')
       db.exec(sql('set-application-id'))
       db.exec(sql('set-user-version-21'))

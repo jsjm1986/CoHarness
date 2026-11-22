@@ -1435,6 +1435,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       || req.headers['x-dsh-prepare-continuation'] !== undefined ? undefined
       : { ...sessionSelectors, nodeId: localNode, ...observeReadySession }
     const delegatableRead = isDelegatablePersonalRead(req.method, requestUrl, typeof expectedPrincipal === 'string', req.headers.accept)
+    let skipOrdinaryReadySession = false
     if (readySession?.target === 'personal' && (req.method === 'POST' || delegatableRead) && handlers.readySession !== undefined) {
       const candidate = signedPersonalForward(req, pathname, { ...readySession, target: 'personal' }, readySession.observe)
       if (candidate !== undefined) {
@@ -1442,11 +1443,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const managedPersonalRead = delegatableRead && claims.context?.personalRead !== undefined
           && claims.user.status === 'active' && !claims.user.mustChangePassword && nodeReadBridges.get(req.socket) === claims.issuerNode
         if (req.method !== 'POST' && !managedPersonalRead) readySession.observe?.('forwarded', 'fallbackDelegation')
-        else if (await handlers.readySession(req, res, {
-          ...readySession, ...candidate, actor: claims.user, ...(managedPersonalRead ? { managedPersonalRead: true } : {}),
-        })) {
-          auditForwardedAccount(req, pathname, claims)
-          return
+        else {
+          if (!managedPersonalRead) skipOrdinaryReadySession = true
+          if (await handlers.readySession(req, res, {
+            ...readySession, ...candidate, actor: claims.user, ...(managedPersonalRead ? { managedPersonalRead: true } : {}),
+          })) {
+            auditForwardedAccount(req, pathname, claims)
+            return
+          }
         }
       }
     }
@@ -1469,7 +1473,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
     }
     const { token, user, forward } = session
-    if (readySession !== undefined && (!runtimeRead || !user.mustChangePassword)
+    if (!skipOrdinaryReadySession && readySession !== undefined && (!runtimeRead || !user.mustChangePassword)
       && (forward === undefined || forwardedSessionMatches(forward, readySession))
       && await handlers.readySession?.(req, res, { ...readySession, actor: user, sessionToken: token,
         ...(forward === undefined ? {} : { entryNodeId: forward.issuerNode }) })) return
