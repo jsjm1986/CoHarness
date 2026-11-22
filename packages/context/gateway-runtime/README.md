@@ -60,6 +60,8 @@ The optional `personalDraft` claim binds an ordinary personal principal to one p
 
 Project credentials retain the [collaboration requirement](../collaboration/README.md#application-authorization) on the application root while runtime or authorization providers are replaced.
 
+The standalone `./steward-statement` entry classifies SQL for the steward approval tool and Gateway executor. The executor applies the matching transaction and approval rules.
+
 <a id="resource-admission"></a>
 ## Resource admission
 
@@ -69,7 +71,7 @@ The `./resource-budget` provider registers the exact Runtime generation before p
 
 The optional `modelTimings` flag writes metadata-only samples to the Runtime log or systemd unit journal. It defaults to false and follows Gateway performance diagnostics in the managed launch profile. The samples report [input and request preparation](../gateway-execution/README.md#execution-authorization), resource admission and the model attempt through its first text. Existing log retention applies.
 
-`model-resource-timing` measures origin capture, local registration, submission, status calls and intervals before polling. A qualified response can report `grantQueueMs`, from durable reservation insertion to grant. Coordinator durations belong to the enclosing call. Samples carry timestamps, durations, counts and outcome.
+`model-resource-timing` measures origin capture, local registration, submission, status calls and intervals before polling. `statusChangeWaitMs` is the reported coordinator hold inside `statusMs`, and `statusChangeWaitSamples` counts responses with this measurement. A qualified response can report `grantQueueMs` from durable reservation insertion to grant. It can overlap both polling and status-call time. The owning Gateway accepts `operationId` for submission and single-reservation status calls, and `lastStatusOperationId` identifies the most recent status exchange when it used a batch.
 
 The provider captures Session scope, signed interactive caller, or explicit infrastructure ownership before joining its bounded registration queue. Origin failures reject immediately. The Runtime service owns registration, repeated polling and completion after caller-scope capture. Cancelled requests that have not been sent release their local queue capacity independently of an earlier HTTP request. Validated live entries register serially; attempted registrations retain exact completion accounting until acknowledged.
 

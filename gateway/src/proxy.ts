@@ -21,6 +21,7 @@ import { isExplicitSessionRequest, isPreparedSessionRequest, isReadyRuntimeRead,
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { StreamPrincipalLeases } from './stream-principal-leases.ts'
 import { NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
+import type { ReadySessionOutcome } from './performance-observer.ts'
 import { ComputerAccessError } from './computer-access.ts'
 import { sendDeferredRuntimeBootstrap } from './deferred-runtime-bootstrap.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
@@ -584,10 +585,14 @@ export function createProxyHandlers(
     })
   }
 
-  const readySession: ReadySessionHandler = async (req, res, { actor, forwarded, managedPersonalRead, ...selection }) => {
+  const readySession: ReadySessionHandler = async (req, res, { actor, forwarded, managedPersonalRead, observe, ...selection }) => {
     const monitor = deps.accessMonitor
+    const route = forwarded === undefined ? 'ordinary' : 'forwarded'
     if (sessionAdmission === undefined || principalSigner === undefined || instances.retainReadySession === undefined
-      || monitor?.synchronizeTo === undefined || !monitor.available) return false
+      || monitor?.synchronizeTo === undefined || !monitor.available) {
+      observe?.(route, 'fallbackUnavailable')
+      return false
+    }
     const target = selection.target === 'personal'
       ? { kind: 'user' as const, id: actor.id, runtimeId: selection.runtimeId }
       : { kind: 'project' as const, id: Number(selection.target.slice('project:'.length)), runtimeId: selection.runtimeId }
@@ -601,6 +606,13 @@ export function createProxyHandlers(
     active.add(operation)
     let release: (() => Promise<void>) | undefined
     let expiry: NodeJS.Timeout | undefined
+    let observed = false
+    const report = (outcome: ReadySessionOutcome): void => {
+      if (!observed && observe !== undefined) {
+        observed = true
+        observe(route, outcome)
+      }
+    }
     try {
       const issuer = forwarded === undefined ? undefined : { nodeId: forwarded.claims.issuerNode, publicKey: forwarded.issuerPublicKey }
       const approved = managedPersonalRead === true ? forwarded?.claims.context?.personalRead : undefined
@@ -624,8 +636,8 @@ export function createProxyHandlers(
           snapshot: { target, port, generation, launchStamp, startedAt, state: 'ready' } }
       }))
       release = retained?.release
-      if (res.destroyed) return true
-      if (retained === null) return false
+      if (res.destroyed) { report('cancelled'); return true }
+      if (retained === null) { report('fallbackNotRetained'); return false }
       const { user, scope, snapshot, accessRevision } = retained.admission
       const expiresAt = Math.min(retained.admission.expiresAt, forwarded?.claims.expiresAt ?? Infinity)
       if (scope.kind === 'personal' && (user.homePath !== actor.homePath || user.role !== actor.role)) {
@@ -635,7 +647,7 @@ export function createProxyHandlers(
         ? await timeOperation('accessSync', () => monitor.synchronizeTo!(BigInt(accessRevision)))
         : monitor.matchesRevision?.(BigInt(accessRevision)) === true
       if (!authorityCurrent || expiresAt <= Date.now()) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
-      if (res.destroyed) return true
+      if (res.destroyed) { report('cancelled'); return true }
       const localVerdict = releaseDraftWriter === undefined ? undefined : localStopGate?.()
       if (localVerdict !== undefined && localVerdict !== 'open') throw new RuntimeAssetUnavailableError(503, localVerdict)
       if (forwarded !== undefined && !forwarded.consume()) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
@@ -648,13 +660,18 @@ export function createProxyHandlers(
       const personalDraft = scope.kind !== 'personal' || delegated !== undefined ? undefined
         : releaseDraftWriter !== undefined ? 'prepare'
         : localStopGate !== undefined && req.method === 'POST' && url.pathname === '/api/admit/v1/session.prompt' ? 'admit-input' : undefined
+      report(delegated === undefined ? 'ready' : 'delegated')
       await forwardRuntime(req, res, { user, scope, environment: { id: selection.runtimeId, nodeId: selection.nodeId } },
         snapshot, expiresAt, personalDraft)
       return true
     } catch (error) {
-      if (res.destroyed) return true
+      if (res.destroyed) { report('cancelled'); return true }
       if (error instanceof RuntimeAssetUnavailableError) {
-        if (runtimeRead && req.method === 'GET' && error.code === 'maintenance') return false
+        if (runtimeRead && req.method === 'GET' && error.code === 'maintenance') {
+          report('fallbackMaintenance')
+          return false
+        }
+        report('refused')
         req.resume()
         res.writeHead(error.status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         res.end(JSON.stringify({ error: error.code === 'maintenance' || error.code === 'stale-epoch' ? error.code
@@ -662,7 +679,8 @@ export function createProxyHandlers(
           : { code: 'RUNTIME_LEASE_UNAVAILABLE', message: 'The prepared Runtime is no longer ready. Retry explicitly.' } }))
         return true
       }
-      if (error instanceof RuntimeLeaseUnavailableError) return false
+      if (error instanceof RuntimeLeaseUnavailableError) { report('fallbackNotRetained'); return false }
+      report('failed')
       throw error
     } finally {
       req.url = originalUrl

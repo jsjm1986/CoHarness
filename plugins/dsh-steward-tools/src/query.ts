@@ -1,17 +1,15 @@
 /** Statement classification shared with the Gateway steward endpoint. */
+import { classifyStewardStatement } from '@deepseek-ai/dsh-gateway-runtime/steward-statement'
 
 const NOISE = /^\s*(?:--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|\s)*/
-const READONLY_HEAD = /^(select|with|values|table|show|explain)\b/i
 
 /**
- * Whether a statement is read-only by its leading keyword. The classifier is
- * optimistic for tooling UX (approval prompts) only — the Gateway reclassifies
- * authoritatively before executing, so a mismatch denies, never silently widens.
+ * Whether the tool can submit a statement without an approval interaction.
  * @param sql - model-supplied statement text.
- * @returns `true` for SELECT-family heads.
+ * @returns true for the read lane.
  */
 export function isReadOnly(sql: string): boolean {
-  return READONLY_HEAD.test(sql.replace(NOISE, ''))
+  return classifyStewardStatement(sql) === 'read'
 }
 
 /**

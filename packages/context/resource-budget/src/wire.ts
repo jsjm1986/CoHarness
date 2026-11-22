@@ -24,6 +24,8 @@ export const RESOURCE_QUALIFIED_GRANT_HEADER = 'x-dsh-resource-qualified-grant'
 export const RESOURCE_CHANGE_CURSOR_HEADER = 'x-dsh-resource-change-cursor'
 /** Optional observed time from durable queue insertion to grant, in milliseconds. */
 export const RESOURCE_GRANT_AGE_HEADER = 'x-dsh-resource-grant-queue-ms'
+/** Optional duration in milliseconds spent waiting for a change inside a status exchange. */
+export const RESOURCE_CHANGE_WAIT_TIMING_HEADER = 'x-dsh-resource-change-wait-ms'
 
 /**
  * Identify the two remote admission exchanges sampled by managed model diagnostics.

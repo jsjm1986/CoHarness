@@ -86,6 +86,26 @@ describe('GatewayPerformanceObserver', () => {
     expect(after.requests.durationMs.p50Ms).toBe(1)
   })
 
+  it('separates ready Session forwarding decisions from HTTP outcomes', () => {
+    const observer = create()
+    observer.recordReadySession('ordinary', 'ready')
+    observer.recordReadySession('forwarded', 'fallbackCandidate')
+    const before = observer.snapshot(null)
+    observer.recordReadySession('forwarded', 'delegated')
+    observer.recordReadySession('ordinary', 'refused')
+    observer.dispose()
+    observer.recordReadySession('forwarded', 'ready')
+    expect(before.readySession).toMatchObject({
+      ordinary: { ready: 1, refused: 0, fallbackCandidate: 0 },
+      forwarded: { ready: 0, delegated: 0, fallbackCandidate: 1 },
+    })
+    expect(observer.snapshot(null).readySession).toEqual({
+      ordinary: { ...before.readySession.ordinary, refused: 1 },
+      forwarded: { ...before.readySession.forwarded, delegated: 1 },
+    })
+    expect(observer.snapshot(null).requests.completed).toBe(0)
+  })
+
   it('counts a finished response once and removes both lifecycle listeners', () => {
     const observer = create()
     const res = response()

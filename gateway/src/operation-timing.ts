@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { PoolClient } from 'pg'
+import type { ReadySessionOutcome, ReadySessionRoute } from './performance-observer.ts'
 import { isReadyRuntimeRead } from './runtime-request-path.ts'
 
 const method = new Map([
@@ -37,6 +38,7 @@ interface Sample {
   id:string; operation:Method; startedAtMs:number; durationMs:number; responseHeadersMs?:number
   status:number; aborted:boolean; sentBytes:number|null; receivedBytes:number|null
   forwarding?:Partial<Record<ForwardingMark,number>>
+  readySession?:Partial<Record<ReadySessionRoute,Partial<Record<ReadySessionOutcome,number>>>>
   databaseCheckout?:Partial<Record<SqlRole,CheckoutSpans>>
   resourceBearerDatabase?:{poolWaitMs:number;connectionSetupMs:number;failedCheckoutMs:number;queryMs:number;queries:number}
   phases:Partial<Record<OperationPhase,number>>; sql:Record<SqlRole,{count:number;elapsedMs:number}>
@@ -125,6 +127,19 @@ export async function timeResourceBearer<T>(work: () => Promise<T> | T): Promise
 export function recordNodeTransport(state:NodeTransport):void{
   const flight=current.getStore()
   if(flight && !flight.closed) flight.sample.nodeTransport=state
+}
+
+/**
+ * Record one ready-Session forwarding attempt on the current request.
+ * @param route - whether the attempt used the node assertion or ordinary account path.
+ * @param outcome - decision for this attempt.
+ */
+export function recordReadySession(route: ReadySessionRoute, outcome: ReadySessionOutcome): void {
+  const flight = current.getStore()
+  if (flight === undefined || flight.closed) return
+  const routes = flight.sample.readySession ??= {}
+  const outcomes = routes[route] ??= {}
+  outcomes[outcome] = (outcomes[outcome] ?? 0) + 1
 }
 
 /**

@@ -174,11 +174,13 @@ Runtime 分发器在认证运行时令牌后，将文档流式操作交给 Gatew
 
 Gateway 将浏览器请求、事件流建立、就绪期限与服务端计时选项一同写入每个受管 Connection 插件。指定 Runtime 的页面使用所属电脑的配置。版本化对话诊断在保留就绪代次时，将 `runtimeQueue` 和 `runtimeLiveness` 记入 `admit`。在两端 Gateway 使用 `GET /admin/api/performance/operations?id=<uuid>` 对照所属端排队、本机进程监督、治理 SQL 和节点传输，按同一个操作 ID 匹配记录。各阶段耗时可能重叠。模型生成和浏览器绘制单独计时。
 
+所属 Gateway 在两个诊断接口的 `readySession` 字段中统计就绪代次的对话转发尝试。`forwarded` 统计携带本机节点服务断言且目标明确的请求，`ordinary` 统计通过账号路由进入的准入。`ready` 和 `delegated` 表示已准入 Runtime 代理。`fallbackCandidate` 统计不满足签名就绪准入条件的断言，`fallbackDelegation` 统计无可用委托的结构化读取。其他计数分别记录服务不可用、无法持有当前代次、启动读取继续走维护路由、拒绝、客户端断开和处理异常。同一请求回退后可能计入两组。
+
 对于已跟踪的就绪代次，个人对话准备请求使用共享实例锁，并在锁等待之后以一次 PostgreSQL 往返读取当前权限。工作区目录可同时持有自己的共享锁。进程内引用保护该代次，直到返回响应并记录该代次的完成活动。需要记录开始活动的就绪对话操作通过[迁移 140](deploy/postgres/migrations/140_ready_runtime_admission.sql) 在实例锁之后复核权限。Host 继续核验具体对话权限并保有持久输入回执。参见[个人对话准备准入决策](../.agents/notes/implemented/architecture/2026-11-21-personal-prepare-instance-lock.zh.md)。
 
 浏览器声明预期账号和确切 Runtime 时，结构化启动读取、Host 描述、工作区列表、会话列表与历史 RPC 可对就绪代次复用上述准入。客户端沿用原路径、游标和归档读取规则。当前代次未就绪时，读取按普通路由及启动规则处理。恢复已保存的个人对话时，浏览器附加 `dshRestore=1`，只使用现有的就绪代次，不启动 Runtime。
 
-对于使用已验证节点内容卷的就绪项目，历史准备请求以及绑定账号的 Host 描述、工作区列表、会话列表和历史读取会持有当前代次。首次治理查询验证账号权限，并返回[迁移 147](deploy/postgres/migrations/147_ready_project_content_admission.sql) 提供的存储标识。所属 Gateway 从该卷读取当前项目名，转发前再次验证权限和相同的存储归属。
+对于使用已验证节点内容卷的就绪项目，历史准备请求以及绑定账号的 Host 描述、工作区列表、会话列表和历史读取会持有当前代次。这也适用于选择器一致、入口节点获准的普通签名节点服务转发。首次治理查询验证账号权限，并返回[迁移 147](deploy/postgres/migrations/147_ready_project_content_admission.sql) 提供的存储标识。所属 Gateway 从该卷读取当前项目名，转发前再次验证权限和相同的存储归属。这类项目的写请求使用普通写入准入。
 
 `HGW_NODE_SERVICE_PREPARED_READ_DELEGATION=on` 允许主入口核准个人历史准备请求，以及绑定账号的结构化启动、Host 描述、工作区列表、会话列表和历史读取。请在主入口和所属 Gateway 同时启用，并使用配套 Node Agent。主入口在转发前和返回结果前都复核当前权限。所属端在已认证的本机 Node Agent 连接上核验签名请求和会话，检查已应用的权限修订号，并保留获准的代次。符合条件时，所属端在响应前无需查询治理库。其余请求沿用普通准入。委托读取记录完成活动和启动审计事件。参见[个人 Runtime 读取决策](../.agents/notes/implemented/architecture/2026-11-21-personal-history-restore-admission.zh.md)。
 

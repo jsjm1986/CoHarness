@@ -22,6 +22,7 @@ export const GATEWAY_RUNTIME_PACKAGES: readonly { readonly directory: string; re
   { directory: 'packages/util/home-paths', entry: 'lib/index.js' },
   { directory: 'packages/util/values', entry: 'lib/index.js' },
   { directory: 'packages/context/resource-budget', entry: 'lib/wire.js' },
+  { directory: 'packages/context/gateway-runtime', entry: 'lib/steward-statement.js' },
   { directory: 'packages/schedule/schedule', entry: 'lib/index.js' },
   { directory: 'packages/attachment/userdoc', entry: 'lib/index.js' },
   { directory: 'packages/attachment/userdoc-local', entry: 'lib/index.js' },

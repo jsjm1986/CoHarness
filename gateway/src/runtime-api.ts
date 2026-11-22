@@ -5,7 +5,7 @@ import type { GatewayAccessMonitor } from './access-invalidation.ts'
 import { StreamPrincipalRequestError, type StreamPrincipalRenewals, type StreamLeaseRuntime } from './stream-principal-leases.ts'
 import { createRuntimeDocumentStoreStream, type RuntimeDocumentStoreHandler } from './runtime-document-store.ts'
 import type { GatewayRuntimeHandler } from './server.ts'
-import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_GRANT_AGE_HEADER,
+import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_CHANGE_WAIT_TIMING_HEADER, RESOURCE_GRANT_AGE_HEADER,
   RESOURCE_PHASE_TIMING_HEADER, isResourceAdmissionRequest } from '@deepseek-ai/dsh-resource-budget/wire'
 import { DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_UPSTREAM_TIMEOUT_MS } from './config.ts'
 import { activeModelStatusOperation, handleRuntimeResourceApi, scopedModelResourceRequest } from './runtime-resource-api.ts'
@@ -810,10 +810,13 @@ export function createRuntimeApiHandler(
             const seen = req.headers[RESOURCE_CHANGE_CURSOR_HEADER]
             const waitMs = deps.resourceStatusWaitMs ?? 0
             let waiting = false
+            let changeWaitMs: number | undefined
             if (waitMs > 0 && typeof seen === 'string' && /^[a-f0-9-]{36}\.\d{1,16}$/u.test(seen)) {
               const signal = requestSignal(req, res)
+              const startedWaiting = deps.performanceEnabled === true ? performance.now() : undefined
               try { waiting = await timeOperation('resourceChangeWait', () => budget.waitForChange(seen, waitMs, signal)) }
               catch (error) { if (signal.aborted) return true; throw error }
+              if (startedWaiting !== undefined) changeWaitMs = performance.now() - startedWaiting
             }
             if (!await executionWrite.admit(true)) return true
             const cursor = budget.changeCursor
@@ -823,6 +826,7 @@ export function createRuntimeApiHandler(
               if (started !== undefined) {
                 res.setHeader(RESOURCE_PHASE_TIMING_HEADER, JSON.stringify([0, Math.round((performance.now() - started) * 100) / 100, 0]))
                 if (confirmed.queueMs !== null) res.setHeader(RESOURCE_GRANT_AGE_HEADER, String(Math.round(confirmed.queueMs)))
+                if (changeWaitMs !== undefined) res.setHeader(RESOURCE_CHANGE_WAIT_TIMING_HEADER, changeWaitMs.toFixed(2))
               }
               if (confirmed.state === 'queued' && waiting) res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
               res.setHeader('cache-control', 'no-store')

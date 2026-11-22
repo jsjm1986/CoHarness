@@ -60,6 +60,8 @@ kind: "package-reference"
 
 项目凭据会在应用根上下文中保留[协作要求](../collaboration/README.zh.md#application-authorization)，覆盖运行时或授权提供方的替换过程。
 
+独立入口 `./steward-statement` 为 steward 审批工具和 Gateway 执行器归类 SQL。执行器应用对应的事务与审批规则。
+
 <a id="resource-admission"></a>
 ## 资源准入
 
@@ -69,7 +71,7 @@ kind: "package-reference"
 
 `modelTimings` 默认关闭。受管启动配置随 Gateway 性能诊断启用，将计时元数据写入 Runtime 日志或 systemd 单元日志。采样覆盖[输入与请求准备](../gateway-execution/README.zh.md#execution-authorization)、资源准入及模型尝试到首段文本。沿用现有日志保留策略。
 
-`model-resource-timing` 记录来源绑定、本地登记、提交、状态请求和轮询间隔。核验通过的响应可以报告 `grantQueueMs`，即预留落盘到获得额度的时间。协调器的分段耗时包含在对应请求内。样本包含时间戳、耗时、次数和结果。
+`model-resource-timing` 记录来源绑定、本地登记、提交、状态请求和轮询间隔。`statusChangeWaitMs` 是 `statusMs` 中协调器报告的挂起等待时间，`statusChangeWaitSamples` 记录包含该测量的响应次数。核验通过的响应可以报告 `grantQueueMs`，即预留落盘到获得额度的时间。它可能与轮询间隔和状态请求耗时重叠。可用 `operationId` 在所属 Gateway 查询提交和单预留状态请求，批量轮询的最近一次请求可用 `lastStatusOperationId` 查询。
 
 提供方在进入有界注册队列前，捕获 Session 范围、签名交互调用者或明确的基础设施归属。归属解析失败会立即拒绝。捕获调用方范围后，由 Runtime 服务负责注册、重复轮询和完成结算。尚未发送的请求被取消时，会独立于此前的 HTTP 请求释放本地排队容量。已验证且仍有效的条目串行注册；已尝试注册的请求则保留精确的完成记账，直到得到确认。
 

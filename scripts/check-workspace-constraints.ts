@@ -235,7 +235,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-userdoc': ['lib/identity.js'],
   // The runtime provider and Gateway server adapter share generated frame and protocol chunks.
   '@deepseek-ai/dsh-userdoc-gateway': ['lib/protocol.js', 'lib/server.js', 'lib/frame-*.js', 'lib/protocol-*.js'],
-  '@deepseek-ai/dsh-gateway-runtime': ['lib/resource-budget.js'],
+  '@deepseek-ai/dsh-gateway-runtime': ['lib/resource-budget.js', 'lib/steward-statement.js'],
   '@deepseek-ai/dsh-gateway-execution': ['lib/desktop-availability.js'],
   // SDK children load their independent control plugin before profile entries.
   '@deepseek-ai/dsh-subagent-dsh-sdk': ['lib/managed.js'],

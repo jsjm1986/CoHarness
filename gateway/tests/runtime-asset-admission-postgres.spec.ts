@@ -418,10 +418,11 @@ pg('PostgreSQL exact Runtime admission', () => {
       const metrics = await observations.json() as { operations: Array<{
         phases: { runtimeQueue?: number; runtimeLiveness?: number }
         sql: { governance: { count: number } }
+        readySession?: unknown
       }> }
       expect(metrics.operations).toHaveLength(1)
-      const { phases, sql: { governance } } = metrics.operations[0]!
-      return { data, phases, governance }
+      const { phases, sql: { governance }, readySession: decisions } = metrics.operations[0]!
+      return { data, phases, governance, decisions }
     }
     const sessionId = 'fixture-history', requestId = randomUUID()
     for (const [path, method, payload] of [
@@ -439,6 +440,8 @@ pg('PostgreSQL exact Runtime admission', () => {
       expect(before.governance.count - after.governance.count, `${method} statements removed`).toBeGreaterThanOrEqual(5)
       expect(after.phases.runtimeQueue).toBeGreaterThanOrEqual(0)
       expect(after.phases.runtimeLiveness).toBeGreaterThanOrEqual(0)
+      expect(after.decisions).toEqual({ ordinary: { ready: 1 } })
+      expect(before.decisions).toBeUndefined()
     }
     expect(readySession).toHaveBeenCalledTimes(4)
     const legacy = '/api/session.history'
@@ -460,6 +463,8 @@ pg('PostgreSQL exact Runtime admission', () => {
     const after = await measure(candidate, path, payload, forwarded)
     expect(after.data).toEqual(before.data)
     expect(before.governance.count - after.governance.count).toBe(1)
+    expect(before.decisions).toEqual({ forwarded: { fallbackCandidate: 1 }, ordinary: { ready: 1 } })
+    expect(after.decisions).toEqual({ forwarded: { ready: 1 } })
     expect(readySession).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ forwarded: expect.anything() }))
     expect(consumed.size).toBe(2)
     const replay = await fetch(`${candidate}${path}?dshRuntime=${f.personal.id}&dshTarget=personal&dshNode=${nodeId}`, {
@@ -551,6 +556,11 @@ pg('PostgreSQL exact Runtime admission', () => {
     const maintenanceBoot = await boot(candidate, String(f.member.id))
     expect(maintenanceBoot.status).toBe(200)
     expect(await maintenanceBoot.json()).toEqual(await (await boot(baseline, String(f.member.id))).json())
+    const performance = await fetch(`${candidate}/admin/api/performance`, { headers: { cookie: `${SESSION_COOKIE}=${admin.token}` } })
+    expect(performance.status).toBe(200)
+    expect(await performance.json()).toMatchObject({
+      readySession: { ordinary: { ready: 5, refused: 2, fallbackMaintenance: 1 }, forwarded: { ready: 5, refused: 1 } },
+    })
   })
 
   it('refuses revoked sessions, foreign owners, duplicate-owner guesses and mismatched explicit scope or computer', async () => {

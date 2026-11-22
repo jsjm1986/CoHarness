@@ -5,7 +5,7 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import ResourceBudget, { ResourceAdmissionError, type ResourceLease, type ResourceOperationId, type ResourceRequest } from '@deepseek-ai/dsh-resource-budget'
 import {
-  RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_GRANT_AGE_HEADER,
+  RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_CHANGE_WAIT_TIMING_HEADER, RESOURCE_GRANT_AGE_HEADER,
   RESOURCE_INGRESS_TIMING_HEADER, RESOURCE_MESSAGE_MAX_BYTES, RESOURCE_PHASE_TIMING_HEADER,
   RESOURCE_POLL_MAX_OPERATIONS, RESOURCE_QUALIFIED_GRANT_HEADER,
   resourceErrorSchema, resourceRegistrationSchema,
@@ -28,6 +28,7 @@ interface Deferred<T> {
 }
 
 interface ModelResourceTiming {
+  operationId: ResourceOperationId
   startedAt: number
   started: number
   originMs: number
@@ -37,6 +38,9 @@ interface ModelResourceTiming {
   submitCalls: number
   statusMs: number
   statusCalls: number
+  lastStatusOperationId?: ResourceOperationId
+  statusChangeWaitSamples: number
+  statusChangeWaitMs: number
   queuedResponses: number
   pollReady?: number | undefined
   pollWaitMs: number
@@ -48,6 +52,15 @@ interface ModelResourceTiming {
   gatewayIngressBearerMs: number
   gatewayWriteAdmissionMs: number
   grantQueueMs?: number
+}
+
+interface ResourceExchangeObservation {
+  operationId: ResourceOperationId
+  samples: readonly ModelResourceTiming[]
+}
+
+function observeSingle(timing: ModelResourceTiming | undefined): ResourceExchangeObservation | undefined {
+  return timing === undefined ? undefined : { operationId: timing.operationId, samples: [timing] }
 }
 
 function readCoordinatorTiming(response: Response | undefined, name: string, count: 2): [number, number] | undefined
@@ -71,15 +84,17 @@ function readCoordinatorTiming(
 function reportTiming(timing: ModelResourceTiming, outcome: 'granted' | 'failed'): void {
   const round = (ms: number): number => Math.round(ms * 100) / 100
   const {
-    startedAt, started, originMs, registrationWaitMs, submitMs, submitCalls, statusMs, statusCalls,
+    operationId, startedAt, started, originMs, registrationWaitMs, submitMs, submitCalls, statusMs, statusCalls,
+    lastStatusOperationId, statusChangeWaitSamples, statusChangeWaitMs,
     queuedResponses, pollWaitMs, gatewaySamples, gatewayHandlerBearerMs, gatewayAuthorityMs, gatewayTransactionMs,
     gatewayIngressSamples, gatewayIngressBearerMs, gatewayWriteAdmissionMs,
   } = timing
   try {
     console.info(`[model-resource-timing] ${JSON.stringify({
-      startedAt, outcome, elapsedMs: round(performance.now() - started), originMs: round(originMs),
+      operationId, startedAt, outcome, elapsedMs: round(performance.now() - started), originMs: round(originMs),
       registrationWaitMs: round(registrationWaitMs), submitMs: round(submitMs), submitCalls,
-      statusMs: round(statusMs), statusCalls, queuedResponses, pollWaitMs: round(pollWaitMs),
+      statusMs: round(statusMs), statusCalls, lastStatusOperationId, queuedResponses, pollWaitMs: round(pollWaitMs),
+      ...(statusChangeWaitSamples === 0 ? {} : { statusChangeWaitSamples, statusChangeWaitMs: round(statusChangeWaitMs) }),
       ...(timing.grantQueueMs === undefined ? {} : { grantQueueMs: timing.grantQueueMs }),
       ...(gatewaySamples === 0 ? {} : { gatewaySamples, gatewayHandlerBearerMs: round(gatewayHandlerBearerMs),
         gatewayAuthorityMs: round(gatewayAuthorityMs), gatewayTransactionMs: round(gatewayTransactionMs) }),
@@ -218,9 +233,11 @@ export class GatewayResourceBudget extends ResourceBudget {
       || this.bytes + initialBytes > policy.maxQueuedBytes) throw new ResourceAdmissionError('refused', 'The Runtime resource queue is full.')
     const controller = new AbortController()
     const result = deferred<ResourceLease>(), done = deferred<void>()
+    const operationId = randomUUID() as ResourceOperationId
     const timing = request.kind === 'model' && this.owner.runtime.modelTimings ? {
-      startedAt: Date.now(), started: performance.now(), originMs: 0, registrationWaitMs: 0,
+      operationId, startedAt: Date.now(), started: performance.now(), originMs: 0, registrationWaitMs: 0,
       submitMs: 0, submitCalls: 0, statusMs: 0, statusCalls: 0, queuedResponses: 0, pollWaitMs: 0,
+      statusChangeWaitSamples: 0, statusChangeWaitMs: 0,
       gatewaySamples: 0, gatewayHandlerBearerMs: 0, gatewayAuthorityMs: 0, gatewayTransactionMs: 0,
       gatewayIngressSamples: 0, gatewayIngressBearerMs: 0, gatewayWriteAdmissionMs: 0,
     } satisfies ModelResourceTiming : undefined
@@ -240,7 +257,7 @@ export class GatewayResourceBudget extends ResourceBudget {
     const onAbort = (): void => { controller.abort(request.signal?.reason) }
     request.signal?.addEventListener('abort', onAbort, { once: true })
     const entry: Operation = {
-      id: randomUUID() as ResourceOperationId, kind: request.kind, controller, result, done, origin,
+      id: operationId, kind: request.kind, controller, result, done, origin,
       signal: AbortSignal.any([this.lifetime.signal, controller.signal, ...request.signal === undefined ? [] : [request.signal]]),
       detach: () => { request.signal?.removeEventListener('abort', onAbort) },
       timer: setTimeout(() => { controller.abort(new ResourceAdmissionError('expired', 'Resource admission expired.')) }, policy.maxWaitMs),
@@ -324,7 +341,7 @@ export class GatewayResourceBudget extends ResourceBudget {
   private async register(entry: Operation): Promise<void> {
     const timing = entry.timing
     if (timing?.registrationReady !== undefined) timing.registrationWaitMs = performance.now() - timing.registrationReady
-    const samples = timing === undefined ? undefined : [timing]
+    const observation = observeSingle(timing)
     try {
       const policy = this.policy
       if (policy === undefined) throw new ResourceAdmissionError('unavailable', 'Resource admission has not initialized.')
@@ -340,7 +357,7 @@ export class GatewayResourceBudget extends ResourceBudget {
         entry.request = request
         entry.attempted = true
         let status: ResourceStatus
-        try { status = resourceStatusSchema.parse(await this.post('request', request, undefined, undefined, samples, entry)) } catch (error) {
+        try { status = resourceStatusSchema.parse(await this.post('request', request, undefined, undefined, observation, entry)) } catch (error) {
           if (error instanceof ResourceHttpError && (error.code === 'resource-request-conflict' || error.code === 'resource-sequence-gap')) {
             entry.attempted = false
             await this.resynchronize()
@@ -386,10 +403,9 @@ export class GatewayResourceBudget extends ResourceBudget {
     switch (status.state) {
       case 'active': {
         if (!qualified) {
-          const samples = entry.timing === undefined ? undefined : [entry.timing]
           const scopedModel = request.kind === 'model' && request.origin.kind === 'session' && request.origin.scopeId !== undefined
           const response = await this.post(scopedModel ? 'confirm-active-model' : 'statuses',
-            { operations: [{ sequence: request.sequence, requestId: entry.id }] }, undefined, undefined, samples)
+            { operations: [{ sequence: request.sequence, requestId: entry.id }] }, undefined, undefined, observeSingle(entry.timing))
           if (!Array.isArray(response) || response.length !== 1) throw new Error('invalid resource grant check')
           await this.acceptStatus(entry, request, resourceStatusSchema.parse(response[0]), true)
           return
@@ -456,9 +472,12 @@ export class GatewayResourceBudget extends ResourceBudget {
       try {
         const single = batch.length === 1 ? batch[0]?.entry : undefined
         const observed = single?.changeCursor === undefined ? undefined : single
+        const observation = samples.length === 0 ? undefined : {
+          operationId: single?.id ?? (randomUUID() as ResourceOperationId), samples,
+        }
         const response = await this.post(observed === undefined ? 'statuses' : 'confirm-active-model', {
           operations: batch.map(({ entry, request }) => ({ sequence: request.sequence, requestId: entry.id })),
-        }, undefined, observed?.controller.signal, samples, observed)
+        }, undefined, observed?.controller.signal, observation, observed)
         if (!Array.isArray(response) || response.length !== batch.length) throw new Error('invalid resource status batch')
         for (const [index, { entry, request }] of batch.entries()) {
           // Another operation's authorization can delay a batched grant.
@@ -594,7 +613,7 @@ export class GatewayResourceBudget extends ResourceBudget {
 
   private async post(
     action: string, value: unknown, deadline?: number, upstream?: AbortSignal,
-    samples?: readonly ModelResourceTiming[], observed?: Operation,
+    observation?: ResourceExchangeObservation, observed?: Operation,
   ): Promise<unknown> {
     const confirmingModel = action === 'confirm-active-model'
     const route = confirmingModel ? 'statuses' : action
@@ -604,13 +623,14 @@ export class GatewayResourceBudget extends ResourceBudget {
     const signal = upstream === undefined ? AbortSignal.timeout(timeout) : AbortSignal.any([upstream, AbortSignal.timeout(timeout)])
     const body = JSON.stringify(value)
     if (Buffer.byteLength(body) > RESOURCE_MESSAGE_MAX_BYTES) throw new ResourceAdmissionError('refused', 'Resource metadata exceeds the protocol byte limit.')
-    const started = samples?.length ? performance.now() : undefined
+    const started = observation === undefined ? undefined : performance.now()
     const cursor = confirmingModel ? observed?.changeCursor : undefined
     if (observed !== undefined) observed.changeCursor = undefined
     let response: Response | undefined
     try {
       response = await this.owner.runtime.request(`/internal/runtime/resources/${route}`, {
         method: 'POST', headers: { 'content-type': 'application/json',
+          ...(observation === undefined ? {} : { 'x-dsh-operation-id': observation.operationId }),
           ...(confirmingModel ? { [RESOURCE_ACTIVE_MODEL_CHECK_HEADER]: '1' } : {}),
           ...(cursor === undefined ? {} : { [RESOURCE_CHANGE_CURSOR_HEADER]: cursor }) }, body, signal,
       })
@@ -629,14 +649,23 @@ export class GatewayResourceBudget extends ResourceBudget {
       }
       return payload
     } finally {
-      if (started !== undefined && samples !== undefined) {
+      if (started !== undefined && observation !== undefined) {
         const elapsed = performance.now() - started
         const phases = readCoordinatorTiming(response, RESOURCE_PHASE_TIMING_HEADER, 3)
         const ingress = readCoordinatorTiming(response, RESOURCE_INGRESS_TIMING_HEADER, 2)
         const age = response?.headers.get(RESOURCE_GRANT_AGE_HEADER) ?? ''
-        for (const timing of samples) {
+        const changeWait = response?.headers.get(RESOURCE_CHANGE_WAIT_TIMING_HEADER) ?? ''
+        for (const timing of observation.samples) {
           if (action === 'request') { timing.submitCalls += 1; timing.submitMs += elapsed }
-          if (route === 'statuses') { timing.statusCalls += 1; timing.statusMs += elapsed }
+          if (route === 'statuses') {
+            timing.statusCalls += 1
+            timing.statusMs += elapsed
+            timing.lastStatusOperationId = observation.operationId
+            if (/^\d{1,12}(?:\.\d{1,2})?$/u.test(changeWait)) {
+              timing.statusChangeWaitSamples += 1
+              timing.statusChangeWaitMs += Math.min(elapsed, Number(changeWait))
+            }
+          }
           if (/^\d{1,12}$/u.test(age)) timing.grantQueueMs = Number(age)
           if (phases !== undefined) {
             timing.gatewaySamples += 1

@@ -6,7 +6,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Pool, PoolClient } from 'pg'
-import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_GRANT_AGE_HEADER,
+import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_CHANGE_WAIT_TIMING_HEADER, RESOURCE_GRANT_AGE_HEADER,
   RESOURCE_QUALIFIED_GRANT_HEADER } from '@deepseek-ai/dsh-resource-budget/wire'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { NodeResourceBudgetConfig } from '../src/node-resource-budget.ts'
@@ -228,7 +228,9 @@ describePg('Runtime resource HTTP admission', () => {
       status: 200, body: [{ state: 'queued' }],
     })
     const waitForChange = vi.spyOn(f.resourceBudget!, 'waitForChange')
-    const awaiting = http('statuses', { operations: [queued] }, f.personal, { ...hint, [RESOURCE_CHANGE_CURSOR_HEADER]: cursor! })
+    const awaiting = http('statuses', { operations: [queued] }, f.personal, {
+      ...hint, [RESOURCE_CHANGE_CURSOR_HEADER]: cursor!, 'x-dsh-operation-id': queued.requestId,
+    })
     try {
       await expect.poll(() => waitForChange.mock.calls.length).toBe(1)
       expect(writers).toBe(0)
@@ -238,7 +240,9 @@ describePg('Runtime resource HTTP admission', () => {
       expect(dispatch.status).toBe(200)
       expect(await dispatch.json()).toEqual([{ state: 'active' }])
       expect(dispatch.headers.get(RESOURCE_GRANT_AGE_HEADER)).toMatch(/^\d+$/u)
-      expect(timings.samples().at(-1)).toMatchObject({ operation: 'resourceStatuses', sql: { governance: { count: 1 } },
+      expect(dispatch.headers.get(RESOURCE_CHANGE_WAIT_TIMING_HEADER)).toMatch(/^\d+\.\d{2}$/u)
+      expect(Number(dispatch.headers.get(RESOURCE_CHANGE_WAIT_TIMING_HEADER))).toBeGreaterThan(0)
+      expect(timings.samples(queued.requestId).at(-1)).toMatchObject({ operation: 'resourceStatuses', sql: { governance: { count: 1 } },
         phases: { resourceChangeWait: expect.any(Number) } })
     } finally {
       waitForChange.mockRestore()

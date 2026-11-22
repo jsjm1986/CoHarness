@@ -7,7 +7,7 @@ import { setImmediate } from 'node:timers/promises'
 import type { Pool } from 'pg'
 import { Context } from '@deepseek-ai/cordis'
 import { resourceBudgetOf } from '@deepseek-ai/dsh-resource-budget'
-import { RESOURCE_INGRESS_TIMING_HEADER, RESOURCE_PHASE_TIMING_HEADER } from '@deepseek-ai/dsh-resource-budget/wire'
+import { RESOURCE_CHANGE_WAIT_TIMING_HEADER, RESOURCE_INGRESS_TIMING_HEADER, RESOURCE_PHASE_TIMING_HEADER } from '@deepseek-ai/dsh-resource-budget/wire'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import GatewayResourceBudget from '../../packages/context/gateway-runtime/src/resource-budget.ts'
@@ -51,14 +51,21 @@ it.each(['process', 'model'] as const)('delivers a %s permit after repeated queu
         case path('request'): {
           const { requestId, sequence } = JSON.parse(String(init.body)) as NonNullable<typeof registration>
           registration = { requestId, sequence }
+          expect(new Headers(init.headers).get('x-dsh-operation-id')).toBe(kind === 'model' ? requestId : null)
           return Response.json({ state: 'queued' }, { headers: {
             [RESOURCE_PHASE_TIMING_HEADER]: '[0,0,0]', [RESOURCE_INGRESS_TIMING_HEADER]: '[0,0]',
           } })
         }
         case path('statuses'): {
           expect(JSON.parse(String(init.body))).toEqual({ operations: [registration] })
-          return Response.json([{ state: ++polls <= queuedPolls ? 'queued' : 'active' }], {
-            headers: { [RESOURCE_PHASE_TIMING_HEADER]: polls === 1 ? 'invalid' : '[0,0,0]' },
+          expect(new Headers(init.headers).get('x-dsh-operation-id')).toBe(kind === 'model' ? registration!.requestId : null)
+          polls += 1
+          if (polls === 2) await new Promise<void>(resolveDelay => { setTimeout(resolveDelay, 3) })
+          return Response.json([{ state: polls <= queuedPolls ? 'queued' : 'active' }], {
+            headers: {
+              [RESOURCE_PHASE_TIMING_HEADER]: polls === 1 ? 'invalid' : '[0,0,0]',
+              ...(polls === 2 ? { [RESOURCE_CHANGE_WAIT_TIMING_HEADER]: '2.15' } : {}),
+            },
           })
         }
         case path('finish'): {
@@ -85,7 +92,9 @@ it.each(['process', 'model'] as const)('delivers a %s permit after repeated queu
       const sample = String(output.mock.calls[0]?.[0])
       expect(sample.startsWith(prefix)).toBe(true)
       expect(JSON.parse(sample.slice(prefix.length))).toMatchObject({ outcome: 'granted',
-        originMs: 0, registrationWaitMs: 0, submitCalls: 1, submitMs: 0, statusCalls: polls, statusMs: 0,
+        operationId: registration!.requestId, lastStatusOperationId: registration!.requestId,
+        originMs: 0, registrationWaitMs: 0, submitCalls: 1, submitMs: 0, statusCalls: polls, statusMs: 3,
+        statusChangeWaitSamples: 1, statusChangeWaitMs: 2.15,
         queuedResponses: polls, pollWaitMs: polls * policy.sampleMs, gatewaySamples: polls,
         gatewayIngressSamples: 1, gatewayIngressBearerMs: 0, gatewayWriteAdmissionMs: 0 })
     } else expect(output).not.toHaveBeenCalled()

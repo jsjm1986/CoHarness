@@ -16,7 +16,7 @@ Tool surface for the reserved **steward** maintenance runtime: one audited SQL c
 
 ## Boundary (honest limits)
 
-- Statement classification in this package is a UX hint for the approval prompt. The authoritative classification and limits (statement bytes, row cap, result bytes, statement timeout) live in the Gateway executor (`gateway/src/postgres/steward-query.ts`), which reclassifies independently — a mismatch denies, never widens.
+- The tool and Gateway use the same statement classifier. A data-changing CTE or an outer write command enters the approval lane. Read-only CTEs use the read lane. The Gateway classifies the submitted SQL itself and enforces the transaction mode, exact approval binding, and statement limits.
 - The tool cannot create approvals: without a granted in-session approval the write fails closed, and the approval id is bound to the calling session via its `callId`.
 - The steward runtime cannot change its own plugin composition; `steward_query` is mounted by the deployment patch, not through plugin management.
 - Administrative operations outside SQL (release activation, runtime restarts) are not exposed by this package; the operator applies them from the admin surface.

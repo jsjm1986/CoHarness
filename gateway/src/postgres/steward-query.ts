@@ -1,6 +1,7 @@
 import type { RuntimeId } from '../runtime-catalog.ts'
 /** Audited SQL execution channel for the resident steward runtime. */
 import { Query, type Pool, type PoolClient } from 'pg'
+import { classifyStewardStatement } from '@deepseek-ai/dsh-gateway-runtime/steward-statement'
 import { connectFromPool } from './database.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 
@@ -18,9 +19,6 @@ const MAX_ROW_LIMIT = 5_000
 const MAX_RESULT_BYTES = 256 * 1024
 const STATEMENT_TIMEOUT_MS = 15_000
 const APPROVAL_TTL_MINUTES = 15
-
-const LEADING_NOISE = /^\s*(?:--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|\s)*/
-const READONLY_HEAD = /^(select|with|values|table|show|explain)\b/i
 
 /** Authenticated steward target coordinates carried by the runtime token. */
 export interface StewardQuerySubject {
@@ -46,17 +44,6 @@ export interface StewardQueryResult {
   plan: unknown[] | null
   rowCount: number | null
   truncated: boolean
-}
-
-/**
- * Statement classification gates which lane a statement enters; it is not the
- * write-safety boundary. Read-classified statements run inside a READ ONLY
- * transaction, so `EXPLAIN ANALYZE` and data-modifying CTEs that pass the
- * leading-keyword test still fail at execution and are audited as errors.
- */
-function classify(sql: string): 'read' | 'write' {
-  const stripped = sql.replace(LEADING_NOISE, '')
-  return READONLY_HEAD.test(stripped) ? 'read' : 'write'
 }
 
 /**
@@ -222,7 +209,7 @@ export class StewardQueryService {
     if (Buffer.byteLength(statement, 'utf8') > MAX_STATEMENT_BYTES) {
       throw new StewardQueryError(413, 'steward-statement-too-large', `statement exceeds ${MAX_STATEMENT_BYTES} bytes`)
     }
-    const classification = classify(statement)
+    const classification = classifyStewardStatement(statement)
     if (classification === 'read' && READ_LANE_DENY.test(scrubbedSql(statement))) {
       await this.journal(subject, statement, classification, input.dryRun === true, 'denied', null, null, null, 'statement-forbidden', input.approvalId)
       throw new StewardQueryError(403, 'steward-statement-forbidden', 'the statement calls a function whose effects escape the read-only lane')

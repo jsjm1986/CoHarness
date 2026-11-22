@@ -90,6 +90,9 @@
       "@deepseek-ai/dsh-resource-budget/wire": [
         "../packages/context/resource-budget/lib/types/wire.d.ts"
       ],
+      "@deepseek-ai/dsh-gateway-runtime/steward-statement": [
+        "../packages/context/gateway-runtime/lib/types/steward-statement.d.ts"
+      ],
       "@deepseek-ai/dsh-subprocess": [
         "../packages/subprocess/subprocess/lib/types/index.d.ts"
       ],

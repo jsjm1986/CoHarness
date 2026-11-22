@@ -25,6 +25,7 @@ export default defineConfig({
       { find: /^@deepseek-ai\/dsh-subprocess$/, replacement: pkg('packages/subprocess/subprocess') },
       { find: /^@deepseek-ai\/dsh-resource-budget$/, replacement: pkg('packages/context/resource-budget') },
       { find: '@deepseek-ai/dsh-resource-budget/wire', replacement: pkg('packages/context/resource-budget', 'wire.js') },
+      { find: '@deepseek-ai/dsh-gateway-runtime/steward-statement', replacement: pkg('packages/context/gateway-runtime', 'steward-statement.js') },
       { find: /^@deepseek-ai\/dsh-atomic-write$/, replacement: pkg('packages/util/atomic-write') },
       { find: /^@deepseek-ai\/dsh-native-command$/, replacement: pkg('packages/util/native-command') },
       { find: /^@deepseek-ai\/dsh-managed-data$/, replacement: pkg('packages/util/managed-data') },

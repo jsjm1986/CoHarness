@@ -61,8 +61,8 @@ import type { ProjectInvitation, ProjectKind, ProjectThemePolicy } from './proje
 import { applyModelGovernanceToProject, modelPolicyProjectionDiagnostics, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
 import { ProjectModelSettingsConflictError, type ModelSettingsPathOp } from './model-governance.ts'
 import type { GatewayWorkbenchCatalogHandler } from './workbench.ts'
-import { OperationTimings, timeOperation, timeResourceBearer } from './operation-timing.ts'
-import { GatewayPerformanceObserver } from './performance-observer.ts'
+import { OperationTimings, recordReadySession, timeOperation, timeResourceBearer } from './operation-timing.ts'
+import { GatewayPerformanceObserver, type ReadySessionOutcome, type ReadySessionRoute } from './performance-observer.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { RuntimeAccountError } from './launcher.ts'
 import { RuntimeCatalogError, type RuntimeId, type RuntimeNodeId } from './runtime-catalog.ts'
@@ -729,6 +729,8 @@ export type ReadyEventHandler = (req: IncomingMessage, socket: Duplex, head: Buf
  */
 export type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer, context: GatewayRequestContext) => Promise<void>
 
+type ReadySessionObservation = (route: ReadySessionRoute, outcome: ReadySessionOutcome) => void
+
 /**
  * Dispatch an exact Session operation or a qualified Runtime read against the supervised generation.
  * @param req - original request.
@@ -745,6 +747,8 @@ export type ReadySessionHandler = (req: IncomingMessage, res: ServerResponse, se
   entryNodeId?: RuntimeNodeId
   forwarded?: GatewayForwardSessionCandidate
   managedPersonalRead?: true
+  /** Observe the forwarding decision before the response settles. */
+  observe?: ReadySessionObservation
 }) => Promise<boolean>
 
 function exactSessionSelectors(selection: URLSearchParams): { runtimeId: RuntimeId; target: RuntimePlacement['target'] } | undefined {
@@ -964,14 +968,19 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
   const signedPersonalForward = (req: IncomingMessage, pathname: string, selection: {
     runtimeId: RuntimeId; nodeId: RuntimeNodeId; target: 'personal'
-  }): { sessionToken: string; forwarded: GatewayForwardSessionCandidate } | undefined => {
+  }, observe?: ReadySessionObservation): {
+    sessionToken: string; forwarded: GatewayForwardSessionCandidate
+  } | undefined => {
     const assertion = req.headers['x-dsh-gateway-forward']
     if (req.headers[NODE_SERVICE_TARGET_HEADER] !== selection.nodeId || typeof assertion !== 'string') return undefined
     const forwarded = deps.forwardedSessionPrincipal?.(assertion)
     const sessionToken = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     if (forwarded == null || sessionToken === undefined || !browserPrincipalMatches(req, forwarded.claims.user)
       || !forwardRequestMatches(forwarded.claims, { method: req.method, path: pathname, sessionToken })
-      || !forwardedSessionMatches(forwarded.claims, selection)) return undefined
+      || !forwardedSessionMatches(forwarded.claims, selection)) {
+      observe?.('forwarded', 'fallbackCandidate')
+      return undefined
+    }
     return { sessionToken, forwarded }
   }
 
@@ -1013,6 +1022,12 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     enabled: cfg.performanceEnabled,
     eventLoopResolutionMs: cfg.performanceEventLoopResolutionMs,
   })
+  const observeReadySession = cfg.performanceEnabled ? {
+    observe(route: ReadySessionRoute, outcome: ReadySessionOutcome) {
+      performanceObserver.recordReadySession(route, outcome)
+      recordReadySession(route, outcome)
+    },
+  } : undefined
   const unclaimedLoopback = new Map<string, { socket: Socket; forget: () => void }>()
   const nodeReadBridges = new WeakMap<Socket, RuntimeNodeId>()
   const bridgeCoordinate = (socket: Socket, port: number | undefined = socket.remotePort): string | undefined => {
@@ -1417,15 +1432,17 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     const sessionNode = requestUrl.searchParams.get('dshNode')
     const readySession = sessionSelectors === undefined || localNode === undefined || recoveryRestricted
       || sessionNode !== null && sessionNode !== localNode || requestUrl.searchParams.getAll('dshNode').length > 1
-      || req.headers['x-dsh-prepare-continuation'] !== undefined ? undefined : { ...sessionSelectors, nodeId: localNode }
+      || req.headers['x-dsh-prepare-continuation'] !== undefined ? undefined
+      : { ...sessionSelectors, nodeId: localNode, ...observeReadySession }
     const delegatableRead = isDelegatablePersonalRead(req.method, requestUrl, typeof expectedPrincipal === 'string', req.headers.accept)
     if (readySession?.target === 'personal' && (req.method === 'POST' || delegatableRead) && handlers.readySession !== undefined) {
-      const candidate = signedPersonalForward(req, pathname, { ...readySession, target: 'personal' })
+      const candidate = signedPersonalForward(req, pathname, { ...readySession, target: 'personal' }, readySession.observe)
       if (candidate !== undefined) {
         const claims = candidate.forwarded.claims
         const managedPersonalRead = delegatableRead && claims.context?.personalRead !== undefined
           && claims.user.status === 'active' && !claims.user.mustChangePassword && nodeReadBridges.get(req.socket) === claims.issuerNode
-        if ((req.method === 'POST' || managedPersonalRead) && await handlers.readySession(req, res, {
+        if (req.method !== 'POST' && !managedPersonalRead) readySession.observe?.('forwarded', 'fallbackDelegation')
+        else if (await handlers.readySession(req, res, {
           ...readySession, ...candidate, actor: claims.user, ...(managedPersonalRead ? { managedPersonalRead: true } : {}),
         })) {
           auditForwardedAccount(req, pathname, claims)
