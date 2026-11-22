@@ -270,6 +270,24 @@ export class PostgresMaintenanceService {
   }
 
   /**
+   * Read writer convergence on the published push-only schema, which predates physical isolation records.
+   * @returns maintenance state based on acknowledged process stops and outstanding writes.
+   */
+  async stateBeforePushUpgrade(): Promise<ClusterState> {
+    return this.stateWithin(this.context.pool, false)
+  }
+
+  /**
+   * Hold the legacy deployment in maintenance through the push ledger upgrade.
+   * @param client - migration transaction that owns subsequent schema and ledger writes.
+   */
+  async verifyPushUpgrade(client: Queryable): Promise<void> {
+    const control = await this.lockControl(client)
+    if (control.mode !== 'maintenance') throw new MaintenanceError(409, 'push-upgrade-requires-maintenance')
+    if (!(await this.stateWithin(client, false)).writersQuiesced) throw new MaintenanceError(409, 'writers-not-quiesced')
+  }
+
+  /**
    * Read maintenance state and recent operations while retaining current administrator eligibility.
    * @param actor - authenticated administrator public number.
    * @returns the organization deployment state and its twenty newest operations.
@@ -280,7 +298,7 @@ export class PostgresMaintenanceService {
     }))
   }
 
-  private async stateWithin(queryable: Queryable): Promise<ClusterState> {
+  private async stateWithin(queryable: Queryable, physicalIsolation = true): Promise<ClusterState> {
     const control = await readControl(queryable, this.context.organizationId)
     const nodes = await queryable.query<{
       id: string
@@ -299,7 +317,7 @@ export class PostgresMaintenanceService {
               (SELECT count(*)::integer FROM harness.instances i
                WHERE i.organization_id=n.organization_id AND i.assigned_node_id=n.id
                  AND (i.observed_state<>'stopped' OR i.desired_state<>'stopped')) active_runtimes,
-              harness.node_physically_isolated(n.organization_id,n.id) externally_fenced
+              ${physicalIsolation ? 'harness.node_physically_isolated(n.organization_id,n.id)' : 'false'} externally_fenced
        FROM harness.compute_nodes n WHERE n.organization_id=$1 ORDER BY n.name`,
       [this.context.organizationId],
     )

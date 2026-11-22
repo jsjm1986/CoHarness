@@ -650,10 +650,12 @@ async function applyMigration(client: PoolClient, migration: MigrationFile): Pro
 
 async function applyPushMigrationLineage(
   client: PoolClient, migrations: MigrationFile[], existing: MigrationRecord[], relocations: MigrationRelocation[],
+  verify: (client: Queryable) => Promise<void>,
 ): Promise<number[]> {
   const applied: number[] = []
   await client.query('BEGIN')
   try {
+    await verify(client)
     for (const { from, to } of relocations) {
       const previous = existing[from - 1]!
       const target = migrations[to - 1]!
@@ -677,8 +679,8 @@ async function applyPushMigrationLineage(
 
 /** Options for an explicitly coordinated migration apply. */
 export interface MigrationApplyOptions {
-  /** Adopt the checksummed legacy push ledger after deployment writers have quiesced. */
-  reconcilePushLedger?: boolean
+  /** Verify quiescence and retain the maintenance fence in the legacy push upgrade transaction. */
+  verifyPushUpgrade?: (client: Queryable) => Promise<void>
 }
 
 /** Outcome of an applied governance migration sequence. */
@@ -695,7 +697,7 @@ export interface MigrationApplyResult {
  * Apply checksummed SQL and associated versioned backfills in atomic migration transactions.
  * @param pool - database whose advisory lock serializes all migration runners.
  * @param directory - complete, immutable SQL migration sequence matching this Gateway.
- * @param options - whether the deployment applier has quiesced writers for a legacy push upgrade.
+ * @param options - deployment applier's transactional maintenance check for the legacy push ledger.
  * @returns versions applied by this runner and the latest supported version.
  */
 export async function runMigrations(pool: Pool, directory: string, options?: MigrationApplyOptions): Promise<MigrationApplyResult> {
@@ -728,8 +730,8 @@ export async function runMigrations(pool: Pool, directory: string, options?: Mig
     const relocations = pushMigrationRelocations(existing.rows, migrations)
     let installed = existing.rows.length
     if (relocations !== undefined) {
-      if (!options?.reconcilePushLedger) throw new Error('PostgreSQL push migration ledger requires coordinated deploy-apply')
-      applied.push(...await applyPushMigrationLineage(client, migrations, existing.rows, relocations))
+      if (options?.verifyPushUpgrade === undefined) throw new Error('PostgreSQL push migration ledger requires coordinated deploy-apply')
+      applied.push(...await applyPushMigrationLineage(client, migrations, existing.rows, relocations, options.verifyPushUpgrade))
       installed = LAST_PUSH_MIGRATION_VERSION
     } else {
       for (const [index, recorded] of existing.rows.entries()) {
