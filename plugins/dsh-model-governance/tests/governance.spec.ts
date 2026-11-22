@@ -6,10 +6,10 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import LlmRuntime, { LlmAdapter } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, LlmOperationDispatch, StreamChunk } from '@deepseek-ai/dsh-llm'
 import * as Governance from '../src/index.ts'
 import { UsageOutbox } from '../src/outbox.ts'
-import { loadPolicy } from '../src/policy.ts'
+import { policyReader } from '../src/policy.ts'
 
 const oldHome = process.env.DSH_HOME
 afterEach(() => {
@@ -96,7 +96,7 @@ describe('instance model governance', () => {
   it('fails closed on malformed policy and enforces denial before adapter dispatch', async () => {
     const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home
     writeFileSync(join(home, 'model-governance.json'), '{}')
-    expect(() => loadPolicy(join(home, 'model-governance.json'))).toThrow(/version/)
+    expect(() => policyReader(join(home, 'model-governance.json'))()).toThrow(/version/)
     policy(home, false)
     const ctx = new Context(); await ctx.plugin(LlmRuntime)
     const adapter = new Adapter(); ctx.llm.registerAdapter(['p'], adapter)
@@ -106,6 +106,43 @@ describe('instance model governance', () => {
     expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'MODEL_FORBIDDEN' } } })
     expect(readdirSync(join(home, 'model-governance-outbox')).filter(name => name.endsWith('.json'))).toHaveLength(1)
     await ctx.fiber.dispose()
+  })
+
+  it.each(['in-place change', 'missing file'] as const)('denies physical dispatch on %s and admits the restored policy', async change => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-dispatch-'))
+    process.env.DSH_HOME = home
+    const filename = join(home, 'model-governance.json')
+    policy(home, true)
+    const previous = readFileSync(filename)
+    const send = vi.fn(async () => {})
+    let mutate = true
+    const adapter = new class extends LlmAdapter {
+      async *stream(_options: GenerateOptions, dispatch?: LlmOperationDispatch): AsyncIterable<StreamChunk> {
+        if (mutate) {
+          mutate = false
+          if (change === 'in-place change') policy(home, false)
+          else rmSync(filename)
+        }
+        if (dispatch === undefined) throw new Error('Missing physical dispatch guard')
+        await dispatch(send)
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      }
+    }()
+    const ctx = new Context()
+    try {
+      await ctx.plugin(LlmRuntime)
+      ctx.llm.registerAdapter(['p'], adapter)
+      await ctx.plugin(Governance)
+      const stream = () => drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [] }))
+      expect((await stream()).at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'MODEL_FORBIDDEN' } } })
+      expect(send).not.toHaveBeenCalled()
+      writeFileSync(filename, previous)
+      expect((await stream()).at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+      expect(send).toHaveBeenCalledOnce()
+    } finally {
+      await ctx.fiber.dispose()
+      rmSync(home, { recursive: true, force: true })
+    }
   })
 
   it('records usage with personal credential attribution without changing the stream', async () => {

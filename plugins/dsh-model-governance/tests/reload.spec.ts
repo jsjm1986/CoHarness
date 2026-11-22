@@ -3,7 +3,7 @@ import { basename } from 'node:path'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { GovernancePolicyFile } from '../src/policy.ts'
+import { policyReader, type GovernancePolicyFile } from '../src/policy.ts'
 import { PolicyReloader, type WatchDirectory } from '../src/reload.ts'
 
 class FakeWatcher extends EventEmitter {
@@ -52,6 +52,7 @@ describe('PolicyReloader', () => {
     const invalid: unknown[] = []
     const reloader = new PolicyReloader({
       filename,
+      readPolicy: policyReader(filename),
       onValid: next => { valid.push(next) },
       onInvalid: error => { invalid.push(error) },
       onWatcherError: vi.fn(),
@@ -85,6 +86,7 @@ describe('PolicyReloader', () => {
     const onWatcherError = vi.fn()
     const reloader = new PolicyReloader({
       filename,
+      readPolicy: policyReader(filename),
       onValid: vi.fn(),
       onInvalid: vi.fn(),
       onWatcherError,

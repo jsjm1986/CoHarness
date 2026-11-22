@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadPolicy } from '../src/policy.ts'
+import { policyReader } from '../src/policy.ts'
 
 function writePolicy(value: unknown): string {
   const home = mkdtempSync(join(tmpdir(), 'dsh-policy-'))
@@ -101,7 +101,7 @@ function completeModel(overrides: Record<string, unknown> = {}): Record<string, 
 describe('model-governance policy projection', () => {
   it('retains the complete organization Provider and model profile', () => {
     const raw = completePolicy()
-    const loaded = loadPolicy(writePolicy(raw))
+    const loaded = policyReader(writePolicy(raw))()
     expect(loaded.providers).toEqual(raw.providers)
     expect(loaded.providers[0]?.profile).toEqual((raw.providers as Array<Record<string, unknown>>)[0]?.profile)
   })
@@ -113,7 +113,7 @@ describe('model-governance policy projection', () => {
       profile: completeProfile({ api: 'openai-responses', compat: {}, models: [model] }),
       models: [model],
     })
-    expect(loadPolicy(writePolicy(completePolicy({ providers: [provider] }))).providers[0])
+    expect(policyReader(writePolicy(completePolicy({ providers: [provider] })))().providers[0])
       .toMatchObject({ protocol: 'openai-responses', profile: { compat: {} }, models: [{ compat: {} }] })
   })
 
@@ -159,6 +159,6 @@ describe('model-governance policy projection', () => {
       })],
     }],
   ] satisfies Array<[string, Record<string, unknown>]>)('rejects %s before publishing a Provider snapshot', (_name, overrides) => {
-    expect(() => loadPolicy(writePolicy(completePolicy(overrides)))).toThrow(/model-governance/)
+    expect(() => policyReader(writePolicy(completePolicy(overrides)))()).toThrow(/model-governance/)
   })
 })

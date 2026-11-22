@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/dsh-model-governance/README.md
 document:
-  en: 520f3f15203a4c409cbe33a047f32629750d8148
-  zh: 0c4af1684a203d2cb2d1daf3905f341eb7a652f7
+  en: 233818eb13b25035744f4dfae41463420d56bd04
+  zh: 1c2c3ae4cb78cad0e304aae9494e9216e95cfefb
 /dsh-model-governance:
-  en: 066b67a954f094c2
-  zh: 4bac5de70cace2f3
+  en: 8bacbec21fe66f90
+  zh: 6002aaaebd10d90c
 /dsh-model-governance/organization-providers-and-credentials:
   en: 586b09e6271acfbe
   zh: b897868b291f4b40

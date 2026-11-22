@@ -7,12 +7,14 @@ export const POLICY_UNAVAILABLE_REASON = 'Model authorization is temporarily una
 export class ReloadableModelAccess {
     userDeclared;
     snapshot;
+    policy;
     /**
      * @param policy - the policy that was validated during plugin activation.
      * @param userDeclared - the live user-declared provider lookup.
      */
     constructor(policy, userDeclared) {
         this.userDeclared = userDeclared;
+        this.policy = policy;
         this.snapshot = createSnapshot(policy);
     }
     /**
@@ -20,10 +22,14 @@ export class ReloadableModelAccess {
      * @param policy - the newly validated policy.
      */
     replace(policy) {
+        if (this.policy === policy)
+            return;
         this.snapshot = createSnapshot(policy);
+        this.policy = policy;
     }
     /** Enter fail-closed mode until a valid policy is published. */
     unavailable() {
+        this.policy = undefined;
         this.snapshot = {
             defaultAllowed: false,
             userDeclaredAllowed: false,

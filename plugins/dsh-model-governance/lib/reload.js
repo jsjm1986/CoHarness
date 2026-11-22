@@ -1,13 +1,12 @@
 import { watch } from 'node:fs';
 import { basename, dirname } from 'node:path';
-import { loadPolicy } from "./policy.js";
 /**
  * Reloads an atomically replaced policy file and drains all queued work before
  * disposal. The parent directory is watched so rename-based replacement keeps
  * working after the policy inode changes.
  */
 export class PolicyReloader {
-    filename;
+    readPolicy;
     target;
     onValid;
     onInvalid;
@@ -20,7 +19,7 @@ export class PolicyReloader {
      * @param options - policy path, lifecycle callbacks, and optional watcher factory.
      */
     constructor(options) {
-        this.filename = options.filename;
+        this.readPolicy = options.readPolicy;
         this.target = basename(options.filename);
         this.onValid = options.onValid;
         this.onInvalid = options.onInvalid;
@@ -59,7 +58,7 @@ export class PolicyReloader {
         if (this.closed)
             return;
         try {
-            this.onValid(loadPolicy(this.filename));
+            this.onValid(this.readPolicy());
         }
         catch (error) {
             this.onInvalid(error);

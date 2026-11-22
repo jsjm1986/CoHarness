@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-01-model-request-execution.md
 document:
-  en: c57bc87c7cee774953fd02415c9dc7672674ebf7
-  zh: a92f4908e27194d624f88f43dce5c1128fee3a9f
+  en: cfa70adcc4ba3d942ace40cabbc024338e7b18e2
+  zh: fe59f75da48efa073512936f4e19c9677f7948f4
 /agent-note-model-streams-retain-execution-and-billing-owners:
   en: df7371acd2b251fc
   zh: dc4ec5b7d4e0fb7e
@@ -12,8 +12,8 @@ document:
   en: 60a35ce368983aa7
   zh: c707563373e51861
 /agent-note-model-streams-retain-execution-and-billing-owners/decision:
-  en: bfbae45b0b9ce0ac
-  zh: da6f0f46cfeadedd
+  en: b21a6688ee43982d
+  zh: 46a88203cefdede4
 /agent-note-model-streams-retain-execution-and-billing-owners/alternatives-considered:
   en: d331bd24bcaacfbf
   zh: 0d9cbc10548b7005

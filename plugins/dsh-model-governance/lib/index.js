@@ -7,7 +7,7 @@ import { LlmError } from '@deepseek-ai/dsh-llm';
 import { ReloadableModelAccess } from "./access.js";
 import { UsageOutbox } from "./outbox.js";
 import { OrganizationCredentialLayer } from "./organization-credentials.js";
-import { loadPolicy } from "./policy.js";
+import { policyReader } from "./policy.js";
 import { ReloadableModelProviderConfig, stagedProviderSnapshot } from "./provider-config.js";
 import { PolicyReloader } from "./reload.js";
 import { baselineRegistrations, diffRegistrations } from "./registration.js";
@@ -89,7 +89,8 @@ async function billingExecution(options, agent, authority) {
 export function apply(ctx) {
     const home = process.env.DSH_HOME ?? join(homedir(), '.dsh');
     const policyPath = process.env.DSH_MODEL_GOVERNANCE ?? join(home, 'model-governance.json');
-    const policy = loadPolicy(policyPath);
+    const readPolicy = policyReader(policyPath);
+    const policy = readPolicy();
     let stopped = false;
     const requests = new AsyncLocalStorage();
     let activeRequests = 0;
@@ -150,6 +151,7 @@ export function apply(ctx) {
     }, 'model-governance: drain policy reload and usage outbox');
     reloader = new PolicyReloader({
         filename: policyPath,
+        readPolicy,
         onValid: next => {
             if (stopped)
                 return;
@@ -232,7 +234,7 @@ export function apply(ctx) {
         if (stopped)
             return access.decide(target);
         try {
-            access.replace(loadPolicy(policyPath));
+            access.replace(readPolicy());
         }
         catch {
             access.unavailable();

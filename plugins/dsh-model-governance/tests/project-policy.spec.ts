@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadPolicy } from '../src/policy.ts'
+import { policyReader, type GovernancePolicyFile } from '../src/policy.ts'
 
 function policy(provider: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -16,11 +16,11 @@ function policy(provider: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
-function read(provider: Record<string, unknown>): ReturnType<typeof loadPolicy> {
+function read(provider: Record<string, unknown>): GovernancePolicyFile {
   const home = mkdtempSync(join(tmpdir(), 'dsh-project-policy-'))
   const path = join(home, 'model-governance.json')
   writeFileSync(path, JSON.stringify(policy(provider)))
-  return loadPolicy(path)
+  return policyReader(path)()
 }
 
 describe('project model policy', () => {

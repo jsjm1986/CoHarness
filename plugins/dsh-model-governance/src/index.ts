@@ -10,7 +10,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ReloadableModelAccess } from './access.ts'
 import { UsageOutbox, type UsageRecord } from './outbox.ts'
 import { OrganizationCredentialLayer } from './organization-credentials.ts'
-import { loadPolicy } from './policy.ts'
+import { policyReader } from './policy.ts'
 import { ReloadableModelProviderConfig, stagedProviderSnapshot } from './provider-config.ts'
 import { PolicyReloader } from './reload.ts'
 import { baselineRegistrations, diffRegistrations } from './registration.ts'
@@ -107,7 +107,8 @@ async function billingExecution(
 export function apply(ctx: Context): void {
   const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
   const policyPath = process.env.DSH_MODEL_GOVERNANCE ?? join(home, 'model-governance.json')
-  const policy = loadPolicy(policyPath)
+  const readPolicy = policyReader(policyPath)
+  const policy = readPolicy()
   let stopped = false
   const requests = new AsyncLocalStorage<ModelExecution>()
   let activeRequests = 0
@@ -169,6 +170,7 @@ export function apply(ctx: Context): void {
   }, 'model-governance: drain policy reload and usage outbox')
   reloader = new PolicyReloader({
     filename: policyPath,
+    readPolicy,
     onValid: next => {
       if (stopped) return
       providerConfig.replace(stagedProviderSnapshot(providerConfig.snapshot(), {
@@ -235,7 +237,7 @@ export function apply(ctx: Context): void {
   })
   const currentAccess = (target: Pick<GenerateOptions, 'provider' | 'model'>) => {
     if (stopped) return access.decide(target)
-    try { access.replace(loadPolicy(policyPath)) } catch {
+    try { access.replace(readPolicy()) } catch {
       access.unavailable()
     }
     return access.decide(target)

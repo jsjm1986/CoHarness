@@ -1,6 +1,6 @@
 import { watch, type FSWatcher } from 'node:fs'
 import { basename, dirname } from 'node:path'
-import { loadPolicy, type GovernancePolicyFile } from './policy.ts'
+import type { GovernancePolicyFile } from './policy.ts'
 
 /** Directory watcher signature used by the policy reloader and its tests. */
 export type WatchDirectory = (
@@ -13,6 +13,8 @@ export type WatchDirectory = (
 export interface PolicyReloaderOptions {
   /** Absolute or process-resolvable policy filename. */
   filename: string
+  /** Fresh policy reader shared with the request guards. */
+  readPolicy: () => GovernancePolicyFile
   /** Publish one validated policy snapshot. */
   onValid: (policy: GovernancePolicyFile) => void
   /** Enter the consumer's fail-closed state after a reload failure. */
@@ -29,7 +31,7 @@ export interface PolicyReloaderOptions {
  * working after the policy inode changes.
  */
 export class PolicyReloader {
-  private readonly filename: string
+  private readonly readPolicy: () => GovernancePolicyFile
   private readonly target: string
   private readonly onValid: (policy: GovernancePolicyFile) => void
   private readonly onInvalid: (error: unknown) => void
@@ -43,7 +45,7 @@ export class PolicyReloader {
    * @param options - policy path, lifecycle callbacks, and optional watcher factory.
    */
   constructor(options: PolicyReloaderOptions) {
-    this.filename = options.filename
+    this.readPolicy = options.readPolicy
     this.target = basename(options.filename)
     this.onValid = options.onValid
     this.onInvalid = options.onInvalid
@@ -82,7 +84,7 @@ export class PolicyReloader {
   private reload(): void {
     if (this.closed) return
     try {
-      this.onValid(loadPolicy(this.filename))
+      this.onValid(this.readPolicy())
     } catch (error) {
       this.onInvalid(error)
     }
