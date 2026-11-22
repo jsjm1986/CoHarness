@@ -38,10 +38,12 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
   workspaceCatalog?: Pick<import('./workspace-catalog.ts').PostgresWorkspaceCatalog, 'personal'>
 }): GatewayWorkbenchCatalogHandler {
   return async (user, signal, selected) => {
-    const projectRows = await deps.collaboration.listAccountConversations?.(user.id) ?? []
     if (deps.workspaceCatalog !== undefined) {
+      const [projectRows, personalWorkspaces] = await Promise.all([
+        deps.collaboration.listAccountConversations?.(user.id) ?? Promise.resolve([]),
+        deps.workspaceCatalog.personal(user),
+      ])
       signal.throwIfAborted()
-      const personalWorkspaces = await deps.workspaceCatalog.personal(user)
       const indexed = new Map(projectRows.map(item => [`${item.runtime.runtimeId
         ?? (item.runtime.kind === 'project' ? `project:${item.runtime.projectId}` : 'personal')}:${item.sessionId}`, item]))
       for (const group of personalWorkspaces) {
@@ -54,6 +56,7 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
         personalComplete: false, personalWorkspaces: personalWorkspaces.map(group => ({ runtime: group.runtime,
           status: group.status, observedState: group.observedState, syncedAt: group.syncedAt, items: group.items })) }
     }
+    const projectRows = await deps.collaboration.listAccountConversations?.(user.id) ?? []
     if (selected?.kind === 'project') return { items: projectRows, personalComplete: false }
     const target = { kind: 'user' as const, id: user.id, ...(selected?.runtimeId === undefined ? {} : { runtimeId: selected.runtimeId }) }
     // Project authorization remains authoritative while the personal runtime
@@ -77,35 +80,46 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
         scope: { kind: 'personal' },
         runtime: { ...target, generation: running.generation, ...(running.runtimeId === undefined ? {} : { runtimeId: running.runtimeId }) },
       })
-      const response = await fetch(`http://${authority}/api/session.list`, {
-        method: 'POST',
-        headers: {
-          host: authority,
-          origin: `http://${authority}`,
-          'content-type': 'application/json',
-          [PRINCIPAL_HEADER]: principal,
-        },
-        body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: 'session.list', payload: {} }),
-        signal: AbortSignal.any([signal, AbortSignal.timeout(deps.upstreamTimeoutMs)]),
-      })
-      if (!response.ok) throw new Error(`personal workbench catalog returned HTTP ${String(response.status)}`)
-      const envelope = object(await readResponseJson(response, deps.maxResponseBytes))
+      const rpcHeaders = {
+        host: authority,
+        origin: `http://${authority}`,
+        'content-type': 'application/json',
+        [PRINCIPAL_HEADER]: principal,
+      }
+      const rpcSignal = AbortSignal.any([signal, AbortSignal.timeout(deps.upstreamTimeoutMs)])
+      const [response, archiveResponse] = await Promise.all([
+        fetch(`http://${authority}/api/session.list`, {
+          method: 'POST',
+          headers: rpcHeaders,
+          body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: 'session.list', payload: {} }),
+          signal: rpcSignal,
+        }),
+        fetch(`http://${authority}/api/workspace.list`, {
+          method: 'POST',
+          headers: rpcHeaders,
+          body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: 'workspace.list', payload: {} }),
+          signal: rpcSignal,
+        }),
+      ])
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => { /* discard unread response body on status failure */ })
+        await archiveResponse.body?.cancel().catch(() => { /* discard unread archive body on status failure */ })
+        throw new Error(`personal workbench catalog returned HTTP ${String(response.status)}`)
+      }
+      if (!archiveResponse.ok) {
+        await response.body?.cancel().catch(() => { /* discard unread response body on archive failure */ })
+        await archiveResponse.body?.cancel().catch(() => { /* discard unread archive body on status failure */ })
+        throw new Error(`personal workbench archive list returned HTTP ${String(archiveResponse.status)}`)
+      }
+      const [rawEnvelope, rawArchiveEnvelope] = await Promise.all([
+        readResponseJson(response, deps.maxResponseBytes),
+        readResponseJson(archiveResponse, deps.maxResponseBytes),
+      ])
+      const envelope = object(rawEnvelope)
       const result = object(envelope?.result)
       const value = object(result?.value)
       if (result?.ok !== true || !Array.isArray(value?.items)) throw new Error('personal workbench catalog returned an invalid response')
-      const archiveResponse = await fetch(`http://${authority}/api/workspace.list`, {
-        method: 'POST',
-        headers: {
-          host: authority,
-          origin: `http://${authority}`,
-          'content-type': 'application/json',
-          [PRINCIPAL_HEADER]: principal,
-        },
-        body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: 'workspace.list', payload: {} }),
-        signal: AbortSignal.any([signal, AbortSignal.timeout(deps.upstreamTimeoutMs)]),
-      })
-      if (!archiveResponse.ok) throw new Error(`personal workbench archive list returned HTTP ${String(archiveResponse.status)}`)
-      const archiveEnvelope = object(await readResponseJson(archiveResponse, deps.maxResponseBytes))
+      const archiveEnvelope = object(rawArchiveEnvelope)
       const archiveResult = object(archiveEnvelope?.result)
       const archiveValue = object(archiveResult?.value)
       if (archiveResult?.ok !== true || !Array.isArray(archiveValue?.archivedSessionIds)

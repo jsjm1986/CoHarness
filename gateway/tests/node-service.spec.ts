@@ -1579,3 +1579,51 @@ it('reports identifier-free forwarding and pool diagnostics on /admin/api/perfor
   expect(raw).not.toContain(f.nodeId)
   expect(raw).not.toContain(f.environment.id)
 })
+
+it('preserves idle node transports across user- and project-scoped invalidations while draining on node or org invalidation', async () => {
+  const listeners = new Set<(subject: import('../src/access-invalidation.ts').AccessInvalidationSubject) => void | Promise<void>>()
+  const monitor: import('../src/access-invalidation.ts').GatewayAccessMonitor = {
+    available: true,
+    synchronize: async () => {},
+    subscribe: listener => {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
+  }
+  const emit = async (subject: import('../src/access-invalidation.ts').AccessInvalidationSubject) => {
+    for (const listener of listeners) await listener(subject)
+  }
+  const nodeId = randomUUID() as RuntimeNodeId
+  const localNodeId = randomUUID() as RuntimeNodeId
+  const opened: Duplex[] = []
+  const poolProxy = new GatewayNodeServiceProxy({
+    localNodeId,
+    resolveForAccount: async () => { throw new Error('unused') },
+    authorizeAdministratorNode: async () => nodeId,
+    authorizeAccountNode: async () => {},
+  }, {
+    capacity: () => 'available',
+    open: async (_target, signal) => {
+      const stream = new PassThrough()
+      opened.push(stream)
+      signal.addEventListener('abort', () => { stream.destroy() }, { once: true })
+      return stream
+    },
+    revalidate: async () => {},
+    released: async () => {},
+  }, 5_000, loadNodeServiceConfig({}), monitor)
+  releases.push(() => poolProxy.close())
+  await emit({ userId: 42 })
+  await emit({ projectId: 7 })
+  expect(poolProxy.diagnostics().pool).toMatchObject({
+    idleInvalidationsGlobal: 0,
+    idleInvalidationsNode: 0,
+  })
+  await emit({ nodeId })
+  await emit({})
+  expect(poolProxy.diagnostics().pool).toMatchObject({
+    idleInvalidationsNode: 1,
+    idleInvalidationsGlobal: 1,
+  })
+  expect(opened).toHaveLength(0)
+})

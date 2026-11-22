@@ -1131,7 +1131,24 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   // headersTimeout to exceed keepAliveTimeout.
   server.keepAliveTimeout = cfg.keepAliveTimeoutMs
   server.headersTimeout = cfg.keepAliveTimeoutMs + 5_000
-  if (deps.performance === undefined) server.once('close', () => { performanceObserver.dispose() })
+  const nodeIdentityCache = new Map<string, { lease: import('./node-access.ts').NodeLease; expiresAtMs: number }>()
+  const nodeIdentityInFlight = new Map<string, { epoch: number; promise: Promise<import('./node-access.ts').NodeLease> }>()
+  let nodeIdentityCacheEpoch = 0
+  const clearNodeIdentityCache = (): void => {
+    nodeIdentityCacheEpoch += 1
+    nodeIdentityCache.clear()
+  }
+  const unsubscribeNodeIdentityCache = deps.accessMonitor?.subscribe(subject => {
+    if (subject.userId === undefined && subject.projectId === undefined
+      && (subject.nodeId === undefined || subject.nodeId === deps.nodeServiceIdentity?.nodeId)) {
+      clearNodeIdentityCache()
+    }
+  })
+  server.once('close', () => {
+    unsubscribeNodeIdentityCache?.()
+    clearNodeIdentityCache()
+    if (deps.performance === undefined) performanceObserver.dispose()
+  })
 
   /**
    * Maintenance-mode write gate: mutating requests consult the shared
@@ -1230,9 +1247,53 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const bridge = coordinate === undefined ? undefined : unclaimedLoopback.get(coordinate)
       nodeControlsInFlight += 1
       try {
-        const lease = await deps.nodeServiceIdentity.authorize(bearer.slice(7), {
-          connectionId: req.headers['x-dsh-node-connection'], epoch: req.headers['x-dsh-node-epoch'],
-        })
+        const token = bearer.slice(7)
+        const connectionHeader = req.headers['x-dsh-node-connection']
+        const epochHeader = req.headers['x-dsh-node-epoch']
+        const canCache = deps.accessMonitor?.available === true && cfg.nodeServiceIdentityCacheMs > 0
+          && typeof connectionHeader === 'string' && typeof epochHeader === 'string'
+        const cacheKey = canCache
+          ? `${createHash('sha256').update(token).digest('hex')}:${connectionHeader}:${epochHeader}`
+          : undefined
+        const now = Date.now()
+        let lease: import('./node-access.ts').NodeLease
+        const cached = cacheKey === undefined ? undefined : nodeIdentityCache.get(cacheKey)
+        if (cached !== undefined && cached.expiresAtMs > now && deps.accessMonitor?.available === true) {
+          lease = cached.lease
+        } else {
+          if (cacheKey !== undefined) nodeIdentityCache.delete(cacheKey)
+          const existing = cacheKey === undefined ? undefined : nodeIdentityInFlight.get(cacheKey)
+          if (existing !== undefined && existing.epoch === nodeIdentityCacheEpoch) {
+            lease = await existing.promise
+          } else {
+            const flightEpoch = nodeIdentityCacheEpoch
+            const promise = deps.nodeServiceIdentity.authorize(token, {
+              connectionId: connectionHeader, epoch: epochHeader,
+            })
+            if (cacheKey !== undefined) nodeIdentityInFlight.set(cacheKey, { epoch: flightEpoch, promise })
+            try {
+              lease = await promise
+            } finally {
+              if (cacheKey !== undefined && nodeIdentityInFlight.get(cacheKey)?.promise === promise) {
+                nodeIdentityInFlight.delete(cacheKey)
+              }
+            }
+            if (cacheKey !== undefined && flightEpoch === nodeIdentityCacheEpoch && deps.accessMonitor?.available === true) {
+              const leaseExpiresMs = Date.parse(lease.expiresAt)
+              const expiresAtMs = Math.min(
+                Date.now() + cfg.nodeServiceIdentityCacheMs,
+                Number.isFinite(leaseExpiresMs) ? leaseExpiresMs : Date.now() + cfg.nodeServiceIdentityCacheMs,
+              )
+              if (expiresAtMs > Date.now()) {
+                if (nodeIdentityCache.size >= 64) {
+                  const oldest = nodeIdentityCache.keys().next().value
+                  if (oldest !== undefined) nodeIdentityCache.delete(oldest)
+                }
+                nodeIdentityCache.set(cacheKey, { lease, expiresAtMs })
+              }
+            }
+          }
+        }
         if (lease.nodeId !== deps.nodeServiceIdentity.nodeId || lease.organizationId !== deps.nodeServiceIdentity.organizationId) {
           throw new NodeServiceError(409, 'node-service/mismatch')
         }

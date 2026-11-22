@@ -335,7 +335,8 @@ const launcher = selectLauncher(cfg, () => ({
 const resourceBudget = new NodeResourceBudget(pool, context.organizationId, context.nodeId, cfg.resourceBudget)
 await resourceBudget.configure()
 const gatewayModelBudget = await GatewayModelBudget.open(resourceBudget, join(nodeControlPaths(cfg.stateRoot).gatewayModels, context.nodeId))
-const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs, accessListenerPool)
+const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs, accessListenerPool,
+  Math.max(cfg.accessInvalidationPollMs, cfg.accessInvalidationHealthyPollMs))
 startupDatabaseConsumers.push(() => accessMonitor.close())
 const localAccessMonitor = scopeAccessMonitor(accessMonitor, context.nodeId as RuntimeNodeId)
 const principalDirectory = new NodePrincipalDirectory(context, cfg.runtimeTokenCacheMs)

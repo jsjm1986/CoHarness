@@ -135,7 +135,7 @@ export function createBrowserDocumentHandler(deps: Dependencies) {
                 : new DocumentCatalogError('DOCUMENT_SCOPE_UNAVAILABLE',503,'The selected computer is unavailable.')
             }
           }
-        },lifetime,deps.overviewConcurrency ?? 1,progress)
+        },lifetime,deps.overviewConcurrency ?? 6,progress)
       }
       if (stream === undefined) return read(signal)
       return writeOverviewStream(stream, actor.id, deps.responseLimit, signal, deps.overviewAccessMonitor, read)

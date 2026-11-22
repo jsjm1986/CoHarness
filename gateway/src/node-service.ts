@@ -76,8 +76,8 @@ export function loadNodeServiceConfig(env: NodeJS.ProcessEnv): NodeServiceConfig
   const maxConnections = setting(env, 'HGW_NODE_SERVICE_MAX_CONNECTIONS', 64)
   const maxPerNode = setting(env, 'HGW_NODE_SERVICE_MAX_PER_NODE', 16)
   if (maxPerNode > maxConnections) throw new Error('HGW_NODE_SERVICE_MAX_PER_NODE must not exceed HGW_NODE_SERVICE_MAX_CONNECTIONS')
-  const httpMaxIdleConnections = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS', Math.min(16, maxConnections))
-  const httpMaxIdlePerNode = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE', Math.min(2, maxPerNode, httpMaxIdleConnections))
+  const httpMaxIdleConnections = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS', Math.min(32, maxConnections))
+  const httpMaxIdlePerNode = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE', Math.min(6, maxPerNode, httpMaxIdleConnections))
   if (httpMaxIdleConnections > maxConnections || httpMaxIdlePerNode > maxPerNode || httpMaxIdlePerNode > httpMaxIdleConnections) {
     throw new Error('Node service HTTP idle limits must fit the global and per-node connection limits')
   }

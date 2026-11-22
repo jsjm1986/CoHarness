@@ -249,21 +249,8 @@ export function createProxyHandlers(
   // Grants handoff is intrinsic to starting an instance: the manager calls this
   // just before every spawn, so the child always reads the current grants.
   instances.beforeStart = async (runtime, purpose): Promise<void> => {
-    if (runtime.user !== undefined) {
-      writeRuntimeGrantsFile(runtime.dshHome, await runtimeDirectoryGrants(runtime.user, projects), cfg.usersRoot,
-        runtime.retainedData ? { existingHome: true } : undefined)
-      if (deps.governance !== undefined) await writeModelGovernanceFile(cfg, deps.governance, { ...runtime.user, dshHome: runtime.dshHome },
-        runtime.retainedData ? { existingHome: true } : undefined)
-    } else {
-      if (runtime.project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
-      writeRuntimeGrantsFile(runtime.dshHome, projectRuntimeGrants(cfg, runtime.project), cfg.projectRuntimesRoot,
-        runtime.retainedData ? { existingHome: true } : undefined)
-      if (deps.governance !== undefined) {
-        await writeProjectModelGovernanceFile(cfg, deps.governance, runtime.project, runtime.dshHome,
-          runtime.retainedData ? { existingHome: true } : undefined)
-      }
-    }
-    if (deps.pluginState !== undefined) {
+    const projectPlugins = async (): Promise<void> => {
+      if (deps.pluginState === undefined) return
       // Desired state is newer than what this instance last applied when the
       // manager's write-back already carried it: only pending revisions write.
       const pending = await deps.pluginState.projection(runtime.target)
@@ -271,6 +258,30 @@ export function createProxyHandlers(
         await deps.pluginState.project(runtime.dshHome, pending.state)
         if (purpose === 'launch') await deps.pluginState.markApplied(runtime.target, pending.revision)
       }
+    }
+    if (runtime.user !== undefined) {
+      const user = runtime.user
+      await Promise.all([
+        (async () => {
+          writeRuntimeGrantsFile(runtime.dshHome, await runtimeDirectoryGrants(user, projects), cfg.usersRoot,
+            runtime.retainedData ? { existingHome: true } : undefined)
+          if (deps.governance !== undefined) {
+            await writeModelGovernanceFile(cfg, deps.governance, { ...user, dshHome: runtime.dshHome },
+              runtime.retainedData ? { existingHome: true } : undefined)
+          }
+        })(),
+        projectPlugins(),
+      ])
+    } else {
+      if (runtime.project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
+      const project = runtime.project
+      writeRuntimeGrantsFile(runtime.dshHome, projectRuntimeGrants(cfg, project), cfg.projectRuntimesRoot,
+        runtime.retainedData ? { existingHome: true } : undefined)
+      await Promise.all([
+        deps.governance === undefined ? Promise.resolve() : writeProjectModelGovernanceFile(cfg, deps.governance, project, runtime.dshHome,
+          runtime.retainedData ? { existingHome: true } : undefined),
+        projectPlugins(),
+      ])
     }
   }
   instances.beforeUse = async (runtime): Promise<void> => {

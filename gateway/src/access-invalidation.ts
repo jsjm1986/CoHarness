@@ -109,18 +109,28 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
   private closed = false
   private unavailable = false
   private caughtUp = false
+  private lastDrainAt = 0
+  private readonly healthyPollMs: number
   private nodeStatus: AccessRevisionRow['node_status'] | undefined
 
   /**
    * Construct the monitor; call synchronize before accepting traffic.
    * @param context - database and organization owned by this Gateway
-   * @param pollMs - fallback interval for a lost notification and reconnect attempts
+   * @param pollMs - fallback interval for reconnect attempts and unhealthy catch-up
    * @param listenerPool - reserved listener and outbox connection pool. Omission uses the injected context pool.
+   * @param healthyPollMs - reconciliation interval while LISTEN is live and caught up; defaults to pollMs.
    */
   constructor(private readonly context: PostgresRuntimeContext, pollMs: number,
-    private readonly listenerPool: Pool = context.pool) {
+    private readonly listenerPool: Pool = context.pool, healthyPollMs = pollMs) {
     if (!Number.isSafeInteger(pollMs) || pollMs < 1 || pollMs > 2_147_483_647) throw new Error('invalid access invalidation poll interval')
-    this.timer = setInterval(() => { this.wake() }, pollMs)
+    if (!Number.isSafeInteger(healthyPollMs) || healthyPollMs < pollMs || healthyPollMs > 2_147_483_647) {
+      throw new Error('invalid access invalidation healthy poll interval')
+    }
+    this.healthyPollMs = healthyPollMs
+    this.timer = setInterval(() => {
+      if (this.available && performance.now() - this.lastDrainAt < this.healthyPollMs) return
+      this.wake()
+    }, pollMs)
     this.timer.unref()
   }
 
@@ -395,6 +405,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
       if (acknowledged.rowCount !== 1) throw new Error('access invalidation compute node disappeared')
     }
     this.cursor = cursor
+    this.lastDrainAt = performance.now()
     this.unavailable = false
     this.caughtUp = true
   }

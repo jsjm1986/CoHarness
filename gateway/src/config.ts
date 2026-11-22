@@ -76,8 +76,12 @@ export interface GatewayConfig {
   keepAliveTimeoutMs: number
   /** Maximum interval between durable access-revocation reads and listener reconnects. */
   accessInvalidationPollMs: number
+  /** Reconciliation interval while PostgreSQL LISTEN is live and caught up (HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS). */
+  accessInvalidationHealthyPollMs: number
   /** Memoization window for runtime-credential resolution; access invalidations flush early. */
   runtimeTokenCacheMs: number
+  /** Memoization window for local node-service identity attestations when LISTEN is healthy (HGW_NODE_SERVICE_IDENTITY_CACHE_MS). */
+  nodeServiceIdentityCacheMs: number
   /** Heartbeat interval for a managed runtime's execution revocation stream. */
   executionWatchHeartbeatMs: number
   /** Maximum bytes retained or streamed from one runtime upstream response. */
@@ -997,7 +1001,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     databaseStartupRetryInitialMs,
     databaseStartupRetryMaxMs,
     accessInvalidationPollMs: timerDelay(env.HGW_ACCESS_INVALIDATION_POLL_MS, 1_000, 'HGW_ACCESS_INVALIDATION_POLL_MS'),
+    accessInvalidationHealthyPollMs: timerDelay(env.HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS, 15_000, 'HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS'),
     runtimeTokenCacheMs: timerDelay(env.HGW_RUNTIME_TOKEN_CACHE_MS, 2_000, 'HGW_RUNTIME_TOKEN_CACHE_MS'),
+    nodeServiceIdentityCacheMs: timerDelay(env.HGW_NODE_SERVICE_IDENTITY_CACHE_MS, 5_000, 'HGW_NODE_SERVICE_IDENTITY_CACHE_MS'),
     executionWatchHeartbeatMs: timerDelay(env.HGW_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, 'HGW_EXECUTION_WATCH_HEARTBEAT_MS'),
     runtimeCredentialDir,
     organizationModelCredentialKeyFile,

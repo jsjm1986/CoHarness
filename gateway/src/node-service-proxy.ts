@@ -144,7 +144,11 @@ export class GatewayNodeServiceProxy {
   }
 
   private invalidate(subject: AccessInvalidationSubject): void {
-    void this.httpPool.closeIdle(subject.nodeId)
+    // Idle node transports carry no user or project credentials; only node- or
+    // organization-scoped invalidations need to drain unused byte connections.
+    if (subject.userId === undefined && subject.projectId === undefined) {
+      void this.httpPool.closeIdle(subject.nodeId)
+    }
     for (const operation of this.active) {
       if (subject.nodeId !== undefined && subject.nodeId !== operation.nodeId) continue
       if (subject.userId !== undefined && subject.userId !== operation.userId) continue
