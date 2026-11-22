@@ -1142,6 +1142,31 @@ describe('runtime completed-turn push notifications', () => {
 })
 
 describe('runtime bounded session history', () => {
+  it('serves a committed event only from the authenticated Runtime and exact Session', async () => {
+    const runtime = fixture()
+    const header: ConversationHeader = {
+      id: 'receipt-session',
+      organizationId: ORGANIZATION_ID,
+      creatorUserId: CREATOR_INTERNAL_ID,
+      projectId: PROJECT_INTERNAL_ID,
+      visibility: 'private',
+      sessionFormatVersion: 0,
+      createdAt: CREATED_AT,
+    }
+    const readEvent = vi.fn(async (_id: string, _seq: number, _signal?: AbortSignal) => ({ header, event }))
+    Object.assign(runtime.conversations, { readEvent })
+    const read = (suffix: string) => request(runtime.handler, `/internal/runtime/session/read-event?sessionId=receipt-session&${suffix}`, {
+      method: 'GET', body: {},
+    })
+    expect(await read('seq=0')).toMatchObject({ status: 200, body: { header: { id: header.id }, events: [event] } })
+    expect(readEvent).toHaveBeenCalledWith(header.id, 0, expect.any(AbortSignal))
+    readEvent.mockResolvedValueOnce({ header: { ...header, projectId: 'foreign-project' }, event })
+    expect(await read('seq=0')).toMatchObject({ status: 404, body: { error: 'conversation-not-found' } })
+    expect(await read('seq=0&seq=1')).toMatchObject({ status: 400, body: { code: 'protocol' } })
+    expect(readEvent).toHaveBeenCalledTimes(2)
+    expect(runtime.conversations.load).not.toHaveBeenCalled()
+  })
+
   it('authorizes from metadata and serves an indexed page without loading the log', async () => {
     const runtime = fixture()
     const header: ConversationHeader = {

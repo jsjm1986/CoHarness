@@ -6,7 +6,7 @@ import type {
   GatewayRuntimeRequestInit,
   GatewaySessionCreationAuthorization,
 } from '@deepseek-ai/dsh-gateway-runtime'
-import SessionStore, { SessionDraftId, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionDraftId, SessionId, SessionLogOffset, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { sessionLogicalFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import type { SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
 import { describe, expect, it, vi } from 'vitest'
@@ -250,6 +250,16 @@ class GatewayTransport {
       return json(200, {
         header: structuredClone(stored.header),
         events: structuredClone(stored.events.slice(fromSeq)),
+      })
+    }
+
+    if (url.pathname === '/internal/runtime/session/read-event') {
+      const stored = this.sessions.get(sessionId)
+      if (stored === undefined) return json(404, { error: 'conversation-not-found' })
+      const seq = Number(url.searchParams.get('seq'))
+      return json(200, {
+        header: structuredClone(stored.header),
+        events: structuredClone(stored.events.slice(seq, seq + 1)),
       })
     }
 
@@ -564,6 +574,38 @@ describe('GatewaySessionPersistence response validation', () => {
 })
 
 describe('GatewaySessionPersistence bounded page transport', () => {
+  it('reads one exact committed draft event without loading the catalog, pages or suffix', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const transport = new GatewayTransport()
+    const id = SessionId('draft-receipt')
+    const header = { id, version: SESSION_FORMAT_VERSION, createdAt: 1, draft: true }
+    const queued = {
+      type: 'agent/inbox/spliced', seq: 1, time: 1, data: { inserted: [{
+        role: 'user', id: 'first-input', content: [{ type: 'text', text: 'x'.repeat(600 * 1024) }],
+        source: { kind: 'user', admission: { key: '1'.repeat(64), digest: '2'.repeat(64) } },
+      }] },
+    }
+    transport.seed(id, [{ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }, queued,
+      { type: 'turn/end', seq: 2, time: 1, data: { turn: 1 } }], header)
+    const fiber = await mountBackend(ctx, transport)
+    const request = vi.spyOn(transport, 'request')
+    try {
+      await expect(ctx.sessionPersistence.readCommittedEvent(id, SessionLogOffset(1))).resolves.toEqual(queued)
+      expect(request.mock.calls.map(([path]) => path)).toEqual(['/internal/runtime/session/read-event?sessionId=draft-receipt&seq=1'])
+      await expect(ctx.sessionPersistence.readCommittedEvent(id, SessionLogOffset(3))).resolves.toBeUndefined()
+
+      request.mockResolvedValueOnce(json(200, { header: { ...header, id: 'other-session' }, events: [queued] }))
+      await expect(ctx.sessionPersistence.readCommittedEvent(id, SessionLogOffset(1))).rejects.toMatchObject({ code: 'protocol' })
+      request.mockResolvedValueOnce(json(200, { header, events: [{ ...queued, seq: 2 }] }))
+      await expect(ctx.sessionPersistence.readCommittedEvent(id, SessionLogOffset(1))).rejects.toMatchObject({ code: 'protocol' })
+    } finally {
+      request.mockRestore()
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('reads metadata and follows revision-bound cursor pages without loading the full log', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

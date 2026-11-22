@@ -36,7 +36,7 @@ import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-model-access'
 import type {} from '@deepseek-ai/dsh-model-provider-config'
 import { foldRequestHeader, isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
-import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
+import { admittedPrompts, hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type {
   JsonValue,
   Session,
@@ -175,7 +175,7 @@ import type {} from '@deepseek-ai/dsh-working-directory'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { promptInputJson, promptProofJson } from './api/prompt-wire.ts'
 import type { ResponseValue } from './api/rpc-map.ts'
-import { admittedPrompts, promptFingerprint, promptReceiptKey, promptReceiptProjection } from './prompt-receipts.ts'
+import { promptFingerprint, promptReceiptKey, promptReceiptProjection } from './prompt-receipts.ts'
 import { inboxProjectionDefinition } from './inbox-projection.ts'
 import { modelSelectionProjectionDefinition } from './model-selection-projection.ts'
 import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'

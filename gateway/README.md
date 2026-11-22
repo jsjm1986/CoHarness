@@ -147,7 +147,7 @@ API requests can select an authorized environment with `dshRuntime=<environment 
 
 Admin's node settings control the draft history window. Each new saved edit retains the newest contiguous revisions within both budgets. A GET with a revision returns that version alone. A pruned revision returns HTTP 410. The current draft is separate.
 
-Before a project's first message materializes its Session, its creator can save private tab drafts and select that conversation as a document attachment target through the exact unexpired reservation. Current account, computer, project and Runtime permissions still apply. Cancelled or expired reservations grant no access; an existing Session always uses its ordinary visibility and lifecycle checks. Draft text remains on the owning computer and is neither shared with project members nor used to start a Runtime.
+While a project Session exists only as a reservation, its creator can save private tab drafts and select that conversation as a document attachment target through the exact unexpired reservation. Current account, computer, project and Runtime permissions still apply. Cancelled or expired reservations grant no access; an existing Session always uses its ordinary visibility and lifecycle checks. Draft text remains on the owning computer and is neither shared with project members nor used to start a Runtime.
 
 Production install, cutover, and acceptance live in [deploy/README.md](deploy/README.md).
 

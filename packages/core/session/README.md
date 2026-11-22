@@ -122,6 +122,8 @@ The package is built on event sourcing: a `Session` is an append-only log of typ
 
 A `user/message` stores the complete `UserMessage` directly, including the identity created before inbox routing or step entry. It renders its `content` verbatim whether it is a direct human prompt, a synthetic injection, or an entered goal round; its typed `source` is the only channel that tells them apart and carries any domain-specific durable facts. `assistant/message` and `tool/result` likewise store complete message values. Turn execution remains enclosed by `turn/start` and `turn/end`; `agent.inject()` queues input until a later pre-step claims it and returns it in an enter decision.
 
+Persistence treats a user input with a durable inbox receipt as sufficient to store the Session prefix. The visible-content classifier uses surface messages to determine when a draft has conversation content.
+
 `tool/result` persists one identified user-role tool-result message, optional internal failure identity, and optional presentation metadata. A tool's successful canonical `value` and human-readable canonical failure message remain execution-local; rendered error content is the replay-authoritative message.
 
 ### Session event vocabulary (`types.ts`)

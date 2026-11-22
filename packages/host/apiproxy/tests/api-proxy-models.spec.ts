@@ -35,7 +35,7 @@ import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '../src/api-proxy.ts'
-import { admittedPrompts } from '../src/prompt-receipts.ts'
+import { admittedPrompts } from '@deepseek-ai/dsh-session/surface'
 
 let nextRpc = 1
 function request<P>(payload: P): RpcRequest<P> {

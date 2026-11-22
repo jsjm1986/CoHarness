@@ -195,6 +195,9 @@ describe.skipIf(skip)('physical project content PostgreSQL', () => {
         const unrelated = await fetch(endpoint + `meta?sessionId=${checkpointSession}`, { headers })
         expect(unrelated.status).toBe(401)
         await unrelated.arrayBuffer()
+        const revokedReceipt = await fetch(endpoint + `read-event?sessionId=${checkpointSession}&seq=1`, { headers })
+        expect(revokedReceipt.status).toBe(401)
+        await revokedReceipt.arrayBuffer()
         await control.query(`UPDATE harness.node_agents SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE node_id=$1`, [node])
         expect(await instances.authenticateRuntimeShutdownToken(token)).toBeNull()
         await control.query(`UPDATE harness.node_agents SET lease_expires_at=clock_timestamp()+interval '5 minutes' WHERE node_id=$1`, [node])
@@ -214,6 +217,9 @@ describe.skipIf(skip)('physical project content PostgreSQL', () => {
             node_connection_epoch=NULL,runtime_token_hash=$2,runtime_token_issued_at=now() WHERE runtime_id=$1`, [b.runtimeId,createHash('sha256').update(token).digest()])
         })
       }
+      const restoredRead = await fetch(endpoint + `read-event?sessionId=${checkpointSession}&seq=1`, { headers })
+      expect(restoredRead.status).toBe(200)
+      expect(await restoredRead.json()).toMatchObject({ header: { id: checkpointSession }, events: [finalEvent] })
       const principal = principals.issue({ user:{id:Number(owner.public_id),username:'owner',displayName:'Owner',role:'user',
         status:'active',homePath:'/owner',mustChangePassword:false,autoReviewEligible:false},
         runtime,scope:{kind:'project',projectId:projectNumber,projectName:privateName,mode:'rw'} })

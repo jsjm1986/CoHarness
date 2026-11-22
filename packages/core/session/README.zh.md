@@ -122,6 +122,8 @@ kind: "package-reference"
 
 `user/message` 会直接存储完整的 `UserMessage`，其中包括收件箱路由或进入步骤前创建的标识。无论它是直接人类提示词、合成注入，还是已进入的 Goal Round，都会原样呈现其 `content`；带类型的 `source` 是区分三者的唯一通道，并携带各领域专有的持久事实。`assistant/message` 和 `tool/result` 也会存储完整的消息值。轮次执行仍由 `turn/start` 与 `turn/end` 包围；`agent.inject()` 会把输入排队，直到后续某次 pre-step 领取它，并在 enter 决策中返回它。
 
+用户输入带有持久入队回执时，持久化提供方会存储会话前缀。草稿是否有可见内容由 surface 消息决定。
+
 `tool/result` 持久保存一条带标识、user-role 的工具结果消息，以及可选内部失败标识和可选呈现元数据。工具成功时的规范 `value` 和便于人类阅读的规范失败消息只存在于执行本地；渲染后的错误内容是回放权威消息。
 
 ### 会话事件词汇（`types.ts`）

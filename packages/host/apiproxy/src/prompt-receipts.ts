@@ -1,7 +1,8 @@
 /** Recover browser input acceptance from the same Session event that enqueued it. */
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
-import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
+import { admittedPrompts } from '@deepseek-ai/dsh-session/surface'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { RpcId } from './api/rpc.ts'
 
@@ -25,21 +26,6 @@ export function promptReceiptKey(session: SessionId, actor: number | undefined, 
  */
 export function promptFingerprint(input: string): string {
   return createHash('sha256').update(input).digest('hex')
-}
-
-const receipt = z.object({ key: z.string().regex(/^[0-9a-f]{64}$/u), digest: z.string().regex(/^[0-9a-f]{64}$/u) })
-
-/** Extract the input receipts committed by an inbox insertion.
- * @param event - one logical Session event.
- * @returns the stored receipt keys and input fingerprints.
- */
-export function admittedPrompts(event: SessionEvent): Array<{ key: string; digest: string }> {
-  if (event.type !== 'agent/inbox/spliced') return []
-  return event.data.inserted.flatMap(({ source }) => {
-    if (source.kind !== 'user' || !('admission' in source)) return []
-    const parsed = receipt.safeParse(source.admission)
-    return parsed.success ? [parsed.data] : []
-  })
 }
 
 /** Private Host projection; recovery metadata never enters an RPC history projection. */

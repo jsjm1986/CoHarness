@@ -1,6 +1,6 @@
 /** Receipt extraction from inbox events and the persisted prompt proof input. */
 import { expect, it } from 'vitest'
-import { admittedPrompts } from '../src/prompt-receipts.ts'
+import { admittedPrompts } from '@deepseek-ai/dsh-session/surface'
 import { promptInputJson } from '../src/api/prompt-wire.ts'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { UserDocIdType } from '@deepseek-ai/dsh-userdoc'

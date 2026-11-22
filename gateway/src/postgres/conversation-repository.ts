@@ -1572,6 +1572,40 @@ export class ConversationRepository {
     }
   }
 
+  /**
+   * Read an exact committed sequence and its owning header in one snapshot.
+   * @param sessionId - Session in this repository's Runtime.
+   * @param seq - logical event sequence.
+   * @param signal - optional read cancellation.
+   * @returns the header and event, or undefined when the Session is absent.
+   */
+  async readEvent(sessionId: string, seq: number, signal?: AbortSignal):
+  Promise<{ header: ConversationHeader; event: ConversationEvent | null } | undefined> {
+    if (!Number.isSafeInteger(seq) || seq < 0) {
+      throw new ConversationReadError('protocol', 'conversation event seq must be a non-negative safe integer')
+    }
+    try {
+      const { rows: [row] } = await checkedQuery<StoredHeaderRow & { event: ConversationEvent | null }>(this.reader,
+        `SELECT ${HEADER_COLUMNS},requested.event
+          FROM ${this.rows('conversation_sessions')} conversation_sessions
+          LEFT JOIN LATERAL (SELECT e.event FROM ${this.rows('conversation_events')} e
+            WHERE e.session_id=$1 AND e.seq=$2) requested ON true
+          WHERE id=$1 AND status<>'deleted'`,
+        [sessionId, seq], signal)
+      if (row === undefined) return undefined
+      const nextSeq = Number(row.next_seq)
+      if (!Number.isSafeInteger(nextSeq) || nextSeq < 0
+        || (row.event === null ? seq < nextSeq : seq >= nextSeq || row.event.seq !== seq)) {
+        throw new ConversationReadError('protocol', 'conversation event does not match its committed sequence')
+      }
+      return { header: headerFromRow(row), event: row.event }
+    } catch (error: unknown) {
+      const normalized = normalizeReadError(error, signal)
+      if (normalized !== undefined) throw normalized
+      throw error
+    }
+  }
+
   /** Read one conversation header and revision without touching its event rows. */
   async readHeader(sessionId: string, signal?: AbortSignal): Promise<ConversationHeader | undefined> {
     try {

@@ -76,7 +76,7 @@ import {
 /** Required storage operations and optional bounded reads exposed by a Runtime repository. */
 export type RuntimeConversationRepository = Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
   & Partial<Pick<ConversationRepository,
-      'readHeader' | 'readFrom' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
+      'readHeader' | 'readFrom' | 'readEvent' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
       | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner' | 'hasProjectDraftReservation'>>
 
 export interface RuntimeCredentialSubject {
@@ -1612,6 +1612,23 @@ export function createRuntimeApiHandler(
           header: runtimeHeader(header),
           events,
         })
+        return true
+      }
+
+      if (pathname === '/internal/runtime/session/read-event' && req.method === 'GET') {
+        const repository = conversations(subject)
+        const sessionId = url.searchParams.get('sessionId') ?? ''
+        const seq = Number(url.searchParams.get('seq'))
+        if (url.searchParams.getAll('seq').length !== 1 || url.searchParams.get('seq') !== String(seq)
+          || !safeInteger(seq)) throw new ConversationReadError('protocol', 'invalid conversation event seq')
+        if (repository.readEvent === undefined) throw new ConversationReadError('dependency', 'conversation event read is unavailable')
+        const value = await repository.readEvent(sessionId, seq, requestSignal(req, res))
+        if (value === undefined || value.header.id !== sessionId || !belongsToRuntime(value.header, subject)) {
+          throw new CollaborationDeniedError('conversation-not-found')
+        }
+        const events = value.event === null ? [] : [value.event]
+        validateConversationRange(events, seq)
+        send(res, 200, { header: runtimeHeader(value.header), events })
         return true
       }
 

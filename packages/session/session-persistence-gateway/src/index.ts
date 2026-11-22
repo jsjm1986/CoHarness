@@ -50,6 +50,7 @@ import SessionPersistence, {
   type SessionHistoryIndex,
   type SessionHistoryIndexItem,
   type SessionPersistenceRevision as PersistenceRevision,
+  SessionPersistenceNotFoundError,
   SessionPersistenceReadError,
   SessionPersistenceReadCursor,
   type SessionPersistencePage,
@@ -533,6 +534,27 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
 
   override readFrom(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEventSuffix> {
     return this.coordinator.readFrom(id, fromSeq, signal)
+  }
+
+  /** @inheritdoc */
+  override async readCommittedEvent(id: SessionId, seq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEvent | undefined> {
+    SessionLogOffset(seq)
+    const value = await this.optional(
+      `/internal/runtime/session/read-event?sessionId=${encodeURIComponent(id)}&seq=${String(seq)}`,
+      signal,
+    )
+    if (value === undefined) throw new SessionPersistenceNotFoundError(id)
+    const body = record(value)
+    if (body === undefined) throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid committed session event response')
+    const { storage, events } = this.storedEvents(body, id)
+    if ((storage.meta.version as number) !== SESSION_FORMAT_VERSION) return super.readCommittedEvent(id, seq, signal)
+    const [event] = events
+    if (event === undefined) return undefined
+    if (events.length !== 1 || event.seq !== Number(seq)
+      || (!KNOWN_SESSION_EVENT_TYPES.has(event.type) && event.ignorable !== true)) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid committed session event')
+    }
+    return event
   }
 
   /** Read one session header through the indexed Gateway metadata endpoint. */

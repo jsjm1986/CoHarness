@@ -10,7 +10,7 @@ Creating a browser session before the first prompt writes policy, turn, and reje
 
 ## Decision
 
-`SessionHeader.draft` marks a browser-created root whose physical persistence is deferred. `PersistenceCoordinator` buffers non-materializing events in memory and atomically writes the buffered prefix with the first non-empty surface message. Command, goal, and plan state events materialize a hidden command-only record; disposing an unmaterialized draft drops the buffer. A visible message promotes the stored header out of draft status. The shared `hasConversationContent` predicate is the only blankness rule used by attached summaries, projections, and persistence metadata.
+`SessionHeader.draft` marks a browser-created root eligible for deferred persistence. `PersistenceCoordinator` buffers events in memory and atomically writes the prefix when a non-empty surface message, a receipt-bearing inbox insertion, or command, goal, or plan state first requires storage. The Host can confirm durable input while it is still queued. Disposing an unmaterialized draft drops the buffer. The shared `hasConversationContent` predicate governs blankness in attached summaries, projections, and persistence metadata.
 
 Gateway runtimes reserve a scope-qualified `(draftId, sessionId)` pair before Agent creation. PostgreSQL returns one canonical Session id for retries, renews a one-hour lease, and releases it after materialization or successful disposal. The reservation contains no prompt text, attachment bytes, or credentials. Local JSONL and SQLite providers use the same deferred coordinator and persist the promoted draft marker; SQLite rejects older schemas under the pre-release no-migration policy. First reservation attempts acquire a transaction-scoped lock keyed by organization, Runtime, scope and draft id before reading the lease row. Overlapping callers reuse the winning Session id even when their proposed ids differ and no Session has materialized.
 
@@ -24,7 +24,7 @@ Runtime ownership and maintenance selection follow the [Session identity decisio
 
 **Persist every new Session and hide it in the Client.** Rejected because the database, archive index, and workspace membership would still accumulate abandoned roots and competing tabs would remain independent.
 
-**Use the first accepted prompt or `running` state as materialization.** Rejected because pre-step policy can reject or rewrite an input into an empty turn; a non-empty durable surface event is the shared evidence available to every consumer.
+**Count an accepted prompt or `running` state as visible content.** Pre-step policy can reject an input or rewrite it into an empty turn. A non-empty durable surface message is the shared evidence for visibility.
 
 **Use projection-cache blank hints as the cold authority.** Rejected because checkpoints can lag or be absent. Gateway-maintained watermarks are updated with the append transaction; local providers retain a bounded probe fallback.
 
@@ -32,13 +32,13 @@ Runtime ownership and maintenance selection follow the [Session identity decisio
 
 ## Consequences
 
-Abandoned browser drafts leave no durable session artifact, and one draft identity can survive a reload without storing credentials. Command-only state remains recoverable but does not enter ordinary conversation lists. A real message makes the session visible without a second attach or identity migration. Cold listing cost is proportional to session metadata rather than log bytes when the Gateway index is available.
+Abandoned, unmaterialized browser drafts leave no durable session artifact. One draft identity can survive a reload without storing credentials. A Session holding only command state or a queued input remains recoverable and stays out of ordinary conversation lists. A visible message promotes the same Session identity. With the Gateway index, cold listing reads session metadata.
 
-The `SessionHeader` and SQLite metadata formats change while the repository is pre-release; older SQLite stores are refused rather than migrated. Local JSONL cannot update an already-written header, so promotion happens at first materialization and pre-existing artifacts retain the conservative probe behavior. Empty-draft maintenance is administrator-only and keeps rows in trash until the configured purge window expires.
+The `SessionHeader` and SQLite metadata formats change while the repository is pre-release; older SQLite stores are refused rather than migrated. Local JSONL keeps its original physical header. If a visible message arrives after first materialization, readers derive visibility from the committed body. Empty-draft maintenance is administrator-only and keeps rows in trash until the configured purge window expires.
 
 ## Verification
 
-Focused tests cover the shared classifier, seed-only draft buffering, first-message atomic materialization, command-only hiding, stale list reconciliation, Workspace draft reuse, SQLite schema ownership, Gateway content metadata parsing, and migration backfill for legacy escaped-NUL events. Gateway and admin maintenance paths validate scope ownership, lease expiry, dry-run selection, trash, restore, and purge without exposing prompt data.
+Focused tests cover the shared classifier, seed-only draft buffering, atomic receipt and first-message materialization, command-only hiding, stale list reconciliation, Workspace draft reuse, SQLite schema ownership, Gateway content metadata parsing, and migration backfill for legacy escaped-NUL events. The keyless project transcript verifies reading the committed receipt before visible content and replaying the append without another insertion. Gateway and admin maintenance paths validate scope ownership, lease expiry, dry-run selection, trash, restore, and purge without exposing prompt data.
 
 ## Related
 

@@ -9,7 +9,7 @@ kind: "package-reference"
 
 所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?, coldSummaryCacheMaxEntries?, coldSummaryCacheMaxBytes?, workspaceFileMaxBytes?, workspaceFileMaxLines?, workspaceFileMaxEntries?, workspaceFileMaxResources?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
 
-版本化准备接口接收原生 `session.create` 和 `session.history` 请求。新建可登记 Host 的默认工作区并返回其位置。打开历史要求 Session 可读且未归档。`/api/admit/v1/session.prompt` 要求固定的请求 ID，并在核验收件箱事件落盘后返回成功。核验只读取该序号的已提交事件，允许模型同时追加后续输出。响应丢失后使用原账号、电脑、Runtime、Session 和请求 ID 调用 `/api/admit/v1/session.status`。传入 `confirmInput: true` 时，已确认的回执提供该次操作专用的 `inputProof`，供客户端匹配待确认输入。状态查询不会投递消息。 当前个人 JSONL 日志的提供方只定位和校验一次已提交前缀，即可读回该回执。
+版本化准备接口接收原生 `session.create` 和 `session.history` 请求。新建可登记 Host 的默认工作区并返回其位置。打开历史要求 Session 可读且未归档。`/api/admit/v1/session.prompt` 要求固定的请求 ID，并在核验收件箱事件落盘后返回成功。带回执的入队事件与草稿前缀一起落盘，输入仍在排队时即可确认。核验只读取该序号的已提交事件，允许模型同时追加后续输出。响应丢失后使用原账号、电脑、Runtime、Session 和请求 ID 调用 `/api/admit/v1/session.status`。传入 `confirmInput: true` 时，已确认的回执提供该次操作专用的 `inputProof`，供客户端匹配待确认输入。状态查询不会投递消息。当前个人 JSONL 日志的提供方只定位和校验一次已提交前缀，即可读回该回执。
 
 携带版本化操作 UUID 的持久提示请求通过 `x-dsh-host-admission-ms` 报告 Host 受理耗时。字段区分会话授权、Agent 准备、等待 Agent 受理、签注执行身份、收件箱追加、刷盘和核验。`inboxAppend` 内的 `inboxPublish` 截止到发送插入通知，`inboxWake` 衡量该次调用剩余的同步工作。字段值为毫秒。
 

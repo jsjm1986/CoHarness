@@ -10,7 +10,12 @@ import { FakeApiClient, fakeRemote } from './fake-api.client.ts'
 
 afterEach(() => { vi.unstubAllGlobals() })
 
-it.each([false, true])('resumes one queued submission after lease turnover (already committed=%s)', async (committed) => {
+it.each([
+  { kind: 'personal', committed: false },
+  { kind: 'personal', committed: true },
+  { kind: 'project', committed: false },
+  { kind: 'project', committed: true },
+] as const)('resumes one $kind submission after lease turnover (already committed=$committed)', async ({ kind, committed }) => {
   vi.stubGlobal('location', new URL('https://harness.invalid/'))
   const slots = new Map<string, string>()
   vi.stubGlobal('sessionStorage', {
@@ -18,8 +23,8 @@ it.each([false, true])('resumes one queued submission after lease turnover (alre
     setItem: (key: string, value: string) => { slots.set(key, value) },
     removeItem: (key: string) => { slots.delete(key) },
   })
-  const target = { kind: 'personal', nodeId: '10000000-0000-4000-8000-000000000008',
-    runtimeId: '10000000-0000-4000-8000-000000000009' } as SessionRuntimeTarget
+  const target = { kind, ...(kind === 'project' ? { projectId: 14 } : {}),
+    nodeId: '10000000-0000-4000-8000-000000000008', runtimeId: '10000000-0000-4000-8000-000000000009' } as SessionRuntimeTarget
   const connection = { interactions: 'none', metadataTiming: { requestTimeoutMs: 1000, retryAfterMs: 1 } } as ConnectionHandle
   const api = new PreparedSessionApi(connection, target, 7)
   const calls: string[] = [], dispatched: object[] = []
@@ -39,6 +44,7 @@ it.each([false, true])('resumes one queued submission after lease turnover (alre
   vi.stubGlobal('fetch', async (url: URL, init: RequestInit) => {
     expect(url.searchParams.get('dshRuntime')).toBe(target.runtimeId)
     expect(url.searchParams.get('dshNode')).toBe(target.nodeId)
+    expect(url.searchParams.get('dshTarget')).toBe(kind === 'project' ? 'project:14' : 'personal')
     expect(new Headers(init.headers).get('x-dsh-expected-principal-id')).toBe('7')
     if (typeof init.body !== 'string') throw new Error('Expected a JSON request body')
     const { rpcId, payload } = JSON.parse(init.body) as {

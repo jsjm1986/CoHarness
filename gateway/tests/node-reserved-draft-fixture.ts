@@ -118,7 +118,11 @@ export async function reservedDraftFixture(control:Pool,content:Pool,dataDirecto
   }catch(error){await close();throw error}
 }
 
-/** Drive preparation, private text, first content append and historical reading through real authenticated HTTP handlers. */
+/**
+ * Drive preparation, private drafts, and the first durable input through authenticated Gateway handlers.
+ * @param f - physical project and its authenticated clients.
+ * @returns the resulting keyless workflow transcript.
+ */
 export async function reservedDraftTranscript(f:Awaited<ReturnType<typeof reservedDraftFixture>>):Promise<string>{
   const prepared=await f.prepare(),url=f.draft(prepared.sessionId,prepared.editorId),otherTab=f.draft(prepared.sessionId,randomUUID())
   expect((await f.content.query('SELECT FROM node_content.conversation_sessions WHERE organization_id=$1 AND runtime_id=$2 AND id=$3',[f.context.organizationId,f.binding.runtimeId,prepared.sessionId])).rowCount).toBe(0)
@@ -130,16 +134,42 @@ export async function reservedDraftTranscript(f:Awaited<ReturnType<typeof reserv
   expect((await f.request(url,'GET',undefined,f.other.id)).status).toBe(403)
   expect(await f.request(f.documentTarget(prepared.sessionId))).toEqual({status:200,body:{runtimeId:f.binding.runtimeId,sessionId:prepared.sessionId,canWrite:true}})
   expect((await f.request(f.documentTarget(prepared.sessionId),'GET',undefined,f.other.id)).status).toBe(409)
-  const events=[{seq:0,time:1,type:'user/message',surfaceOp:'append',data:{source:{kind:'user',participant:{userId:f.owner.id}},content:[{type:'text',text:'first submitted message'}]}}]
-  const append=await f.request('/internal/runtime/session/append','POST',{sessionId:prepared.sessionId,batchId:randomUUID(),creationAuthorization:prepared.authorization,events},f.owner.id,true)
-  expect(append.status,JSON.stringify(append.body)).toBe(200)
+
+  const appendPath='/internal/runtime/session/append'
+  const source={kind:'user',rpcId:randomUUID(),participant:{userId:f.owner.id},admission:{key:'a'.repeat(64),digest:'b'.repeat(64)}}
+  const message={id:randomUUID(),role:'user',source,content:[{type:'text',text:'first submitted message'}]}
+  const queued={seq:0,time:1,type:'agent/inbox/spliced',data:{target:'next-turn',start:0,inserted:[message]}}
+  const queuedBatch={sessionId:prepared.sessionId,batchId:randomUUID(),creationAuthorization:prepared.authorization,events:[queued]}
+  expect(await f.request(appendPath,'POST',queuedBatch,f.owner.id,true)).toEqual({status:200,body:{result:'inserted'}})
+  const receiptPath='/internal/runtime/session/read-event?'+new URLSearchParams({sessionId:prepared.sessionId,seq:'0'})
+  const receipt=await f.request(receiptPath,'GET',undefined,f.owner.id,true)
+  expect(receipt.status,JSON.stringify(receipt.body)).toBe(200)
+  expect(receipt.body).toMatchObject({header:{id:prepared.sessionId,draft:true},events:[queued]})
+  expect(await f.request(appendPath,'POST',queuedBatch,f.owner.id,true)).toEqual({status:200,body:{result:'duplicate'}})
+
+  const visible={seq:1,time:2,type:'user/message',surfaceOp:'append',data:message}
+  const append=await f.request(appendPath,'POST',{sessionId:prepared.sessionId,batchId:randomUUID(),events:[visible]},f.owner.id,true)
+  expect(append).toEqual({status:200,body:{result:'inserted'}})
   const history=await f.request('/internal/runtime/session/load?sessionId='+encodeURIComponent(prepared.sessionId),'GET',undefined,f.owner.id,true)
   expect(history.status,JSON.stringify(history.body)).toBe(200)
-  expect(JSON.stringify(history.body)).toContain('first submitted message')
+  expect(history.body.events).toEqual([queued,visible])
   expect((await f.request(url)).body.text).toBe('first tab draft')
   expect((await f.request(otherTab)).body.text).toBe('second tab draft')
   expect(await f.request(url,'GET',undefined,f.other.id)).toEqual({status:200,body:{revision:0,text:''}})
   expect((await f.control.query('SELECT FROM harness.conversation_sessions WHERE organization_id=$1 AND runtime_id=$2',[f.context.organizationId,f.binding.runtimeId])).rowCount).toBe(0)
   expect((await f.content.query('SELECT FROM node_content.composer_drafts WHERE organization_id=$1 AND runtime_id=$2',[f.context.organizationId,f.binding.runtimeId])).rowCount).toBe(2)
-  return '# Reserved project drafts\n\nAuthenticated preparation: one unmaterialized Session on the project computer.\nFirst tab: save HTTP 200, read HTTP 200; private text preserved.\nSecond tab: independent draft; neither tab overwrites the other.\nAnother account with project and administrator access: unmaterialized draft HTTP 403.\nDocument target: creator HTTP 200 with exact coordinates; another account HTTP 409.\nFirst submitted message: persisted once on the project volume; authorized history HTTP 200.\nBoth drafts remain readable after Session materialization.\nGovernance database: no Session body; content database: two private draft records.\n'
+  return [
+    '# Reserved project drafts',
+    '',
+    'Authenticated preparation: one unmaterialized Session on the project computer.',
+    'First tab: save HTTP 200, read HTTP 200; private text preserved.',
+    'Second tab: independent draft; neither tab overwrites the other.',
+    'Another account with project and administrator access: unmaterialized draft HTTP 403.',
+    'Document target: creator HTTP 200 with exact coordinates; another account HTTP 409.',
+    'Queued input: exact committed receipt before the first visible message; replay keeps one insertion.',
+    'First submitted message: persisted once on the project volume; authorized history HTTP 200.',
+    'Both drafts remain readable after Session materialization.',
+    'Governance database: no Session body; content database: two private draft records.',
+    '',
+  ].join('\n')
 }
