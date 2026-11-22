@@ -870,6 +870,13 @@ export function createRuntimeApiHandler(
               fencedPrincipal = signed
             }
           }
+          if (pathname === '/internal/runtime/execution/terminal-authorize') {
+            const signed = assertionFor(req, deps.principals, executionWrite.subject, true)!
+            if (signed.purpose === undefined && signed.user.id === executionWrite.subject.target.id) {
+              fencedSubject = executionWrite.subject
+              fencedPrincipal = signed
+            }
+          }
         }
         if (!await executionWrite.admit(fencedSubject !== undefined)) return true
       }
@@ -978,6 +985,13 @@ export function createRuntimeApiHandler(
           }
           send(res, 200, action === 'inherit' ? await execution.inherit(subject, value) : await execution.relay(subject, value))
         } else if (action === 'terminal-authorize') {
+          if (personalFence !== undefined) {
+            const signed = fencedPrincipal ?? assertionFor(req, deps.principals, subject, true)!
+            if (signed.purpose === undefined && signed.user.id === subject.target.id) {
+              send(res, 200, await execution.authorizeTerminal(subject, signed, deps.context.nodeId, value, personalFence))
+              return true
+            }
+          }
           send(res, 200, await execution.authorizeTerminal(subject, (await currentAssertion(req, subject, true))!, deps.context.nodeId, value))
         } else if (action === 'terminal-check') {
           send(res, 200, await execution.checkTerminal(subject, deps.context.nodeId, value))

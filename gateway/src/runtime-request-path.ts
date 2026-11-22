@@ -76,6 +76,16 @@ export function isReadyRuntimeRead(method: string | undefined, url: URL): boolea
 }
 
 /**
+ * Identify low-latency interactive Runtime RPCs eligible for single-statement ready-session admission.
+ * @param method - original HTTP method.
+ * @param pathname - request pathname without query parameters.
+ * @returns whether this interactive POST may use `readySession` with full activity recording.
+ */
+export function isReadyRuntimeInteractive(method: string | undefined, pathname: string): boolean {
+  return method === 'POST' && (pathname === '/api/terminal/write' || pathname === '/api/terminal/resize')
+}
+
+/**
  * Select read operations that can use the primary's approval on a ready personal Runtime.
  * @param method - original HTTP method.
  * @param url - browser request coordinates.
@@ -137,6 +147,7 @@ export function isPersonalExecutionWriteRequest(pathname: string, method: string
   return method === 'POST'
     && (pathname === '/internal/runtime/execution/register-session' || pathname === '/internal/runtime/execution/input'
       || pathname === '/internal/runtime/execution/enter' || pathname === '/internal/runtime/execution/authorize'
+      || pathname === '/internal/runtime/execution/terminal-authorize'
       || pathname === '/internal/runtime/model-credential' || pathname === '/internal/runtime/resources/request'
       || (pathname === '/internal/runtime/resources/statuses' && activeModelCheck))
 }

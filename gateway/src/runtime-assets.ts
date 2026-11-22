@@ -13,10 +13,24 @@ import { parseCookies, SESSION_COOKIE } from './server.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import type { RuntimePlacement } from './runtime-router.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
+import { compressBuffer, isCompressibleContentType, MIN_COMPRESS_BYTES, preferredCompression, type ContentCoding } from './http-compression.ts'
+import type { RemoteAssetCapture } from './node-service-proxy.ts'
+
+const DEFAULT_REMOTE_CACHE_MAX_BYTES = 32 * 1024 * 1024
+const REMOTE_CACHE_MAX_ENTRY_BYTES = 4 * 1024 * 1024
+const REMOTE_CACHE_MAX_ENTRIES = 128
+
+/** Identifier-free metrics for Center-side caching of remote immutable runtime assets. */
+export interface RuntimeAssetCacheDiagnostics {
+  readonly remoteCacheHits: number
+  readonly remoteCacheMisses: number
+  readonly remoteCacheEntries: number
+  readonly remoteCacheBytes: number
+}
 
 /** Existing authority, lifecycle and forwarding owners used by immutable resource dispatch. */
 export interface RuntimeAssetsOptions {
-  cfg: { publicOrigins: string[]; upstreamTimeoutMs: number }
+  cfg: { publicOrigins: string[]; upstreamTimeoutMs: number; runtimeAssetCacheMaxBytes?: number }
   localNodeId: RuntimeNodeId
   admission: { admit(request: RuntimeAssetRequest): Promise<RuntimeAssetAdmission> }
   instances: Pick<InstanceManager, 'retainAsset'>
@@ -24,30 +38,187 @@ export interface RuntimeAssetsOptions {
   signer: GatewayPrincipalSigner
   /** Existing bounded node transport; omitted on an independent computer. */
   forward?: (request: IncomingMessage, response: ServerResponse, actor: UserRow,
-    placement: RuntimePlacement & { environment: NonNullable<RuntimePlacement['environment']> }) => Promise<boolean>
+    placement: RuntimePlacement & { environment: NonNullable<RuntimePlacement['environment']> },
+    capture?: RemoteAssetCapture) => Promise<boolean>
 }
 
 interface ActiveAsset { nodeId?: RuntimeNodeId; userId: number; projectId?: number; qualified: boolean; cancel(): void }
+
+type StoredCoding = 'identity' | ContentCoding
+
+interface CachedRemoteAsset {
+  readonly nodeId: RuntimeNodeId
+  readonly contentType: string
+  readonly etag?: string
+  readonly cacheControl?: string
+  readonly variants: Partial<Record<StoredCoding, Buffer>>
+  bytes: number
+}
 
 /** Owns resource responses and revocation listeners without granting execution authority. */
 export class RuntimeAssets {
   private readonly active = new Set<ActiveAsset>()
   private readonly work = new Set<Promise<unknown>>()
+  private readonly remoteCache = new Map<string, CachedRemoteAsset>()
+  private readonly remoteCacheMaxBytes: number
+  private remoteCacheBytes = 0
+  private remoteCacheHits = 0
+  private remoteCacheMisses = 0
   private readonly unsubscribe: () => void
   private closed = false
 
   /** @param options - current node authority and the existing transport/lifecycle providers. */
   constructor(private readonly options: RuntimeAssetsOptions) {
+    this.remoteCacheMaxBytes = options.cfg.runtimeAssetCacheMaxBytes ?? DEFAULT_REMOTE_CACHE_MAX_BYTES
     this.unsubscribe = options.monitor.subscribe(subject => { this.invalidate(subject) })
   }
 
+  /** @returns cumulative Center-side remote immutable asset cache metrics without identifiers. */
+  diagnostics(): RuntimeAssetCacheDiagnostics {
+    return {
+      remoteCacheHits: this.remoteCacheHits,
+      remoteCacheMisses: this.remoteCacheMisses,
+      remoteCacheEntries: this.remoteCache.size,
+      remoteCacheBytes: this.remoteCacheBytes,
+    }
+  }
+
   private invalidate(subject: AccessInvalidationSubject): void {
+    if (subject.nodeId !== undefined) {
+      for (const [key, entry] of this.remoteCache) {
+        if (entry.nodeId === subject.nodeId) {
+          this.remoteCacheBytes -= entry.bytes
+          this.remoteCache.delete(key)
+        }
+      }
+    } else if (subject.userId === undefined && subject.projectId === undefined) {
+      this.remoteCache.clear()
+      this.remoteCacheBytes = 0
+    }
     for (const operation of this.active) {
       if (subject.nodeId !== undefined && operation.nodeId !== undefined && subject.nodeId !== operation.nodeId) continue
       if (subject.userId !== undefined && subject.userId !== operation.userId) continue
       if (subject.projectId !== undefined && operation.qualified && subject.projectId !== operation.projectId) continue
       operation.cancel()
     }
+  }
+
+  private storeRemoteVariant(key: string, nodeId: RuntimeNodeId, captured: {
+    readonly contentType: string
+    readonly etag?: string
+    readonly cacheControl?: string
+    readonly contentEncoding?: string
+    readonly body: Buffer
+  }): void {
+    if (this.closed || this.remoteCacheMaxBytes <= 0 || captured.body.byteLength > REMOTE_CACHE_MAX_ENTRY_BYTES) return
+    const coding: StoredCoding | undefined = captured.contentEncoding === undefined || captured.contentEncoding === 'identity'
+      ? 'identity'
+      : captured.contentEncoding === 'br' || captured.contentEncoding === 'gzip' ? captured.contentEncoding : undefined
+    if (coding === undefined) return
+    const existing = this.remoteCache.get(key)
+    if (existing !== undefined) {
+      const prev = existing.variants[coding]
+      const delta = captured.body.byteLength - (prev?.byteLength ?? 0)
+      if (existing.bytes + delta > REMOTE_CACHE_MAX_ENTRY_BYTES) return
+      existing.variants[coding] = captured.body
+      existing.bytes += delta
+      this.remoteCacheBytes += delta
+      this.remoteCache.delete(key)
+      this.remoteCache.set(key, existing)
+    } else {
+      const entry: CachedRemoteAsset = {
+        nodeId,
+        contentType: captured.contentType,
+        ...(captured.etag === undefined ? {} : { etag: captured.etag }),
+        ...(captured.cacheControl === undefined ? {} : { cacheControl: captured.cacheControl }),
+        variants: { [coding]: captured.body },
+        bytes: captured.body.byteLength,
+      }
+      this.remoteCache.set(key, entry)
+      this.remoteCacheBytes += entry.bytes
+    }
+    this.evictRemoteCache()
+  }
+
+  private evictRemoteCache(): void {
+    while (this.remoteCache.size > REMOTE_CACHE_MAX_ENTRIES || this.remoteCacheBytes > this.remoteCacheMaxBytes) {
+      const oldest = this.remoteCache.entries().next().value as [string, CachedRemoteAsset] | undefined
+      if (oldest === undefined) break
+      this.remoteCache.delete(oldest[0])
+      this.remoteCacheBytes = Math.max(0, this.remoteCacheBytes - oldest[1].bytes)
+    }
+  }
+
+  private async serveCachedRemote(req: IncomingMessage, res: ServerResponse, key: string, signal: AbortSignal): Promise<boolean> {
+    if (this.remoteCacheMaxBytes <= 0 || req.headers.range !== undefined) return false
+    const entry = this.remoteCache.get(key)
+    if (entry === undefined) return false
+    this.remoteCache.delete(key)
+    this.remoteCache.set(key, entry)
+    if (entry.etag !== undefined && req.headers['if-none-match'] === entry.etag) {
+      this.remoteCacheHits += 1
+      res.writeHead(304, {
+        etag: entry.etag,
+        vary: 'accept-encoding',
+        ...(entry.cacheControl === undefined ? {} : { 'cache-control': entry.cacheControl }),
+      })
+      res.end()
+      return true
+    }
+    const preferred = preferredCompression(req.headers['accept-encoding'])
+    let body: Buffer | undefined
+    let encoding: ContentCoding | undefined
+    if (preferred !== undefined && entry.variants[preferred] !== undefined) {
+      body = entry.variants[preferred]
+      encoding = preferred
+    } else if (entry.variants.identity !== undefined) {
+      const identity = entry.variants.identity
+      if (preferred !== undefined && identity.byteLength >= MIN_COMPRESS_BYTES && isCompressibleContentType(entry.contentType)) {
+        const compressed = await compressBuffer(identity, preferred)
+        signal.throwIfAborted()
+        if (compressed.byteLength < identity.byteLength) {
+          body = compressed
+          encoding = preferred
+          if (this.remoteCache.get(key) === entry && entry.variants[preferred] === undefined
+            && entry.bytes + compressed.byteLength <= REMOTE_CACHE_MAX_ENTRY_BYTES) {
+            entry.variants[preferred] = compressed
+            entry.bytes += compressed.byteLength
+            this.remoteCacheBytes += compressed.byteLength
+            this.evictRemoteCache()
+          }
+        } else {
+          body = identity
+        }
+      } else {
+        body = identity
+      }
+    } else if (preferred !== undefined) {
+      // Client accepts an encoding we already cached (e.g. br cached, client accepts br + gzip).
+      const rawAccept = Array.isArray(req.headers['accept-encoding'])
+        ? req.headers['accept-encoding'].join(',') : (req.headers['accept-encoding'] ?? '')
+      for (const candidate of ['br', 'gzip'] as const) {
+        if (entry.variants[candidate] !== undefined && preferredCompression(
+          rawAccept.split(',').filter(part => part.trim().toLowerCase().startsWith(candidate) || part.trim().startsWith('*')).join(','),
+        ) === candidate) {
+          body = entry.variants[candidate]
+          encoding = candidate
+          break
+        }
+      }
+    }
+    if (body === undefined) return false
+    this.remoteCacheHits += 1
+    res.writeHead(200, {
+      'content-type': entry.contentType,
+      'content-length': body.byteLength,
+      vary: 'accept-encoding',
+      ...(encoding === undefined ? {} : { 'content-encoding': encoding }),
+      ...(entry.etag === undefined ? {} : { etag: entry.etag }),
+      ...(entry.cacheControl === undefined ? {} : { 'cache-control': entry.cacheControl }),
+    })
+    if (req.method === 'HEAD') res.end()
+    else res.end(body)
+    return true
   }
 
   /**
@@ -141,7 +312,19 @@ export class RuntimeAssets {
         throw new RuntimeAssetUnavailableError(409, 'runtime-asset/target-mismatch')
       }
       if (!placement.local) {
-        if (this.options.forward === undefined || !await this.options.forward(req, res, admission.user, placement)) {
+        const cacheKey = `${placement.environment.node.id}:${runtimeId}:${snapshot.generation}:${runtimeRequestPath(req.url ?? '/')}`
+        if (await this.serveCachedRemote(req, res, cacheKey, owner.signal)) return true
+        if (this.options.forward === undefined) {
+          throw new RuntimeAssetUnavailableError(503, 'runtime-asset/unavailable')
+        }
+        if (this.remoteCacheMaxBytes > 0 && req.headers.range === undefined) this.remoteCacheMisses += 1
+        const capture: RemoteAssetCapture | undefined = this.remoteCacheMaxBytes > 0 && req.method === 'GET' && req.headers.range === undefined
+          ? {
+            maxBytes: Math.min(REMOTE_CACHE_MAX_ENTRY_BYTES, this.remoteCacheMaxBytes),
+            onComplete: captured => { this.storeRemoteVariant(cacheKey, placement.environment.node.id, captured) },
+          }
+          : undefined
+        if (!await this.options.forward(req, res, admission.user, placement, capture)) {
           throw new RuntimeAssetUnavailableError(503, 'runtime-asset/unavailable')
         }
         return true
@@ -212,6 +395,8 @@ export class RuntimeAssets {
   async close(): Promise<void> {
     this.closed = true
     this.unsubscribe()
+    this.remoteCache.clear()
+    this.remoteCacheBytes = 0
     for (const operation of this.active) operation.cancel()
     await Promise.allSettled([...this.work])
   }

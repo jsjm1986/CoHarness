@@ -1,6 +1,6 @@
 /** Preserve the module loader's opaque query while removing Gateway-only selection. */
 import { expect, it } from 'vitest'
-import { isDelegatablePersonalRead, isExplicitScopeRequest, isImmutableRuntimeAssetRequest, isReadyRuntimeRead, isRuntimeAssetRequest, pinRuntimeRequestPath, runtimeRequestPath } from '../src/runtime-request-path.ts'
+import { isDelegatablePersonalRead, isExplicitScopeRequest, isImmutableRuntimeAssetRequest, isPersonalExecutionWriteRequest, isReadyRuntimeInteractive, isReadyRuntimeRead, isRuntimeAssetRequest, pinRuntimeRequestPath, runtimeRequestPath } from '../src/runtime-request-path.ts'
 import type { RuntimeId } from '../src/runtime-catalog.ts'
 
 const runtime = '10000000-0000-4000-8000-000000000001' as RuntimeId
@@ -95,4 +95,13 @@ it.each([
   ['POST', '/api/admit/v1/session.prompt', true, 'application/json'],
 ])('keeps %s %s on ordinary admission (%s, %s)', (method, path, accountBound, accept) => {
   expect(isDelegatablePersonalRead(method, new URL(path, 'http://gateway'), accountBound, accept)).toBe(false)
+})
+
+it('selects interactive terminal write/resize RPCs for ready-session admission and personal terminal-authorize fence', () => {
+  expect(isReadyRuntimeInteractive('POST', '/api/terminal/write')).toBe(true)
+  expect(isReadyRuntimeInteractive('POST', '/api/terminal/resize')).toBe(true)
+  expect(isReadyRuntimeInteractive('GET', '/api/terminal/write')).toBe(false)
+  expect(isReadyRuntimeInteractive('POST', '/api/terminal/create')).toBe(false)
+  expect(isPersonalExecutionWriteRequest('/internal/runtime/execution/terminal-authorize', 'POST')).toBe(true)
+  expect(isPersonalExecutionWriteRequest('/internal/runtime/execution/terminal-authorize', 'GET')).toBe(false)
 })

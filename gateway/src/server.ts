@@ -66,7 +66,8 @@ import { GatewayPerformanceObserver, type ReadySessionOutcome, type ReadySession
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { RuntimeAccountError } from './launcher.ts'
 import { RuntimeCatalogError, type RuntimeId, type RuntimeNodeId } from './runtime-catalog.ts'
-import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isPersonalExecutionWriteRequest, isReadyRuntimeRead, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isPersonalExecutionWriteRequest, isReadyRuntimeInteractive, isReadyRuntimeRead, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { sendCompressed } from './http-compression.ts'
 import { DocumentCatalogError, parseDocumentOverviewOptions } from './document-catalog.ts'
 import { BROWSER_DOCUMENT_OVERVIEW_STREAM } from './browser-documents.ts'
 import { ComputerAccessError, type GatewayComputerAccess } from './computer-access.ts'
@@ -837,6 +838,7 @@ export interface GatewayHandlers {
   upgrade?: UpgradeHandler
   /** Exact immutable resources retain no execution activity and never recover a Runtime. */
   runtimeAssets?: Pick<import('./runtime-assets.ts').RuntimeAssets, 'handle'>
+    & Partial<Pick<import('./runtime-assets.ts').RuntimeAssets, 'diagnostics'>>
   /** Account catalog including personal runtime metadata and ACL-filtered projects. */
   workbenchCatalog?: GatewayWorkbenchCatalogHandler
   /** Gateway-owned alternate-scope document listing; never expose runtime URLs. */
@@ -1488,7 +1490,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     const explicitSession = isExplicitSessionRequest(req.method, pathname)
     const expectedPrincipal = req.headers['x-dsh-expected-principal-id']
     const runtimeRead = typeof expectedPrincipal === 'string' && isReadyRuntimeRead(req.method, requestUrl)
-    const sessionSelectors = explicitSession || runtimeRead ? exactSessionSelectors(requestUrl.searchParams) : undefined
+    const readyInteractive = typeof expectedPrincipal === 'string' && isReadyRuntimeInteractive(req.method, pathname)
+    const sessionSelectors = explicitSession || runtimeRead || readyInteractive ? exactSessionSelectors(requestUrl.searchParams) : undefined
     const localNode = deps.nodeServiceIdentity?.nodeId
     const sessionNode = requestUrl.searchParams.get('dshNode')
     const readySession = sessionSelectors === undefined || localNode === undefined || recoveryRestricted
@@ -1503,7 +1506,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const claims = candidate.forwarded.claims
         const managedPersonalRead = delegatableRead && claims.context?.personalRead !== undefined
           && claims.user.status === 'active' && !claims.user.mustChangePassword && nodeReadBridges.get(req.socket) === claims.issuerNode
-        if (req.method !== 'POST' && !managedPersonalRead) readySession.observe?.('forwarded', 'fallbackDelegation')
+        if (readyInteractive && claims.user.mustChangePassword) {
+          // Preserve password-change enforcement before admitting interactive RPCs.
+        } else if (req.method !== 'POST' && !managedPersonalRead) readySession.observe?.('forwarded', 'fallbackDelegation')
         else {
           if (!managedPersonalRead) skipOrdinaryReadySession = true
           if (await handlers.readySession(req, res, {
@@ -1534,7 +1539,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
     }
     const { token, user, forward } = session
-    if (!skipOrdinaryReadySession && readySession !== undefined && (!runtimeRead || !user.mustChangePassword)
+    if (!skipOrdinaryReadySession && readySession !== undefined && (!(runtimeRead || readyInteractive) || !user.mustChangePassword)
       && (forward === undefined || forwardedSessionMatches(forward, readySession))
       && await handlers.readySession?.(req, res, { ...readySession, actor: user, sessionToken: token,
         ...(forward === undefined ? {} : { entryNodeId: forward.issuerNode }) })) return
@@ -1664,7 +1669,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           }
           else if (deps.documentOverview !== undefined) result = await deps.documentOverview.overview(user.id, options, true)
           else { send(res, 501, '{"error":"documents-unavailable"}', 'application/json'); return }
-          if (!abort.signal.aborted && !res.headersSent) send(res, 200, JSON.stringify(result), 'application/json')
+          if (!abort.signal.aborted && !res.headersSent) await sendCompressed(req, res, 200, JSON.stringify(result), 'application/json')
         } else {
           if (handlers.browserDocuments === undefined) { send(res, 501, '{"error":"documents-unavailable"}', 'application/json'); return }
           let payload: unknown
@@ -1700,7 +1705,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (nodeId !== null && nodeId !== environment.node.id) throw new RuntimeCatalogError(400, 'runtime-catalog/target-mismatch')
       await deps.topology?.assertNode(environment.node.id)
       const projects = await deps.collaboration?.projectsForUser(user.id) ?? []
-      send(res, 200, JSON.stringify({ user: { id: user.id, displayName: user.displayName },
+      await sendCompressed(req, res, 200, JSON.stringify({ user: { id: user.id, displayName: user.displayName },
         environment: { id: environment.id, nodeId: environment.node.id }, projects }), 'application/json')
       return
     }
@@ -1753,7 +1758,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const result = pathname === '/account/api/runtimes'
         ? await deps.runtimeCatalog.pageForAccount(user, options)
         : await deps.runtimeCatalog.pageForAdministrator(user, options)
-      send(res, 200, JSON.stringify(result), 'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify(result), 'application/json')
       return
     }
 
@@ -1881,7 +1886,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (req.method!=='GET') {send(res,405,'{"error":"method-not-allowed"}','application/json');return}
       const id=selection.get('id')
       if (id!==null && !nodeUuidSchema.safeParse(id).success) {send(res,400,'{"error":"invalid-operation-id"}','application/json');return}
-      send(res,200,JSON.stringify({operations:operationTimings.samples(id??undefined)}),'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify({ operations: operationTimings.samples(id ?? undefined) }), 'application/json')
       return
     }
     if (pathname === '/admin/api/performance') {
@@ -1892,11 +1897,12 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 405, '{"error":"method-not-allowed"}', 'application/json')
         return
       }
-      send(res, 200, JSON.stringify({
+      await sendCompressed(req, res, 200, JSON.stringify({
         ...performanceObserver.snapshot(deps.instances.capacitySnapshot?.() ?? null),
         databasePool: deps.databasePerformance?.() ?? null,
         modelPolicyProjection: modelPolicyProjectionDiagnostics(deps),
         nodeForwarding: deps.nodeServiceProxy?.diagnostics?.() ?? null,
+        runtimeAssets: handlers.runtimeAssets?.diagnostics?.() ?? null,
       }), 'application/json')
       return
     }
@@ -2489,7 +2495,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA',400,'Invalid document page.')
         }
         const page = await deps.documentOverview.localOverview(user.id,options,Number(offset),Number(limit),abort.signal)
-        if (!abort.signal.aborted) send(res,200,JSON.stringify(page),'application/json')
+        if (!abort.signal.aborted) await sendCompressed(req, res, 200, JSON.stringify(page), 'application/json')
       } catch (error) {
         if (abort.signal.aborted) return
         if (!(error instanceof DocumentCatalogError)) throw error
@@ -2507,7 +2513,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res,400,'{"error":"invalid-project-selection"}','application/json'); return
       }
       if (deps.projectMetadata === undefined) { send(res,503,'{"error":"node-content/unavailable"}','application/json'); return }
-      send(res,200,JSON.stringify({ items: await deps.projectMetadata.authorizedMetadata(user.id, adminView ? 'admin' : 'account', ids.map(Number)) }), 'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify({ items: await deps.projectMetadata.authorizedMetadata(user.id, adminView ? 'admin' : 'account', ids.map(Number)) }), 'application/json')
       return
     }
     if (pathname === '/account/api/workbench/rows' && req.method === 'GET') {
@@ -2524,7 +2530,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         ? await checkDocumentAttachmentTarget(handlers.workbenchRows,owner,selection,undefined,reservedSession)
         : await handlers.workbenchRows(owner,selection)
       res.setHeader('x-dsh-runtime-id', page.runtimeId)
-      send(res, 200, JSON.stringify(page), 'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify(page), 'application/json')
       return
     }
 
@@ -2561,7 +2567,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       } finally {
         abort.dispose()
       }
-      send(res, 200, JSON.stringify({
+      await sendCompressed(req, res, 200, JSON.stringify({
         personal: { id: user.id, name: user.displayName || user.username },
         activeRuntime: { ...activeRuntime, ...(environment === undefined ? {} : {
           runtimeId: environment.id, nodeId: environment.nodeId,
@@ -3010,7 +3016,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             if (fresh === null || fresh.id !== user.id || fresh.mustChangePassword) throw new CollaborationDeniedError('forbidden')
           }
           const current = new Map(authorities.map(authority => [authority.projectId, authority]))
-          send(res, 200, JSON.stringify(prepared.flatMap(item => {
+          await sendCompressed(req, res, 200, JSON.stringify(prepared.flatMap(item => {
             if (item === null) return []
             const { project, nodeId } = item
             const authority = current.get(project.id)

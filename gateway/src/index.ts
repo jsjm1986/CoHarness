@@ -647,7 +647,7 @@ const proxyHandlers = createProxyHandlers(deps, principalKeys.signer, runtimeAdm
 const runtimeAssets = new RuntimeAssets({
   cfg, localNodeId: context.nodeId as RuntimeNodeId, admission: runtimeAdmission,
   instances, monitor: accessMonitor, signer: principalKeys.signer,
-  forward: (req, res, actor, placement) => nodeServiceProxy.asset(req, res, actor, placement),
+  forward: (req, res, actor, placement, capture) => nodeServiceProxy.asset(req, res, actor, placement, capture),
 })
 await accessMonitor.synchronize()
 // Browser document operations run against each scope's filesystem root so a

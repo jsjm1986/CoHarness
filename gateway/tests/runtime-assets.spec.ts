@@ -221,3 +221,60 @@ it('reuses the exact fresh placement for remote delivery without invoking a loca
   expect(f.forward.mock.calls[0]?.[3]).toBe(f.admission.placement)
   expect(f.observed).toHaveLength(0)
 })
+
+it('caches captured remote immutable assets on Center while still enforcing fresh admission and node invalidation', async () => {
+  const f = await fixture({ remote: true })
+  const payload = 'export const plugin = ' + JSON.stringify('x'.repeat(2048)) + '\n'
+  f.forward.mockImplementation(async (_req, res, _actor, _placement, capture) => {
+    res.writeHead(200, {
+      'content-type': 'text/javascript; charset=utf-8',
+      etag: '"remote-v1"',
+      'cache-control': 'private, max-age=31536000, immutable',
+    })
+    res.end(payload)
+    capture?.onComplete({
+      status: 200,
+      contentType: 'text/javascript; charset=utf-8',
+      etag: '"remote-v1"',
+      cacheControl: 'private, max-age=31536000, immutable',
+      body: Buffer.from(payload, 'utf8'),
+    })
+    return true
+  })
+
+  const first = await fetch(f.origin + f.path, { headers: f.headers })
+  expect(first.status).toBe(200)
+  expect(await first.text()).toBe(payload)
+  expect(f.forward).toHaveBeenCalledTimes(1)
+  expect(f.assets.diagnostics()).toMatchObject({ remoteCacheHits: 0, remoteCacheMisses: 1, remoteCacheEntries: 1 })
+
+  // Second request serves from Center cache (zero remote forward) while still re-running admission + monitor sync.
+  const second = await fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': 'br, gzip' } })
+  expect(second.status).toBe(200)
+  expect(await second.text()).toBe(payload)
+  expect(f.forward).toHaveBeenCalledTimes(1)
+  expect(f.admit).toHaveBeenCalledTimes(2)
+  expect(f.assets.diagnostics().remoteCacheHits).toBe(1)
+
+  // Conditional ETag check answers 304 directly from Center cache.
+  const notModified = await fetch(f.origin + f.path, { headers: { ...f.headers, 'if-none-match': '"remote-v1"' } })
+  expect(notModified.status).toBe(304)
+  await notModified.arrayBuffer()
+  expect(f.forward).toHaveBeenCalledTimes(1)
+
+  // Authority change STILL refuses even when bytes are warm in cache.
+  const originalSync = f.monitor.synchronizeTo
+  f.monitor.synchronizeTo = async () => false
+  const refused = await fetch(f.origin + f.path, { headers: f.headers })
+  expect(refused.status).toBe(503)
+  await refused.arrayBuffer()
+  f.monitor.synchronizeTo = originalSync
+
+  // Node invalidation evicts that node's cached bytes so the next fetch goes upstream again.
+  await f.invalidate({ nodeId: f.admission.placement.environment.node.id })
+  expect(f.assets.diagnostics().remoteCacheEntries).toBe(0)
+  const afterEvict = await fetch(f.origin + f.path, { headers: f.headers })
+  expect(afterEvict.status).toBe(200)
+  await afterEvict.arrayBuffer()
+  expect(f.forward).toHaveBeenCalledTimes(2)
+})

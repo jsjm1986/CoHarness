@@ -23,6 +23,11 @@ import { UserService } from '../src/users.ts'
 import { ProjectService } from '../src/projects.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { createGatewayServer, scopeCookie, type GatewayDeps } from '../src/server.ts'
+import { RuntimeAssets } from '../src/runtime-assets.ts'
+import { GatewayPrincipalSigner } from '../src/principal.ts'
+import { generateKeyPairSync } from 'node:crypto'
+import { brotliDecompressSync } from 'node:zlib'
+import { request as httpRequest } from 'node:http'
 import { GatewayRuntimeRouter, LocalRuntimeAdapter } from '../src/runtime-router.ts'
 import { RuntimeCatalogError, type RuntimeCatalogEntry, type RuntimeId, type RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { NodeAccessError, type NodeCredential, type NodeLease } from '../src/node-access.ts'
@@ -120,6 +125,7 @@ async function main(): Promise<void> {
       centerAuthorizeChannel: 0,
       remoteTunnelAuthorizeChannel: 0,
       remoteTunnelProxyAdmission: 0,
+      remoteTunnelReadySession: 0,
     }
 
     const centerAuthorizeChannel = async (token: string, input: unknown) => {
@@ -203,6 +209,14 @@ async function main(): Promise<void> {
     cleanups.push(async () => { await new Promise<void>(resolve => { remoteWss.close(() => { resolve() }) }) })
 
     const remoteServer = createGatewayServer(remoteDeps, {
+      readySession: async (_req, res) => {
+        // Simulates remote readySession fast path: single atomic admitSession SQL over tunnel (1 RTT vs 3+ RTTs).
+        pgCounts.remoteTunnelReadySession += 1
+        if (TUNNEL_PG_RTT_MS > 0) await delay(TUNNEL_PG_RTT_MS)
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end('{"ok":true,"route":"readySession"}')
+        return true
+      },
       proxy: async (_req, res) => {
         // Simulates remote proxy.ts slow-path admission: accessMonitor.synchronize() + 2 serial PG checks over tunnel
         await remoteMonitor.synchronize()
@@ -270,6 +284,7 @@ async function main(): Promise<void> {
       centerAuthorizeChannel: after.centerAuthorizeChannel - before.centerAuthorizeChannel,
       remoteTunnelAuthorizeChannel: after.remoteTunnelAuthorizeChannel - before.remoteTunnelAuthorizeChannel,
       remoteTunnelProxyAdmission: after.remoteTunnelProxyAdmission - before.remoteTunnelProxyAdmission,
+      remoteTunnelReadySession: after.remoteTunnelReadySession - before.remoteTunnelReadySession,
       centerAccessSync: after.centerAccessSync - before.centerAccessSync,
       remoteTunnelAccessSync: after.remoteTunnelAccessSync - before.remoteTunnelAccessSync,
       poolOpened: after.forwarding.pool.opened - before.forwarding.pool.opened,
@@ -282,9 +297,19 @@ async function main(): Promise<void> {
     })
 
     const apiUrl = `${centerBase}/api/session.list?dshRuntime=${environment.id}&dshTarget=personal&dshNode=${remoteNodeId}`
-    const callOne = async (path = apiUrl): Promise<number> => {
+    const callOne = async (path = apiUrl, extraHeaders: Record<string, string> = {}): Promise<number> => {
       const started = performance.now()
-      const res = await fetch(path, { method: 'POST', headers: { cookie, origin: centerBase, 'content-type': 'application/json' }, body: '{}' })
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: {
+          cookie,
+          origin: centerBase,
+          'content-type': 'application/json',
+          'x-dsh-expected-principal-id': String(admin.id),
+          ...extraHeaders,
+        },
+        body: '{}',
+      })
       if (res.status !== 200) throw new Error(`unexpected status ${String(res.status)}`)
       await res.arrayBuffer()
       return performance.now() - started
@@ -395,6 +420,69 @@ async function main(): Promise<void> {
     ) as { totalDocuments: number; unavailableNodes?: readonly string[] }
     const s5Total = performance.now() - s5Start
 
+    // Scenario 6: Center-side remote /plugins/combo.js cache (cold vs warm) + Brotli dynamic compression ratio
+    const pluginPayload = 'export const bundle = ' + JSON.stringify(Array.from({ length: 400 }, (_, i) => ({
+      id: `plugin-item-${i}`, title: 'Multi-computer plugin module payload', version: '1.0.0',
+    }))) + ';\n'
+    const pluginBytes = Buffer.byteLength(pluginPayload, 'utf8')
+    let remotePluginFetches = 0
+    const pluginAssets = new RuntimeAssets({
+      cfg: centerConfig,
+      localNodeId,
+      admission: {
+        admit: async () => {
+          if (CENTER_PG_RTT_MS > 0) await delay(CENTER_PG_RTT_MS)
+          return {
+            user: admin,
+            scope: { kind: 'personal' },
+            accessRevision: '1',
+            expiresAt: Date.now() + 60_000,
+            placement: { local: false, resetScope: false, target: 'personal', environment },
+            snapshot: { target: { kind: 'user', id: admin.id, runtimeId: environment.id }, state: 'ready', generation: 1, port: 1, launchStamp: 's', startedAt: Date.now() },
+          }
+        },
+      },
+      instances: { retainAsset: async () => null },
+      monitor: { available: true, synchronize: async () => {}, synchronizeTo: async () => true, subscribe: () => () => {} },
+      signer: new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'perf', 30_000),
+      forward: async (_req, res, _actor, _placement, capture) => {
+        remotePluginFetches += 1
+        if (TUNNEL_PG_RTT_MS > 0) await delay(TUNNEL_PG_RTT_MS)
+        res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', etag: '"rev-012345abcdef"' })
+        res.end(pluginPayload)
+        capture?.onComplete({
+          status: 200,
+          contentType: 'text/javascript; charset=utf-8',
+          etag: '"rev-012345abcdef"',
+          body: Buffer.from(pluginPayload, 'utf8'),
+        })
+        return true
+      },
+    })
+    cleanups.push(() => pluginAssets.close())
+    const pluginServer = createServer((req, res) => { void pluginAssets.handle(req, res, admin) })
+    const pluginBase = await listen(pluginServer)
+    cleanups.push(() => close(pluginServer))
+    const pluginPort = Number(new URL(pluginBase).port)
+    const pluginPath = `/plugins/combo.js??fixture/client.js&rev=012345abcdef&dshRuntime=${environment.id}`
+    const fetchRaw = (headers: Record<string, string>) => new Promise<{ ms: number; bytes: number; encoding: string | undefined }>((resolve, reject) => {
+      const started = performance.now()
+      const req = httpRequest({ hostname: '127.0.0.1', port: pluginPort, path: pluginPath, method: 'GET', headers: { cookie, ...headers } }, res => {
+        const chunks: Buffer[] = []
+        res.on('data', chunk => { chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)) })
+        res.once('end', () => {
+          const buf = Buffer.concat(chunks)
+          if (res.headers['content-encoding'] === 'br' && brotliDecompressSync(buf).toString('utf8') !== pluginPayload) {
+            reject(new Error('corrupt brotli payload')); return
+          }
+          resolve({ ms: performance.now() - started, bytes: buf.byteLength, encoding: res.headers['content-encoding'] })
+        })
+      })
+      req.once('error', reject); req.end()
+    })
+    const s6Cold = await fetchRaw({ 'accept-encoding': 'br, gzip' })
+    const s6Warm = await fetchRaw({ 'accept-encoding': 'br, gzip' })
+
     writePerformanceReport({
       schemaVersion: 1,
       config: {
@@ -415,6 +503,16 @@ async function main(): Promise<void> {
           concurrency: overviewConcurrencyObserved,
           totalDocuments: overviewResult.totalDocuments,
           unavailableNodes: overviewResult.unavailableNodes?.length ?? 0,
+        },
+        s6_remotePluginCacheAndCompression: {
+          coldMs: Math.round(s6Cold.ms * 100) / 100,
+          warmMs: Math.round(s6Warm.ms * 100) / 100,
+          rawBytes: pluginBytes,
+          warmWireBytes: s6Warm.bytes,
+          warmEncoding: s6Warm.encoding,
+          compressionRatio: Math.round((s6Warm.bytes / pluginBytes) * 1000) / 1000,
+          remotePluginFetches,
+          cacheDiagnostics: pluginAssets.diagnostics(),
         },
       },
       finalForwardingDiagnostics: proxy.diagnostics(),

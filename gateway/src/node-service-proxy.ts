@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { Agent, request, STATUS_CODES, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isReadyRuntimeInteractive, pinRuntimeRequestPath } from './runtime-request-path.ts'
 import type { UserRow } from './auth.ts'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
 import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
@@ -107,6 +107,19 @@ export interface NodeServiceForwardingDiagnostics {
   readonly preparedReadReleaseChecks: number
   readonly preparedReadReleaseSkipped: number
   readonly pool: NodeServiceHttpPoolDiagnostics
+}
+
+/** Optional bounded tee for capturing immutable 200 OK remote asset payloads after streaming completes. */
+export interface RemoteAssetCapture {
+  readonly maxBytes: number
+  onComplete(captured: {
+    readonly status: number
+    readonly contentType: string
+    readonly etag?: string
+    readonly cacheControl?: string
+    readonly contentEncoding?: string
+    readonly body: Buffer
+  }): void
 }
 
 /** One center proxy owner, with independent cancellation for each selected computer/runtime. */
@@ -281,7 +294,8 @@ export class GatewayNodeServiceProxy {
    * @returns true after remote delivery, or false for this computer.
    */
   asset(req: IncomingMessage, res: ServerResponse, actor: UserRow,
-    placement: RuntimePlacement & { environment: NonNullable<RuntimePlacement['environment']> }): Promise<boolean> {
+    placement: RuntimePlacement & { environment: NonNullable<RuntimePlacement['environment']> },
+    capture?: RemoteAssetCapture): Promise<boolean> {
     if (!isImmutableRuntimeAssetRequest(req.method, req.url ?? '/')) throw new NodeServiceError(400, 'node-service/invalid-target')
     const url = new URL(req.url ?? '/', 'http://gateway'), environment = placement.environment
     if (url.searchParams.getAll('dshRuntime').length !== 1 || url.searchParams.get('dshRuntime') !== environment.id
@@ -294,7 +308,7 @@ export class GatewayNodeServiceProxy {
     return this.track(this.forwardSelectedHttp(req, res, {
       nodeId: environment.node.id, runtimeId: environment.id, environment, resolvedTarget: placement.target,
       ...(environment.owner.kind === 'project' ? { projectId: environment.owner.id } : {}),
-    }, actor))
+    }, actor, undefined, capture))
   }
 
   /**
@@ -325,7 +339,8 @@ export class GatewayNodeServiceProxy {
     return this.forwardSelectedHttp(req,res,target,actor,parsed?.body)
   }
 
-  private async forwardSelectedHttp(req: IncomingMessage, res: ServerResponse, target: Target, actor: UserRow | number, body?: string): Promise<boolean> {
+  private async forwardSelectedHttp(req: IncomingMessage, res: ServerResponse, target: Target, actor: UserRow | number,
+    body?: string, capture?: RemoteAssetCapture): Promise<boolean> {
     if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
     await this.directory.assertNode?.(target.nodeId)
     this.metrics.httpTotal += 1
@@ -343,6 +358,7 @@ export class GatewayNodeServiceProxy {
       signal.throwIfAborted()
       const url = new URL(req.url ?? '/', 'http://gateway')
       const interactive = target.runtimeId !== undefined && (isExplicitSessionRequest(req.method, url.pathname)
+        || isReadyRuntimeInteractive(req.method, url.pathname)
         || req.method === 'POST' && (url.pathname === '/api/session.history' || url.pathname === '/api/host.describe')
         || req.method === 'GET' && url.pathname === '/' && url.searchParams.get('dshBootstrap') === '1')
       const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
@@ -407,8 +423,43 @@ export class GatewayNodeServiceProxy {
                 }
               }
               signal.throwIfAborted()
-              res.writeHead(response.statusCode ?? 502, responseHeaders(response.headers, target.resetCookie))
+              const status = response.statusCode ?? 502
+              const forwardedHeaders = responseHeaders(response.headers, target.resetCookie)
+              const declaredLength = typeof response.headers['content-length'] === 'string'
+                ? Number(response.headers['content-length']) : undefined
+              const shouldCapture = capture !== undefined && req.method === 'GET' && status === 200
+                && target.resetCookie === undefined && response.headers['set-cookie'] === undefined
+                && (declaredLength === undefined || (Number.isSafeInteger(declaredLength) && declaredLength >= 0 && declaredLength <= capture.maxBytes))
+              let capturedChunks: Buffer[] | undefined = shouldCapture ? [] : undefined
+              let capturedBytes = 0
+              if (capturedChunks !== undefined) {
+                response.on('data', (chunk: Buffer | string) => {
+                  if (capturedChunks === undefined) return
+                  const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+                  capturedBytes += buf.byteLength
+                  if (capturedBytes > capture!.maxBytes) { capturedChunks = undefined; return }
+                  capturedChunks.push(buf)
+                })
+              }
+              res.writeHead(status, forwardedHeaders)
               await pipeline(response, res)
+              if (capturedChunks !== undefined && !signal.aborted) {
+                const contentType = typeof response.headers['content-type'] === 'string'
+                  ? response.headers['content-type'] : 'application/octet-stream'
+                const etag = typeof response.headers.etag === 'string' ? response.headers.etag : undefined
+                const cacheControl = typeof response.headers['cache-control'] === 'string'
+                  ? response.headers['cache-control'] : undefined
+                const contentEncoding = typeof response.headers['content-encoding'] === 'string'
+                  ? response.headers['content-encoding'].trim().toLowerCase() : undefined
+                capture!.onComplete({
+                  status,
+                  contentType,
+                  ...(etag === undefined ? {} : { etag }),
+                  ...(cacheControl === undefined ? {} : { cacheControl }),
+                  ...(contentEncoding === undefined ? {} : { contentEncoding }),
+                  body: Buffer.concat(capturedChunks, capturedBytes),
+                })
+              }
             })().then(resolve, (error: unknown) => { response.destroy(); reject(error) })
           })
           submitted = true

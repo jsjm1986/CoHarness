@@ -82,6 +82,8 @@ export interface GatewayConfig {
   runtimeTokenCacheMs: number
   /** Memoization window for local node-service identity attestations when LISTEN is healthy (HGW_NODE_SERVICE_IDENTITY_CACHE_MS). */
   nodeServiceIdentityCacheMs: number
+  /** Maximum byte budget for Center-side caching of remote immutable `/plugins/*` bundles (HGW_RUNTIME_ASSET_CACHE_MAX_BYTES; 0 disables). */
+  runtimeAssetCacheMaxBytes: number
   /** Heartbeat interval for a managed runtime's execution revocation stream. */
   executionWatchHeartbeatMs: number
   /** Maximum bytes retained or streamed from one runtime upstream response. */
@@ -1004,6 +1006,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     accessInvalidationHealthyPollMs: timerDelay(env.HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS, 15_000, 'HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS'),
     runtimeTokenCacheMs: timerDelay(env.HGW_RUNTIME_TOKEN_CACHE_MS, 2_000, 'HGW_RUNTIME_TOKEN_CACHE_MS'),
     nodeServiceIdentityCacheMs: timerDelay(env.HGW_NODE_SERVICE_IDENTITY_CACHE_MS, 5_000, 'HGW_NODE_SERVICE_IDENTITY_CACHE_MS'),
+    runtimeAssetCacheMaxBytes: (() => {
+      const raw = env.HGW_RUNTIME_ASSET_CACHE_MAX_BYTES
+      if (raw === undefined) return 32 * 1024 * 1024
+      const resolved = Number(raw)
+      if (!Number.isSafeInteger(resolved) || resolved < 0) throw new Error('HGW_RUNTIME_ASSET_CACHE_MAX_BYTES must be a non-negative safe integer')
+      return resolved
+    })(),
     executionWatchHeartbeatMs: timerDelay(env.HGW_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, 'HGW_EXECUTION_WATCH_HEARTBEAT_MS'),
     runtimeCredentialDir,
     organizationModelCredentialKeyFile,

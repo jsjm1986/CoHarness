@@ -1067,27 +1067,68 @@ export class GatewayExecutionIdentity {
    * @param value - requested Session identity.
    * @returns the server-confirmed creator identity; administrator status grants no terminal bypass.
    */
-  async authorizeTerminal(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, nodeId: string, value: unknown): Promise<{ userId: number; grantId: string }> {
+  async authorizeTerminal(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, nodeId: string,
+    value: unknown, fence?: PersonalExecutionWriteFence): Promise<{ userId: number; grantId: string }> {
     const request = object(value, ['sessionId'])
     const sessionId = identity(request.sessionId)
+    const runtimeId = subject.target.runtimeId
+    if (fence !== undefined && subject.target.kind === 'user' && runtimeId !== undefined
+      && principal.purpose === undefined && nodeId === this.nodeId) {
+      if (principal.user.id !== subject.target.id) throw new ExecutionIdentityError(403, 'personal execution cannot borrow another account')
+      const { rows: [granted] } = await this.personalWrite(() => this.pool.query<{ grant_id: string }>(`WITH authorized AS MATERIALIZED (
+          SELECT harness.personal_execution_actor($1,$2,$3,$4,$5,$6,$7) AS actor
+        ), policy AS MATERIALIZED (
+          SELECT a.actor, p.revision AS user_rev
+          FROM authorized a
+          JOIN harness.terminal_access_policies p
+            ON p.organization_id=$1 AND p.user_id=a.actor AND p.node_id=$2 AND p.enabled
+          FOR SHARE OF p
+        ), upserted AS (
+          INSERT INTO harness.terminal_session_grants AS g
+            (organization_id,node_id,runtime_kind,runtime_public_id,generation,session_id,user_id,user_policy_revision,project_policy_revision)
+          SELECT $1,$2,'user',$7,$4,$8,policy.actor,policy.user_rev,0
+          FROM policy
+          ON CONFLICT(organization_id,node_id,runtime_kind,runtime_public_id,session_id,user_id) DO UPDATE SET
+            grant_id=CASE WHEN g.generation=EXCLUDED.generation AND g.user_policy_revision=EXCLUDED.user_policy_revision
+              AND g.project_policy_revision=EXCLUDED.project_policy_revision THEN g.grant_id ELSE gen_random_uuid() END,
+            generation=EXCLUDED.generation,user_policy_revision=EXCLUDED.user_policy_revision,project_policy_revision=EXCLUDED.project_policy_revision
+          WHERE g.generation<>EXCLUDED.generation OR g.user_policy_revision<>EXCLUDED.user_policy_revision
+            OR g.project_policy_revision<>EXCLUDED.project_policy_revision
+          RETURNING grant_id
+        )
+        SELECT grant_id FROM upserted
+        UNION ALL
+        SELECT g.grant_id FROM harness.terminal_session_grants g
+        JOIN policy ON g.user_id=policy.actor
+        WHERE g.organization_id=$1 AND g.node_id=$2 AND g.runtime_kind='user' AND g.runtime_public_id=$7 AND g.session_id=$8
+          AND NOT EXISTS (SELECT 1 FROM upserted)`,
+      [...this.personalCoordinates(subject, runtimeId, fence), sessionId]),
+      'terminal creator grant conflicts with an earlier authorization')
+      if (granted === undefined) throw new ExecutionIdentityError(403, 'terminal qualification is unavailable')
+      return { userId: principal.user.id, grantId: granted.grant_id }
+    }
     return this.inRuntime(subject, async (client, subject) => {
       const actor = await this.principalActor(client, subject, sessionId, principal)
-      await this.eligibleActors(client, subject, sessionId, [actor], 'user-terminal')
       const revisions = await this.terminalRevisions(client, subject, actor)
-      const granted = await client.query<{ grant_id: string }>(`INSERT INTO harness.terminal_session_grants AS g
-        (organization_id,node_id,runtime_kind,runtime_public_id,generation,session_id,user_id,user_policy_revision,project_policy_revision)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
-        ON CONFLICT(organization_id,node_id,runtime_kind,runtime_public_id,session_id,user_id) DO UPDATE SET
-          grant_id=CASE WHEN g.generation=EXCLUDED.generation AND g.user_policy_revision=EXCLUDED.user_policy_revision
-            AND g.project_policy_revision=EXCLUDED.project_policy_revision THEN g.grant_id ELSE gen_random_uuid() END,
-          generation=EXCLUDED.generation,user_policy_revision=EXCLUDED.user_policy_revision,project_policy_revision=EXCLUDED.project_policy_revision
-        WHERE g.generation<>EXCLUDED.generation OR g.user_policy_revision<>EXCLUDED.user_policy_revision
-          OR g.project_policy_revision<>EXCLUDED.project_policy_revision
-        RETURNING grant_id`, [subject.organizationId,nodeId,subject.target.kind,subject.target.id,subject.generation,sessionId,actor,revisions.user,revisions.project])
-      const existing = granted.rows[0] === undefined ? await client.query<{ grant_id: string }>(`SELECT grant_id FROM harness.terminal_session_grants
-        WHERE organization_id=$1 AND node_id=$2 AND runtime_kind=$3 AND runtime_public_id=$4 AND session_id=$5 AND user_id=$6`,
-      [subject.organizationId,nodeId,subject.target.kind,subject.target.id,sessionId,actor]) : granted
-      return { userId: principal.user.id, grantId: existing.rows[0]!.grant_id }
+      const granted = await client.query<{ grant_id: string }>(`WITH upserted AS (
+          INSERT INTO harness.terminal_session_grants AS g
+            (organization_id,node_id,runtime_kind,runtime_public_id,generation,session_id,user_id,user_policy_revision,project_policy_revision)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          ON CONFLICT(organization_id,node_id,runtime_kind,runtime_public_id,session_id,user_id) DO UPDATE SET
+            grant_id=CASE WHEN g.generation=EXCLUDED.generation AND g.user_policy_revision=EXCLUDED.user_policy_revision
+              AND g.project_policy_revision=EXCLUDED.project_policy_revision THEN g.grant_id ELSE gen_random_uuid() END,
+            generation=EXCLUDED.generation,user_policy_revision=EXCLUDED.user_policy_revision,project_policy_revision=EXCLUDED.project_policy_revision
+          WHERE g.generation<>EXCLUDED.generation OR g.user_policy_revision<>EXCLUDED.user_policy_revision
+            OR g.project_policy_revision<>EXCLUDED.project_policy_revision
+          RETURNING grant_id
+        )
+        SELECT grant_id FROM upserted
+        UNION ALL
+        SELECT grant_id FROM harness.terminal_session_grants
+        WHERE organization_id=$1 AND node_id=$2 AND runtime_kind=$3 AND runtime_public_id=$4 AND session_id=$6 AND user_id=$7
+          AND NOT EXISTS (SELECT 1 FROM upserted)`,
+      [subject.organizationId,nodeId,subject.target.kind,subject.target.id,subject.generation,sessionId,actor,revisions.user,revisions.project])
+      return { userId: principal.user.id, grantId: granted.rows[0]!.grant_id }
     })
   }
 
