@@ -574,6 +574,7 @@ export class GatewayRuntime extends Service {
       console.info(`[model-attempt-timing] ${JSON.stringify({
         outcome: sample.outcome, startedAt: sample.startedAt, elapsedMs: round(sample.elapsedMs),
         adapterPreparationMs: round(sample.adapterPreparationMs), resourceWaitMs: round(sample.resourceWaitMs),
+        ...(sample.resourceOperationId === undefined ? {} : { resourceOperationId: sample.resourceOperationId }),
         initialAuthorizationMs: round(sample.initialAuthorizationMs),
         adapterDispatchPreparationMs: round(sample.adapterDispatchPreparationMs),
         dispatchAuthorizationMs: round(sample.dispatchAuthorizationMs), adapterCallbacks: sample.adapterCallbacks,

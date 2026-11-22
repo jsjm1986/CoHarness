@@ -69,6 +69,21 @@ export interface NodeServiceHttpLease {
   destroy(): void
 }
 
+/** Identifier-free cumulative counters and live occupancy for pooled node HTTP transports. */
+export interface NodeServiceHttpPoolDiagnostics {
+  readonly reused: number
+  readonly opened: number
+  readonly queued: number
+  readonly revalidateCalls: number
+  readonly revalidateSkipped: number
+  readonly idleInvalidationsGlobal: number
+  readonly idleInvalidationsNode: number
+  readonly closedIdleEntries: number
+  readonly active: number
+  readonly idle: number
+  readonly waiting: number
+}
+
 /** Request authorization remains with both Gateways; only byte connections are retained. */
 export class NodeServiceHttpPool {
   private readonly entries = new Set<Entry>()
@@ -79,6 +94,10 @@ export class NodeServiceHttpPool {
   private revision = 0
   private readonly waiters = new Set<PendingAcquisition>()
   private readonly waitingByNode = new Map<RuntimeNodeId, number>()
+  private metrics = {
+    reused: 0, opened: 0, queued: 0, revalidateCalls: 0, revalidateSkipped: 0,
+    idleInvalidationsGlobal: 0, idleInvalidationsNode: 0, closedIdleEntries: 0,
+  }
 
   /**
    * @param services - existing global/per-computer connection admission and lease owner.
@@ -179,6 +198,7 @@ export class NodeServiceHttpPool {
       const timer = setTimeout(() => { waiter.reject(new NodeServiceError(504, 'node-service/timeout')) }, remaining)
       timer.unref()
       this.waiters.add(waiter)
+      this.metrics.queued += 1
       this.waitingByNode.set(nodeId, waitingOnNode + 1)
       signal.addEventListener('abort', cancel, { once: true })
       if (signal.aborted) cancel()
@@ -211,6 +231,7 @@ export class NodeServiceHttpPool {
     try {
       const stream = entry.stream
       if (stream === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
+      this.metrics.revalidateCalls += 1
       await timeOperation('nodeLeaseCheck', () => this.services.revalidate(stream))
       if (this.closed || signal.aborted || entry.owner.signal.aborted || stream.destroyed) {
         throw new NodeServiceError(409, 'node-service/cancelled')
@@ -253,6 +274,8 @@ export class NodeServiceHttpPool {
   private borrow(entry: Entry, reused: boolean): NodeServiceHttpLease {
     const agent = entry.agent
     if (agent === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
+    if (reused) this.metrics.reused += 1
+    else this.metrics.opened += 1
     let released = false
     return { agent, reused, destroy: () => { if (released) return; released = true; this.destroy(entry) }, release: () => {
       if (released) return
@@ -282,12 +305,29 @@ export class NodeServiceHttpPool {
   }
 
   /**
+   * Read cumulative pool counts and live occupancy without retaining node identifiers.
+   * @returns Identifier-free transport reuse, opening, queueing and invalidation diagnostics.
+   */
+  diagnostics(): NodeServiceHttpPoolDiagnostics {
+    let active = 0
+    let idle = 0
+    for (const entry of this.entries) {
+      if (entry.busy) active += 1
+      else idle += 1
+    }
+    return { ...this.metrics, active, idle, waiting: this.waiters.size }
+  }
+
+  /**
    * Drain retained idle transports before the existing node detachment fence.
    * @param nodeId - affected computer, or all computers when omitted.
    * @returns after the selected idle transports have actually closed.
    */
   async closeIdle(nodeId?: RuntimeNodeId): Promise<void> {
+    if (nodeId === undefined) this.metrics.idleInvalidationsGlobal += 1
+    else this.metrics.idleInvalidationsNode += 1
     const entries = [...this.transports].filter(([entry]) => !entry.busy && (nodeId === undefined || entry.nodeId === nodeId))
+    this.metrics.closedIdleEntries += entries.length
     for (const [entry] of entries) this.destroy(entry)
     await Promise.all(entries.map(([, closed]) => closed))
   }

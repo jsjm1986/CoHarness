@@ -12,6 +12,8 @@ export type ResourceOriginIntent = 'execution' | 'interactive' | 'infrastructure
 
 /** One admitted resource whose accounting survives transport failure. */
 export interface ResourceLease {
+  /** Provider-generated operation UUID for correlating resource-admission diagnostics, when exposed. */
+  readonly operationId?: ResourceOperationId
   /** Caller or provider cancellation, including after uncertain cleanup; owners still report its actual outcome. */
   readonly signal: AbortSignal
   /** Report proven execution quiescence. A provider may own another delivery attempt while occupation stays reserved. */

@@ -169,11 +169,9 @@ cachedPredecessorTitle( meta: SessionHeader, inheritedEventCount: SessionLogOffs
 hydratePrepared( session: Session, events: readonly SessionEvent[], ): ProjectionSnapshot
 
 /**
- * Durably checkpoint one live session NOW (all mandatory points call
- * this; tests and carriers may too). The registry cut is snapshotted at
- * this boundary (states are live references), then the session's record is
- * replaced on the domain's write chain. NOT fail-soft — callers on the
- * fail-soft paths contain it.
+ * Durably checkpoint a live Session using a detached registry cut. Replaces
+ * the Session's stored record only after the log reaches that cut. Storage
+ * failures reject the call.
  * @param session - the live session to checkpoint.
  * @returns resolution after durability and event emission.
  */

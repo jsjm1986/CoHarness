@@ -153,7 +153,7 @@ export interface GatewayDeps {
     authorize(token: string, input: unknown): Promise<import('./node-access.ts').NodeLease>
   }
   /** Authenticated forwarding to another computer's existing Gateway, when explicitly enabled. */
-  nodeServiceProxy?: Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'http' | 'upgrade'> & Partial<Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'webhook' | 'closeIdle'>>
+  nodeServiceProxy?: Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'http' | 'upgrade'> & Partial<Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'webhook' | 'closeIdle' | 'diagnostics'>>
   /** Shared process diagnostics; its supplying owner disposes it after all observed listeners close. */
   performance?: GatewayPerformanceObserver
   /** Native pool counters, without querying the database or retaining connection details. */
@@ -1835,6 +1835,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         ...performanceObserver.snapshot(deps.instances.capacitySnapshot?.() ?? null),
         databasePool: deps.databasePerformance?.() ?? null,
         modelPolicyProjection: modelPolicyProjectionDiagnostics(deps),
+        nodeForwarding: deps.nodeServiceProxy?.diagnostics?.() ?? null,
       }), 'application/json')
       return
     }

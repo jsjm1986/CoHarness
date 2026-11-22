@@ -1535,3 +1535,47 @@ it('awaits cancelled connection preparation and disposes its late control reques
   released.resolve(); await closing
   expect(disposed).toBe(1)
 })
+
+it('reports identifier-free forwarding and pool diagnostics on /admin/api/performance', async () => {
+  const approvals = [
+    { accessRevision: '1', generation: 1, port: 40000, startedAt: 1, launchStamp: 'stamp-1', expiresAt: Date.now() + 60_000 },
+    { accessRevision: '1', generation: 1, port: 40000, startedAt: 1, launchStamp: 'stamp-1', expiresAt: Date.now() + 60_000 },
+    null,
+  ]
+  const f = await fixture({ HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: 'on' }, true, false, undefined, undefined, async () => approvals.shift() ?? null)
+  const bootstrapUrl = `${f.base}/?dshRuntime=${f.environment.id}&dshTarget=personal&dshNode=${f.nodeId}&dshBootstrap=1`
+  const first = await fetch(bootstrapUrl, {
+    headers: { cookie: f.cookie, accept: 'application/json', 'x-dsh-expected-principal-id': String(f.admin.id) },
+  })
+  expect(first.status).toBe(200); await first.arrayBuffer()
+  const second = await fetch(bootstrapUrl, {
+    headers: { cookie: f.cookie, accept: 'application/json', 'x-dsh-expected-principal-id': String(f.admin.id) },
+  })
+  expect(second.status).toBe(200); await second.arrayBuffer()
+  await f.proxy.closeIdle(f.nodeId)
+  const perf = await fetch(`${f.base}/admin/api/performance`, { headers: { cookie: f.cookie } })
+  expect(perf.status).toBe(200)
+  const raw = await perf.text()
+  const snapshot = JSON.parse(raw)
+  expect(snapshot.nodeForwarding).toMatchObject({
+    httpTotal: 2,
+    upgradeTotal: 0,
+    preparedReadEligible: 2,
+    preparedReadHit: 1,
+    preparedReadFallback: 1,
+    preparedReadReleaseChecks: 1,
+    preparedReadReleaseSkipped: 0,
+    pool: {
+      opened: 1,
+      reused: 1,
+      revalidateCalls: 1,
+      idleInvalidationsNode: 1,
+      closedIdleEntries: 1,
+      active: 0,
+      idle: 0,
+      waiting: 0,
+    },
+  })
+  expect(raw).not.toContain(f.nodeId)
+  expect(raw).not.toContain(f.environment.id)
+})

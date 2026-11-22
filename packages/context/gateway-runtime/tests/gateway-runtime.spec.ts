@@ -194,6 +194,10 @@ describe('Gateway request context', () => {
       const line = String(output.mock.calls[0]?.[0])
       expect(line.startsWith(prefix)).toBe(true)
       expect(JSON.parse(line.slice(prefix.length))).toEqual(sample)
+      const correlated = { ...sample, resourceOperationId: '00000000-0000-4000-8000-000000000001' } as const
+      ctx.emit('llm/model-attempt-timing', correlated)
+      expect(output).toHaveBeenCalledTimes(2)
+      expect(JSON.parse(String(output.mock.calls[1]?.[0]).slice(prefix.length))).toEqual(correlated)
     } finally {
       output.mockRestore()
       await ctx.fiber.dispose()

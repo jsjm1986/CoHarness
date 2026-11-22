@@ -3335,7 +3335,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async write(session: Session): Promise<void>',
-        description: 'Durably checkpoint one live session NOW (all mandatory points call this; tests and carriers may too). The registry cut is snapshotted at this boundary (states are live references), then the session\'s record is replaced on the domain\'s write chain. NOT fail-soft — callers on the fail-soft paths contain it.',
+        description: 'Durably checkpoint a live Session using a detached registry cut. Replaces the Session\'s stored record only after the log reaches that cut. Storage failures reject the call.',
         parameters: [{ name: 'session', description: 'the live session to checkpoint.' }],
         returns: 'resolution after durability and event emission.',
       },
@@ -8196,7 +8196,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelAttemptTiming',
-    declaration: 'export interface ModelAttemptTiming {\n    startedAt: number;\n    outcome: \'first-text\' | \'closed\';\n    elapsedMs: number;\n    adapterPreparationMs: number;\n    resourceWaitMs: number;\n    initialAuthorizationMs: number;\n    adapterDispatchPreparationMs: number;\n    dispatchAuthorizationMs: number;\n    adapterCallbacks: number;\n    afterLastAuthorizationMs: number;\n}',
+    declaration: 'export interface ModelAttemptTiming {\n    startedAt: number;\n    outcome: \'first-text\' | \'closed\';\n    elapsedMs: number;\n    adapterPreparationMs: number;\n    resourceWaitMs: number;\n    resourceOperationId?: string;\n    initialAuthorizationMs: number;\n    adapterDispatchPreparationMs: number;\n    dispatchAuthorizationMs: number;\n    adapterCallbacks: number;\n    afterLastAuthorizationMs: number;\n}',
   },
   {
     name: 'ModelMessageSource',
@@ -8960,7 +8960,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResourceLease',
-    declaration: 'export interface ResourceLease {\n    readonly signal: AbortSignal;\n    release(): Promise<void>;\n    uncertain(): Promise<void>;\n}',
+    declaration: 'export interface ResourceLease {\n    readonly operationId?: ResourceOperationId;\n    readonly signal: AbortSignal;\n    release(): Promise<void>;\n    uncertain(): Promise<void>;\n}',
+  },
+  {
+    name: 'ResourceOperationId',
+    declaration: 'export type ResourceOperationId = Branded<\'ResourceOperationId\'>;',
   },
   {
     name: 'ResourceOriginIntent',

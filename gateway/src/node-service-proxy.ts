@@ -16,7 +16,7 @@ import { NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-str
 import { FORWARDED_PRINCIPAL_HEADER, type PersonalReadAdmission } from './forwarded-principal.ts'
 import type { GatewayNodeServices } from './node-service.ts'
 import type { NodeServiceConfig } from './node-service.ts'
-import { NodeServiceHttpPool } from './node-service-http-pool.ts'
+import { NodeServiceHttpPool, type NodeServiceHttpPoolDiagnostics } from './node-service-http-pool.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
 
 /** Organization directory and current Admin authority; paths remain owned by the selected Gateway. */
@@ -95,6 +95,20 @@ function rawResponse(status: number, input: IncomingHttpHeaders, upgrade: boolea
   return `${lines.join('\r\n')}\r\n\r\n`
 }
 
+/** Identifier-free cumulative forwarding and delegated-read metrics for the center proxy. */
+export interface NodeServiceForwardingDiagnostics {
+  readonly httpTotal: number
+  readonly upgradeTotal: number
+  readonly accessSyncCalls: number
+  readonly accessSyncSkipped: number
+  readonly preparedReadEligible: number
+  readonly preparedReadHit: number
+  readonly preparedReadFallback: number
+  readonly preparedReadReleaseChecks: number
+  readonly preparedReadReleaseSkipped: number
+  readonly pool: NodeServiceHttpPoolDiagnostics
+}
+
 /** One center proxy owner, with independent cancellation for each selected computer/runtime. */
 export class GatewayNodeServiceProxy {
   private readonly active = new Set<Active>()
@@ -103,6 +117,11 @@ export class GatewayNodeServiceProxy {
   private closed = false
   private readonly unsubscribe?: () => void
   private readonly httpPool: NodeServiceHttpPool
+  private readonly metrics = {
+    httpTotal: 0, upgradeTotal: 0, accessSyncCalls: 0, accessSyncSkipped: 0,
+    preparedReadEligible: 0, preparedReadHit: 0, preparedReadFallback: 0,
+    preparedReadReleaseChecks: 0, preparedReadReleaseSkipped: 0,
+  }
 
   /**
    * @param directory - organization-owned placement and current Admin authority.
@@ -134,6 +153,12 @@ export class GatewayNodeServiceProxy {
     }
   }
 
+  private async synchronizeMonitor(reason?: 'runtime-stop'): Promise<void> {
+    if (this.monitor === undefined) return
+    this.metrics.accessSyncCalls += 1
+    await this.monitor.synchronize(reason)
+  }
+
   private async target(actor: UserRow, url: URL, cookie: string | undefined, method?: string, onLocal?: (placement: RuntimePlacement) => void): Promise<Target | null> {
     const runtime = url.searchParams.get('dshRuntime'), node = url.searchParams.get('dshNode')
     // Account-wide metadata remains available before the user selects one of several personal Runtimes.
@@ -144,7 +169,7 @@ export class GatewayNodeServiceProxy {
       if (node === null) return null
       if (!nodeUuidSchema.safeParse(node).success) throw new NodeServiceError(400, 'node-service/invalid-target')
       if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
-      await this.monitor?.synchronize()
+      await this.synchronizeMonitor()
       if (this.directory.authorizeAccountNode === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
       const nodeId = node as RuntimeNodeId
       await this.directory.authorizeAccountNode(actor, nodeId)
@@ -155,7 +180,7 @@ export class GatewayNodeServiceProxy {
       if (actor.role !== 'admin') throw new NodeServiceError(403, 'node-service/invalid-target')
       if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
       const stop = method === 'POST' && managedRuntime !== undefined && url.pathname.endsWith('/stop')
-      await this.monitor?.synchronize(stop ? 'runtime-stop' : undefined)
+      await this.synchronizeMonitor(stop ? 'runtime-stop' : undefined)
       if (runtime !== null || managedRuntime !== undefined) {
         if (runtime !== null && managedRuntime !== undefined && runtime !== managedRuntime) throw new NodeServiceError(400, 'node-service/invalid-target')
         if (this.directory.resolveForAdministrator === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
@@ -173,7 +198,7 @@ export class GatewayNodeServiceProxy {
       || /^\/admin\/projects\/[1-9][0-9]*\/settings$/u.test(url.pathname) || url.pathname === '/api' || url.pathname.startsWith('/api/') || url.pathname.startsWith('/account/api/') || scopeChange
     if (runtime === null && node === null && (!runtimePath || scopeChange || this.directory.resolvePlacement === undefined)) return null
     if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
-    await this.monitor?.synchronize()
+    await this.synchronizeMonitor()
     if (!runtimePath
       && !url.pathname.startsWith('/admin/api/')) throw new NodeServiceError(400, 'node-service/invalid-target')
     if (runtime !== null || node === null) {
@@ -299,6 +324,7 @@ export class GatewayNodeServiceProxy {
   private async forwardSelectedHttp(req: IncomingMessage, res: ServerResponse, target: Target, actor: UserRow | number, body?: string): Promise<boolean> {
     if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
     await this.directory.assertNode?.(target.nodeId)
+    this.metrics.httpTotal += 1
     const owner = new AbortController()
     const signal = AbortSignal.any([owner.signal, this.lifetime.signal])
     const abort = () => { if (!res.writableFinished) owner.abort() }
@@ -325,8 +351,13 @@ export class GatewayNodeServiceProxy {
         && url.searchParams.getAll('dshNode').length <= 1
         ? { actorId: actor.id, sessionToken: token, runtimeId: target.runtimeId, nodeId: target.nodeId, target: 'personal' as const }
         : undefined
+      if (approval !== undefined) this.metrics.preparedReadEligible += 1
       const personalRead = approval === undefined ? undefined
         : await timeOperation('entryReadApproval', () => this.directory.approvePersonalRead!(approval)) ?? undefined
+      if (approval !== undefined) {
+        if (personalRead !== undefined) this.metrics.preparedReadHit += 1
+        else this.metrics.preparedReadFallback += 1
+      }
       signal.throwIfAborted()
       const lease = await timeOperation('nodeConnection',()=>this.httpPool.acquire(target.nodeId, signal, interactive))
       recordNodeTransport(lease.reused ? 'reused' : 'opened')
@@ -363,6 +394,7 @@ export class GatewayNodeServiceProxy {
               mark('responseHeaders')
               if (response.headers[NODE_SERVICE_TARGET_HEADER] !== target.nodeId) throw new NodeServiceError(409, 'node-service/mismatch')
               if (approval !== undefined && personalRead !== undefined) {
+                this.metrics.preparedReadReleaseChecks += 1
                 const current = await timeOperation('entryReadRelease', () => this.directory.approvePersonalRead!(approval))
                 if (current === null || current.accessRevision !== personalRead.accessRevision
                   || current.generation !== personalRead.generation || current.port !== personalRead.port
@@ -396,6 +428,14 @@ export class GatewayNodeServiceProxy {
   }
 
   /**
+   * Read cumulative forwarding, delegated-read and pooled-transport metrics without identifiers.
+   * @returns Identifier-free counters for administrator performance inspection.
+   */
+  diagnostics(): NodeServiceForwardingDiagnostics {
+    return { ...this.metrics, pool: this.httpPool.diagnostics() }
+  }
+
+  /**
    * Close unused HTTP transports before the node's final detachment admission check.
    * @param nodeId - reviewed computer; active requests and browser WebSockets remain owned.
    * @returns after its idle transports have closed.
@@ -418,6 +458,7 @@ export class GatewayNodeServiceProxy {
     const target = await this.target(actor, new URL(req.url ?? '/', 'http://gateway'), req.headers.cookie, req.method)
     if (target === null) return false
     await this.directory.assertNode?.(target.nodeId)
+    this.metrics.upgradeTotal += 1
     const owner = new AbortController(), abort = () => { owner.abort() }
     const signal = AbortSignal.any([owner.signal, this.lifetime.signal])
     const active: Active = { ...target, userId: actor.id, abort }

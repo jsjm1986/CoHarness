@@ -414,7 +414,7 @@ export class GatewayResourceBudget extends ResourceBudget {
         if (!this.available()) { await this.cancel(entry); return }
         entry.delivered = true
         clearTimeout(entry.timer)
-        entry.result.resolve({ signal: entry.signal,
+        entry.result.resolve({ operationId: entry.id, signal: entry.signal,
           release: () => this.release(entry), uncertain: () => this.complete(entry, 'uncertain') })
         return
       }

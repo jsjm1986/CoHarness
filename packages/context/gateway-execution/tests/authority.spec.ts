@@ -31,7 +31,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 
 type JobNotice = { type: 'settled'; job: { owner: SessionId } } | { type: 'output'; owner?: SessionId }
 
-async function fixture(options: { kind?: 'user' | 'project'; config?: Config; watchCancel?: () => Promise<undefined> } = {}) {
+async function fixture(options: { kind?: 'user' | 'project'; config?: Config; watchCancel?: () => Promise<undefined>; modelTimings?: boolean } = {}) {
   const ctx = new Context()
   const sessions = ctx.plugin(SessionStore)
   const projections = ctx.plugin(SessionProjectionRegistry)
@@ -75,6 +75,7 @@ async function fixture(options: { kind?: 'user' | 'project'; config?: Config; wa
     return Response.json(current)
   })
   ctx.provide('gatewayRuntime', { identity: { kind: options.kind ?? 'user', id: 1 },
+    modelTimings: options.modelTimings === true,
     interactive: () => principal, current: () => principal ?? requestPrincipal, request } as never)
   const fiber = ctx.plugin(GatewayExecution, options.config)
   cleanups.push(async () => { agents.clear(); await fiber.dispose(); await projections.dispose(); await sessions.dispose() })
@@ -1936,6 +1937,40 @@ describe('immutable current execution', () => {
       const result = await executing
       await f.ctx.waterfall('tools/post-execute', exec, result, async () => ({ kind: 'accept' as const }))
       warn.mockRestore()
+    }
+  })
+
+  it('correlates enter and authorize operation IDs on model-input-timing when headers are present', async () => {
+    const f = await fixture({ modelTimings: true })
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const emitInputTurn = async (turn: number, withHeaders: boolean): Promise<Record<string, unknown>> => {
+      const enterHeaders = withHeaders ? { 'x-dsh-operation-id': '00000000-0000-4000-8000-000000000101' } : undefined
+      const authHeaders = withHeaders ? { 'x-dsh-operation-id': '00000000-0000-4000-8000-000000000202' } : undefined
+      f.responses.set('/enter', async () => Response.json(state(), enterHeaders === undefined ? undefined : { headers: enterHeaders }))
+      f.responses.set('/authorize', async () => Response.json(state(), authHeaders === undefined ? undefined : { headers: authHeaders }))
+      const message = createUserMessage({ source: { kind: 'user', gatewayExecutionInput: A }, content: [{ type: 'text', text: `hello-${String(turn)}` }] })
+      f.ctx.emit('agent/inbox/inserted', { agent: f.agent, message } as never)
+      f.ctx.emit('agent/inbox/claimed', { agent: f.agent, message } as never)
+      const signal = new AbortController().signal
+      await f.ctx.waterfall('system-prompt/assemble', {} as never, { agent: f.agent, signal } as never, async () => ({} as never))
+      await f.ctx.waterfall('agent/pre-step', { agent: f.agent, messages: [message], signal } as never, async () => ({ kind: 'enter' as const, messages: [message] }))
+      await f.ctx.serial('agent/message-entered', { agent: f.agent, event: { data: message }, turn, step: 0, signal } as never)
+      await f.ctx.waterfall('agent/request', { agent: f.agent, turn, step: 0, signal } as never, async () => undefined as never)
+      f.ctx.emit('agent/assistant-stream', { agent: f.agent, frame: { type: 'start', turn, step: 0 } } as never)
+      const prefix = '[model-input-timing] '
+      const raw = String(info.mock.calls.at(-1)?.[0])
+      expect(raw.startsWith(prefix)).toBe(true)
+      return JSON.parse(raw.slice(prefix.length)) as Record<string, unknown>
+    }
+    try {
+      const correlated = await emitInputTurn(1, true)
+      expect(correlated.enterOperationId).toBe('00000000-0000-4000-8000-000000000101')
+      expect(correlated.authorizeOperationId).toBe('00000000-0000-4000-8000-000000000202')
+      const plain = await emitInputTurn(2, false)
+      expect(plain).not.toHaveProperty('enterOperationId')
+      expect(plain).not.toHaveProperty('authorizeOperationId')
+    } finally {
+      info.mockRestore()
     }
   })
 })

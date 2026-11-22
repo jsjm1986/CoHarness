@@ -138,6 +138,8 @@ export interface ModelAttemptTiming {
   elapsedMs: number
   adapterPreparationMs: number
   resourceWaitMs: number
+  /** Resource-admission operation UUID returned by the resource provider, when available. */
+  resourceOperationId?: string
   initialAuthorizationMs: number
   adapterDispatchPreparationMs: number
   dispatchAuthorizationMs: number
@@ -1211,6 +1213,7 @@ export class LlmRuntime extends TypertRemoteService {
       const sample: ModelAttemptTiming = {
         startedAt: timing.startedAt, outcome, elapsedMs: now - timing.started,
         adapterPreparationMs: timing.adapterPreparationMs, resourceWaitMs: timing.resourceWaitMs,
+        ...(lease?.operationId === undefined ? {} : { resourceOperationId: lease.operationId }),
         initialAuthorizationMs: timing.initialAuthorizationMs, adapterDispatchPreparationMs: timing.adapterDispatchPreparationMs,
         dispatchAuthorizationMs: timing.dispatchAuthorizationMs, adapterCallbacks: timing.adapterCallbacks,
         afterLastAuthorizationMs: timing.lastAuthorizedDispatch === 0 ? 0 : now - timing.lastAuthorizedDispatch,

@@ -89,8 +89,9 @@ interface ModelInputTiming {
   enterStarted: number
   inheritanceMs: number
   enterRpcMs: number
+  enterOperationId?: string | undefined
   accepted: number
-  request?: { started: number; authorized: number }
+  request?: { started: number; authorized: number; authorizeOperationId?: string | undefined }
 }
 
 /** Watch updates observed during one permission request, including an idle owner. */
@@ -286,7 +287,7 @@ export class GatewayExecution extends ExecutionAuthority {
         const timing = timings.input.get(agent)
         if (timing === undefined || timing.turn !== frame.turn || timing.step !== frame.step || timing.request === undefined) return
         timings.input.delete(agent)
-        const { inbox, enterStartedAt, enterStarted, inheritanceMs, enterRpcMs, accepted, request } = timing
+        const { inbox, enterStartedAt, enterStarted, inheritanceMs, enterRpcMs, enterOperationId, accepted, request } = timing
         const prep = inbox?.preparation, claimed = inbox?.claimed
         const preStep = timings.preStep.get(agent)
         timings.preStep.delete(agent)
@@ -307,8 +308,11 @@ export class GatewayExecution extends ExecutionAuthority {
             ...(preStep?.turn !== frame.turn || preStep.step !== frame.step ? {} : {
               preStepPlugins: preStep.hooks.map(hook => ({ plugin: hook.plugin, elapsedMs: round(hook.elapsedMs) })),
             }),
-            inheritanceMs: round(inheritanceMs), enterRpcMs: round(enterRpcMs), enterToAcceptedMs: round(accepted - enterStarted),
+            inheritanceMs: round(inheritanceMs), enterRpcMs: round(enterRpcMs),
+            ...(enterOperationId === undefined ? {} : { enterOperationId }),
+            enterToAcceptedMs: round(accepted - enterStarted),
             acceptedToRequestMs: round(request.started - accepted), requestAuthorizationMs: round(request.authorized - request.started),
+            ...(request.authorizeOperationId === undefined ? {} : { authorizeOperationId: request.authorizeOperationId }),
             afterAuthorizationToStreamMs: round(streamStarted - request.authorized),
           })}`)
         } catch { /* Diagnostic output cannot interrupt the assistant stream. */ }
@@ -371,14 +375,16 @@ export class GatewayExecution extends ExecutionAuthority {
           if (currentScopeId === undefined) throw this.denied('execute', 'The delegated execution scope is unavailable.')
         }
         const beforeRpc = enterStarted === undefined ? 0 : performance.now()
+        let enterOperationId: string | undefined
         state = executionState(await this.post('/enter', {
           sessionId: agent.id, inputId, messageId: event.data.id, contentHash: original.hash,
           currentScopeId: currentScopeId ?? null,
           unverifiedHistory: false,
-        }, undefined, signal))
+        }, undefined, signal, enterStarted === undefined ? undefined : (id) => { enterOperationId = id }))
         if (enterStarted !== undefined) {
           modelInput = {
             turn, step, inbox: original.timing, enterStartedAt, enterStarted, inheritanceMs, enterRpcMs: performance.now() - beforeRpc,
+            ...(enterOperationId === undefined ? {} : { enterOperationId }),
           }
         }
       } else if (source.gatewayExecutionScope !== undefined) {
@@ -414,8 +420,15 @@ export class GatewayExecution extends ExecutionAuthority {
       return this.runCaptured(agent, scope, async () => {
         const timing = timings?.input.get(agent)
         const started = timing !== undefined && timing.turn === turn && timing.step === step ? performance.now() : undefined
-        await this.authorize(this.capabilityFor(agent), agent, signal)
-        if (timing !== undefined && started !== undefined) timing.request = { started, authorized: performance.now() }
+        let authorizeOperationId: string | undefined
+        await this.authorizeWithTiming(this.capabilityFor(agent), agent, signal, undefined,
+          started === undefined ? undefined : (id) => { authorizeOperationId = id })
+        if (timing !== undefined && started !== undefined) {
+          timing.request = {
+            started, authorized: performance.now(),
+            ...(authorizeOperationId === undefined ? {} : { authorizeOperationId }),
+          }
+        }
         return next()
       })
     })
@@ -502,7 +515,13 @@ export class GatewayExecution extends ExecutionAuthority {
       ? 'plugin-management' : 'execute'
   }
 
-  private async post(path: string, body: unknown, principal?: GatewayRequestPrincipal, signal?: AbortSignal): Promise<unknown> {
+  private async post(
+    path: string,
+    body: unknown,
+    principal?: GatewayRequestPrincipal,
+    signal?: AbortSignal,
+    onOperationId?: (id: string) => void,
+  ): Promise<unknown> {
     this.lifetime.signal.throwIfAborted()
     const operationSignal = signal === undefined ? this.lifetime.signal : AbortSignal.any([signal, this.lifetime.signal])
     const response = await this.dependencies.ctx.gatewayRuntime.request(`/internal/runtime/execution${path}`, {
@@ -513,6 +532,10 @@ export class GatewayExecution extends ExecutionAuthority {
     if (!response.ok) {
       discardGatewayRead(response.body)
       throw this.denied('execute', 'The Gateway refused execution authorization. Use a verified account and an ordinary permission mode.')
+    }
+    const operationId = response.headers.get('x-dsh-operation-id')
+    if (onOperationId !== undefined && operationId !== null && operationId.length > 0 && operationId.length <= 64) {
+      onOperationId(operationId)
     }
     return response.status === 204 ? undefined : readGatewayResponseJson(response, undefined, operationSignal)
   }
@@ -906,6 +929,16 @@ export class GatewayExecution extends ExecutionAuthority {
    * @returns Gateway-confirmed participants for auditing and attribution; permission checks do not bill model requests.
    */
   async authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal, execution?: ToolExecution): Promise<ExecutionState> {
+    return this.authorizeWithTiming(capability, agent, signal, execution)
+  }
+
+  private async authorizeWithTiming(
+    capability: ExecutionCapability,
+    agent: Agent,
+    signal?: AbortSignal,
+    execution?: ToolExecution,
+    onOperationId?: (id: string) => void,
+  ): Promise<ExecutionState> {
     if (!this.available(agent)) throw this.denied(capability, 'Gateway execution authorization is unavailable.')
     const scope = execution === undefined ? this.currentScope(agent) : this.resolvedScope(this.toolScope(execution, agent))
     const generation = this.watchGeneration
@@ -920,7 +953,7 @@ export class GatewayExecution extends ExecutionAuthority {
       }
       const state = executionState(await this.post('/authorize', {
         sessionId: agent.id, capability, scopeId: scope.scopeId, unverifiedHistory: scope.unverifiedHistory,
-      }, undefined, signal))
+      }, undefined, signal, onOperationId))
       if (!this.available(agent) || generation !== this.watchGeneration || invalidation !== this.invalidationOf(agent, scope)
         || pending.invalidated || state.actors.some(actor => pending.users.has(actor.userId))
         || signal?.aborted

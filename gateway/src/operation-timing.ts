@@ -10,16 +10,26 @@ const method = new Map([
   ['/api/prepare/v1/session.create','create'],['/api/prepare/v1/session.history','history'],['/api/session.history','history'],
   ['/api/host.describe','hostDescription'],['/api/workspace.list','workspaceList'],['/api/session.list','sessionList'],
   ['/api/admit/v1/session.prompt','send'],['/api/admit/v1/session.status','status'],
+  ['/api/terminal/write','terminalWrite'],['/api/terminal/follow','terminalFollow'],
+  ['/account/api/runtime/prepare/v1','runtimePrepare'],
   ['/internal/runtime/execution/input','executionInput'],['/internal/runtime/execution/register-session','executionRegister'],
   ['/internal/runtime/execution/enter','executionEnter'],['/internal/runtime/execution/authorize','executionAuthorize'],
   ['/internal/runtime/resources/request','resourceRequest'],['/internal/runtime/resources/statuses','resourceStatuses'],
   ['/internal/runtime/model-credential','modelCredential'],
 ] as const)
+const getMethod = new Map([
+  ['/account/api/workbench/rows', 'workbenchRows'],
+  ['/account/api/workbench/context', 'workbenchContext'],
+  ['/account/api/documents/overview', 'documentsOverview'],
+  ['/account/api/node-document-overview', 'nodeDocumentOverview'],
+] as const)
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 export type OperationPhase='authorize'|'prepare'|'admit'|'accessSync'|'runtimeQueue'|'runtimeLiveness'|'nodeConnection'|'nodeQueue'|'nodeLeaseCheck'|'nodeServiceOpen'|'upstream'
   |'entryReadApproval'|'entryReadRelease'|'nodePreparedRead'
   | 'governanceCheckout' | 'contentCheckout' | 'resourceWriteAdmission' | 'resourceChangeWait' | 'executionInputServer'
-type Method='bootstrap'|'hostDescription'|'workspaceList'|'sessionList'|'create'|'history'|'send'|'status'|'executionInput'|'executionRegister'
+type Method='bootstrap'|'hostDescription'|'workspaceList'|'sessionList'|'create'|'history'|'send'|'status'
+  |'terminalWrite'|'terminalFollow'|'runtimePrepare'|'workbenchRows'|'workbenchContext'|'documentsOverview'|'nodeDocumentOverview'
+  |'executionInput'|'executionRegister'
   |'executionEnter'|'executionAuthorize'|'resourceRequest'|'resourceStatuses'|'modelCredential'
 type SqlRole='governance'|'content'
 /** Result of acquiring one exclusive PostgreSQL client. */
@@ -238,7 +248,10 @@ export class OperationTimings {
     if (suppliedId !== undefined && (typeof suppliedId!=='string' || !uuid.test(suppliedId))) return work()
     const path=(req.url??'').split('?',1)[0]!
     const action = req.method==='POST' ? (method as ReadonlyMap<string,Method>).get(path)
-      : req.method==='GET' && path==='/' && isReadyRuntimeRead(req.method, new URL(req.url??'/', 'http://gateway')) ? 'bootstrap' : undefined
+      : req.method==='GET'
+        ? ((getMethod as ReadonlyMap<string,Method>).get(path)
+          ?? (path==='/' && isReadyRuntimeRead(req.method, new URL(req.url??'/', 'http://gateway')) ? 'bootstrap' : undefined))
+        : undefined
     if (action === undefined) return work()
     const requestId=suppliedId ?? (action==='executionEnter' || action==='executionAuthorize' || action==='resourceRequest'
       || action==='resourceStatuses' || action==='modelCredential' ? randomUUID() : undefined)
