@@ -276,6 +276,11 @@
       "source": "packages/context/gateway-runtime/src/stream-principal-leases.ts"
     },
     {
+      "doc": "docs/subsystems/collaboration.md",
+      "symbol": "TerminalCreatorId",
+      "source": "packages/api/terminal-controller/src/authorization.ts"
+    },
+    {
       "doc": "docs/subsystems/commands.md",
       "symbol": "CommandDefinition",
       "source": "packages/interaction/commands/src/index.ts"
@@ -1440,8 +1445,18 @@
     },
     {
       "doc": "docs/subsystems/persistence.md",
+      "symbol": "ReservedProjectDraft",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
       "symbol": "RestoredSessionOptions",
       "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionDraftModelSelection",
+      "source": "packages/session/session-persistence/src/index.ts"
     },
     {
       "doc": "docs/subsystems/persistence.md",

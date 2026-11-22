@@ -59,7 +59,7 @@ const RUNTIME_TOKEN_CACHE_CAPACITY = 256
 export class PostgresInstanceRepository implements InstanceRepository {
   private readonly tokenCache = new Map<string, { subject: RuntimeCredentialSubject | null; expiresAt: number }>()
   private readonly tokenFlights = new Map<string, Promise<RuntimeCredentialSubject | null>>()
-  private readonly personalExecutionCandidates = new Map<string, RuntimeCredentialSubject>()
+  private readonly executionWriteCandidates = new Map<string, RuntimeCredentialSubject>()
 
   constructor(
     private readonly context: PostgresRuntimeContext,
@@ -72,7 +72,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
   /** Node-private verified data paths. Missing required evidence throws; omitted dshHome preserves a new Runtime's layout. */
   resolveLocalPaths?:(target:RuntimeTarget)=>Promise<GovernanceLocalPaths|undefined>
 
-  /** Drop memoized authorization and in-flight lookups. Personal write coordinates require fresh SQL qualification. */
+  /** Drop cached authorization and in-flight lookups. Retained coordinates require fresh SQL qualification. */
   invalidateRuntimeTokenCache(): void {
     this.tokenCache.clear()
     this.tokenFlights.clear()
@@ -682,7 +682,26 @@ export class PostgresInstanceRepository implements InstanceRepository {
    * @returns Personal Runtime coordinates learned from a previous run or control authentication, or null. Only the write may authorize them.
    */
   personalExecutionCandidate(token: string): RuntimeCredentialSubject | null {
-    return this.personalExecutionCandidates.get(createHash('sha256').update(token).digest('hex')) ?? null
+    const subject = this.modelCredentialCandidate(token)
+    return subject?.target.kind === 'user' ? subject : null
+  }
+
+  /**
+   * Recover coordinates for the model credential lookup that rechecks authority in PostgreSQL.
+   * @param token - private Runtime bearer.
+   * @returns Personal or project coordinates learned from earlier authentication, or null.
+   */
+  modelCredentialCandidate(token: string): RuntimeCredentialSubject | null {
+    return this.executionWriteCandidates.get(createHash('sha256').update(token).digest('hex')) ?? null
+  }
+
+  private rememberExecutionWriteCandidate(hash: Buffer, subject: RuntimeCredentialSubject): void {
+    const key = hash.toString('hex')
+    this.executionWriteCandidates.delete(key)
+    if (this.executionWriteCandidates.size >= RUNTIME_TOKEN_CACHE_CAPACITY) {
+      this.executionWriteCandidates.delete(this.executionWriteCandidates.keys().next().value!)
+    }
+    this.executionWriteCandidates.set(key, subject)
   }
 
   /**
@@ -790,14 +809,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
         generation: Number(row.generation),
         userInternalId: row.user_internal_id,
       }
-      if (use === 'run') {
-        const key = hash.toString('hex')
-        this.personalExecutionCandidates.delete(key)
-        if (this.personalExecutionCandidates.size === RUNTIME_TOKEN_CACHE_CAPACITY) {
-          this.personalExecutionCandidates.delete(this.personalExecutionCandidates.keys().next().value!)
-        }
-        this.personalExecutionCandidates.set(key, subject)
-      }
+      if (use === 'run') this.rememberExecutionWriteCandidate(hash, subject)
       return subject
     }
     if (row.project_internal_id !== null && row.project_public_id !== null) {
@@ -811,14 +823,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
           nodeId: this.context.nodeId, runtimeId: row.runtime_id, volumeId: row.volume_id, writerEpoch: row.writer_epoch,
         } }),
       }
-      if (use === 'run') {
-        const key = hash.toString('hex')
-        this.personalExecutionCandidates.delete(key)
-        if (this.personalExecutionCandidates.size === RUNTIME_TOKEN_CACHE_CAPACITY) {
-          this.personalExecutionCandidates.delete(this.personalExecutionCandidates.keys().next().value!)
-        }
-        this.personalExecutionCandidates.set(key, subject)
-      }
+      if (use === 'run') this.rememberExecutionWriteCandidate(hash, subject)
       return subject
     }
     throw new Error('runtime credential resolved an ownerless instance')

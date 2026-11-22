@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import type { ProjectNameKeyring } from './project-name-keyring.ts'
 
-export const GOVERNANCE_REBUILD_SCHEMA_VERSION = 147
+export const GOVERNANCE_REBUILD_SCHEMA_VERSION = 148
 const dispositions = {safe:'restore-safe',reset:'reset-and-review',node:'node-owned',ephemeral:'ephemeral'} as const
 export type GovernanceColumnDisposition = typeof dispositions[keyof typeof dispositions]
 export interface GovernanceRebuildColumn {name:string;disposition:GovernanceColumnDisposition}
@@ -189,11 +189,15 @@ const schema143Tables = {
     "safe": "id,organization_id,scope_kind,scope_id,source_node_id,target_node_id,tier,revision,quota_bytes,created_at,updated_at,enabled,capture_stopped_at,retirement_point_id,retired_at",
   }),
 } as const
-export const governanceRebuildTables = {
+const schema144Tables = {
   ...schema143Tables,
   push_deliveries: columns({
     "ephemeral": "organization_id,session_id,event_seq,device_id,status,attempts,last_error,created_at,sent_at,updated_at,runtime_id,runtime_namespace,provider_msg_id,delivered_at,opened_at",
   }),
+} as const
+export const governanceRebuildTables = {
+  ...schema144Tables,
+  conversation_draft_reservations: columns({"node":"organization_id,scope_key,draft_id,session_id,user_id,project_id,cwd,visibility,agent_preset,created_at,updated_at,lease_expires_at,ssh_target_id,runtime_id,runtime_namespace,model_selection"}),
 } as const
 export type GovernanceRebuildTable = keyof typeof governanceRebuildTables
 type GovernanceInventoryTables = Partial<Record<GovernanceRebuildTable,readonly GovernanceRebuildColumn[]>>
@@ -205,6 +209,7 @@ const schema135Inventory=inventory(schema135Tables)
 const schema136Inventory=inventory(schema136Tables)
 const schema139Inventory=inventory(schema139Tables)
 const schema143Inventory=inventory(schema143Tables)
+const schema144Inventory=inventory(schema144Tables)
 const currentInventory=inventory(governanceRebuildTables)
 /** Resolve only reviewed immutable payload inventories; no newer-schema fallback is permitted.
  * @param version - final migration version sealed into the source package.
@@ -215,7 +220,8 @@ export function governanceRebuildInventory(version:number){
     :version===136||version===137||version===138?schema136Inventory
     :version===139||version===140||version===141||version===142?schema139Inventory
     :version===143?schema143Inventory
-    :version===144||version===145||version===146||version===GOVERNANCE_REBUILD_SCHEMA_VERSION?currentInventory:undefined
+    :version===144||version===145||version===146||version===147?schema144Inventory
+    :version===GOVERNANCE_REBUILD_SCHEMA_VERSION?currentInventory:undefined
 }
 /** Stable per-column decisions also accompany the encrypted package for administrator review. */
 export const governanceRebuildDispositions = currentInventory.dispositions

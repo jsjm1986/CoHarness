@@ -1,5 +1,5 @@
 /** Real Runtime credentials preserve independent execution identities for equal Host Session IDs. @module */
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -12,12 +12,16 @@ import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresAuditService } from '../src/postgres/audit-service.ts'
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresMaintenanceService, type WriteGateVerdict } from '../src/postgres/maintenance-service.ts'
+import { PostgresModelGovernanceService, projectProviderCredentialRef } from '../src/postgres/model-governance-service.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import { PostgresUserService } from '../src/postgres/user-service.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { OperationTimings } from '../src/operation-timing.ts'
+import { OrganizationModelCredentialCipher } from '../src/organization-model-credentials.ts'
 import { PRINCIPAL_HEADER } from '../src/principal.ts'
+import { runtimeBearerToken } from '../src/runtime-api.ts'
+import { RUNTIME_MODEL_CREDENTIAL_PATH } from '../src/runtime-request-path.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { createExecutionFixture } from './execution-fixture.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
@@ -349,6 +353,101 @@ describePg('execution Runtime identity isolation', () => {
     }
     expect((await pool.query('SELECT id FROM harness.execution_inputs WHERE organization_id=$1 AND message_id=$2', [f.organizationId, refusedMessage])).rows).toHaveLength(0)
     expect((await pool.query('SELECT session_id FROM harness.execution_sessions WHERE organization_id=$1 AND session_id=$2', [f.organizationId, refusedSession])).rows).toHaveLength(0)
+  })
+
+  it('resolves credentials for the exact Runtime in one statement and confines project candidates to the model route', async () => {
+    const cipher = new OrganizationModelCredentialCipher(randomBytes(32))
+    const f = await createExecutionFixture(pool, { executionWriteEpoch: 1n,
+      governance: context => new PostgresModelGovernanceService(context, cipher) })
+    cleanups.push(f.dispose)
+    const root = await mkdtemp(join(tmpdir(), 'hgw-model-credential-admission-'))
+    cleanups.push(() => rm(root, { recursive: true, force: true }))
+    const cfg = testConfig(root)
+    const governance = new PostgresModelGovernanceService(f.context, cipher)
+    const provider = { provider: 'org-company', displayName: 'Company', driver: 'pi-ai' as const,
+      protocol: 'anthropic-messages' as const, baseURL: 'https://models.example/v1/', authMode: 'api-key' as const }
+    await governance.upsertProvider({ ...provider, status: 'draft', credential: 'company-key' })
+    await governance.upsertModel({ provider: provider.provider, model: 'reply', displayName: 'Reply', enabled: true,
+      inputMicrosPerMillion: 0, outputMicrosPerMillion: 0, cacheReadMicrosPerMillion: 0, cacheWriteMicrosPerMillion: 0 })
+    await governance.upsertProvider({ ...provider, status: 'enabled' })
+    await governance.setUserAccess(f.admin.id, provider.provider, 'reply', true)
+    await governance.setProjectAccess(f.project.id, provider.provider, 'reply', true)
+    const { rows: [company] } = await pool.query<{ credential_ref: string }>(`SELECT credential_ref
+      FROM harness.model_providers WHERE organization_id=$1 AND provider_key=$2`, [f.organizationId, provider.provider])
+    const projectRef = projectProviderCredentialRef(f.project.id, 'local')
+    await governance.mutateProjectModelSettings(f.project.id, [{ op: 'set', path: ['providers', 'local'],
+      value: { api: 'anthropic-messages', baseURL: 'https://models.example/v1/', apiKeyEnv: projectRef,
+        models: [{ id: 'reply', name: 'Reply' }] } }])
+    await governance.setProjectCredential(f.project.id, projectRef, 'project-key')
+
+    const repo = f.instances
+    const personal = await repo.authenticateRuntimeControlToken(f.personal.token, pool, 1n)
+    const project = await repo.authenticateRuntimeControlToken(f.project.token, pool, 1n)
+    await repo.authenticateRuntimeControlToken(f.other.token, pool, 1n)
+    expect(personal?.target.runtimeId).toBe(f.personal.runtimeId)
+    expect(project?.target.runtimeId).toBe(f.project.runtimeId)
+    repo.invalidateRuntimeTokenCache()
+    expect(repo.personalExecutionCandidate(f.personal.token)).toEqual(personal)
+    expect(repo.personalExecutionCandidate(f.project.token)).toBeNull()
+    expect(repo.modelCredentialCandidate(f.personal.token)).toEqual(personal)
+    expect(repo.modelCredentialCandidate(f.project.token)).toEqual(project)
+
+    const timings = new OperationTimings(8)
+    const runtime = Object.assign((...args: Parameters<typeof f.handler>) =>
+      timings.run(args[0], args[1], () => f.handler(...args)), f.handler)
+    const maintenanceGate = vi.fn(async (): Promise<WriteGateVerdict> => 'open')
+    const runtimeAuthorize = vi.fn(async (req: Parameters<typeof runtimeBearerToken>[0]) =>
+      await repo.authenticateRuntimeToken(runtimeBearerToken(req) ?? '') ?? false)
+    const runtimeModelCredentialCandidate = vi.fn((req: Parameters<typeof runtimeBearerToken>[0]) =>
+      repo.modelCredentialCandidate(runtimeBearerToken(req) ?? ''))
+    const server = createGatewayServer({ cfg, maintenanceGate, users: new PostgresUserService(f.context, cfg),
+      auth: new PostgresAuthService(f.context, cfg), projects: new PostgresProjectService(f.context, cfg),
+      audit: new PostgresAuditService(f.context), instances: new InstanceManager(repo, cfg) }, {
+      runtime, runtimeAuthorize, runtimeModelCredentialCandidate,
+      runtimePersonalExecutionCandidate: req => repo.personalExecutionCandidate(runtimeBearerToken(req) ?? ''),
+      runtimePersonalExecutionStopGate: () => 'open',
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    cleanups.push(() => new Promise<void>((resolve, reject) => {
+      server.close(error => error === undefined ? resolve() : reject(error))
+      server.closeAllConnections()
+    }))
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+    const credential = async (owner: typeof f.project, ref: string, status = 200) => {
+      const id = randomUUID()
+      const response = await fetch(base + RUNTIME_MODEL_CREDENTIAL_PATH, { method: 'POST',
+        headers: { ...f.headers(owner), 'x-dsh-operation-id': id }, body: JSON.stringify({ ref }) })
+      const body: unknown = await response.json()
+      expect(response.status).toBe(status)
+      if (response.ok) expect(response.headers.get('cache-control')).toBe('no-store')
+      expect(timings.samples(id)[0]?.sql.governance.count).toBe(1)
+      return body
+    }
+    expect(await credential(f.personal, company!.credential_ref)).toEqual({ configured: true, value: 'company-key' })
+    expect(await credential(f.project, company!.credential_ref)).toEqual({ configured: true, value: 'company-key' })
+    expect(await credential(f.project, projectRef)).toEqual({ configured: true, value: 'project-key' })
+    expect(await credential(f.personal, projectRef)).toEqual({ configured: false })
+    expect(await credential(f.other, projectRef)).toEqual({ configured: false })
+    await governance.setProjectAccess(f.project.id, provider.provider, 'reply', false)
+    expect(await credential(f.project, company!.credential_ref)).toEqual({ configured: false })
+    await pool.query(`INSERT INTO harness.cluster_control(organization_id,mode,write_epoch) VALUES($1,'serving',2)`, [f.organizationId])
+    expect(await credential(f.project, projectRef, 503)).toEqual({ error: 'stale-epoch' })
+    expect(runtimeAuthorize).not.toHaveBeenCalled()
+    expect(maintenanceGate).not.toHaveBeenCalled()
+
+    await pool.query(`UPDATE harness.cluster_control SET write_epoch=1 WHERE organization_id=$1`, [f.organizationId])
+    const sessionId = await f.session(f.project)
+    runtimeModelCredentialCandidate.mockClear()
+    const registered = await fetch(base + '/internal/runtime/execution/register-session', { method: 'POST',
+      headers: f.headers(f.project), body: JSON.stringify({ sessionId }) })
+    expect(registered.status).toBe(200)
+    await registered.arrayBuffer()
+    expect(runtimeAuthorize).toHaveBeenCalledOnce()
+    expect(runtimeModelCredentialCandidate).not.toHaveBeenCalled()
+
+    await pool.query('UPDATE harness.instances SET runtime_token_hash=$2 WHERE runtime_id=$1', [f.project.runtimeId, randomBytes(32)])
+    expect(await credential(f.project, projectRef, 401)).toEqual({ error: 'invalid-runtime-token' })
+    expect(runtimeAuthorize).toHaveBeenCalledOnce()
   })
 
   it('keeps parent admission, inheritance and identical relay message IDs in their originating Runtime', async () => {

@@ -1,16 +1,103 @@
 /** Reserved project drafts keep exact creator authority through cancellation and first materialization. */
-import { randomUUID } from 'node:crypto'
-import { expect, it } from 'vitest'
-import { createPostgresPool } from '../src/postgres/database.ts'
+import { randomBytes, randomUUID } from 'node:crypto'
+import { expect, it, vi } from 'vitest'
+import { createPostgresPool, transaction } from '../src/postgres/database.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { reservedDraftFixture, reservedDraftTranscript } from './node-reserved-draft-fixture.ts'
 import type { NodeDraftKey } from '../src/node-drafts.ts'
 
 const governance=postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL),contentUrl=postgresTestDatabaseUrl(process.env.HGW_TEST_NODE_CONTENT_DATABASE_URL),pgdata=process.env.HGW_TEST_NODE_CONTENT_PGDATA
+async function verifyProjectDraftRecovery(f: Awaited<ReturnType<typeof reservedDraftFixture>>): Promise<void> {
+  const { control, content } = f
+  const prepared = await f.prepare()
+  const recover = (sessionId = prepared.sessionId, user = f.owner.id) =>
+    f.request('/internal/runtime/session/draft/recover', 'POST', { sessionId }, user, true)
+  const selection = { provider: 'project-provider', model: 'alternate', reasoningEffort: 'high' }
+  const select = (target = prepared, user = f.owner.id) => f.request('/internal/runtime/session/draft/model', 'POST',
+    { sessionId: target.sessionId, draftId: target.reservationId, selection }, user, true)
+  const { organizationId, nodeId } = f.context
+  const { runtimeId, projectId } = f.binding
+  expect(await recover()).toMatchObject({ status: 200, body: {
+    sessionId: prepared.sessionId, draftId: prepared.reservationId, visibility: 'private', cwd: expect.any(String),
+  } })
+  expect(await recover(prepared.sessionId, f.other.id)).toEqual({ status: 404, body: { error: 'conversation-not-found' } })
+  expect((await select({ ...prepared, reservationId: randomUUID() })).status).toBe(404)
+  expect((await select(prepared, f.other.id)).status).toBe(404)
+  expect(await select()).toEqual({ status: 200, body: { saved: true } })
+  expect(await recover()).toMatchObject({ status: 200, body: { modelSelection: selection } })
+  expect((await content.query('SELECT model_selection FROM node_content.conversation_draft_reservations WHERE runtime_id=$1 AND session_id=$2',
+    [runtimeId, prepared.sessionId])).rows).toEqual([{ model_selection: selection }])
+  expect((await content.query('SELECT FROM node_content.conversation_sessions WHERE runtime_id=$1 AND id=$2',
+    [runtimeId, prepared.sessionId])).rowCount).toBe(0)
+  expect((await control.query('SELECT FROM harness.conversation_draft_reservations WHERE runtime_id=$1', [runtimeId])).rowCount).toBe(0)
+
+  const mode = (access: 'rw' | 'ro') => control.query(`UPDATE harness.project_members SET access_mode=$4
+    WHERE organization_id=$1 AND project_id=$2 AND user_id=$3`, [organizationId, projectId, f.ownerId, access])
+  const read = f.store.read.bind(f.store)
+  const revokeDuringRead = vi.spyOn(f.store, 'read').mockImplementationOnce(async (...args) => {
+    const value = await read(...args)
+    await mode('ro')
+    return value
+  })
+  try {
+    expect((await recover()).status).toBe(403)
+    expect(revokeDuringRead).toHaveBeenCalled()
+  } finally {
+    revokeDuringRead.mockRestore()
+    await mode('rw')
+  }
+  const grant = (allowed: boolean) => control.query(`UPDATE harness.computer_use_permissions SET enabled=$4
+    WHERE organization_id=$1 AND node_id=$2 AND user_id=$3`, [organizationId, nodeId, f.ownerId, allowed])
+  await grant(false)
+  expect((await recover()).status).toBe(403)
+  expect((await select()).status).toBe(403)
+  await grant(true)
+
+  const expired = await f.prepare()
+  await content.query(`UPDATE node_content.conversation_draft_reservations
+    SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE runtime_id=$1 AND session_id=$2`, [runtimeId, expired.sessionId])
+  expect((await recover(expired.sessionId)).status).toBe(404)
+  expect((await select(expired)).status).toBe(404)
+  const archived = await f.prepare()
+  await content.query(`INSERT INTO node_content.conversation_archive_records
+    (organization_id,runtime_id,root_session_id,state,runtime_public_id) VALUES($1,$2,$3,'archived',$4)`,
+  [organizationId, runtimeId, archived.sessionId, f.projectId])
+  expect((await recover(archived.sessionId)).status).toBe(404)
+  expect((await select(archived)).status).toBe(404)
+
+  const wrongBinding = f.conversations.forRuntime({ organizationId, runtimeId }, {
+    generation: 1, contentBinding: { ...f.binding, writerEpoch: (BigInt(f.binding.writerEpoch) + 1n).toString() },
+  })
+  await expect(wrongBinding.readReservedProjectDraft(prepared.sessionId, projectId, f.ownerId)).rejects
+    .toThrow('does not match its active placement')
+
+  const connection = randomUUID()
+  await transaction(control, async tx => {
+    await tx.query('UPDATE harness.deployment_topology SET legacy_initialization_required=true WHERE organization_id=$1', [organizationId])
+    await tx.query(`INSERT INTO harness.node_agents(organization_id,node_id,credential_hash,connection_id,connection_epoch,lease_expires_at,execution_ready)
+      VALUES($1,$2,$3,$4,1,clock_timestamp()+interval '5 minutes',true)`,
+    [organizationId, nodeId, randomBytes(32), connection])
+    await tx.query('UPDATE harness.instances SET node_connection_id=$2,node_connection_epoch=1 WHERE runtime_id=$1', [runtimeId, connection])
+  })
+  try {
+    expect((await recover()).status).toBe(200)
+    await control.query("UPDATE harness.node_agents SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE node_id=$1", [nodeId])
+    expect((await recover()).status).toBe(401)
+    expect((await select()).status).toBe(401)
+  } finally {
+    await transaction(control, async tx => {
+      await tx.query('UPDATE harness.instances SET node_connection_id=NULL,node_connection_epoch=NULL WHERE runtime_id=$1', [runtimeId])
+      await tx.query('DELETE FROM harness.node_agents WHERE organization_id=$1 AND node_id=$2', [organizationId, nodeId])
+      await tx.query('UPDATE harness.deployment_topology SET legacy_initialization_required=false WHERE organization_id=$1', [organizationId])
+    })
+  }
+}
+
 it.skipIf(!governance||!contentUrl||!pgdata)('keeps unmaterialized drafts private, rejects cancelled authority, and preserves both tabs through first append',async()=>{
   const control=createPostgresPool(governance!,{max:3}),content=createPostgresPool(contentUrl!,{max:3})
   try{
     await using f=await reservedDraftFixture(control,content,pgdata!)
+    await verifyProjectDraftRecovery(f)
     await reservedDraftTranscript(f)
     const prepared=await f.prepare(),url=f.draft(prepared.sessionId,prepared.editorId)
     expect((await f.request(url,'PUT',{revision:0,text:'retained draft'})).status).toBe(200)
@@ -95,9 +182,15 @@ it.skipIf(!governance||!contentUrl||!pgdata)('keeps unmaterialized drafts privat
     expect(await f.drafts.reservedSessionAuthenticated!(legacyKey,digest)).toBe(false)
     await expect(f.drafts.applyAuthenticated!(legacyKey,{kind:'read'},digest)).rejects.toMatchObject({code:'forbidden'})
     const revoked=await f.prepare(),revokedUrl=f.draft(revoked.sessionId,revoked.editorId)
+    expect((await f.request(revokedUrl,'PUT',{revision:0,text:'retained after revocation'})).status).toBe(200)
     f.pauseFinalRead(async()=>{f.pauseFinalRead(undefined);await control.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE organization_id=$1 AND node_id=$2 AND user_id=$3',[f.context.organizationId,f.context.nodeId,f.ownerId])})
     expect((await f.request(revokedUrl)).status).toBe(403)
-    expect((await f.request(revokedUrl,'PUT',{revision:0,text:'not authorized'})).status).toBe(403)
-    expect((await f.request(f.documentTarget(revoked.sessionId))).status).toBe(403)
+    const hidden = { status: 404, body: { error: 'runtime-catalog/not-found' } }
+    const denied = { status: 403, body: { error: 'not-member' } }
+    expect([denied, hidden]).toContainEqual(await f.request(revokedUrl,'PUT',{revision:1,text:'not authorized'}))
+    await expect.poll(() => f.request(f.documentTarget(revoked.sessionId))).toEqual(hidden)
+    expect((await content.query('SELECT revision::int,body FROM node_content.composer_drafts WHERE organization_id=$1 AND runtime_id=$2 AND session_id=$3',
+      [f.context.organizationId,f.binding.runtimeId,revoked.sessionId])).rows)
+      .toEqual([{ revision: 1, body: Buffer.from('retained after revocation') }])
   }finally{await Promise.all([control.end(),content.end()])}
 })

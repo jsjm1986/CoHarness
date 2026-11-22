@@ -2,7 +2,9 @@ import {requireNodeContentRelations,type NodeContentCheckInput} from '../node-co
 import { conversationQueryFieldsV1 } from './conversation-query-fields-v1.ts'
 import { createHash } from 'node:crypto'
 import { escapeLiteral, type Pool, type PoolClient, type QueryResultRow } from 'pg'
+import { z } from 'zod'
 import { transaction, type Queryable } from './database.ts'
+import { publicNumber } from './runtime-context.ts'
 import { assertSafeAssistantEvent } from '../conversation-safety.ts'
 import { encodeSearchText, literalSearchParts } from './search-text.ts'
 import { literalLikePattern } from './literal-like-pattern.ts'
@@ -144,12 +146,21 @@ export interface ConversationDraftReservationInput {
   sshTarget?: number
 }
 
-/** Canonical session identity returned by a draft reservation. */
+/** Credentials-free model selection stored with an owned project draft. */
+export const draftModelSelectionSchema = z.strictObject({
+  provider: z.string().min(1),
+  model: z.string().min(1),
+  reasoningEffort: z.string().min(1).optional(),
+})
+type DraftModelSelection = z.infer<typeof draftModelSelectionSchema>
+
+/** Canonical session identity and saved model choice returned by a draft reservation. */
 export interface ConversationDraftReservation {
   draftId: string
   sessionId: string
   leaseExpiresAt: number
   created: boolean
+  modelSelection?: DraftModelSelection
 }
 
 export interface ConversationEvent {
@@ -1126,7 +1137,8 @@ export class ConversationRepository {
         visibility: ConversationVisibility
         agent_preset: string | null
         ssh_target_id: string | null
-      }>(`SELECT session_id,user_id,project_id,cwd,visibility,agent_preset,ssh_target_id::text
+        model_selection: unknown
+      }>(`SELECT session_id,user_id,project_id,cwd,visibility,agent_preset,ssh_target_id::text,model_selection
           FROM ${this.rows('conversation_draft_reservations')} conversation_draft_reservations
           WHERE organization_id=$1 AND scope_key=$2 AND draft_id=$3 FOR UPDATE`,
       [input.organizationId, input.scopeKey, input.draftId])
@@ -1153,6 +1165,7 @@ export class ConversationRepository {
           sessionId: row.session_id,
           leaseExpiresAt: Number(renewed.rows[0]!.lease_expires_at_ms),
           created: false,
+          ...(row.model_selection === null ? {} : { modelSelection: draftModelSelectionSchema.parse(row.model_selection) }),
         }
       }
       const sessionCollision = await client.query<{ draft_id: string }>(`SELECT draft_id
@@ -1244,6 +1257,63 @@ export class ConversationRepository {
       WHERE organization_id=$1 AND session_id=$2 AND project_id=$3 AND lease_expires_at > now()`,
     [organizationId, sessionId, projectId])
     return (result.rowCount ?? 0) > 0
+  }
+
+  /**
+   * Read one live reservation in this Runtime's content store. Archived, materialized and other creators' drafts are excluded.
+   * @param sessionId - original draft Session identifier.
+   * @param projectId - verified internal project identifier.
+   * @param userId - verified internal creator identifier.
+   * @returns the original draft metadata, or undefined when it cannot be recovered.
+   */
+  async readReservedProjectDraft(sessionId: string, projectId: string, userId: string) {
+    const { rows: [row] } = await this.reader.query<{
+      draft_id: string; cwd: string; visibility: 'project' | 'private'; agent_preset: string | null;
+      ssh_target_id: string | null; model_selection: unknown
+    }>(`SELECT d.draft_id,d.cwd,d.visibility,d.agent_preset,d.ssh_target_id::text,d.model_selection
+      FROM ${this.schema}.conversation_draft_reservations d WHERE ${this.liveProjectDraftPredicate()}`,
+    [sessionId, projectId, userId])
+    if (row === undefined) return undefined
+    return { sessionId, draftId: row.draft_id, cwd: row.cwd, visibility: row.visibility,
+      ...(row.agent_preset === null ? {} : { agentPreset: row.agent_preset }),
+      ...(row.ssh_target_id === null ? {} : { sshTarget: publicNumber(row.ssh_target_id, 'SSH target') }),
+      ...(row.model_selection === null ? {} : { modelSelection: draftModelSelectionSchema.parse(row.model_selection) }) }
+  }
+
+  private liveProjectDraftPredicate(): string {
+    return `${this.predicate('d')} AND d.session_id=$1 AND d.project_id=$2 AND d.user_id=$3
+        AND d.visibility IN ('project','private') AND d.lease_expires_at>clock_timestamp()
+        AND NOT EXISTS (SELECT FROM ${this.rows('conversation_sessions')} c WHERE c.id=d.session_id)
+        AND NOT EXISTS (SELECT FROM ${this.schema}.conversation_archive_records a
+          WHERE a.organization_id=d.organization_id AND a.runtime_id=d.runtime_id AND a.root_session_id=d.session_id
+            AND (a.state IN ('trash','purged') OR (a.state='archived' AND a.restored_at IS NULL)))`
+  }
+
+  /**
+   * Commit a model choice in the same content store and ownership scope as the unmaterialized draft.
+   * @param input - exact draft, creator, and current Runtime placement with the validated selection.
+   * @returns true after commit, or false when the reservation is unavailable.
+   */
+  async saveReservedProjectDraftModel(input: { sessionId: string; draftId: string; projectId: string; userId: string;
+    nodeId: string; generation: number; selection: DraftModelSelection }): Promise<boolean> {
+    return this.mutate([{ internalId: input.userId }], async client => {
+      if (this.local === undefined) {
+        // Order this write with first materialization and with a replacement Runtime in the shared store.
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',
+          [`conversation:${JSON.stringify([this.scope.organizationId, this.scope.runtimeId, input.sessionId])}`])
+        const active = await client.query(`SELECT FROM harness.instances i WHERE i.organization_id=$1 AND i.runtime_id=$2
+          AND i.project_id=$3 AND i.assigned_node_id=$4 AND i.generation=$5
+          AND i.provisioning_state='ready' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
+          AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
+          FOR SHARE OF i`, [this.scope.organizationId, this.scope.runtimeId, input.projectId, input.nodeId, input.generation])
+        if (active.rowCount !== 1) throw conversationWriteDenied('The draft Runtime is no longer current.')
+      }
+      await this.assertProjectCreatorMembership(client, this.scope.organizationId, input.projectId, input.userId)
+      const result = await client.query(`UPDATE ${this.schema}.conversation_draft_reservations d SET model_selection=$5::jsonb
+        WHERE ${this.liveProjectDraftPredicate()} AND d.draft_id=$4`,
+      [input.sessionId, input.projectId, input.userId, input.draftId, JSON.stringify(input.selection)])
+      return result.rowCount === 1
+    })
   }
 
   /**

@@ -56,6 +56,8 @@ import {
   SessionPersistenceReadError,
 } from '@deepseek-ai/dsh-session-persistence'
 import type {
+  ReservedProjectDraft,
+  SessionDraftModelSelection,
   SessionPersistence,
   SessionPersistencePage,
   SessionPersistencePageRequest,
@@ -2166,6 +2168,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     }
   }
 
+  function missingConversation(error: RpcError): boolean {
+    return error.code === 'collaboration-forbidden' && error.details.reason === 'conversation-not-found'
+  }
+
   /** Capture project membership and reject writes from a read-only project scope. */
   function authorizeScopeWrite():
   { authority: CollaborationAuthority | undefined } | { error: RpcError } {
@@ -2516,6 +2522,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   function selectForNextRequest(agent: Agent, selection: ModelSelection): void {
     agent.session.append('model/selection', selection)
     selectionFor(agent).current = selection
+  }
+
+  function draftModelSelection({ provider, model, reasoningEffort }: SessionDraftModelSelection): ModelSelection {
+    return { provider, model, ...(reasoningEffort === undefined ? {} : { reasoningEffort: ReasoningEffortId(reasoningEffort) }) }
   }
 
   /**
@@ -3507,6 +3517,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    * runs the requested preset (or the configured default) rather than the one
    * its log recorded, and any candidate that has content, declines a preset
    * switch, or loses its writer is refused so the caller can mint a fresh one.
+   * @param savedModel - original model choice applied only to a newly rebuilt draft.
    */
   async function ensureSession(
     sessionId: SessionId,
@@ -3516,6 +3527,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     draft = false,
     sshTarget?: number,
     reuseBlank = false,
+    savedModel?: SessionDraftModelSelection,
   ): Promise<Agent> {
     using _admission = ctx.agents.reserveUse([sessionId])
     let creation = sessionCreations.get(sessionId)
@@ -3647,7 +3659,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ...composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset },
             ...sshTarget === undefined ? {} : { sshTarget },
           },
-          setup: composition.setup,
+          setup: savedModel === undefined ? composition.setup : async (agentCtx, agent) => {
+            const commit = await composition.setup(agentCtx, agent)
+            selectForNextRequest(agent, draftModelSelection(savedModel))
+            return commit
+          },
         }))
       })().catch((error: unknown) => {
         // A decline is terminal: the recovery below exists for identities a
@@ -3700,6 +3716,33 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     })
     workspaceCreationChain = operation.then(() => undefined, () => undefined)
     return operation
+  }
+
+  /** Rebuild the current creator's reserved project draft without changing its identity. */
+  async function restoreProjectDraft(draft: ReservedProjectDraft, authority: CollaborationAuthority): Promise<void> {
+    const { sessionId, cwd, visibility, agentPreset, sshTarget, draftId } = draft.request
+    if (await resolveProjectPath(cwd, authority) !== cwd) throw new CollaborationError('forbidden')
+    const workspace = await ctx.workspaceRegistry.resolveByPath(cwd)
+    const agent = await withSessionCreation(visibility,
+      () => ensureSession(sessionId, cwd, true, agentPreset, true, sshTarget, false, draft.modelSelection))
+    if (!sessionBlank(agent.session)) return
+    draft.adopt()
+    if (workspace !== undefined && !workspace.sessionIds.includes(sessionId) && !draftSessions.has(sessionId)) {
+      draftSessions.set(sessionId, { workspace, draftId, materialized: false })
+    }
+  }
+
+  async function authorizeReservedDraftWrite(sessionId: SessionId, refusal: RpcError): Promise<AuthorizedSession | { error: RpcError }> {
+    const scope = authorizeScopeWrite()
+    if ('error' in scope) return scope
+    if (scope.authority?.participant.scope.kind !== 'project') return { error: refusal }
+    const draft = await ctx.get('sessionPersistence')?.reservedProjectDraft(sessionId)
+    if (draft !== undefined) {
+      const archived = archivedInputError(sessionId)
+      if (archived !== undefined) return { error: archived }
+      await restoreProjectDraft(draft, scope.authority)
+    }
+    return authorizeSession(sessionId, 'write')
   }
 
   /**
@@ -3848,6 +3891,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       message: decision.reason,
       details: { provider, model },
     }
+  }
+
+  async function describeModelSelection(request: RpcRequest<unknown>, current: ModelSelection): Promise<RpcResponse<ResponseValue<'session.models'>>> {
+    const { groups, failures } = await buildModelCatalog(ctx)
+    const routable = routeServed(current.provider) && modelRefusal(current.provider, current.model) === undefined
+    return ok(request, { current: { ...current }, routable, groups, failures })
   }
 
   /**
@@ -4493,6 +4542,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const draftId = request.payload.draftId
         const draftRequested = draftId !== undefined
         let reservedDraft = false
+        let savedModel: SessionDraftModelSelection | undefined
         if (draftId !== undefined) {
           try {
             const persistence = ctx.get('sessionPersistence')
@@ -4508,6 +4558,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             if (reservation !== undefined) {
               sessionId = reservation.sessionId
               reservedDraft = true
+              savedModel = reservation.modelSelection
             }
           } catch (error: unknown) {
             if (error instanceof CollaborationError) return err(request, collaborationRefusal(error, 'write', sessionId))
@@ -4547,6 +4598,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               draftRequested,
               requestedSshTarget,
               reuseRequested,
+              savedModel,
             ).catch(async (error: unknown) => {
               // A declined reuse candidate is left untouched and replaced by a
               // fresh Session: the stale blank never blocks New Session, and
@@ -4937,7 +4989,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       async models(request) {
         const { sessionId } = request.payload
         const authorized = await authorizeSession(sessionId, 'read')
-        if ('error' in authorized) return err(request, authorized.error)
+        if ('error' in authorized) {
+          if (!missingConversation(authorized.error)) return err(request, authorized.error)
+          const draft = await ctx.get('sessionPersistence')?.reservedProjectDraft(sessionId)
+          if (draft === undefined) return err(request, authorized.error)
+          return describeModelSelection(request, draft.modelSelection === undefined
+            ? defaults.defaultModelSelection() : draftModelSelection(draft.modelSelection))
+        }
         // The picker is a read: a session whose Agent is not live — and not
         // already resuming for another reason — is served from its durable log
         // instead of resuming one just to render the trigger label. The
@@ -4977,15 +5035,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
           current = detachedSelection(events) ?? defaults.defaultModelSelection()
         }
-        const { groups, failures } = await buildModelCatalog(ctx)
-        const routable = routeServed(current.provider)
-          && modelRefusal(current.provider, current.model) === undefined
-        return ok(request, { current: { ...current }, routable, groups, failures })
+        return describeModelSelection(request, current)
       },
 
       async selectModel(request) {
         const { sessionId, provider, model, reasoningEffort } = request.payload
-        const authorized = await authorizeSession(sessionId, 'write')
+        let authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized && missingConversation(authorized.error)) {
+          try {
+            authorized = await authorizeReservedDraftWrite(sessionId, authorized.error)
+          } catch (error: unknown) {
+            if (error instanceof CollaborationError) return err(request, collaborationRefusal(error, 'write', sessionId))
+            const failure = asHistoryPersistenceError(error)
+            if (failure === undefined) throw error
+            return err(request, { code: 'model-unavailable', message: 'The project draft could not be recovered for model selection.', details: { provider, model } })
+          }
+        }
         if ('error' in authorized) return err(request, authorized.error)
         const found = await agentFor(sessionId)
         if ('error' in found) return err(request, found.error)
@@ -5018,6 +5083,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               ...resolved.reasoningEffort === undefined
                 ? {}
                 : { reasoningEffort: resolved.reasoningEffort },
+            }
+            if (authorized.authority?.participant.scope.kind === 'project') {
+              await ctx.get('sessionPersistence')?.saveDraftModelSelection(sessionId, selected)
             }
             selectForNextRequest(found.agent, selected)
             if (authorized.authority?.participant.scope.kind !== 'project') {
@@ -5196,7 +5264,20 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { issues: [] },
           })
         }
-        const authorized = await timeAdmission(observe, 'sessionAuthority', () => authorizeSession(sessionId, 'write'))
+        const unavailable = () => err<{ accepted: true }>(request, { code: 'prompt-durability-unavailable',
+          message: 'The input receipt could not be verified on this Runtime.', details: { sessionId } })
+        let authorized = await timeAdmission(observe, 'sessionAuthority', () => authorizeSession(sessionId, 'write'))
+        if ('error' in authorized && missingConversation(authorized.error)
+          && mode === 'queue' && request.payload.durable === true && requestId !== undefined) {
+          try {
+            authorized = await authorizeReservedDraftWrite(sessionId, authorized.error)
+          } catch (error: unknown) {
+            if (error instanceof CollaborationError) return err(request, collaborationRefusal(error, 'write', sessionId))
+            const failure = asHistoryPersistenceError(error)
+            if (failure?.code === 'dependency' || failure?.code === 'timeout') return unavailable()
+            throw error
+          }
+        }
         if ('error' in authorized) return err(request, authorized.error)
         // An archived session admits no input; clients may hold a stale
         // mounted view until the archive baseline lands.
@@ -5223,8 +5304,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             digest: promptFingerprint(promptInputJson(mode, canonicalTimeZone ?? null, content)),
           }
           : undefined
-        const unavailable = () => err<{ accepted: true }>(request, { code: 'prompt-durability-unavailable',
-          message: 'The input receipt could not be verified on this Runtime.', details: { sessionId } })
         const confirm = async (): Promise<RpcResponse<{ accepted: true }>> => {
           try {
             if (receipt !== undefined && await confirmPromptReceipt(agent.session, receipt.key, undefined, observe)) {
@@ -5324,7 +5403,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async promptStatus(request, signal): Promise<RpcResponse<ResponseValue<'session.promptStatus'>>> {
         const { sessionId, requestId, confirmInput } = request.payload
-        const authorized = await authorizeSession(sessionId, 'read')
+        const unavailable = () => err<{ state: 'accepted' | 'unknown' }>(request, { code: 'prompt-durability-unavailable',
+          message: 'The input receipt could not be read on this Runtime.', details: { sessionId } })
+        let authorized = await authorizeSession(sessionId, 'read')
+        if ('error' in authorized && missingConversation(authorized.error)) {
+          try {
+            if (await ctx.get('sessionPersistence')?.reservedProjectDraft(sessionId, signal) !== undefined) {
+              return ok(request, { state: 'unknown' as const })
+            }
+          } catch (error: unknown) {
+            if (signal?.aborted) return err(request, { code: 'cancelled', message: 'Receipt lookup was cancelled.', details: {} })
+            const failure = asHistoryPersistenceError(error)
+            if (failure?.code === 'dependency' || failure?.code === 'timeout') return unavailable()
+            throw error
+          }
+          authorized = await authorizeSession(sessionId, 'read')
+        }
         if ('error' in authorized) return err(request, authorized.error)
         const key = promptReceiptKey(sessionId, projectParticipant(authorized.authority)?.userId, requestId)
         const accepted = async (digest: string): Promise<RpcResponse<ResponseValue<'session.promptStatus'>>> => {
@@ -5336,8 +5430,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           if (promptReceiptKey(sessionId, actor, requestId) !== key) return unavailable()
           return ok(request, { state: 'accepted' as const, inputProof: promptFingerprint(promptProofJson(requestId, digest)) })
         }
-        const unavailable = () => err<{ state: 'accepted' | 'unknown' }>(request, { code: 'prompt-durability-unavailable',
-          message: 'The input receipt could not be read on this Runtime.', details: { sessionId } })
         try {
           const attached = ctx.sessions.get(sessionId)
           if (attached !== undefined) {

@@ -66,7 +66,7 @@ import { GatewayPerformanceObserver, type ReadySessionOutcome, type ReadySession
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { RuntimeAccountError } from './launcher.ts'
 import { RuntimeCatalogError, type RuntimeId, type RuntimeNodeId } from './runtime-catalog.ts'
-import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isPersonalExecutionWriteRequest, isReadyRuntimeInteractive, isReadyRuntimeRead, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isPersonalExecutionWriteRequest, isReadyRuntimeInteractive, isReadyRuntimeRead, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest, pinRuntimeRequestPath, RUNTIME_MODEL_CREDENTIAL_PATH } from './runtime-request-path.ts'
 import { sendCompressed } from './http-compression.ts'
 import { DocumentCatalogError, parseDocumentOverviewOptions } from './document-catalog.ts'
 import { BROWSER_DOCUMENT_OVERVIEW_STREAM } from './browser-documents.ts'
@@ -791,7 +791,7 @@ export interface GatewayRuntimeHandler {
    * @param res - response owned when this dispatcher returns true.
    * @param pathname - parsed request pathname.
    * @param body - bounded control payload, empty for GET and HEAD.
-   * @param executionWrite - admission available for an exact personal execution request.
+   * @param executionWrite - admission for exact personal execution or a model credential lookup.
    * @param controlSubject - exact Runtime identity preauthenticated for renewal or completion, with a final ownership check in the dispatcher.
    * @returns whether this dispatcher owns the response.
    */
@@ -861,6 +861,8 @@ export interface GatewayHandlers {
   runtimeAuthorize?: (req: IncomingMessage) => Awaitable<boolean | 'shutdown-storage' | RuntimeCredentialSubject>
   /** Previously verified coordinates for an exact personal write with its own SQL authority check. */
   runtimePersonalExecutionCandidate?: (req: IncomingMessage) => RuntimeCredentialSubject | null
+  /** Previously verified personal or project coordinates for the model credential endpoint alone. */
+  runtimeModelCredentialCandidate?: (req: IncomingMessage) => RuntimeCredentialSubject | null
   /** Process-local shutdown gate for a write that checks the shared epoch in its own transaction. */
   runtimePersonalExecutionStopGate?: () => WriteGateVerdict
   /** Deployment maintenance and write-epoch checks for one authenticated planned-stop checkpoint. */
@@ -1377,8 +1379,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       let authorized: boolean | 'shutdown-storage' | RuntimeCredentialSubject = false
       const stopGate = handlers.runtimePersonalExecutionStopGate
       const activeModelCheck = req.headers[RESOURCE_ACTIVE_MODEL_CHECK_HEADER] === '1'
+      const findCandidate = pathname === RUNTIME_MODEL_CREDENTIAL_PATH
+        ? handlers.runtimeModelCredentialCandidate ?? handlers.runtimePersonalExecutionCandidate
+        : handlers.runtimePersonalExecutionCandidate
       const candidate = stopGate !== undefined && isPersonalExecutionWriteRequest(pathname, req.method, activeModelCheck)
-        ? handlers.runtimePersonalExecutionCandidate?.(req) : undefined
+        ? findCandidate?.(req) : undefined
       const fromCandidate = candidate != null && handlers.runtime?.defersPersonalExecutionWrite?.(candidate, pathname, req.method, activeModelCheck) === true
       const measureIngress = cfg.performanceEnabled && handlers.runtimeAuthorize !== undefined && isResourceAdmissionRequest(pathname, req.method)
       const authorizationStarted = measureIngress ? performance.now() : 0

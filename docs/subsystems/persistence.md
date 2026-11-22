@@ -378,6 +378,29 @@ interface SessionPersistenceSnapshot {
 }
 ```
 
+## Reserved project drafts
+
+The Host can read the current draft creator's reservation when a project Session has yet to materialize. It adopts the reservation only after restoring the matching Session. An explicit model choice commits to that reservation before the picker acknowledges it. On recovery the Host reapplies the choice and checks current model permissions before a turn starts.
+
+```ts type-equiv
+/** Provider route, model, and optional reasoning effort stored with an unmaterialized project draft. */
+interface SessionDraftModelSelection {
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort?: string
+}
+```
+
+```ts type-equiv
+/** Unmaterialized project draft recovered from the current owner's reservation. */
+interface ReservedProjectDraft {
+  readonly request: SessionDraftReservationRequest & { readonly visibility: 'project' | 'private' }
+  readonly modelSelection?: SessionDraftModelSelection
+  /** Track the reservation for release after the Host has reconstructed its Session. */
+  adopt(): void
+}
+```
+
 ## The backends
 
 All implement the same abstract `SessionPersistence` (locate/create/append/prepare/load/inspect/readFrom/list/listSnapshots over `SessionEvent`, with optional cancellation on observation methods) and pass the shared `runPersistenceContract` suite:
@@ -757,6 +780,22 @@ async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>
  * @returns the provider's canonical identity, or undefined when reservations are local-only.
  */
 reserveDraft(_request: SessionDraftReservationRequest): Promise<SessionDraftReservation | undefined>
+
+/**
+ * Read the current project writer's unmaterialized draft without acquiring an Agent or renewing its lease.
+ * @param _id - Session identity from the original submission.
+ * @param _signal - caller cancellation.
+ * @returns the live reservation for the current creator, or undefined when absent or unsupported.
+ */
+reservedProjectDraft(_id: SessionId, _signal?: AbortSignal): Promise<ReservedProjectDraft | undefined>
+
+/**
+ * Save a model choice before acknowledging it on a provider-owned, unmaterialized project draft.
+ * @param _id - Session identity of the draft being edited.
+ * @param _selection - validated model choice. Authorization is checked again when starting a turn.
+ * @returns after the choice commits, or immediately when no project reservation is tracked.
+ */
+saveDraftModelSelection(_id: SessionId, _selection: SessionDraftModelSelection): Promise<void>
 
 /**
  * Renew a provider-owned draft lease. Missing leases are intentionally no-op.

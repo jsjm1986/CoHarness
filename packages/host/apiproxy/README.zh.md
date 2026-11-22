@@ -11,6 +11,8 @@ kind: "package-reference"
 
 版本化准备接口接收原生 `session.create` 和 `session.history` 请求。新建可登记 Host 的默认工作区并返回其位置。打开历史要求 Session 可读且未归档。`/api/admit/v1/session.prompt` 要求固定的请求 ID，并在核验收件箱事件落盘后返回成功。带回执的入队事件与草稿前缀一起落盘，输入仍在排队时即可确认。核验只读取该序号的已提交事件，允许模型同时追加后续输出。响应丢失后使用原账号、电脑、Runtime、Session 和请求 ID 调用 `/api/admit/v1/session.status`。传入 `confirmInput: true` 时，已确认的回执提供该次操作专用的 `inputProof`，供客户端匹配待确认输入。状态查询不会投递消息。当前个人 JSONL 日志的提供方只定位和校验一次已提交前缀，即可读回该回执。
 
+Runtime 换代后，若未落盘项目草稿的创建者仍持有有效预留，回执查询可返回 `unknown`。排队补发按预留的目录、可见性、组合和已保存的模型选择重建同一个 Session。发送准入会检查当前模型政策。如果原模型已被禁用，创建者可重选获准的模型并发送保留的文字。查询回执不会让草稿落盘。
+
 携带版本化操作 UUID 的持久提示请求通过 `x-dsh-host-admission-ms` 报告 Host 受理耗时。字段区分会话授权、Agent 准备、等待 Agent 受理、签注执行身份、收件箱追加、刷盘和核验。`inboxAppend` 内的 `inboxPublish` 截止到发送插入通知，`inboxWake` 衡量该次调用剩余的同步工作。字段值为毫秒。
 
 Mux 实时队列快照可复用相同事件序号下已校验的收件箱投影。初始快照和缺少该投影的组合可以读取 Agent 持有的队列。

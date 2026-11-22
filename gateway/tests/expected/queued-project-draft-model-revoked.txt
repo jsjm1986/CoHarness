@@ -1,0 +1,9 @@
+Direct Runtime entry discovers the owning computer before the first send.
+The private project draft has a reservation and no stored Session. Its selected model differs from the project default.
+While the computer is offline the original queued input stays visible and unconfirmed.
+A model revoked offline refuses the recovered send without creating a Session or losing the text. Selecting an allowed model resumes the original submission.
+Receipt lookup leaves the project draft unmaterialized, and replay retains its original owner and working directory.
+After the node lease changes, the same browser submission reads its receipt and resumes in the new Runtime generation.
+The owning Runtime records one user input and a complete model reply.
+The durable request uses the draft model that is currently allowed.
+A delayed draft creation retry keeps ordinary model selection available on the stored Session.

@@ -8,6 +8,9 @@ const COMBO_RESOURCE = new RegExp(`^${PLUGIN_PACKAGE}/client\\.js(\\.map)?$`, 'u
 const PLUGIN_CHUNK = new RegExp(`^/plugins/${PLUGIN_PACKAGE}/client\\.[A-Za-z0-9][A-Za-z0-9._-]*\\.js(?:\\.map)?$`, 'u')
 const IMMUTABLE_REVISION = /^[a-f0-9]{12}(?:[a-f0-9]{52})?$/u
 
+/** Runtime endpoint for retrieving a managed model credential. */
+export const RUNTIME_MODEL_CREDENTIAL_PATH = '/internal/runtime/model-credential'
+
 /**
  * Qualify only versioned plugin modules and hashed release assets for read-only admission.
  * @param method - original HTTP method.
@@ -137,18 +140,18 @@ export function isRuntimeResourceCompletionRequest(pathname: string, method: str
 }
 
 /**
- * Select requests that can qualify an exact personal Runtime in the same SQL statement as the write.
+ * Select requests that can qualify their Runtime as part of personal execution or a model credential lookup.
  * @param pathname - parsed internal request path.
  * @param method - HTTP method.
  * @param activeModelCheck - whether the provider requested an exact active model confirmation.
- * @returns whether to consider the statement's personal execution admission.
+ * @returns whether to consider SQL-fenced admission.
  */
 export function isPersonalExecutionWriteRequest(pathname: string, method: string | undefined, activeModelCheck = false): boolean {
   return method === 'POST'
     && (pathname === '/internal/runtime/execution/register-session' || pathname === '/internal/runtime/execution/input'
       || pathname === '/internal/runtime/execution/enter' || pathname === '/internal/runtime/execution/authorize'
       || pathname === '/internal/runtime/execution/terminal-authorize'
-      || pathname === '/internal/runtime/model-credential' || pathname === '/internal/runtime/resources/request'
+      || pathname === RUNTIME_MODEL_CREDENTIAL_PATH || pathname === '/internal/runtime/resources/request'
       || (pathname === '/internal/runtime/resources/statuses' && activeModelCheck))
 }
 

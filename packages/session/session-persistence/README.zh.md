@@ -58,6 +58,8 @@ kind: "package-reference"
 | `revision(id, signal?): Promise<SessionPersistenceRevision \| undefined>` | 在不加载事件的情况下读取一份已实体化日志不透明、来源限定的修订值。第一方提供方使用按 id 的存储查询；`undefined` 表示该 id 不存在。默认实现会筛选 `listSnapshots`，使第三方提供方保持兼容，但可能扫描其目录。 |
 | `listSnapshots(signal?): Promise<SessionPersistenceSnapshot[]>` | 返回轻量元数据和每份日志一个不透明、带品牌类型的修订值，不加载事件日志。日志及其后端存储不变时，修订保持相等；append 或变更性 load 修复后会改变；不会仅因两个存储使用相同本地计数器而冲突。可选信号请求取消后端发现工作；第一方后端会先等待所有已启动的列出工作结束，再予以拒绝，因此调用返回拒绝时，相关工作已完全停稳。 |
 | `reserveDraft(request): Promise<SessionDraftReservation \| undefined>` | 可在 Agent 创建前为浏览器草稿预留身份。Gateway 提供方返回按 scope 限定的 canonical Session id 和有期限 lease；本地提供方返回 `undefined`。请求只含 id、cwd、可见性和 preset 元数据。 |
+| `reservedProjectDraft(id, signal?)` | 读取当前用户创建且尚未落盘的项目草稿预留。获授权的 Host 可在重建 Session 后接管预留。 |
+| `saveDraftModelSelection(id, selection): Promise<void>` | 模型选择确认前，将未落盘项目草稿的选择写入已跟踪的预留。没有项目预留的提供方立即返回。 |
 | `heartbeatDraft(request): Promise<void>` / `releaseDraft(request): Promise<void>` | 续期或释放提供方拥有的草稿 lease。两个操作都是幂等的，绝不持久化 prompt 文本或凭据。 |
 
 <a id="invariants-every-backend-must-honor"></a>

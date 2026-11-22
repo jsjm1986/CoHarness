@@ -15,6 +15,7 @@ import { createPostgresPool, runMigrations } from '../lib/postgres/database.js'
 import { resolvePostgresRuntimeContext } from '../lib/postgres/runtime-context.js'
 import { PostgresUserService } from '../lib/postgres/user-service.js'
 import { PostgresNodeAccessService } from '../lib/postgres/node-access-service.js'
+import { PostgresModelGovernanceService } from '../lib/postgres/model-governance-service.js'
 import { loadConfig } from '../lib/config.js'
 import { topologyBrowser } from './fixtures/topology-browser.mjs'
 import { computerWorkspaceClient } from './fixtures/computer-workspace-client.mjs'
@@ -170,7 +171,8 @@ async function verify(){
   const environment = (await directory.json()).items.find(item => item.owner.id === b.userId && item.node.id === b.nodeId)
   assert.ok(environment)
   if(operationsOnly){
-    const reconnectOnly = process.env.HGW_TEST_PROMPT_RECONNECT_ONLY === '1'
+    const projectReconnect = process.env.HGW_TEST_PROJECT_PROMPT_RECONNECT_ONLY === '1'
+    const reconnectOnly = projectReconnect || process.env.HGW_TEST_PROMPT_RECONNECT_ONLY === '1'
     const hotOnly = process.env.HGW_TEST_VERSIONED_HOT_ONLY === '1'
     assert.ok(!reconnectOnly || !hotOnly)
     if (!reconnectOnly && !hotOnly) {
@@ -180,8 +182,32 @@ async function verify(){
     }
     if (!hotOnly) {
       const {verifyQueuedPromptReconnect} = await import('./fixtures/queued-prompt-reconnect.mjs')
-      await verifyQueuedPromptReconnect({ pool, base: a.base, cookie, runtimeId: environment.id, nodeId: b.nodeId, userId: b.userId,
-        disconnect: () => agent.stop(), reconnect: async () => { agent = startAgent(); await agent.wait('channel-ready') } })
+      let runtimeId = environment.id, projectId
+      const models = new PostgresModelGovernanceService(context)
+      if (projectReconnect) {
+        const created = await fetch(`${a.base}/account/api/projects?dshNode=${b.nodeId}`, { method: 'POST',
+          headers: { cookie, origin: a.base, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Queued project input' }) })
+        assert.equal(created.status, 201, await created.clone().text())
+        projectId = (await created.json()).id
+        await models.setProjectAccess(projectId, 'org-topology', 'fixture-chat', true)
+        await models.setProjectAccess(projectId, 'org-topology', 'fixture-draft-chat', true)
+        const { rows: [project] } = await pool.query(`SELECT i.runtime_id FROM harness.instances i
+          JOIN harness.projects p ON (p.organization_id,p.id)=(i.organization_id,i.project_id)
+          WHERE p.organization_id=$1 AND p.public_id=$2 AND i.assigned_node_id=$3`, [organization, projectId, b.nodeId])
+        assert.ok(project)
+        runtimeId = project.runtime_id
+        await node.command('relay', { runtimeId, projectId })
+      }
+      try {
+        const options = { pool, base: a.base, cookie, runtimeId, projectId, nodeId: b.nodeId, userId: b.userId,
+          disconnect: () => agent.stop(), reconnect: async () => { agent = startAgent(); await agent.wait('channel-ready') } }
+        await verifyQueuedPromptReconnect(options)
+        if (projectId !== undefined) {
+          await verifyQueuedPromptReconnect({ ...options, revokeModel: () => models.setProjectAccess(projectId, 'org-topology', 'fixture-draft-chat', false) })
+        }
+      } catch (error) {
+        throw new Error(`Queued input fixture failed.\nCenter: ${center.diagnostics()}\nNode: ${node.diagnostics()}`, { cause: error })
+      }
     }
     if (reconnectOnly) return
     const {verifyVersionedNodeService} = await import('./fixtures/versioned-node-service.mjs')

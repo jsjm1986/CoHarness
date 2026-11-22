@@ -31,7 +31,8 @@ kind: "package-reference"
 - append 与 repair 批次 id 是操作类型、会话 id 和载荷的确定性哈希。Gateway/PostgreSQL 去重使重试保持幂等，同时不会抑制不同批次。
 - 每份响应进入 Session store 前都会验证。此提供方通过共享 coordinator 支持完整加载、非变更 inspect、revision 检查、尾部读取、snapshot、批量 append、flush 和恢复。
 - `locate()` 返回 `undefined`，且 `supportsRawArtifacts` 为 false，因为 PostgreSQL 不拥有独立本地文本记录文件。
-- 浏览器创建根会话前会预留按 scope 限定的草稿 id。PostgreSQL 为重试返回同一个 canonical Session id，未使用的 reservation 在一小时后过期，且不保存 prompt 文本或凭据。首个实体化 append 或草稿成功 dispose 后会释放 reservation。
+- 浏览器创建根会话前会预留按 scope 限定的草稿 id。PostgreSQL 为重试返回同一个 canonical Session id，未使用的 reservation 在一小时后过期，且不保存 prompt 文本或凭据。首个实体化 append 或草稿成功 dispose 后会释放 reservation。恢复从项目 Runtime 指定的内容库读取，在返回元数据前核对当前创建者、项目写权限、Runtime 租约及数据归属。
+- 模型选择成功时，在同一个有效预留中只保存提供方、模型和可选推理强度。首次使会话落盘的追加会把恢复的模型选择写入 Session 日志。
 - `revision(id, signal?)` 使用认证的逐会话 revision 端点，不列出运行时目录。`listSnapshots()` 携带 PostgreSQL 维护的 `blank`、`visibleContentSeq` 和 `lastPromptAt` 事实。仅草稿行不会进入普通会话列表；仅命令行仍可恢复并供维护视图处理。
 - `readHeader(id, signal?)` 和 `readRevision(id, signal?)` 使用带索引的元数据 endpoint。`readPage(id, request, signal?)` 使用 PostgreSQL 的 `(session_id, seq)` keyset 查询，每页最多返回 512 KiB／2,000 个事件／50 个组，并把续传 cursor 绑定到源 revision。`readHistoryIndex(id, maxItems?, signal?)` 只读取轮次边界和有界搜索预览，不选择事件正文。提供方保留有类型的分页失败，Gateway page 路径不会传输完整 detached 历史。
 - `readCommittedEvent(id, seq, signal?)` 提供用于核验回执的精确序号对应的已提交事件。Gateway 在所属 Runtime 的范围内用一次索引查询读取头部和事件，并在内部响应大小限制内返回完整事件。

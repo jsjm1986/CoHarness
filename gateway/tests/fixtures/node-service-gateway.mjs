@@ -19,7 +19,7 @@ const [
   { PostgresUserService }, { PostgresAuthService }, { PostgresProjectService }, { PostgresAuditService },
   { PostgresCollaborationService }, { PostgresInstanceRepository }, { PostgresRuntimeCatalog },
   { PostgresNodeAccessService }, { InstanceManager }, { LocalLauncher }, { PostgresAccessMonitor, scopeAccessMonitor },
-  { NodeResourceBudget }, { createGatewayServer, scopeCookie }, { createProxyHandlers }, { createRuntimeApiHandler },
+  { NodeResourceBudget }, { createGatewayServer, scopeCookie }, { createProxyHandlers }, { createRuntimeApiHandler, runtimeBearerToken },
   { PostgresConversationStore }, { loadPrincipalKeys }, { PostgresModelGovernanceService },
   { OrganizationModelCredentialCipher, loadOrganizationModelCredentialKey }, { createUsageIntakeServer },
   { GatewayNodeChannels }, { GatewayNodeServices }, { GatewayNodeServiceProxy },
@@ -110,9 +110,13 @@ if (nodeName === 'center') {
   const provider = { provider: 'org-topology', displayName: 'Topology fixture', driver: 'pi-ai', protocol: 'openai-completions',
     baseURL: process.env.DEEPSEEK_BASE_URL, authMode: process.env.HGW_TEST_VERSIONED_OPERATIONS?'api-key':'none' }
   await governance.upsertProvider({ ...provider, status: 'draft',...(process.env.HGW_TEST_VERSIONED_OPERATIONS?{credential:'private-fixture-model-access'}:{}) })
-  await governance.upsertModel({ provider: provider.provider, model: 'fixture-chat', displayName: 'Fixture Chat', enabled: true,
-    adminAllowed: true, userAllowed: true, inputMicrosPerMillion: 0, outputMicrosPerMillion: 0,
-    cacheReadMicrosPerMillion: 0, cacheWriteMicrosPerMillion: 0 })
+  const models = [['fixture-chat', 'Fixture Chat']]
+  if (process.env.HGW_TEST_PROJECT_PROMPT_RECONNECT_ONLY === '1') models.push(['fixture-draft-chat', 'Fixture Draft Chat'])
+  for (const [model, displayName] of models) {
+    await governance.upsertModel({ provider: provider.provider, model, displayName, enabled: true,
+      adminAllowed: true, userAllowed: true, inputMicrosPerMillion: 0, outputMicrosPerMillion: 0,
+      cacheReadMicrosPerMillion: 0, cacheWriteMicrosPerMillion: 0 })
+  }
   await governance.upsertProvider({ ...provider, status: 'enabled' })
 }
 const resources = new NodeResourceBudget(pool, context.organizationId, context.nodeId, { ...cfg.resourceBudget, sampleMs: 20, staleMs: 300000 })
@@ -136,15 +140,16 @@ launcher.start = async input => {
 const manager = new InstanceManager(repository, cfg, launcher, { principalPublicKey: keys.publicKeyPem, nodeId: context.nodeId }, resources, processOwner)
 const primaryTarget = await manager.resolveTarget({ kind: 'user', id: user.id })
 await manager.stateOf(primaryTarget)
-if (nodeName !== 'center') {
-  const { dshHome } = await manager.storageOf(primaryTarget)
+async function setOnDemand(target) {
+  const { dshHome } = await manager.storageOf(target)
   await mkdir(dshHome, { recursive: true })
-  await writeFile(join(dshHome, 'settings.yaml'), 'runtime-execution:\n  mode: on-demand\n', { mode: 0o600 })
+  const model = target.kind === 'project' ? 'agent-default-model:\n  provider: org-topology\n  model: fixture-chat\n' : ''
+  await writeFile(join(dshHome, 'settings.yaml'), 'runtime-execution:\n  mode: on-demand\n' + model, { mode: 0o600 })
 }
+if (nodeName !== 'center') await setOnDemand(primaryTarget)
 const relaySockets = new Set()
 const runtimeRelays = new Set()
-async function relayFor(runtimeId, ownerUserId = user.id) {
-const target = await manager.resolveTarget({ kind: 'user', id: ownerUserId, ...(runtimeId === undefined ? {} : { runtimeId }) })
+async function relayFor(target) {
 const { dshHome: runtimeHome } = await manager.storageOf(target)
 const runtimeRelay = createRelay(downstream => {
   relaySockets.add(downstream); downstream.once('close', () => relaySockets.delete(downstream))
@@ -165,7 +170,7 @@ runtimeRelays.add(runtimeRelay)
 await pool.query(`UPDATE harness.instances SET port=$3 WHERE organization_id=$1 AND runtime_id=$2 AND assigned_node_id=$4`,
   [context.organizationId, target.runtimeId, runtimeRelay.address().port, context.nodeId])
 }
-await relayFor(primaryTarget.runtimeId)
+await relayFor(primaryTarget)
 const monitor = new PostgresAccessMonitor(context, 60000); await monitor.synchronize()
 const localMonitor = scopeAccessMonitor(monitor, context.nodeId)
 localMonitor.subscribe(() => repository.invalidateRuntimeTokenCache())
@@ -262,12 +267,13 @@ const server = createGatewayServer(deps, { ...local, runtime, nodeDrafts: drafts
     overviewTimeoutMs: cfg.upstreamTimeoutMs, overviewAccessMonitor: monitor,
     origin: cfg.publicOrigins[0], responseLimit: cfg.upstreamResponseLimitBytes }), admin: createAdminApiHandler(deps),
   runtimeAuthorize: async req => {
-    const token = req.headers.authorization?.slice('Bearer '.length)
+    const token = runtimeBearerToken(req)
     return token === undefined ? false : await repository.authenticateRuntimeToken(token) ?? false
   },
   ...(legacyPersonalAdmission ? {} : {
     runtimePersonalExecutionStopGate: personalExecutionStopGate,
-    runtimePersonalExecutionCandidate: req => repository.personalExecutionCandidate(req.headers.authorization?.slice('Bearer '.length) ?? ''),
+    runtimePersonalExecutionCandidate: req => repository.personalExecutionCandidate(runtimeBearerToken(req) ?? ''),
+    runtimeModelCredentialCandidate: req => repository.modelCredentialCandidate(runtimeBearerToken(req) ?? ''),
   }),
 })
 const intake = createUsageIntakeServer(governance)
@@ -317,7 +323,14 @@ process.on('message', input => {
       const owner = await repository.owner({ kind: 'project', id: input.projectId })
       reply({ kind: 'directory-policy', origin: owner?.projectOrigin })
     }
-    else if (input.kind === 'relay') { await relayFor(input.runtimeId, input.userId); reply({ kind: 'relay' }) }
+    else if (input.kind === 'relay') {
+      const { runtimeId, projectId, userId = user.id } = input
+      const target = await manager.resolveTarget(projectId === undefined ? { kind: 'user', id: userId, runtimeId }
+        : { kind: 'project', id: projectId, runtimeId })
+      if (projectId !== undefined) await setOnDemand(target)
+      await relayFor(target)
+      reply({ kind: 'relay' })
+    }
     else if (input.kind === 'observe-idle-pressure' && process.env.HGW_TEST_VERSIONED_OPERATIONS) {
       assert.equal(writersInFlight, 0)
       await resources.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 64 })

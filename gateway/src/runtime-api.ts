@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { ExecutionIdentityError, GatewayExecutionIdentity, watchExecutionAccess } from './execution-identity.ts'
 import type { GatewayAccessMonitor } from './access-invalidation.ts'
 import { StreamPrincipalRequestError, type StreamPrincipalRenewals, type StreamLeaseRuntime } from './stream-principal-leases.ts'
@@ -39,6 +40,7 @@ import {
   ConversationReadError,
   conversationHistoryIndexFromEvents,
   conversationEventGroupKey,
+  draftModelSelectionSchema,
   decodePageCursor,
   encodePageCursor,
   type ConversationRepository,
@@ -77,7 +79,8 @@ import {
 export type RuntimeConversationRepository = Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
   & Partial<Pick<ConversationRepository,
       'readHeader' | 'readFrom' | 'readEvent' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
-      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner' | 'hasProjectDraftReservation'>>
+      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner' | 'hasProjectDraftReservation'
+      | 'readReservedProjectDraft' | 'saveReservedProjectDraftModel'>>
 
 export interface RuntimeCredentialSubject {
   organizationId: string
@@ -891,8 +894,9 @@ export function createRuntimeApiHandler(
       const streamControl = isRuntimeStreamControlRequest(pathname, req.method)
       const bearerStarted = deps.performanceEnabled === true && isResourceAdmissionRequest(pathname, req.method)
         ? performance.now() : undefined
+      const draftModelWrite = pathname === '/internal/runtime/session/draft/model' && req.method === 'POST'
       const active = fencedSubject ?? resourceSubject ?? controlSubject ?? await authenticate(req,
-        isRuntimeResourceCompletionRequest(pathname, req.method), streamControl, executionWrite?.fromCandidate)
+        isRuntimeResourceCompletionRequest(pathname, req.method), streamControl, draftModelWrite || executionWrite?.fromCandidate)
       const bearerMs = resourceBearerMs ?? (bearerStarted === undefined ? undefined : performance.now() - bearerStarted)
       const shutdown = active === null && token !== undefined && isRuntimeShutdownStorageRequest(pathname, req.method)
         ? await deps.instances.authenticateRuntimeShutdownToken?.(token) : undefined
@@ -1360,7 +1364,62 @@ export function createRuntimeApiHandler(
           draftId: reservation.draftId,
           sessionId: reservation.sessionId,
           leaseExpiresAt: reservation.leaseExpiresAt,
+          ...(reservation.modelSelection === undefined ? {} : { modelSelection: reservation.modelSelection }),
         })
+        return true
+      }
+
+      if (draftModelWrite || (pathname === '/internal/runtime/session/draft/recover' && req.method === 'POST')) {
+        const payload = record(JSON.parse(body))
+        if (typeof payload?.sessionId !== 'string' || payload.sessionId === '' || payload.sessionId.length > 256) {
+          throw new Error('invalid draft recovery request')
+        }
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (subject.target.kind !== 'project' || subject.projectInternalId === undefined
+          || claims.scope.kind !== 'project' || claims.scope.mode !== 'rw') {
+          throw new CollaborationDeniedError('forbidden')
+        }
+        const repository = conversations(subject)
+        const userId = await internalUserId(deps.context.pool, subject.organizationId, claims.user.id)
+        if (userId === null) throw new CollaborationDeniedError('forbidden')
+        if (draftModelWrite) {
+          const selection = draftModelSelectionSchema.safeParse(payload.selection)
+          if (typeof payload.draftId !== 'string' || payload.draftId === '' || payload.draftId.length > 256 || !selection.success) {
+            throw new ExecutionIdentityError(400, 'invalid draft model selection')
+          }
+          if (repository.saveReservedProjectDraftModel === undefined) {
+            send(res, 503, { error: 'draft-reservation-unavailable' })
+            return true
+          }
+          const saved = await repository.saveReservedProjectDraftModel({
+            sessionId: payload.sessionId, draftId: payload.draftId, projectId: subject.projectInternalId, userId,
+            nodeId: deps.context.nodeId, generation: subject.generation, selection: selection.data,
+          })
+          if (!saved) throw new CollaborationDeniedError('conversation-not-found')
+          send(res, 200, { saved: true })
+          return true
+        }
+        if (repository.readReservedProjectDraft === undefined) {
+          send(res, 503, { error: 'draft-reservation-unavailable' })
+          return true
+        }
+        const draft = await repository.readReservedProjectDraft(payload.sessionId, subject.projectInternalId, userId)
+        if (draft === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        // Qualify publication after the storage read. A former generation or placement cannot recover a draft.
+        const [live, membership] = await Promise.all([
+          authenticate(req, false, false, true),
+          deps.collaboration.projectForUser(subject.target.id, claims.user.id),
+        ])
+        if (live === null || live.organizationId !== subject.organizationId
+          || live.target.runtimeId !== subject.target.runtimeId || live.generation !== subject.generation
+          || live.projectInternalId !== subject.projectInternalId || !isDeepStrictEqual(live.contentBinding, subject.contentBinding)) {
+          send(res, 401, { error: 'invalid-runtime-token' })
+          return true
+        }
+        if (membership?.mode !== 'rw') throw new CollaborationDeniedError('forbidden')
+        assertionFor(req, deps.principals, live, true)
+        res.setHeader('cache-control', 'no-store')
+        send(res, 200, draft)
         return true
       }
 

@@ -908,6 +908,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
+        signature: 'readonly ws: HostConnectionWebSocket',
+        description: 'Authenticated bidirectional WebSocket channel registry.',
+        parameters: [],
+      },
+      {
         signature: 'readonly allowsRemoteAuthorities: boolean',
         description: 'Whether this deployment accepts authorities beyond loopback: true only when a validated `trustedHosts` entry names a non-loopback hostname.',
         parameters: [],
@@ -3299,6 +3304,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the provider\'s canonical identity, or undefined when reservations are local-only.',
       },
       {
+        signature: 'reservedProjectDraft(_id: SessionId, _signal?: AbortSignal): Promise<ReservedProjectDraft | undefined>',
+        description: 'Read the current project writer\'s unmaterialized draft without acquiring an Agent or renewing its lease.',
+        parameters: [{ name: '_id', description: 'Session identity from the original submission.' }, { name: '_signal', description: 'caller cancellation.' }],
+        returns: 'the live reservation for the current creator, or undefined when absent or unsupported.',
+      },
+      {
+        signature: 'saveDraftModelSelection(_id: SessionId, _selection: SessionDraftModelSelection): Promise<void>',
+        description: 'Save a model choice before acknowledging it on a provider-owned, unmaterialized project draft.',
+        parameters: [{ name: '_id', description: 'Session identity of the draft being edited.' }, { name: '_selection', description: 'validated model choice. Authorization is checked again when starting a turn.' }],
+        returns: 'after the choice commits, or immediately when no project reservation is tracked.',
+      },
+      {
         signature: 'heartbeatDraft(_request: SessionDraftReservationRequest): Promise<void>',
         description: 'Renew a provider-owned draft lease. Missing leases are intentionally no-op.',
         parameters: [{ name: '_request', description: 'draft identity and scope metadata.' }],
@@ -4942,6 +4959,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Authorize a real user gesture without inheriting model, Auto, or approval authority.',
         parameters: [{ name: 'sessionId', description: 'exact target Session, including inactive history.' }, { name: 'signal', description: 'request cancellation, distinct from the returned authority lifetime.' }],
         returns: 'creator identity and a grant cancelled on revocation.',
+      },
+      {
+        signature: 'verifyUpgradeCreator?(creator: TerminalCreatorId): boolean',
+        description: 'Confirm that an upgraded input socket carries the same verified user identity as an already-admitted creator.',
+        parameters: [{ name: 'creator', description: 'creator identity bound to the live output attachment.' }],
+        returns: 'true only when the current upgrade request verifies the exact same creator.',
       },
     ],
   },
@@ -6727,6 +6750,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ConnectionTrustRequest {\n    readonly headers: Headers | Readonly<Record<string, string | readonly string[] | undefined>>;\n}',
   },
   {
+    name: 'ConnectionWebSocket',
+    declaration: 'export interface ConnectionWebSocket {\n    readonly signal: AbortSignal;\n    readonly readyState: \'open\' | \'closing\' | \'closed\';\n    send(data: string): void;\n    close(code?: number, reason?: string): void;\n    onMessage(listener: (data: string) => void): () => void;\n    onClose(listener: () => void): () => void;\n}',
+  },
+  {
+    name: 'ConnectionWebSocketHandler',
+    declaration: 'export type ConnectionWebSocketHandler = (socket: ConnectionWebSocket, request: IncomingMessage) => void | Promise<void>;',
+  },
+  {
+    name: 'ConnectionWebSocketOptions',
+    declaration: 'export interface ConnectionWebSocketOptions {\n    readonly authority: ConnectionRpcAuthority;\n    readonly maxMessageBytes?: number;\n    readonly authorize?: (request: IncomingMessage, signal: AbortSignal) => boolean | Promise<boolean>;\n}',
+  },
+  {
     name: 'ContentBlockMap',
     declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'file\': FileBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-addition\': ToolAdditionBlock;\n    \'tool-removal\': ToolRemovalBlock;\n}',
   },
@@ -7545,6 +7580,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'HostConnectionRpc',
     declaration: 'export interface HostConnectionRpc {\n    handle(channel: string, handler: ConnectionRpcHandler, options: ConnectionRpcHandlerOptions): () => Promise<void>;\n    intercept(channel: \'/api\', matches: ConnectionRpcEndpointMatcher, handler: ConnectionRpcHandler, options: ConnectionRpcHandlerOptions): () => Promise<void>;\n}',
+  },
+  {
+    name: 'HostConnectionWebSocket',
+    declaration: 'export interface HostConnectionWebSocket {\n    handle(path: string, handler: ConnectionWebSocketHandler, options: ConnectionWebSocketOptions): () => Promise<void>;\n}',
   },
   {
     name: 'ImageAttachmentLimits',
@@ -8923,6 +8962,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface RequestUserInput {\n    readonly role: \'user\';\n    readonly content: UserMessage[\'content\'];\n    readonly id?: never;\n    readonly source?: never;\n}',
   },
   {
+    name: 'ReservedProjectDraft',
+    declaration: 'export interface ReservedProjectDraft {\n    readonly request: SessionDraftReservationRequest & {\n        readonly visibility: \'project\' | \'private\';\n    };\n    readonly modelSelection?: SessionDraftModelSelection;\n    adopt(): void;\n}',
+  },
+  {
     name: 'ResolvedAlwaysRetryPolicy',
     declaration: 'export interface ResolvedAlwaysRetryPolicy extends ResolvedRetryBackoff {\n    readonly mode: \'always\';\n}',
   },
@@ -9215,8 +9258,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type SessionDraftId = Branded<\'SessionDraftId\'>;',
   },
   {
+    name: 'SessionDraftModelSelection',
+    declaration: 'export interface SessionDraftModelSelection {\n    readonly provider: string;\n    readonly model: string;\n    readonly reasoningEffort?: string;\n}',
+  },
+  {
     name: 'SessionDraftReservation',
-    declaration: 'export interface SessionDraftReservation {\n    readonly sessionId: SessionId;\n    readonly leaseExpiresAt: number;\n}',
+    declaration: 'export interface SessionDraftReservation {\n    readonly sessionId: SessionId;\n    readonly leaseExpiresAt: number;\n    readonly modelSelection?: SessionDraftModelSelection;\n}',
   },
   {
     name: 'SessionDraftReservationRequest',

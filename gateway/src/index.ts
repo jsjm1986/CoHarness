@@ -91,7 +91,7 @@ import { createProxyHandlers } from './proxy.ts'
 import { NodePrincipalDirectory } from './postgres/node-principal-directory.ts'
 import { PostgresAccessMonitor, scopeAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
-import { createRuntimeApiHandler } from './runtime-api.ts'
+import { createRuntimeApiHandler, runtimeBearerToken } from './runtime-api.ts'
 import { isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest } from './runtime-request-path.ts'
 import { isRuntimeShutdownStorageRequest, type RuntimeDrain, type RuntimeDrainReport } from './runtime-shutdown.ts'
 import { GovernanceRebuildAdmission } from './governance-rebuild-admission.ts'
@@ -749,13 +749,9 @@ const server = createGatewayServer(deps, {
     maxResponseBytes: cfg.upstreamResponseLimitBytes,
     upstreamTimeoutMs: cfg.upstreamTimeoutMs,
   }),
-  // Authenticate before buffering. Personal execution can reuse the identity
-  // when the write statement rechecks the bearer and serving epoch itself.
   runtimeAuthorize: async (req) => {
-    const value = req.headers.authorization
-    if (typeof value !== 'string' || !value.startsWith('Bearer ')) return false
-    const token = value.slice('Bearer '.length)
-    if (token === '') return false
+    const token = runtimeBearerToken(req)
+    if (token === undefined) return false
     const pathname = new URL(req.url ?? '/', 'http://local').pathname
     if (isRuntimeStreamControlRequest(pathname, req.method)) {
       return await authenticateRuntimeControlToken(token) ?? false
@@ -774,9 +770,12 @@ const server = createGatewayServer(deps, {
   },
   runtimePersonalExecutionStopGate: personalExecutionStopGate,
   runtimePersonalExecutionCandidate: req => {
-    const value = req.headers.authorization
-    if (typeof value !== 'string' || !value.startsWith('Bearer ')) return null
-    return instanceRepository.personalExecutionCandidate(value.slice('Bearer '.length))
+    const token = runtimeBearerToken(req)
+    return token === undefined ? null : instanceRepository.personalExecutionCandidate(token)
+  },
+  runtimeModelCredentialCandidate: req => {
+    const token = runtimeBearerToken(req)
+    return token === undefined ? null : instanceRepository.modelCredentialCandidate(token)
   },
   runtimeShutdownStorageWriteGate: async () => (await maintenance.writeGate(baselineWriteEpoch)).verdict,
   runtimeResourceCompletionWriteGate: async () => {

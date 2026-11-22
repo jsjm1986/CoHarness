@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-persistence-gateway/README.md
 document:
-  en: 867cf1fc2448eadd39dc35ff08e206fb59c804a3
-  zh: 3c218bb493de039d5a6170eedc8687f7d5b4ba53
+  en: 67726898a41517f7d63e61405aa6ef3a1c3e01f4
+  zh: 6358c6713782e01a7842fcdd1dd1d9cf1b078092
 /:
   en: 6d21b9f6a9990d1d
   zh: 61495d48365178df
@@ -18,8 +18,8 @@ document:
   en: b317899eb8a6b8be
   zh: 1024630c103cdc60
 /deepseek-ai-dsh-session-persistence-gateway/persistence-contract:
-  en: 10b3b6a323aedbf2
-  zh: fa87ada2989c8fdb
+  en: ca0f025fbf08a8e3
+  zh: 0d24ee958bdf1265
 /deepseek-ai-dsh-session-persistence-gateway/configuration:
   en: d8a947aefc465fcd
   zh: 8e8333e2fc4bf88d

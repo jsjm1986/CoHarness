@@ -22,6 +22,7 @@ import {
   isSurfaceEligibleType,
   KNOWN_SESSION_EVENT_TYPES,
   SESSION_FORMAT_VERSION,
+  SessionDraftId,
   SessionId,
   SessionLogOffset,
   type Session,
@@ -38,6 +39,8 @@ import SessionPersistence, {
   MAX_WRITE_BATCH_DELAY_MS,
   PersistenceCoordinator,
   SessionPersistenceRevision,
+  type ReservedProjectDraft,
+  type SessionDraftModelSelection,
   type SessionDraftReservation,
   type SessionDraftReservationRequest,
   type SessionContentMetadata,
@@ -105,6 +108,18 @@ function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined
+}
+
+function readDraftModelSelection(value: unknown): SessionDraftModelSelection | undefined {
+  if (value === undefined) return undefined
+  const selection = record(value)
+  if (typeof selection?.provider !== 'string' || selection.provider === ''
+    || typeof selection.model !== 'string' || selection.model === ''
+    || (selection.reasoningEffort !== undefined && (typeof selection.reasoningEffort !== 'string' || selection.reasoningEffort === ''))) {
+    throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid project draft model selection')
+  }
+  return { provider: selection.provider, model: selection.model,
+    ...(selection.reasoningEffort === undefined ? {} : { reasoningEffort: selection.reasoningEffort }) }
 }
 
 function nonNegativeInteger(value: unknown): value is number {
@@ -492,7 +507,47 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       visibility,
     }
     this.drafts.set(canonical.sessionId, { request: canonical })
-    return { sessionId: canonical.sessionId, leaseExpiresAt: value.leaseExpiresAt }
+    const modelSelection = readDraftModelSelection(value.modelSelection)
+    return { sessionId: canonical.sessionId, leaseExpiresAt: value.leaseExpiresAt,
+      ...(modelSelection === undefined ? {} : { modelSelection }) }
+  }
+
+  override async reservedProjectDraft(id: SessionId, signal?: AbortSignal): Promise<ReservedProjectDraft | undefined> {
+    if (this.ctx.gatewayRuntime.identity.kind !== 'project') return undefined
+    const response = await this.optional('/internal/runtime/session/draft/recover', signal, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: id }),
+      principal: true,
+    })
+    if (response === undefined) return undefined
+    const value = record(response)
+    if (value?.sessionId !== id || typeof value.draftId !== 'string' || value.draftId === ''
+      || typeof value.cwd !== 'string' || value.cwd === '' || (value.visibility !== 'project' && value.visibility !== 'private')
+      || (value.agentPreset !== undefined && typeof value.agentPreset !== 'string')
+      || (value.sshTarget !== undefined && (!safeInteger(value.sshTarget) || value.sshTarget < 1))) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned invalid project draft metadata')
+    }
+    const request: ReservedProjectDraft['request'] = {
+      sessionId: id, draftId: SessionDraftId(value.draftId), cwd: value.cwd, visibility: value.visibility,
+      ...(value.agentPreset === undefined ? {} : { agentPreset: value.agentPreset }),
+      ...(value.sshTarget === undefined ? {} : { sshTarget: value.sshTarget }),
+    }
+    const modelSelection = readDraftModelSelection(value.modelSelection)
+    return { request, ...(modelSelection === undefined ? {} : { modelSelection }),
+      adopt: () => { if (!this.drafts.has(id)) this.drafts.set(id, { request }) } }
+  }
+
+  override async saveDraftModelSelection(id: SessionId, selection: SessionDraftModelSelection): Promise<void> {
+    const draft = this.drafts.get(id)
+    if (draft === undefined || this.ctx.gatewayRuntime.identity.kind !== 'project' || this.coordinator.isMaterialized(id)) return
+    const result = record(await this.request('/internal/runtime/session/draft/model', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: id, draftId: draft.request.draftId, selection }),
+      principal: true,
+    }))
+    if (result?.saved !== true) throw new SessionPersistenceReadError('protocol', 'Gateway did not acknowledge the project draft model selection')
   }
 
   override async heartbeatDraft(request: SessionDraftReservationRequest): Promise<void> {

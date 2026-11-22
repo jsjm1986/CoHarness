@@ -17,7 +17,7 @@ import { NodeContentStore } from '../src/node-content-store.ts'
 import { migrateNodeContent } from '../src/node-content-migrations.ts'
 import { publishRecoveryProtocol } from '../src/peer-backup-recovery-access.ts'
 import { PeerBackupGovernance } from '../src/peer-backup-governance.ts'
-import { PeerBackupRestic } from '../src/peer-backup-restic.ts'
+import { PeerBackupRestic, type PeerBackupExporter } from '../src/peer-backup-restic.ts'
 import { PeerBackupRepository, PEER_REPOSITORY_PREFIX } from '../src/peer-backup-repository.ts'
 import { PeerProjectExporter } from '../src/peer-backup-project-export.ts'
 import type { PeerFileRootMap } from '../src/peer-snapshot-roots.ts'
@@ -251,6 +251,7 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
           delivered = '2026-01-01T00:00:00.000Z',
           future = '2099-01-01T00:00:00.000Z'
         const waiting = randomUUID()
+        const legacyDraft = randomUUID()
         const schedule = {
           unit: { name: 'schedule', version: 1 },
           global: null,
@@ -331,6 +332,12 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
                 data: { target: 'followup', start: 0, inserted: [{ id: message, source: { kind: 'schedule' } }] },
               }),
             ],
+          )
+          await tx.query(
+            `INSERT INTO node_content.conversation_draft_reservations
+            (organization_id,runtime_id,scope_key,draft_id,session_id,user_id,project_id,cwd,visibility,lease_expires_at)
+            VALUES($1,$2,'fixture',$3,$4,$5,$6,$7,'private','2026-01-01T00:00:00Z')`,
+            [org, project.runtimeId, legacyDraft, randomUUID(), user, project.projectId, workspace],
           )
         })
         const witness = await old.read(project, (tx) => readProjectScheduleWitness(tx, project, limits, signal))
@@ -480,11 +487,29 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
           },
         }
         const exporter = new PeerProjectExporter({ control, store: old, ...limits, files: fileProvider })
+        const legacyExporter: PeerBackupExporter = {
+          async capture(...args) {
+            const capture = await exporter.capture(...args)
+            const directory = join(args[1], 'project')
+            const drafts = join(directory, 'conversation_draft_reservations.jsonl')
+            const inventoryPath = join(directory, 'inventory.json')
+            const row = JSON.parse(await readFile(drafts, 'utf8')) as Record<string, unknown>
+            expect(row).toMatchObject({ draft_id: legacyDraft, model_selection: null })
+            delete row.model_selection
+            const bytes = JSON.stringify(row) + '\n'
+            const inventory = JSON.parse(await readFile(inventoryPath, 'utf8')) as { tables: Array<{ name: string; sha256: string }> }
+            inventory.tables.find(table => table.name === 'conversation_draft_reservations')!.sha256 = hash(bytes)
+            await writeFile(drafts, bytes)
+            await writeFile(inventoryPath, JSON.stringify(inventory))
+            return capture
+          },
+          validate: exporter.validate.bind(exporter),
+        }
         const jobId = await administrative.enqueue(admin.id, policy.policyId, 'capture'),
           job = await ga.claim()
         if (!job || job.id !== jobId) throw new Error('Missing capture claim')
         const point = await ga.withLease(job, signal, (active, progress) =>
-          engine.backup(policy, { origin, user: a.nodeId, token: write, passwordFile }, exporter, jobId, active, progress),
+          engine.backup(policy, { origin, user: a.nodeId, token: write, passwordFile }, legacyExporter, jobId, active, progress),
         )
         expect(point.gapCount).toBe(0)
         await ga.finish(job, { point })
@@ -617,6 +642,8 @@ describe.skipIf(!controlUrl || !contentUrl || !pgdata || !restic)('operator-appr
         )
         expect(await readFile(join(targetDocs.root, 'report.txt'), 'utf8')).toBe('bytes to recover\n')
         await stagePeerProject(next, op, drill, files, limits, signal)
+        expect((await replacement.query('SELECT draft_id,cwd,model_selection FROM node_content.conversation_draft_reservations WHERE runtime_id=$1',
+          [op.runtimeId])).rows).toEqual([{ draft_id: legacyDraft, cwd: targetWorkspace, model_selection: null }])
         const retiredTarget = new PeerProjectFileGate(join(root, 'historically-retired-state'))
         await retiredTarget.retire(op.publicId, randomUUID(), async () => true)
         const previousGateway = new PeerProjectRecovery(b, next, limits, cfg.instancePortBase, undefined, retiredTarget)

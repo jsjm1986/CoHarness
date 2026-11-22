@@ -188,7 +188,7 @@ Gateway 将浏览器请求、事件流建立、就绪期限与服务端计时选
 
 在所属 Gateway，`hostAdmission` 记录一次持久发送的会话授权、Agent 准备、受理排队、执行身份验证、收件箱追加、刷盘和回读。`executionInput` 与 `executionRegister` 使用同一个操作 ID 记录内部请求的治理 SQL 次数和耗时。[迁移 141](deploy/postgres/migrations/141_personal_execution_admission.sql) 分别用一条语句登记个人根会话及受理个人空间的原始交互消息。这两类请求可在读取有大小限制的正文前，从已验证过的个人令牌取得精确 Runtime 身份。写入语句核验当前操作者及电脑授权、精确令牌、代次及节点租约、服务模式及写入代次，以及不可变回执。已识别令牌发起其他执行写入时须重新鉴权并检查共享维护状态。未知令牌在读取正文前走常规验证。 个人输入的 `executionInputServer` 记录 PostgreSQL 内部的耗时，包括锁等待。与客户端观测的语句耗时对照，可区分数据库内部和其余往返耗时。
 
-Gateway 有界保留运行或控制鉴权时验证的个人 Runtime 身份。普通令牌鉴权结果失效后，上述写入仍可读取这些身份。各次写入都须由对应语句核验当前权限。
+Gateway 有界保留运行或控制鉴权时验证的 Runtime 身份坐标。个人执行仅选择个人坐标，模型凭据端点可以选择个人或项目坐标。普通令牌鉴权缓存失效后，坐标仍可读取，各条 SQL 语句在使用前核验当前权限。
 
 预备新的空白个人草稿时，Gateway 记录在途写入，并对确切就绪代次核验当前浏览器权限。草稿可以直接进入编辑。首条预备消息到达时，所属 Gateway 在同一条语句中登记根会话和输入回执。如果首次操作需要会话谱系，或者请求未携带已签名的预备发送标记，Runtime 通过常规路径登记。过期租约或写入代次拒绝受理，重试复用原回执。
 
@@ -202,7 +202,7 @@ Gateway 有界保留运行或控制鉴权时验证的个人 Runtime 身份。普
 
 压力采样每次发布后等待配置的周期，再开始下一次采集。观测语句校验当前服务模式和写入纪元。启动额度由资源压力和公平调度决定。
 
-已识别的个人 Runtime 通过本机关停检查后，可以用一条语句读取托管模型凭据。语句在同一数据库快照中读取当前 Runtime 权限、服务写入代次、模型授权和加密凭据。项目凭据沿用项目检查。`modelCredential` 诊断记录耗时与 SQL 次数，凭据内容不进入样本。
+已识别的个人或项目 Runtime 通过本机关停检查后，用一条语句读取托管模型凭据。语句在同一快照中核验当前令牌、Runtime 代次、服务写入代次和凭据权限。项目自有凭据仅供所属项目读取。`modelCredential` 诊断记录耗时与 SQL 次数，凭据内容不进入样本。
 
 连接额度支持并发传输时，页面启动与对话准备请求为每台电脑保留一条可复用的 HTTP 连接。后台请求共享其余连接。精确代次的 HTTP 和 WebSocket 引用在活动写入期间阻止空闲回收，并释放生命周期队列供其他对话请求使用。
 
@@ -214,7 +214,7 @@ Gateway 有界保留运行或控制鉴权时验证的个人 Runtime 身份。普
 
 已受监督的个人 Runtime 为精确定位的 WebSocket 记录开始和完成活动。转发的升级请求在分派前核验当前签名密钥、签发节点租约和浏览器会话。Gateway 在监听前计算启动指纹，包括没有遗留 Runtime 的部署。
 
-构建 Gateway 和 Web profile 后， `HGW_TEST_VERSIONED_OPERATIONS=50 node gateway/tests/run-node-content-postgres.mjs --operations` 通过节点出站通道测量 50 轮打开、新建、发送持久受理和模型首字。首字从发起发送开始，计到已连接的事件连接收到第一条文本帧。两台 Gateway 使用临时治理数据库，Runtime 使用本机测试模型。
+构建 Gateway 和 Web profile 后，`HGW_TEST_VERSIONED_OPERATIONS=50 node gateway/tests/run-node-content-postgres.mjs --operations` 通过节点出站通道测量 50 轮打开、新建、发送持久受理和模型首字。首字从发起发送开始，计到已连接的事件连接收到第一条文本帧。两台 Gateway 使用临时治理数据库，Runtime 使用本机测试模型。同一命令设置 `HGW_TEST_PROJECT_PROMPT_RECONNECT_ONLY=1`，验证项目草稿换代恢复，覆盖回执丢失和离线期间模型权限被撤销。
 
 冷 Runtime 准入在当前 Gateway 的个人与项目运行时之间共享 FIFO 启动和常驻预约。冷启动等待不阻止热运行时继续使用。容量保留至进程确认终止。重启后由 supervisor 保留的进程计入限额，不会仅因配置限额较低而被终止。默认值是保守保护设置，不代表实测支持 300 人或 100 个混合任务。这些限额覆盖受管 Runtime 进程，不覆盖 Agent／工具／PTY 并发、非受管进程或同机另一 Gateway。参见 [Runtime 准入决策](../.agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.zh.md)。
 

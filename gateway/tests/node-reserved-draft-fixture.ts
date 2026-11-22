@@ -98,7 +98,8 @@ export async function reservedDraftFixture(control:Pool,content:Pool,dataDirecto
       await response.arrayBuffer();expect(response.status).toBe(302);cookies.set(user.id,response.headers.getSetCookie()[0]!.split(';')[0]!)
     }
     async function request<T=Record<string,unknown>>(path:string,method='GET',body?:unknown,user=owner.id,internal=false){
-      const principal=principals.issue({user:{...owner,mustChangePassword:false},runtime:{kind:'project',id:projectId,runtimeId:binding.runtimeId,generation:1},scope:{kind:'project',projectId,projectName:name,mode:'rw'}})
+      const caller=user===owner.id?owner:other
+      const principal=principals.issue({user:{...caller,mustChangePassword:false},runtime:{kind:'project',id:projectId,runtimeId:binding.runtimeId,generation:1},scope:{kind:'project',projectId,projectName:name,mode:'rw'}})
       const response=await fetch(base+path,{method,headers:{origin:base,cookie:cookies.get(user)!,'content-type':'application/json',...(internal?{authorization:'Bearer '+token,[PRINCIPAL_HEADER]:principal}:{})},body:body===undefined?undefined:JSON.stringify(body)})
       return {status:response.status,body:await response.json() as T}
     }

@@ -931,6 +931,15 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   }
 
   /**
+   * Observe whether this provider has adopted or committed the stored Session.
+   * @param id - Session to check without accessing storage.
+   * @returns true when the tracked Session has a committed artifact.
+   */
+  isMaterialized(id: SessionId): boolean {
+    return this.states.get(id)?.materialized === true
+  }
+
+  /**
    * Storage metadata for a session bound to a live Session through
    * `session/created`, or `undefined` for untracked and detached ids. Awaits
    * any in-flight registration for the id so a concurrent `create` observes
