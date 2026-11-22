@@ -15,6 +15,7 @@ import { pathToFileURL } from 'node:url'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { afterAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import {
+  bundlePatchPaths,
   composeEntries,
   createRuntimeResolution,
   getDshRuntimeVersion,
@@ -49,6 +50,20 @@ const tmp = (): string => {
   tempRoots.push(dir)
   return dir
 }
+
+it('loads patch files that belong to the bundle package', () => {
+  const root = tmp(), bundle = join(root, 'bundle'), adjacent = join(root, 'adjacent')
+  mkdirSync(bundle)
+  mkdirSync(adjacent)
+  const patch = join(bundle, 'cordis.patch.yml')
+  writeFileSync(patch, '[]\n')
+  writeFileSync(join(adjacent, 'other.yml'), '[]\n')
+  symlinkSync(adjacent, join(bundle, 'outside'), 'junction')
+  expect(bundlePatchPaths(bundle, { patch: './cordis.patch.yml' })).toEqual([patch])
+  for (const location of ['../adjacent/other.yml', 'outside/other.yml', patch]) {
+    expect(() => bundlePatchPaths(bundle, { patch: location })).toThrow('bundle patch must be inside its package')
+  }
+})
 
 /** Stage a fake installed app: package.json with deps and a node_modules holding bundles. */
 function stageInstallation(

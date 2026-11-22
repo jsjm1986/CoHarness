@@ -58,6 +58,14 @@ declare module '@deepseek-ai/cordis' {
 
   interface Events {
     /**
+     * Authorize a structured tool's resolved path before reading or changing that target.
+     * Listeners reject with a filesystem error to refuse the operation.
+     * @param path - canonical process path chosen by the tool's filesystem provider.
+     * @param mode - read or write access required by the operation.
+     * @mode serial
+     */
+    'fs/authorize-target'(path: string, mode: 'read' | 'write'): void | Promise<void>
+    /**
      * Single-slot decision for the next {@link FileSystem.writeText}. Calling
      * `next()` yields the bare provider's unconditional write; the first listener
      * that returns an intent owns the decision rather than composing with peers.

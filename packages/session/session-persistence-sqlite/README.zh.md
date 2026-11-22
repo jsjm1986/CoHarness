@@ -42,6 +42,8 @@ Schema 20 在本包内拥有 codec，不导入其他持久化格式中可变的�
 <a id="schema-compatibility"></a>
 ## Schema 兼容性
 
+SQLite Session 存储会拒绝创建绑定受管 SSH 目标的 Session。此类 Session 使用部署的 JSONL 或 Gateway 持久化。
+
 全新数据库直接初始化为 schema 20。旧 schema、外部 application identity、非空未版本化数据库以及不兼容 schema 对象会在打开时拒绝；运行时不会隐式升级文件。停止进程后使用离线工具：
 
 ```sh

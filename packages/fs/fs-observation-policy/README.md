@@ -25,7 +25,7 @@ await ctx.plugin(FsPolicy)
 
 ## Summary
 
-`dsh-fs-observation-policy` makes filesystem tools require an agent to read a file before overwriting or editing it. It also rejects a mutation when the file has changed since that read, and returns a clear instruction to re-read and retry. Reading a missing path authorizes guarded creation, while concurrent creation remains protected. Choose it for deployments that want read-before-write safety; resumed sessions must read targets again because observations are not persisted.
+`dsh-fs-observation-policy` makes filesystem tools require an agent to read a file before overwriting, editing, or deleting it. It also rejects a mutation when the file has changed since that read, and returns a clear instruction to re-read and retry. Reading a missing path authorizes guarded creation, while concurrent creation remains protected. Choose it for deployments that want read-before-write safety; resumed sessions must read targets again because observations are not persisted.
 
 ## Table of Contents
 
@@ -58,7 +58,7 @@ Three `fs/*` events (declared by `@deepseek-ai/dsh-fs`, dispatched by `@deepseek
 | Event | This plugin's listener |
 |---|---|
 | `fs/write-intent` | Unseen or observed absent → `{ kind: 'createIfAbsent' }`; observed present → `{ kind: 'replaceIfVersion', version: vObserved }`. Single-slot decision; does NOT call `next()`. |
-| `fs/edit-intent` | Unseen → `FS_NOT_OBSERVED`; observed absent → `FS_NOT_FOUND`; observed present → `{ version: vObserved }` as the CAS basis. Single-slot decision; does NOT call `next()`. |
+| `fs/edit-intent` and `fs/delete-intent` | Unseen → `FS_NOT_OBSERVED`; observed absent → `FS_NOT_FOUND`; observed present → `{ version: vObserved }` as the CAS basis. Single-slot decision; does NOT call `next()`. |
 | `fs/observed` | Records `{ kind: 'present', version }` or `{ kind: 'absent' }` for this owner+target. Synchronous, side-effect-only `WeakMap.set`. |
 
 <a id="observed-state-is-the-prior-observation-record-freshness-is-provider-cas"></a>
@@ -69,7 +69,7 @@ Observed state is a weak owner-to-target map with three logical states: unseen, 
 <a id="single-slot-first-wins"></a>
 ## Single-slot, first-wins
 
-The `fs/write-intent`/`fs/edit-intent` slots hold exactly one decider — this plugin fully decides and does not call `next()`. The slot is first-wins by registration order; this plugin owning it is the default-deployment convention, not an event-enforced invariant (a decider registered before / `prepend`ed would win instead). This is not a composable authorization chain — layered permission/audit/sandbox interception belongs on `tools/execute`.
+The write, edit, and delete intent slots hold exactly one decider — this plugin fully decides and does not call `next()`. The slot is first-wins by registration order; this plugin owning it is the default-deployment convention, not an event-enforced invariant (a decider registered before / `prepend`ed would win instead). This is not a composable authorization chain — layered permission/audit/sandbox interception belongs on `tools/execute`.
 
 <a id="no-method-coupling"></a>
 ## No method coupling

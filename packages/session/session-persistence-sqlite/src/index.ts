@@ -113,6 +113,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
 
   /* jscpd:ignore-start -- each persistence provider repeats the narrow Service Definition adapter. */
   override createStored(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void> {
+    if (meta.sshTarget !== undefined) return Promise.reject(new Error('SQLite Session storage cannot retain a managed SSH target'))
     return this.coordinator.create(meta, inheritedEventCount)
   }
 

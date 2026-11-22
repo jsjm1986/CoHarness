@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/dsh-steward-tools/README.md
 document:
-  en: fa61adf398113a7f9282879ece983c72f566fb89
-  zh: 9cb77f82dfac75276ea5b7842a3ec8e0ad195c72
+  en: 226f20261484e5bc4497b23b926e7b9bc280e967
+  zh: 69f55d07b768d5dc300e810c74708ad1a4ff3651
 /deepseek-ai-dsh-steward-tools:
   en: 40a36e0e6c0af9d3
   zh: 50bb5c8842abf71a
 /deepseek-ai-dsh-steward-tools/what-it-does:
-  en: 80809fc004aab98f
-  zh: 75126b0bc898d173
+  en: 41976fce2a6c0200
+  zh: 1c9b76a2c08cca85
 /deepseek-ai-dsh-steward-tools/boundary-honest-limits:
   en: eb0b2e7a63ea1a67
   zh: a8639e485cff4f06

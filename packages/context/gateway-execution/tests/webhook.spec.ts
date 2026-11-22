@@ -1,6 +1,9 @@
 /** The managed webhook dispatch route admits only purpose-bound principals and bounded bodies. */
 import { EventEmitter } from 'node:events'
+import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { PassThrough } from 'node:stream'
 import { GatewayCollaboration } from '@deepseek-ai/dsh-collaboration-gateway'
 import { Context } from '@deepseek-ai/cordis'
 import type { GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
@@ -84,14 +87,10 @@ function fixture(options: { withRoute?: boolean; failSession?: unknown } = {}): 
     failSession(error) { options.failSession = error },
     sessionCalls,
     respond(res, body) {
-      const req = new EventEmitter() as IncomingMessage
-      req.method = 'POST'
+      const req = Object.assign(new PassThrough(), { method: 'POST' })
       const raw = typeof body === 'string' ? body : JSON.stringify(body)
-      process.nextTick(() => {
-        req.emit('data', Buffer.from(raw))
-        req.emit('end')
-      })
-      route(req, res as unknown as ServerResponse)
+      route(req as unknown as IncomingMessage, res as unknown as ServerResponse)
+      req.end(Buffer.from(raw))
       return new Promise((resolve) => {
         const check = () => {
           if (res.writableEnded) { resolve({ status: res.status, json: JSON.parse(res.body) }); return }
@@ -174,20 +173,20 @@ it.each([
   disposers.push(async () => { await consumer.dispose(); await presets.dispose() })
   await consumer.await()
   await vi.waitFor(() => { expect(handler).toBeDefined() })
-  const req = new EventEmitter() as IncomingMessage; req.method = 'POST'
+  const req = Object.assign(new PassThrough(), { method: 'POST' })
   const res = fakeResponse()
-  handler!(req, res as unknown as ServerResponse)
+  handler!(req as unknown as IncomingMessage, res as unknown as ServerResponse)
   const body = { ...validBody, request: { ...validBody.request, projectVisibility: visibility } }
-  req.emit('data', Buffer.from(JSON.stringify(body))); req.emit('end')
+  req.end(Buffer.from(JSON.stringify(body)))
   await vi.waitFor(() => { expect(res.writableEnded).toBe(true) })
   expect(res.status).toBe(status)
   if (status === 403) { expect(followup).not.toHaveBeenCalled(); return }
   expect(followup).toHaveBeenCalledOnce()
   holdPreset = true
-  const pending = new EventEmitter() as IncomingMessage; pending.method = 'POST'
+  const pending = Object.assign(new PassThrough(), { method: 'POST' })
   const cancelled = fakeResponse()
-  handler!(pending, cancelled as unknown as ServerResponse)
-  pending.emit('data', Buffer.from(JSON.stringify(body))); pending.emit('end')
+  handler!(pending as unknown as IncomingMessage, cancelled as unknown as ServerResponse)
+  pending.end(Buffer.from(JSON.stringify(body)))
   await resolving.promise
   await presets.dispose()
   resume.resolve(undefined)
@@ -251,17 +250,18 @@ it('rejects invalid JSON and schema violations', async () => {
 
 it('rejects oversized bodies while preserving the response channel', async () => {
   const f = fixture()
-  const res = fakeResponse()
-  const req = new EventEmitter() as IncomingMessage
-  req.method = 'POST'
-  let destroyed = false
-  req.destroy = () => { destroyed = true; return req }
-  f.handler(req, res as unknown as ServerResponse)
-  req.emit('data', Buffer.alloc(1_048_577))
-  req.emit('end')
-  await vi.waitFor(() => { expect(res.writableEnded).toBe(true) })
-  expect(destroyed).toBe(false)
-  expect(res.status).toBe(502)
+  const server = createServer(f.handler)
+  disposers.push(() => new Promise<void>((resolve) => { server.close(() => resolve()) }))
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', resolve)
+  })
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`
+  const response = await fetch(url, { method: 'POST', body: Buffer.alloc(1_048_577) })
+  expect(response.status).toBe(413)
+  expect(response.headers.get('connection')).toBe('close')
+  expect(await response.json()).toEqual({ error: 'dispatch-body-too-large' })
+  expect(f.sessionCalls).toEqual([])
 })
 
 it('admits one Session per valid delivery', async () => {

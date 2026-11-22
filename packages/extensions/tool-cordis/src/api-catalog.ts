@@ -5595,6 +5595,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'forge', description: 'family whose provider changed.' }],
   },
   {
+    name: 'fs/authorize-target',
+    mode: 'serial',
+    signature: '\'fs/authorize-target\'(path: string, mode: \'read\' | \'write\'): void | Promise<void>',
+    summary: 'Authorize a structured tool\'s resolved path before reading or changing that target.',
+    description: 'Authorize a structured tool\'s resolved path before reading or changing that target. Listeners reject with a filesystem error to refuse the operation.',
+    parameters: [{ name: 'path', description: 'canonical process path chosen by the tool\'s filesystem provider.' }, { name: 'mode', description: 'read or write access required by the operation.' }],
+  },
+  {
     name: 'fs/delete-intent',
     mode: 'waterfall',
     signature: '\'fs/delete-intent\'(target: FsTarget, actor: object | undefined, next: () => { version: FsVersion } | undefined | Promise<{ version: FsVersion } | undefined>): Promise<{ version: FsVersion } | undefined>',

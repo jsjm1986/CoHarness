@@ -10,6 +10,7 @@
 - 读语句(`SELECT`/`WITH`/`VALUES`/`TABLE`/`SHOW`/`EXPLAIN`）直接执行；其余语句先经会话内审批通道询问操作员，获批后把审批 id 一并交给 Gateway，由 Gateway 对照 `conversation_interaction_responses` 复核后再执行。
 - `dry_run` 返回语句的 `EXPLAIN` 计划而不执行——写语句同样适用，因为不落任何改动，无需审批。
 - `row_limit` 限制返回的读取行与 dry-run 计划行。Gateway 的结果大小限制可能更早截断任一种响应；工具会明确标记被截断的计划和读取结果。
+- 取消工具会结束它到 Gateway 的请求。对 Gateway 已受理的语句，以 Gateway 记录的结果为准。
 - 每次尝试——读、拒绝、失败、应用——都由 Gateway 记入 `harness.steward_query_log`。
 - 注册 `steward:policy` 系统提示词节区，让模型知道自己运行在维护通道：受审计 SQL、只读事务、会话内写批准、留痕。
 

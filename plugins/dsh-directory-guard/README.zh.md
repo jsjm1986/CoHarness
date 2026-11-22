@@ -4,7 +4,7 @@
 
 一个树外 dsh 插件 bundle，在 dsh 实例**内部**强制执行按用户的目录权限，是网关操作系统层（systemd）强制的 philosophy-native 对应层。见平台设计文档 §7 与 §14。
 
-Workspace 文件 RPC 通过 Host 的 `workspace-files/authorize` 事件使用同一份 grants。监听器在读取元数据或内容前检查 canonical provider 路径，路径不属于任何 grant 时返回 `FS_PERMISSION_DENIED`，并在插件卸载时与工具监听器一起移除。这条读取路径独立于模型工具受到保护，不新增第二份授权存储。
+文件补丁和 Office 工具在检查或改动文件前，按文件系统提供方选定的规范路径校验权限。Workspace 文件 RPC 通过 Host 的 `workspace-files/authorize` 事件使用同一份 grants。监听器在读取元数据或内容前检查 canonical provider 路径，路径不属于任何 grant 时返回 `FS_PERMISSION_DENIED`，并在插件卸载时与工具监听器一起移除。这条读取路径独立于模型工具受到保护，不新增第二份授权存储。
 
 ## 功能
 
@@ -24,6 +24,8 @@ Workspace 文件 RPC 通过 Host 的 `workspace-files/authorize` 事件使用同
 | `grep`、`glob` | `path`（缺省为会话 cwd；pattern 与 include 过滤仍交给搜索引擎） | 读 |
 | `lsp` | `file_path`，以及作为工作区被索引的会话 cwd | 读 |
 | `present` | 每个 `files[].path` | 读 |
+| `office_render`、`office_convert`、`office_recalculate` | 解析后的输入路径 | 读 |
+| `apply_patch` | 解析后的源及目标路径 | 写 |
 | 其他任意工具 | `file_path` | 读 |
 
 - **写**目标不在任何 `rw` 授权内 → 拒绝。

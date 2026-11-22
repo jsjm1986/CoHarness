@@ -55,7 +55,7 @@ kind: "package-reference"
 
 ### 配置
 
-所有键均为可选。`read`、`readImage`、`write` 和 `edit` 开关默认为 `true`；将开关设为 `false` 可省略对应工具及其指导文本。`applyPatch` 默认为 `false`；[`dsh-base`](../../bundle/base/cordis.patch.yml) 与 Web 的 `standard` preset 在各自的 `tool-fs` 行上开启它，而 Web 的 `ptc`、`cordis` preset 显式写出 `applyPatch: false`，改这一行即可在 `edit` 旁加入或去掉该工具。允许关闭全部五个工具。启用 `readImage` 仍需要附件存储和支持图片输入的模型。关闭 `read` 时仍会校验读取上限。
+所有键均为可选。`read`、`readImage`、`write` 和 `edit` 开关默认为 `true`；将开关设为 `false` 可省略对应工具及其指导文本。`applyPatch` 默认为 `false`。在 `tool-fs` 条目将其设为 `true`，即可与 `edit` 一同注册该工具。安装观察策略时，删除文件须使用该会话最近看到的版本。允许关闭全部五个工具。启用 `readImage` 仍需要附件存储和支持图片输入的模型。关闭 `read` 时仍会校验读取上限。
 
 | 键 | 默认值 | 含义 |
 |---|---|---|

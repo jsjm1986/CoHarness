@@ -79,6 +79,24 @@ it('returns the empty patch confirmation', async () => {
     content: [{ type: 'text', text: 'Success. No operations in patch.' }], meta: { diffs: [], stopped: false } })
 })
 
+it('checks both paths of a move before committing any operation in the patch', async () => {
+  const t = await setup()
+  await t.file('source', 'old\n')
+  const checks: string[] = []
+  t.ctx.on('fs/authorize-target', (path, mode) => {
+    expect(mode).toBe('write')
+    checks.push(path)
+    if (path === resolve(t.workspace, 'restricted')) throw new FsError('Write permission required', 'FS_PERMISSION_DENIED')
+  })
+  const result = await call(t, patch(add('first'), move('source', 'restricted')))
+  expect(checks).toEqual(['first', 'source', 'restricted'].map(name => resolve(t.workspace, name)))
+  expect(result.isError).toBe(true)
+  expect(result.content).toEqual(expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining('Write permission required') })]))
+  expect(await t.bytes('source')).toBe('old\n')
+  await expect(t.bytes('first')).rejects.toMatchObject({ code: 'ENOENT' })
+  await expect(t.bytes('restricted')).rejects.toMatchObject({ code: 'ENOENT' })
+})
+
 it('throws typed syntax and aggregated unread-file refusals without diffs', async () => {
   const t = await setup()
   const syntax = await call(t, 'invalid')

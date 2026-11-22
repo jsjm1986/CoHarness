@@ -42,6 +42,8 @@ Full reads scan physical rows in first-logical-sequence order. A reverse pass fi
 <a id="schema-compatibility"></a>
 ## Schema compatibility
 
+SQLite Session storage rejects creation with a managed SSH target. Use the deployment’s JSONL or Gateway persistence for Sessions bound to managed SSH.
+
 A pristine database initializes directly at schema 20. Older schemas, foreign application identities, non-pristine unversioned databases, and incompatible schema objects reject at open; the runtime never upgrades a file implicitly. Use the offline tools while the process is stopped:
 
 ```sh

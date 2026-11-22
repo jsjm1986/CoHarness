@@ -25,7 +25,7 @@ await ctx.plugin(FsPolicy)
 
 ## 概述
 
-`dsh-fs-observation-policy` 要求 agent（智能体）先读取文件，文件系统工具才可覆盖或编辑它。如果文件自读取后发生变化，它也会拒绝变更，并清楚提示重新读取后重试。读取缺失路径会授权带防护的创建，同时仍防止覆盖并发创建的文件。需要编辑前读取安全性的部署请选择它；由于观察记录不持久化，恢复的会话必须重新读取目标。
+`dsh-fs-observation-policy` 要求 agent（智能体）先读取文件，文件系统工具才可覆盖、编辑或删除它。如果文件自读取后发生变化，它也会拒绝变更，并清楚提示重新读取后重试。读取缺失路径会授权带防护的创建，同时仍防止覆盖并发创建的文件。需要编辑前读取安全性的部署请选择它；由于观察记录不持久化，恢复的会话必须重新读取目标。
 
 ## 目录
 
@@ -58,7 +58,7 @@ await ctx.plugin(FsPolicy)
 | 事件 | 本插件的监听器 |
 |---|---|
 | `fs/write-intent` | 未见或已观测为缺失 → `{ kind: 'createIfAbsent' }`；已观测为存在 → `{ kind: 'replaceIfVersion', version: vObserved }`。单 slot 决策；不调用 `next()`。 |
-| `fs/edit-intent` | 未见 → `FS_NOT_OBSERVED`；已观测为缺失 → `FS_NOT_FOUND`；已观测为存在 → 返回 `{ version: vObserved }` 作为 CAS 基础。单 slot 决策；不调用 `next()`。 |
+| `fs/edit-intent` 与 `fs/delete-intent` | 未见 → `FS_NOT_OBSERVED`；已观测为缺失 → `FS_NOT_FOUND`；已观测为存在 → 返回 `{ version: vObserved }` 作为 CAS 基础。单 slot 决策；不调用 `next()`。 |
 | `fs/observed` | 为该所有者与目标记录 `{ kind: 'present', version }` 或 `{ kind: 'absent' }`。同步、只有副作用的 `WeakMap.set`。 |
 
 <a id="observed-state-is-the-prior-observation-record-freshness-is-provider-cas"></a>
@@ -69,7 +69,7 @@ await ctx.plugin(FsPolicy)
 <a id="single-slot-first-wins"></a>
 ## 单 slot、先到者胜
 
-`fs/write-intent`/`fs/edit-intent` slot 只容纳一个决策器；本插件会完整决策，不调用 `next()`。slot 按注册顺序先到者胜；由本插件拥有 slot 只是默认部署约定，不是事件强制的不变式（更早注册或通过 `prepend` 注册的决策器会胜出）。这不是可组合的授权链；分层权限/审计/沙箱拦截属于 `tools/execute`。
+写入、编辑及删除意图的 slot 只容纳一个决策器；本插件会完整决策，不调用 `next()`。slot 按注册顺序先到者胜；由本插件拥有 slot 只是默认部署约定，不是事件强制的不变式（更早注册或通过 `prepend` 注册的决策器会胜出）。这不是可组合的授权链；分层权限/审计/沙箱拦截属于 `tools/execute`。
 
 <a id="no-method-coupling"></a>
 ## 不与方法耦合

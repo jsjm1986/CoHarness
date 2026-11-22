@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 An out-of-tree dsh plugin bundle that enforces per-user directory permissions **inside** a dsh instance, as the philosophy-native counterpart to the gateway's OS-level (systemd) enforcement. See the platform design doc §7 and §14.
 
-Workspace file RPCs use the same grants through the Host `workspace-files/authorize` event. The listener checks the canonical provider path before metadata or content is read and returns `FS_PERMISSION_DENIED` outside every grant. It is removed with the tool listener on plugin disposal. This closes the read path independently of model tools; it does not add a second grant store.
+File patches and Office tools authorize the canonical paths selected by their filesystem provider before inspecting or changing any file. Workspace file RPCs use the same grants through the Host `workspace-files/authorize` event. The listener checks the canonical provider path before metadata or content is read and returns `FS_PERMISSION_DENIED` outside every grant. It is removed with the tool listener on plugin disposal. This closes the read path independently of model tools; it does not add a second grant store.
 
 ## What it does
 
@@ -24,6 +24,8 @@ Grants are `{ path, mode: 'ro' | 'rw' }` entries and may also carry a `label` (d
 | `grep`, `glob` | `path` (defaults to the session cwd; patterns and `include` filters stay with the search engine) | read |
 | `lsp` | `file_path`, plus the session cwd it indexes as the workspace | read |
 | `present` | every `files[].path` | read |
+| `office_render`, `office_convert`, `office_recalculate` | resolved input | read |
+| `apply_patch` | resolved source and destination paths | write |
 | any other tool | `file_path` | read |
 
 - **write** to a target not inside an `rw` grant → denied.

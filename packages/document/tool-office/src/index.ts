@@ -244,6 +244,7 @@ async function readableInput(
   ctx: Context, path: string, options: { cwd: string; signal: AbortSignal },
 ): Promise<{ target: FsTarget; info: FsInfo }> {
   const target = await ctx.fs.resolve(path, options)
+  await ctx.serial('fs/authorize-target', ctx.fs.processPath(target), 'read')
   const info = await ctx.fs.stat(target, options.signal)
   if (info === undefined) throw new Error(`cannot read "${target.displayPath}": not found`)
   if (info.type !== 'file') throw new Error(`cannot read "${target.displayPath}": not a regular file`)

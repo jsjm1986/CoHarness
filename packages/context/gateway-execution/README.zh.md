@@ -58,7 +58,7 @@ Gateway 数据库需要执行身份迁移 030、031 和[不可变执行范围迁
 
 启用[受管模型计时](../gateway-runtime/README.zh.md#resource-admission)后，`model-input-timing` 跟踪进入首次助手流的最后一条已签名输入。它度量收件箱等待、准备、继承和授权。`preStepPlugins` 报告每个监听器的插件名称和扣除其等待后续监听器的耗时。重放输入可能缺少实时收件箱计时。样本包含插件标签、耗时和时间戳。
 
-本提供者拥有 `pluginManagementAuthorization` 和 `permissionPresetAuthorization`。交互式 profile 操作使用 Gateway 的实时管理员检查；Agent 发起的操作使用该 Agent 的完整参与者集合。授权缺失不会回退到先前 HTTP 请求或浏览器自报角色。[Profile 管理授权](../../../.agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.zh.md) 定义受保护操作和取消行为。
+本提供者拥有 `pluginManagementAuthorization` 和 `permissionPresetAuthorization`。交互式 profile 操作要求当前 Gateway 管理员或明确的插件管理授权。Profile 管理器保护部署中已启用的沙箱、审批、文档管理和管家工具组件。Agent 发起的操作使用该 Agent 的完整参与者集合。授权缺失不会回退到先前 HTTP 请求或浏览器自报角色。[Profile 管理授权](../../../.agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.zh.md) 定义受保护操作和取消行为。
 
 <a id="revocation-and-cancellation"></a>
 ## 撤权与取消

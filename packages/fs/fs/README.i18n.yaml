@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs/README.md
 document:
-  en: 454cc28e673338a646a4499c90dce2f7eac12c34
-  zh: 9813c8e324862dae6f6d1a7181cc2dc2d1cc03be
+  en: 4c589e494bc6bebc5bbd3d9f19603e18172f8a6f
+  zh: f7222e2af13bfd892e37866e2a2a2bb28a47b736
 /:
   en: ead98d44e725922f
   zh: 61495d48365178df
@@ -21,8 +21,8 @@ document:
   en: 95e953374950c607
   zh: 34217d2d961bc35b
 /deepseek-ai-dsh-fs/the-fs-policy-events:
-  en: 99885f4bd6e84317
-  zh: 2ff43826ffc372da
+  en: f44e917889878859
+  zh: 475ad54a648d9c0f
 /deepseek-ai-dsh-fs/a-provider-contract-not-the-policy-layer:
   en: 4657f78ad0f0c5f0
   zh: bdcf63f1239ff278

@@ -31,8 +31,10 @@ it('requires a fresh Gateway decision for every profile operation', async () => 
   request.mockResolvedValue(new Response('{}', { status: 403 }))
   await expect(policy.authorize()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
   expect(request).toHaveBeenCalledTimes(2)
-  expect(policy.protectedModules).toContain('@deepseek-ai/dsh-model-governance')
-  expect(policy.protectedModules).toContain('@deepseek-ai/dsh-directory-guard')
+  for (const module of ['model-governance', 'directory-guard', 'fs-sandbox', 'sandbox-local', 'bash-sandbox', 'pwsh-sandbox',
+    'permission-presets', 'user-approval', 'userdoc-gateway', 'steward-tools']) {
+    expect(policy.protectedModules).toContain(`@deepseek-ai/dsh-${module}`)
+  }
 })
 
 it.each(['absent', 'expired', 'scoped'] as const)('refuses %s authority before contacting the Gateway', async (reason) => {

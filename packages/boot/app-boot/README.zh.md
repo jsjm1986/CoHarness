@@ -64,6 +64,8 @@ profile 导入插件前，DSH 会检查其 `peerDependencies` 中对 `@deepseek-
 
 启用的 `dsh-hmr` 插件会监视 profile manifest 与两份用户 patch 文件，重新读取按顺序排列的组合包层，并应用[重载失败策略](#startup-and-reload-failures)。[DSH HMR](../hmr/README.zh.md) 将这些重载与[插件管理器](../plugin-manager/README.zh.md)的配置写入串行化；包操作在其队列之外执行。启动器不安装 HMR 或监视器；HMR 被禁用或不存在时，更改需要重启。
 
+组合包清单使用相对于该包的补丁路径。清单指定的路径及其解析目标均须位于该包内。
+
 插入条目的插件名可以是绝对文件系统路径、文件 URL 或包标识符。patch 加载会把 `insert` 条目及其嵌套分组中的绝对路径以及相对于 patch 文件的 `./` 或 `../` 路径转换为文件 URL；对已有条目名称的断言及替换用的 `config` 值保持原样。
 
 挂载 profile 条目前，`dsh` launcher 会从安装依赖图与有序 bundle 依赖图计算一份不可变的 runtime resolution。默认使用 runtime 模式，将 runtime resolution 安装到 Node 的 ESM 与 CommonJS 解析器中，不创建 fallback 链接。普通 Node 中的 `runProfile` 调用方可以显式选择 link 模式以物化 runtime resolution，选择 dual 模式以物化并校验它。打包可执行文件始终使用 runtime 模式。

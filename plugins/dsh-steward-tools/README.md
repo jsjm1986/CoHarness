@@ -10,6 +10,7 @@ Tool surface for the reserved **steward** maintenance runtime: one audited SQL c
 - Read statements (`SELECT`/`WITH`/`VALUES`/`TABLE`/`SHOW`/`EXPLAIN`) execute directly. Anything else first asks the operator through the session approval channel, then carries the granted approval id to the Gateway, which re-verifies it against `conversation_interaction_responses` before executing.
 - `dry_run` returns the statement's `EXPLAIN` plan without executing — including for writes, which need no approval because nothing is applied.
 - `row_limit` bounds returned read rows and dry-run plan rows. The Gateway's result-size limit can truncate either response earlier; the tool marks truncated plans and read results explicitly.
+- Cancelling the tool stops its Gateway request. The Gateway owns the recorded outcome of any statement it has already accepted.
 - Every attempt — read, denied, failed, applied — is journaled by the Gateway in `harness.steward_query_log`.
 - Registers the `steward:policy` system-prompt section so the model knows it runs in the maintenance channel: audited SQL, read-only transactions, in-conversation write approval, journaling.
 

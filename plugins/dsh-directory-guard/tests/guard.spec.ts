@@ -194,6 +194,24 @@ describe('decideDeny', () => {
 })
 
 describe('mounted tools/pre-execute guard', () => {
+  it('requires read or write access to the path selected by the tool', async () => {
+    const home = scratch()
+    const elsewhere = scratch()
+    const ctx = new Context()
+    const stop = registerGuard(ctx, () => [{ path: home, mode: 'ro' }])
+    try {
+      await expect(ctx.serial('fs/authorize-target', join(home, 'input.docx'), 'read')).resolves.toBeUndefined()
+      await expect(ctx.serial('fs/authorize-target', join(home, 'input.docx'), 'write')).rejects
+        .toMatchObject({ code: 'FS_PERMISSION_DENIED' })
+      await expect(ctx.serial('fs/authorize-target', join(elsewhere, 'input.docx'), 'read')).rejects
+        .toMatchObject({ code: 'FS_PERMISSION_DENIED' })
+      stop()
+      await expect(ctx.serial('fs/authorize-target', join(home, 'input.docx'), 'write')).resolves.toBeUndefined()
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('resolves through ctx.fs from the Session working directory and delegates unknown tools', async () => {
     const root = scratch()
     const home = join(root, 'home'); mkdirSync(home)

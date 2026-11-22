@@ -728,6 +728,23 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     await ctx.fiber.dispose()
   })
 
+  it('refuses to create a Session whose SSH target cannot survive a restart', async () => {
+    const path = await freshDbPath('dsh-sqlite-ssh-')
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(SessionPersistenceSqlite, { path })
+      const id = SessionId('ssh-sqlite')
+      await expect(ctx.sessionPersistence.createStored({
+        id, version: SESSION_FORMAT_VERSION, createdAt: 1, cwd: '/work', isSeeded: false, sshTarget: 42,
+      })).rejects.toThrow('cannot retain a managed SSH target')
+      expect(ctx.sessionPersistence.isPending(id)).toBe(false)
+      expect(await ctx.sessionPersistence.listSnapshots()).toEqual([])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('folds exact content metadata for a draft row after restart', async () => {
     const path = await freshDbPath('dsh-sqlite-draft-')
     const ctx = new Context()

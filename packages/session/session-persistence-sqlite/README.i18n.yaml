@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-persistence-sqlite/README.md
 document:
-  en: fc251122c477cae127374b39876341f647bd8038
-  zh: 6021519dd23eaf23b6b079a5b153455b47570071
+  en: 22945220f115b115f8b3ad5a2fc3670c905c6a52
+  zh: 06babe4f7dc52746f3ddacec0100df6a1d231c7e
 /:
   en: 970fcde77dd91fde
   zh: 61495d48365178df
@@ -21,8 +21,8 @@ document:
   en: ed8c595815fc80aa
   zh: 7a823430712b802c
 /deepseek-ai-dsh-session-persistence-sqlite/schema-compatibility:
-  en: 789b783b60c25e0a
-  zh: d99c31a8b504d8ea
+  en: 5e63537df6fd9f1a
+  zh: d4b2c0b92773f432
 /deepseek-ai-dsh-session-persistence-sqlite/configuration-schemastery:
   en: ab6a5a31f2501979
   zh: d9db81b116cbb225

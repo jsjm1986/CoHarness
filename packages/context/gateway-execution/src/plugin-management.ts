@@ -24,6 +24,13 @@ const protectedModules = new Set([
   '@deepseek-ai/dsh-directory-guard',
   '@deepseek-ai/dsh-sandbox-policy',
   '@deepseek-ai/dsh-fs-sandbox',
+  '@deepseek-ai/dsh-sandbox-local',
+  '@deepseek-ai/dsh-bash-sandbox',
+  '@deepseek-ai/dsh-pwsh-sandbox',
+  '@deepseek-ai/dsh-permission-presets',
+  '@deepseek-ai/dsh-user-approval',
+  '@deepseek-ai/dsh-userdoc-gateway',
+  '@deepseek-ai/dsh-steward-tools',
   '@deepseek-ai/dsh-archive-gateway',
 ])
 

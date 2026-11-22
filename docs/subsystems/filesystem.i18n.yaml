@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/filesystem.md
 document:
-  en: 113e4915f31f9886a34e31b08a7eb27757ce952d
-  zh: 838393df510414fd0cbb3472522ec82e5d5ee165
+  en: f41be8af7d9fd96d61c4297ef8d79f9377409ae4
+  zh: bd912e0d5c32e2c41e24a4d41e9ed66afdd7f22f
 /filesystem:
   en: 9085200a1975c5cd
   zh: 48af21e513f7dc25
