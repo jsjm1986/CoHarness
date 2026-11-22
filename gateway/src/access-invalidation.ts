@@ -38,6 +38,17 @@ export interface GatewayAccessMonitor {
    * @returns whether the local monitor still admits that exact revision.
    */
   matchesRevision?(revision: bigint): boolean
+  /**
+   * Read the connected monitor's current applied revision without querying the database.
+   * @returns applied organization revision while LISTEN is live and caught up, otherwise undefined.
+   */
+  currentRevision?(): bigint | undefined
+  /**
+   * Ensure the local monitor has applied at least `revision`, skipping a database query when already caught up.
+   * @param revision - revision already observed by the forwarding primary.
+   * @returns true while the connected monitor has applied at least `revision`.
+   */
+  ensureAtLeast?(revision: bigint): Promise<boolean>
   /** Register cancellation/projection work, awaited before its revision is acknowledged. */
   subscribe(listener: (subject: AccessInvalidationSubject) => void | Promise<void>): () => void
 }
@@ -71,6 +82,8 @@ export function scopeAccessMonitor(monitor: GatewayAccessMonitor, nodeId: Runtim
     synchronize: purpose => monitor.synchronize(purpose),
     ...(monitor.synchronizeTo === undefined ? {} : { synchronizeTo: (revision: bigint) => monitor.synchronizeTo!(revision) }),
     ...(monitor.matchesRevision === undefined ? {} : { matchesRevision: (revision: bigint) => monitor.matchesRevision!(revision) }),
+    ...(monitor.currentRevision === undefined ? {} : { currentRevision: () => monitor.currentRevision!() }),
+    ...(monitor.ensureAtLeast === undefined ? {} : { ensureAtLeast: (revision: bigint) => monitor.ensureAtLeast!(revision) }),
     subscribe: listener => monitor.subscribe(subject => subject.nodeId === undefined || subject.nodeId === nodeId ? listener(subject) : undefined),
   }
 }
@@ -194,6 +207,20 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
    * @returns whether listeners have applied it and the monitor remains available.
    */
   matchesRevision(revision: bigint): boolean { return this.available && this.cursor === revision }
+
+  /** @returns current applied organization access revision while LISTEN is live and caught up. */
+  currentRevision(): bigint | undefined { return this.available ? this.cursor : undefined }
+
+  /**
+   * Skip a tunnel database query when the connected LISTEN monitor is already at or beyond `revision`.
+   * @param revision - revision already synchronized on the forwarding primary.
+   * @returns whether the monitor is available and applied through at least `revision`.
+   */
+  async ensureAtLeast(revision: bigint): Promise<boolean> {
+    if (this.available && this.cursor !== undefined && this.cursor >= revision) return true
+    await this.synchronize()
+    return this.available && this.cursor !== undefined && this.cursor >= revision
+  }
 
   private readFresh(): NonNullable<PostgresAccessMonitor['flight']> {
     if (this.closed) throw new Error('access monitor is closed')

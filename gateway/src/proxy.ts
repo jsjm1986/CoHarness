@@ -350,9 +350,26 @@ export function createProxyHandlers(
           res?.writeHead(400, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end('{"error":"invalid-prepare-continuation"}')
           return null
         }
-        const prepared = await instances.prepareSessionRuntime(context.runtime, continuation as RuntimePreparationId | undefined)
+        const waitAbort = new AbortController()
+        const onDisconnect = (): void => { if (res === null || !res.writableFinished) waitAbort.abort() }
+        req.once('aborted', onDisconnect)
+        res?.once('close', onDisconnect)
+        if (req.aborted || res?.destroyed === true) waitAbort.abort()
+        let prepared: Awaited<ReturnType<typeof instances.prepareSessionRuntime>>
+        try {
+          prepared = await instances.prepareSessionRuntime(
+            context.runtime,
+            continuation as RuntimePreparationId | undefined,
+            cfg.runtimePrepareWaitMs,
+            waitAbort.signal,
+          )
+        } finally {
+          req.removeListener('aborted', onDisconnect)
+          res?.removeListener('close', onDisconnect)
+        }
+        if (res?.destroyed === true) return null
         if (prepared.kind === 'ready') return { ...prepared.endpoint, target }
-        res?.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store', 'retry-after': '2' }).end(JSON.stringify({
+        res?.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store', 'retry-after': '1' }).end(JSON.stringify({
           error: { code: 'INSTANCE_STARTING', message: 'The runtime is starting. Retry shortly.' },
           preparation: { id: prepared.id, waitMs: Math.min(2_147_483_647, cfg.runtimeCapacity.maxQueueWaitMs + cfg.readinessTimeoutMs) },
         }))
@@ -419,13 +436,22 @@ export function createProxyHandlers(
     }
   }
 
+  const synchronizeAccess = async (forwardedRevision?: bigint): Promise<void> => {
+    const monitor = deps.accessMonitor
+    if (monitor === undefined) return
+    if (forwardedRevision !== undefined && monitor.ensureAtLeast !== undefined) {
+      if (await monitor.ensureAtLeast(forwardedRevision)) return
+    }
+    await monitor.synchronize()
+  }
+
   const proxyRequest: ProxyHandler = async (req, res, context) => {
     const originalUrl = req.url
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     const lang = gateLanguage(req.headers.cookie)
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
-    await deps.accessMonitor?.synchronize()
+    await synchronizeAccess(context.forwardedAccessRevision)
     if (res.destroyed) return
     let ready = await timeOperation('prepare',()=>ensureReady(req, res, context, lang))
     delete req.headers['x-dsh-prepare-continuation']
@@ -764,7 +790,7 @@ export function createProxyHandlers(
     const eventConnection = ['/api/events.mux', '/api/events.host'].includes(new URL(req.url ?? '/', 'http://gateway.invalid').pathname)
     let ready: { port: number; generation: number; target: RuntimeTarget }
     try {
-      await deps.accessMonitor?.synchronize()
+      await synchronizeAccess(context.forwardedAccessRevision)
       if (socket.destroyed) return
       const resolved = await ensureReady(req, null, context, lang)
       if (resolved === null) throw new Error('runtime did not start')

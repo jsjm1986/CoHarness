@@ -190,7 +190,7 @@ describe('proxy handlers', () => {
     const catalog: RuntimeCatalogEntry = { id: environment.id, owner: { kind: 'personal', id: 1, name: 'Alice' },
       node: { id: environment.nodeId, name: 'Fixture', status: 'active', lastHeartbeatAt: null },
       generation: 1, observedState: 'stopped', routing: 'unavailable' }
-    const { deps, base, cookie, alice, db } = await setup(false, {}, undefined, {
+    const { deps, base, cookie, alice, db } = await setup(false, { HGW_RUNTIME_PREPARE_WAIT_MS: '0' }, undefined, {
       async placement() { return { target: 'personal', local: true, resetScope: false, environment: catalog } },
       async landing() { return { target: 'personal', local: true, resetScope: false, environment: catalog } },
       async resolve(user) { return { context: { user, scope: { kind: 'personal' }, runtime: user, environment }, resetScope: false } },
@@ -205,7 +205,7 @@ describe('proxy handlers', () => {
       const first = await request()
       expect(first.status, await first.clone().text()).toBe(503)
       expect(first.headers.get('x-dsh-runtime-id')).toBe(environment.id)
-      expect(first.headers.get('retry-after')).toBe('2')
+      expect(first.headers.get('retry-after')).toBe('1')
       expect(first.headers.get('cache-control')).toBe('no-store')
       const pending = await first.json() as { error: { code: string }; preparation: { id: string; waitMs: number } }
       expect(pending).toMatchObject({ error: { code: 'INSTANCE_STARTING' }, preparation: { waitMs: deps.cfg.runtimeCapacity.maxQueueWaitMs + deps.cfg.readinessTimeoutMs } })
@@ -226,6 +226,28 @@ describe('proxy handlers', () => {
       await revoked.body?.cancel()
       expect(await deps.instances.isLive(alice.id)).toBe(true)
     } finally { release.resolve() }
+  })
+
+  it('resolves a fast cold /api/prepare/v1/* start in one HTTP request within HGW_RUNTIME_PREPARE_WAIT_MS', async () => {
+    const environment = { id: '00000000-0000-4000-8000-000000000093' as RuntimeId, nodeId: '00000000-0000-4000-8000-000000000094' as RuntimeNodeId }
+    const catalog: RuntimeCatalogEntry = { id: environment.id, owner: { kind: 'personal', id: 1, name: 'Alice' },
+      node: { id: environment.nodeId, name: 'Fixture', status: 'active', lastHeartbeatAt: null },
+      generation: 1, observedState: 'stopped', routing: 'unavailable' }
+    const { deps, base, cookie, alice } = await setup(false, { HGW_RUNTIME_PREPARE_WAIT_MS: '5000' }, undefined, {
+      async placement() { return { target: 'personal', local: true, resetScope: false, environment: catalog } },
+      async landing() { return { target: 'personal', local: true, resetScope: false, environment: catalog } },
+      async resolve(user) { return { context: { user, scope: { kind: 'personal' }, runtime: user, environment }, resetScope: false } },
+    })
+    const url = `${base}/api/prepare/v1/session.create?dshRuntime=${environment.id}&dshTarget=personal&dshNode=${environment.nodeId}`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: '{}',
+    })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('x-dsh-runtime-id')).toBe(environment.id)
+    await response.body?.cancel()
+    expect(await deps.instances.isLive(alice.id)).toBe(true)
   })
 
   it('projects recovery plugin state without marking it consumed by a running process', async () => {

@@ -64,6 +64,7 @@ import {
 } from './launch-stamp.ts'
 
 const POLL_INTERVAL_MS = 300
+const READINESS_POLL_SCHEDULE_MS = [50, 100, 150, 200, POLL_INTERVAL_MS] as const
 const STOP_GRACE_MS = 5000
 /** Bound on a single loopback probe; an unanswered port stays conservative-occupied. */
 const PORT_PROBE_TIMEOUT_MS = 1000
@@ -1290,12 +1291,15 @@ export class InstanceManager {
   }
 
   /**
-   * Admit an explicit Session preparation without holding HTTP open for process readiness.
+   * Admit an explicit Session preparation with an optional bounded short-wait for fast cold starts.
    * @param subject - freshly authorized exact Runtime owner.
    * @param continuation - receipt of an accepted start; cannot start or replace a generation.
+   * @param waitMs - bounded milliseconds to wait for an in-flight start to settle before returning a pending receipt; 0 returns immediately.
+   * @param signal - caller disconnect cancellation during the bounded short-wait; never cancels the underlying Runtime start.
    * @returns a verified endpoint or a receipt for the same outstanding start.
    */
-  async prepareSessionRuntime(subject: RuntimeSubject, continuation?: RuntimePreparationId): Promise<RuntimePreparation> {
+  async prepareSessionRuntime(subject: RuntimeSubject, continuation?: RuntimePreparationId,
+    waitMs = 0, signal?: AbortSignal): Promise<RuntimePreparation> {
     const target = runtimeTargetOf(subject), key = targetKey(target)
     let receipt = this.preparations.get(key)
     if (continuation !== undefined) {
@@ -1315,6 +1319,19 @@ export class InstanceManager {
     }
     await receipt.request.admission
     if (this.preparations.get(key) !== receipt) throw new RuntimeStartBlockedError('unavailable', 'Runtime preparation expired. Start a new preparation explicitly.')
+    if (receipt.result === undefined && waitMs > 0 && signal?.aborted !== true) {
+      const waitAbort = new AbortController()
+      const timerSignal = signal === undefined ? waitAbort.signal : AbortSignal.any([signal, waitAbort.signal])
+      try {
+        await Promise.race([
+          receipt.request.completion.then(() => undefined, () => undefined),
+          delay(waitMs, undefined, { signal: timerSignal }).catch(() => undefined),
+        ])
+      } finally {
+        waitAbort.abort()
+      }
+      if (this.preparations.get(key) !== receipt) throw new RuntimeStartBlockedError('unavailable', 'Runtime preparation expired. Start a new preparation explicitly.')
+    }
     if (receipt.result === undefined) return { kind: 'pending', id: receipt.id }
     if (!receipt.result.ok) throw receipt.result.error
     const endpoint = await this.liveEndpoint(target)
@@ -1763,6 +1780,7 @@ export class InstanceManager {
       } as const
       const readinessRequest = runtimeReadinessRequestProof(runtimeToken, readinessNonce, readinessIdentity)
       const readinessExpected = runtimeReadinessResponseProof(runtimeToken, readinessNonce, readinessIdentity)
+      let pollAttempt = 0
       while (withinDeadline()) {
         let authenticated = false
         try {
@@ -1812,7 +1830,9 @@ export class InstanceManager {
         }
         const remaining = deadline - performance.now()
         if (remaining <= 0) break
-        try { await delay(Math.min(POLL_INTERVAL_MS, remaining), undefined, { signal }) }
+        const nextDelayMs = READINESS_POLL_SCHEDULE_MS[Math.min(pollAttempt, READINESS_POLL_SCHEDULE_MS.length - 1)]!
+        pollAttempt += 1
+        try { await delay(Math.min(nextDelayMs, remaining), undefined, { signal }) }
         catch (error) {
           if (signal.aborted) throw new RuntimeCapacityError('cancelled')
           throw error

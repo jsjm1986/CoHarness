@@ -84,6 +84,8 @@ export interface GatewayConfig {
   nodeServiceIdentityCacheMs: number
   /** Maximum byte budget for Center-side caching of remote immutable `/plugins/*` bundles (HGW_RUNTIME_ASSET_CACHE_MAX_BYTES; 0 disables). */
   runtimeAssetCacheMaxBytes: number
+  /** Bounded server-side short-wait during cold `/api/prepare/v1/*` requests before returning 503 pending (HGW_RUNTIME_PREPARE_WAIT_MS; 0 disables). */
+  runtimePrepareWaitMs: number
   /** Heartbeat interval for a managed runtime's execution revocation stream. */
   executionWatchHeartbeatMs: number
   /** Maximum bytes retained or streamed from one runtime upstream response. */
@@ -1011,6 +1013,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       if (raw === undefined) return 32 * 1024 * 1024
       const resolved = Number(raw)
       if (!Number.isSafeInteger(resolved) || resolved < 0) throw new Error('HGW_RUNTIME_ASSET_CACHE_MAX_BYTES must be a non-negative safe integer')
+      return resolved
+    })(),
+    runtimePrepareWaitMs: (() => {
+      const raw = env.HGW_RUNTIME_PREPARE_WAIT_MS
+      if (raw === undefined) return 1_500
+      const resolved = Number(raw)
+      if (!Number.isSafeInteger(resolved) || resolved < 0 || resolved > 2_147_483_647) {
+        throw new Error('HGW_RUNTIME_PREPARE_WAIT_MS must be a non-negative safe integer within timer range')
+      }
       return resolved
     })(),
     executionWatchHeartbeatMs: timerDelay(env.HGW_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, 'HGW_EXECUTION_WATCH_HEARTBEAT_MS'),

@@ -157,4 +157,14 @@ describe('forwarded principal assertions', () => {
     expect(legacyClaims).not.toBeNull()
     expect(forwardRequestMatches(legacyClaims!, { method: 'POST', path: '/x', sessionToken: 'session-token' })).toBe(false)
   })
+
+  it('verifies optional numeric accessRevision and rejects malformed values', () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+    const now = 100_000
+    const signer = new GatewayPrincipalSigner(privateKey, 'acme', 1000)
+    const valid = signer.issueForward({ issuerNode: NODE_A, audienceNode: NODE_B, user: USER, now, accessRevision: '42' })
+    expect(verifyGatewayForward(valid, publicKey, { audienceNode: NODE_B, organization: 'acme', now })?.accessRevision).toBe('42')
+    const malformed = signer.issueForward({ issuerNode: NODE_A, audienceNode: NODE_B, user: USER, now, accessRevision: 'not-a-rev' })
+    expect(verifyGatewayForward(malformed, publicKey, { audienceNode: NODE_B, organization: 'acme', now })).toBeNull()
+  })
 })

@@ -696,6 +696,8 @@ export interface GatewayRequestContext {
   runtime: RuntimeSubject
   /** Explicit stable environment identity; process generation is resolved by the local lifecycle owner. */
   environment?: { id: import('./runtime-catalog.ts').RuntimeId; nodeId: import('./runtime-catalog.ts').RuntimeNodeId; nodeName?: string }
+  /** Verified organization access revision already synchronized by the forwarding primary. */
+  forwardedAccessRevision?: bigint
 }
 
 export type ProxyHandler = (req: IncomingMessage, res: ServerResponse, context: GatewayRequestContext) => Promise<void>
@@ -990,7 +992,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   const parsedTarget = (raw: string | null | undefined): 'personal' | `project:${number}` =>
     raw !== undefined && raw !== null && /^project:[1-9][0-9]*$/u.test(raw) ? raw as `project:${number}` : 'personal'
 
-  const requestContext = (req: IncomingMessage, user: UserRow, checked?:RuntimePlacement,
+  const requestContext = async (req: IncomingMessage, user: UserRow, checked?:RuntimePlacement,
     forward?: import('./forwarded-principal.ts').GatewayForwardClaims) => {
     const query = new URL(req.url ?? '/', 'http://x').searchParams
     const runtimeId = query.get('dshRuntime'), target = query.get('dshTarget')
@@ -1000,17 +1002,20 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     // selectors exactly and the claimed environment lands on this node. The
     // destination still resolves scope and node-local runtime storage itself.
     const claimed = forward?.context, effectiveTarget = target ?? parsedTarget(scopeCookie)
+    const forwardedAccessRevision = forward?.accessRevision === undefined ? undefined : BigInt(forward.accessRevision)
+    const attach = (resolved: Awaited<ReturnType<typeof runtimeRouter.resolve>>) => forwardedAccessRevision === undefined
+      ? resolved : { ...resolved, context: { ...resolved.context, forwardedAccessRevision } }
     if (claimed !== undefined && forward?.selection !== undefined
       && (forward.selection.runtimeId ?? null) === runtimeId
       && (forward.selection.target ?? null) === effectiveTarget
       && claimed.environment.nodeId === deps.nodeServiceIdentity?.nodeId) {
       const claimedTarget = forward.selection.target as 'personal' | `project:${number}`
-      return runtimeRouter.resolve(user, { runtimeId, target: claimedTarget, scopeCookie },
+      return attach(await runtimeRouter.resolve(user, { runtimeId, target: claimedTarget, scopeCookie },
         { target: claimedTarget, local: true, resetScope: false,
           environment: { id: claimed.environment.id,
-            node: { id: claimed.environment.nodeId, name: claimed.environment.nodeName } } as RuntimePlacement['environment'] })
+            node: { id: claimed.environment.nodeId, name: claimed.environment.nodeName } } as RuntimePlacement['environment'] }))
     }
-    return runtimeRouter.resolve(user, { runtimeId, target, scopeCookie },checked)
+    return attach(await runtimeRouter.resolve(user, { runtimeId, target, scopeCookie }, checked))
   }
 
   const conversationRuntime = (context: GatewayRequestContext): import('./runtime-catalog.ts').RuntimeId => {

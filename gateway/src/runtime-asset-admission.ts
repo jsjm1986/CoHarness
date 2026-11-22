@@ -163,7 +163,7 @@ export class PostgresRuntimeAssetAdmission {
    */
   async admitSession(request: RuntimeAssetRequest & { nodeId: RuntimeNodeId; target: RuntimePlacement['target'] },
     generation: number, issuer?: { nodeId: RuntimeNodeId; publicKey: string }, recordStartActivity = true): Promise<RuntimeAssetAdmission | null> {
-    const nodeProjects = issuer === undefined && request.target !== 'personal' && !recordStartActivity ? this.nodeProjects : undefined
+    const nodeProjects = request.target !== 'personal' && !recordStartActivity ? this.nodeProjects : undefined
     const shareInstanceLock = !recordStartActivity && (request.target === 'personal' || nodeProjects !== undefined)
     const parameters = [...this.parameters(issuer === undefined ? request : { ...request, entryNodeId: issuer.nodeId }),
       request.nodeId, generation, request.target, ...(shareInstanceLock ? [] : [Date.now()]), String(this.writeEpoch)]
@@ -193,7 +193,7 @@ export class PostgresRuntimeAssetAdmission {
     if (result.issuer_lease_exp != null) admission.expiresAt = Math.min(admission.expiresAt, result.issuer_lease_exp.getTime())
     if (admission.scope.kind === 'personal') return admission
     if (row?.project_content != null && nodeProjects !== undefined) {
-      return this.admitNodeProjectRead(request, admission, initial ?? undefined, row.project_content, nodeProjects)
+      return this.admitNodeProjectRead(request, admission, initial ?? undefined, row.project_content, nodeProjects, issuer)
     }
     if (row?.legacy_project_name == null) return null
     if (row.legacy_project_path !== initial?.legacy_project_path) throw new RuntimeAssetUnavailableError(403, 'access-revoked')
@@ -201,7 +201,8 @@ export class PostgresRuntimeAssetAdmission {
   }
 
   private async admitNodeProjectRead(request: RuntimeAssetRequest, admitted: RuntimeAssetAdmission, initial: Row | undefined,
-    binding: NonNullable<ProjectContentRef['content']>, nodeProjects: Pick<NodeProjectMetadata, 'lookup'>): Promise<RuntimeAssetAdmission> {
+    binding: NonNullable<ProjectContentRef['content']>, nodeProjects: Pick<NodeProjectMetadata, 'lookup'>,
+    issuer?: { nodeId: RuntimeNodeId; publicKey: string }): Promise<RuntimeAssetAdmission> {
     const retained = admitted.snapshot
     if (!admitted.placement.local || binding.runtimeId !== request.runtimeId || binding.nodeId !== request.nodeId
       || !isDeepStrictEqual(initial?.project_content, binding)) {
@@ -209,14 +210,30 @@ export class PostgresRuntimeAssetAdmission {
     }
     const display = (await nodeProjects.lookup([{ content: binding }], retained.generation)).get(binding.projectId)!
     // No governance connection remains locked while the node reads its volume.
-    const { rows: [result] } = await this.context.pool.query<{ snapshot: Row | null }>(
-      `SELECT ${admissionSnapshot} snapshot`, this.parameters(request))
-    const row = result?.snapshot ?? undefined
+    const scopedRequest = issuer === undefined ? request : { ...request, entryNodeId: issuer.nodeId }
+    const baseParameters = this.parameters(scopedRequest)
+    const recheckSql = issuer === undefined
+      ? `SELECT ${admissionSnapshot} snapshot`
+      : `WITH issuer AS MATERIALIZED (
+          SELECT o.access_revision::text issuer_revision, key.lease_exp issuer_lease_exp
+          FROM (${nodePrincipalKeyQuery(5)}) key
+          JOIN harness.organizations o ON o.id=$1 AND o.status='active'
+          WHERE key.pem=$6
+        ) SELECT ${admissionSnapshot} snapshot, issuer_revision, issuer_lease_exp FROM issuer`
+    const { rows: [result] } = await this.context.pool.query<{
+      snapshot: Row | null; issuer_revision?: string; issuer_lease_exp?: Date | null
+    }>(recheckSql, issuer === undefined ? baseParameters : [...baseParameters, issuer.publicKey])
+    if (result === undefined) throw new RuntimeAssetUnavailableError(403, 'access-revoked')
+    const row = result.snapshot ?? undefined
     this.assertServing(row)
+    if (row !== undefined && result.issuer_revision !== undefined && row.access_revision !== result.issuer_revision) {
+      throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
+    }
     if (!isDeepStrictEqual(row?.project_content, binding)) {
       throw new RuntimeAssetUnavailableError(403, 'access-revoked')
     }
     const current = this.admission(request, row)
+    if (result.issuer_lease_exp != null) current.expiresAt = Math.min(current.expiresAt, result.issuer_lease_exp.getTime())
     if (current.accessRevision !== admitted.accessRevision || current.scope.kind !== 'project'
       || current.snapshot.generation !== retained.generation
       || current.snapshot.port !== retained.port || current.snapshot.launchStamp !== retained.launchStamp

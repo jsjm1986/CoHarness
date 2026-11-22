@@ -513,6 +513,7 @@ async (target, user, request, personalRead) => {
   // can adopt it as a checked placement; scope and runtime storage are
   // node-local data the destination resolves itself.
   const environment = target.environment
+  const accessRevision = accessMonitor.currentRevision()
   return principalKeys.signer.issueForward({
     issuerNode: context.nodeId, audienceNode: target.nodeId, user,
     selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
@@ -521,6 +522,7 @@ async (target, user, request, personalRead) => {
         ...(personalRead === undefined ? {} : { personalRead }),
       } }),
     request,
+    ...(accessRevision === undefined ? {} : { accessRevision: String(accessRevision) }),
   })
 })
 const runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter({ collaboration, instances }), {

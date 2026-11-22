@@ -25,6 +25,7 @@ import { InstanceManager } from '../src/instances.ts'
 import { createGatewayServer, scopeCookie, type GatewayDeps } from '../src/server.ts'
 import { RuntimeAssets } from '../src/runtime-assets.ts'
 import { GatewayPrincipalSigner } from '../src/principal.ts'
+import { verifyGatewayForward } from '../src/forwarded-principal.ts'
 import { generateKeyPairSync } from 'node:crypto'
 import { brotliDecompressSync } from 'node:zlib'
 import { request as httpRequest } from 'node:http'
@@ -77,11 +78,22 @@ async function close(server: Server): Promise<void> {
   await new Promise<void>((resolve, reject) => { server.close(error => { if (error) reject(error); else resolve() }) })
 }
 
-class SyntheticAccessMonitor implements Pick<GatewayAccessMonitor, 'subscribe' | 'synchronize' | 'available'> {
+class SyntheticAccessMonitor implements Pick<GatewayAccessMonitor, 'subscribe' | 'synchronize' | 'available' | 'currentRevision' | 'ensureAtLeast'> {
   readonly available = true
   private readonly listeners = new Set<(subject: AccessInvalidationSubject) => void | Promise<void>>()
+  private revision = 1n
   syncCalls = 0
-  constructor(private readonly rttMs: number) {}
+  ensureAtLeastSkips = 0
+  constructor(private readonly rttMs: number, private readonly sharedDbRevision: { current: bigint }) {}
+  currentRevision(): bigint | undefined { return this.available ? this.revision : undefined }
+  async ensureAtLeast(revision: bigint): Promise<boolean> {
+    if (this.available && this.revision >= revision) {
+      this.ensureAtLeastSkips += 1
+      return true
+    }
+    await this.synchronize()
+    return this.available && this.revision >= revision
+  }
   subscribe(listener: (subject: AccessInvalidationSubject) => void | Promise<void>): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
@@ -89,9 +101,17 @@ class SyntheticAccessMonitor implements Pick<GatewayAccessMonitor, 'subscribe' |
   async synchronize(): Promise<void> {
     this.syncCalls += 1
     if (this.rttMs > 0) await delay(this.rttMs)
+    this.revision = this.sharedDbRevision.current
   }
-  async emit(subject: AccessInvalidationSubject): Promise<void> {
+  async emit(subject: AccessInvalidationSubject, peers: SyntheticAccessMonitor[] = []): Promise<void> {
+    this.sharedDbRevision.current += 1n
+    this.revision = this.sharedDbRevision.current
     for (const listener of this.listeners) await listener(subject)
+    // Simulate PostgreSQL NOTIFY propagating the committed revision to connected peers.
+    for (const peer of peers) {
+      peer.revision = this.sharedDbRevision.current
+      for (const listener of peer.listeners) await listener(subject)
+    }
   }
 }
 
@@ -166,8 +186,11 @@ async function main(): Promise<void> {
       pageForAdministrator: async () => ({ items: [environment], nextCursor: null }),
     }
 
-    const centerMonitor = new SyntheticAccessMonitor(CENTER_PG_RTT_MS)
-    const remoteMonitor = new SyntheticAccessMonitor(TUNNEL_PG_RTT_MS)
+    const sharedDbRevision = { current: 1n }
+    const centerMonitor = new SyntheticAccessMonitor(CENTER_PG_RTT_MS, sharedDbRevision)
+    const remoteMonitor = new SyntheticAccessMonitor(TUNNEL_PG_RTT_MS, sharedDbRevision)
+    const forwardKeys = generateKeyPairSync('ed25519')
+    const forwardSigner = new GatewayPrincipalSigner(forwardKeys.privateKey, lease.organizationId, 30_000)
     const channels = new GatewayNodeChannels({
       authorizeChannel: centerAuthorizeChannel,
       authorizeAdministratorNode: async () => remoteNodeId,
@@ -181,7 +204,21 @@ async function main(): Promise<void> {
       authorizeAccountNode: async () => {},
       resolvePlacement: (actor, selection) => centerRouter.placement(actor, selection),
       resetScopeCookie: () => scopeCookie('personal', centerConfig),
-    }, services, 15_000, centerConfig.nodeService, centerMonitor as unknown as GatewayAccessMonitor)
+    }, services, 15_000, centerConfig.nodeService, centerMonitor as unknown as GatewayAccessMonitor,
+    async (target, user, request) => {
+      const rev = centerMonitor.currentRevision()
+      return forwardSigner.issueForward({
+        issuerNode: localNodeId,
+        audienceNode: target.nodeId,
+        user,
+        selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
+        ...(target.environment === undefined || target.resolvedTarget === undefined ? {} : {
+          context: { environment: { id: target.environment.id, nodeId: target.environment.node.id, nodeName: target.environment.node.name } },
+        }),
+        request,
+        ...(rev === undefined ? {} : { accessRevision: String(rev) }),
+      })
+    })
     cleanups.push(async () => { await proxy.close(); await services.close(); await channels.close() })
 
     const makeDeps = (cfg: typeof centerConfig, id: RuntimeNodeId, authChannel: typeof centerAuthorizeChannel): GatewayDeps => ({
@@ -203,10 +240,19 @@ async function main(): Promise<void> {
     centerDeps.runtimeRouter = centerRouter
     remoteDeps.runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(remoteDeps), { localNodeId: remoteNodeId, catalog })
     remoteDeps.accessMonitor = remoteMonitor as unknown as GatewayAccessMonitor
+    remoteDeps.forwardedPrincipal = async assertion => verifyGatewayForward(assertion, forwardKeys.publicKey, {
+      audienceNode: remoteNodeId,
+      organization: lease.organizationId,
+    })
 
     const remoteWss = new WebSocketServer({ noServer: true })
     remoteWss.on('headers', headers => { headers.push(`${NODE_SERVICE_TARGET_HEADER}: ${remoteNodeId}`) })
     cleanups.push(async () => { await new Promise<void>(resolve => { remoteWss.close(() => { resolve() }) }) })
+
+    const syncRemoteAccess = async (forwardedRevision?: bigint) => {
+      if (forwardedRevision !== undefined && await remoteMonitor.ensureAtLeast(forwardedRevision)) return
+      await remoteMonitor.synchronize()
+    }
 
     const remoteServer = createGatewayServer(remoteDeps, {
       readySession: async (_req, res) => {
@@ -217,16 +263,16 @@ async function main(): Promise<void> {
         res.end('{"ok":true,"route":"readySession"}')
         return true
       },
-      proxy: async (_req, res) => {
-        // Simulates remote proxy.ts slow-path admission: accessMonitor.synchronize() + 2 serial PG checks over tunnel
-        await remoteMonitor.synchronize()
+      proxy: async (_req, res, context) => {
+        // Simulates remote proxy.ts slow-path admission with Wave 3 ensureAtLeast sync skip + 2 serial PG checks.
+        await syncRemoteAccess(context.forwardedAccessRevision)
         pgCounts.remoteTunnelProxyAdmission += 2
         if (TUNNEL_PG_RTT_MS > 0) await delay(TUNNEL_PG_RTT_MS * 2)
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end('{"ok":true}')
       },
-      upgrade: async (req, socket, head) => {
-        await remoteMonitor.synchronize()
+      upgrade: async (req, socket, head, context) => {
+        await syncRemoteAccess(context.forwardedAccessRevision)
         remoteWss.handleUpgrade(req, socket, head, ws => {
           ws.send('{"ready":true}')
         })
@@ -278,6 +324,7 @@ async function main(): Promise<void> {
       ...pgCounts,
       centerAccessSync: centerMonitor.syncCalls,
       remoteTunnelAccessSync: remoteMonitor.syncCalls,
+      remoteTunnelAccessSyncSkipped: remoteMonitor.ensureAtLeastSkips,
       forwarding: proxy.diagnostics(),
     })
     const delta = (before: ReturnType<typeof snapshotCounters>, after: ReturnType<typeof snapshotCounters>) => ({
@@ -287,6 +334,7 @@ async function main(): Promise<void> {
       remoteTunnelReadySession: after.remoteTunnelReadySession - before.remoteTunnelReadySession,
       centerAccessSync: after.centerAccessSync - before.centerAccessSync,
       remoteTunnelAccessSync: after.remoteTunnelAccessSync - before.remoteTunnelAccessSync,
+      remoteTunnelAccessSyncSkipped: after.remoteTunnelAccessSyncSkipped - before.remoteTunnelAccessSyncSkipped,
       poolOpened: after.forwarding.pool.opened - before.forwarding.pool.opened,
       poolReused: after.forwarding.pool.reused - before.forwarding.pool.reused,
       poolQueued: after.forwarding.pool.queued - before.forwarding.pool.queued,
@@ -341,7 +389,7 @@ async function main(): Promise<void> {
 
     // Scenario 3: Unrelated org-wide invalidation followed by 4 concurrent requests
     const s3Before = snapshotCounters()
-    await centerMonitor.emit({ userId: 999999 })
+    await centerMonitor.emit({ userId: 999999 }, [remoteMonitor])
     await delay(10)
     const s3Start = performance.now()
     const s3Samples = await Promise.all([callOne(), callOne(), callOne(), callOne()])

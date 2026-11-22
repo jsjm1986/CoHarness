@@ -60,6 +60,8 @@ export interface GatewayForwardClaims {
    * or replayed assertion is worthless without the forwarded session.
    */
   request?: { method: string; path: string; sessionHash: string }
+  /** Organization access revision synchronized by the forwarding primary before signing. */
+  accessRevision?: string
   issuedAt: number
   expiresAt: number
   nonce: string
@@ -174,6 +176,9 @@ function forwardClaims(value: unknown): GatewayForwardClaims {
       || typeof request.path !== 'string' || typeof request.sessionHash !== 'string') {
       throw new Error('invalid forwarded principal claims')
     }
+  }
+  if (claims.accessRevision !== undefined && (typeof claims.accessRevision !== 'string' || !/^[0-9]{1,20}$/u.test(claims.accessRevision))) {
+    throw new Error('invalid forwarded principal claims')
   }
   return value as GatewayForwardClaims
 }

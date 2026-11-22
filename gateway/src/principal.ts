@@ -252,6 +252,8 @@ export class GatewayPrincipalSigner {
     context?: unknown
     /** Exact request binding; without it the assertion is a bearer credential. */
     request?: { method: string; path: string; sessionHash: string }
+    /** Organization access revision synchronized by the forwarding primary before signing. */
+    accessRevision?: string
     now?: number
   }): string {
     const now = input.now ?? Date.now()
@@ -263,6 +265,7 @@ export class GatewayPrincipalSigner {
       ...(input.selection === undefined ? {} : { selection: input.selection }),
       ...(input.context === undefined ? {} : { context: input.context }),
       ...(input.request === undefined ? {} : { request: input.request }),
+      ...(input.accessRevision === undefined ? {} : { accessRevision: input.accessRevision }),
       issuedAt, expiresAt: issuedAt + this.ttlMs, nonce: randomUUID(),
     }
     return signedPayload(claims, this.privateKey)
