@@ -1,5 +1,11 @@
 /** Passive, paged account directory for an explicitly scoped multi-computer entry. */
 import type { OwnerProjectDisplay } from './project-metadata.ts'
+import {
+  clearVerifiedProjectDisplayCache,
+  evictVerifiedProjectDisplay,
+  lookupVerifiedProjectDisplay,
+  rememberVerifiedProjectDisplay,
+} from './project-display-cache.ts'
 import { addressRuntimeUrl, runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { SessionRuntimeTarget } from './contract/sessions.ts'
 
@@ -39,8 +45,11 @@ function environments(input: unknown, account: number): { entries: Environment[]
       || (owner.kind !== 'personal' && owner.kind !== 'project')) throw new Error('Invalid authorized Runtime')
     if (owner.kind === 'personal' && owner.id !== account) continue
     const location = { runtimeId: row.id, nodeId: String(node.id) as NonNullable<SessionRuntimeTarget['nodeId']>, nodeName: node.name }
+    const cached = owner.kind === 'project' && row.metadataOnNode === true
+      ? lookupVerifiedProjectDisplay(account, location.nodeId, owner.id, location.runtimeId)
+      : undefined
     const target: SessionRuntimeTarget = owner.kind === 'personal' ? { kind: 'personal', ...location }
-      : { kind: 'project', projectId: owner.id, projectName: row.metadataOnNode === true ? `#${owner.id}` : owner.name, ...location }
+      : { kind: 'project', projectId: owner.id, projectName: row.metadataOnNode === true ? (cached?.name ?? `#${owner.id}`) : owner.name, ...location }
     entries.push({ target, status: node.status, observedState: row.observedState,
       ...(row.metadataOnNode === true ? { metadataOnNode: true } : {}) })
   }
@@ -113,8 +122,16 @@ export class EntryDirectory {
     }
     this.entries = granted
     for (const key of this.retained.keys()) if (!granted.has(key)) this.retained.delete(key)
-    this.members = root.projects.map(record).map(member => member.metadataOnNode === true
-      ? { ...member, name: `#${String(member.projectId)}`, path: '' } : member)
+    this.members = root.projects.map(record).map((member) => {
+      if (member.metadataOnNode !== true) return member
+      const projectId = typeof member.projectId === 'number' ? member.projectId : undefined
+      const matched = projectId === undefined ? undefined
+        : [...granted.values()].find(row => row.target.kind === 'project' && row.target.projectId === projectId)?.target
+      const nodeId = typeof member.nodeId === 'string' ? member.nodeId : matched?.nodeId
+      const runtimeId = typeof member.runtimeId === 'string' ? member.runtimeId : matched?.runtimeId
+      const cached = projectId === undefined ? undefined : lookupVerifiedProjectDisplay(account, nodeId, projectId, runtimeId)
+      return { ...member, name: cached?.name ?? `#${String(member.projectId)}`, path: cached?.rootPath ?? '' }
+    })
     this.personal = { id: account, name: user.displayName }
     this.active = granted.get(runtimeTargetKey(bootstrap))?.target
     this.more = page.nextCursor
@@ -179,6 +196,12 @@ export class EntryDirectory {
     if (this.epoch !== version) throw new Error('Project directory changed')
     const target = this.target(String(display.projectId))
     if (target?.runtimeId !== display.runtimeId || target.nodeId !== display.nodeId) throw new Error('Project owner changed')
+    if (this.personal !== undefined) rememberVerifiedProjectDisplay(this.personal.id, display)
+    const entryKey = runtimeTargetKey(target)
+    const entry = this.entries.get(entryKey)
+    if (entry !== undefined && entry.target.kind === 'project') {
+      this.entries.set(entryKey, { ...entry, target: { ...entry.target, projectName: display.name } })
+    }
     this.members = this.members.map(row => row.projectId === display.projectId
       ? { ...row, name: display.name, path: display.rootPath, ownerDisplayLoaded: true } : row)
   }
@@ -302,8 +325,11 @@ export class EntryDirectory {
       }) }
   }
 
-  /** Revoke cached grants, private rows and any reads from this generation. */
-  clear(): void {
+  /** Revoke cached grants, private rows and any reads from this generation.
+   * @param evictDisplays - when true (default), also purge cached verified project labels for this account.
+   */
+  clear(evictDisplays = true): void {
+    if (evictDisplays && this.personal !== undefined) clearVerifiedProjectDisplayCache(this.personal.id)
     this.epoch++
     this.entries.clear()
     this.retained.clear()
@@ -316,6 +342,9 @@ export class EntryDirectory {
 
   private withdraw(target: SessionRuntimeTarget): void {
     const key = runtimeTargetKey(target)
+    if (target.kind === 'project' && this.personal !== undefined) {
+      evictVerifiedProjectDisplay(this.personal.id, target.nodeId, target.projectId, target.runtimeId)
+    }
     this.entries.delete(key)
     this.retained.delete(key)
     if (target.kind === 'project') this.members = this.members.filter(row => row.projectId !== target.projectId)

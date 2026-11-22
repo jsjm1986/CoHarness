@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RuntimeAllocationPolicyEditor } from '../components/RuntimeAllocationPolicyEditor.tsx'
 import { NodeConfigurationSection } from './NodeConfigurationSection.tsx'
 import { NodeAccessSection } from './NodeAccessSection.tsx'
+import { PerformanceDiagnosticsSection } from './PerformanceDiagnosticsSection.tsx'
 import { TunnelAccessSection } from './TunnelAccessSection.tsx'
 import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import { DatabaseBackup, HardDriveDownload, RefreshCw, ShieldCheck, Wrench } from 'lucide-react'
@@ -189,6 +190,8 @@ export function DeploymentPage() {
       <TunnelAccessSection />
 
       <NodeConfigurationSection />
+
+      <PerformanceDiagnosticsSection />
 
       {deployment.value?.scope === 'organization' && <Section flush title={t('nodesTitle')} meta={t('nodesMeta')}>
         {state === null ? null : state.nodes.length === 0 ? <EmptyState title={t('nodesEmpty')} /> : (

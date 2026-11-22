@@ -16,6 +16,8 @@ import { operationPhase, timeOperation } from './operation-timing.ts'
  * @returns the same stream with real transport reference, timeout and TCP controls.
  */
 export function nodeServiceHttpSocket(stream: Duplex, transport: Socket): Duplex {
+  // Disable Nagle on the underlying node-service TCP socket so small interactive RPCs flush immediately.
+  transport.setNoDelay(true)
   const timeout = (): void => { stream.emit('timeout') }
   transport.on('timeout', timeout)
   stream.once('close', () => { transport.removeListener('timeout', timeout) })

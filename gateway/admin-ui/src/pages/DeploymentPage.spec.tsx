@@ -10,6 +10,7 @@ vi.mock('../api.ts', async original => ({ ...await original<typeof api>(), getDe
 vi.mock('./DeploymentTopologySection.tsx', () => ({ DeploymentTopologySection: () => null, NodeConnectionSection: () => null }))
 vi.mock('./NodeAccessSection.tsx', () => ({ NodeAccessSection: () => null }))
 vi.mock('./NodeConfigurationSection.tsx', () => ({ NodeConfigurationSection: () => null }))
+vi.mock('./PerformanceDiagnosticsSection.tsx', () => ({ PerformanceDiagnosticsSection: () => null }))
 vi.mock('./TunnelAccessSection.tsx', () => ({ TunnelAccessSection: () => null }))
 vi.mock('./NodeContentSection.tsx', () => ({ NodeContentSection: () => null }))
 vi.mock('./NodeContentMigrationSection.tsx', () => ({ NodeContentMigrationSection: () => null }))

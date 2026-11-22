@@ -162,7 +162,7 @@ export class GatewayEntryRequests {
   get catalogAuthority() { return this.directory.authority }
 
   /** Refresh the organization's grants without accepting rows from a superseded directory generation. */
-  refreshDirectory(): void { this.directory.clear(); this.catalogs.invalidate() }
+  refreshDirectory(): void { this.directory.clear(false); this.catalogs.invalidate() }
 
   /** Resolve the picker selection's optional label separately from its conversation rows.
    * @param scope - verified selection in the visible directory.
@@ -299,7 +299,7 @@ export class GatewayEntryRequests {
   async dispose(): Promise<void> {
     this.closed = true
     this.lifetime.abort()
-    this.directory.clear()
+    this.directory.clear(false)
     await Promise.all([this.catalogs.dispose(), this.targets.dispose(), this.histories.dispose(), this.creates.dispose()])
   }
 }

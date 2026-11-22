@@ -96,7 +96,8 @@ export function nodeServiceDuplex(socket: WebSocket): Duplex {
 async function localSocket(url: URL, signal: AbortSignal): Promise<Socket> {
   signal.throwIfAborted()
   // A local response EOF must leave the reverse pipeline alive until its WebSocket output drains.
-  const socket = connect({ host: url.hostname === '[::1]' ? '::1' : url.hostname, port: Number(url.port || '80'), allowHalfOpen: true })
+  // Disable Nagle so small interactive RPCs and terminal keystrokes do not stall on delayed ACKs.
+  const socket = connect({ host: url.hostname === '[::1]' ? '::1' : url.hostname, port: Number(url.port || '80'), allowHalfOpen: true, noDelay: true })
   socket.pause()
   return new Promise<Socket>((resolve, reject) => {
     const abort = () => { cleanup(); socket.destroy(); reject(signal.reason) }
