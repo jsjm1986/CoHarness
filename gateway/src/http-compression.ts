@@ -121,8 +121,28 @@ export async function sendCompressed(
 ): Promise<void> {
   if (res.destroyed || res.writableEnded) return
   const raw = Buffer.isBuffer(body) ? body : Buffer.from(body, 'utf8')
-  const compressible = isCompressibleContentType(contentType)
+  const normalizedExtra: OutgoingHttpHeaders = {}
+  let extraContentEncoding = false
+  if (extraHeaders !== undefined) {
+    for (const [key, value] of Object.entries(extraHeaders)) {
+      if (value === undefined) continue
+      const lower = key.toLowerCase()
+      if (lower === 'content-encoding') extraContentEncoding = true
+      if (lower === 'vary') {
+        const items = Array.isArray(value) ? value.join(',') : String(value)
+        for (const token of items.split(',')) {
+          const trimmed = token.trim()
+          if (trimmed !== '') appendVary(res, trimmed)
+        }
+        continue
+      }
+      normalizedExtra[key] = value
+    }
+  }
+  const compressible = status !== 204 && status !== 304
+    && isCompressibleContentType(contentType)
     && res.getHeader('content-encoding') === undefined
+    && !extraContentEncoding
     && raw.byteLength >= MIN_COMPRESS_BYTES
   let payload = raw
   let encoding: ContentCoding | undefined
@@ -139,12 +159,12 @@ export async function sendCompressed(
     }
   }
   const headers: OutgoingHttpHeaders = {
-    ...extraHeaders,
+    ...normalizedExtra,
     'content-type': contentType,
     'content-length': payload.byteLength,
     ...(encoding === undefined ? {} : { 'content-encoding': encoding }),
   }
   res.writeHead(status, headers)
-  if (req.method === 'HEAD') res.end()
+  if (req.method === 'HEAD' || status === 204 || status === 304) res.end()
   else res.end(payload)
 }

@@ -53,7 +53,10 @@ describe('ExecutionIdentityService.authorizeTerminal fast path', () => {
     expect(sql).toContain('harness.personal_execution_actor')
     expect(sql).toContain('harness.terminal_access_policies')
     expect(sql).toContain('WITH authorized AS MATERIALIZED')
-    expect(sql).toContain('UNION ALL')
+    expect(sql).toContain('ON CONFLICT')
+    expect(sql).toContain('RETURNING grant_id')
+    expect(sql).not.toContain('UNION ALL')
+    expect(sql).not.toContain('WHERE g.generation<>EXCLUDED.generation')
   })
 
   it('maps missing qualification, SQL fence errors, foreign users, and invalid payloads cleanly', async () => {
@@ -104,6 +107,10 @@ describe('ExecutionIdentityService.authorizeTerminal fast path', () => {
     // Verify no duplicate computer_use_allowed check and no separate fallback SELECT on terminal_session_grants.
     expect(queries.filter(sql => sql.includes('computer_use_allowed'))).toHaveLength(1)
     expect(queries.filter(sql => sql.includes('terminal_access_policies'))).toHaveLength(1)
-    expect(queries.filter(sql => sql.includes('terminal_session_grants'))).toHaveLength(1)
+    const grantQueries = queries.filter(sql => sql.includes('terminal_session_grants'))
+    expect(grantQueries).toHaveLength(1)
+    expect(grantQueries[0]).toContain('RETURNING grant_id')
+    expect(grantQueries[0]).not.toContain('UNION ALL')
+    expect(grantQueries[0]).not.toContain('WHERE g.generation<>EXCLUDED.generation')
   })
 })

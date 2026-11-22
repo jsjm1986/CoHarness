@@ -3,12 +3,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Pool } from 'pg'
 import { z } from 'zod'
 import {
-  RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_MESSAGE_MAX_BYTES, RESOURCE_PHASE_TIMING_HEADER, RESOURCE_QUALIFIED_GRANT_HEADER,
+  RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_CHANGE_WAIT_TIMING_HEADER,
+  RESOURCE_MESSAGE_MAX_BYTES, RESOURCE_PHASE_TIMING_HEADER, RESOURCE_QUALIFIED_GRANT_HEADER,
   resourceFinishSchema, resourceRequestSchema, resourceStatusesSchema,
   type ResourceOrigin, type ResourceStatus, type ResourceWireRequest,
 } from '@deepseek-ai/dsh-resource-budget/wire'
 import { ExecutionIdentityError, type GatewayExecutionIdentity, type PersonalExecutionWriteFence } from './execution-identity.ts'
 import { NodeResourceBudgetError, type NodeResourceAdmission, type NodeResourceBudget } from './node-resource-budget.ts'
+import { timeOperation } from './operation-timing.ts'
 import type { GatewayPrincipalClaims, GatewayPrincipalSigner } from './principal.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 
@@ -20,6 +22,8 @@ interface Dependencies {
   readonly personalFence?: PersonalExecutionWriteFence
   readonly fencedRequest?: ScopedModelRequest
   readonly waitForQueued?: boolean
+  readonly resourceStatusWaitMs?: number
+  readonly waitSignal?: () => AbortSignal
   readonly bearerMs?: number
 }
 
@@ -196,12 +200,15 @@ export async function handleRuntimeResourceApi(
           projectId: subject.target.kind === 'project' ? subject.target.id : 0,
           ...(request.origin.kind === 'session' ? { sessionId: request.origin.sessionId, scopeId: request.origin.scopeId } : {}),
         }, fence)
+        const reserved = timing === undefined ? 0 : performance.now()
+        let postAuthorizeMs = 0
         if (cursor !== undefined && status.state === 'queued') res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
         if (fence !== undefined && status.state === 'active') {
           res.setHeader(RESOURCE_QUALIFIED_GRANT_HEADER, '1')
         } else if (fence === undefined && scopedModel && status.state === 'active' && request.origin.kind === 'session') {
           // Confirm post-reservation scope authority in-process so project and
           // node_content model grants avoid a second /resources/statuses HTTP round trip.
+          const postStarted = timing === undefined ? 0 : performance.now()
           try {
             await authorizeSession(deps, subject, request.origin)
             res.setHeader(RESOURCE_QUALIFIED_GRANT_HEADER, '1')
@@ -211,19 +218,40 @@ export async function handleRuntimeResourceApi(
             } else {
               throw error
             }
+          } finally {
+            if (timing !== undefined) postAuthorizeMs = performance.now() - postStarted
           }
         }
-        timing?.(authorized - started, performance.now() - authorized)
+        timing?.((authorized - started) + postAuthorizeMs, reserved - authorized)
         send(200, status)
         return true
       }
       case 'statuses': {
         const request = resourceStatusesSchema.parse(payload)
+        const waitMs = deps.resourceStatusWaitMs ?? 0
+        const seen = req.headers?.[RESOURCE_CHANGE_CURSOR_HEADER]
+        let waiting = false
+        let changeWaitMs: number | undefined
+        if (deps.waitForQueued === true && waitMs > 0
+          && req.headers?.[RESOURCE_ACTIVE_MODEL_CHECK_HEADER] === '1'
+          && request.operations.length === 1
+          && typeof seen === 'string' && /^[a-f0-9-]{36}\.\d{1,16}$/u.test(seen)) {
+          const signal = deps.waitSignal?.() ?? new AbortController().signal
+          const startedWait = timing === undefined ? undefined : performance.now()
+          try { waiting = await timeOperation('resourceChangeWait', () => deps.budget.waitForChange(seen, waitMs, signal)) }
+          catch (error) { if (signal.aborted) return true; throw error }
+          if (startedWait !== undefined) changeWaitMs = performance.now() - startedWait
+        }
+        const cursor = waiting ? deps.budget.changeCursor : undefined
         const started = timing === undefined ? 0 : performance.now()
         const admissions = await deps.budget.admissions(subject, request.operations)
         const observed = timing === undefined ? 0 : performance.now()
         const statuses: ResourceStatus[] = []
         for (const admission of admissions) statuses.push(await qualifiedStatus(deps, subject, admission))
+        if (cursor !== undefined && statuses.length === 1 && statuses[0]?.state === 'queued') {
+          res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
+        }
+        if (changeWaitMs !== undefined) res.setHeader(RESOURCE_CHANGE_WAIT_TIMING_HEADER, changeWaitMs.toFixed(2))
         timing?.(performance.now() - observed, observed - started)
         send(200, statuses)
         return true

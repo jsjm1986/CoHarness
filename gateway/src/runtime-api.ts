@@ -20,7 +20,7 @@ import { CollaborationDeniedError } from './collaboration.ts'
 import { DesktopCoordinationError, type DesktopCoordinator } from './desktop-coordinator.ts'
 import type { RuntimeTarget } from './instances.ts'
 import { isRuntimeShutdownStorageRequest } from './runtime-shutdown.ts'
-import { isPersonalExecutionWriteRequest, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest } from './runtime-request-path.ts'
+import { isPersonalExecutionWriteRequest, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest, RUNTIME_MODEL_CREDENTIAL_PATH } from './runtime-request-path.ts'
 import { NodeContentUnavailable, type NodeContentBinding } from './node-content-store.ts'
 import {
   PRINCIPAL_HEADER,
@@ -372,7 +372,12 @@ function assertionHeader(req: IncomingMessage): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
-function authorizationToken(req: IncomingMessage): string | undefined {
+/**
+ * Read the Runtime bearer from an internal request.
+ * @param req - incoming HTTP request.
+ * @returns the bearer, or undefined when the header lacks a nonempty Bearer value.
+ */
+export function runtimeBearerToken(req: IncomingMessage): string | undefined {
   const value = req.headers.authorization
   if (typeof value !== 'string' || !value.startsWith('Bearer ')) return undefined
   const token = value.slice('Bearer '.length)
@@ -521,7 +526,7 @@ export function createRuntimeApiHandler(
 ): GatewayRuntimeHandler {
   const execution = deps.executionIdentity ?? new GatewayExecutionIdentity(deps.context.pool, deps.context.nodeId, deps.nodeContent)
   const authenticate = async (req: IncomingMessage, cleanup: boolean, control = false, fresh = false): Promise<RuntimeCredentialSubject | null> => {
-    const token = authorizationToken(req)
+    const token = runtimeBearerToken(req)
     if (token === undefined) return null
     if (control && deps.authenticateRuntimeControlToken !== undefined) return deps.authenticateRuntimeControlToken(token)
     return cleanup && deps.instances.authenticateRuntimeCleanupToken !== undefined
@@ -780,7 +785,7 @@ export function createRuntimeApiHandler(
       const resourceConfirmation = pathname === '/internal/runtime/resources/statuses'
         && req.headers[RESOURCE_ACTIVE_MODEL_CHECK_HEADER] === '1'
       const resourceExchange = resourceSubmission || resourceConfirmation
-      const token = authorizationToken(req)
+      const token = runtimeBearerToken(req)
       const epoch = deps.executionWriteEpoch
       const writeFence = token === undefined || epoch === undefined ? undefined : { bearer: token, epoch }
       const fencedRequest = resourceSubmission && deps.resourceBudget !== undefined && executionWrite !== undefined
@@ -794,7 +799,7 @@ export function createRuntimeApiHandler(
       let resourceBearerMs: number | undefined
       let attemptedPersonalEntry = false
       if (executionWrite !== undefined) {
-        if (pathname === '/internal/runtime/model-credential' && writeFence !== undefined
+        if (pathname === RUNTIME_MODEL_CREDENTIAL_PATH && writeFence !== undefined
           && (deps.governance.resolveRuntimeCredential !== undefined
             || (executionWrite.subject.target.kind === 'user' && deps.governance.resolvePersonalRuntimeCredential !== undefined))) {
           if (!await executionWrite.admit(true)) return true
@@ -908,7 +913,9 @@ export function createRuntimeApiHandler(
         if (deps.resourceBudget === undefined) { send(res, 503, { error: 'resource-unavailable' }); return true }
         return await handleRuntimeResourceApi({ pool: deps.context.pool, principals: deps.principals,
           execution, budget: deps.resourceBudget, personalFence, fencedRequest, bearerMs,
-          waitForQueued: (deps.resourceStatusWaitMs ?? 0) > 0 }, subject, req, res, pathname, body)
+          waitForQueued: (deps.resourceStatusWaitMs ?? 0) > 0,
+          resourceStatusWaitMs: deps.resourceStatusWaitMs,
+          waitSignal: () => requestSignal(req, res) }, subject, req, res, pathname, body)
       }
       const url = new URL(req.url ?? '/', 'http://runtime')
       const runtimeCurrent = async (): Promise<boolean> => {
@@ -1111,7 +1118,7 @@ export function createRuntimeApiHandler(
         send(res, 200, resolved)
         return true
       }
-      if (pathname === '/internal/runtime/model-credential' && req.method === 'POST') {
+      if (pathname === RUNTIME_MODEL_CREDENTIAL_PATH && req.method === 'POST') {
         const ref = managedCredentialRef(JSON.parse(body))
         const value = deps.governance.resolveManagedCredential !== undefined
           ? await deps.governance.resolveManagedCredential(subject.target, ref)
@@ -2093,7 +2100,7 @@ export function createRuntimeApiHandler(
   handler.defersPersonalExecutionWrite = (subject, pathname, method, activeModelCheck) => {
     if (deps.executionWriteEpoch === undefined || subject.target.runtimeId === undefined) return false
     if (!isPersonalExecutionWriteRequest(pathname, method, activeModelCheck)) return false
-    if (pathname === '/internal/runtime/model-credential') {
+    if (pathname === RUNTIME_MODEL_CREDENTIAL_PATH) {
       if (deps.governance.resolveRuntimeCredential !== undefined) return true
       return subject.target.kind === 'user' && subject.contentBinding === undefined
         && deps.governance.resolvePersonalRuntimeCredential !== undefined

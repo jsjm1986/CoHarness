@@ -4,7 +4,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Pool, PoolClient } from 'pg'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  RESOURCE_ACTIVE_MODEL_CHECK_HEADER,
   RESOURCE_CHANGE_CURSOR_HEADER,
+  RESOURCE_CHANGE_WAIT_TIMING_HEADER,
+  RESOURCE_PHASE_TIMING_HEADER,
   RESOURCE_QUALIFIED_GRANT_HEADER,
 } from '@deepseek-ai/dsh-resource-budget/wire'
 import { ExecutionIdentityError, GatewayExecutionIdentity } from '../src/execution-identity.ts'
@@ -164,6 +167,47 @@ describe('Wave 4: immediate qualified project model grants and cursor wakeups', 
     expect(r3.json()).toEqual({ state: 'queued' })
     expect(r3.headers.get(RESOURCE_QUALIFIED_GRANT_HEADER)).toBeUndefined()
     expect(r3.headers.get(RESOURCE_CHANGE_CURSOR_HEADER)).toBe('11111111-1111-4111-8111-111111111111.5')
+
+    // Case 4: queued project model statuses honors waitForChange + emits fresh cursor while still queued.
+    authorize.mockClear()
+    authorize.mockResolvedValueOnce({
+      scopeId: SCOPE_ID, revision: '1', inputs: [INPUT_ID], actors: [{ userId: 7 }],
+      primaryActorUserId: 7, unverifiedHistory: false,
+    })
+    const waitForChange = vi.fn(async () => true)
+    const admissions = vi.fn(async () => [{
+      status: { state: 'queued' as const },
+      origin: { kind: 'session' as const, sessionId: 'sess-1', scopeId: SCOPE_ID },
+    }])
+    const statusDeps = {
+      ...deps,
+      budget: { request: budgetRequest, waitForChange, admissions, changeCursor: '11111111-1111-4111-8111-111111111111.6' } as never,
+      resourceStatusWaitMs: 500,
+      bearerMs: 1,
+    }
+    const r4 = fakeResponse()
+    const statusPayload = JSON.stringify({ operations: [{ sequence: 1, requestId: randomUUID() }] })
+    await handleRuntimeResourceApi(
+      statusDeps,
+      projectSubject,
+      {
+        method: 'POST',
+        headers: {
+          [RESOURCE_ACTIVE_MODEL_CHECK_HEADER]: '1',
+          [RESOURCE_CHANGE_CURSOR_HEADER]: '11111111-1111-4111-8111-111111111111.5',
+        },
+      } as unknown as IncomingMessage,
+      r4.res,
+      '/internal/runtime/resources/statuses',
+      statusPayload,
+    )
+    expect(waitForChange).toHaveBeenCalledTimes(1)
+    expect(waitForChange).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111.5', 500, expect.any(AbortSignal))
+    expect(r4.status()).toBe(200)
+    expect(r4.json()).toEqual([{ state: 'queued' }])
+    expect(r4.headers.get(RESOURCE_CHANGE_CURSOR_HEADER)).toBe('11111111-1111-4111-8111-111111111111.6')
+    expect(r4.headers.get(RESOURCE_CHANGE_WAIT_TIMING_HEADER)).toBeDefined()
+    expect(r4.headers.get(RESOURCE_PHASE_TIMING_HEADER)).toBeDefined()
   })
 })
 
@@ -181,7 +225,6 @@ describe('Wave 4: combined scope+actor and project/steward/members/placement SQL
         if (sql.includes('project_content_placement')) {
           return {
             rows: [{
-              placement_ok: true,
               steward_ok: true,
               members: [{ user_id: ACTOR_UUID, access_mode: 'rw' }],
             }],
@@ -230,5 +273,8 @@ describe('Wave 4: combined scope+actor and project/steward/members/placement SQL
     expect(localQueries).toHaveLength(2)
     // Governance PG (over 200ms tunnel): 1 users/memberships + 1 combined placement/steward/members = ONLY 2 queries!
     expect(governanceQueries).toHaveLength(2)
+    // PostgreSQL forbids FOR SHARE on the nullable side of an outer join (0A000): enforce inner JOIN.
+    expect(governanceQueries[1]).toContain('JOIN harness.project_content_placement')
+    expect(governanceQueries[1]).not.toMatch(/LEFT\s+JOIN\s+harness\.project_content_placement/iu)
   })
 })

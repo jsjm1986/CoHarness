@@ -1105,25 +1105,16 @@ export class GatewayExecutionIdentity {
           JOIN harness.terminal_access_policies p
             ON p.organization_id=$1 AND p.user_id=a.actor AND p.node_id=$2 AND p.enabled
           FOR SHARE OF p
-        ), upserted AS (
-          INSERT INTO harness.terminal_session_grants AS g
-            (organization_id,node_id,runtime_kind,runtime_public_id,generation,session_id,user_id,user_policy_revision,project_policy_revision)
-          SELECT $1,$2,'user',$7,$4,$8,policy.actor,policy.user_rev,0
-          FROM policy
-          ON CONFLICT(organization_id,node_id,runtime_kind,runtime_public_id,session_id,user_id) DO UPDATE SET
-            grant_id=CASE WHEN g.generation=EXCLUDED.generation AND g.user_policy_revision=EXCLUDED.user_policy_revision
-              AND g.project_policy_revision=EXCLUDED.project_policy_revision THEN g.grant_id ELSE gen_random_uuid() END,
-            generation=EXCLUDED.generation,user_policy_revision=EXCLUDED.user_policy_revision,project_policy_revision=EXCLUDED.project_policy_revision
-          WHERE g.generation<>EXCLUDED.generation OR g.user_policy_revision<>EXCLUDED.user_policy_revision
-            OR g.project_policy_revision<>EXCLUDED.project_policy_revision
-          RETURNING grant_id
         )
-        SELECT grant_id FROM upserted
-        UNION ALL
-        SELECT g.grant_id FROM harness.terminal_session_grants g
-        JOIN policy ON g.user_id=policy.actor
-        WHERE g.organization_id=$1 AND g.node_id=$2 AND g.runtime_kind='user' AND g.runtime_public_id=$7 AND g.session_id=$8
-          AND NOT EXISTS (SELECT 1 FROM upserted)`,
+        INSERT INTO harness.terminal_session_grants AS g
+          (organization_id,node_id,runtime_kind,runtime_public_id,generation,session_id,user_id,user_policy_revision,project_policy_revision)
+        SELECT $1,$2,'user',$7,$4,$8,policy.actor,policy.user_rev,0
+        FROM policy
+        ON CONFLICT(organization_id,node_id,runtime_kind,runtime_public_id,session_id,user_id) DO UPDATE SET
+          grant_id=CASE WHEN g.generation=EXCLUDED.generation AND g.user_policy_revision=EXCLUDED.user_policy_revision
+            AND g.project_policy_revision=EXCLUDED.project_policy_revision THEN g.grant_id ELSE gen_random_uuid() END,
+          generation=EXCLUDED.generation,user_policy_revision=EXCLUDED.user_policy_revision,project_policy_revision=EXCLUDED.project_policy_revision
+        RETURNING grant_id`,
       [...this.personalCoordinates(subject, runtimeId, fence), sessionId]),
       'terminal creator grant conflicts with an earlier authorization')
       if (granted === undefined) throw new ExecutionIdentityError(403, 'terminal qualification is unavailable')
@@ -1132,23 +1123,14 @@ export class GatewayExecutionIdentity {
     return this.inRuntime(subject, async (client, subject) => {
       const actor = await this.principalActor(client, subject, sessionId, principal)
       const revisions = await this.terminalRevisions(client, subject, actor)
-      const granted = await client.query<{ grant_id: string }>(`WITH upserted AS (
-          INSERT INTO harness.terminal_session_grants AS g
-            (organization_id,node_id,runtime_kind,runtime_public_id,generation,session_id,user_id,user_policy_revision,project_policy_revision)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
-          ON CONFLICT(organization_id,node_id,runtime_kind,runtime_public_id,session_id,user_id) DO UPDATE SET
-            grant_id=CASE WHEN g.generation=EXCLUDED.generation AND g.user_policy_revision=EXCLUDED.user_policy_revision
-              AND g.project_policy_revision=EXCLUDED.project_policy_revision THEN g.grant_id ELSE gen_random_uuid() END,
-            generation=EXCLUDED.generation,user_policy_revision=EXCLUDED.user_policy_revision,project_policy_revision=EXCLUDED.project_policy_revision
-          WHERE g.generation<>EXCLUDED.generation OR g.user_policy_revision<>EXCLUDED.user_policy_revision
-            OR g.project_policy_revision<>EXCLUDED.project_policy_revision
-          RETURNING grant_id
-        )
-        SELECT grant_id FROM upserted
-        UNION ALL
-        SELECT grant_id FROM harness.terminal_session_grants
-        WHERE organization_id=$1 AND node_id=$2 AND runtime_kind=$3 AND runtime_public_id=$4 AND session_id=$6 AND user_id=$7
-          AND NOT EXISTS (SELECT 1 FROM upserted)`,
+      const granted = await client.query<{ grant_id: string }>(`INSERT INTO harness.terminal_session_grants AS g
+          (organization_id,node_id,runtime_kind,runtime_public_id,generation,session_id,user_id,user_policy_revision,project_policy_revision)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        ON CONFLICT(organization_id,node_id,runtime_kind,runtime_public_id,session_id,user_id) DO UPDATE SET
+          grant_id=CASE WHEN g.generation=EXCLUDED.generation AND g.user_policy_revision=EXCLUDED.user_policy_revision
+            AND g.project_policy_revision=EXCLUDED.project_policy_revision THEN g.grant_id ELSE gen_random_uuid() END,
+          generation=EXCLUDED.generation,user_policy_revision=EXCLUDED.user_policy_revision,project_policy_revision=EXCLUDED.project_policy_revision
+        RETURNING grant_id`,
       [subject.organizationId,nodeId,subject.target.kind,subject.target.id,subject.generation,sessionId,actor,revisions.user,revisions.project])
       return { userId: principal.user.id, grantId: granted.rows[0]!.grant_id }
     })
@@ -1254,22 +1236,18 @@ export class GatewayExecutionIdentity {
     const { schema, db } = subject.storage
     let nodeProjectGate: { steward_ok: boolean; members: Array<{ user_id: string; access_mode: string }> } | undefined
     if (schema === 'node_content') {
-      // Combine placement binding, project active + steward qualification, and project_members FOR SHARE
-      // into one governance round trip before reading the node-local content store.
       const gate = await client.query<{
-        placement_ok: boolean
         steward_ok: boolean
         members: Array<{ user_id: string; access_mode: string }>
       }>(`WITH project_check AS MATERIALIZED (
-          SELECT (b.runtime_id IS NOT NULL) AS placement_ok,
-            (p.kind='standard' OR (
+          SELECT (p.kind='standard' OR (
               SELECT count(*) FROM harness.steward_access_policies sp
               JOIN harness.memberships m ON m.organization_id=sp.organization_id AND m.user_id=sp.user_id
               WHERE sp.organization_id=p.organization_id AND sp.node_id=$4 AND sp.enabled
                 AND sp.user_id=ANY($3::uuid[]) AND m.role='admin'
             )=cardinality($3::uuid[])) AS steward_ok
           FROM harness.projects p
-          LEFT JOIN harness.project_content_placement b
+          JOIN harness.project_content_placement b
             ON (b.organization_id,b.project_id)=(p.organization_id,p.id)
             AND b.runtime_id=$5 AND b.node_id=$4 AND b.volume_id=$6 AND b.writer_epoch=$7
           WHERE p.organization_id=$1 AND p.id=$2 AND p.status='active'
@@ -1278,13 +1256,13 @@ export class GatewayExecutionIdentity {
           SELECT pm.user_id,pm.access_mode FROM harness.project_members pm
           WHERE pm.organization_id=$1 AND pm.project_id=$2 AND pm.user_id=ANY($3::uuid[])
           FOR SHARE OF pm
-        ) SELECT project_check.placement_ok, project_check.steward_ok,
+        ) SELECT project_check.steward_ok,
           COALESCE((SELECT jsonb_agg(jsonb_build_object('user_id',m.user_id,'access_mode',m.access_mode)) FROM members m),'[]'::jsonb) AS members
           FROM project_check`,
       [subject.organizationId, subject.projectInternalId, actorIds, this.nodeId,
         subject.target.runtimeId, subject.contentBinding!.volumeId, subject.contentBinding!.writerEpoch])
       const row = gate.rows[0]
-      if (row === undefined || !row.placement_ok) throw new ExecutionIdentityError(403, 'project execution placement is unavailable')
+      if (row === undefined) throw new ExecutionIdentityError(403, 'project execution placement is unavailable')
       nodeProjectGate = row
     }
     const projectJoin = (table: 'c' | 'd'): string => schema === 'harness'

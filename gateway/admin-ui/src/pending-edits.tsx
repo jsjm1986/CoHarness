@@ -1,5 +1,5 @@
 /** Document-owned protection for unsaved Admin forms; draft values stay in their existing form owners. */
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { useBlocker } from 'react-router-dom'
 import { Button, Dialog } from './components/ui.tsx'
 import { adminLanguage, translateCopy } from './language.ts'
@@ -22,12 +22,27 @@ interface PendingEdits {
 }
 const PendingEditsContext = createContext<PendingEdits | undefined>(undefined)
 
+/** Bridge letting an outer computer-switch history listener respect inner unsaved edits. */
+export interface PendingEditsGuard {
+  hasChanges(): boolean
+  block(url: string): void
+}
+
 /** @param props - one Admin document and its forms; protectHistory requires a Data Router. @returns navigation protection without storing form values. */
-export function PendingEditsProvider({ children, protectHistory = false }: { children: ReactNode; protectHistory?: boolean }) {
+export function PendingEditsProvider({ children, protectHistory = false, guardRef }: {
+  children: ReactNode
+  protectHistory?: boolean
+  guardRef?: MutableRefObject<PendingEditsGuard | undefined>
+}) {
   const owners = useRef(new Set<symbol>())
   const hasChanges = useCallback(() => owners.current.size > 0, [])
   const [destination, setDestination] = useState<string | null | undefined>()
   const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
+  useLayoutEffect(() => {
+    if (guardRef === undefined) return
+    guardRef.current = { hasChanges, block: url => setDestination(url) }
+    return () => { guardRef.current = undefined }
+  }, [guardRef, hasChanges])
   const protection = useMemo<PendingEdits>(() => ({
     set(owner, dirty) { if (dirty) owners.current.add(owner); else owners.current.delete(owner) },
     navigate(url, perform) {

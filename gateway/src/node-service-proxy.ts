@@ -427,8 +427,15 @@ export class GatewayNodeServiceProxy {
               const forwardedHeaders = responseHeaders(response.headers, target.resetCookie)
               const declaredLength = typeof response.headers['content-length'] === 'string'
                 ? Number(response.headers['content-length']) : undefined
+              const rawCacheControl = typeof response.headers['cache-control'] === 'string' ? response.headers['cache-control'] : ''
+              const cacheableControl = !/\b(?:no-store|private|no-cache)\b/iu.test(rawCacheControl)
+              const rawVary = Array.isArray(response.headers.vary) ? response.headers.vary.join(',')
+                : typeof response.headers.vary === 'string' ? response.headers.vary : ''
+              const cacheableVary = rawVary.split(',').map(part => part.trim().toLowerCase()).filter(part => part !== '')
+                .every(token => token === 'accept-encoding')
               const shouldCapture = capture !== undefined && req.method === 'GET' && status === 200
                 && target.resetCookie === undefined && response.headers['set-cookie'] === undefined
+                && cacheableControl && cacheableVary
                 && (declaredLength === undefined || (Number.isSafeInteger(declaredLength) && declaredLength >= 0 && declaredLength <= capture.maxBytes))
               let capturedChunks: Buffer[] | undefined = shouldCapture ? [] : undefined
               let capturedBytes = 0

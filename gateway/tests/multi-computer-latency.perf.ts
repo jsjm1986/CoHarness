@@ -45,11 +45,6 @@ import { NODE_SERVICE_TARGET_HEADER } from '../src/node-service-stream.ts'
 import { testConfig } from './test-config.ts'
 import { writePerformanceReport } from './performance-report.ts'
 
-/** Simulated round-trip delays in milliseconds; overridable via environment for quick checks. */
-const TUNNEL_PG_RTT_MS = Number(process.env.HGW_PERF_TUNNEL_PG_RTT_MS ?? '40')
-const CENTER_PG_RTT_MS = Number(process.env.HGW_PERF_CENTER_PG_RTT_MS ?? '4')
-const SCALE_TO_200MS = 200 / Math.max(1, TUNNEL_PG_RTT_MS)
-
 function percentile(samples: readonly number[], fraction: number): number {
   if (samples.length === 0) return 0
   const sorted = [...samples].sort((a, b) => a - b)
@@ -115,7 +110,17 @@ class SyntheticAccessMonitor implements Pick<GatewayAccessMonitor, 'subscribe' |
   }
 }
 
-async function main(): Promise<void> {
+/** Options controlling synthetic database RTT injection for benchmark or deterministic regression runs. */
+export interface MultiComputerBenchmarkOptions {
+  readonly tunnelPgRttMs?: number
+  readonly centerPgRttMs?: number
+}
+
+/** Run the end-to-end multi-computer benchmark and return its structured report. */
+export async function runMultiComputerBenchmark(options: MultiComputerBenchmarkOptions = {}) {
+  const TUNNEL_PG_RTT_MS = options.tunnelPgRttMs ?? Number(process.env.HGW_PERF_TUNNEL_PG_RTT_MS ?? '40')
+  const CENTER_PG_RTT_MS = options.centerPgRttMs ?? Number(process.env.HGW_PERF_CENTER_PG_RTT_MS ?? '4')
+  const SCALE_TO_200MS = 200 / Math.max(1, TUNNEL_PG_RTT_MS)
   const root = await mkdtemp(join(tmpdir(), 'hgw-multi-computer-perf-'))
   const cleanups: Array<() => Promise<void>> = []
   try {
@@ -531,7 +536,7 @@ async function main(): Promise<void> {
     const s6Cold = await fetchRaw({ 'accept-encoding': 'br, gzip' })
     const s6Warm = await fetchRaw({ 'accept-encoding': 'br, gzip' })
 
-    writePerformanceReport({
+    return {
       schemaVersion: 1,
       config: {
         tunnelPgRttMs: TUNNEL_PG_RTT_MS,
@@ -564,11 +569,13 @@ async function main(): Promise<void> {
         },
       },
       finalForwardingDiagnostics: proxy.diagnostics(),
-    })
+    }
   } finally {
     for (const cleanup of cleanups.reverse()) await cleanup().catch(() => {})
     await rm(root, { recursive: true, force: true })
   }
 }
 
-await main()
+if (import.meta.main) {
+  writePerformanceReport(await runMultiComputerBenchmark())
+}

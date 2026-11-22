@@ -77,3 +77,38 @@ it('switches computers in-SPA without a full page reload or directory refetch wh
     assign.mockRestore()
   }
 })
+
+it('protects unsaved edits when browser back crosses computers in-SPA', async () => {
+  vi.mocked(getAdminComputerContext).mockResolvedValue({ nodeId: center, name: 'Center', forwardingEnabled: true })
+  vi.mocked(listNodeAccess).mockResolvedValue({ items: [{ nodeId: secondary, name: 'Secondary', revision: 1,
+    status: 'connected', platform: 'linux', architecture: 'arm64', lastSeenAt: null, leaseExpiresAt: null, executionReady: false }], nextCursor: null })
+  window.history.replaceState({}, '', '/admin/users/23?from=qa#quota')
+  render(<App />)
+  await screen.findByRole('textbox', { name: 'Unsaved quota' })
+  fireEvent.click(screen.getByRole('button', { name: /^管理电脑：/u }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Secondary' }))
+  const input = await screen.findByRole('textbox', { name: 'Unsaved quota' })
+  fireEvent.change(input, { target: { value: '98765' } })
+
+  // Simulate browser Back to Center while the Secondary form is dirty.
+  window.history.replaceState({}, '', '/admin/users/23?from=qa#quota')
+  fireEvent(window, new PopStateEvent('popstate'))
+
+  const dialog = await screen.findByRole('dialog', { name: '保留当前编辑' })
+  expect(within(dialog).getByRole('link', { name: '在新标签页打开' }).getAttribute('href')).toBe('/admin/users/23?from=qa#quota')
+  expect(window.location.pathname).toBe(`/admin/computers/${secondary}/users/23`)
+  expect(screen.getByRole('textbox', { name: 'Unsaved quota' })).toHaveProperty('value', '98765')
+  fireEvent.click(within(dialog).getByRole('button', { name: '留在当前页面' }))
+  expect(screen.queryByRole('dialog', { name: '保留当前编辑' })).toBeNull()
+})
+
+it('renders the invalid-computer notice when clean popstate lands on a malformed computer URL', async () => {
+  vi.mocked(getAdminComputerContext).mockResolvedValue({ nodeId: center, name: 'Center', forwardingEnabled: true })
+  vi.mocked(listNodeAccess).mockResolvedValue({ items: [], nextCursor: null })
+  window.history.replaceState({}, '', '/admin/users/23')
+  render(<App />)
+  await screen.findByRole('textbox', { name: 'Unsaved quota' })
+  window.history.replaceState({}, '', '/admin/computers/not-a-uuid/users/23')
+  fireEvent(window, new PopStateEvent('popstate'))
+  expect((await screen.findByRole('alert')).textContent).toBe('电脑选择无效，请重新选择')
+})

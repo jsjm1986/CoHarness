@@ -63,6 +63,10 @@ describe('sendCompressed', () => {
         await sendCompressed(req, res, 200, bigJson, 'application/json')
       } else if (req.url === '/small') {
         await sendCompressed(req, res, 200, smallJson, 'application/json')
+      } else if (req.url === '/extra-vary') {
+        await sendCompressed(req, res, 200, bigJson, 'application/json', { vary: 'accept' })
+      } else if (req.url === '/not-modified') {
+        await sendCompressed(req, res, 304, '', 'application/json')
       } else {
         await sendCompressed(req, res, 200, bigJson, 'application/x-ndjson')
       }
@@ -75,6 +79,16 @@ describe('sendCompressed', () => {
     expect(br.headers['cache-control']).toBe('no-store')
     expect(br.body.byteLength).toBeLessThan(Buffer.byteLength(bigJson) / 4)
     expect(brotliDecompressSync(br.body).toString('utf8')).toBe(bigJson)
+
+    const extraVary = await rawGet(port, '/extra-vary', { 'accept-encoding': 'br' })
+    expect(extraVary.status).toBe(200)
+    expect(extraVary.headers['content-encoding']).toBe('br')
+    expect(extraVary.headers.vary).toBe('accept, accept-encoding')
+
+    const notModified = await rawGet(port, '/not-modified', { 'accept-encoding': 'br' })
+    expect(notModified.status).toBe(304)
+    expect(notModified.headers['content-encoding']).toBeUndefined()
+    expect(notModified.body.byteLength).toBe(0)
 
     const gz = await rawGet(port, '/big', { 'accept-encoding': 'gzip' })
     expect(gz.headers['content-encoding']).toBe('gzip')

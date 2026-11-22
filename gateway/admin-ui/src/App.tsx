@@ -28,7 +28,7 @@ import { adminLanguage, setAdminLanguage, translateCopy } from './language.ts'
 import { zh as chromeZh, en as chromeEn, type ChromeCopyKey } from './chrome.copy.ts'
 import { ComputerSelectorProvider } from './ComputerSelector.tsx'
 import { adminComputerBase, adminComputerTarget } from './computer-target.ts'
-import { PendingEditsProvider, useProtectedNavigation } from './pending-edits.tsx'
+import { PendingEditsProvider, useProtectedNavigation, type PendingEditsGuard } from './pending-edits.tsx'
 import { zh as computerZh, en as computerEn } from './computer.copy.ts'
 
 const ArchivesPage = lazyPage(async () => ({ default: (await import('./pages/ArchivesPage.tsx')).ArchivesPage }))
@@ -71,15 +71,35 @@ function readComputerTarget(pathname: string): { nodeId: ReturnType<typeof admin
 
 function OrdinaryAdminApp() {
   const [computer, setComputer] = useState(() => readComputerTarget(window.location.pathname))
+  const computerRef = useRef(computer)
+  const currentUrlRef = useRef(`${window.location.pathname}${window.location.search}${window.location.hash}`)
+  const pendingGuardRef = useRef<PendingEditsGuard | undefined>(undefined)
+  const switchedComputerRef = useRef(false)
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: computerZh, en: computerEn }), [])
   const switchComputer = useCallback((nextNodeId: ReturnType<typeof adminComputerTarget>, nextUrl: string) => {
     window.history.pushState(null, '', nextUrl)
-    setComputer({ nodeId: nextNodeId, invalid: false })
+    currentUrlRef.current = nextUrl
+    switchedComputerRef.current = true
+    const next = { nodeId: nextNodeId, invalid: false }
+    computerRef.current = next
+    setComputer(next)
   }, [])
   useEffect(() => {
-    const syncFromHistory = (): void => {
+    const syncFromHistory = (event: PopStateEvent): void => {
+      const attemptedUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
       const next = readComputerTarget(window.location.pathname)
-      setComputer(current => current.nodeId === next.nodeId && current.invalid === next.invalid ? current : next)
+      const current = computerRef.current
+      if (current.nodeId === next.nodeId && current.invalid === next.invalid) return
+      event.stopImmediatePropagation()
+      if (pendingGuardRef.current?.hasChanges() === true) {
+        window.history.pushState(null, '', currentUrlRef.current)
+        pendingGuardRef.current.block(attemptedUrl)
+        return
+      }
+      currentUrlRef.current = attemptedUrl
+      switchedComputerRef.current = true
+      computerRef.current = next
+      setComputer(next)
     }
     window.addEventListener('popstate', syncFromHistory)
     return () => { window.removeEventListener('popstate', syncFromHistory) }
@@ -91,47 +111,73 @@ function OrdinaryAdminApp() {
     </div>
   </main>
   return <DeploymentContextProvider>
-    <AdminWorkspace nodeId={computer.nodeId} onSwitchComputer={switchComputer} />
+    <AdminWorkspace
+      nodeId={computer.nodeId}
+      onSwitchComputer={switchComputer}
+      currentUrlRef={currentUrlRef}
+      pendingGuardRef={pendingGuardRef}
+      switchedComputerRef={switchedComputerRef}
+    />
   </DeploymentContextProvider>
 }
 
-function AdminWorkspace({ nodeId, onSwitchComputer }: {
+function AdminWorkspace({ nodeId, onSwitchComputer, currentUrlRef, pendingGuardRef, switchedComputerRef }: {
   nodeId: ReturnType<typeof adminComputerTarget>
   onSwitchComputer(nextNodeId: ReturnType<typeof adminComputerTarget>, nextUrl: string): void
+  currentUrlRef: MutableRefObject<string>
+  pendingGuardRef: MutableRefObject<PendingEditsGuard | undefined>
+  switchedComputerRef: MutableRefObject<boolean>
 }) {
   const deployment = useDeploymentContext()
   const selectComputerRef = useRef<(nextNodeId?: ReturnType<typeof adminComputerTarget>) => void>(() => {})
   const expectedBase = adminComputerBase(nodeId)
   const [router, setRouter] = useState<{ base: string; instance: ReturnType<typeof createBrowserRouter> }>()
   useEffect(() => {
-    const owned = createBrowserRouter([{ path: '*', element: <PendingEditsProvider protectHistory>
-      <AdminDocument nodeId={nodeId} onSwitchComputer={onSwitchComputer} selectComputerRef={selectComputerRef} />
+    const owned = createBrowserRouter([{ path: '*', element: <PendingEditsProvider protectHistory guardRef={pendingGuardRef}>
+      <AdminDocument
+        nodeId={nodeId}
+        onSwitchComputer={onSwitchComputer}
+        selectComputerRef={selectComputerRef}
+        currentUrlRef={currentUrlRef}
+        switchedComputerRef={switchedComputerRef}
+      />
     </PendingEditsProvider> }], { basename: expectedBase })
     setRouter({ base: expectedBase, instance: owned })
     return () => { owned.dispose() }
-  }, [expectedBase, nodeId, onSwitchComputer])
+  }, [currentUrlRef, expectedBase, nodeId, onSwitchComputer, pendingGuardRef, switchedComputerRef])
   return <ComputerSelectorProvider enabled={deployment.value?.scope === 'organization'} nodeId={nodeId}
     onSelect={nextNodeId => selectComputerRef.current(nextNodeId)}>
     {router === undefined || router.base !== expectedBase ? <PageLoading /> : <RouterProvider key={router.base} router={router.instance} />}
   </ComputerSelectorProvider>
 }
 
-function AdminDocument({ nodeId, onSwitchComputer, selectComputerRef }: {
+function AdminDocument({ nodeId, onSwitchComputer, selectComputerRef, currentUrlRef, switchedComputerRef }: {
   nodeId: ReturnType<typeof adminComputerTarget>
   onSwitchComputer(nextNodeId: ReturnType<typeof adminComputerTarget>, nextUrl: string): void
   selectComputerRef: MutableRefObject<(nextNodeId?: ReturnType<typeof adminComputerTarget>) => void>
+  currentUrlRef: MutableRefObject<string>
+  switchedComputerRef: MutableRefObject<boolean>
 }) {
   const navigation = useProtectedNavigation()
   const deployment = useDeploymentContext()
   const location = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: computerZh, en: computerEn }), [])
   const unavailable = nodeId !== undefined && deployment.value !== null && deployment.value.scope === 'local' && nodeId !== deployment.value.entry.nodeId
+  useLayoutEffect(() => {
+    currentUrlRef.current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  }, [currentUrlRef, location.hash, location.pathname, location.search])
   useLayoutEffect(() => {
     selectComputerRef.current = nextNodeId => {
       const nextUrl = `${adminComputerBase(nextNodeId)}${location.pathname}${location.search}${location.hash}`
       navigation.navigate(nextUrl, () => onSwitchComputer(nextNodeId, nextUrl))
     }
   }, [location.hash, location.pathname, location.search, navigation, onSwitchComputer, selectComputerRef])
+  useEffect(() => {
+    if (!switchedComputerRef.current) return
+    switchedComputerRef.current = false
+    mainRef.current?.focus({ preventScroll: true })
+  }, [switchedComputerRef])
   useEffect(() => {
     const previous = document.documentElement.lang
     document.documentElement.lang = adminLanguage()
@@ -151,7 +197,7 @@ function AdminDocument({ nodeId, onSwitchComputer, selectComputerRef }: {
           <Brand compact />
           <AccountActions compact />
         </header>
-        <main className="mainContent">
+        <main ref={mainRef} tabIndex={-1} className="mainContent">
           {deployment.error && location.pathname !== '/deployment' && <div className="page adminEntryNotice">
             <ErrorBanner message={t('policyFailed')} />
             <Button onClick={() => void deployment.refresh()}>{t('retryPolicy')}</Button>

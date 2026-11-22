@@ -251,15 +251,19 @@ it('caches captured remote immutable assets on Center while still enforcing fres
   // Second request serves from Center cache (zero remote forward) while still re-running admission + monitor sync.
   const second = await fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': 'br, gzip' } })
   expect(second.status).toBe(200)
+  expect(second.headers.get('etag')).toBe('W/"remote-v1"')
   expect(await second.text()).toBe(payload)
   expect(f.forward).toHaveBeenCalledTimes(1)
   expect(f.admit).toHaveBeenCalledTimes(2)
   expect(f.assets.diagnostics().remoteCacheHits).toBe(1)
 
-  // Conditional ETag check answers 304 directly from Center cache.
+  // Conditional ETag check answers 304 directly from Center cache for both strong and weakened forms.
   const notModified = await fetch(f.origin + f.path, { headers: { ...f.headers, 'if-none-match': '"remote-v1"' } })
   expect(notModified.status).toBe(304)
   await notModified.arrayBuffer()
+  const notModifiedWeak = await fetch(f.origin + f.path, { headers: { ...f.headers, 'if-none-match': 'W/"remote-v1"' } })
+  expect(notModifiedWeak.status).toBe(304)
+  await notModifiedWeak.arrayBuffer()
   expect(f.forward).toHaveBeenCalledTimes(1)
 
   // Authority change STILL refuses even when bytes are warm in cache.

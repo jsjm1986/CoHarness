@@ -116,7 +116,7 @@ export class RuntimeAssets {
       : captured.contentEncoding === 'br' || captured.contentEncoding === 'gzip' ? captured.contentEncoding : undefined
     if (coding === undefined) return
     const existing = this.remoteCache.get(key)
-    if (existing !== undefined) {
+    if (existing !== undefined && existing.etag === captured.etag && existing.contentType === captured.contentType) {
       const prev = existing.variants[coding]
       const delta = captured.body.byteLength - (prev?.byteLength ?? 0)
       if (existing.bytes + delta > REMOTE_CACHE_MAX_ENTRY_BYTES) return
@@ -126,6 +126,10 @@ export class RuntimeAssets {
       this.remoteCache.delete(key)
       this.remoteCache.set(key, existing)
     } else {
+      if (existing !== undefined) {
+        this.remoteCacheBytes = Math.max(0, this.remoteCacheBytes - existing.bytes)
+        this.remoteCache.delete(key)
+      }
       const entry: CachedRemoteAsset = {
         nodeId,
         contentType: captured.contentType,
@@ -155,22 +159,32 @@ export class RuntimeAssets {
     if (entry === undefined) return false
     this.remoteCache.delete(key)
     this.remoteCache.set(key, entry)
-    if (entry.etag !== undefined && req.headers['if-none-match'] === entry.etag) {
-      this.remoteCacheHits += 1
-      res.writeHead(304, {
-        etag: entry.etag,
-        vary: 'accept-encoding',
-        ...(entry.cacheControl === undefined ? {} : { 'cache-control': entry.cacheControl }),
+    const rawIfNoneMatch = req.headers['if-none-match']
+    if (entry.etag !== undefined && typeof rawIfNoneMatch === 'string') {
+      const normalized = entry.etag.startsWith('W/') ? entry.etag.slice(2) : entry.etag
+      const matched = rawIfNoneMatch.split(',').some(candidate => {
+        const trimmed = candidate.trim()
+        return trimmed === '*' || trimmed === entry.etag || (trimmed.startsWith('W/') ? trimmed.slice(2) : trimmed) === normalized
       })
-      res.end()
-      return true
+      if (matched) {
+        this.remoteCacheHits += 1
+        res.writeHead(304, {
+          etag: entry.etag,
+          vary: 'accept-encoding',
+          ...(entry.cacheControl === undefined ? {} : { 'cache-control': entry.cacheControl }),
+        })
+        res.end()
+        return true
+      }
     }
     const preferred = preferredCompression(req.headers['accept-encoding'])
     let body: Buffer | undefined
     let encoding: ContentCoding | undefined
+    let derivedFromIdentity = false
     if (preferred !== undefined && entry.variants[preferred] !== undefined) {
       body = entry.variants[preferred]
       encoding = preferred
+      derivedFromIdentity = entry.variants.identity !== undefined
     } else if (entry.variants.identity !== undefined) {
       const identity = entry.variants.identity
       if (preferred !== undefined && identity.byteLength >= MIN_COMPRESS_BYTES && isCompressibleContentType(entry.contentType)) {
@@ -179,6 +193,7 @@ export class RuntimeAssets {
         if (compressed.byteLength < identity.byteLength) {
           body = compressed
           encoding = preferred
+          derivedFromIdentity = true
           if (this.remoteCache.get(key) === entry && entry.variants[preferred] === undefined
             && entry.bytes + compressed.byteLength <= REMOTE_CACHE_MAX_ENTRY_BYTES) {
             entry.variants[preferred] = compressed
@@ -207,13 +222,15 @@ export class RuntimeAssets {
       }
     }
     if (body === undefined) return false
+    const responseEtag = entry.etag === undefined ? undefined
+      : (derivedFromIdentity && encoding !== undefined && !entry.etag.startsWith('W/') ? `W/${entry.etag}` : entry.etag)
     this.remoteCacheHits += 1
     res.writeHead(200, {
       'content-type': entry.contentType,
       'content-length': body.byteLength,
       vary: 'accept-encoding',
       ...(encoding === undefined ? {} : { 'content-encoding': encoding }),
-      ...(entry.etag === undefined ? {} : { etag: entry.etag }),
+      ...(responseEtag === undefined ? {} : { etag: responseEtag }),
       ...(entry.cacheControl === undefined ? {} : { 'cache-control': entry.cacheControl }),
     })
     if (req.method === 'HEAD') res.end()
