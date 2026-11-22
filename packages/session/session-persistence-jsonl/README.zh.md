@@ -81,6 +81,8 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 - **单会话元数据。**`readHeader(id, signal?)`、`revision(id, signal?)` 和 `readRevision(id, signal?)` 使用 `stat(id, { signal })`：在项目目录中查找请求的 id，只校验其选定代次的文件头，并返回与 `stat` 相同的待物化创建元数据或 `undefined` 结果。代次、身份、编码和文件头解码错误从 `stat` 原样传播；最高代次不受支持时绝不回退到前代。根目录编码准入仍检查所配置的根目录。不保留跨请求的文件头缓存，元数据读取不检查事件正文。[存储身份决策](../../../.agents/notes/implemented/bug-fix/2026-07-20-jsonl-storage-identity.zh.md)说明单会话发现与拒绝规则。
 - **轻量修订。**源身份包含 device、inode、size 和纳秒时间戳；历史代次还包含 corpus revision，因此其查找仍会发现并读取整个根目录所选代次的文件状态。`listSnapshots(signal?)` 对每个已发现产物使用同一身份。该标识会在 append、修复、替换或存储变更后改变。完整前缀读取要求读取字节前后的身份一致，`readStoredRevision()` 也使用同一身份校验保留的 preparation。快照列表通过产物发现原样转发该信号，并在每个 `stat` 前后检查取消；由于文件系统 `stat` 不可中断，取消会等待活动调用完成，然后在不启动另一次调用的情况下拒绝。
 
+`readCommittedEvent` 只定位和校验当前代一次，然后返回指定完整事件的独立副本。历史代走常规读取句柄。读取不会发布迁移后的代次或修改已存储前缀。
+
 <a id="write-path"></a>
 ## 写入路径
 

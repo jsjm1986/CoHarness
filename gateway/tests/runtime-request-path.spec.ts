@@ -1,6 +1,6 @@
 /** Preserve the module loader's opaque query while removing Gateway-only selection. */
 import { expect, it } from 'vitest'
-import { isExplicitScopeRequest, isImmutableRuntimeAssetRequest, isRuntimeAssetRequest, pinRuntimeRequestPath, runtimeRequestPath } from '../src/runtime-request-path.ts'
+import { isDelegatablePersonalRead, isExplicitScopeRequest, isImmutableRuntimeAssetRequest, isReadyRuntimeRead, isRuntimeAssetRequest, pinRuntimeRequestPath, runtimeRequestPath } from '../src/runtime-request-path.ts'
 import type { RuntimeId } from '../src/runtime-catalog.ts'
 
 const runtime = '10000000-0000-4000-8000-000000000001' as RuntimeId
@@ -67,4 +67,32 @@ it.each(['/account/api/scope', '/account/runtime/start'])('treats a %s scope POS
   expect(isExplicitScopeRequest('POST', new URL(`http://gateway${pathname}?dshRuntime=${runtime}`))).toBe(true)
   expect(isExplicitScopeRequest('POST', new URL(`http://gateway${pathname}`))).toBe(false)
   expect(isExplicitScopeRequest('GET', new URL(`http://gateway${pathname}?dshRuntime=${runtime}`))).toBe(false)
+})
+
+it.each([
+  ['POST', '/api/session.history', true],
+  ['POST', '/api/host.describe', true],
+  ['POST', '/api/workspace.list', true],
+  ['POST', '/api/session.list', true],
+  ['GET', '/?dshBootstrap=1', true],
+  ['GET', '/?dshBootstrap=full', false],
+  ['GET', '/?dshBootstrap=1&dshBootstrap=full', false],
+  ['GET', '/api/session.history', false],
+  ['POST', '/api/session.create', false],
+  ['POST', '/api/workspace/move', false],
+  ['POST', '/api/session.history/extra', false],
+])('selects %s %s for ready Runtime reads if eligible (%s)', (method, path, eligible) => {
+  expect(isReadyRuntimeRead(method, new URL(path, 'http://gateway'))).toBe(eligible)
+})
+
+it.each([
+  ['GET', '/?dshBootstrap=1', false, 'application/json'],
+  ['GET', '/?dshBootstrap=1', true, 'text/html'],
+  ['GET', '/?dshBootstrap=1&dshBootstrap=1', true, 'application/json'],
+  ['GET', '/?dshBootstrap=full', true, 'application/json'],
+  ['POST', '/api/workspace.list', false, 'application/json'],
+  ['POST', '/api/prepare/v1/session.create', true, 'application/json'],
+  ['POST', '/api/admit/v1/session.prompt', true, 'application/json'],
+])('keeps %s %s on ordinary admission (%s, %s)', (method, path, accountBound, accept) => {
+  expect(isDelegatablePersonalRead(method, new URL(path, 'http://gateway'), accountBound, accept)).toBe(false)
 })

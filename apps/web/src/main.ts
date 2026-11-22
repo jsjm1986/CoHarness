@@ -3,7 +3,7 @@
  * module-table seeding, the boot page, and the UI-renderer handoff — lives
  * in @deepseek-ai/dsh-client-web; this file only finds the mount point.
  */
-import { AppWebEntry } from '@deepseek-ai/dsh-client-web'
+import { AppWebEntry } from '@deepseek-ai/dsh-client-web/boot'
 import { setupNativePush } from './native-push.ts'
 
 const el = document.getElementById('root')

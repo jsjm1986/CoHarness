@@ -303,6 +303,7 @@
       "@deepseek-ai/dsh-client-ui-workspace": ["./packages/client/ui-workspace/src"],
       "@deepseek-ai/dsh-client-userdoc-upload": ["./packages/client/userdoc-upload/src"],
       "@deepseek-ai/dsh-client-web": ["./packages/client/web/src"],
+      "@deepseek-ai/dsh-client-web/boot": ["./packages/client/web/src/boot.ts"],
       "@deepseek-ai/dsh-client-web/injections": ["./packages/client/web/src/apply-injections.ts"],
       "@deepseek-ai/dsh-experimental-agent-team": ["./packages/experimental/agent-team/src"],
       "@deepseek-ai/dsh-experimental-agent-team-profile": ["./packages/experimental/agent-team-profile/src"],

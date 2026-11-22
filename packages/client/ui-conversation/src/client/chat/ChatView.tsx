@@ -632,7 +632,7 @@ export function ChatView({
     loadOlder()
   }, [loadOlder])
 
-  /** Request one older page when the reader is near the head, with one request per head. */
+  /** Request one older page on an upward scroll to the head, with one request per head. */
   const maybeAutoLoadOlder = useCallback((el: HTMLElement): void => {
     if (el.scrollTop > OLDER_AUTO_LOAD_THRESHOLD) {
       autoLoadHeadRef.current = undefined
@@ -735,14 +735,6 @@ export function ChatView({
     lastNode?.kind, lastSteeringId, loadingOlder, openState,
   ])
 
-  // A short history can already be at the head after the initial bottom jump;
-  // run the same guarded probe once after layout so it does not require a
-  // synthetic scroll event from the browser.
-  useEffect(() => {
-    const local = listRef.current
-    if (local !== null) maybeAutoLoadOlder(scrollerOf(local))
-  }, [maybeAutoLoadOlder])
-
   /** Locate the reader's row once: the active rail turn, the pending prepend anchor, and the saved position. */
   const sampleReaderGeometryRef = useRef(() => {})
   sampleReaderGeometryRef.current = () => {
@@ -804,7 +796,6 @@ export function ChatView({
     /* v8 ignore next -- ref-null guard: the handler only fires while mounted. */
     if (local === null) return
     const el = scrollerOf(local)
-    maybeAutoLoadOlder(el)
     // Only reader input may make raw scroll geometry change follow ownership:
     // a delivered position that deviates from the observed-top ledger (every
     // programmatic write records itself there synchronously). This covers
@@ -813,7 +804,9 @@ export function ChatView({
     // programmatic deliveries land on the ledger itself, so both preserve
     // the current ownership state.
     const floor = Math.max(0, el.scrollHeight - el.clientHeight)
-    const movedByReader = Math.abs(el.scrollTop - Math.min(observedTopRef.current, floor)) > 0.5
+    const movement = el.scrollTop - Math.min(observedTopRef.current, floor)
+    const movedByReader = Math.abs(movement) > 0.5
+    if (el.scrollTop > OLDER_AUTO_LOAD_THRESHOLD || movement < -0.5) maybeAutoLoadOlder(el)
     if (movedByReader) restoredAnchorRef.current = null
     // Geometry decides at-bottom, not the ledger: browser writes (shrink
     // clamps, scroll anchoring) never reach observedTop, so inheriting a stale

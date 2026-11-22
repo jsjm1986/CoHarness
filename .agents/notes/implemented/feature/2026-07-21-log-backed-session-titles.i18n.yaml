@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-21-log-backed-session-titles.md
 document:
-  en: a80a385f160fd85ff1c1cc1bcfb6b6217fed1dd5
-  zh: 4418e797c8b002557c206e5fe77768dfbda6b303
+  en: 78d4521bcb26f0b811df0d9b29a4cbf32faa5e38
+  zh: 19e1a66d693dd90fcffa89443abdfbf6ec292320
 /agent-note-log-backed-session-titles:
   en: b04a348ca633c170
   zh: 5d6a97ea03e86102
@@ -18,8 +18,8 @@ document:
   en: dde8dcdce2d3f8a9
   zh: 361cc484214e1ec0
 /agent-note-log-backed-session-titles/decision/input-and-asynchronous-timing:
-  en: b993715f52754146
-  zh: e903c499cd541475
+  en: bac541424fb4e4f1
+  zh: 8d458eff608868d3
 /agent-note-log-backed-session-titles/decision/registration-routing-and-failure-policy:
   en: c4d90f32a570cf1b
   zh: f290f104fb3c5d62

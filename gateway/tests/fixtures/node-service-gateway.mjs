@@ -34,6 +34,7 @@ const [
   { NodeConfigurationStore }, { nodeConfigurationAuthority }, { GatewayNodeConnection },
   { PostgresWorkspaceCatalog }, { createGatewayWorkbenchCatalogHandler }, { workbenchRows },
   { PostgresRuntimeAssetAdmission }, { LocalNodeDrafts },
+  { NodePrincipalDirectory }, { createGatewayForwardAuthority },
 ] = await Promise.all([
   'config', 'postgres/database', 'postgres/runtime-context', 'postgres/user-service', 'postgres/auth-service',
   'postgres/project-service', 'postgres/audit-service', 'postgres/collaboration-service', 'postgres/instance-repository',
@@ -46,6 +47,7 @@ const [
   'document-transfer', 'browser-documents', 'postgres/webhook-endpoint-service', 'postgres/webhook-delivery-service', 'webhook-intake', 'deployment-topology',
   'postgres/maintenance-service', 'postgres/backup-service', 'node-config-store', 'postgres/node-configuration-authority', 'node-connection',
   'workspace-catalog', 'workbench', 'workbench-rows', 'runtime-asset-admission', 'node-drafts',
+  'postgres/node-principal-directory', 'forwarded-principal',
 ].map(load))
 
 const cfg = loadConfig({
@@ -60,6 +62,7 @@ const cfg = loadConfig({
   HGW_UPSTREAM_TIMEOUT_MS: '65000',
   ...(nodeName === 'center' ? {} : { HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS: '120000', HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS: '60000', HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS: '120000' }),
   HGW_NODE_SERVICE_FORWARDING: 'on', HGW_NODE_AGENT_HEARTBEAT_MS: '100', HGW_NODE_AGENT_LEASE_MS: '30000',
+  HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: process.env.HGW_NODE_SERVICE_PREPARED_READ_DELEGATION,
 })
 cfg.releaseId = nodeName === 'center' ? 'fixture-center-release' : 'fixture-worker-release'
 await mkdir(root, { recursive: true })
@@ -89,7 +92,7 @@ cfg.defaultEnvFile = join(root, 'credentials', 'fixture-model.env')
 process.env.DEEPSEEK_BASE_URL = `http://127.0.0.1:${modelFixture.address().port}`
 await writeFile(cfg.defaultEnvFile, 'DEEPSEEK_API_KEY=fixture-only\n', { mode: 0o600 })
 cfg.dshCommand = [process.execPath, fileURLToPath(new URL('../../../apps/cli/lib/bin.js', import.meta.url)), 'web', '--no-open', '--port', '0']
-const pool = createPostgresPool(databaseUrl, { max: 6 })
+const pool = createPostgresPool(databaseUrl, { max: 6, min: process.env.HGW_TEST_VERSIONED_OPERATIONS ? 2 : 0 })
 const context = await resolvePostgresRuntimeContext(pool, slug, nodeName)
 if (nodeName === 'center') await enableFixtureTopology(context)
 const users = new PostgresUserService(context, cfg), auth = new PostgresAuthService(context, cfg)
@@ -115,7 +118,9 @@ if (nodeName === 'center') {
 const resources = new NodeResourceBudget(pool, context.organizationId, context.nodeId, { ...cfg.resourceBudget, sampleMs: 20, staleMs: 300000 })
 await resources.configure()
 await resources.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 64 })
-const repository = new PostgresInstanceRepository(context, cfg.instancePortBase)
+const legacyPersonalAdmission = process.env.HGW_TEST_LEGACY_PERSONAL_ADMISSION === '1'
+const repository = new PostgresInstanceRepository(context, cfg.instancePortBase, undefined, undefined,
+  legacyPersonalAdmission ? 0 : cfg.runtimeTokenCacheMs)
 const processOwner = await GatewayModelBudget.open(resources, join(root, 'gateway-owners'))
 const launcher = new LocalLauncher(cfg), credentials = new Map()
 const heldStarts = new Map()
@@ -163,6 +168,7 @@ await pool.query(`UPDATE harness.instances SET port=$3 WHERE organization_id=$1 
 await relayFor(primaryTarget.runtimeId)
 const monitor = new PostgresAccessMonitor(context, 60000); await monitor.synchronize()
 const localMonitor = scopeAccessMonitor(monitor, context.nodeId)
+localMonitor.subscribe(() => repository.invalidateRuntimeTokenCache())
 const catalog = new PostgresRuntimeCatalog(context, cfg.runtimeCatalog, context.nodeId)
 const access = new PostgresNodeAccessService(context, cfg.nodeAccess, cfg.runtimeCatalog)
 const channels = new GatewayNodeChannels(access, cfg.nodeChannel)
@@ -176,6 +182,14 @@ await maintenance.heartbeat(0n, 0)
 const nodeEnvironment = { HGW_STATE_ROOT: cfg.stateRoot, HGW_NODE_CONNECTION_FILE: cfg.nodeConnectionFile }
 const nodeAuthority = nodeConfigurationAuthority(context)
 const nodeConfiguration = new NodeConfigurationStore(context, cfg, nodeEnvironment, nodeAuthority)
+const admission = new PostgresRuntimeAssetAdmission(context, 1n)
+const delegation = cfg.nodeService.preparedReadDelegation === true
+const directory = new NodePrincipalDirectory(context, cfg.runtimeTokenCacheMs)
+if (delegation) {
+  await pool.query('UPDATE harness.compute_nodes SET principal_public_key=$3 WHERE organization_id=$1 AND id=$2',
+    [context.organizationId, context.nodeId, keys.publicKeyPem])
+  monitor.subscribe(() => directory.invalidate())
+}
 const remote = new GatewayNodeServiceProxy({ assertNode: id => topology.assertNode(id), localNodeId: context.nodeId,
   resolveForAccount: (actor, id) => catalog.resolveForAccount(actor, id),
   resolveForAdministrator: (actor, id) => catalog.resolveForAdministrator(actor, id),
@@ -183,15 +197,31 @@ const remote = new GatewayNodeServiceProxy({ assertNode: id => topology.assertNo
   resetScopeCookie: () => scopeCookie('personal', cfg),
   authorizeAccountNode: (actor, id) => computerAccess.authorize(actor.id, id),
   authorizeAdministratorNode: (actor, id) => access.authorizeAdministratorNode(actor, id),
-}, services, cfg.upstreamTimeoutMs, cfg.nodeService, monitor)
+  ...(delegation ? { approvePersonalRead: input => admission.approvePersonalRead(input, keys.publicKeyPem) } : {}),
+}, services, cfg.upstreamTimeoutMs, cfg.nodeService, monitor, delegation ? (target, actor, request, personalRead) => {
+  const environment = target.environment
+  return keys.signer.issueForward({ issuerNode: context.nodeId, audienceNode: target.nodeId, user: actor, request,
+    selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
+    ...(environment === undefined || target.resolvedTarget === undefined ? {} : { context: {
+      environment: { id: environment.id, nodeId: environment.node.id, nodeName: environment.node.name }, personalRead,
+    } }),
+  })
+} : undefined)
 const collaboration = new PostgresCollaborationService(context, context.nodeId)
 const webhookEndpoints = new PostgresWebhookEndpointService(context, new WebhookSecretCipher(Buffer.alloc(32, 42)))
 const webhookDeliveries = new PostgresWebhookDeliveryService(context)
 const runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter({ projects, collaboration, instances: manager }), { localNodeId: context.nodeId, catalog })
 const pluginState = new PostgresPluginState(context)
 const documentCatalog = new PostgresDocumentCatalogService(context, cfg.archiveRetentionDays, context.nodeId)
+let writersInFlight = 0
+let stopping
+const personalExecutionStopGate = legacyPersonalAdmission ? undefined : () => stopping === undefined ? 'open' : 'maintenance'
 const deps = { cfg, topology, users, auth, projects, audit, governance, collaboration, instances: manager, accessMonitor: localMonitor,
   maintenance, backups: new PostgresBackupService(context), nodeConfiguration,
+  ...(legacyPersonalAdmission ? {} : { writerSpan: () => {
+    writersInFlight++
+    return () => { writersInFlight-- }
+  } }),
   nodeConnection: new GatewayNodeConnection(context, cfg, nodeEnvironment, nodeAuthority, topology),
   computerAccess, documentLocations: new PostgresDocumentLocations(context, cfg.runtimeCatalog, context.nodeId),
   documentOverview: documentCatalog, documents: documentCatalog,
@@ -205,6 +235,7 @@ const deps = { cfg, topology, users, auth, projects, audit, governance, collabor
   runtimeCatalog: catalog, nodeAccess: access, nodeChannels: channels, nodeServices: services, nodeServiceProxy: remote,
   runtimeRouter,
   nodeServiceIdentity: { nodeId: context.nodeId, organizationId: context.organizationId, authorize: (token, input) => access.authorizeChannel(token, input) },
+  ...(delegation ? createGatewayForwardAuthority(directory, { audienceNode: context.nodeId, organization: slug }, cfg.principalAssertionTtlMs) : {}),
 }
 const documentCatalogHandlers = createDocumentCatalogHandlers(documentCatalog, audit)
 const localDocuments = new LocalDocumentBroker({ cfg, nodeId: context.nodeId, computerAccess, users, projects, collaboration,
@@ -213,9 +244,9 @@ const documentDeps = { instances: manager, users, projects, collaboration, princ
   maxResponseBytes: cfg.upstreamResponseLimitBytes, upstreamTimeoutMs: cfg.upstreamTimeoutMs, local: localDocuments }
 const workspaceCatalog = new PostgresWorkspaceCatalog(context, context.nodeId)
 const drafts = new LocalNodeDrafts(cfg.stateRoot)
-const local = createProxyHandlers(deps, keys.signer, new PostgresRuntimeAssetAdmission(context, 1n))
+const local = createProxyHandlers(deps, keys.signer, admission, personalExecutionStopGate)
 const runtime = createRuntimeApiHandler({ documentStore: input => localDocuments.serveRuntimeStore(input),
-  executionWriteEpoch: process.env.HGW_TEST_LEGACY_PERSONAL_ADMISSION === '1' ? undefined : 1n,
+  executionWriteEpoch: legacyPersonalAdmission ? undefined : 1n,
   workspaceCatalog,
   documentCatalogSync: input => localDocuments.reconcileRuntimeCatalog(input),
   documentCatalogAuthorize: documentCatalogHandlers.authorize, documentCatalogOverview: documentCatalogHandlers.overview, documentCatalogHistory: documentCatalogHandlers.history, context, instances: repository, conversations: new PostgresConversationStore(pool),
@@ -232,8 +263,12 @@ const server = createGatewayServer(deps, { ...local, runtime, nodeDrafts: drafts
     origin: cfg.publicOrigins[0], responseLimit: cfg.upstreamResponseLimitBytes }), admin: createAdminApiHandler(deps),
   runtimeAuthorize: async req => {
     const token = req.headers.authorization?.slice('Bearer '.length)
-    return token !== undefined && await repository.authenticateRuntimeToken(token) !== null
+    return token === undefined ? false : await repository.authenticateRuntimeToken(token) ?? false
   },
+  ...(legacyPersonalAdmission ? {} : {
+    runtimePersonalExecutionStopGate: personalExecutionStopGate,
+    runtimePersonalExecutionCandidate: req => repository.personalExecutionCandidate(req.headers.authorization?.slice('Bearer '.length) ?? ''),
+  }),
 })
 const intake = createUsageIntakeServer(governance)
 // Production mints the release's launch stamps before accepting requests.
@@ -247,7 +282,6 @@ const base = `http://127.0.0.1:${cfg.port}`
 cfg.publicOrigins.push(base)
 await nodeConfiguration.initialize()
 if (nodeName === 'center') await pool.query('UPDATE harness.deployment_topology SET primary_origin=$2,revision=revision+1 WHERE organization_id=$1 AND enabled AND primary_node_id=$3', [context.organizationId, base, context.nodeId])
-let stopping
 async function stop() {
   return stopping ??= (async () => {
     for (const held of heldStarts.values()) held.resolve()
@@ -285,6 +319,7 @@ process.on('message', input => {
     }
     else if (input.kind === 'relay') { await relayFor(input.runtimeId, input.userId); reply({ kind: 'relay' }) }
     else if (input.kind === 'observe-idle-pressure' && process.env.HGW_TEST_VERSIONED_OPERATIONS) {
+      assert.equal(writersInFlight, 0)
       await resources.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 64 })
       reply({ kind: 'observe-idle-pressure' })
     }

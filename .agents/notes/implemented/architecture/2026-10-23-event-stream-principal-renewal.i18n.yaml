@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-event-stream-principal-renewal.md
 document:
-  en: 3ddea7f4fcd7f1c9cae9286d365151e37c05f867
-  zh: eb5a91fbdfaf6f931c063a55482bc9adedf163c5
+  en: 8388efbea5e9765af5efafcc497b08a6dd3a56f4
+  zh: 30ca25c23f14ca5703099596aebfaf61576ec11a
 /agent-note-socket-owned-renewal-of-short-gateway-principals:
   en: 2f26bf03107f487d
   zh: fe823c2425d34dc8
@@ -12,8 +12,8 @@ document:
   en: d5f8c5920e026031
   zh: 596a13aaacd929d1
 /agent-note-socket-owned-renewal-of-short-gateway-principals/decision:
-  en: 78fd6c24ce3c919b
-  zh: 9b0d4b44460254d2
+  en: 47b32fa7d094cf6c
+  zh: 5cd2e88369de0547
 /agent-note-socket-owned-renewal-of-short-gateway-principals/alternatives-considered:
   en: a770fdc09e7e0ab7
   zh: 8c81969c82f1ee1f
@@ -21,5 +21,5 @@ document:
   en: c9da05348402cfdc
   zh: 52bfc9fabe56cefe
 /agent-note-socket-owned-renewal-of-short-gateway-principals/verification:
-  en: dce47256ce071cf5
-  zh: deec13b6772910f6
+  en: ce4ee071e31e9780
+  zh: e3c92d90ffbd26cc

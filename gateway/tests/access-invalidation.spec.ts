@@ -480,6 +480,24 @@ describePg('cross-Gateway access invalidation', () => {
     await expect(gateway.monitor.synchronize()).rejects.toThrow('access organization is not active')
   })
 
+  it('closes existing streams on a draining node and retains only exact stop catch-up', async () => {
+    const f = await fixture()
+    const gateway = f.gateways[1]!
+    const socket = await f.socket(gateway, f.aliceCookie)
+    const closed = once(socket, 'close', { signal: AbortSignal.timeout(5_000) })
+
+    await pool.query("UPDATE harness.compute_nodes SET status='draining' WHERE id=$1", [gateway.owner.nodeId])
+    await gateway.monitor.synchronize('runtime-stop')
+    await closed
+    expect(gateway.monitor.available).toBe(false)
+    await expect(gateway.monitor.synchronize()).rejects.toMatchObject({ code: 'access-node-draining' })
+    await expect(gateway.monitor.checkControlReadiness()).rejects.toMatchObject({ code: 'access-node-draining' })
+
+    await pool.query("UPDATE harness.compute_nodes SET status='offline' WHERE id=$1", [gateway.owner.nodeId])
+    await expect(gateway.monitor.synchronize('runtime-stop')).rejects.toThrow('access organization is not active')
+    expect(gateway.monitor.available).toBe(false)
+  })
+
   it('resumes the node checkpoint on cold start and coalesces repeated offline runtime changes', async () => {
     const f = await fixture()
     const gateway = f.gateways[1]!

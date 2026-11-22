@@ -678,6 +678,15 @@ async inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection>
 async readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEventSuffix>
 
 /**
+ * Read one exact event from the validated committed prefix.
+ * @param id - stored Session identity.
+ * @param seq - logical sequence to verify.
+ * @param signal - optional cancellation for the storage read.
+ * @returns the detached event, or undefined if that sequence is absent.
+ */
+async readCommittedEvent(id: SessionId, seq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEvent | undefined>
+
+/**
  * Read one session header without loading its event log. First-party
  * providers override this with an indexed lookup; the default filters the
  * lightweight snapshot list for third-party compatibility.

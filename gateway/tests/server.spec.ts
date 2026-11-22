@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
 import { RESOURCE_INGRESS_TIMING_HEADER } from '@deepseek-ai/dsh-resource-budget/wire'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -141,6 +142,38 @@ async function login(base: string, username: string, password: string): Promise<
   const cookie = response.headers.get('set-cookie') ?? ''
   return cookie.split(';')[0] ?? ''
 }
+
+it('tries exact personal event admission before general routing and refuses a mismatched document owner', async () => {
+  const runtimeId = randomUUID() as RuntimeId
+  const nodeId = randomUUID() as RuntimeNodeId
+  const readyEvent = vi.fn<NonNullable<GatewayHandlers['readyEvent']>>(async (_req, socket) => {
+    socket.destroy()
+    return true
+  })
+  const upgrade = vi.fn<NonNullable<GatewayHandlers['upgrade']>>()
+  const { deps, base } = await setup({}, { readyEvent, upgrade }, undefined, conversationEnvironment)
+  const cookie = await login(base, 'root-admin', 'pw-12345678')
+  const route = vi.fn(async () => false)
+  const resolve = vi.spyOn(deps.runtimeRouter!, 'resolve')
+  deps.nodeServiceIdentity = { nodeId, organizationId: randomUUID(), authorize: async () => { throw new Error('Unexpected node request') } }
+  deps.nodeServiceProxy = { http: vi.fn(), upgrade: route }
+
+  const connect = async (expected: number): Promise<void> => {
+    const url = new URL('/api/events.mux', base.replace('http:', 'ws:'))
+    url.search = new URLSearchParams({ dshRuntime: runtimeId, dshTarget: 'personal', dshNode: nodeId, dshPrincipal: String(expected) }).toString()
+    const stream = new WebSocket(url, { headers: { cookie, origin: base } })
+    try { await once(stream, 'error', { signal: AbortSignal.timeout(5000) }) }
+    finally { stream.terminate() }
+  }
+  await connect(2)
+  expect(readyEvent).not.toHaveBeenCalled()
+  await connect(1)
+  expect(readyEvent).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.anything(), expect.anything(),
+    expect.objectContaining({ actor: expect.objectContaining({ id: 1 }), runtimeId, nodeId }))
+  expect(route).not.toHaveBeenCalled()
+  expect(resolve).not.toHaveBeenCalled()
+  expect(upgrade).not.toHaveBeenCalled()
+})
 
 it('reads the entry directory for an offline bootstrap without contacting its computer and rejects mismatched authority', async () => {
   const { deps, base } = await setup({}, {}, undefined, conversationEnvironment)

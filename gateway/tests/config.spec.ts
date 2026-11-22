@@ -10,6 +10,13 @@ import {
 } from '../src/config.ts'
 
 describe('loadConfig', () => {
+  it('leaves prepared history uncapped by default and validates a node override', () => {
+    expect(loadConfig({}).runtimePreparedHistoryMessages).toBeUndefined()
+    expect(loadConfig({ HGW_RUNTIME_PREPARED_HISTORY_MESSAGES: '2' }).runtimePreparedHistoryMessages).toBe(2)
+    for (const value of ['0', '-1', '1.5', 'invalid', String(Number.MAX_SAFE_INTEGER + 1)]) {
+      expect(() => loadConfig({ HGW_RUNTIME_PREPARED_HISTORY_MESSAGES: value })).toThrow('HGW_RUNTIME_PREPARED_HISTORY_MESSAGES')
+    }
+  })
   it('bounds recovery inspection and review pages independently of backup installation', () => {
     expect(loadConfig({}).recoveryInspection).toEqual({ maxRows: 100000, maxBytes: 64 << 20, pageSize: 50 })
     expect(loadConfig({ HGW_RECOVERY_INSPECTION_MAX_ROWS: '2000', HGW_RECOVERY_INSPECTION_MAX_BYTES: '1048576',

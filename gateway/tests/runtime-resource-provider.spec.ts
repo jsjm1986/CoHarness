@@ -808,6 +808,39 @@ describePg('managed Runtime resource provider', () => {
     } finally { respond.release(); vi.useRealTimers() }
   })
 
+  it('releases the exact model reservation after a late terminal iterator acknowledgement', async () => {
+    const f = await fixture(), closed = barrier()
+    const { ctx } = await f.mount()
+    const llm = new LlmRuntime(ctx, { streamCloseTimeoutMs: 20 })
+    const close = vi.fn(async () => {
+      await closed.promise
+      return { done: true as const, value: undefined }
+    })
+    const chunk: StreamChunk = { type: 'text-delta', index: 0, text: 'partial' }
+    llm.registerAdapter(['budgeted'], new class extends LlmAdapter {
+      override stream(): AsyncIterable<StreamChunk> {
+        return { [Symbol.asyncIterator]: () => ({ next: async () => ({ done: false, value: chunk }), return: close }) }
+      }
+    }())
+    const finish = vi.spyOn(f.budget, 'finish')
+    const iterator = llm.stream({ provider: 'budgeted', model: 'model', messages: [message()],
+      resourceOrigin: 'infrastructure' })[Symbol.asyncIterator]()
+    try {
+      await f.grant(1)
+      expect((await iterator.next()).done).toBe(false)
+      await expect(iterator.return?.()).rejects.toMatchObject({ code: 'ADAPTER_CLOSE_TIMEOUT' })
+      expect((await f.budget.snapshot()).kinds.model).toMatchObject({ active: 1, uncertain: 1 })
+      closed.release()
+      await expect.poll(async () => (await f.budget.snapshot()).kinds.model).toMatchObject({ active: 0, uncertain: 0 })
+      expect(close).toHaveBeenCalledOnce()
+      const [owner, { requestId, sequence }] = finish.mock.calls[0]!
+      expect(finish.mock.calls).toEqual([
+        [owner, expect.objectContaining({ requestId, sequence }), 'uncertain'],
+        [owner, expect.objectContaining({ requestId, sequence }), 'quiescent'],
+      ])
+    } finally { closed.release() }
+  })
+
   it.each(['missing', 'nonterminal'] as const)('retains model accounting when iterator cleanup is %s', async cleanup => {
     const f = await fixture()
     const { ctx } = await f.mount()

@@ -8,6 +8,7 @@ import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager, INSTANCE_PROFILE, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from '../src/instances.ts'
 import { computeLaunchStamps } from '../src/launch-stamp.ts'
+import * as launchStamp from '../src/launch-stamp.ts'
 import type { InstanceRepository, RuntimeInstanceSnapshot, RuntimeTarget, RuntimeStopReason, RuntimeStartIntent } from '../src/instances.ts'
 import type { RuntimeId } from '../src/runtime-catalog.ts'
 import { LocalLauncher, RuntimeLaunchCleanupError, type InstanceProc } from '../src/launcher.ts'
@@ -1101,6 +1102,17 @@ describe('InstanceManager', () => {
     expect(attach).toHaveBeenCalledOnce()
     expect(terminate).toHaveBeenCalledOnce()
     expect(local.capacitySnapshot().resident).toBe(0)
+  })
+
+  it('mints the release launch stamps on startup even without a retained Runtime', async () => {
+    const { manager } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const compute = vi.spyOn(launchStamp, 'computeLaunchStamps')
+    try {
+      expect(await manager.inspectUpgradeSurvivors()).toEqual({ compatible: 0, pending: 0 })
+      expect(await manager.inspectUpgradeSurvivors()).toEqual({ compatible: 0, pending: 0 })
+      expect(compute).toHaveBeenCalledOnce()
+      expect(manager.capacitySnapshot().resident).toBe(0)
+    } finally { compute.mockRestore() }
   })
 
   it.each(['unread', 'isLive'])('retains incompatible survivors without admitting new work after %s', async read => {

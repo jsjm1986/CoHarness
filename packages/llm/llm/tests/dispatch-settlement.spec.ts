@@ -64,3 +64,35 @@ it('retains uncertain capacity when a consumer stops an iterator with no cleanup
   expect(lease.uncertain).toHaveBeenCalledOnce()
   expect(lease.release).not.toHaveBeenCalled()
 })
+
+it.each(['done', 'nonterminal', 'rejected'] as const)('settles a timed-out model close that later becomes %s', async (outcome) => {
+  const ctx = await fixture(), lease = permit()
+  const closing = Promise.withResolvers<IteratorResult<StreamChunk>>()
+  const adapterReturn = vi.fn(() => closing.promise)
+  ctx.provide('resourceBudget', { acquire: async () => lease })
+  const chunk: StreamChunk = { type: 'text-delta', index: 0, text: 'partial' }
+  class Adapter extends LlmAdapter {
+    override stream(): AsyncIterable<StreamChunk> {
+      return { [Symbol.asyncIterator]: () => ({ next: async () => ({ done: false as const, value: chunk }), return: adapterReturn }) }
+    }
+  }
+  ctx.effect(() => ctx.llm.registerAdapter(['delayed-close'], new Adapter()))
+  const iterator = ctx.llm.stream({ provider: 'delayed-close', model: 'm', messages: [] })[Symbol.asyncIterator]()
+  expect((await iterator.next()).done).toBe(false)
+  vi.useFakeTimers()
+  try {
+    const returned = expect(iterator.return?.()).rejects.toMatchObject({ code: 'ADAPTER_CLOSE_TIMEOUT' })
+    await vi.advanceTimersByTimeAsync(1000)
+    await returned
+    expect(adapterReturn).toHaveBeenCalledOnce()
+    expect(lease.uncertain).toHaveBeenCalledOnce()
+    expect(lease.release).not.toHaveBeenCalled()
+    if (outcome === 'rejected') closing.reject(new Error('cleanup failed'))
+    else closing.resolve(outcome === 'done' ? { done: true, value: undefined } : { done: false, value: chunk })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(lease.release).toHaveBeenCalledTimes(outcome === 'done' ? 1 : 0)
+  } finally {
+    closing.resolve({ done: true, value: undefined })
+    vi.useRealTimers()
+  }
+})

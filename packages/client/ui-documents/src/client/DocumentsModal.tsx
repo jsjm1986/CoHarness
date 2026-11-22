@@ -122,15 +122,16 @@ interface UploadBatchFeedback {
   readonly reconciled: boolean
 }
 
-function uploadErrorMessage(error: unknown, t: (key: DocumentsKey) => string): string {
-  if (!(error instanceof UserDocHttpError)) return t('modal.upload.error')
-  if (error.code === 'DOCUMENT_UPLOAD_STORAGE') return t('modal.upload.error.storage')
-  if (error.code === 'DOCUMENT_UPLOAD_EXPIRED') return t('modal.upload.error.expired')
-  if (error.code === 'DOCUMENT_UPLOAD_HASH') return t('modal.upload.error.hash')
-  if (error.code === 'DOCUMENT_UPLOAD_PROTOCOL') return t('modal.upload.error.protocol')
-  if (error.code === 'DOCUMENT_UPLOAD_BUSY') return t('modal.upload.error.busy')
-  if (error.status === 507) return t('modal.upload.error.storage')
-  return t('modal.upload.error')
+function uploadErrorKey(error: unknown): DocumentsKey {
+  if (!(error instanceof UserDocHttpError)) return 'modal.upload.error'
+  if (error.code === 'DOCUMENT_CATALOG_RECOVERY_REQUIRED') return 'modal.upload.error.catalog'
+  if (error.code === 'DOCUMENT_UPLOAD_STORAGE') return 'modal.upload.error.storage'
+  if (error.code === 'DOCUMENT_UPLOAD_EXPIRED') return 'modal.upload.error.expired'
+  if (error.code === 'DOCUMENT_UPLOAD_HASH') return 'modal.upload.error.hash'
+  if (error.code === 'DOCUMENT_UPLOAD_PROTOCOL') return 'modal.upload.error.protocol'
+  if (error.code === 'DOCUMENT_UPLOAD_BUSY') return 'modal.upload.error.busy'
+  if (error.status === 507) return 'modal.upload.error.storage'
+  return 'modal.upload.error'
 }
 
 function documentErrorMessage(error: unknown, t: (key: DocumentsKey) => string): string {
@@ -2122,11 +2123,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
       }
     } catch (cause) {
       const unstarted = files.length - batch.published - 1
+      const errorKey = uploadErrorKey(cause)
       failure = unstarted > 0
-        ? `${uploadErrorMessage(cause, t)}\n${t('modal.upload.incomplete', {
+        ? `${t(errorKey)}\n${t(errorKey === 'modal.upload.error.catalog' ? 'modal.upload.paused' : 'modal.upload.incomplete', {
           name: currentFileName, remaining: String(unstarted),
         })}`
-        : uploadErrorMessage(cause, t)
+        : t(errorKey)
     } finally {
       let reconciled = batch.published === 0
       let listingError = ''

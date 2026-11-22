@@ -35,3 +35,5 @@ Transport reuse removes repeated destination identity handshakes without retaini
 Socket tests cover reuse, bounded idle retention, expiry, cancellation, credential revocation, channel replacement, independent WebSocket streams, detach and shutdown. PostgreSQL tests exercise credential replacement, revocation, epoch and organization changes during lock waits, including a lease that expires without any row update. User acceptance measures the deployed Gateway path separately from model response time and verifies independent computer, Runtime, Workspace and browser-tab identities.
 
 The Gateway proxy test consumes repeated chunked responses from a Runtime that closes each upstream connection. It checks that response bodies are complete, connection-specific fields stay within their hop and the downstream client uses one socket.
+
+With two busy computers and a two-request queue, the first computer can fill its own one-request wait limit while the second can still queue and reuse its connection. A cancelled request makes capacity available to a later request for its computer.

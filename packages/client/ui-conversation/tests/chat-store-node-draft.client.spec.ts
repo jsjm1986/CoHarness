@@ -63,6 +63,7 @@ function persistentNodeChat(options: {
   restoreDraft?: Persistence['restoreDraft']
   retainDuringRenewal?: Persistence['retainDuringRenewal']
   isEntryDraftOwner?: Persistence['isEntryDraftOwner']
+  pendingEntryOwner?: Persistence['pendingEntryOwner']
 }) {
   const listeners = new Set<() => void>()
   let dispose!: () => void
@@ -75,6 +76,7 @@ function persistentNodeChat(options: {
     ...(options.restoreDraft === undefined ? {} : { restoreDraft: options.restoreDraft }),
     ...(options.retainDuringRenewal === undefined ? {} : { retainDuringRenewal: options.retainDuringRenewal }),
     ...(options.isEntryDraftOwner === undefined ? {} : { isEntryDraftOwner: options.isEntryDraftOwner }),
+    ...(options.pendingEntryOwner === undefined ? {} : { pendingEntryOwner: options.pendingEntryOwner }),
   })
   return {
     handle, dispose,
@@ -145,6 +147,21 @@ describe('chat store NodeDraft ownership', () => {
     fixture.refresh()
     expect(restoreDraft).not.toHaveBeenCalled()
     expect(store.getSnapshot().draft).toBe('memory only')
+  })
+
+  it.each([true, false])('early edits join only the confirmed startup owner (same owner: %s)', async (sameOwner) => {
+    const entry = ownerOf(7)
+    let owner: Owner = 'pending'
+    const fixture = persistentNodeChat({ owner: () => owner, key: () => typeof owner === 'object' ? KEY : undefined,
+      pendingEntryOwner: () => entry })
+    const store = fixture.handle.create(SESSION)
+    store.actions.setDraft('Typed before opening the Host stream')
+    expect(fake.FakeNodeDraft.instances).toHaveLength(0)
+    owner = sameOwner ? { ...entry } : ownerOf(8)
+    fixture.refresh()
+    await flush()
+    expect(store.getSnapshot().draft).toBe(sameOwner ? 'Typed before opening the Host stream' : '')
+    expect(fake.FakeNodeDraft.last().written.includes(serialized('Typed before opening the Host stream'))).toBe(sameOwner)
   })
 
   it('clears the composer when verification revokes the owner to pending', () => {

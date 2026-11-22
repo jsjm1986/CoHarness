@@ -14,6 +14,8 @@ Gateway PostgreSQL 调用方使用 `pool.query()`、promise 和 callback 两种 
 
 超过上限的 promise 以 `DB_CHECKOUT_QUEUE_FULL` 拒绝；callback 异步收到相同错误。成功或失败后，接纳计数在通知调用方之前释放。原生同步失败会回滚接纳计数；promise 调用方收到 rejection，callback 调用方保留 pg 的同步抛错行为。Pool 开始关闭后，pg 自身的关闭后使用结果优先于接纳拒绝。
 
+对于保留热连接的池，其他可用连接均已借出时，pg 仍可能把请求绑定到新连接。跨网建连包含鉴权往返。归还的健康连接先满足 pg 原生队列中的请求，仍有空闲则可交给等待新连接的请求。一次取连接只在原调用方的异步上下文中交付一个连接，迟到的连接直接归还而不执行 SQL。两次取连接均受 pg 原有的连接数上限和超时约束。
+
 成功的原生 checkout 为每个 client 仅附加一次现有的 metadata-only checked-out client 错误保护。对于 Gateway 创建的 pool，`connectFromPool()` 直接委托，事务调用方因此只消耗一个接纳名额。其现有 fallback 为辅助函数调用方接纳外部注入的 pool，不修改外部所拥有 pool 的原生方法。[poolAdmissionSnapshot()](../../../../gateway/src/postgres/database.ts) 返回当前 pending、配置上限和累计拒绝次数，不含 SQL、凭据或账户标签。它与 pg 原生 waiting count 分开，因为建连中的操作也消耗接纳名额。
 
 等待连接时取消会立即拒绝事务。取消后晚到的 client 只归还一次，不会执行已取消的事务。
@@ -37,3 +39,5 @@ HTTP 请求拥有方将该接纳错误映射为 503。用量接收端在鉴权�
 ## 验证
 
 [无密钥回归套件](../../../../gateway/tests/pool-admission.spec.ts) 通过可控 Client 实现驱动真实 pg pool，不建立数据库 socket。覆盖原生 promise 及 callback query 入口、直接 checkout 重载、辅助函数共享接纳、异步拒绝、容量恢复、建连失败、constructor/query 同步失败、fake-clock checkout 超时、关闭错误优先级以及 checked-out 错误保护。Query 溢出回归在仅辅助函数限流的实现上失败，因为多余原生 query 会成功，而不是收到 `DB_CHECKOUT_QUEUE_FULL`；统一 checkout 拥有方后通过。这些测试证明队列语义与失败清理，不证明 PostgreSQL 吞吐。
+
+[PostgreSQL 传输测试](../../../../gateway/tests/database-transport.spec.ts) 在一个新连接仍处于鉴权时归还另一个连接，验证原生队列优先级、已交付连接只执行一次 SQL、调用方上下文和迟到连接的归还。

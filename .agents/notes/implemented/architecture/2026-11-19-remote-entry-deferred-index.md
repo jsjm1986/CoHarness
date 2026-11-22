@@ -20,8 +20,8 @@ Preloading browser assets from a delayed response leaves the first visible scree
 
 ## Consequences
 
-Static shell delivery is local to the authenticated entry. The browser still loads the selected Runtime's plugin graph and required connection state before mounting the complete application. Model onboarding waits for the workspace baseline on a remote landing. The plugin approval inventory still reconnects using the live connection events.
+Static shell delivery is local to the authenticated entry. Application plugin requests wait for the remote bootstrap scripts so speculative requests cannot consume the connection slots needed to start the module loader. The owner also omits application preload hints from bounded structured boot responses, which handles older release shells during a rolling update. The browser retries one failed revision-pinned bootstrap download on the same origin. It loads the selected Runtime's plugin graph and required connection state before mounting the complete application. Model onboarding waits for the workspace baseline on a remote landing. The plugin approval inventory reconnects using the live connection events.
 
 ## Verification
 
-The built browser scenario holds the remote bootstrap for two tabs, types different text in each, and checks that only the original account and Runtime Session receive the draft. It observes no prompt submission or unrelated Runtime requests during the hold.
+The built browser scenario holds the remote bootstrap for two tabs and types different text in each. One tab receives a 503 for the bootstrap download and recovers before requesting application plugins. Only the original account and Runtime Session receive each draft. The test observes no prompt submission or unrelated Runtime requests during the hold.

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-21-personal-prepare-instance-lock.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-21-personal-prepare-instance-lock.md
+document:
+  en: eac0a1aeda8b138747bb2269c381be229cd9f1d5
+  zh: c8deefdeaf8d0de3f1d93871d4b665ca4b3795bf
+/agent-note-share-the-instance-lock-for-prepared-personal-conversations:
+  en: b589869dfb5bba21
+  zh: e57ef2ae3586089e
+/agent-note-share-the-instance-lock-for-prepared-personal-conversations/problem:
+  en: b8144f9e9e71d429
+  zh: e0d050fe6b05b818
+/agent-note-share-the-instance-lock-for-prepared-personal-conversations/decision:
+  en: 4bbc1290405f48a8
+  zh: 01caf480cb6725b8
+/agent-note-share-the-instance-lock-for-prepared-personal-conversations/alternatives-considered:
+  en: 93e77596fbbba9fd
+  zh: de52823ee66eba0a
+/agent-note-share-the-instance-lock-for-prepared-personal-conversations/consequences:
+  en: e2993d4fc575b447
+  zh: eac7d47e54564aad

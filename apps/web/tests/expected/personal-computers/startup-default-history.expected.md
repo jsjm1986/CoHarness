@@ -1,3 +1,4 @@
+History visible before Host describe: false
 Prepared history while Workspace is pending: none
 History visible before Workspace: false
 Authorized prompt: Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop.

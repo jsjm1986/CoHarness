@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-22-browser-advisory-read-scheduling.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-22-browser-advisory-read-scheduling.md
+document:
+  en: a602cfb043f5f3c099af24fca9abb64497b5b3da
+  zh: 3c9b6a3c9041807656888eec755699a0ae15e516
+/agent-note-reserve-browser-connections-for-conversation-actions:
+  en: 6a8a5a161d1518b8
+  zh: f726f6c711994fad
+/agent-note-reserve-browser-connections-for-conversation-actions/problem:
+  en: 001b7e17b45eb5b7
+  zh: 21905559f73ac250
+/agent-note-reserve-browser-connections-for-conversation-actions/decision:
+  en: 1545fc85e0ffc584
+  zh: fdb032d046802e25
+/agent-note-reserve-browser-connections-for-conversation-actions/alternatives-considered:
+  en: c49881205346be4f
+  zh: 1b1ea03a1d515e3a
+/agent-note-reserve-browser-connections-for-conversation-actions/consequences:
+  en: 2fb3bc39df39639a
+  zh: 8c55e1965f9e4e2f

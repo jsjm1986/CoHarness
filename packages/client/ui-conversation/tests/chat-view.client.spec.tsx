@@ -2431,11 +2431,11 @@ describe('ChatView', () => {
     expect(view.getByText('加载中…')).toBeTruthy()
   })
 
-  it('automatically loads older history near the reader head', () => {
+  it('loads older history once when the reader scrolls up to the head', () => {
     const h = makeHarness({ nodes: [user(5, 'later')], hasMore: true })
     const view = render(<h.ChatView {...h.props} />)
     const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
-    let scrollTop = 100
+    let scrollTop = 700
     Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1_000 })
     Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 300 })
     Object.defineProperty(scroller, 'scrollTop', {
@@ -2444,7 +2444,24 @@ describe('ChatView', () => {
       set: (value: number) => { scrollTop = value },
     })
     fireEvent.scroll(scroller)
+    expect(h.loadOlder).not.toHaveBeenCalled()
+    scrollTop = 100
     fireEvent.scroll(scroller)
+    fireEvent.scroll(scroller)
+    expect(h.loadOlder).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a first page that fits the viewport intact until the reader requests older history', () => {
+    const h = makeHarness({ nodes: [user(5, 'recent')], hasMore: true, openState: 'loading' })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 240 })
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 800 })
+    Object.defineProperty(scroller, 'scrollTop', { configurable: true, get: () => 0, set: () => {} })
+    act(() => { h.set({ openState: 'open' }) })
+    fireEvent.scroll(scroller)
+    expect(h.loadOlder).not.toHaveBeenCalled()
+    fireEvent.click(view.getByRole('button', { name: '加载更早' }))
     expect(h.loadOlder).toHaveBeenCalledOnce()
   })
 

@@ -87,6 +87,7 @@ export {
 export { listTrash, purgeDocument, purgeDueDocuments, restoreDocument, trashDocument } from './trash.ts'
 export { LocalUserDocFs } from './local-fs.ts'
 export type { LocalUserDocFsOptions } from './local-fs.ts'
+export { DocumentProjectionGap } from './projection.ts'
 export type { DocumentProjectionBatch, DocumentProjectionChange, DocumentProjectionCursor, DocumentProjectionReadOptions } from './projection.ts'
 
 /** Default document directory name below the runtime operating-system home. */

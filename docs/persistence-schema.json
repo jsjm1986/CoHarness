@@ -44611,7 +44611,7 @@
       "digest": "11e15542af87e45e8f0f1e133f03e1e0effb99b719a8c2a1cea677a18325f083",
       "names": [],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:34"
+        "packages/host/apiproxy/src/api/sessions.ts:35"
       ]
     },
     {
@@ -46720,7 +46720,7 @@
       "digest": "844e2decba6e7c717c04484888eb8c1ee5c1f38e613e9aa8ce7dbe95e53b2e64",
       "names": [],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:104"
+        "packages/host/apiproxy/src/api/sessions.ts:105"
       ]
     },
     {
@@ -47538,7 +47538,7 @@
         "packages/host/apiproxy/src/api/sessions.ts#AuthenticatedParticipant"
       ],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:27"
+        "packages/host/apiproxy/src/api/sessions.ts:28"
       ]
     },
     {
@@ -47941,7 +47941,7 @@
       "names": [],
       "sources": [
         "packages/context/collaboration/src/types.ts:25",
-        "packages/host/apiproxy/src/api/sessions.ts:33"
+        "packages/host/apiproxy/src/api/sessions.ts:34"
       ]
     },
     {
@@ -48718,7 +48718,7 @@
         "packages/host/apiproxy/src/api/sessions.ts#ModelSelection"
       ],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:199"
+        "packages/host/apiproxy/src/api/sessions.ts:200"
       ]
     },
     {
@@ -48854,7 +48854,7 @@
       "digest": "f7e8c6fddd59fe7ecec72b632ae599cbad848dcc487be86881da11c156be7697",
       "names": [],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:109"
+        "packages/host/apiproxy/src/api/sessions.ts:110"
       ]
     },
     {

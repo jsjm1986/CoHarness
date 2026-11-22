@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/README.md
 document:
-  en: 85c39dc172e5ac4a6a9a5424740291598002907e
-  zh: 5eded2a4d57320fe2c4e60585db6501fcb80ee67
+  en: 3ce4d0b1449a6dd8d4d56a5f4ad607e7761e37b4
+  zh: cc4aaa8f536ec1ceb71bf5ccf2e3c7f1c5d05f36
 /harness-gateway:
   en: d06b73ef2a831bb8
   zh: 8a3e3f0d5c13677e
@@ -12,11 +12,11 @@ document:
   en: cd8789fbfd3a1abc
   zh: 80edd417e612f6e9
 /harness-gateway/configuration-environment-variables-see-src-config-ts:
-  en: 868bc15541522a97
-  zh: 8aec04db33dd3c41
+  en: 9d32eefffbcfc8b5
+  zh: cf99d18d12799196
 /harness-gateway/performance-and-runtime-admission:
-  en: c473e6263b243446
-  zh: 70b3f46d2da067b6
+  en: d760ad461c3b6c29
+  zh: 6c346acd33f098d1
 /harness-gateway/public-access-tunnel:
   en: cb899eb32564dc68
   zh: c6d16f6215cb0aa8
@@ -42,8 +42,8 @@ document:
   en: 5d9fd7a1354b66b0
   zh: 111af8d96cf62f40
 /harness-gateway/model-governance-and-usage-accounting:
-  en: 90a00259bf9a0f3b
-  zh: 3c59b592c7bb6cb3
+  en: 356a04c9a0792ea4
+  zh: 2f57e58091359ac4
 /harness-gateway/postgresql-control-plane:
   en: c27f5b4776762617
   zh: fbaeb983a8ff22b4
@@ -51,8 +51,8 @@ document:
   en: e0a5ea991715ea39
   zh: 759bf739d5e323a5
 /harness-gateway/access-revocation-across-gateways:
-  en: 7a7efa516c982e62
-  zh: a12402abac7725ec
+  en: 579b7e4a7ee376cc
+  zh: b621a6771c3e5b95
 /harness-gateway/layered-directory-enforcement:
   en: ab52b7ae0a8333a8
   zh: 72608aa76089e7d7

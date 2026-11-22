@@ -30,8 +30,18 @@ export async function verifyColdSessionPreparation({pool,org,base,cookie,runtime
     resolveUrl(path){const url=super.resolveUrl(path);url.pathname='/api/prepare/v1/session.create';url.searchParams.set('dshNode',nodeId);return url}
     async doFetch(input,init){const headers=new Headers(init.headers);headers.set('cookie',cookie);headers.set('origin',base);return fetch(input,{...init,headers})}
   }
+  const generation = async () => (await pool.query('SELECT generation FROM harness.instances WHERE organization_id=$1 AND runtime_id=$2',
+    [org, runtimeId])).rows[0]?.generation ?? null
+  const originalGeneration = await generation()
+  const saved = new URL('/api/prepare/v1/session.history', base)
+  saved.search = new URLSearchParams({ dshRuntime: runtimeId, dshNode: nodeId, dshTarget: 'personal', dshRestore: '1' }).toString()
+  const response = await fetch(saved, { method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+    body: JSON.stringify({ type: 'client-request', method: 'session.history', rpcId: randomUUID(),
+      payload: { sessionId: 'session-' + randomUUID(), detail: 'conversation', restoreSelection: true } }) })
+  assert.equal(response.status, 503, await response.text())
+  assert.equal(await generation(), originalGeneration)
   await command('hold-start',{runtimeId})
-  const transcript=[]
+  const transcript=['Restoring saved history on the cold computer starts no Runtime.']
   try{
     const draftId='draft-'+randomUUID(),sessionId='cold-'+randomUUID()
     await assert.rejects(new SingleAttempt().sessions.create({sessionId,draftId}),error=>error.status===503)
@@ -53,8 +63,7 @@ export async function verifyColdSessionPreparation({pool,org,base,cookie,runtime
     assert.equal(requests.at(-1).continuation,null)
     assert.equal(requests.length,beforeWarm+1)
     transcript.push('A second independent creation remains a different Session and uses one hot request.')
-    const generation=async()=>Number((await pool.query('SELECT generation FROM harness.instances WHERE organization_id=$1 AND runtime_id=$2',[org,runtimeId])).rows[0].generation)
-    const original=await generation()
+    const original=Number(await generation())
     const control=async action=>{
       const response=await fetch(`${base}/admin/api/runtimes/${runtimeId}/${action}?dshNode=${nodeId}`,{method:'POST',
         headers:{cookie,origin:base,'content-type':'application/json'},body:JSON.stringify({generation:original})})
@@ -65,9 +74,9 @@ export async function verifyColdSessionPreparation({pool,org,base,cookie,runtime
       const response=await fetch(url,{method:'POST',headers:{cookie,origin:base,'content-type':'application/json','x-dsh-prepare-continuation':receipt},body:requests[0].body})
       const body=await response.text();assert.equal(response.status,503,body);assert.match(body,/INSTANCE_UNAVAILABLE/)
     }
-    await control('stop');await stale();assert.equal(await generation(),original)
-    await control('restart');const replacement=await generation();assert.ok(replacement>original)
-    await stale();assert.equal(await generation(),replacement)
+    await control('stop');await stale();assert.equal(Number(await generation()),original)
+    await control('restart');const replacement=Number(await generation());assert.ok(replacement>original)
+    await stale();assert.equal(Number(await generation()),replacement)
     transcript.push('Stopped and replaced generations reject the old continuation without another start or Session mutation.')
     const text=transcript.join('\n')+'\n'
     assert.equal(text,await readFile(new URL('../expected/cold-session-preparation.txt',import.meta.url),'utf8'))

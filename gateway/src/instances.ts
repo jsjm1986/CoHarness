@@ -2418,14 +2418,13 @@ export class InstanceManager {
   }
 
   /**
-   * Inspect retained generations without cancelling their accepted work.
+   * Mint launch stamps before serving and inspect retained generations without interrupting work.
    * Incompatible or unknown launch identities refuse new forwarding until an explicit restart.
    * @returns compatible and pending-upgrade counts; neither category proves process quiescence.
    */
   async inspectUpgradeSurvivors(): Promise<{ compatible: number; pending: number }> {
     await this.initialized
     const targets = [...new Set([...this.procs.keys(), ...this.residentLeases.keys()])].map(key => targetFromKey(key))
-    if (targets.length === 0) return { compatible: 0, pending: 0 }
     let stamps: LaunchStampSet
     try {
       stamps = this.stamps()

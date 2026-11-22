@@ -181,6 +181,50 @@ describe('connection termination diagnostics', () => {
     }
   })
 
+  it('reconnects while both retired sockets are still closing', async () => {
+    vi.stubGlobal('location', { hostname: 'localhost', search: '', origin: 'http://localhost:3080' })
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => response(init))
+    const connected = vi.fn()
+    const delivered = vi.fn()
+    const failure = vi.fn()
+    const api = new WebApiClient()
+    const tapped: RpcMessage[] = []
+    const untap = api.subscribeEnvelopes((batch) => { tapped.push(...batch) })
+    const controller = new ConnectionController(api, { onConnected: connected, onMuxEnvelope: delivered, onFailure: failure }, config)
+    const frame = (rpcId: string) => JSON.stringify({
+      type: 'server-request', rpcId, method: 'session/subscribed',
+      payload: { type: 'session/subscribed', sessionId: 'session-browser', lastSeq: 8 },
+    })
+    try {
+      controller.start()
+      await vi.waitFor(() => { expect(connected).toHaveBeenCalledOnce() })
+      const retired = [...sockets]
+      for (const socket of retired) socket.holdClose = true
+      controller.reconnect()
+      retired[0]!.receive(frame('retired'))
+      await vi.waitFor(() => { expect(connected).toHaveBeenCalledTimes(2) })
+      expect(retired.map(socket => [socket.readyState, socket.closeCalls])).toEqual([
+        [FakeWebSocket.CLOSING, 1], [FakeWebSocket.CLOSING, 1],
+      ])
+      expect(sockets.slice(2).map(socket => socket.url)).toEqual(retired.map(socket => socket.url))
+      sockets[2]!.receive(frame('replacement'))
+      await vi.waitFor(() => {
+        expect(tapped.filter(message => message.type === 'server-request').map(message => message.rpcId)).toEqual(['replacement'])
+        expect(delivered).toHaveBeenCalledExactlyOnceWith({ rpcId: 'replacement', payload: {
+          type: 'session/subscribed', sessionId: 'session-browser', lastSeq: 8,
+        } })
+      })
+      expect(failure).not.toHaveBeenCalled()
+    } finally {
+      controller.stop()
+      untap()
+      for (const socket of sockets) if (socket.readyState !== FakeWebSocket.CLOSED) socket.remoteClose(1000, true)
+      fetch.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it.each([false, true])('treats stop as client cancellation without a failure or retry (ready=%s)', async (ready) => {
     ;(globalThis as Win).location = { hostname: 'localhost', search: '', origin: 'http://localhost:3080' }
     vi.stubGlobal('WebSocket', FakeWebSocket)

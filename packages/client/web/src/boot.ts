@@ -12,8 +12,7 @@ import type {
 import { bootClient } from './boot-client.ts'
 import { BootPage } from './boot-page.ts'
 import { mountClient } from './mount.ts'
-import { loadRemoteEntry, remoteEntrySelection, RemoteEntryAccountChanged, remoteEntryUrl } from './remote-entry.ts'
-import { getStaticModules } from './seed.ts'
+import { loadRemoteEntry, remoteEntrySelection, RemoteEntryAccountChanged, remoteEntryUrl, type RemoteEntrySelection } from './remote-entry.ts'
 import { StartupDraftView } from './startup-draft.ts'
 import './abort-signal.ts'
 import './base.css'
@@ -21,7 +20,7 @@ import './base.css'
 /** Module transport hook replaced by jsdom tests. */
 export type BootSeams = Pick<ClientModuleCreateOptions, 'loadBundle'>
 
-/** Browser boot entry consumed by `apps/web`. */
+/** Browser boot entry that renders native input before loading the renderer's shared modules. */
 export class AppWebEntry {
   private readonly container: HTMLElement
   private readonly seams: BootSeams | undefined
@@ -52,17 +51,12 @@ export class AppWebEntry {
   async run(onFailure?: (reason: unknown) => void): Promise<void> {
     try {
       const remote = remoteEntrySelection()
-      if (remote !== undefined) {
-        const draft = new StartupDraftView(remote)
-        this.startupDraft = draft
-        this.page.attachDraft(draft)
-        const boot = await loadRemoteEntry(remote, this.lifetime.signal)
-        if (boot === 'full-index') {
-          if (draft.read() === '') location.replace(remoteEntryUrl(remote, 'full'))
-          else draft.showNativeIndexLink()
-          return
-        }
-      }
+      const remoteBoot = remote === undefined ? undefined : this.bootRemoteIndex(remote)
+      const platform = import('./seed.ts')
+      void platform.catch((_error: unknown) => {
+        // The remote account check takes precedence over reporting a renderer asset failure.
+      })
+      if (remoteBoot !== undefined && !await remoteBoot) return
       // Boot-readiness gate: whichever bootstrap applies the injection table
       // settles this deferred once every row has taken effect — the served
       // index resolves it in the rendered tail, so the await returns on the
@@ -83,6 +77,8 @@ export class AppWebEntry {
       const transport = (globalThis as {
         __DSH_TRANSPORT__?: { loadBundle?: ClientModuleCreateOptions['loadBundle'] }
       }).__DSH_TRANSPORT__
+      const { getStaticModules } = await platform
+      if (this.lifetime.signal.aborted) return
       this.modules = moduleLoader.create({
         boot: win.__DSH_BOOT__,
         staticModules: getStaticModules(),
@@ -136,6 +132,17 @@ export class AppWebEntry {
     if (ctx !== undefined) await ctx.fiber.dispose()
     this.startupDraft?.dispose()
     this.page.dispose()
+  }
+
+  private async bootRemoteIndex(remote: RemoteEntrySelection): Promise<boolean> {
+    const draft = new StartupDraftView(remote)
+    this.startupDraft = draft
+    this.page.attachDraft(draft)
+    const boot = await loadRemoteEntry(remote, this.lifetime.signal)
+    if (boot === 'injections') return true
+    if (draft.read() === '') location.replace(remoteEntryUrl(remote, 'full'))
+    else draft.showNativeIndexLink()
+    return false
   }
 
   /** Prefetch stage-one bundles and their dynamic requests before concurrent plugin imports. */

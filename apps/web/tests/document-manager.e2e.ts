@@ -41,6 +41,7 @@ const LOADING_EXPECTED = join(EXPECTED_DIR, 'loading.expected.md')
 const UPLOAD_EMPTY_EXPECTED = join(EXPECTED_DIR, 'upload-empty.expected.md')
 const UPLOAD_PUBLISHED_EXPECTED = join(EXPECTED_DIR, 'upload-published.expected.md')
 const UPLOAD_PARTIAL_EXPECTED = join(EXPECTED_DIR, 'upload-partial.expected.md')
+const UPLOAD_RECOVERY_EXPECTED = join(EXPECTED_DIR, 'upload-recovery.expected.md')
 const SHORT_TOOLS_EXPECTED = join(EXPECTED_DIR, 'short-tools.expected.md')
 const TRASH_CONFLICT_EXPECTED = join(SNAPSHOT_DIR, 'trash-conflict.expected.md')
 const MODE = webSnapshotMode()
@@ -891,7 +892,7 @@ describe('web e2e: document manager', () => {
     expect(page.url()).toBe(beforeUrl)
   }, workflowMatrixEnabled ? 180_000 : 60_000)
 
-  it.each(['success', 'partial-failure'] as const)(
+  it.each(['success', 'partial-failure', 'catalog-recovery'] as const)(
     'desktop: shows real upload batch publication through a held completion: %s',
     async (outcome) => {
       const folderName = `u01-upload-${outcome}`
@@ -960,6 +961,10 @@ describe('web e2e: document manager', () => {
           await release.promise
           if (outcome === 'partial-failure') {
             await route.fulfill({ status: 500, json: { code: 'DOCUMENT_UPLOAD_STORAGE', error: 'Synthetic completion failure' } })
+          } else if (outcome === 'catalog-recovery') {
+            await route.fulfill({ status: 409, json: {
+              error: { code: 'DOCUMENT_CATALOG_RECOVERY_REQUIRED', message: 'Document catalog recovery is required for this scope.' },
+            } })
           } else await route.continue()
         })()
         pending.add(operation)
@@ -1044,7 +1049,7 @@ describe('web e2e: document manager', () => {
         release.resolve(undefined)
         const rows = manager.locator('[data-documents-list]')
         await rows.getByText('u01-a.txt', { exact: true }).waitFor()
-        if (outcome === 'partial-failure') {
+        if (outcome !== 'success') {
           const alert = manager.getByRole('alert')
           await alert.waitFor()
           expect(await alert.textContent()).toContain('u01-b.txt')
@@ -1052,10 +1057,10 @@ describe('web e2e: document manager', () => {
           expect(startedFiles).toEqual(['u01-a.txt', 'u01-b.txt'])
           expect(await rows.getByText('u01-b.txt', { exact: true }).count()).toBe(0)
           expect(await manager.getByText('Uploaded: 1 / 3', { exact: true }).count()).toBe(1)
-          await compareOrRefreshGolden(UPLOAD_PARTIAL_EXPECTED,
+          await compareOrRefreshGolden(outcome === 'catalog-recovery' ? UPLOAD_RECOVERY_EXPECTED : UPLOAD_PARTIAL_EXPECTED,
             await captureStableAria(page, '[data-documents-panel] [role="alert"]', scaffold.workspaceCwd), MODE)
           if (workflowMatrixEnabled) expectTextContrast(await captureTextContrast(page,
-            [{ label: 'upload-failure', text: alert }], 'documents-upload-partial-failure'))
+            [{ label: 'upload-failure', text: alert }], `documents-upload-${outcome}`))
         } else {
           await rows.getByText('u01-c.txt', { exact: true }).waitFor()
           expect(startedFiles).toEqual(files.map(file => file.name))
@@ -2046,7 +2051,7 @@ describe('web e2e: document manager', () => {
 
   it('commits exactly the document-manager ARIA expected-output inventory', async () => {
     await assertFixtureInventory(EXPECTED_DIR, [
-      'trash-header.expected.md', 'loading.expected.md', 'upload-empty.expected.md', 'upload-published.expected.md', 'upload-partial.expected.md', 'short-tools.expected.md',
+      'trash-header.expected.md', 'loading.expected.md', 'upload-empty.expected.md', 'upload-published.expected.md', 'upload-partial.expected.md', 'upload-recovery.expected.md', 'short-tools.expected.md',
       'short-filtered-folder.expected.md', 'overview-short-filtered.expected.md',
     ])
   })

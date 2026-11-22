@@ -70,7 +70,7 @@ class SocketQueue<F> {
   }
 }
 
-/** Browser platform subclass: unary/respond use fetch; mux/host use downlink-only WebSockets. */
+/** Browser unary calls use fetch. Cancelling a downlink ends its reader and requests WebSocket closure. */
 export class WebApiClient extends AbstractApiClient {
   /**
    * @param target - optional authenticated Gateway runtime target.
@@ -129,6 +129,7 @@ export class WebApiClient extends AbstractApiClient {
     let url: URL
     try { url = this.prepareSocketUrl === undefined ? candidate : await this.prepareSocketUrl(candidate, signal) }
     catch (error) { if (isAborted()) return; throw error }
+    if (isAborted()) return
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(url)
     const inbox = new SocketQueue<F>()
@@ -136,17 +137,19 @@ export class WebApiClient extends AbstractApiClient {
     let ended = false
     let termination: StreamTermination | undefined
     const isEnded = (): boolean => ended
+    const wakeReader = (): void => {
+      wake?.()
+      wake = undefined
+    }
     const closeForOverflow = (): void => {
       if (ended) return
       ended = true
       termination = new StreamTermination('queue-overflow')
       inbox.clear()
       socket.close()
-      wake?.()
-      wake = undefined
+      wakeReader()
     }
     const enqueue = (item: RpcRequest<F>, bytes: number): boolean => {
-      if (ended) return false
       if (!inbox.push(item, bytes)) {
         // A stalled browser consumer must not turn a server burst into an
         // unbounded heap. Reconnect semantics already treat close as a failed
@@ -155,12 +158,12 @@ export class WebApiClient extends AbstractApiClient {
         closeForOverflow()
         return false
       }
-      wake?.()
-      wake = undefined
+      wakeReader()
       return true
     }
-    const handleOpen = (): void => { onOpen?.() }
+    const handleOpen = (): void => { if (!ended) onOpen?.() }
     const handleMessage = (event: MessageEvent): void => {
+      if (ended) return
       if (typeof event.data !== 'string') {
         console.error(`[client-connection] dropping malformed WebSocket frame on ${path}: binary frames are unsupported`)
         return
@@ -190,10 +193,13 @@ export class WebApiClient extends AbstractApiClient {
       if (ended) return
       ended = true
       if (!isAborted()) termination = new StreamTermination('stream-eof', { closeCode: event.code, wasClean: event.wasClean })
-      wake?.()
-      wake = undefined
+      wakeReader()
     }
     const handleAbort = (): void => {
+      ended = true
+      termination = undefined
+      inbox.clear()
+      wakeReader()
       if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN) socket.close()
     }
     socket.addEventListener('open', handleOpen)

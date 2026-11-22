@@ -27,6 +27,7 @@ import {
   DEFAULT_UPLOAD_MAX_CONCURRENT,
   DEFAULT_UPLOAD_MIN_FREE_BYTES,
   DEFAULT_UPLOAD_SESSION_TTL_MS,
+  DocumentProjectionGap,
   LEGACY_UPLOAD_DIR_NAME,
   LocalUserDocFs,
   type UserDocBackgroundWrite,
@@ -55,6 +56,7 @@ import type {
   GatewayUserService,
 } from './services.ts'
 import {
+  DOCUMENT_TRANSFER_UPLOADS_PATH,
   DocumentTransferError,
   type DocumentTransferScope,
   type GatewayDocumentScopeOperation,
@@ -156,6 +158,13 @@ interface LocalDocumentEntry {
   readonly http: UserDocHttpScope
   readonly authority: AsyncLocalStorage<LocalDocumentAuthority>
   readonly projection: DocumentProjectionDelivery
+  projectionRecoveryRequired: boolean
+}
+
+class DocumentCatalogRecoveryRequired extends DocumentTransferError {
+  constructor() {
+    super('DOCUMENT_CATALOG_RECOVERY_REQUIRED', 409, 'Document catalog recovery is required for this scope. Contact your administrator before retrying the upload.')
+  }
 }
 
 interface CachedLocalDocumentEntry {
@@ -458,7 +467,14 @@ class LocalDocumentEntrySet {
           || pathname === '/internal/runtime/documents/catalog/purge')
         const operation = async (): Promise<Response> => {
           if (write) {
-            await this.deliver(entry, store)
+            try {
+              await this.deliver(entry, store)
+            } catch (error) {
+              if (error instanceof DocumentCatalogRecoveryRequired) {
+                return internalResponse(error.status, { error: error.code, message: error.message })
+              }
+              throw error
+            }
             const payload = internalPayload(init.body)
             const documents = typeof payload === 'object' && payload !== null && 'documents' in payload ? payload.documents : undefined
             return internalResponse(200, { version: 1, accepted: Array.isArray(documents) ? documents.length : 0 })
@@ -513,7 +529,8 @@ class LocalDocumentEntrySet {
         })
       }catch(error){await engine.dispose();throw error}
     }
-    const entry: LocalDocumentEntry = { engine, http: new UserDocHttpScope(host), authority, projection: new DocumentProjectionDelivery() }
+    const entry: LocalDocumentEntry = { engine, http: new UserDocHttpScope(host), authority, projection: new DocumentProjectionDelivery(),
+      projectionRecoveryRequired: false }
     return entry
   }
 
@@ -913,18 +930,37 @@ export class LocalDocumentBroker {
   }
 
   private async flushProjection(authorized: Pick<AuthorizedLocalScope, 'entry' | 'authority'>): Promise<void> {
-    const store = authorized.entry.authority.getStore() ?? authorized.authority
-    return authorized.entry.projection.run(async () => {
-      const identities = authorized.entry.engine.identities
+    const { entry } = authorized
+    const store = entry.authority.getStore() ?? authorized.authority
+    return entry.projection.run(async () => {
+      const identities = entry.engine.identities
       if (identities === undefined || this.deps.catalog === undefined) {
         throw new UserDocError('Document identity projection is unavailable.', DOCUMENT_STORE_UNAVAILABLE_CODE)
       }
-      if (!await identities.hasPendingProjection()) return
-      if (this.deps.writes !== undefined && store.writer?.active !== true) {
-        return withDocumentWriter(authorized.entry.authority, this.deps.writes, store, false,
-          () => this.commitProjection(authorized, identities))
+      if (!await identities.hasPendingProjection() && !entry.projectionRecoveryRequired) return
+      try {
+        if (this.deps.writes !== undefined && store.writer?.active !== true) {
+          await withDocumentWriter(entry.authority, this.deps.writes, store, false,
+            () => this.commitProjection(authorized, identities))
+        } else {
+          await this.commitProjection(authorized, identities)
+        }
+        entry.projectionRecoveryRequired = false
+      } catch (error) {
+        if (!(error instanceof DocumentProjectionGap)) throw error
+        if (!entry.projectionRecoveryRequired) {
+          console.error('[gateway] document catalog recovery required', {
+            organizationId: authorized.authority.subject.organizationId,
+            nodeId: this.deps.nodeId,
+            rootId: error.rootId,
+            receiver: error.receiver,
+            acknowledged: error.acknowledged,
+            head: error.head,
+          })
+        }
+        entry.projectionRecoveryRequired = true
+        throw new DocumentCatalogRecoveryRequired()
       }
-      return this.commitProjection(authorized, identities)
     })
   }
 
@@ -1167,6 +1203,10 @@ export class LocalDocumentBroker {
       const targetPath = runtimeUploadPath(pathname)
       const authorized = await this.authorize(user, requested, 'write')
       signal.throwIfAborted()
+      if (pathname === DOCUMENT_TRANSFER_UPLOADS_PATH && request.method === 'POST' && authorized.entry.projectionRecoveryRequired) {
+        request.resume()
+        throw new DocumentCatalogRecoveryRequired()
+      }
       const originalUrl = request.url
       request.url = targetPath
       try {

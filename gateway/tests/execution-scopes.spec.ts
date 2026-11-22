@@ -2,8 +2,8 @@
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
-import type { Pool } from 'pg'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { Client, type Pool } from 'pg'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { GatewayExecutionIdentity, verifyExecutionAttribution, type ExecutionIdentityState } from '../src/execution-identity.ts'
 import { createExecutionFixture, type Receipt } from './execution-fixture.ts'
@@ -38,12 +38,18 @@ async function fixture() {
 }
 
 describePg('current execution scopes', () => {
+  const observeClientQueries = () => vi.spyOn(Client.prototype, 'query')
+  let clientQueries: ReturnType<typeof observeClientQueries>
   beforeAll(async () => {
+    clientQueries = observeClientQueries()
     pool = createPostgresPool(databaseUrl!, { max: 10 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     await runMigrations(pool, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
   })
-  afterAll(async () => { await pool?.end() })
+  afterAll(async () => {
+    await pool?.end()
+    clientQueries?.mockRestore()
+  })
 
   it('authorizes inherited personal witnesses and checks current computer access on every dispatch', async () => {
     const f = await createExecutionFixture(pool, { executionWriteEpoch: 1n })
@@ -83,7 +89,14 @@ describePg('current execution scopes', () => {
     const f = await fixture(), id = await f.session()
     const old = await f.enter(id, await f.admit(id, f.member))
     expect((await f.authorize(id, old)).status).toBe(403)
-    const current = await f.enter(id, await f.admit(id, f.admin))
+    const admitted = await f.admit(id, f.admin)
+    clientQueries.mockClear()
+    const current = await f.enter(id, admitted)
+    const statements = clientQueries.mock.calls.flatMap(([query]) => typeof query === 'string' ? [query] : [])
+    const actorLookups = statements.filter(sql => /FROM harness\.users\s+WHERE organization_id=\$1 AND id=ANY\(\$2::uuid\[\]\) ORDER BY public_id/u.test(sql))
+    const scopeLookups = statements.filter(sql => /FROM harness\.execution_scopes WHERE .*fingerprint=\$6/u.test(sql))
+    expect(actorLookups).toHaveLength(1)
+    expect(scopeLookups).toHaveLength(1)
     expect(current.actors).toEqual([{ userId: f.admin.id }])
     expect((await f.authorize(id, current)).status).toBe(200)
     expect((await f.call('selection', { sessionId: id, capability: 'auto-review' }, f.admin)).status).toBe(204)

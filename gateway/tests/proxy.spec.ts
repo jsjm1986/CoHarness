@@ -32,6 +32,7 @@ const ECHO_DSH = `
 const fs = require('fs')
 const crypto = require('crypto')
 const http = require('http')
+const { gzipSync } = require('node:zlib')
 const { WebSocketServer } = require(${JSON.stringify(WS_MODULE)})
 const credential = JSON.parse(fs.readFileSync(3, 'utf8'))
 const material = (kind, nonce) => 'dsh-gateway-readiness-v1\\0' + kind + '\\0' + nonce + '\\0' + credential.runtime.kind + '\\0' + String(credential.runtime.id) + '\\0' + String(credential.runtime.generation)
@@ -68,6 +69,25 @@ const server = http.createServer((req, res) => {
     return
   }
   if (req.url === '/api/refused') { res.writeHead(403); res.end('refused'); return }
+  const boot = new URL(req.url, 'http://fixture')
+  if (boot.pathname === '/' && boot.searchParams.get('dshBootstrap') === '1') {
+    const document = boot.searchParams.has('tap') ? { version: 1, kind: 'full-index' } : {
+      version: 1, kind: 'injections',
+      rows: [
+        { kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: { principalId: 1 } },
+        { kind: 'script-preload', src: 'plugins/application.js' },
+        { kind: 'script-src', src: 'plugins/bootstrap.js', placement: 'head' },
+      ],
+      ...(boot.searchParams.has('large') ? { padding: ' '.repeat(1024 * 1024) } : {}),
+    }
+    const data = Buffer.from(JSON.stringify(document))
+    const compressed = req.headers['accept-encoding']?.includes('gzip') === true
+    const body = compressed ? gzipSync(data) : data
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'content-length': body.length,
+      ...(compressed ? { 'content-encoding': 'gzip' } : {}) })
+    res.end(body)
+    return
+  }
   res.setHeader('content-type', 'application/json')
   res.end(JSON.stringify({ host: req.headers.host, origin: req.headers.origin ?? null, url: req.url, principal: req.headers[${JSON.stringify('x-dsh-gateway-principal')}] ?? null }))
 })
@@ -141,6 +161,30 @@ async function setup(withPrincipal = false, env: Record<string, string> = {}, la
 }
 
 describe('proxy handlers', () => {
+  it('keeps application preloads out of the authenticated remote bootstrap response', async () => {
+    const { base, cookie, deps, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const getBootstrap = (flags = '', principal = String(alice.id)) => fetch(`${base}/?dshBootstrap=1${flags}`, {
+      headers: { cookie, accept: 'application/json', 'accept-encoding': 'gzip', 'x-dsh-expected-principal-id': principal },
+    })
+    const ready = await getBootstrap()
+    expect(ready.status).toBe(200)
+    expect(ready.headers.get('cache-control')).toBe('no-store')
+    expect(ready.headers.get('content-encoding')).toBeNull()
+    expect(ready.headers.get('x-dsh-principal-id')).toBe(String(alice.id))
+    expect(await ready.json()).toEqual({ version: 1, kind: 'injections', rows: [
+      { kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: { principalId: 1 } },
+      { kind: 'script-src', src: 'plugins/bootstrap.js', placement: 'head' },
+    ] })
+    expect(await (await getBootstrap('&tap=1')).json()).toEqual({ version: 1, kind: 'full-index' })
+    const large = await (await getBootstrap('&large=1')).json() as { padding: string; rows: { kind: string }[] }
+    expect(large.padding).toHaveLength(1024 * 1024)
+    expect(large.rows.map(row => row.kind)).toEqual(['global', 'script-preload', 'script-src'])
+    const mismatch = await getBootstrap('', '99')
+    expect(mismatch.status).toBe(409)
+    expect(await mismatch.json()).toEqual({ error: 'account-changed' })
+  })
+
   it('returns an exact cold preparation receipt through HTTP, rechecks authorization and forwards only after readiness', async () => {
     const environment = { id: '00000000-0000-4000-8000-000000000091' as RuntimeId, nodeId: '00000000-0000-4000-8000-000000000092' as RuntimeNodeId }
     const catalog: RuntimeCatalogEntry = { id: environment.id, owner: { kind: 'personal', id: 1, name: 'Alice' },

@@ -1,4 +1,5 @@
 /** Actual pg connections against fixture-owned PostgreSQL handshake and disconnect peers. */
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { once } from 'node:events'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createServer, type Socket } from 'node:net'
@@ -14,6 +15,7 @@ import {
   connectFromPool, createPostgresPool, errorCodeForDiagnostics, isTransientDatabaseError,
   withDatabaseStartupRetry, type GatewayPoolConfig,
 } from '../src/postgres/database.ts'
+import { deferred } from './barrier.ts'
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -112,6 +114,80 @@ async function securePeer(receive: (socket: Socket, connection: number, tag: str
 }
 
 describe('Gateway PostgreSQL transport classification', () => {
+  it('borrows a returned connection while a new connection is still authenticating', async () => {
+    const scope = new AsyncLocalStorage<string>()
+    const authenticating = deferred<Socket>()
+    const queries: number[] = []
+    const remote = await peer((socket, connection, tag) => {
+      if (tag === 'Q') {
+        queries.push(connection)
+        socket.write(QUERY_COMPLETE)
+        return
+      }
+      if (connection === 1) socket.write(AUTHENTICATED)
+      else authenticating.resolve(socket)
+    })
+    const pool = poolFor(remote.port, { max: 2, min: 1 })
+    const first = await pool.connect()
+    const acquiring = deferred<{ client: PoolClient; scope: string | undefined }>()
+    scope.run('borrowing', () => pool.connect((error, client) => {
+      if (error) acquiring.reject(error)
+      else acquiring.resolve({ client: client!, scope: scope.getStore() })
+    }))
+    const opening = await authenticating.promise
+    scope.run('returning', () => first.release())
+    const deadline = AbortSignal.timeout(1_500)
+    let winner: PoolClient | undefined
+    let authenticationReleased = false
+    try {
+      const checkout = await Promise.race([acquiring.promise, once(deadline, 'abort').then(() => {
+        throw deadline.reason
+      })])
+      winner = checkout.client
+      expect(winner).toBe(first)
+      expect(checkout.scope).toBe('borrowing')
+      await checkout.client.query('SELECT 1')
+      const unused = once(pool, 'release')
+      authenticationReleased = true
+      opening.write(AUTHENTICATED)
+      const [, connected] = await unused
+      expect(connected).not.toBe(winner)
+    } finally {
+      if (!authenticationReleased) opening.write(AUTHENTICATED)
+      const owned = winner ?? (await acquiring.promise).client
+      owned.release()
+    }
+    expect(queries).toEqual([1])
+    expect(pool.idleCount).toBe(2)
+    expect(remote.connections()).toBe(2)
+  })
+
+  it('serves a native queued checkout before offering a returned connection to a connecting checkout', async () => {
+    const authenticating = deferred<Socket>()
+    const remote = await peer((socket, connection) => {
+      if (connection === 1) socket.write(AUTHENTICATED)
+      else authenticating.resolve(socket)
+    })
+    const pool = poolFor(remote.port, { max: 2, min: 1 })
+    const first = await pool.connect()
+    const connecting = pool.connect()
+    const opening = await authenticating.promise
+    const queued = pool.connect()
+    try {
+      expect(pool.waitingCount).toBe(1)
+      first.release()
+      expect(await queued).toBe(first)
+    } finally {
+      opening.write(AUTHENTICATED)
+    }
+    const fresh = await connecting
+    expect(fresh).not.toBe(first)
+    fresh.release()
+    first.release()
+    expect(pool.idleCount).toBe(2)
+    expect(remote.connections()).toBe(2)
+  })
+
   it('retries an orderly peer disconnect before authentication without parsing its message', async () => {
     const remote = await peer((socket, connection) => {
       if (connection === 1) socket.end()

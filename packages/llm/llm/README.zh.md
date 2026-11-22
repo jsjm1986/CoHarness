@@ -122,6 +122,8 @@ for await (const chunk of ctx.llm.stream({
 
 物理模型流在中间件开始前保留其资源提供者及受管要求。预备、准入和最终请求派发均要求同一提供者仍然有效；撤销、替换或新增必需要求后缺少提供者时，以 `RESOURCE_BUDGET_UNAVAILABLE` 失败，不发送请求。已经取得的许可归还原提供者。恢复准入后使用新的流重试。编排轮次不预留模型容量；其嵌套模型请求分别捕获当前提供者。
 
+适配器迭代器清理超过 `streamCloseTimeoutMs` 时，原许可在清理状态不确定期间保持占用。同一迭代器稍后确认终止时释放原许可。确认缺失、被拒绝或仍未终止时，许可继续占用。
+
 `LlmAdapter.callKind` 默认为 `model`。若适配器的轮次驱动另外受管的模型请求，注册时捕获其 `orchestration` 类型。外层调用使用 `llm/orchestration`，保留必需的策略所有者检查及预备代次，不消耗模型许可，也不进入模型路由授权或模型计量中间件。每个嵌套请求必须使用普通或委派模型操作，分别完成授权、准入及实际用量计量。原生操作工厂拒绝编排路由；可变中间件不能跨执行类型重定向调用。
 
 `prepareOperation()` 预备由 `LlmOperationMap` 声明、由所捕获 `PreparedAdapterCall.operations` 工厂实现的原生模型操作。其冻结的 `request` 包含 Consumer 在 `run()` 前记录的精确无密钥输入。执行经过 `llm/stream`、模型准入和 `llm/pre-dispatch`；中间件从 `GenerateOptions.operation` 读取输入，对话消息为空。操作在终止结果前报告实际累计用量，包括后续失败之前已经获得的用量。中间件若没有执行出结果就结束，会拒绝调用，不会构造虚假的结果。配置不匹配、替换输入或重复执行以 `INVALID_PREPARED_CALL` 失败；捕获的代次缺少工厂时以 `MODEL_OPERATION_UNSUPPORTED` 失败。

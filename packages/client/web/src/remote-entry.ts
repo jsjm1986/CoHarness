@@ -63,6 +63,8 @@ function matchesIdentity(value: unknown, entry: RemoteEntrySelection): boolean {
     : value.runtimeTarget.kind === 'project' && `project:${String(value.runtimeTarget.projectId)}` === entry.scope
 }
 
+class BootstrapScriptLoadError extends Error {}
+
 function loadScript(src: string, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script')
@@ -78,7 +80,7 @@ function loadScript(src: string, signal: AbortSignal): Promise<void> {
       finish(reason instanceof Error ? reason : new Error('Runtime bootstrap aborted', { cause: reason }))
     }
     script.onload = () => { finish() }
-    script.onerror = () => { finish(new Error('A Runtime bootstrap script could not load')) }
+    script.onerror = () => { finish(new BootstrapScriptLoadError('A Runtime bootstrap script could not load')) }
     script.src = src
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) abort()
@@ -86,13 +88,18 @@ function loadScript(src: string, signal: AbortSignal): Promise<void> {
   })
 }
 
-function preloadScript(src: string): HTMLLinkElement {
-  const link = document.createElement('link')
-  link.rel = 'preload'
-  link.as = 'script'
-  link.href = src
-  document.head.append(link)
-  return link
+async function loadBootstrapScript(src: string, signal: AbortSignal): Promise<void> {
+  try {
+    await loadScript(src, signal)
+  } catch (error) {
+    signal.throwIfAborted()
+    if (!(error instanceof BootstrapScriptLoadError)
+      || !/^\/?plugins\/combo\.js\?\?/u.test(src)) throw error
+    const url = new URL(src, document.baseURI)
+    const revision = url.searchParams.get('rev')
+    if (url.origin !== location.origin || revision === null || !/^[a-f0-9]{12}$/u.test(revision)) throw error
+    await loadScript(src, signal)
+  }
 }
 
 function isIndexInjection(value: unknown): value is IndexInjection {
@@ -109,7 +116,8 @@ function isIndexInjection(value: unknown): value is IndexInjection {
   }
 }
 
-/** Apply the selected Host's authenticated index rows in their declared order.
+/** Apply the selected Host's authenticated index rows without speculative preloads.
+ * A failed same-origin, revision-pinned plugin bootstrap download receives one retry.
  * @param entry - exact account, computer and scope that rendered the first shell.
  * @param signal - owning document's lifetime.
  * @returns full-index when raw index transforms or an older Host require native rendering.
@@ -147,12 +155,6 @@ export async function loadRemoteEntry(entry: RemoteEntrySelection, signal: Abort
     throw new Error('Runtime bootstrap returned a different document identity')
   }
   signal.throwIfAborted()
-  // The authenticated Host supplies the same structured rows that its normal HTML renders.
-  const preloads: HTMLLinkElement[] = []
-  try {
-    await applyIndexInjections(rows, src => loadScript(src, signal), (src) => { preloads.push(preloadScript(src)) })
-  } finally {
-    for (const link of preloads) link.remove()
-  }
+  await applyIndexInjections(rows, src => loadBootstrapScript(src, signal))
   return 'injections'
 }

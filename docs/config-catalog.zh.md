@@ -1590,7 +1590,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-gateway-runtime`
 
 - `inject`: `connection`
-- `source`: [`packages/context/gateway-runtime/src/index.ts:524`](../packages/context/gateway-runtime/src/index.ts)
+- `source`: [`packages/context/gateway-runtime/src/index.ts:531`](../packages/context/gateway-runtime/src/index.ts)
 
 ```ts config-catalog
 /** Managed readiness and Workspace metadata publication settings. */
@@ -3667,7 +3667,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-skill-filesystem`
 
 - `inject`: `skills`
-- `source`: [`packages/skill/skill-filesystem/src/index.ts:48`](../packages/skill/skill-filesystem/src/index.ts)
+- `source`: [`packages/skill/skill-filesystem/src/index.ts:50`](../packages/skill/skill-filesystem/src/index.ts)
 
 ```ts config-catalog
 /** Local filesystem skill provider configuration. */
@@ -5069,7 +5069,7 @@ export interface DocumentTransportConfig {
 
 ## `@deepseek-ai/dsh-userdoc-local`
 
-- `source`: [`packages/attachment/userdoc-local/src/index.ts:106`](../packages/attachment/userdoc-local/src/index.ts)
+- `source`: [`packages/attachment/userdoc-local/src/index.ts:107`](../packages/attachment/userdoc-local/src/index.ts)
 
 ```ts config-catalog
 /** Local document backend configuration. */

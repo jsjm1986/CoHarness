@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-04-node-qualified-conversation-admission.md
 document:
-  en: 4045fb87609de70603963ef6d6a059dd5cca39a3
-  zh: 24c1aacd4f5104c79885bcb946e4c5ccbef5f680
+  en: f0f2f49cb009dded8e622363773b954a58c9d6c8
+  zh: 57eaf5dd890e8ccd3bcc501eaca999f9656b647a
 /agent-note-node-qualified-conversation-admission:
   en: e30fdaf185e85213
   zh: 6e1394e0356dab53
@@ -12,8 +12,8 @@ document:
   en: 4913ea4df9c26e87
   zh: 2c696eb9e530e4b1
 /agent-note-node-qualified-conversation-admission/decision:
-  en: a3b71e996e6226c7
-  zh: ff2cfd32880f655b
+  en: 379341090ca8529b
+  zh: 173cb246e40a1ccc
 /agent-note-node-qualified-conversation-admission/alternatives-considered:
   en: 1733905aef64ce1c
   zh: 2d43c6e7b768d3d8

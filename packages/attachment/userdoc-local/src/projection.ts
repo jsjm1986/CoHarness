@@ -10,6 +10,25 @@ export interface DocumentProjectionCursor {
   readonly ordinal: number
 }
 
+/** A receiver cursor precedes an acknowledged prefix already released by this journal. */
+export class DocumentProjectionGap extends Error {
+  /**
+   * @param rootId - exact identity root affected by the lost prefix.
+   * @param receiver - committed receiver position reported for this root.
+   * @param acknowledged - last locally confirmed receiver position.
+   * @param head - current committed position of the local journal.
+   */
+  constructor(
+    readonly rootId: UserDocRootId,
+    readonly receiver: DocumentProjectionCursor,
+    readonly acknowledged: DocumentProjectionCursor,
+    readonly head: DocumentProjectionCursor,
+  ) {
+    super('The catalog checkpoint precedes the retained document projection.')
+    this.name = 'DocumentProjectionGap'
+  }
+}
+
 /** One immutable committed document change, linked to its preceding delivery position. */
 export interface DocumentProjectionChange {
   readonly cursor: DocumentProjectionCursor
@@ -149,12 +168,12 @@ export class DocumentProjectionJournal {
    * @returns a detached batch; an unavailable prefix or unrepresentable single change fails without discarding it.
    */
   read(after: DocumentProjectionCursor, options: DocumentProjectionReadOptions): DocumentProjectionBatch {
-    cursor(after.sequence, after.ordinal)
+    const receiver = cursor(after.sequence, after.ordinal)
     if (!Number.isSafeInteger(options.limit) || options.limit < 1 || !Number.isSafeInteger(options.maxBytes) || options.maxBytes < 1) {
       throw new RangeError('Document projection bounds must be positive safe integers.')
     }
     const { head, acknowledged } = this.progress()
-    if (compare(after, acknowledged) < 0) throw new Error('The catalog checkpoint precedes the retained document projection.')
+    if (compare(receiver, acknowledged) < 0) throw new DocumentProjectionGap(this.rootId, receiver, acknowledged, head)
     if (compare(after, head) > 0) throw new Error('The catalog checkpoint exceeds the document projection head.')
     const changes: DocumentProjectionChange[] = []
     let next = after, encodedChanges = 0

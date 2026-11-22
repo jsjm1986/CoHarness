@@ -52,6 +52,9 @@ function ownedChild(file, environment, ipc = true) {
   let output = ''
   const receive = value => {
     const kind = value.kind ?? value.status
+    if (!ipc && ['degraded', 'stopped', 'stopped-lease-uncertain'].includes(kind)) {
+      diagnostics = `${diagnostics}${JSON.stringify(value)}\n`.slice(-16000)
+    }
     if (kind === 'failure' || kind === 'failed') { fail(new Error(`Node-service fixture failure: ${JSON.stringify(value)}`)); return }
     const pending = waiting.get(kind)
     if (pending) { waiting.delete(kind); pending.resolve(value) }
@@ -88,7 +91,7 @@ function ownedChild(file, environment, ipc = true) {
           } else child.kill('SIGTERM')
         }
         const result = await closed
-        assert.equal(result.signal, null, 'Fixture shutdown must finish without a signal'); assert.equal(result.code, 0, diagnostics)
+        assert.equal(result.signal, null, 'Fixture shutdown must finish without a signal'); assert.equal(result.code, 0, `${file.pathname.split('/').at(-1)}\n${diagnostics}`)
       }
       finally { clearTimeout(timeout) }
     },
@@ -168,14 +171,18 @@ async function verify(){
   assert.ok(environment)
   if(operationsOnly){
     const reconnectOnly = process.env.HGW_TEST_PROMPT_RECONNECT_ONLY === '1'
-    if (!reconnectOnly) {
+    const hotOnly = process.env.HGW_TEST_VERSIONED_HOT_ONLY === '1'
+    assert.ok(!reconnectOnly || !hotOnly)
+    if (!reconnectOnly && !hotOnly) {
       const {verifyColdSessionPreparation}=await import('./fixtures/cold-session-preparation.mjs')
       await verifyColdSessionPreparation({pool,org:organization,base:a.base,cookie,runtimeId:environment.id,nodeId:b.nodeId,userId:b.userId,
         command:(kind,fields)=>node.command(kind,fields)})
     }
-    const {verifyQueuedPromptReconnect} = await import('./fixtures/queued-prompt-reconnect.mjs')
-    await verifyQueuedPromptReconnect({ pool, base: a.base, cookie, runtimeId: environment.id, nodeId: b.nodeId, userId: b.userId,
-      disconnect: () => agent.stop(), reconnect: async () => { agent = startAgent(); await agent.wait('channel-ready') } })
+    if (!hotOnly) {
+      const {verifyQueuedPromptReconnect} = await import('./fixtures/queued-prompt-reconnect.mjs')
+      await verifyQueuedPromptReconnect({ pool, base: a.base, cookie, runtimeId: environment.id, nodeId: b.nodeId, userId: b.userId,
+        disconnect: () => agent.stop(), reconnect: async () => { agent = startAgent(); await agent.wait('channel-ready') } })
+    }
     if (reconnectOnly) return
     const {verifyVersionedNodeService} = await import('./fixtures/versioned-node-service.mjs')
     const localCookie=await login(a.base,'center-owner')

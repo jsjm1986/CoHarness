@@ -207,7 +207,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   ],
   // TODO(alpha.2): restore 'lib/apply-injections.js' when the worker-page
   // index-injection interpreter is ported with its first consumer.
-  '@deepseek-ai/dsh-client-web': ['lib/**/*.css'],
+  '@deepseek-ai/dsh-client-web': ['lib/boot.js', 'lib/seed.js', 'lib/**/*.css'],
   // Document icons distribute their upstream license notice.
   '@deepseek-ai/dsh-client-ui-documents': ['lib/client.*.js', 'LICENSE.material-icon-theme'],
   '@deepseek-ai/dsh-client-ui-theme': ['lib/styles'],

@@ -75,7 +75,7 @@ Uploads use one resumable session protocol on desktop and mobile. Small files us
 
 The manager accepts one upload batch at a time and uploads its files in order. Its published count and native progress bar advance only after the server returns a completed document reference. A separate status names the current file and its byte progress or finalization phase; the upload button keeps its action name. A failed file stops the remaining files; completed files remain stored. When the same view remains open, the manager refreshes the authoritative directory with its existing filters, sort, and page, retaining the published count and error if that read fails. Closing the manager or navigating elsewhere does not redirect accepted writes, and their callbacks cannot replace another view's rows or progress. Completed writes invalidate cached directory metadata for the next read. Retry the failed and unstarted files explicitly; completed files are not uploaded again automatically.
 
-Upload results remain separate from file selection and visibility metadata. A partial failure separates the error from the affected file and unstarted count; completed documents remain browsable.
+Upload results remain separate from file selection and visibility metadata. A partial failure separates the error from the affected file and unstarted count; completed documents remain browsable. If the destination reports a catalog recovery requirement, the upload alert directs the user to an administrator before continuing.
 
 <a id="scope-isolation"></a>
 ## Scope isolation

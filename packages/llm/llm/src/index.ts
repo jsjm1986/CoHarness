@@ -1370,13 +1370,36 @@ export class LlmRuntime extends TypertRemoteService {
     } finally {
       publishTiming('closed')
       let quiescent = completed
+      let closing: Promise<IteratorResult<StreamChunk> | void> | undefined
       try {
         if (!completed) {
           const close = iterator.return?.bind(iterator)
-          if (close) quiescent = await closeWithDeadline(close, this.streamCloseTimeoutMs)
+          if (close) {
+            closing = Promise.resolve().then(close)
+            quiescent = await closeWithDeadline(closing, this.streamCloseTimeoutMs)
+          }
         }
       } finally {
-        if (lease !== undefined) await (quiescent ? lease.release() : lease.uncertain())
+        if (lease !== undefined) {
+          if (quiescent) await lease.release()
+          else {
+            const retained = lease
+            const uncertain = retained.uncertain()
+            // A close deadline ends the caller's wait. The original iterator
+            // can still prove quiescence for this exact permit afterwards.
+            if (closing !== undefined) {
+              const logger = this.ctx.logger
+              void closing.then(async (result) => {
+                if (result?.done !== true) return
+                await uncertain.catch(() => { /* confirmed quiescence can supersede an unacknowledged report */ })
+                await retained.release()
+              }, () => { /* a rejected iterator close leaves occupation uncertain */ }).catch(() => {
+                logger.warn('Model resource completion after adapter close could not be acknowledged.')
+              })
+            }
+            await uncertain
+          }
+        }
       }
     }
   }
@@ -1504,7 +1527,7 @@ async function nextWithSignal<T>(
 
 /** Await iterator cleanup without allowing a broken adapter to hang disposal. */
 async function closeWithDeadline(
-  close: () => Promise<IteratorResult<StreamChunk> | void> | void, timeoutMs: number,
+  closing: Promise<IteratorResult<StreamChunk> | void>, timeoutMs: number,
 ): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_resolve, reject) => {
@@ -1513,10 +1536,7 @@ async function closeWithDeadline(
     }, timeoutMs)
   })
   try {
-    const result = await Promise.race([
-      Promise.resolve().then(close),
-      timeout,
-    ])
+    const result = await Promise.race([closing, timeout])
     return result?.done === true
   } finally {
     /* v8 ignore next -- setTimeout always returns a timer handle in supported runtimes. */

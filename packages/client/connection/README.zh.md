@@ -23,6 +23,8 @@ kind: "package-reference"
 
 `ConnectionHandle.documentIdentity` 提供已校验的账号与初始 Runtime，用于划分浏览器状态的存储命名空间。独立页面、fixture 与显式载体不提供该值。派生目标 handle 共享原始页面的身份，该值不授予目标访问权限。
 
+HTTP/1 或协议未知的页面跨各 Runtime 最多允许三条后台请求同时等待响应头，其中读取最多两条。会话激活和插件清单同步优先于排队中的导航读取和辅助目录。HTTP/2 和 HTTP/3 可并发执行这些操作。显式高优先级请求、新建对话、发送、草稿操作、工作台搜索和翻页直接发出。取消排队中的操作会在到达 Gateway 前撤销请求。连接测量见[调度决策](../../../.agents/notes/implemented/architecture/2026-11-22-browser-advisory-read-scheduling.zh.md)。
+
 fetch 包装把原生请求拒绝标识为 `ApiTransportError`，状态为 `0`、代码为 `request-unavailable`；它保留原因且不重试。这只标识未收到 HTTP 响应，不表示已诊断为断网或已知服务端结果。已取消的请求保留 signal 的原因；身份失败和响应解码缺陷不归类为网络失败。HTTP 与 RPC 失败语义见 [fetch 传输器](../../host/apiproxy/README.zh.md)。
 
 ## 概述
@@ -49,6 +51,8 @@ Host 的 `rpcTimeoutMs` 配置浏览器有界 RPC 调用，默认值保留为 30
 
 `historyPageTargetBytes` 接受正整数，并设置每个完整、未压缩的 history RPC `server-response` JSON 正文以 UTF-8 字节计的目标大小。默认值为 131072 字节。分页会保留完整的 append 来源消息组，因此一个不可分割的消息组可能超过该目标。Fetch 历史响应仍打包剩余的 `assistant/chunk` 游程，并往返 `detail: 'conversation'` 的可选 `omittedSpans`；下载档见 [两档会话历史传输决策](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)。
 
+`preparedHistoryMessages` 为准备操作返回的对话首屏设置可选的正整数上限，按追加来源的消息计数，也适用于新建对话随回执返回的首页。客户端请求的上限更小时，Host 采用较小值。普通历史读取和带游标的续页采用请求中的上限。
+
 共享的一元载体默认通过 16 MiB 字节预算读取成功 JSON 响应；`AbstractApiClient` 与 `InProcessApiClient` 接受正数覆盖值，以便部署选择更小的上限。有界 reader 接受可选的 `AbortSignal`，调用方断开时会取消 response body。超限响应会在 envelope 解析前被拒绝。
 
 通用 RPC 流在调用方中止时显式取消 response reader，包括正在等待下一帧的读取。结束时移除 abort 监听，并等待正文取消完成后再释放 reader；清理同时失败时保留原始读取错误或取消原因。
@@ -68,6 +72,8 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 每条浏览器下行连接使用带 head index 的队列，并限制为最多 1,024 个 frame 和 8 MiB 编码数据。消费者停滞时会关闭该 socket，让 connection generation 重新连接，而不是保留无界突发数据。
 
 `/api/events.mux` 与 `/api/events.host` 各接受一条 WebSocket upgrade，并只向浏览器发送对应的 `ServerRequest` 文本消息；客户端不会在这些 socket 上发送业务数据。任一 socket 结束都会使当前 connection generation 失败并重建两条流，连接就绪仍要求两条 socket 均已打开且 `host.describe` HTTP 调用成功。Host teardown 会终止两条 socket、中止各自的 source，并等待 source 清理完成后再返回。普通网络 GET 这些路径会返回 426，不保留 SSE（Server-Sent Events）回退；`toFetchHandler` 的 SSE 编解码只服务进程内同构载体。
+
+客户端结束连接代次时，WebSocket 读取器丢弃已排队的帧并请求关闭 socket。浏览器完成旧 socket 的关闭流程期间，新连接即可建立。
 
 已认证的浏览器重连时，Mux 打开且 `host.describe` 确认仍是原 Runtime 和所属电脑后，可以提前向对话提供 Mux 帧。消费者只接收现有视图能应用的帧。Host 元数据与其他帧在连接完整就绪后按原顺序交付，连接代次结束时取消其恢复读取。
 

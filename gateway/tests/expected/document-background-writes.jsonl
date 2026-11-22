@@ -7,5 +7,7 @@
 {"case":"catalog-acknowledgement-interrupted","delivered":1,"writers":0}
 {"case":"catalog-acknowledged","status":200,"state":"complete"}
 {"case":"concurrent-browser-runtime-delivery","listing":200,"notification":200,"projectionOrder":["cursor","commit"],"identityPreserved":true}
+{"case":"catalog-prefix-missing","status":409,"newUpload":409,"stagedUpload":200,"download":200,"otherScope":200,"filesPreserved":true,"newUploadQueriedCatalog":false}
+{"case":"catalog-prefix-restored","status":200,"newUpload":200}
 {"case":"scope-removed","closed":true,"contentsPreserved":true,"writers":0}
-{"case":"catalog-drained","writers":0,"delivered":2}
+{"case":"catalog-drained","writers":0,"delivered":3}

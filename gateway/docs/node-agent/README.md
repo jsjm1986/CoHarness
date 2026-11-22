@@ -190,6 +190,8 @@ With `HGW_NODE_SERVICE_DIAL_URLS`, fresh HTTP and streaming service connections 
 
 For an SSH reverse tunnel, bind the listener to loopback on the node and verify the SSH host key. From the node, compare `/healthz/ready` and established WebSocket round trips on both paths. Confirm the same Gateway release and use the more consistent path first. Apply the setting in a maintenance window after confirming that the node's Runtime work can stop. Verify the agent's enrolled identity and measure a forwarded conversation operation.
 
+When PostgreSQL also uses a reverse tunnel, give database and Gateway traffic separate SSH connections. To diagnose latency, compare short read-only queries on an established database connection with PostgreSQL statement duration and wait events from the same window. Repeat with a second loopback forward to the same database before replacing a slow transport. Verify active Runtime work and imminent schedules before changing either production tunnel.
+
 <a id="recovery"></a>
 
 ## Recovery

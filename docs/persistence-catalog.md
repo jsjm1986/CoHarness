@@ -799,7 +799,7 @@ Source: [`packages/memory/memory-context/src/index.ts:39`](../packages/memory/me
 'model/selection': ModelSelection
 ```
 
-Source: [`packages/host/apiproxy/src/api/sessions.ts:80`](../packages/host/apiproxy/src/api/sessions.ts)
+Source: [`packages/host/apiproxy/src/api/sessions.ts:81`](../packages/host/apiproxy/src/api/sessions.ts)
 
 ### `permission/*`
 
@@ -2445,7 +2445,7 @@ SHA-256: `58015da1c1950a66daf66ae24913d6a1fc6d1d9ac441b155f8847f7f8584ba8e`
 
 SHA-256: `844e2decba6e7c717c04484888eb8c1ee5c1f38e613e9aa8ce7dbe95e53b2e64`
 
-Sources: [`packages/host/apiproxy/src/api/sessions.ts:104`](../packages/host/apiproxy/src/api/sessions.ts)
+Sources: [`packages/host/apiproxy/src/api/sessions.ts:105`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -2462,7 +2462,7 @@ Sources: [`packages/host/apiproxy/src/api/sessions.ts:104`](../packages/host/api
 
 SHA-256: `f7e8c6fddd59fe7ecec72b632ae599cbad848dcc487be86881da11c156be7697`
 
-Sources: [`packages/host/apiproxy/src/api/sessions.ts:109`](../packages/host/apiproxy/src/api/sessions.ts)
+Sources: [`packages/host/apiproxy/src/api/sessions.ts:110`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -2543,7 +2543,7 @@ One of:
 
 SHA-256: `11e15542af87e45e8f0f1e133f03e1e0effb99b719a8c2a1cea677a18325f083`
 
-Sources: [`packages/host/apiproxy/src/api/sessions.ts:34`](../packages/host/apiproxy/src/api/sessions.ts)
+Sources: [`packages/host/apiproxy/src/api/sessions.ts:35`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -2569,7 +2569,7 @@ One of:
 
 SHA-256: `c04ca7d7d5b7733834cbc49bf8c396c7d07dd9ec5f4537e45cefd44f8d2df965`
 
-Sources: [`packages/context/collaboration/src/types.ts:25`](../packages/context/collaboration/src/types.ts) · [`packages/host/apiproxy/src/api/sessions.ts:33`](../packages/host/apiproxy/src/api/sessions.ts)
+Sources: [`packages/context/collaboration/src/types.ts:25`](../packages/context/collaboration/src/types.ts) · [`packages/host/apiproxy/src/api/sessions.ts:34`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7890,7 +7890,7 @@ One of:
 
 SHA-256: `ac21aa6c9ecfc9c18ab4e0a1759e1396e29be4f15b3e65250af5f6df01d31794`
 
-Sources: [`packages/host/apiproxy/src/api/sessions.ts:27`](../packages/host/apiproxy/src/api/sessions.ts)
+Sources: [`packages/host/apiproxy/src/api/sessions.ts:28`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7906,7 +7906,7 @@ Sources: [`packages/host/apiproxy/src/api/sessions.ts:27`](../packages/host/apip
 
 SHA-256: `f09e5e7acf5ff5ccd193ff2eeec015fa2ff7c29d98bc465f8c3302058d47e29b`
 
-Sources: [`packages/host/apiproxy/src/api/sessions.ts:199`](../packages/host/apiproxy/src/api/sessions.ts)
+Sources: [`packages/host/apiproxy/src/api/sessions.ts:200`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | Property | Presence | Type |
 |---|---|---|

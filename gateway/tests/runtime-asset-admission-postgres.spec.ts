@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import WebSocket, { WebSocketServer } from 'ws'
 import { PostgresAccessMonitor } from '../src/access-invalidation.ts'
 import { PostgresComputerAccess } from '../src/computer-access.ts'
 import { forwardIssuerOf, verifyGatewayForward, type GatewayForwardClaims } from '../src/forwarded-principal.ts'
@@ -32,7 +33,7 @@ import { RuntimeAssets } from '../src/runtime-assets.ts'
 import type { RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { GatewayRuntimeRouter, LocalRuntimeAdapter } from '../src/runtime-router.ts'
 import { createGatewayServer, SESSION_COOKIE, type GatewayDeps } from '../src/server.ts'
-import { barrier } from './barrier.ts'
+import { barrier, deferred } from './barrier.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { removeFixtureOrganization } from './postgres-fixture-cleanup.ts'
 import { testConfig } from './test-config.ts'
@@ -116,6 +117,26 @@ pg('PostgreSQL exact Runtime admission', () => {
       WHERE session.organization_id=$1 AND instance.runtime_id=$2`, [f.organizationId, f.personal.id])).rows).toEqual(before.rows)
   })
 
+  it('binds primary history approval to the current issuer, exact target and live browser session', async () => {
+    const f = await fixture()
+    const nodeId = f.context.nodeId as RuntimeNodeId
+    const pem = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' }).toString()
+    await pool.query('UPDATE harness.compute_nodes SET principal_public_key=$2 WHERE id=$1', [nodeId, pem])
+    await pool.query(`UPDATE harness.deployment_topology SET enabled=true,primary_node_id=$2,primary_origin='https://test.invalid'
+      WHERE organization_id=$1`, [f.organizationId, nodeId])
+    const request = { ...f.request, target: 'personal' as const, nodeId }
+    expect(await f.admission.approvePersonalRead(request, pem)).toMatchObject({ launchStamp: 'fixture-stamp' })
+    expect(await f.admission.approvePersonalRead({ ...request, nodeId: f.other.nodeId as RuntimeNodeId }, pem)).toBeNull()
+    expect(await f.admission.approvePersonalRead({ ...request, runtimeId: f.shared.id }, pem)).toBeNull()
+
+    const replacement = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' }).toString()
+    await pool.query('UPDATE harness.compute_nodes SET principal_public_key=$2 WHERE id=$1', [nodeId, replacement])
+    expect(await f.admission.approvePersonalRead(request, pem)).toBeNull()
+    expect(await f.admission.approvePersonalRead(request, replacement)).toMatchObject({ launchStamp: 'fixture-stamp' })
+    await f.auth.revoke(request.sessionToken)
+    expect(await f.admission.approvePersonalRead(request, replacement)).toBeNull()
+  })
+
   it('records authorized personal and read-only project Session activity in one round trip without renewing the browser session', async () => {
     const f = await fixture()
     for (const [runtimeId, target, scope] of [
@@ -142,7 +163,7 @@ pg('PostgreSQL exact Runtime admission', () => {
     }
   })
 
-  it('checks the current forwarding issuer and remote Session generation in one statement', async () => {
+  it.each([true, false])('checks the forwarding issuer and remote generation with start activity %s', async recordActivity => {
     const f = await fixture()
     const nodeId = f.context.nodeId as RuntimeNodeId, issuerNode = f.other.nodeId as RuntimeNodeId
     const issuerKey = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' }).toString()
@@ -161,7 +182,7 @@ pg('PostgreSQL exact Runtime admission', () => {
     const issuer = { nodeId: issuerNode, publicKey: issuerKey }
     const query = vi.spyOn(pool, 'query')
     try {
-      await expect(f.admission.admitSession(request, generation, issuer)).resolves.toMatchObject({
+      await expect(f.admission.admitSession(request, generation, issuer, recordActivity)).resolves.toMatchObject({
         user: { id: f.member.id }, scope: { kind: 'personal' }, snapshot: { generation },
       })
       expect(query).toHaveBeenCalledOnce()
@@ -170,15 +191,47 @@ pg('PostgreSQL exact Runtime admission', () => {
     await pool.query("UPDATE harness.instances SET last_activity_at='2001-01-01' WHERE runtime_id=$1", [f.personal.id])
     const rotatedKey = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' }).toString()
     await pool.query('UPDATE harness.compute_nodes SET principal_public_key=$2 WHERE id=$1', [issuerNode, rotatedKey])
-    await expect(f.admission.admitSession(request, generation, issuer)).rejects.toMatchObject({ status: 403, code: 'access-revoked' })
+    await expect(f.admission.admitSession(request, generation, issuer, recordActivity)).rejects.toMatchObject({ status: 403, code: 'access-revoked' })
     await pool.query(`INSERT INTO harness.node_agents(organization_id,node_id,credential_hash,attachment_state,connection_id,connection_epoch,lease_expires_at)
       VALUES($1,$2,$3,'managed',$4,1,clock_timestamp()-interval '60 seconds')`,
     [f.organizationId, issuerNode, createHash('sha256').update(randomUUID()).digest(), randomUUID()])
-    await expect(f.admission.admitSession(request, generation, { ...issuer, publicKey: rotatedKey }))
+    await expect(f.admission.admitSession(request, generation, { ...issuer, publicKey: rotatedKey }, recordActivity))
       .rejects.toMatchObject({ status: 403, code: 'access-revoked' })
     expect((await pool.query<{ unchanged: boolean }>(
       "SELECT last_activity_at='2001-01-01' unchanged FROM harness.instances WHERE runtime_id=$1", [f.personal.id],
     )).rows[0]?.unchanged).toBe(true)
+  })
+
+  it('admits a retained personal preparation while directory publication holds a shared instance lock', async () => {
+    const f = await fixture()
+    const target = { kind: 'user' as const, id: f.member.id, runtimeId: f.personal.id }
+    const generation = await f.repository.generationOf(target)
+    const request = { ...f.request, nodeId: f.context.nodeId as RuntimeNodeId, target: 'personal' as const }
+    await pool.query("UPDATE harness.instances SET last_activity_at='2001-01-01' WHERE runtime_id=$1", [f.personal.id])
+    const holder = await pool.connect()
+    let preparing: Promise<unknown> | undefined
+    const blocked = deferred<never>()
+    const deadline = AbortSignal.timeout(2_000)
+    const reportTimeout = (): void => blocked.reject(deadline.reason)
+    try {
+      await holder.query('BEGIN')
+      await holder.query('SELECT 1 FROM harness.instances WHERE runtime_id=$1 FOR SHARE', [f.personal.id])
+      preparing = f.admission.admitSession(request, generation, undefined, false)
+      deadline.addEventListener('abort', reportTimeout, { once: true })
+      await expect(Promise.race([preparing, blocked.promise])).resolves.toMatchObject({
+        user: { id: f.member.id }, scope: { kind: 'personal' }, snapshot: { generation, target },
+      })
+      expect((await holder.query<{ unchanged: boolean }>(
+        "SELECT last_activity_at='2001-01-01' unchanged FROM harness.instances WHERE runtime_id=$1", [f.personal.id],
+      )).rows[0]?.unchanged).toBe(true)
+    } finally {
+      deadline.removeEventListener('abort', reportTimeout)
+      try { await holder.query('ROLLBACK') } finally { holder.release() }
+      await Promise.allSettled(preparing === undefined ? [] : [preparing])
+    }
+    await f.repository.touch(target, Date.UTC(2002, 5, 1), generation)
+    expect((await pool.query<{ last_activity_at: Date }>('SELECT last_activity_at FROM harness.instances WHERE runtime_id=$1',
+      [f.personal.id])).rows[0]!.last_activity_at).toEqual(new Date(Date.UTC(2002, 5, 1)))
   })
 
   it('records completed activity monotonically and leaves a replacement generation untouched', async () => {
@@ -195,8 +248,10 @@ pg('PostgreSQL exact Runtime admission', () => {
     expect(observed.rows[0]!.last_activity_at.getTime()).toBe(newer)
   })
 
-  it.each(['session', 'computer-grant', 'maintenance', 'write-epoch', 'generation', 'project-mount', 'issuer-revision'] as const)(
-    'rechecks %s after ready Session admission waits for its instance lock', async change => {
+  const revocationCases = ['session', 'computer-grant', 'maintenance', 'write-epoch', 'generation', 'project-mount', 'issuer-revision'] as const
+  it.each(revocationCases.flatMap(change => (change === 'project-mount' ? [true] : [true, false])
+    .map(recordActivity => ({ change, recordActivity }))))(
+    'rechecks $change after the instance lock with start activity $recordActivity', async ({ change, recordActivity }) => {
     const f = await fixture()
     const runtimeId = change === 'project-mount' ? f.shared.id : f.personal.id
     const request = { ...f.request, runtimeId, nodeId: f.context.nodeId as RuntimeNodeId,
@@ -211,7 +266,7 @@ pg('PostgreSQL exact Runtime admission', () => {
       await holder.query('BEGIN')
       const locked = (await holder.query<{ generation: string; pid: number }>(
         'SELECT generation::text,pg_backend_pid() pid FROM harness.instances WHERE runtime_id=$1 FOR UPDATE', [runtimeId])).rows[0]!
-      const settled = f.admission.admitSession(request, Number(locked.generation), issuer)
+      const settled = f.admission.admitSession(request, Number(locked.generation), issuer, recordActivity)
         .then(value => ({ value }), (error: unknown) => ({ error }))
       let result: Awaited<typeof settled>
       try {
@@ -278,6 +333,21 @@ pg('PostgreSQL exact Runtime admission', () => {
         path: req.url, payload: Buffer.concat(chunks).toString() }))
     })
     await listen(upstream)
+    const sockets = new WebSocketServer({ noServer: true })
+    releases.push(() => new Promise<void>((done, fail) => {
+      for (const socket of sockets.clients) socket.terminate()
+      sockets.close(error => error ? fail(error) : done())
+    }))
+    const upgraded = vi.fn()
+    upstream.on('upgrade', (req, socket, head) => {
+      const assertion = req.headers[PRINCIPAL_HEADER]
+      if (typeof assertion !== 'string') { socket.destroy(); return }
+      upgraded()
+      sockets.handleUpgrade(req, socket, head, ws => {
+        const { user, runtime, expiresAt, issuedAt } = signer.verify(assertion)
+        ws.send(JSON.stringify({ user: user.id, runtime, lifespan: expiresAt - issuedAt, retainedCookie: req.headers.cookie !== undefined }))
+      })
+    })
     f.cfg.dshRepoRoot = f.root
     f.cfg.modelGovernancePackage = f.root
     f.cfg.steward.toolsPackage = f.root
@@ -377,12 +447,12 @@ pg('PostgreSQL exact Runtime admission', () => {
     expect(readySession).toHaveBeenCalledTimes(4)
     const path = '/api/admit/v1/session.prompt'
     const payload = JSON.stringify({ type: 'client-request', rpcId: 'fixture', method: 'session.prompt', payload: { sessionId, requestId, prompt: 'fixture-input' } })
-    const forwardedHeaders = (): Record<string, string> => ({
+    const forwardedHeaders = (requestPath = path): Record<string, string> => ({
       [NODE_SERVICE_TARGET_HEADER]: nodeId,
       'x-dsh-gateway-forward': signer.issueForward({ issuerNode: nodeId, audienceNode: nodeId, user: f.member,
         selection: { runtimeId: f.personal.id, target: 'personal' },
         context: { environment: { id: f.personal.id, nodeId } },
-        request: { method: 'POST', path, sessionHash: createHash('sha256').update(f.request.sessionToken).digest('hex') },
+        request: { method: 'POST', path: requestPath, sessionHash: createHash('sha256').update(f.request.sessionToken).digest('hex') },
       }),
     })
     const forwarded = forwardedHeaders()
@@ -400,12 +470,87 @@ pg('PostgreSQL exact Runtime admission', () => {
     expect(await replay.json()).toMatchObject({ error: { code: 'RUNTIME_LEASE_UNAVAILABLE' } })
     expect(start).not.toHaveBeenCalled()
 
+    const wsRef = vi.spyOn(instances, 'wsRef')
+    const synchronized = vi.spyOn(monitor, 'synchronizeTo')
+    const event = (url: string, header: Record<string, string> = {}) => new Promise<unknown>((done, fail) => {
+      const ws = new WebSocket(url.replace('http:', 'ws:'), { origin: candidate, handshakeTimeout: 5_000,
+        headers: { cookie: `${SESSION_COOKIE}=${f.request.sessionToken}`, ...header } })
+      ws.once('error', fail)
+      ws.once('message', frame => {
+        let result: unknown
+        try { result = JSON.parse(frame.toString()) } catch (error) { fail(error) }
+        ws.once('close', () => done(result))
+        ws.close()
+      })
+    })
+    const coordinates = `?dshRuntime=${f.personal.id}&dshTarget=personal&dshNode=${nodeId}`
+    const eventURL = `${candidate}/api/events.mux${coordinates}`
+    await expect(event(eventURL)).resolves.toMatchObject({ user: f.member.id,
+      runtime: { runtimeId: f.personal.id, generation }, lifespan: 30_000, retainedCookie: false })
+    expect(wsRef).not.toHaveBeenCalled()
+    expect(synchronized).toHaveBeenCalledOnce()
+    expect(upgraded).toHaveBeenCalledOnce()
+    const login = await f.auth.qualifyForStream(f.request.sessionToken)
+    if (login === null) throw new Error('Expected eligible browser login for an event stream')
+    const forwardEvent = {
+      [NODE_SERVICE_TARGET_HEADER]: nodeId,
+      'x-dsh-gateway-forward': signer.issueForward({ issuerNode: nodeId, audienceNode: nodeId, user: login.user,
+        selection: { runtimeId: f.personal.id, target: 'personal' },
+        context: { environment: { id: f.personal.id, nodeId } },
+        request: { method: 'GET', path: '/api/events.mux', sessionHash: createHash('sha256').update(f.request.sessionToken).digest('hex') },
+      }),
+    }
+    await expect(event(eventURL, forwardEvent)).resolves.toMatchObject({ runtime: { runtimeId: f.personal.id, generation } })
+    expect(upgraded).toHaveBeenCalledTimes(2)
+    synchronized.mockResolvedValueOnce(false)
+    await expect(event(eventURL)).rejects.toThrow()
+    expect(upgraded).toHaveBeenCalledTimes(2)
+    expect(wsRef).not.toHaveBeenCalled()
+    expect(start).not.toHaveBeenCalled()
+
+    const principal = { 'x-dsh-expected-principal-id': String(f.member.id) }
+    for (const [readMethod, input] of [
+      ['host.describe', {}], ['workspace.list', {}], ['session.list', {}],
+      ['session.history', { sessionId, beforeSeq: 17, maxMessages: 50, detail: 'conversation' }],
+    ] as const) {
+      const readPath = `/api/${readMethod}`
+      const envelope = JSON.stringify({ type: 'client-request', rpcId: 'read', method: readMethod, payload: input })
+      const ordinary = await request(baseline, readPath, envelope, randomUUID(), principal)
+      const prepared = await request(candidate, readPath, envelope, randomUUID(), { ...principal, ...forwardedHeaders(readPath) })
+      expect(prepared.headers.get('x-dsh-runtime-id')).toBe(f.personal.id)
+      expect(await prepared.json()).toEqual(await ordinary.json())
+      expect(readySession).toHaveBeenLastCalledWith(expect.anything(), expect.anything(),
+        expect.objectContaining({ runtimeId: f.personal.id, nodeId, target: 'personal', forwarded: expect.anything() }))
+    }
+    const boot = (entry: string, requestPrincipal: string, session = f.request.sessionToken) =>
+      fetch(`${entry}/${coordinates}&dshBootstrap=1`, { headers: {
+        cookie: `${SESSION_COOKIE}=${session}`, accept: 'application/json', 'x-dsh-expected-principal-id': requestPrincipal,
+      } })
+    const legacyBoot = await boot(baseline, String(f.member.id))
+    const readyBoot = await boot(candidate, String(f.member.id))
+    expect(readyBoot.status).toBe(200)
+    expect(readyBoot.headers.get('x-dsh-runtime-id')).toBe(f.personal.id)
+    expect(await readyBoot.json()).toEqual(await legacyBoot.json())
+    const acceptedReads = readySession.mock.calls.length
+    expect((await boot(candidate, String(f.admin.id))).status).toBe(409)
+    expect((await boot(candidate, String(f.member.id), 'unknown-token')).status).toBe(401)
+    expect(readySession).toHaveBeenCalledTimes(acceptedReads)
+    expect(start).not.toHaveBeenCalled()
+
     await pool.query("INSERT INTO harness.cluster_control(organization_id,mode) VALUES($1,'maintenance')", [f.organizationId])
     const refused = await fetch(`${candidate}/api/prepare/v1/session.history?dshRuntime=${f.personal.id}&dshTarget=personal&dshNode=${nodeId}`,
       { method: 'POST', headers: { cookie: `${SESSION_COOKIE}=${f.request.sessionToken}`, origin: candidate,
         'content-type': 'application/json' }, body })
     expect(refused.status).toBe(503)
     expect(await refused.json()).toEqual({ error: 'maintenance' })
+    const refusedRead = await fetch(`${candidate}/api/session.history${coordinates}`, { method: 'POST', headers: {
+      cookie: `${SESSION_COOKIE}=${f.request.sessionToken}`, origin: candidate, 'content-type': 'application/json', ...principal,
+    }, body })
+    expect(refusedRead.status).toBe(503)
+    await refusedRead.body?.cancel()
+    const maintenanceBoot = await boot(candidate, String(f.member.id))
+    expect(maintenanceBoot.status).toBe(200)
+    expect(await maintenanceBoot.json()).toEqual(await (await boot(baseline, String(f.member.id))).json())
   })
 
   it('refuses revoked sessions, foreign owners, duplicate-owner guesses and mismatched explicit scope or computer', async () => {

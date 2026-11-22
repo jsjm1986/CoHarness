@@ -28,7 +28,7 @@ import { runNodeChannel } from '../src/node-channel-client.ts'
 import { NodeDialer, type NodeDialReason } from '../src/node-dialer.ts'
 import { loadNodeChannelClientLimits, NODE_CHANNEL_PROTOCOL, type NodeProbeId } from '../src/node-channel-protocol.ts'
 import { GatewayNodeServices, loadNodeServiceConfig } from '../src/node-service.ts'
-import { GatewayNodeServiceProxy } from '../src/node-service-proxy.ts'
+import { GatewayNodeServiceProxy, type NodeServiceProxyDirectory } from '../src/node-service-proxy.ts'
 import { NodeServiceHttpPool } from '../src/node-service-http-pool.ts'
 import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_PROTOCOL_VERSION, NODE_SERVICE_TARGET_HEADER, nodeServiceLocalOrigin, NodeServiceError, runNodeServiceBridge } from '../src/node-service-stream.ts'
 import { testConfig } from './test-config.ts'
@@ -113,7 +113,7 @@ function isolatedAgent(
 }
 
 async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false, failedDial?: 'control' | 'service',
-  mixedReleaseAgent?: 'compatible' | 'future-wire') {
+  mixedReleaseAgent?: 'compatible' | 'future-wire', approvePersonalRead?: NodeServiceProxyDirectory['approvePersonalRead']) {
   const root = await mkdtemp(join(tmpdir(), 'hgw-node-service-'))
   releases.push(() => rm(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'accounts.sqlite'))
@@ -177,7 +177,9 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
       }
     },
     ...(resolveOwners ? { resolvePlacement: (actor, selection) => centerRouter.placement(actor, selection), resetScopeCookie: () => scopeCookie('personal', centerConfig) } : {}),
-  }, services, 5000, centerConfig.nodeService)
+    ...(approvePersonalRead === undefined ? {} : { approvePersonalRead }),
+  }, services, 5000, centerConfig.nodeService, undefined,
+  approvePersonalRead === undefined ? undefined : async () => 'fixture-forwarding-assertion')
   let attestationCalls = 0
   const makeDeps = (cfg: typeof centerConfig, id: RuntimeNodeId): GatewayDeps => ({
     cfg, auth: new AuthService(db, cfg), users, projects: new ProjectService(db, cfg), audit: new AuditService(db),
@@ -398,6 +400,10 @@ it('validates fixed local origins and service capacity before network acquisitio
   expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_MAX_CONNECTIONS: '2', HGW_NODE_SERVICE_MAX_PER_NODE: '1',
     HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS: '3' })).toThrow()
   expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS: '1', HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE: '2' })).toThrow()
+  expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS: '1',
+    HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE: '2' })).toThrow()
+  expect(loadNodeServiceConfig({}).httpMaxPendingPerNode).toBe(32)
+  expect(loadNodeServiceConfig({ HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS: '1' }).httpMaxPendingPerNode).toBe(1)
 })
 
 it('keeps the idle outbound control socket active independently of authority renewal', async () => {
@@ -577,6 +583,59 @@ it('serves the selected remote workbench from metadata without opening or starti
   expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 0 })
   expect(f.localStarts).toEqual([])
   expect(f.remoteStarts).toEqual([])
+})
+
+it('withholds prepared history after the primary withdraws permission before the response is delivered', async () => {
+  const delivery = deferred<void>()
+  const review = deferred<void>()
+  let checks = 0
+  const approve: NonNullable<NodeServiceProxyDirectory['approvePersonalRead']> = async () => {
+    checks += 1
+    if (checks === 1) return { generation: 1, port: 40000, launchStamp: null, startedAt: 0,
+      accessRevision: '1', expiresAt: Date.now() + 30_000 }
+    review.resolve()
+    await delivery.promise
+    return null
+  }
+  const f = await fixture({}, true, false, undefined, undefined, approve)
+  const response = fetch(`${f.base}/api/prepare/v1/session.history?dshRuntime=${f.environment.id}&dshTarget=personal`, {
+    method: 'POST', headers: { cookie: f.cookie, origin: f.base, 'content-type': 'application/json' },
+    body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: 'session.history', payload: { sessionId: 'saved' } }),
+  })
+  try {
+    await review.promise
+    expect(f.counters().remoteCalls).toBe(1)
+  } finally {
+    delivery.resolve()
+  }
+  const result = await response
+  expect(result.status).toBe(409)
+  expect(await result.json()).toEqual({ error: 'node-service/cancelled' })
+  expect(checks).toBe(2)
+})
+
+it.each([
+  ['GET', '/', 'dshBootstrap=1'],
+  ['POST', '/api/host.describe', ''],
+  ['POST', '/api/session.list', ''],
+  ['POST', '/api/workspace.list', ''],
+  ['POST', '/api/session.history', ''],
+] as const)('qualifies exact personal reads before forwarding and before delivering %s %s', async (method, path, extra) => {
+  const approve = vi.fn(async () => ({ generation: 1, port: 40000, launchStamp: null, startedAt: 0,
+    accessRevision: '1', expiresAt: Date.now() + 30_000 }))
+  const f = await fixture({}, true, false, undefined, undefined, approve)
+  const search = new URLSearchParams(extra)
+  search.set('dshRuntime', f.environment.id)
+  search.set('dshTarget', 'personal')
+  const response = await fetch(`${f.base}${path}?${search}`, {
+    method, headers: { cookie: f.cookie, origin: f.base, accept: 'application/json',
+      'x-dsh-expected-principal-id': String(f.admin.id) },
+  })
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ node: f.nodeId, runtime: f.environment.id })
+  expect(approve).toHaveBeenCalledTimes(2)
+  expect(approve).toHaveBeenLastCalledWith(expect.objectContaining({ actorId: f.admin.id,
+    nodeId: f.nodeId, runtimeId: f.environment.id, target: 'personal' }))
 })
 
 it('pins the browser SVG icon to its referring tab when several personal Runtimes exist', async () => {
@@ -1143,6 +1202,31 @@ it('admits another computer while the target computer waits for its own busy HTT
   expect(next.agent).toBe(first.agent)
   expect(f.opened).toEqual([a, b])
   next.release(); other.release()
+})
+
+it('keeps waiting capacity for other computers when one computer fills its HTTP queue', async () => {
+  const a = randomUUID() as RuntimeNodeId, b = randomUUID() as RuntimeNodeId
+  const f = capacityPoolFixture(2, 1, undefined, undefined, {
+    HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS: '2', HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE: '1',
+  })
+  const activeA = await f.pool.acquire(a, new AbortController().signal)
+  const activeB = await f.pool.acquire(b, new AbortController().signal)
+  const cancelA = new AbortController()
+  const waitingA = f.pool.acquire(a, cancelA.signal).catch(error => error)
+  const excessA = f.pool.acquire(a, new AbortController().signal).catch(error => error)
+  const waitingB = f.pool.acquire(b, new AbortController().signal, true).catch(error => error)
+  activeB.release()
+  const nextB = await waitingB
+  cancelA.abort()
+  expect(await waitingA).toMatchObject({ code: 'node-service/cancelled' })
+  expect(nextB).toMatchObject({ agent: activeB.agent })
+  expect(await excessA).toMatchObject({ code: 'node-service/busy' })
+  const successorA = f.pool.acquire(a, new AbortController().signal)
+  activeA.release()
+  const nextA = await successorA
+  expect(nextA.agent).toBe(activeA.agent)
+  expect(f.opened).toEqual([a, b])
+  nextA.release(); nextB.release()
 })
 
 it('keeps a reused HTTP response alive when its released predecessor is destroyed late', async () => {

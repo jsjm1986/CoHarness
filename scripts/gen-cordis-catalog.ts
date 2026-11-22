@@ -191,6 +191,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   shortcuts: 'client-face keyboard shortcut service — packages/client/shortcuts/README.md owns the API',
   executionAuthorityRequired: 'managed-deployment marker is owned by packages/context/execution-authority/README.md',
   agentShutdownSignal: 'not a service: process-owned Agent shutdown admission signal, documented in apps/cli/reference/README.md',
+  agentPreStepTiming: 'Managed pre-step timing callback documented in packages/core/agent/README.md#step-admission',
   resourceBudgetRequired: 'managed-deployment marker is owned by packages/context/gateway-runtime/README.md#resource-admission',
   gatewayWorkspaceCatalogRevision: 'not a service: root-owned Workspace publication sequence — packages/context/gateway-runtime/README.md owns publication ordering',
   modelAccessRequired: 'managed-deployment marker is owned by packages/llm/model-access/README.md',

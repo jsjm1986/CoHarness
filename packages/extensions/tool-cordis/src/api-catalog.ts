@@ -3251,6 +3251,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'storage metadata, the requested offset, and stored events with `seq >= fromSeq`.',
       },
       {
+        signature: 'async readCommittedEvent(id: SessionId, seq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEvent | undefined>',
+        description: 'Read one exact event from the validated committed prefix.',
+        parameters: [{ name: 'id', description: 'stored Session identity.' }, { name: 'seq', description: 'logical sequence to verify.' }, { name: 'signal', description: 'optional cancellation for the storage read.' }],
+        returns: 'the detached event, or undefined if that sequence is absent.',
+      },
+      {
         signature: 'async readHeader(id: SessionId, signal?: AbortSignal): Promise<SessionHeader | undefined>',
         description: 'Read one session header without loading its event log. First-party providers override this with an indexed lookup; the default filters the lightweight snapshot list for third-party compatibility.',
         parameters: [{ name: 'id', description: 'persisted session to observe.' }, { name: 'signal', description: 'optional cancellation for backend lookup work.' }],
@@ -7418,7 +7424,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GatewayPrincipalClaims',
-    declaration: 'export interface GatewayPrincipalClaims {\n    version: 1;\n    issuer: \'harness-gateway\';\n    audience: \'dsh-runtime\';\n    organization: string;\n    user: {\n        id: number;\n        username: string;\n        displayName: string;\n        role: \'admin\' | \'user\';\n    };\n    scope: GatewayPrincipalScope;\n    runtime: GatewayRuntimeIdentity;\n    issuedAt: number;\n    expiresAt: number;\n    nonce: string;\n    purpose?: \'archive-read\' | \'document-admin\' | \'terminal-admin\' | \'plugin-admin\' | \'webhook-dispatch\' | \'runtime-asset\';\n    asset?: {\n        method: \'GET\' | \'HEAD\';\n        path: string;\n    };\n}',
+    declaration: 'export interface GatewayPrincipalClaims {\n    version: 1;\n    issuer: \'harness-gateway\';\n    audience: \'dsh-runtime\';\n    organization: string;\n    user: {\n        id: number;\n        username: string;\n        displayName: string;\n        role: \'admin\' | \'user\';\n    };\n    scope: GatewayPrincipalScope;\n    runtime: GatewayRuntimeIdentity;\n    issuedAt: number;\n    expiresAt: number;\n    nonce: string;\n    purpose?: \'archive-read\' | \'document-admin\' | \'terminal-admin\' | \'plugin-admin\' | \'webhook-dispatch\' | \'runtime-asset\';\n    asset?: {\n        method: \'GET\' | \'HEAD\';\n        path: string;\n    };\n    personalDraft?: \'prepare\' | \'admit-input\';\n}',
   },
   {
     name: 'GatewayPrincipalScope',

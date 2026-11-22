@@ -140,6 +140,13 @@ describe('computeLaunchStamps', () => {
 })
 
 describe('policyPatchText', () => {
+  it('projects the first-page limit through the managed Connection plugin', () => {
+    const { cfg } = fixture()
+    const variant = { admin: false, kind: 'user', steward: false } as const
+    expect(policyPatchText(cfg, variant)).not.toContain('preparedHistoryMessages:')
+    expect(policyPatchText({ ...cfg, runtimePreparedHistoryMessages: 2 }, variant))
+      .toContain('    preparedHistoryMessages: 2\n    recovery:')
+  })
   it('disables only VNC and its stream without exposing private state or changing desktop metadata', () => {
     const { cfg } = fixture()
     const variant = { admin: false, kind: 'user', steward: false } as const

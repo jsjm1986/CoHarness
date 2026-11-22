@@ -130,7 +130,7 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 
 Workspace 和 Session 列表各自具有单调的 `pending` → `ready` 基线阶段，也有各自的刷新活动／错误状态。列表请求期间到达的增量插入或更新／移除／顺序帧与一元变更回显会在其响应之上回放。每次成功的 Workspace 基线都会重新建立 Host 持久 Workspace 顺序，因此重连会接纳该客户端离线期间提交的变更。`WorkspaceRuntime.insertBefore` 会立即安装乐观顺序；只有最新一元回声可以替换它，更新的 Host 顺序帧优先于旧回声，而最新请求被拒时会恢复最近一次由 Host 确认的顺序，不会恢复更早且尚未提交的拖拽。已移除的 Workspace id 会保留进程本地删除标记，避免延迟到达的 changed 帧将其复活。Workspace 新近程度只在两条基线都 ready 后派生，且绝不改变 Workspace 列表顺序。
 
-首次验证引导 Runtime 身份时，会保留尚未完成的初始 Workspace 选择。它仍等待两个权威列表与历史打开完成；此前被用户清空或导航取消的意图不会恢复。`connection/reset` 以 `initialConnection: true` 标记首次握手；后续握手传入 `false`，省略参数则请求普通重新验证。后续目标变化会取消待完成导航及尚未被接管的已保存历史读取。详见[引导选择决策](../../../.agents/notes/implemented/bug-fix/2026-10-24-bootstrap-runtime-initial-selection.zh.md)。
+首次验证引导 Runtime 身份时，会保留尚未完成的初始 Workspace 选择。若所属 Host 验证了同一账号与 Runtime，并返回选择摘要，已保存的个人根会话可在连接及列表加载时呈现一页有界历史。其他初始选择仍等待两个权威列表与历史打开完成。发送前需要验证 Host 目标。`connection/reset` 以 `initialConnection: true` 标记首次握手。后续握手传入 `false`，省略参数则请求普通重新验证。清空选择或更换目标会取消待完成的导航与尚未接管的已保存历史请求。详见[引导选择决策](../../../.agents/notes/implemented/bug-fix/2026-10-24-bootstrap-runtime-initial-selection.zh.md)。
 
 `SessionListState.state` 和 `error` 直接投影 manager 的基线活动与最近失败，独立于 `phase`。池化汇总列表报告已鉴权基础 Runtime 的活动；`currentScopeList` 排除额外工作台目标。`sessions.refresh()` 与 `workspaces.refresh()` 复用各自所有者尚未完成的基线读取，通过既有列表状态发布失败，不因 wire 或传输失败拒绝 Promise。账户授权撤回后的显式 Session 刷新不执行读取。
 
