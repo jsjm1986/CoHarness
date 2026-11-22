@@ -1,13 +1,21 @@
-import { createServer, type IncomingMessage, type Server } from 'node:http'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { ModelRegistrationEvent, UsageEvent } from './model-governance.ts'
 import type { GatewayAuditService, GatewayModelGovernanceService } from './services.ts'
 import type { GatewayPerformanceObserver } from './performance-observer.ts'
-import { PostgresCheckoutQueueFullError } from './postgres/database.ts'
+import { isDatabaseContentionError, isTransientDatabaseError, PostgresCheckoutQueueFullError } from './postgres/database.ts'
 
 async function body(req: IncomingMessage, limit = 256 * 1024): Promise<string> {
   const chunks: Buffer[] = []; let size = 0
   for await (const chunk of req) { const value = Buffer.from(chunk as Uint8Array); size += value.length; if (size > limit) throw new Error('body too large'); chunks.push(value) }
   return Buffer.concat(chunks).toString('utf8')
+}
+
+function unavailable(res: ServerResponse, error: unknown): boolean {
+  const code = error instanceof PostgresCheckoutQueueFullError ? error.code
+    : isTransientDatabaseError(error) || isDatabaseContentionError(error) ? 'database-unavailable' : undefined
+  if (code === undefined) return false
+  res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: code }))
+  return true
 }
 
 /** Maintenance fencing for the intake's write path. */
@@ -72,18 +80,12 @@ export function createUsageIntakeServer(
     try {
       await (writes === undefined ? ingest() : writes.track(ingest))
     } catch (error) {
-      if (error instanceof PostgresCheckoutQueueFullError) {
-        res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error.code }))
-        return
-      }
+      if (unavailable(res, error)) return
       res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: String(error) }))
     }
   })().catch((error: unknown) => {
     if (res.writableEnded) return
-    if (error instanceof PostgresCheckoutQueueFullError) {
-      res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error.code }))
-      return
-    }
+    if (unavailable(res, error)) return
     res.writeHead(500).end()
   }) })
 }

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-gateway-model-governance-and-usage.md
 document:
-  en: 3ac627cdf2d92a243420cb3d7fc67fd9f2011383
-  zh: 1484ecda0545f554e85cfea64328a94cecb0e7f0
+  en: e5f61599ffde697f1996091370ec61d668cacd35
+  zh: 536d163a8f3735230887856600bb6bffc73c86b0
 /agent-note-gateway-model-governance-and-usage-accounting:
   en: 9615f71e2a9df8f8
   zh: 4bf94e13a6af0635
@@ -12,8 +12,8 @@ document:
   en: cc14d2cb0d071619
   zh: 5b583fa5277f46ac
 /agent-note-gateway-model-governance-and-usage-accounting/decision:
-  en: 1e96b0addc2ad02f
-  zh: fa96b390bb815f8a
+  en: 0500462b64847451
+  zh: bb0f2136f68a0dc0
 /agent-note-gateway-model-governance-and-usage-accounting/testing:
   en: d0a68e2fe9d2c94e
   zh: 17324c8446bae452

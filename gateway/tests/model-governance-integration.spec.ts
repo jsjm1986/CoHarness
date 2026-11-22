@@ -513,13 +513,18 @@ describe('model governance integration', () => {
     }
   })
 
-  it.each(['authentication', 'ingestion'] as const)('keeps a valid bill retryable when %s checkout admission is full', async stage => {
+  it.each([
+    ['authentication', new PostgresCheckoutQueueFullError(1), 'DB_CHECKOUT_QUEUE_FULL'],
+    ['ingestion', new PostgresCheckoutQueueFullError(1), 'DB_CHECKOUT_QUEUE_FULL'],
+    ['ingestion connection', Object.assign(new Error('database disconnected'), { code: '08006' }), 'database-unavailable'],
+    ['ingestion lock', Object.assign(new Error('database lock timeout'), { code: '55P03' }), 'database-unavailable'],
+  ] as const)('keeps a valid bill retryable after temporary %s failure', async (stage, failure, code) => {
     const { user, governance } = await fixture()
     const token = governance.issueIntakeToken({ kind: 'user', id: user.id })
     const ingest = governance.ingest.bind(governance)
     const authenticate = governance.subjectForIntakeToken.bind(governance)
-    if (stage === 'authentication') governance.subjectForIntakeToken = () => { throw new PostgresCheckoutQueueFullError(1) }
-    else governance.ingest = () => { throw new PostgresCheckoutQueueFullError(1) }
+    if (stage === 'authentication') governance.subjectForIntakeToken = () => { throw failure }
+    else governance.ingest = () => { throw failure }
     const server = createUsageIntakeServer(governance)
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
     closers.push(() => new Promise(resolve => server.close(() => resolve())))
@@ -531,7 +536,7 @@ describe('model governance integration', () => {
     })
     const overloaded = await post()
     expect(overloaded.status).toBe(503)
-    expect(await overloaded.json()).toEqual({ error: 'DB_CHECKOUT_QUEUE_FULL' })
+    expect(await overloaded.json()).toEqual({ error: code })
     governance.ingest = ingest
     governance.subjectForIntakeToken = authenticate
     const retried = await post()
