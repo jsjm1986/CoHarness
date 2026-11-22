@@ -1,7 +1,7 @@
 /** Current governance authority for an exact, already-running Runtime. */
 import { createHash } from 'node:crypto'
 import type { UserRow } from './auth.ts'
-import type { PersonalHistoryAdmission } from './forwarded-principal.ts'
+import type { PersonalReadAdmission } from './forwarded-principal.ts'
 import type { RuntimeInstanceSnapshot } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
@@ -115,13 +115,13 @@ export class PostgresRuntimeAssetAdmission {
   }
 
   /**
-   * Qualify one personal history request at the organization database's primary Gateway.
+   * Qualify one personal Runtime read at the organization database's primary Gateway.
    * @param request - exact target and browser identity for this forwarding attempt.
    * @param issuerPublicKey - public part of the key this Gateway uses to sign the request.
    * @returns the ready generation and current revision, or null when normal routing is required.
    */
-  async approvePersonalHistory(request: RuntimeAssetRequest & { nodeId: RuntimeNodeId; target: 'personal' },
-    issuerPublicKey: string): Promise<PersonalHistoryAdmission | null> {
+  async approvePersonalRead(request: RuntimeAssetRequest & { nodeId: RuntimeNodeId; target: 'personal' },
+    issuerPublicKey: string): Promise<PersonalReadAdmission | null> {
     const { rows: [result] } = await this.context.pool.query<{ snapshot: Row | null; lease_exp: Date | null }>(`
       SELECT ${admissionSnapshot} snapshot, issuer.lease_exp
       FROM harness.deployment_topology topology

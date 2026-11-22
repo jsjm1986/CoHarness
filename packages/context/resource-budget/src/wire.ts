@@ -16,6 +16,14 @@ export const RESOURCE_POLL_MAX_OPERATIONS = 512
 export const RESOURCE_PHASE_TIMING_HEADER = 'x-dsh-resource-phases-ms'
 /** Optional internal JSON tuple of initial bearer and write admission durations in milliseconds. */
 export const RESOURCE_INGRESS_TIMING_HEADER = 'x-dsh-resource-ingress-ms'
+/** A status caller requests qualification of one exact model reservation. */
+export const RESOURCE_ACTIVE_MODEL_CHECK_HEADER = 'x-dsh-active-model-check'
+/** Value "1" marks an active personal model grant whose scope was checked after reservation in the same transaction. */
+export const RESOURCE_QUALIFIED_GRANT_HEADER = 'x-dsh-resource-qualified-grant'
+/** An opaque coordinator revision for one exact, queued personal model status exchange. */
+export const RESOURCE_CHANGE_CURSOR_HEADER = 'x-dsh-resource-change-cursor'
+/** Optional observed time from durable queue insertion to grant, in milliseconds. */
+export const RESOURCE_GRANT_AGE_HEADER = 'x-dsh-resource-grant-queue-ms'
 
 /**
  * Identify the two remote admission exchanges sampled by managed model diagnostics.

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-authorized-workspace-review.md
 document:
-  en: 789f9da955aad5e8e46729d2062a83c8c43f9456
-  zh: 575febb54b9df5bc52943ae38edc909e4c3d476e
+  en: 4cccab0f7e693686cf2398016e368df99b6e05a1
+  zh: c7bd22b711c145d657bee382c8458cafc3afe20b
 /agent-note-authorize-historical-workspace-review-on-the-owning-runtime:
   en: c7c081dad82dc600
   zh: cc81cf73be28462e
@@ -12,8 +12,8 @@ document:
   en: 45a6d7bf7e862dc1
   zh: 065343e3689b946f
 /agent-note-authorize-historical-workspace-review-on-the-owning-runtime/decision:
-  en: 55fcf854e9794043
-  zh: df2c77a1c9f0b08c
+  en: 1de163390230d2e0
+  zh: 4fd069770efb931d
 /agent-note-authorize-historical-workspace-review-on-the-owning-runtime/alternatives-considered:
   en: 80fbdd14ada71ec7
   zh: c5f0fe57dc88bd4c

@@ -101,6 +101,8 @@ Each user-global root holds one `AGENTS.md` with no local overlay; both candidat
 
 Rendering preserves the most specific instruction files first. It drops whole broader files before truncating the most-specific file and emits a visible `Workspace instruction budget ...` notice naming omitted and truncated paths. The rendered bytes never exceed `maxBytes`.
 
+Baseline discovery probes metadata and reads content in groups of up to four concurrent files. Rendering consumes those results in configured priority order.
+
 Instruction content is read through `streamText()` under `maxSourceBytes`, even when provider metadata omits size or a file grows after its metadata probe. An oversized file is ignored; during dynamic reconciliation it is temporarily unavailable rather than removed. The plugin keeps no process-wide cache and never caches instruction prose. Its session-local scope cache uses provider versions only as a fast invalidation signal; after invalidation, SHA-1 over the bounded read remains the cross-provider content identity stored in the structured message source.
 
 <a id="model-experience"></a>

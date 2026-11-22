@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { AccessNodeDrainingError } from './access-invalidation.ts'
-import { RESOURCE_INGRESS_TIMING_HEADER, isResourceAdmissionRequest } from '@deepseek-ai/dsh-resource-budget/wire'
+import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_INGRESS_TIMING_HEADER, isResourceAdmissionRequest } from '@deepseek-ai/dsh-resource-budget/wire'
 import { checkDocumentAttachmentTarget } from './node-content-documents-target.ts'
 import { NodeContentUnavailable } from './node-content-store.ts'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
@@ -61,12 +61,12 @@ import type { ProjectInvitation, ProjectKind, ProjectThemePolicy } from './proje
 import { applyModelGovernanceToProject, modelPolicyProjectionDiagnostics, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
 import { ProjectModelSettingsConflictError, type ModelSettingsPathOp } from './model-governance.ts'
 import type { GatewayWorkbenchCatalogHandler } from './workbench.ts'
-import { OperationTimings, timeOperation } from './operation-timing.ts'
+import { OperationTimings, timeOperation, timeResourceBearer } from './operation-timing.ts'
 import { GatewayPerformanceObserver } from './performance-observer.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { RuntimeAccountError } from './launcher.ts'
 import { RuntimeCatalogError, type RuntimeId, type RuntimeNodeId } from './runtime-catalog.ts'
-import { isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isPersonalExecutionWriteRequest, isReadyRuntimeRead, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isPersonalExecutionWriteRequest, isReadyRuntimeRead, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
 import { DocumentCatalogError, parseDocumentOverviewOptions } from './document-catalog.ts'
 import { BROWSER_DOCUMENT_OVERVIEW_STREAM } from './browser-documents.ts'
 import { ComputerAccessError, type GatewayComputerAccess } from './computer-access.ts'
@@ -795,9 +795,11 @@ export interface GatewayRuntimeHandler {
    * @param subject - recognized Runtime identity to be checked for the exact write.
    * @param pathname - parsed request pathname.
    * @param method - HTTP method.
+   * @param activeModelCheck - whether the provider requested an exact active model confirmation.
    * @returns whether the dispatcher will choose and apply the write gate before dispatch.
    */
-  defersPersonalExecutionWrite?(subject: RuntimeCredentialSubject, pathname: string, method: string | undefined): boolean
+  defersPersonalExecutionWrite?(subject: RuntimeCredentialSubject, pathname: string, method: string | undefined,
+    activeModelCheck?: boolean): boolean
   /**
    * Handle raw bytes before buffered control admission; authenticate each operation before using them.
    * @param req - runtime-token-authenticated request with its body untouched.
@@ -926,6 +928,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     return probe
   }
 
+  const auditForwardedAccount = (req: IncomingMessage, path: string, claims: GatewayForwardClaims): void => {
+    if (path.startsWith('/api/') || isImmutableRuntimeAssetRequest(req.method, req.url ?? '/')) return
+    void Promise.resolve(audit.write({ userId: claims.user.id, action: 'auth.forwarded',
+      methodPath: `${req.method ?? ''} ${path}`, ip: clientIp(req),
+      detail: JSON.stringify({ issuerNode: claims.issuerNode, nonce: claims.nonce }) }))
+      .catch((error: unknown) => { console.error('[gateway] audit write failed:', error) })
+  }
+
   const currentUser = async (req: IncomingMessage): Promise<{ token: string; user: UserRow;
       forward?: import('./forwarded-principal.ts').GatewayForwardClaims } | null> => {
     // A peer-signed assertion proves the forwarding Gateway already validated
@@ -943,15 +953,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       // a stand-in for session validation and the ordinary path runs instead.
       const path = new URL(req.url ?? '/', 'http://gateway').pathname
       if (claims !== null && forwardRequestMatches(claims, { method: req.method, path, sessionToken: token })) {
-        // Acceptance requires the bound session cookie itself; gateway-local
-        // (non-/api) mutations journal their own row because no downstream
-        // revalidation distinguishes them from the user's own traffic.
-        if (!path.startsWith('/api/') && !isImmutableRuntimeAssetRequest(req.method, req.url ?? '/')) {
-          void Promise.resolve(audit.write({ userId: claims.user.id, action: 'auth.forwarded',
-            methodPath: `${req.method ?? ''} ${path}`, ip: clientIp(req),
-            detail: JSON.stringify({ issuerNode: claims.issuerNode, nonce: claims.nonce }) }))
-            .catch((error: unknown) => { console.error('[gateway] audit write failed:', error) })
-        }
+        auditForwardedAccount(req, path, claims)
         return { token: token ?? '', user: claims.user, forward: claims }
       }
     }
@@ -1291,15 +1293,17 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (pathname.startsWith('/internal/runtime/')) {
       let authorized: boolean | 'shutdown-storage' | RuntimeCredentialSubject = false
       const stopGate = handlers.runtimePersonalExecutionStopGate
-      const candidate = stopGate !== undefined && isPersonalExecutionWriteRequest(pathname, req.method)
+      const activeModelCheck = req.headers[RESOURCE_ACTIVE_MODEL_CHECK_HEADER] === '1'
+      const candidate = stopGate !== undefined && isPersonalExecutionWriteRequest(pathname, req.method, activeModelCheck)
         ? handlers.runtimePersonalExecutionCandidate?.(req) : undefined
-      const fromCandidate = candidate != null && handlers.runtime?.defersPersonalExecutionWrite?.(candidate, pathname, req.method) === true
+      const fromCandidate = candidate != null && handlers.runtime?.defersPersonalExecutionWrite?.(candidate, pathname, req.method, activeModelCheck) === true
       const measureIngress = cfg.performanceEnabled && handlers.runtimeAuthorize !== undefined && isResourceAdmissionRequest(pathname, req.method)
       const authorizationStarted = measureIngress ? performance.now() : 0
       if (fromCandidate) authorized = candidate
       else if (handlers.runtimeAuthorize !== undefined) {
+        const authenticate = handlers.runtimeAuthorize
         try {
-          authorized = await handlers.runtimeAuthorize(req)
+          authorized = await (measureIngress ? timeResourceBearer(() => authenticate(req)) : authenticate(req))
         } catch {
           req.resume()
           send(res, 503, '{"error":"runtime-authorization-unavailable"}', 'application/json')
@@ -1325,18 +1329,26 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         && await handlers.runtime.stream(req, res, pathname, () => writeVerdict(req, res, pathname, true))) return
       const streamControl = isRuntimeStreamControlRequest(pathname, req.method)
       const resourceCompletion = isRuntimeResourceCompletionRequest(pathname, req.method)
-      const controlSubject = typeof authorized === 'object' && (streamControl || resourceCompletion)
-        ? authorized : undefined
+      const rechecksControlSubject = (streamControl && req.method === 'POST') || resourceCompletion
+      const controlSubject = typeof authorized === 'object' && rechecksControlSubject ? authorized : undefined
       const gate = authorized === 'shutdown-storage' ? handlers.runtimeShutdownStorageWriteGate
         : resourceCompletion && controlSubject !== undefined ? handlers.runtimeResourceCompletionWriteGate
         : streamControl ? deps.leaseControlGate : undefined
+      const admitWrite = async (selectedGate: (() => Awaitable<WriteGateVerdict>) | undefined): Promise<boolean> => {
+        if (!measureIngress) return writesOpen(req, res, pathname, false, selectedGate)
+        const started = performance.now()
+        const open = await timeOperation('resourceWriteAdmission', () => writesOpen(req, res, pathname, false, selectedGate))
+        if (open) {
+          const writeMs = performance.now() - started
+          res.setHeader(RESOURCE_INGRESS_TIMING_HEADER, JSON.stringify([authorizationMs, writeMs].map(ms => Math.round(ms * 100) / 100)))
+        }
+        return open
+      }
       const executionWrite: PersonalExecutionWriteAdmission | undefined = typeof authorized === 'object' && stopGate !== undefined
-        && handlers.runtime?.defersPersonalExecutionWrite?.(authorized, pathname, req.method) === true
-        ? { subject: authorized, fromCandidate, admit: sqlFenced => writesOpen(req, res, pathname, false, sqlFenced ? stopGate : gate) }
+        && handlers.runtime?.defersPersonalExecutionWrite?.(authorized, pathname, req.method, activeModelCheck) === true
+        ? { subject: authorized, fromCandidate, admit: sqlFenced => admitWrite(sqlFenced ? stopGate : gate) }
         : undefined
-      const writeStarted = measureIngress ? performance.now() : 0
-      if (executionWrite === undefined && !await writesOpen(req, res, pathname, false, gate)) { req.resume(); return }
-      const writeMs = measureIngress ? performance.now() - writeStarted : 0
+      if (executionWrite === undefined && !await admitWrite(gate)) { req.resume(); return }
       let body = ''
       try {
         body = req.method === 'GET' || req.method === 'HEAD'
@@ -1346,9 +1358,6 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         if (!(error instanceof BodyTooLargeError)) throw error
         send(res, 413, '{"error":"runtime-request-too-large"}', 'application/json')
         return
-      }
-      if (measureIngress) {
-        res.setHeader(RESOURCE_INGRESS_TIMING_HEADER, JSON.stringify([authorizationMs, writeMs].map(ms => Math.round(ms * 100) / 100)))
       }
       if (handlers.runtime !== undefined && await handlers.runtime(req, res, pathname, body, executionWrite, controlSubject)) return
       send(res, 404, '{"error":"not-found"}', 'application/json')
@@ -1409,14 +1418,20 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     const readySession = sessionSelectors === undefined || localNode === undefined || recoveryRestricted
       || sessionNode !== null && sessionNode !== localNode || requestUrl.searchParams.getAll('dshNode').length > 1
       || req.headers['x-dsh-prepare-continuation'] !== undefined ? undefined : { ...sessionSelectors, nodeId: localNode }
-    // Structured index reads retain the forwarded-account audit in currentUser.
-    if (readySession?.target === 'personal' && req.method === 'POST' && handlers.readySession !== undefined) {
+    const delegatableRead = isDelegatablePersonalRead(req.method, requestUrl, typeof expectedPrincipal === 'string', req.headers.accept)
+    if (readySession?.target === 'personal' && (req.method === 'POST' || delegatableRead) && handlers.readySession !== undefined) {
       const candidate = signedPersonalForward(req, pathname, { ...readySession, target: 'personal' })
-      if (candidate !== undefined
-        && await handlers.readySession(req, res, { ...readySession, ...candidate, actor: candidate.forwarded.claims.user,
-          ...(pathname === '/api/prepare/v1/session.history' && nodeReadBridges.get(req.socket) === candidate.forwarded.claims.issuerNode
-            ? { managedPersonalRead: true } : {}),
-        })) return
+      if (candidate !== undefined) {
+        const claims = candidate.forwarded.claims
+        const managedPersonalRead = delegatableRead && claims.context?.personalRead !== undefined
+          && claims.user.status === 'active' && !claims.user.mustChangePassword && nodeReadBridges.get(req.socket) === claims.issuerNode
+        if ((req.method === 'POST' || managedPersonalRead) && await handlers.readySession(req, res, {
+          ...readySession, ...candidate, actor: claims.user, ...(managedPersonalRead ? { managedPersonalRead: true } : {}),
+        })) {
+          auditForwardedAccount(req, pathname, claims)
+          return
+        }
+      }
     }
 
     const session = await currentUser(req)

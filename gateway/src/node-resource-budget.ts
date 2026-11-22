@@ -1,11 +1,13 @@
 /** Durable node-wide admission with equal-user, per-user project round robin. */
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { addAbortListener } from 'node:events'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { Pool, PoolClient } from 'pg'
 import type { ResourceKind, ResourceOperationId } from '@deepseek-ai/dsh-resource-budget/types'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import { resourcePolicySchema, resourceStatusSchema, type ResourceStatus } from '@deepseek-ai/dsh-resource-budget/wire'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
+import type { PersonalExecutionWriteFence } from './execution-identity.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 import type { RuntimeTarget } from './instances.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
@@ -92,6 +94,12 @@ interface AdmissionRow {
   state: 'queued' | 'active' | 'uncertain'
 }
 
+interface ReservationRow {
+  limits: unknown
+  state: string
+  refusal: string | null
+}
+
 interface RuntimeStartAdmission {
   state: 'waiting' | 'admitted' | 'stale-generation' | 'timeout'
   limits: unknown
@@ -100,6 +108,42 @@ interface RuntimeStartAdmission {
 const NODE = 'organization_id=$1 AND node_id=$2'
 const OWNER = `${NODE} AND runtime_kind=$3 AND runtime_public_id=$4 AND generation=$5`
 const REQUEST = `${OWNER} AND sequence=$6`
+const resourceRequestSql = (allocation: '$6' | 'authorized.allocation') =>
+  `harness.request_node_resource($1,$2,$3,$4,$5,${allocation},$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`
+// Wait for the node before locking the actor. The scope and generation locks then cover the reservation through commit.
+const personalReservationSql = (lockNode: string) => `WITH locked AS MATERIALIZED (${lockNode}), authorized AS MATERIALIZED (
+    SELECT locked.allocation FROM locked CROSS JOIN LATERAL
+      harness.authorize_personal_execution_scope($1,$2,locked.allocation,$5,$20,$21,$4,$14,$17)
+  ), reserved AS MATERIALIZED (
+    SELECT reservation.*, authorized.allocation
+    FROM authorized CROSS JOIN LATERAL ${resourceRequestSql('authorized.allocation')} reservation
+  ) SELECT reserved.* FROM reserved
+    WHERE CASE WHEN reserved.state='active' THEN EXISTS (
+      SELECT FROM harness.authorize_personal_execution_scope($1,$2,reserved.allocation,$5,$20,$21,$4,$14,$17)
+    ) ELSE TRUE END`
+const scopedPersonalResourceSql = personalReservationSql(
+  `SELECT $6::uuid AS allocation FROM harness.lock_node_resources($1,$2,$8::jsonb)`,
+)
+// The lock pins the previously validated policy through the implicit commit. A policy miss has no accounting effects.
+const scopedPersonalResourceWithConfiguredPolicySql = personalReservationSql(
+  `SELECT $6::uuid AS allocation FROM harness.node_resource_state WHERE ${NODE} AND limits=$8::jsonb FOR UPDATE`,
+)
+// An active reservation needs no scheduler update. Its stored origin supplies
+// the scope for fresh authorization without holding the resource lock.
+const qualifiedPersonalModelSql = `WITH reservation AS MATERIALIZED (
+    SELECT request.session_id,request.scope_id,request.state,
+      EXTRACT(EPOCH FROM request.granted_at-request.created_at)*1000 AS queue_ms
+    FROM harness.node_resource_requests request
+    JOIN harness.node_resource_runtimes owner USING(organization_id,node_id,runtime_kind,runtime_public_id,generation)
+    JOIN harness.node_resource_state policy USING(organization_id,node_id)
+    WHERE (request.organization_id,request.node_id,request.runtime_kind,request.runtime_public_id,request.generation)
+      =($1,$2,$3,$4,$5) AND owner.runtime_id=$6
+      AND request.sequence=$7 AND request.operation_id=$8 AND request.kind='model'
+      AND (request.state='active' OR ($12::boolean AND request.state='queued' AND request.deadline>clock_timestamp()))
+      AND request.origin_kind='session' AND request.scope_id IS NOT NULL
+      AND octet_length(request.session_id) BETWEEN 1 AND 256 AND request.actor_public_id=$4 AND policy.limits=$11::jsonb
+  ) SELECT reservation.state,reservation.queue_ms::float8 FROM reservation CROSS JOIN LATERAL
+    harness.authorize_personal_execution_scope($1,$2,$6,$5,$9,$10,$4,reservation.session_id,reservation.scope_id)`
 const admissionErrors = new Map<string, NodeResourceBudgetError['reason']>([
   ['P4201', 'stale-generation'], ['P4202', 'request-conflict'], ['P4203', 'unregistered'],
   ['P4204', 'sequence-gap'], ['P4205', 'operation-conflict'],
@@ -108,6 +152,10 @@ const admissionErrors = new Map<string, NodeResourceBudgetError['reason']>([
 
 /** PostgreSQL owns reservations; no Gateway-local timer or lease expiry can release running work. */
 export class NodeResourceBudget {
+  private readonly changeEpoch = randomUUID()
+  private changeRevision = 0
+  private readonly changeWaiters = new Set<() => void>()
+
   constructor(
     private readonly pool: Pool,
     private readonly organizationId: string,
@@ -115,6 +163,39 @@ export class NodeResourceBudget {
     readonly config: NodeResourceBudgetConfig,
   ) {
     resourceLimits.parse(config)
+  }
+
+  /** Process-local revision published with queued status responses. It carries no authority. */
+  get changeCursor(): string { return `${this.changeEpoch}.${String(this.changeRevision)}` }
+
+  private signalChange(): void {
+    this.changeRevision += 1
+    for (const wake of this.changeWaiters) wake()
+  }
+
+  /**
+   * Wait for a committed pressure or completion update without a database checkout.
+   * @param cursor - revision observed before the previous durable queue lookup.
+   * @param timeoutMs - maximum wait within the caller's HTTP deadline.
+   * @param signal - request cancellation.
+   * @returns true when a wait slot was available or the cursor had already advanced. False asks the caller to use periodic polling.
+   */
+  async waitForChange(cursor: string, timeoutMs: number, signal: AbortSignal): Promise<boolean> {
+    signal.throwIfAborted()
+    if (cursor !== this.changeCursor) return true
+    if (this.changeWaiters.size >= this.config.maxQueued) return false
+    let wake!: () => void
+    const waiting = new Promise<void>(resolve => { wake = resolve })
+    const timer = setTimeout(wake, timeoutMs)
+    timer.unref()
+    const aborted = addAbortListener(signal, wake)
+    this.changeWaiters.add(wake)
+    try { await waiting; signal.throwIfAborted(); return true }
+    finally {
+      this.changeWaiters.delete(wake)
+      clearTimeout(timer)
+      aborted[Symbol.dispose]()
+    }
   }
 
   /**
@@ -134,16 +215,23 @@ export class NodeResourceBudget {
   /**
    * Publish pressure capture bounds; normal observations cannot multiply start credits.
    * @param observation - local monotonic capture and host metrics, never supplied by a Runtime.
+   * @param writeEpoch - this Gateway's serving epoch; an initial database starts at epoch one.
    * @returns completion after fair queued admissions commit.
    */
-  async observe(observation: NodePressureObservation): Promise<void> {
+  async observe(observation: NodePressureObservation, writeEpoch = 1n): Promise<void> {
     const { capturedAt, ...sample } = observation
     // One server call carries the whole round: capture age at dispatch bounds the
     // sample the same way the former pre/post-lock pair did for the lock queue.
     const elapsed = performance.now() - capturedAt
     try {
-      await this.pool.query('SELECT harness.observe_node_resources($1,$2,$3::jsonb,$4,$5::jsonb)',
-        [this.organizationId, this.nodeId, JSON.stringify(sample), elapsed, JSON.stringify(this.config)])
+      const { rows: [round] } = await this.pool.query<{ observed: { applied: boolean } }>(
+        `SELECT harness.observe_node_resources($1,$2,$3::jsonb,$4,$5::jsonb) AS observed
+           FROM harness.organizations organization
+           LEFT JOIN harness.cluster_control control ON control.organization_id=organization.id
+          WHERE organization.id=$1 AND COALESCE(control.mode,'serving')='serving'
+            AND COALESCE(control.write_epoch,1)=$6`,
+        [this.organizationId, this.nodeId, JSON.stringify(sample), elapsed, JSON.stringify(this.config), String(writeEpoch)])
+      if (round?.observed.applied === true) this.signalChange()
     } catch (error) {
       if (!isDatabaseContentionError(error)) throw error
       throw new NodeResourceBudgetError(503, 'database-busy', 'Resource accounting is busy. Retry after the current operation settles.', { cause: error })
@@ -289,24 +377,44 @@ export class NodeResourceBudget {
    * Serialize registration, fair selection and the durable reservation under one node lock.
    * @param subject - current authenticated Runtime generation.
    * @param request - bounded metadata whose actor and project were resolved by the Gateway.
+   * @param personalFence - for a scoped personal model request, verify the exact bearer, serving epoch and immutable scope in the reservation transaction. A matching stored policy permits one database round trip. Other origins use their verified attribution.
    * @returns bounded admission, idempotent replay, or explicit refusal.
    */
-  async request(subject: ResourceOwner, request: NodeResourceRequest): Promise<NodeResourceStatus> {
+  async request(subject: ResourceOwner, request: NodeResourceRequest, personalFence?: PersonalExecutionWriteFence): Promise<NodeResourceStatus> {
     if ('ownerId' in subject && request.kind !== 'model') throw new Error('Gateway process ownership supports model requests only')
+    if (personalFence !== undefined && ('ownerId' in subject || subject.target.kind !== 'user' || subject.target.runtimeId === undefined
+      || request.kind !== 'model' || request.origin !== 'session' || request.sessionId === undefined || request.scopeId === undefined
+      || request.actorId !== subject.target.id || request.projectId !== 0 || request.administrative !== false)) {
+      throw new Error('Personal model reservation requires its exact Runtime, actor and Session scope')
+    }
     const owner = this.owner(subject)
     const fingerprint = createHash('sha256').update(JSON.stringify([request.requestId, request.kind, request.actorId,
       request.projectId, request.sessionId ?? null, request.scopeId ?? null, request.origin ?? null, request.administrative ?? false])).digest('hex')
     const bytes = Buffer.byteLength(JSON.stringify({ ...request, owner }))
+    const parameters = [...owner, ...this.exactOwner(subject), JSON.stringify(this.config), request.sequence, request.requestId,
+      request.kind, request.actorId, request.projectId, request.sessionId ?? null, fingerprint, bytes,
+      request.scopeId ?? null, request.origin ?? null, request.administrative ?? false,
+      ...(personalFence === undefined ? [] : [createHash('sha256').update(personalFence.bearer).digest(), String(personalFence.epoch)])]
+    if (personalFence !== undefined) {
+      try {
+        const { rows: [row] } = await this.pool.query<ReservationRow>(scopedPersonalResourceWithConfiguredPolicySql, parameters)
+        if (row !== undefined) return this.reservationStatus(row)
+      } catch (error) {
+        this.admissionError(error)
+      }
+    }
     return this.admissionTransaction(async client => {
-      const { rows: [row] } = await client.query<{ limits: unknown; state: string; refusal: string | null }>(
-        'SELECT * FROM harness.request_node_resource($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)',
-        [...owner, ...this.exactOwner(subject), JSON.stringify(this.config), request.sequence, request.requestId,
-          request.kind, request.actorId, request.projectId, request.sessionId ?? null, fingerprint, bytes,
-          request.scopeId ?? null, request.origin ?? null, request.administrative ?? false],
+      const { rows: [row] } = await client.query<ReservationRow>(
+        personalFence === undefined ? `SELECT * FROM ${resourceRequestSql('$6')}` : scopedPersonalResourceSql,
+        parameters,
       )
-      resourceLimits.parse(row!.limits)
-      return resourceStatusSchema.parse(row!.refusal === null ? { state: row!.state } : { state: row!.state, reason: row!.refusal })
+      return this.reservationStatus(row!)
     })
+  }
+
+  private reservationStatus(row: ReservationRow): NodeResourceStatus {
+    resourceLimits.parse(row.limits)
+    return resourceStatusSchema.parse(row.refusal === null ? { state: row.state } : { state: row.state, reason: row.refusal })
   }
 
   /**
@@ -328,6 +436,31 @@ export class NodeResourceBudget {
    */
   async statuses(subject: RuntimeCredentialSubject, operations: readonly Pick<NodeResourceRequest, 'sequence' | 'requestId'>[]): Promise<NodeResourceStatus[]> {
     return (await this.admissions(subject, operations)).map(admission => admission.status)
+  }
+
+  /**
+   * Read a personal model reservation with the same current authorization required at dispatch.
+   * @param subject - authenticated Runtime and exact generation.
+   * @param operation - sequence and matching operation ID.
+   * @param fence - current bearer and write epoch checked by the execution authority.
+   * @param includeQueued - accept an unexpired queued reservation when the client waits for committed scheduler updates.
+   * @returns a qualified active or queued state, or undefined for ordinary accounting and qualification.
+   */
+  async checkPersonalModel(subject: RuntimeCredentialSubject, operation: Pick<NodeResourceRequest, 'sequence' | 'requestId'>,
+    fence: PersonalExecutionWriteFence, includeQueued: boolean): Promise<{ state: 'queued' | 'active'; queueMs: number | null } | undefined> {
+    const runtimeId = subject.target.runtimeId
+    if (subject.target.kind !== 'user' || runtimeId === undefined || subject.contentBinding !== undefined) return
+    const [organization, node, kind, actor, generation] = this.owner(subject)
+    try {
+      const { rows: [row] } = await this.pool.query<{ state: 'queued' | 'active'; queue_ms: number | null }>(qualifiedPersonalModelSql,
+        [organization, node, kind, actor, generation, runtimeId, operation.sequence, operation.requestId,
+          createHash('sha256').update(fence.bearer).digest(), String(fence.epoch), JSON.stringify(this.config), includeQueued])
+      if (row !== undefined) return { state: row.state, queueMs: row.queue_ms }
+    } catch (error) {
+      // Let the ordinary status path handle authority refusal and maintenance.
+      if (error instanceof Error && 'code' in error && (error.code === 'P4101' || error.code === 'P4104')) return
+      this.admissionError(error)
+    }
   }
 
   /**
@@ -390,6 +523,7 @@ export class NodeResourceBudget {
       // Keep the ownership row locked only through commit. Browser admission also needs this row.
       await this.current(client, subject)
     })
+    if (outcome !== 'uncertain') this.signalChange()
   }
 
   /**

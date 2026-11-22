@@ -92,6 +92,8 @@ export interface GatewayPrincipalClaims {
   purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch' | 'runtime-asset'
   /** Exact resource coordinates; required only for a read-only asset assertion. */
   asset?: { method: 'GET' | 'HEAD'; path: string }
+  /** Request step for an empty draft in the selected personal Runtime. */
+  personalDraft?: 'prepare' | 'admit-input'
 }
 
 /** Private launch credential delivered through an inherited FD or systemd credential file. */
@@ -262,6 +264,8 @@ export async function readGatewayResponseBytes(
   } finally {
     reader.releaseLock()
   }
+  const [single] = chunks
+  if (chunks.length === 1 && single !== undefined) return single
   const bytes = new Uint8Array(total)
   let offset = 0
   for (const chunk of chunks) {
@@ -412,6 +416,9 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     ? (asset?.method !== 'GET' && asset?.method !== 'HEAD') || typeof asset.path !== 'string'
       || !immutableAssetRequest(asset.method, asset.path)
     : claims.asset !== undefined) throw new Error('invalid Gateway asset assertion')
+  if (claims.personalDraft !== undefined && ((claims.personalDraft !== 'prepare' && claims.personalDraft !== 'admit-input')
+    || claims.purpose !== undefined || scope.kind !== 'personal' || runtime.kind !== 'user' || runtime.id !== user.id
+    || runtime.runtimeId === undefined)) throw new Error('invalid personal draft assertion')
   if (scope.kind === 'project' && (!positiveInteger(scope.projectId)
     || !nonEmptyString(scope.projectName) || (scope.mode !== 'ro' && scope.mode !== 'rw')
     || (scope.canManage !== undefined && typeof scope.canManage !== 'boolean'))) {
@@ -708,6 +715,11 @@ export class GatewayRuntime extends Service {
         claims: verifyGatewayPrincipal(header, this.credential, this.publicKey),
       }
       this.assertPurposePermitted(principal.claims, request.kind, requestMeta.method, requestMeta.pathname, request.url)
+      const draftStep = principal.claims.personalDraft
+      if (draftStep !== undefined && (request.kind !== 'http' || requestMeta.method !== 'POST'
+        || requestMeta.pathname !== (draftStep === 'prepare' ? '/api/prepare/v1/session.create' : '/api/admit/v1/session.prompt'))) {
+        throw new Error('personal draft assertion does not match the request')
+      }
       if (request.kind === 'upgrade' && request.signal !== undefined
         && (requestMeta.pathname === '/api/events.mux' || requestMeta.pathname === '/api/events.host')
         && this.streamPrincipals !== undefined) {

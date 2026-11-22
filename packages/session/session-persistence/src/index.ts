@@ -841,6 +841,26 @@ export abstract class SessionPersistence extends Service {
   }
 
   /**
+   * Read one exact event from the validated committed prefix.
+   * @param id - stored Session identity.
+   * @param seq - logical sequence to verify.
+   * @param signal - optional cancellation for the storage read.
+   * @returns the detached event, or undefined if that sequence is absent.
+   */
+  async readCommittedEvent(id: SessionId, seq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEvent | undefined> {
+    const options = signal === undefined ? undefined : { signal }
+    const handle = await this.open(id, 'read', options)
+    try {
+      if (handle.id !== id || handle.header.id !== id) return
+      const { events } = await handle.read(seq, 1, options)
+      const [event] = events
+      if (events.length === 1 && event?.seq === Number(seq)) return event
+    } finally {
+      await handle.close()
+    }
+  }
+
+  /**
    * Read one session header without loading its event log. First-party
    * providers override this with an indexed lookup; the default filters the
    * lightweight snapshot list for third-party compatibility.

@@ -13,6 +13,7 @@ import type { DesktopHolder } from './desktop-coordinator.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
 import { getProjectContentBinding, NodeContentUnavailable, type NodeContentStore } from './node-content-store.ts'
+import { recordExecutionInputServerTime } from './operation-timing.ts'
 
 /** A refused execution identity request, without database or credential details. */
 export class ExecutionIdentityError extends Error {
@@ -118,6 +119,15 @@ function primaryActor(value: unknown): number | undefined {
   return value
 }
 
+function inputEntry(value: unknown) {
+  const request = object(value, ['sessionId', 'inputId', 'messageId', 'contentHash', 'creationAuthorization', 'unverifiedHistory', 'currentScopeId'])
+  if (request.unverifiedHistory !== undefined && typeof request.unverifiedHistory !== 'boolean') {
+    throw new ExecutionIdentityError(400, 'invalid unverified history flag')
+  }
+  return { request, sessionId: identity(request.sessionId), id: inputId(request.inputId), messageId: identity(request.messageId),
+    hash: contentHash(request.contentHash) }
+}
+
 function transferHash(sender: string, inputs: string[], primary: number | undefined, unverified: boolean): string {
   return createHash('sha256').update(JSON.stringify({ sender, inputs: inputs.toSorted(), primary: primary ?? null, unverified })).digest('hex')
 }
@@ -134,6 +144,50 @@ function scope(subject: ExecutionRuntimeSubject, sessionId: string): [string, st
 
 const SESSION_COORDINATES = 'organization_id=$1 AND runtime_kind=$2 AND runtime_public_id=$3 AND session_id=$4'
 const SESSION_SCOPE = `${SESSION_COORDINATES} AND runtime_id=$5`
+
+const personalEntry = (row: 's' | 'i') =>
+  `(${row}.organization_id,${row}.runtime_kind,${row}.runtime_public_id,${row}.runtime_id,${row}.session_id)=($1,'user',$7,$3,$8)`
+const executionScopeFingerprint = (ids: string[], primary: string | null, unverified: boolean): string =>
+  createHash('sha256').update(JSON.stringify({ ids, primary, unverified })).digest('hex')
+
+// A concurrent Session update can make the locked revision newer than the
+// statement snapshot. Only the ordinary transaction may proceed in that case.
+const enterPersonalRootInput = `WITH snapshot AS MATERIALIZED (
+    SELECT s.revision FROM harness.execution_sessions s WHERE ${personalEntry('s')}
+  ), locked AS MATERIALIZED (
+    SELECT s.actor_witnesses,s.primary_actor_user_id FROM harness.execution_sessions s
+    JOIN snapshot ON s.revision=snapshot.revision WHERE ${personalEntry('s')}
+      AND s.parent_session_id IS NULL AND NOT s.is_seeded AND NOT s.unverified_history
+    FOR UPDATE OF s
+  ), authorized AS MATERIALIZED (
+    SELECT locked.*,harness.personal_execution_actor($1,$2,$3,$4,$5,$6,$7) AS actor FROM locked
+  ), receipt AS MATERIALIZED (
+    SELECT i.id,eligible.actor FROM authorized eligible JOIN harness.execution_inputs i ON ${personalEntry('i')}
+    WHERE i.id=$9 AND i.message_id=$10 AND i.content_hash=$11 AND i.kind='message'
+      AND i.previous_input_id IS NULL AND i.created_by_user_id=eligible.actor AND i.actor_user_ids=ARRAY[eligible.actor]
+      AND eligible.actor=$12 AND eligible.actor_witnesses-eligible.actor::text='{}'::jsonb
+      AND (eligible.primary_actor_user_id IS NULL OR eligible.primary_actor_user_id=eligible.actor)
+  ), existing AS MATERIALIZED (
+    SELECT s.id,s.revision::text,s.input_ids,s.unverified FROM harness.execution_scopes s
+    JOIN receipt ON TRUE WHERE ${personalEntry('s')} AND s.fingerprint=$13
+  ), entered AS (
+    UPDATE harness.execution_inputs i SET entered_at=now() FROM receipt
+    WHERE i.id=receipt.id AND i.entered_at IS NULL RETURNING i.id
+  ), changed AS (
+    UPDATE harness.execution_sessions s SET revision=s.revision+(entered.id IS NOT NULL)::int+(existing.id IS NULL)::int,
+      actor_witnesses=CASE WHEN entered.id IS NULL OR s.actor_witnesses ? receipt.actor::text THEN s.actor_witnesses
+        ELSE s.actor_witnesses||jsonb_build_object(receipt.actor::text,receipt.id::text) END,
+      primary_actor_user_id=CASE WHEN entered.id IS NULL THEN s.primary_actor_user_id ELSE receipt.actor END,
+      updated_at=now()
+    FROM receipt LEFT JOIN entered ON TRUE LEFT JOIN existing ON TRUE
+    WHERE ${personalEntry('s')} AND (entered.id IS NOT NULL OR existing.id IS NULL) RETURNING s.revision
+  ), inserted AS (
+    INSERT INTO harness.execution_scopes(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,
+      fingerprint,revision,input_ids,primary_actor_user_id,unverified)
+    SELECT $1,'user',$7,$8,$3,$13,changed.revision,ARRAY[receipt.id],receipt.actor,false
+    FROM changed CROSS JOIN receipt WHERE NOT EXISTS(SELECT FROM existing)
+    RETURNING id,revision::text,input_ids,unverified
+  ) SELECT * FROM existing UNION ALL SELECT * FROM inserted`
 
 /**
  * Validate delayed usage attribution against immutable inputs, not present-day eligibility.
@@ -335,18 +389,33 @@ export class GatewayExecutionIdentity {
   async input(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, value: unknown, fence?: PersonalExecutionWriteFence): Promise<{
     inputId: string; actors: Array<{ userId: number }>; primaryActorUserId: number
   }> {
-    const request = object(value, ['sessionId', 'messageId', 'kind', 'contentHash', 'previousInputId', 'creationAuthorization'])
+    const request = object(value, ['sessionId', 'messageId', 'kind', 'contentHash', 'previousInputId', 'creationAuthorization', 'registerRoot'])
     if (request.kind !== 'message') throw new ExecutionIdentityError(400, 'question inputs require the question claim endpoint')
+    if (request.registerRoot !== undefined && request.registerRoot !== true) throw new ExecutionIdentityError(400, 'invalid execution root registration')
     const sessionId = identity(request.sessionId), messageId = identity(request.messageId), hash = contentHash(request.contentHash)
     const previous = request.previousInputId === undefined ? undefined : inputId(request.previousInputId)
     const runtimeId = subject.target.runtimeId
+    if (request.registerRoot === true && (fence === undefined || subject.target.kind !== 'user' || runtimeId === undefined
+      || subject.contentBinding !== undefined || principal.scope.kind !== 'personal' || principal.purpose !== undefined
+      || principal.personalDraft !== 'admit-input' || previous !== undefined || request.creationAuthorization !== undefined)) {
+      throw new ExecutionIdentityError(403, 'the first input requires a prepared personal Session')
+    }
     if (fence !== undefined && subject.target.kind === 'user' && runtimeId !== undefined
       && principal.purpose === undefined && previous === undefined) {
       if (principal.user.id !== subject.target.id) throw new ExecutionIdentityError(403, 'personal execution cannot borrow another account')
-      const { rows: [receipt] } = await this.personalWrite(() => this.pool.query<{ input_id: string; public_actors: string[] }>(
-        'SELECT * FROM harness.admit_personal_execution_input($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      // The receipt depends on the newly locked root. Either error rolls back both functions.
+      const timedReceipt = `SELECT receipt.*, (EXTRACT(EPOCH FROM clock_timestamp()-statement_timestamp())*1000)::float8 AS server_ms`
+      const sql = request.registerRoot === true
+        ? `WITH root AS MATERIALIZED (
+          SELECT $8::text AS session_id, harness.register_personal_execution_root($1,$2,$3,$4,$5,$6,$7,$8)
+        ) ${timedReceipt} FROM root CROSS JOIN LATERAL
+          harness.admit_personal_execution_input($1,$2,$3,$4,$5,$6,$7,root.session_id,$9,$10) AS receipt`
+        : `${timedReceipt} FROM harness.admit_personal_execution_input($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) AS receipt`
+      const { rows: [receipt] } = await this.personalWrite(() => this.pool.query<{ input_id: string; public_actors: string[]; server_ms: number }>(sql,
         [...this.personalCoordinates(subject, runtimeId, fence), sessionId, messageId, hash]),
-      'execution input identity conflicts with an earlier admission')
+      request.registerRoot === true ? 'execution input or Session lineage conflicts with an earlier admission'
+        : 'execution input identity conflicts with an earlier admission')
+      recordExecutionInputServerTime(receipt!.server_ms)
       return { inputId: receipt!.input_id, actors: receipt!.public_actors.map(id => ({ userId: publicNumber(id, 'execution actor') })),
         primaryActorUserId: principal.user.id }
     }
@@ -377,26 +446,56 @@ export class GatewayExecutionIdentity {
   }
 
   /**
+   * Admit a single original personal root receipt in its own authority statement.
+   * @param subject - recognized personal Runtime coordinates.
+   * @param value - exact receipt and message identity, with no inherited scope.
+   * @param fence - current bearer and Gateway write epoch.
+   * @returns The recorded scope or undefined if entry requires general Runtime admission.
+   */
+  tryEnterPersonalRoot(subject: RuntimeCredentialSubject, value: unknown, fence: PersonalExecutionWriteFence): Promise<ExecutionIdentityState | undefined> {
+    return this.enterPersonalRoot(subject, inputEntry(value), fence)
+  }
+
+  private async enterPersonalRoot(subject: RuntimeCredentialSubject, entry: ReturnType<typeof inputEntry>,
+    fence: PersonalExecutionWriteFence): Promise<ExecutionIdentityState | undefined> {
+    const { request, sessionId, id, messageId, hash } = entry
+    const runtimeId = subject.target.runtimeId, actor = subject.userInternalId
+    if (subject.target.kind !== 'user' || subject.contentBinding !== undefined || runtimeId === undefined || actor === undefined
+      || request.currentScopeId !== null || request.unverifiedHistory === true || request.creationAuthorization !== undefined) return undefined
+    const fingerprint = executionScopeFingerprint([id], actor, false)
+    const { rows: [entered] } = await this.personalWrite(
+      () => this.pool.query<Pick<ExecutionScopeRow, 'id' | 'revision' | 'input_ids' | 'unverified'>>(enterPersonalRootInput,
+        [...this.personalCoordinates(subject, runtimeId, fence), sessionId, id, messageId, hash, actor, fingerprint]),
+      'execution input or scope conflicts with an earlier entry',
+    )
+    if (entered === undefined) return undefined
+    return { scopeId: entered.id, revision: entered.revision, inputs: entered.input_ids,
+      actors: [{ userId: subject.target.id }], primaryActorUserId: subject.target.id, unverifiedHistory: entered.unverified }
+  }
+
+  /**
    * Merge a bound receipt into the Session's monotonically growing actor set.
    * @param subject - authenticated runtime
    * @param value - exact receipt, message, and content identities
+   * @param fence - current personal Runtime credential for single-statement root entry
    * @returns canonical witnesses and actors after the atomic merge
    */
-  async enter(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
-    const request = object(value, ['sessionId', 'inputId', 'messageId', 'contentHash', 'creationAuthorization', 'unverifiedHistory', 'currentScopeId'])
-    const sessionId = identity(request.sessionId), id = inputId(request.inputId)
-    const messageId = identity(request.messageId), hash = contentHash(request.contentHash)
-    if (request.unverifiedHistory !== undefined && typeof request.unverifiedHistory !== 'boolean') throw new ExecutionIdentityError(400, 'invalid unverified history flag')
+  async enter(subject: RuntimeCredentialSubject, value: unknown, fence?: PersonalExecutionWriteFence): Promise<ExecutionIdentityState> {
+    const entry = inputEntry(value)
+    const { request, sessionId, id, messageId, hash } = entry
+    const entered = fence === undefined ? undefined : await this.enterPersonalRoot(subject, entry, fence)
+    if (entered !== undefined) return entered
     return this.inRuntime(subject, async (client, subject) => {
       const state = await this.session(client, subject, sessionId)
       const receipt = await this.receipt(client, subject, sessionId, id)
       if (receipt.message_id !== messageId || receipt.content_hash !== hash) throw new ExecutionIdentityError(403, 'execution input does not match the entered message')
-      const recorded = await this.consume(client, subject, sessionId, state, receipt, request.unverifiedHistory === true)
-      if (!('currentScopeId' in request)) return recorded
+      const recorded = await this.consume(subject, sessionId, state, receipt, request.unverifiedHistory === true)
+      if (!('currentScopeId' in request)) return this.state(client, subject, recorded)
       const previous = request.currentScopeId === null ? undefined
         : await this.readScope(client, subject, sessionId, inputId(request.currentScopeId))
       return this.createScope(client, subject, sessionId, [...(previous?.input_ids ?? []), receipt.id],
-        receipt.created_by_user_id, (previous?.unverified ?? false) || request.unverifiedHistory === true)
+        receipt.created_by_user_id, (previous?.unverified ?? false) || request.unverifiedHistory === true, recorded,
+        previous === undefined ? receipt : undefined)
     })
   }
 
@@ -820,11 +919,11 @@ export class GatewayExecutionIdentity {
         if (claim.rowCount !== 1) throw new ExecutionIdentityError(409, 'execution question was claimed by another response')
       }
       const receipt = await this.insertInput(client, subject, sessionId, questionId, 'question', hash, actor)
-      const recorded = await this.consume(client, subject, sessionId, state, receipt, false)
-      if (request.scopeId === undefined) return { claimed: true, ...recorded }
+      const recorded = await this.consume(subject, sessionId, state, receipt, false)
+      if (request.scopeId === undefined) return { claimed: true, ...await this.state(client, subject, recorded) }
       const original = await this.readScope(client, subject, sessionId, inputId(request.scopeId))
       return { claimed: true, ...await this.createScope(client, subject, sessionId, [...original.input_ids, receipt.id],
-        receipt.created_by_user_id, original.unverified) }
+        receipt.created_by_user_id, original.unverified, recorded) }
     })
   }
 
@@ -864,12 +963,12 @@ export class GatewayExecutionIdentity {
     return row
   }
 
-  private async scopeState(client: PoolClient, subject: ExecutionRuntimeSubject, captured: ExecutionScopeRow): Promise<ExecutionIdentityState> {
-    const actors = await this.scopeActors(subject, captured)
-    const primary = captured.primary_actor_user_id === null ? undefined : await this.publicActors(client, subject, [captured.primary_actor_user_id])
+  private async scopeState(client: PoolClient, subject: ExecutionRuntimeSubject, captured: ExecutionScopeRow,
+    entered?: SessionRow, witness?: InputRow): Promise<ExecutionIdentityState> {
+    const actors = witness !== undefined && captured.input_ids.length === 1 && captured.input_ids[0] === witness.id
+      ? witness.actor_user_ids : await this.scopeActors(subject, captured)
     return { scopeId: captured.id, revision: captured.revision, inputs: captured.input_ids,
-      actors: await this.publicActors(client, subject, actors), unverifiedHistory: captured.unverified,
-      ...(primary === undefined ? {} : { primaryActorUserId: primary[0]!.userId }) }
+      ...await this.projectActors(client, subject, actors, captured.primary_actor_user_id, entered), unverifiedHistory: captured.unverified }
   }
 
   private async scopeActors(subject: ExecutionRuntimeSubject, captured: ExecutionScopeRow): Promise<string[]> {
@@ -885,20 +984,25 @@ export class GatewayExecutionIdentity {
   }
 
   private async createScope(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string,
-    inputs: string[], primary: string | null, unverified: boolean): Promise<ExecutionIdentityState> {
+    inputs: string[], primary: string | null, unverified: boolean, entered?: SessionRow, witness?: InputRow): Promise<ExecutionIdentityState> {
     const ids = [...new Set(inputs)].sort()
-    const fingerprint = createHash('sha256').update(JSON.stringify({ ids, primary, unverified })).digest('hex')
-    const existing = await subject.storage.db.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
-      FROM ${subject.storage.schema}.execution_scopes WHERE ${SESSION_SCOPE} AND fingerprint=$6`, [...scope(subject, sessionId), fingerprint])
-    if (existing.rows[0] !== undefined) return this.scopeState(client, subject, existing.rows[0])
-    const changed = await subject.storage.db.query<{ revision: string }>(`UPDATE ${subject.storage.schema}.execution_sessions SET revision=revision+1,updated_at=now()
-      WHERE ${SESSION_SCOPE} RETURNING revision::text`, scope(subject, sessionId))
-    await subject.storage.db.query(`INSERT INTO ${subject.storage.schema}.execution_scopes(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,fingerprint,revision,input_ids,primary_actor_user_id,unverified)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
-    [...scope(subject, sessionId), fingerprint, changed.rows[0]!.revision, ids, primary, unverified])
-    const rows = await subject.storage.db.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
-      FROM ${subject.storage.schema}.execution_scopes WHERE ${SESSION_SCOPE} AND fingerprint=$6`, [...scope(subject, sessionId), fingerprint])
-    return this.scopeState(client, subject, rows.rows[0]!)
+    const fingerprint = executionScopeFingerprint(ids, primary, unverified)
+    const { schema, db } = subject.storage
+    const fields = 'id,revision::text,input_ids,primary_actor_user_id,unverified'
+    const lookup = `SELECT ${fields} FROM ${schema}.execution_scopes WHERE ${SESSION_SCOPE} AND fingerprint=$6`
+    const coordinates = [...scope(subject, sessionId), fingerprint]
+    // Callers already locked the Session. The lookup sees any scope committed by the prior lock holder.
+    const { rows: [stored] } = await db.query<ExecutionScopeRow>(`WITH existing AS MATERIALIZED (${lookup}), changed AS (
+        UPDATE ${schema}.execution_sessions SET revision=revision+1,updated_at=now()
+        WHERE ${SESSION_SCOPE} AND NOT EXISTS(SELECT FROM existing) RETURNING revision
+      ), inserted AS (
+        INSERT INTO ${schema}.execution_scopes(organization_id,runtime_kind,runtime_public_id,session_id,runtime_id,
+          fingerprint,revision,input_ids,primary_actor_user_id,unverified)
+        SELECT $1,$2,$3,$4,$5,$6,changed.revision,$7,$8,$9 FROM changed ON CONFLICT DO NOTHING
+        RETURNING ${fields}
+      ) SELECT * FROM existing UNION ALL SELECT * FROM inserted`, [...coordinates, ids, primary, unverified])
+    const row = stored ?? (await db.query<ExecutionScopeRow>(lookup, coordinates)).rows[0]!
+    return this.scopeState(client, subject, row, entered, witness)
   }
 
   private inRuntime<T>(subject: RuntimeCredentialSubject, work: (client: PoolClient, owner: ExecutionRuntimeSubject) => Promise<T>): Promise<T> {
@@ -1158,13 +1262,24 @@ export class GatewayExecutionIdentity {
 
   private async merge(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string, state: SessionRow,
     receipts: InputRow[], primary: string | null, unverified: boolean): Promise<ExecutionIdentityState> {
+    return this.state(client, subject, await this.mergeSession(subject, sessionId, state, receipts, primary, unverified))
+  }
+
+  private async mergeSession(subject: ExecutionRuntimeSubject, sessionId: string, state: SessionRow,
+    receipts: InputRow[], primary: string | null, unverified: boolean, enteredInputId?: string): Promise<SessionRow> {
     const witnesses = { ...state.actor_witnesses }
     for (const receipt of receipts) for (const actor of receipt.actor_user_ids) witnesses[actor] ??= receipt.id
-    const changed = await subject.storage.db.query<{ revision: string }>(`UPDATE ${subject.storage.schema}.execution_sessions SET actor_witnesses=$6::jsonb,primary_actor_user_id=$7,
-      unverified_history=unverified_history OR $8,revision=revision+1,updated_at=now() WHERE ${SESSION_SCOPE} RETURNING revision::text`,
-    [...scope(subject, sessionId), JSON.stringify(witnesses), primary, unverified])
-    return this.state(client, subject, { ...state, revision: changed.rows[0]!.revision, actor_witnesses: witnesses, primary_actor_user_id: primary,
-      unverified_history: state.unverified_history || unverified })
+    const { schema, db } = subject.storage
+    const enter = enteredInputId === undefined ? '' : `WITH entered AS (
+      UPDATE ${schema}.execution_inputs SET entered_at=now() WHERE id=$9 AND ${SESSION_SCOPE} RETURNING id
+    ) `
+    const changed = await db.query<{ revision: string }>(`${enter}UPDATE ${schema}.execution_sessions
+      SET actor_witnesses=$6::jsonb,primary_actor_user_id=$7,unverified_history=unverified_history OR $8,
+        revision=revision+1,updated_at=now() WHERE ${SESSION_SCOPE}
+        ${enteredInputId === undefined ? '' : 'AND EXISTS(SELECT FROM entered)'} RETURNING revision::text`,
+    [...scope(subject, sessionId), JSON.stringify(witnesses), primary, unverified, ...(enteredInputId === undefined ? [] : [enteredInputId])])
+    return { ...state, revision: changed.rows[0]!.revision, actor_witnesses: witnesses, primary_actor_user_id: primary,
+      unverified_history: state.unverified_history || unverified }
   }
 
   private async replayTransfer(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string,
@@ -1174,16 +1289,15 @@ export class GatewayExecutionIdentity {
       : this.state(client, subject, state)
   }
 
-  private async consume(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string, state: SessionRow,
-    receipt: InputRow, unverified: boolean): Promise<ExecutionIdentityState> {
+  private async consume(subject: ExecutionRuntimeSubject, sessionId: string, state: SessionRow,
+    receipt: InputRow, unverified: boolean): Promise<SessionRow> {
     if (receipt.entered_at !== null) {
       if (unverified && !state.unverified_history) {
-        return this.merge(client, subject, sessionId, state, [], state.primary_actor_user_id!, true)
+        return this.mergeSession(subject, sessionId, state, [], state.primary_actor_user_id, true)
       }
-      return this.state(client, subject, state)
+      return state
     }
-    await subject.storage.db.query(`UPDATE ${subject.storage.schema}.execution_inputs SET entered_at=now() WHERE id=$1`, [receipt.id])
-    return this.merge(client, subject, sessionId, state, [receipt], receipt.created_by_user_id, unverified)
+    return this.mergeSession(subject, sessionId, state, [receipt], receipt.created_by_user_id, unverified, receipt.id)
   }
 
   private async publicActors(client: PoolClient, subject: ExecutionRuntimeSubject, actors: string[]): Promise<Array<{ userId: number }>> {
@@ -1193,9 +1307,22 @@ export class GatewayExecutionIdentity {
   }
 
   private async state(client: PoolClient, subject: ExecutionRuntimeSubject, state: SessionRow): Promise<ExecutionIdentityState> {
-    const primary = state.primary_actor_user_id === null ? undefined : await this.publicActors(client, subject, [state.primary_actor_user_id])
     return { revision: state.revision, inputs: [...new Set(Object.values(state.actor_witnesses))].sort(),
-      actors: await this.publicActors(client, subject, Object.keys(state.actor_witnesses)),
-      ...(primary === undefined ? {} : { primaryActorUserId: primary[0]!.userId }), unverifiedHistory: state.unverified_history }
+      ...await this.projectActors(client, subject, Object.keys(state.actor_witnesses), state.primary_actor_user_id),
+      unverifiedHistory: state.unverified_history }
+  }
+
+  private async projectActors(client: PoolClient, subject: ExecutionRuntimeSubject, actors: string[], primary: string | null,
+    entered?: SessionRow): Promise<Pick<ExecutionIdentityState, 'actors' | 'primaryActorUserId'>> {
+    const visible = new Set(actors)
+    const required = new Set([...actors, ...Object.keys(entered?.actor_witnesses ?? {})])
+    if (primary !== null) required.add(primary)
+    if (entered?.primary_actor_user_id != null) required.add(entered.primary_actor_user_id)
+    const result = await client.query<{ id: string; public_id: string }>(`SELECT id::text,public_id::text FROM harness.users
+      WHERE organization_id=$1 AND id=ANY($2::uuid[]) ORDER BY public_id`, [subject.organizationId, [...required]])
+    if (result.rows.length !== required.size) throw new ExecutionIdentityError(403, 'execution actor record is unavailable')
+    const projected = result.rows.map(row => ({ id: row.id, userId: publicNumber(row.public_id, 'execution actor') }))
+    return { actors: projected.filter(row => visible.has(row.id)).map(({ userId }) => ({ userId })),
+      ...(primary === null ? {} : { primaryActorUserId: projected.find(row => row.id === primary)!.userId }) }
   }
 }

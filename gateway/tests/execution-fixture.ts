@@ -37,6 +37,7 @@ export interface Receipt { inputId: string; actors: Array<{ userId: number }>; p
 export async function createExecutionFixture(pool: Pool, options: {
   executionWatchHeartbeatMs?: number
   executionWatchAuthorizationTimeoutMs?: number
+  resourceStatusWaitMs?: number
   executionWriteEpoch?: bigint
   performanceEnabled?: boolean
   /** Enable multi-computer topology and establish a control lease before starting managed fixture Runtimes. */
@@ -121,6 +122,7 @@ export async function createExecutionFixture(pool: Pool, options: {
     resourceBudget,
     executionWatchHeartbeatMs: options.executionWatchHeartbeatMs ?? 60_000,
     executionWatchAuthorizationTimeoutMs: options.executionWatchAuthorizationTimeoutMs,
+    resourceStatusWaitMs: options.resourceStatusWaitMs,
     sshTargets: new PostgresSshTargetService(context),
     collaboration: new PostgresCollaborationService(context), governance: { resolveOrganizationCredential: async () => null } })
   const server = createServer((req, res) => {

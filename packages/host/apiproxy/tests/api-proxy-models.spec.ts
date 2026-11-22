@@ -28,6 +28,7 @@ import type {
 } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import SessionPersistence from '@deepseek-ai/dsh-session-persistence'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
@@ -790,6 +791,7 @@ it('verifies the exact durable inbox event while later Session events commit, an
     Object.assign(agent, { followup: (message: UserMessage) => { inbox.splice('next-turn', Infinity, 0, [message]) } })
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }), cwd: root })
     const open = ctx.sessionPersistence.open.bind(ctx.sessionPersistence)
+    const readCommittedEvent = ctx.sessionPersistence.readCommittedEvent.bind(ctx.sessionPersistence)
     const otherSession = ctx.sessions.create()
     const otherWriter = await ctx.sessionPersistence.create(otherSession.header)
     ctx.effect(() => () => otherWriter.close())
@@ -810,11 +812,7 @@ it('verifies the exact durable inbox event while later Session events commit, an
           agent.session.append('agent/inbox/spliced', { target: 'next-turn', start: 1, removedCount: 0, inserted: [] })
           await ctx.sessions.flush(agent.session)
         }
-        const [proof] = admittedPrompts(event)
-        if (!proof || mode !== 'key' && mode !== 'digest') return page
-        const changed = { ...proof, [mode]: '0'.repeat(64) }
-        const inserted = event.data.inserted.map(item => ({ ...item, source: { ...item.source, admission: changed } }))
-        return { ...page, events: [{ ...event, data: { ...event.data, inserted } }] }
+        return page
       }
       const close = async (): Promise<void> => {
         await handle.close()
@@ -828,9 +826,27 @@ it('verifies the exact durable inbox event while later Session events commit, an
         },
       })
     })
+    const receiptRead = vi.spyOn(ctx.sessionPersistence, 'readCommittedEvent').mockImplementation(async (...args) => {
+      const event = mode === 'id' || mode === 'close'
+        ? await SessionPersistence.prototype.readCommittedEvent.call(ctx.sessionPersistence, ...args)
+        : await readCommittedEvent(...args)
+      if (event?.type !== 'agent/inbox/spliced') return event
+      if (mode === 'concurrent' && !advanced) {
+        advanced = true
+        agent.session.append('agent/inbox/spliced', { target: 'next-turn', start: 1, removedCount: 0, inserted: [] })
+        await ctx.sessions.flush(agent.session)
+      }
+      const [proof] = admittedPrompts(event)
+      if (!proof || mode !== 'key' && mode !== 'digest') return event
+      const changed = { ...proof, [mode]: '0'.repeat(64) }
+      const inserted = event.data.inserted.map(item => ({ ...item, source: { ...item.source, admission: changed } }))
+      return { ...event, data: { ...event.data, inserted } }
+    })
     const requestId = RpcId('concurrent-operation')
     const payload = { sessionId, requestId, mode: 'queue' as const, durable: true as const, content: [{ type: 'text' as const, text: 'one input' }] }
     expect((await api.sessions.prompt(request(payload))).result).toEqual({ ok: true, value: { accepted: true } })
+    expect(receiptRead).toHaveBeenCalledTimes(1)
+    expect(openOverride).not.toHaveBeenCalled()
     expect(advanced).toBe(true)
     const [marker] = Object.values(ctx.sessionProjections.stateOf(agent.session, 'acceptedPromptReceipts')!)
     advanced = false
@@ -843,6 +859,7 @@ it('verifies the exact durable inbox event while later Session events commit, an
         ok: false, error: { code: 'prompt-durability-unavailable' },
       })
     }
+    receiptRead.mockRestore()
     openOverride.mockRestore()
     const failedFlush = vi.spyOn(ctx.sessions, 'flush').mockRejectedValueOnce(new Error('storage unavailable'))
     expect((await api.sessions.promptStatus(request({ sessionId, requestId }))).result).toMatchObject({

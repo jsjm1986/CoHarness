@@ -22,7 +22,6 @@ import { createPostgresPool, runMigrations, transaction } from '../src/postgres/
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import type { RuntimeCredentialSubject } from '../src/runtime-api.ts'
-import { barrier } from './barrier.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { enableFixtureTopology } from './fixtures/topology-fixture.mjs'
 
@@ -198,7 +197,8 @@ describePg('durable node resource budget', () => {
     let calls = 0
     const instrumented = new Proxy(observerPool, { get(actualPool, key) {
       if (key === 'query') return async (sql: string, values?: readonly unknown[]) => {
-        if (sql === 'SELECT harness.observe_node_resources($1,$2,$3::jsonb,$4,$5::jsonb)') {
+        if (sql.includes('SELECT harness.observe_node_resources($1,$2,$3::jsonb,$4,$5::jsonb) AS observed')
+          && sql.includes('COALESCE(control.write_epoch,1)=$6')) {
           calls++
           await new Promise(resolve => setTimeout(resolve, 150))
         }
@@ -544,7 +544,7 @@ describePg('durable node resource budget', () => {
   it('rolls back a Runtime decision whose deadline expires before dispatch', async () => {
     const f = await fixture(), subject = await prepareStart(f, 0)
     await f.grant(1)
-    let clock = Math.floor(performance.now())
+    let clock = performance.now()
     const now = vi.spyOn(performance, 'now').mockImplementation(() => clock)
     try {
       const delayed = await startPool(async (sql, execute) => {
@@ -563,7 +563,7 @@ describePg('durable node resource budget', () => {
   it('retains an acknowledged allocation when the caller deadline expires during commit', async () => {
     const f = await fixture(), subject = await prepareStart(f, 0)
     await f.grant(1)
-    let clock = Math.floor(performance.now())
+    let clock = performance.now()
     const now = vi.spyOn(performance, 'now').mockImplementation(() => clock)
     try {
       const delayed = await startPool(async (sql, execute) => {
@@ -711,6 +711,24 @@ describePg('durable node resource budget', () => {
       await observing
       await observerPool.end()
     }
+  })
+
+  it('gates observation credits inside the write statement using the current mode and epoch', async () => {
+    const f = await fixture()
+    const sample = () => ({ capturedAt: performance.now(), cpu: 0, memory: 'normal' as const, eventLoopMs: 0, parallelism: 2 })
+    const credits = async () => (await pool.query<{ credits: number }>(
+      'SELECT credits FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2',
+      [f.context.organizationId, f.context.nodeId],
+    )).rows[0]!.credits
+    await pool.query("INSERT INTO harness.cluster_control(organization_id,mode,write_epoch) VALUES($1,'maintenance',2)", [f.context.organizationId])
+    const before = await credits()
+    await f.budget.observe(sample(), 2n)
+    expect(await credits()).toBe(before)
+    await pool.query("UPDATE harness.cluster_control SET mode='serving' WHERE organization_id=$1", [f.context.organizationId])
+    await f.budget.observe(sample(), 1n)
+    expect(await credits()).toBe(before)
+    await f.budget.observe(sample(), 2n)
+    expect(await credits()).toBe(2)
   })
 
   it('publishes only the remaining pressure validity after capture', async () => {
@@ -913,12 +931,14 @@ describePg('durable node resource budget', () => {
     const f = await fixture(), subject = f.subjects[0]!, operation = f.request(0, 1)
     await f.grant(1)
     expect(await f.budget.request(subject, operation)).toEqual({ state: 'active' })
-    const scheduled = barrier(), resume = barrier()
+    let scheduled!: () => void, resume!: () => void
+    const scheduling = new Promise<void>(resolve => { scheduled = resolve })
+    const resuming = new Promise<void>(resolve => { resume = resolve })
     const delayed = await startPool(async (sql, execute) => {
       const result = await execute()
       if (sql === 'SELECT harness.schedule_node_resources($1,$2)') {
-        scheduled.resolve()
-        await resume.promise
+        scheduled()
+        await resuming
       }
       return result
     })
@@ -926,13 +946,13 @@ describePg('durable node resource budget', () => {
     const pending = budget.finish(subject, operation, 'quiescent')
     const settled = Promise.allSettled([pending])
     try {
-      await Promise.race([scheduled.promise, pending])
+      await Promise.race([scheduling, pending])
       await transaction(pool, async client => {
         const args = [f.context.organizationId, f.users[0]!.uuid]
         expect((await client.query('SELECT id FROM harness.instances WHERE organization_id=$1 AND user_id=$2 FOR UPDATE NOWAIT', args)).rowCount).toBe(1)
         if (change) await client.query('UPDATE harness.instances SET generation=generation+1 WHERE organization_id=$1 AND user_id=$2', args)
       })
-    } finally { resume.resolve(); await settled }
+    } finally { resume(); await settled }
     expect(await settled).toEqual(change
       ? [{ status: 'rejected', reason: expect.objectContaining({ reason: 'stale-generation' }) }]
       : [{ status: 'fulfilled', value: undefined }])

@@ -141,6 +141,27 @@ function observation(header: SessionHeader, events: readonly SessionEvent[] = []
 }
 
 describe('managed execution identity', () => {
+  it.each([true, false])('adopts a prepared personal draft with combined input admission enabled=%s', async (combined) => {
+    const f = await fixture(), caller = principal()
+    const session = f.ctx.sessions.create(SessionId('prepared-draft'), { meta: { draft: true } })
+    const agent = { ...f.agent, id: session.id, session }
+    f.agents.set(agent.id, agent)
+    const before = f.requests.length
+    f.setPrincipal({ ...caller, claims: { ...caller.claims, personalDraft: 'prepare' } })
+    await f.ctx.serial('agent/created', { agent, source: 'startup' })
+    expect(f.requests.slice(before)).toEqual([])
+    f.setPrincipal(combined ? { ...caller, claims: { ...caller.claims, personalDraft: 'admit-input' } } : caller)
+    f.responses.set('/input', async () => Response.json({ inputId: A }))
+    const message = createUserMessage({ content: [{ type: 'text', text: 'first input' }], source: { kind: 'user' } })
+    expect((await f.ctx.executionAuthority.stamp(session, message)).source).toMatchObject({ gatewayExecutionInput: A })
+    expect(f.requests.slice(before).map(row => row.path)).toEqual(combined
+      ? ['/internal/runtime/execution/input']
+      : ['/internal/runtime/execution/register-session', '/internal/runtime/execution/input'])
+    expect(f.requests.at(-1)?.body.registerRoot).toBe(combined ? true : undefined)
+    await f.ctx.executionAuthority.stamp(session, message)
+    expect(f.requests.at(-1)?.body).not.toHaveProperty('registerRoot')
+  })
+
   it('mounts desktop policy with live root routing and keeps a child lease until the whole root is idle', async () => {
     const f = await fixture({ config: { desktop: 'display-0', desktopPollMs: 60_000 } })
     const session = f.ctx.sessions.create(SessionId('desktop-child'))

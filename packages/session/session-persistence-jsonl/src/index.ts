@@ -307,7 +307,7 @@ class JsonlSessionPersistence extends SessionPersistence {
   /** One joinable decode/migration operation per selected historical Session file revision. */
   private readonly migrationPreparations = new Map<SessionId, MigrationPreparation>()
   private readonly preparationTasks = new Set<Promise<PreparedStoredLog>>()
-  private readonly opening = new Set<Promise<SessionHandle>>()
+  private readonly opening = new Set<Promise<unknown>>()
   private openingClosed = false
   private readonly listLimit: LimitFunction
 
@@ -404,7 +404,28 @@ class JsonlSessionPersistence extends SessionPersistence {
    */
   override open(id: SessionId, access: SessionAccess, options?: SessionPersistenceOpenOptions): Promise<SessionHandle> {
     if (this.openingClosed) return Promise.reject(new Error('session-persistence-jsonl is closed'))
-    const task = this.openAccepted(id, access, options)
+    return this.trackOpen(this.openAccepted(id, access, options))
+  }
+
+  /** @inheritdoc */
+  override readCommittedEvent(id: SessionId, seq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEvent | undefined> {
+    if (this.openingClosed) return Promise.reject(new Error('session-persistence-jsonl is closed'))
+    return this.trackOpen(this.readCommittedEventAccepted(id, seq, signal))
+  }
+
+  private async readCommittedEventAccepted(
+    id: SessionId, seq: SessionLogOffsetType, signal?: AbortSignal,
+  ): Promise<SessionEvent | undefined> {
+    signal?.throwIfAborted()
+    const path = await this.resolveCurrentLog(id, signal)
+    if (this.tracker.hasPending(id)) return
+    if (path === undefined) return super.readCommittedEvent(id, seq, signal)
+    const stored = await this.readStoredLog(path, id, signal)
+    const event = stored.events[seq]
+    if (event?.seq === Number(seq)) return structuredClone(event)
+  }
+
+  private trackOpen<T>(task: Promise<T>): Promise<T> {
     this.opening.add(task)
     const complete = (): void => { this.opening.delete(task) }
     void task.then(complete, complete)

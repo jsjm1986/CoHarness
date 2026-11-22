@@ -75,6 +75,19 @@ export function isReadyRuntimeRead(method: string | undefined, url: URL): boolea
   return bootstrap.length === 1 && bootstrap[0] === '1'
 }
 
+/**
+ * Select read operations that can use the primary's approval on a ready personal Runtime.
+ * @param method - original HTTP method.
+ * @param url - browser request coordinates.
+ * @param accountBound - whether the request declares its expected browser account.
+ * @param accept - browser response format requested for structured bootstrap.
+ * @returns whether this request can use delegated read admission.
+ */
+export function isDelegatablePersonalRead(method: string | undefined, url: URL, accountBound: boolean, accept: string | undefined): boolean {
+  if (method === 'POST' && url.pathname === '/api/prepare/v1/session.history') return true
+  return accountBound && isReadyRuntimeRead(method, url) && (method !== 'GET' || accept === 'application/json')
+}
+
 /** @param method - original HTTP method. @param url - original request coordinates. @returns whether a scope change explicitly prepares an allocation. */
 export function isExplicitScopeRequest(method: string | undefined, url: URL): boolean {
   return method === 'POST' && (url.pathname === '/account/api/scope' || url.pathname === '/account/runtime/start') && url.searchParams.has('dshRuntime')
@@ -117,11 +130,15 @@ export function isRuntimeResourceCompletionRequest(pathname: string, method: str
  * Select requests that can qualify an exact personal Runtime in the same SQL statement as the write.
  * @param pathname - parsed internal request path.
  * @param method - HTTP method.
+ * @param activeModelCheck - whether the provider requested an exact active model confirmation.
  * @returns whether to consider the statement's personal execution admission.
  */
-export function isPersonalExecutionWriteRequest(pathname: string, method: string | undefined): boolean {
+export function isPersonalExecutionWriteRequest(pathname: string, method: string | undefined, activeModelCheck = false): boolean {
   return method === 'POST'
-    && (pathname === '/internal/runtime/execution/register-session' || pathname === '/internal/runtime/execution/input')
+    && (pathname === '/internal/runtime/execution/register-session' || pathname === '/internal/runtime/execution/input'
+      || pathname === '/internal/runtime/execution/enter' || pathname === '/internal/runtime/execution/authorize'
+      || pathname === '/internal/runtime/model-credential' || pathname === '/internal/runtime/resources/request'
+      || (pathname === '/internal/runtime/resources/statuses' && activeModelCheck))
 }
 
 /**

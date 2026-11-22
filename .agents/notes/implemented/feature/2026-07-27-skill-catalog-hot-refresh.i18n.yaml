@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-skill-catalog-hot-refresh.md
 document:
-  en: fcca04e685c258eb927319c4f999160a1a0d3699
-  zh: a7d060a3c683dde789f07403e3f55a9f2c6643c4
+  en: c44d3f8ebfc292c34ecd1b3cbee3cd7f0278e444
+  zh: 485df70b1cdeb59421a9d97570f1a34eb3fed73e
 /agent-note-skill-catalog-hot-refresh:
   en: eeb2d5e6949cb6b7
   zh: 67621d79746ea5f3
@@ -12,8 +12,8 @@ document:
   en: 130ae203aa047092
   zh: fe9254a523a98bfd
 /agent-note-skill-catalog-hot-refresh/decision:
-  en: 0f646b14e95111e2
-  zh: 2c26fb9c94352a08
+  en: 804ef5708441fed6
+  zh: 4567504281f79ec4
 /agent-note-skill-catalog-hot-refresh/verification:
   en: 5e6556b68f77835b
   zh: ff58f2f7aad404ca

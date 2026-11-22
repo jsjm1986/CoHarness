@@ -19,7 +19,8 @@ import type { WorkspaceId, WorkspaceView } from './workspace.ts'
 import type { UserDocIdType, UserDocPromptAttachment } from '@deepseek-ai/dsh-userdoc'
 
 /** Timing category for a Host's durable prompt admission. */
-export type PromptAdmissionPhase = 'sessionAuthority' | 'agentReadiness' | 'admissionWait' | 'executionStamp' | 'inboxAppend' | 'flushReceipt' | 'readReceipt'
+export type PromptAdmissionPhase = 'sessionAuthority' | 'agentReadiness' | 'admissionWait' | 'executionStamp'
+  | 'inboxAppend' | 'inboxPublish' | 'inboxWake' | 'flushReceipt' | 'readReceipt'
 /** Host carrier observer receiving elapsed milliseconds for completed admission phases. */
 export type PromptAdmissionObserver = (phase: PromptAdmissionPhase, durationMs: number) => void
 

@@ -3,8 +3,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Pool } from 'pg'
 import { z } from 'zod'
 import {
-  RESOURCE_MESSAGE_MAX_BYTES, RESOURCE_PHASE_TIMING_HEADER, resourceFinishSchema, resourceRequestSchema, resourceStatusesSchema,
-  type ResourceOrigin, type ResourceStatus,
+  RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_MESSAGE_MAX_BYTES, RESOURCE_PHASE_TIMING_HEADER, RESOURCE_QUALIFIED_GRANT_HEADER,
+  resourceFinishSchema, resourceRequestSchema, resourceStatusesSchema,
+  type ResourceOrigin, type ResourceStatus, type ResourceWireRequest,
 } from '@deepseek-ai/dsh-resource-budget/wire'
 import { ExecutionIdentityError, type GatewayExecutionIdentity, type PersonalExecutionWriteFence } from './execution-identity.ts'
 import { NodeResourceBudgetError, type NodeResourceAdmission, type NodeResourceBudget } from './node-resource-budget.ts'
@@ -17,7 +18,44 @@ interface Dependencies {
   readonly execution: GatewayExecutionIdentity
   readonly budget: NodeResourceBudget
   readonly personalFence?: PersonalExecutionWriteFence
+  readonly fencedRequest?: ScopedModelRequest
+  readonly waitForQueued?: boolean
   readonly bearerMs?: number
+}
+
+type SessionOrigin = Extract<ResourceOrigin, { kind: 'session' }>
+type ScopedModelRequest = ResourceWireRequest & { kind: 'model'; origin: Required<SessionOrigin> }
+
+function boundedResourcePayload(body: string): unknown {
+  if (Buffer.byteLength(body) > RESOURCE_MESSAGE_MAX_BYTES) return
+  try { return JSON.parse(body) as unknown } catch (error) {
+    if (error instanceof SyntaxError) return
+    throw error
+  }
+}
+
+/**
+ * Qualify a bounded personal model submission for database-verified admission.
+ * @param body - bounded Runtime API body.
+ * @returns Scoped model metadata; other submissions retain ordinary bearer and write admission.
+ */
+export function scopedModelResourceRequest(body: string): ScopedModelRequest | undefined {
+  const result = resourceRequestSchema.safeParse(boundedResourcePayload(body))
+  if (!result.success) return
+  const { kind, origin } = result.data
+  if (kind === 'model' && origin.kind === 'session' && origin.scopeId !== undefined && Buffer.byteLength(origin.sessionId) <= 256) {
+    return { ...result.data, kind, origin: { ...origin, scopeId: origin.scopeId } }
+  }
+}
+
+/**
+ * Select one exact bounded operation for active model confirmation.
+ * @param body - bounded Runtime API body.
+ * @returns the single operation reference, or undefined for ordinary status admission.
+ */
+export function activeModelStatusOperation(body: string): Pick<ResourceWireRequest, 'sequence' | 'requestId'> | undefined {
+  const result = resourceStatusesSchema.safeParse(boundedResourcePayload(body))
+  if (result.success && result.data.operations.length === 1) return result.data.operations[0]
 }
 
 function assertNeverOrigin(_origin: never): never {
@@ -138,22 +176,27 @@ export async function handleRuntimeResourceApi(
   if (req.method !== 'POST') { send(405, { error: 'resource-method' }); return true }
   if (Buffer.byteLength(body) > RESOURCE_MESSAGE_MAX_BYTES) { send(413, { error: 'resource-message-too-large' }); return true }
   try {
-    const payload: unknown = JSON.parse(body)
+    const payload: unknown = deps.fencedRequest ?? JSON.parse(body)
     switch (pathname.slice('/internal/runtime/resources/'.length)) {
       case 'register':
         z.object({}).strict().parse(payload)
         send(200, await deps.budget.register(subject))
         return true
       case 'request': {
-        const request = resourceRequestSchema.parse(payload)
+        const request = deps.fencedRequest ?? resourceRequestSchema.parse(payload)
         const started = timing === undefined ? 0 : performance.now()
-        const attribution = await actor(deps, subject, request.origin)
+        const fence = deps.fencedRequest === undefined ? undefined : deps.personalFence
+        const cursor = fence !== undefined && deps.waitForQueued === true ? deps.budget.changeCursor : undefined
+        const attribution = fence === undefined ? await actor(deps, subject, request.origin)
+          : { actorId: subject.target.id, administrative: false }
         const authorized = timing === undefined ? 0 : performance.now()
         const status = await deps.budget.request(subject, {
           sequence: request.sequence, requestId: request.requestId, kind: request.kind, ...attribution, origin: request.origin.kind,
           projectId: subject.target.kind === 'project' ? subject.target.id : 0,
           ...(request.origin.kind === 'session' ? { sessionId: request.origin.sessionId, scopeId: request.origin.scopeId } : {}),
-        })
+        }, fence)
+        if (cursor !== undefined && status.state === 'queued') res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
+        if (fence !== undefined && status.state === 'active') res.setHeader(RESOURCE_QUALIFIED_GRANT_HEADER, '1')
         timing?.(authorized - started, performance.now() - authorized)
         send(200, status)
         return true
@@ -180,6 +223,10 @@ export async function handleRuntimeResourceApi(
         return true
     }
   } catch (error) {
+    if (deps.fencedRequest !== undefined && error instanceof Error && 'code' in error) {
+      if (error.code === 'P4101') throw new ExecutionIdentityError(403, 'personal execution is no longer authorized')
+      if (error.code === 'P4104') throw new ExecutionIdentityError(503, 'execution writes are unavailable')
+    }
     if (error instanceof NodeResourceBudgetError) send(error.status, { error: `resource-${error.reason}` })
     else if (error instanceof z.ZodError || error instanceof SyntaxError) send(400, { error: 'resource-message' })
     else throw error

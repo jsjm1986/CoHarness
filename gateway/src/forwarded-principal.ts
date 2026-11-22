@@ -8,7 +8,9 @@ import { verifiedPayload } from './principal.ts'
 
 export const FORWARDED_PRINCIPAL_HEADER = 'x-dsh-gateway-forward'
 
-const personalHistoryAdmissionSchema = z.object({
+const MAX_LIVE_FORWARD_NONCES = 4096
+
+const personalReadAdmissionSchema = z.object({
   generation: z.number().int().positive(),
   port: z.number().int().min(1).max(65535),
   launchStamp: z.string().max(256).nullable(),
@@ -17,8 +19,8 @@ const personalHistoryAdmissionSchema = z.object({
   expiresAt: z.number().int().positive(),
 }).strict()
 
-/** Exact supervised generation and current revision approved by the primary for personal history. */
-export type PersonalHistoryAdmission = z.infer<typeof personalHistoryAdmissionSchema>
+/** Exact supervised generation and current revision approved by the primary for a personal read. */
+export type PersonalReadAdmission = z.infer<typeof personalReadAdmissionSchema>
 
 /**
  * Claims a forwarding Gateway already proved for one request aimed at
@@ -48,7 +50,7 @@ export interface GatewayForwardClaims {
    */
   context?: {
     environment: { id: RuntimeId; nodeId: RuntimeNodeId; nodeName?: string }
-    personalHistory?: PersonalHistoryAdmission
+    personalRead?: PersonalReadAdmission
   }
   /**
    * The exact request this assertion was issued for. Without it the assertion
@@ -84,16 +86,19 @@ interface ForwardAuthority {
  * @param ttlMs - maximum lifetime retained by the process-local nonce ledger.
  * @returns verification callbacks for the ordinary and retained Session admission paths.
  */
-export function createGatewayForwardAuthority(directory: NodePrincipalDirectory, audience: {
+export function createGatewayForwardAuthority(directory: Pick<NodePrincipalDirectory, 'issuerKey' | 'publishedKeyCandidate'>, audience: {
   audienceNode: RuntimeNodeId; organization: string
 }, ttlMs: number): ForwardAuthority {
   const nonces = new Map<string, number>()
   const consume = (claims: GatewayForwardClaims): boolean => {
     const now = Date.now()
     if (claims.expiresAt <= now) return false
-    for (const [nonce, expiry] of nonces) if (expiry <= now) nonces.delete(nonce)
-    if (nonces.has(claims.nonce)) return false
-    if (nonces.size >= 4096) nonces.clear()
+    const usedUntil = nonces.get(claims.nonce)
+    if (usedUntil !== undefined && usedUntil > now) return false
+    if (nonces.size === MAX_LIVE_FORWARD_NONCES) {
+      for (const [nonce, expiry] of nonces) if (expiry <= now) nonces.delete(nonce)
+      if (nonces.size === MAX_LIVE_FORWARD_NONCES) return false
+    }
     nonces.set(claims.nonce, Math.min(claims.expiresAt, now + ttlMs))
     return true
   }
@@ -159,7 +164,7 @@ function forwardClaims(value: unknown): GatewayForwardClaims {
     if (context === undefined || environment === undefined || typeof environment.id !== 'string'
       || typeof environment.nodeId !== 'string'
       || (environment.nodeName !== undefined && typeof environment.nodeName !== 'string')
-      || context.personalHistory !== undefined && !personalHistoryAdmissionSchema.safeParse(context.personalHistory).success) {
+      || context.personalRead !== undefined && !personalReadAdmissionSchema.safeParse(context.personalRead).success) {
       throw new Error('invalid forwarded principal claims')
     }
   }

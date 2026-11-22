@@ -1,18 +1,25 @@
-/** Metadata-only per-request observations on the versioned conversation routes, confined to a bounded process ring. */
+/** Metadata-only conversation and resource-admission observations in a bounded process ring. */
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { PoolClient } from 'pg'
+import { isReadyRuntimeRead } from './runtime-request-path.ts'
 
 const method = new Map([
-  ['/api/prepare/v1/session.create','create'],['/api/prepare/v1/session.history','history'],
+  ['/api/prepare/v1/session.create','create'],['/api/prepare/v1/session.history','history'],['/api/session.history','history'],
+  ['/api/host.describe','hostDescription'],['/api/workspace.list','workspaceList'],['/api/session.list','sessionList'],
   ['/api/admit/v1/session.prompt','send'],['/api/admit/v1/session.status','status'],
   ['/internal/runtime/execution/input','executionInput'],['/internal/runtime/execution/register-session','executionRegister'],
+  ['/internal/runtime/execution/enter','executionEnter'],['/internal/runtime/execution/authorize','executionAuthorize'],
+  ['/internal/runtime/resources/request','resourceRequest'],['/internal/runtime/resources/statuses','resourceStatuses'],
+  ['/internal/runtime/model-credential','modelCredential'],
 ] as const)
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 export type OperationPhase='authorize'|'prepare'|'admit'|'accessSync'|'runtimeQueue'|'runtimeLiveness'|'nodeConnection'|'nodeQueue'|'nodeLeaseCheck'|'nodeServiceOpen'|'upstream'
   |'entryReadApproval'|'entryReadRelease'|'nodePreparedRead'
-  | 'governanceCheckout' | 'contentCheckout'
-type Method='create'|'history'|'send'|'status'|'executionInput'|'executionRegister'
+  | 'governanceCheckout' | 'contentCheckout' | 'resourceWriteAdmission' | 'resourceChangeWait' | 'executionInputServer'
+type Method='bootstrap'|'hostDescription'|'workspaceList'|'sessionList'|'create'|'history'|'send'|'status'|'executionInput'|'executionRegister'
+  |'executionEnter'|'executionAuthorize'|'resourceRequest'|'resourceStatuses'|'modelCredential'
 type SqlRole='governance'|'content'
 /** Result of acquiring one exclusive PostgreSQL client. */
 export type ConnectionCheckout = { kind: 'opened'; setupMs: number } | { kind: 'reused' | 'handoff' | 'failed' }
@@ -22,7 +29,7 @@ interface CheckoutSpans {
 }
 type NodeTransport='opened'|'reused'
 type ForwardingMark='leaseAcquired'|'assertionReady'|'socketAssigned'|'requestWritten'|'responseHeaders'
-const admissionPhases=['sessionAuthority','agentReadiness','admissionWait','executionStamp','inboxAppend','flushReceipt','readReceipt'] as const
+const admissionPhases=['sessionAuthority','agentReadiness','admissionWait','executionStamp','inboxAppend','inboxPublish','inboxWake','flushReceipt','readReceipt'] as const
 type HostAdmission=Partial<Record<typeof admissionPhases[number],number>>
 const preparationPhases = ['bodyMs', 'sessionMs', 'initialHistoryMs'] as const
 type HostPreparation = Partial<Record<typeof preparationPhases[number], number>>
@@ -31,6 +38,7 @@ interface Sample {
   status:number; aborted:boolean; sentBytes:number|null; receivedBytes:number|null
   forwarding?:Partial<Record<ForwardingMark,number>>
   databaseCheckout?:Partial<Record<SqlRole,CheckoutSpans>>
+  resourceBearerDatabase?:{poolWaitMs:number;connectionSetupMs:number;failedCheckoutMs:number;queryMs:number;queries:number}
   phases:Partial<Record<OperationPhase,number>>; sql:Record<SqlRole,{count:number;elapsedMs:number}>
   hostMs?:number; hostAdmission?:HostAdmission; hostPreparation?:HostPreparation; nodeTransport?:NodeTransport
 }
@@ -41,6 +49,11 @@ function length(value:string|string[]|number|undefined):number|null {
   if(value===undefined || Array.isArray(value) || !/^\d{1,16}$/u.test(String(value))) return null
   const n=Number(value)
   return Number.isSafeInteger(n)?n:null
+}
+
+/** @returns Whether database dispatch has an active request observation to preserve across checkout. */
+export function hasOperationTiming(): boolean {
+  return current.getStore()?.closed === false
 }
 
 function hostPhases<Phase extends string>(value: unknown, phases: readonly Phase[]): Partial<Record<Phase, number>> | undefined {
@@ -74,6 +87,37 @@ export async function timeOperation<T>(phase:OperationPhase,work:()=>Promise<T>)
   try { return await work() } finally { finish() }
 }
 
+function resourceBearerDatabase(sample: Sample): NonNullable<Sample['resourceBearerDatabase']> {
+  const pool = sample.databaseCheckout?.governance
+  const sql = sample.sql.governance
+  return { poolWaitMs: pool?.waitMs ?? 0, connectionSetupMs: pool?.setupMs ?? 0, failedCheckoutMs: pool?.failedMs ?? 0,
+    queryMs: sql.elapsedMs, queries: sql.count }
+}
+
+/**
+ * Attribute a resource bearer lookup before the write check and accounting statements.
+ * @param work - Runtime credential verification.
+ * @returns The unchanged verification result. Query duration includes database transport.
+ */
+export async function timeResourceBearer<T>(work: () => Promise<T> | T): Promise<T> {
+  const flight = current.getStore()
+  if (flight === undefined || flight.closed) return work()
+  const finish = operationPhase('authorize')
+  const before = resourceBearerDatabase(flight.sample)
+  try { return await work() } finally {
+    finish()
+    if (!flight.closed) {
+      const after = resourceBearerDatabase(flight.sample)
+      flight.sample.resourceBearerDatabase = {
+        poolWaitMs: rounded(after.poolWaitMs - before.poolWaitMs),
+        connectionSetupMs: rounded(after.connectionSetupMs - before.connectionSetupMs),
+        failedCheckoutMs: rounded(after.failedCheckoutMs - before.failedCheckoutMs),
+        queryMs: rounded(after.queryMs - before.queryMs), queries: after.queries - before.queries,
+      }
+    }
+  }
+}
+
 /**
  * Record connection reuse in the current bounded operation sample.
  * @param state - whether the node-service acquisition opened or reused a transport.
@@ -81,6 +125,17 @@ export async function timeOperation<T>(phase:OperationPhase,work:()=>Promise<T>)
 export function recordNodeTransport(state:NodeTransport):void{
   const flight=current.getStore()
   if(flight && !flight.closed) flight.sample.nodeTransport=state
+}
+
+/**
+ * Record the database server's elapsed execution input statement time.
+ * @param milliseconds - time measured on PostgreSQL, including any server-side waits.
+ */
+export function recordExecutionInputServerTime(milliseconds: number): void {
+  const flight = current.getStore()
+  if (flight?.sample.operation === 'executionInput' && !flight.closed && Number.isFinite(milliseconds)) {
+    flight.sample.phases.executionInputServer = rounded(milliseconds)
+  }
 }
 
 /**
@@ -154,7 +209,7 @@ export function observeOperationSql(db:PoolClient,role:SqlRole):void{
   }})
 }
 
-/** Per-Gateway ring. The browser operation UUID has no authorization or routing meaning. */
+/** Per-Gateway ring. Operation UUIDs have no authorization or routing meaning. */
 export class OperationTimings {
   private readonly history:Sample[]=[]
   private position=0
@@ -163,10 +218,18 @@ export class OperationTimings {
    * @returns the handler promise without extending the request lifetime.
    */
   run<T>(req:IncomingMessage,res:ServerResponse,work:()=>Promise<T>):Promise<T>{
-    const requestId=req.headers['x-dsh-operation-id'],path=(req.url??'').split('?',1)[0]!
-    const action=(method as ReadonlyMap<string,Method>).get(path)
-    if (!this.capacity || req.method!=='POST' || !action || typeof requestId!=='string' || !uuid.test(requestId)) return work()
-    const sample:Sample={id:requestId,operation:action,startedAtMs:Date.now(),status:0,durationMs:0,aborted:false,receivedBytes:length(req.headers['content-length']),
+    if (!this.capacity) return work()
+    const suppliedId=req.headers['x-dsh-operation-id']
+    if (suppliedId !== undefined && (typeof suppliedId!=='string' || !uuid.test(suppliedId))) return work()
+    const path=(req.url??'').split('?',1)[0]!
+    const action = req.method==='POST' ? (method as ReadonlyMap<string,Method>).get(path)
+      : req.method==='GET' && path==='/' && isReadyRuntimeRead(req.method, new URL(req.url??'/', 'http://gateway')) ? 'bootstrap' : undefined
+    if (action === undefined) return work()
+    const requestId=suppliedId ?? (action==='executionEnter' || action==='executionAuthorize' || action==='resourceRequest'
+      || action==='resourceStatuses' || action==='modelCredential' ? randomUUID() : undefined)
+    if (requestId === undefined) return work()
+    const sample:Sample={id:requestId,operation:action,startedAtMs:Date.now(),status:0,durationMs:0,aborted:false,
+      receivedBytes:action==='modelCredential' ? null : length(req.headers['content-length']),
       sentBytes:null,phases:{},sql:{governance:{count:0,elapsedMs:0},content:{count:0,elapsedMs:0}}}
     const scope:Flight={sample,start:performance.now(),closed:false}
     const writeHead=res.writeHead
@@ -182,7 +245,7 @@ export class OperationTimings {
       res.off('finish',finish);res.off('close',finish)
       if(res.writeHead===observeWriteHead) res.writeHead=writeHead
       sample.durationMs=rounded(performance.now()-scope.start);sample.status=res.statusCode;sample.aborted=!res.writableFinished
-      sample.sentBytes=length(res.getHeader('content-length'))
+      if (action!=='modelCredential') sample.sentBytes=length(res.getHeader('content-length'))
       const host=res.getHeader('x-dsh-host-duration-ms')
       if(typeof host==='string' && /^\d{1,8}(?:\.\d{1,3})?$/u.test(host)) sample.hostMs=Number(host)
       const admissions=action==='send' ? hostPhases(res.getHeader('x-dsh-host-admission-ms'), admissionPhases) : undefined

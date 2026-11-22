@@ -16,15 +16,16 @@ import type { GatewayConfig } from './config.ts'
 import type { EffectiveGrant } from './projects.ts'
 import { gateCopy, gateLanguage, stoppedPage, waitingPage, type GatePageLanguage } from './html.ts'
 import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, runtimeTargetOf, type ProjectRuntime, type RuntimeTarget, type RuntimePreparationId } from './instances.ts'
-import { PRINCIPAL_HEADER, type GatewayPrincipalSigner, type PrincipalScope } from './principal.ts'
+import { PRINCIPAL_HEADER, type GatewayPrincipalClaims, type GatewayPrincipalSigner, type PrincipalScope } from './principal.ts'
 import { isExplicitSessionRequest, isPreparedSessionRequest, isReadyRuntimeRead, isRuntimeAssetRequest, runtimeRequestPath } from './runtime-request-path.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { StreamPrincipalLeases } from './stream-principal-leases.ts'
 import { NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
 import { ComputerAccessError } from './computer-access.ts'
+import { sendDeferredRuntimeBootstrap } from './deferred-runtime-bootstrap.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
 import { RuntimeAssetUnavailableError, type PostgresRuntimeAssetAdmission } from './runtime-asset-admission.ts'
-import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ReadyEventHandler, type ReadySessionHandler, type ProxyHandler, type UpgradeHandler } from './server.ts'
+import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayHandlers, type GatewayRequestContext, type ReadyEventHandler, type ReadySessionHandler, type ProxyHandler, type UpgradeHandler } from './server.ts'
 
 function wantsHtml(req: IncomingMessage): boolean {
   return (req.headers.accept ?? '').includes('text/html')
@@ -99,12 +100,14 @@ const STREAMING_MEDIA_TYPES = new Set(['text/event-stream', 'application/x-ndjso
  * @param deps - Gateway lifecycle and authorization providers.
  * @param principalSigner - signer for the receiving Runtime's request identity.
  * @param sessionAdmission - optional fresh authority for Session operations and event connections on a supervised Runtime.
+ * @param localStopGate - process shutdown check required for preparing a personal draft before execution registration.
  * @returns the Runtime dispatchers and their lifecycle controls.
  */
 export function createProxyHandlers(
   deps: GatewayDeps,
   principalSigner?: GatewayPrincipalSigner,
   sessionAdmission?: Pick<PostgresRuntimeAssetAdmission, 'admitSession'>,
+  localStopGate?: GatewayHandlers['runtimePersonalExecutionStopGate'],
 ): { proxy: ProxyHandler; readySession: ReadySessionHandler; readyEvent: ReadyEventHandler; upgrade: UpgradeHandler; invalidateAccess: GatewayAccessInvalidation; streamPrincipals?: StreamPrincipalLeases; close(): void } {
   const { cfg, instances, audit, projects } = deps
   const server = httpProxy.createProxyServer({
@@ -115,6 +118,7 @@ export function createProxyHandlers(
     // persists on keep-alive connections and kills any stream that pauses.
     proxyTimeout: cfg.upstreamTimeoutMs,
   })
+  const deferredBootstrap = new WeakSet<ServerResponse>()
   // http-proxy-3 emits a server-level 'error' for failures outside the
   // per-request callback — notably any 'error' on the client socket of an
   // upgraded WebSocket — and rethrows it when the application adds no
@@ -234,6 +238,11 @@ export function createProxyHandlers(
       console.error(`[gateway] proxy response stream error${typeof code === 'string' ? ` (${code})` : ''}: ${req.method} ${req.url}`)
       if (!res.destroyed && !res.writableEnded) res.destroy()
     })
+    if (deferredBootstrap.delete(res)) {
+      void sendDeferredRuntimeBootstrap(proxyResponse, res).catch((error: unknown) => {
+        if (!res.destroyed && !res.writableEnded) res.destroy(error instanceof Error ? error : undefined)
+      })
+    }
   })
 
   // Grants handoff is intrinsic to starting an instance: the manager calls this
@@ -487,7 +496,8 @@ export function createProxyHandlers(
 
   async function forwardRuntime(req: IncomingMessage, res: ServerResponse,
     context: Pick<GatewayRequestContext, 'user' | 'scope' | 'environment'>,
-    ready: { port: number; generation: number; target: RuntimeTarget }, deadline?: number): Promise<void> {
+    ready: { port: number; generation: number; target: RuntimeTarget }, deadline?: number,
+    personalDraft?: GatewayPrincipalClaims['personalDraft']): Promise<void> {
     const now = Date.now()
     if (deadline !== undefined && deadline <= now) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
     const principal = principalSigner?.issue({
@@ -495,8 +505,12 @@ export function createProxyHandlers(
       user: context.user,
       scope: context.scope,
       runtime: { ...ready.target, generation: ready.generation },
+      ...(personalDraft === undefined ? {} : { personalDraft }),
     }, deadline)
-    const pathname = new URL(req.url ?? '/', 'http://x').pathname
+    const url = new URL(req.url ?? '/', 'http://x')
+    const { pathname } = url
+    const structuredBootstrap = req.method === 'GET' && pathname === '/' && req.headers.accept === 'application/json'
+      && url.searchParams.getAll('dshBootstrap').length === 1 && url.searchParams.get('dshBootstrap') === '1'
     if (pathname.startsWith('/api/') && !isDocumentUploadDataPath(req.method, pathname)) {
       res.once('finish', () => {
         // Successful RPC traffic is transport noise; only failures are audit-worthy.
@@ -541,7 +555,12 @@ export function createProxyHandlers(
         }
       })
       try {
-        server.web(req, res, targetOptions(ready.port, principal), () => {
+        const options = targetOptions(ready.port, principal)
+        if (structuredBootstrap) deferredBootstrap.add(res)
+        const upstream = structuredBootstrap
+          ? { ...options, selfHandleResponse: true, headers: { ...options.headers, 'accept-encoding': 'identity' } }
+          : options
+        server.web(req, res, upstream, () => {
           if (!res.destroyed && !res.headersSent) {
             res.writeHead(502, { 'content-type': 'application/json' })
             res.end(JSON.stringify({
@@ -575,6 +594,8 @@ export function createProxyHandlers(
     const originalUrl = req.url
     const url = new URL(originalUrl ?? '/', 'http://gateway')
     const runtimeRead = isReadyRuntimeRead(req.method, url)
+    const preparePersonalDraft = target.kind === 'user' && req.method === 'POST' && url.pathname === '/api/prepare/v1/session.create'
+    const releaseDraftWriter = preparePersonalDraft && localStopGate !== undefined ? deps.writerSpan?.() : undefined
     const cancel = (): void => { if (!res.writableFinished) res.destroy() }
     const operation = { userId: actor.id, ...(target.kind === 'project' ? { projectId: target.id } : {}), cancel }
     active.add(operation)
@@ -582,7 +603,7 @@ export function createProxyHandlers(
     let expiry: NodeJS.Timeout | undefined
     try {
       const issuer = forwarded === undefined ? undefined : { nodeId: forwarded.claims.issuerNode, publicKey: forwarded.issuerPublicKey }
-      const approved = managedPersonalRead === true ? forwarded?.claims.context?.personalHistory : undefined
+      const approved = managedPersonalRead === true ? forwarded?.claims.context?.personalRead : undefined
       const delegated = approved !== undefined && approved.expiresAt > Date.now()
         && monitor.matchesRevision?.(BigInt(approved.accessRevision)) === true ? approved : undefined
       const recordStartActivity = !runtimeRead && !isPreparedSessionRequest(req.method, url.pathname)
@@ -612,6 +633,8 @@ export function createProxyHandlers(
         : monitor.matchesRevision?.(BigInt(accessRevision)) === true
       if (!authorityCurrent || expiresAt <= Date.now()) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
       if (res.destroyed) return true
+      const localVerdict = releaseDraftWriter === undefined ? undefined : localStopGate?.()
+      if (localVerdict !== undefined && localVerdict !== 'open') throw new RuntimeAssetUnavailableError(503, localVerdict)
       if (forwarded !== undefined && !forwarded.consume()) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
       expiry = setTimeout(cancel, Math.min(2_147_483_647, expiresAt - Date.now()))
       expiry.unref()
@@ -619,7 +642,11 @@ export function createProxyHandlers(
       scrubRuntimeHeaders(req)
       res.setHeader('x-dsh-principal-id', String(user.id))
       res.setHeader('x-dsh-runtime-id', selection.runtimeId)
-      await forwardRuntime(req, res, { user, scope, environment: { id: selection.runtimeId, nodeId: selection.nodeId } }, snapshot, expiresAt)
+      const personalDraft = scope.kind !== 'personal' || delegated !== undefined ? undefined
+        : releaseDraftWriter !== undefined ? 'prepare'
+        : localStopGate !== undefined && req.method === 'POST' && url.pathname === '/api/admit/v1/session.prompt' ? 'admit-input' : undefined
+      await forwardRuntime(req, res, { user, scope, environment: { id: selection.runtimeId, nodeId: selection.nodeId } },
+        snapshot, expiresAt, personalDraft)
       return true
     } catch (error) {
       if (res.destroyed) return true
@@ -639,6 +666,7 @@ export function createProxyHandlers(
       active.delete(operation)
       if (expiry !== undefined) clearTimeout(expiry)
       await release?.().catch((error: unknown) => { console.error('[gateway] HTTP operation lease release failed:', error) })
+      releaseDraftWriter?.()
     }
   }
 

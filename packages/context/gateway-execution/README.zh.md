@@ -50,11 +50,13 @@ Gateway 数据库需要执行身份迁移 030、031 和[不可变执行范围迁
 
 只有仍在处理中的、不受用途限制的 HTTP 主体可以为人工消息或问题答案作证。证明将精确输入绑定到 Gateway 的不可变记录。即使可信上下文插件随后渲染了引用，输入进入时仍核查其原始内容摘要。队列编辑保留先前编辑者；被认领的问题答案加入回答者。展示参与者和普通审批响应不会创建授权身份。
 
+经过认证的预备创建可先打开新建的空白个人草稿。首条预备发送同时登记执行根会话并写入不可变输入回执。其他需要根会话的操作沿用常规登记。草稿正文和会话持久化各自沿用原有存储和恢复规则。
+
 提供者在 `gateway/execution` 事件中记录不可变执行范围。新的根回合从本次接纳的输入开始；编辑保留所有编辑者，受管子 Agent 的输入保留真实继承链。Goal 回合、后台任务结果、Team 消息和 PTC 回调携带各自产生时捕获的范围。迟到结果不能替换新请求的身份。历史凭据引用仍用于审计与延迟计费。[服务定义](../execution-authority/README.zh.md) 规定消费者义务。
 
 在模型请求或允许的工具调用之前，提供者核验该次执行范围中的每位参与人。普通执行要求当前写权限；Full 和 profile 管理要求管理员权限，Auto 要求独立资格。当前链中的未知输入会阻止特权执行，但新的已验证根请求可在未知历史输入之后继续。预设选择核验当前选择者，真实执行再次核验完整执行链。[权限预设](../../interaction/permission-presets/README.zh.md) 负责选择与默认值。
 
-启用[受管模型计时](../gateway-runtime/README.zh.md#resource-admission)后，`model-input-timing` 记录进入首次助手流的最后一条已签名输入。它度量已观察到的收件箱等待、认领到进入的间隔、继承和进入授权，并记录流开始前的请求授权和准备。重放输入可能缺少实时收件箱记录。样本只包含计时信息。
+启用[受管模型计时](../gateway-runtime/README.zh.md#resource-admission)后，`model-input-timing` 跟踪进入首次助手流的最后一条已签名输入。它度量收件箱等待、准备、继承和授权。`preStepPlugins` 报告每个监听器的插件名称和扣除其等待后续监听器的耗时。重放输入可能缺少实时收件箱计时。样本包含插件标签、耗时和时间戳。
 
 本提供者拥有 `pluginManagementAuthorization` 和 `permissionPresetAuthorization`。交互式 profile 操作使用 Gateway 的实时管理员检查；Agent 发起的操作使用该 Agent 的完整参与者集合。授权缺失不会回退到先前 HTTP 请求或浏览器自报角色。[Profile 管理授权](../../../.agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.zh.md) 定义受保护操作和取消行为。
 

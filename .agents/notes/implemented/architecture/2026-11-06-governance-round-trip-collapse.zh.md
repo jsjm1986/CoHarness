@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-**服务端观测轮次。** 迁移 `121_observe_node_resources.sql` 新增 `harness.observe_node_resources(tenant, computer, sample, elapsed_ms, initial_limits)`：在一次调用内完成资源行插入或加锁、过期排队请求清扫、陈旧采样拒绝、按采样与已存 limits 重算 credits、条件调度。`NodeResourceBudget.observe` 现在把 `performance.now() - capturedAt` 作为 `elapsed_ms` 传入；函数叠加自身入口到持锁的等待，使在锁队列中等待期间过期的采样照旧被丢弃。函数顶部的 `set_config('lock_timeout', statement_timeout, true)` 在该调用隐式事务内复刻客户端包装器 `lockWait: 'statement'` 的锁等待边界。
+**服务端观测轮次。** 迁移 `121_observe_node_resources.sql` 新增 `harness.observe_node_resources(tenant, computer, sample, elapsed_ms, initial_limits)`：在一次调用内完成资源行插入或加锁、过期排队请求清扫、陈旧采样拒绝、按采样与已存 limits 重算 credits、条件调度。`NodeResourceBudget.observe` 现在把 `performance.now() - capturedAt` 作为 `elapsed_ms` 传入；函数叠加自身入口到持锁的等待，使在锁队列中等待期间过期的采样照旧被丢弃。函数顶部的 `set_config('lock_timeout', statement_timeout, true)` 在该调用隐式事务内复刻客户端包装器 `lockWait: 'statement'` 的锁等待边界。 观测语句校验服务模式和当前写入纪元。采样器在发布后等待配置的周期。链路耗时波动时，新采样有余量通过数据库的采样间隔校验。
 
 **Runtime token 鉴权缓存。** `PostgresInstanceRepository` 以 `sha256(token) + cleanup` 为键、短 TTL(`HGW_RUNTIME_TOKEN_CACHE_MS`，默认关闭，网关显式开启）记忆 `authenticateRuntimeToken` 结果，含单飞去重与有界 LRU。`harness_access_invalidation` 通知经既有监听通道到达各网关并清空缓存；token 签发/撤销写路径在提交时同步清缓存。`runtime_node_execution_allowed` 以 `node_connection_epoch` 绑定节点授权，节点重启即更换 epoch，使缓存项与 TTL 无关地失效。
 
@@ -22,7 +22,17 @@ Status: implemented
 
 **目标节点连接可用性。** 等待空闲传输彻底关闭时，请求目标的可复用连接可能已经可用。归还或关闭连接会唤醒符合条件的请求。池在确认关闭前保留物理容量计数，交付复用流前核验租约。观测区分排队、租约核验及建立服务连接。
 
-**个人执行回执。** 本机 HTTP 载体在读取有大小限制的正文前验证 Runtime，然后分别用一条数据库语句登记个人根会话和受理原始交互输入。载体对这两条语句计数跟踪写入，并检查本进程是否正在停止。语句在写入时核验精确 Runtime 凭据、受管租约、服务模式和写入代次。会话锁串行化回执标识和会话谱系。账号与成员资格锁保证读取电脑授权时可见等待期间提交的撤权。项目、继承谱系、编辑和分派断言检查共享维护状态。Host 刷盘并核对收件箱该条已提交事件后确认回执。
+**个人执行回执。** 个人根会话和原始交互输入分别使用一条数据库语句。本机 HTTP 载体可在授权缓存到期后识别已验证过的个人令牌，仅为语句提供 Runtime 坐标。载体计数跟踪写入，并检查本进程是否正在停止。语句在写入时核验精确 Runtime 凭据、受管租约、服务模式和写入代次。会话锁串行化回执标识和会话谱系。账号与成员资格锁保证读取电脑授权时可见等待期间提交的撤权。失败响应须重新核验令牌，才返回请求会话的具体失败信息。项目、继承谱系、编辑和分派断言检查共享维护状态和当前令牌授权。未知令牌在读取正文前鉴权。Host 刷盘并核对收件箱该条已提交事件后确认回执。
+
+所属 Gateway 在运行和控制鉴权成功时记录精确的个人 Runtime 坐标。有界坐标缓存保留在普通鉴权结果失效之后。授权更新或控制流重连后，现有 Host 可用一条查询登记新的根会话。组合测试比较坐标未知时的两条查询和已验证时的一条查询，并确认已撤权或过期的凭据无法提交根会话或输入。
+
+**预备空白个人草稿。** 浏览器准入核验当前登录、电脑授权、Runtime 代次和服务写入代次。本机关停检查和在途写入记录覆盖转发阶段。签名的操作声明允许[执行提供者](../../../../packages/context/gateway-execution/README.zh.md#execution-authorization)暂缓登记尚未持久化的空白草稿。首条预备消息在提交回执时登记根会话，确切会话锁保持至提交。混合版本缺少签名声明时沿用常规登记。已存会话、项目会话及依赖谱系的操作继续按原规则核验。
+
+**模型首次输出前的执行登记。** [执行存储](../../../../gateway/src/execution-identity.ts)先锁定会话，再读取回执或执行范围。一条语句记录输入进入并合并参与人凭据。范围查重、递增修订号和写入范围共用另一条语句，并发重试复用同一范围和修订号。只涉及一条不可变回执时可复用已读取的参与人。带确切范围的普通个人执行在该语句内核验令牌、租约、授权和代次。其他能力和未验证历史变更继续执行各自的权限及维护校验。每次实际模型调用仍会核验授权。
+
+个人根会话的原始回执可以使用此前验证过的 Runtime 坐标，通过自带权限核验的语句进入执行。会话修订变化或回执需要常规事务时，事务开始前重新校验令牌和共享维护状态。个人托管凭据在同一个快照中核验 Runtime 资格、服务状态及加密凭据的模型授权，避免把不同往返取得的 Runtime 权限和凭据策略混在一起。凭据准备完成后，派发仍检查当前权限。
+
+排队的个人模型请求可以在所属 Gateway 等待已提交的压力采样或完成更新。有界等待无需开启数据库事务或登记在途写入。唤醒后由一条语句读取精确预留并复核保存的范围及当前权限。公平调度仍归数据库。旧协调器、批量请求和无法精确匹配的预留沿用常规状态准入。
 
 **页面启动期间的前台请求。** 对话创建后，后台请求可能立即占满可用连接。配置额度支持并发时，HTTP 池从已有的可复用连接中为页面启动和对话准备操作保留一条。其他流继续由各自的请求持有，并使用原有时限。精确 HTTP 与 WebSocket 引用在治理准入或完成写入期间保有活动记录，并释放生命周期队列。
 
@@ -32,7 +42,11 @@ Status: implemented
 
 受管模型诊断由各自的插件记录[实时输入准备](../../../../packages/context/gateway-execution/README.zh.md#execution-authorization)和[资源准入](../../../../packages/context/gateway-runtime/README.zh.md#resource-admission)。统计轮询中的排队响应，并单独度量轮询间隔与请求耗时。成功响应附带 Gateway 已度量的耗时。诊断复用准入查询，输出独立于授权结果。
 
-资源完成操作通过节点记账行串行化。最终的所有权语句紧接提交前锁定精确 Runtime 行。协调器等待前面的记账往返时，已就绪的浏览器准入可以锁定活动行。如果在最终语句前更换代次，记账和排队授权均会回滚。私有 HTTP 入口向完成操作传递已验证的所有者，bearer 查询暂时失败返回 HTTP 503。确认模型静止后，[Runtime 提供方](../../../../packages/context/gateway-runtime/README.zh.md#resource-admission)使用原序号和操作 ID 重试提交。响应丢失或适配器清理未确认时，预留继续占用。
+提交带执行作用域的个人模型请求时，可以复用已验证 bearer 所对应的 Runtime 标识。预留事务先等待节点记账行，再锁定账号并检查当前 bearer 摘要、代次、写入纪元、电脑租约和记录的 Session 授权。校验拒绝时回滚预留，原操作仍可使用该序号。状态轮询和最终执行授权继续校验当前权限。Gateway 分别采集提交和状态轮询数据，将 bearer 校验的连接等待与建立耗时单列，查询耗时包含数据库传输。
+
+[个人模型预留](../../../../gateway/src/node-resource-budget.ts)在锁定的节点策略与 Gateway 已校验的策略一致时使用 PostgreSQL 隐式事务。策略相等保证记账开始前额度有效。策略不一致时，记账沿用显式事务，由 Gateway 在提交前校验持久策略。现有函数继续校验账号、代次与调度规则。 立即获准的操作在同一事务内于预留后复核执行范围。只有该操作获得确认时才能省去独立的状态查询。排队检查和实际派发仍按当前权限校验。
+
+资源完成操作通过节点记账行串行化。最终的所有权语句紧接提交前锁定精确 Runtime 行。协调器等待前面的记账往返时，已就绪的浏览器准入可以锁定活动行。如果在最终语句前更换代次，记账和排队授权均会回滚。私有 HTTP 入口向完成操作传递已验证的所有者，bearer 查询暂时失败返回 HTTP 503。确认模型静止后，[Runtime 提供方](../../../../packages/context/gateway-runtime/README.zh.md#resource-admission)使用原序号和操作 ID 重试提交。[模型服务](../../../../packages/llm/llm/README.zh.md#understand-the-implementation)在适配器关闭超时后保留原许可，同一迭代器稍后确认终止时释放。
 
 ## 备选方案
 
@@ -49,6 +63,8 @@ Status: implemented
 **无失效通道的更长 token TTL。** 否决：撤销必须以通知速度而非 TTL 速度传播，故缓存订阅既有 access-invalidation 通道而非延长陈旧窗口。
 
 ## 影响
+
+[资源 HTTP 验收夹具](../../../../gateway/tests/runtime-resource-api.spec.ts)观察到符合条件的预留及其重试各使用一条治理命令。显式事务使用三条命令。夹具还检查持久策略不同时的回退、策略无效时的回滚，以及租约或权限变化后的拒绝。[执行 HTTP 验收夹具](../../../../gateway/tests/execution-runtime-isolation-postgres.spec.ts)比较确切个人执行授权的四条与一条语句，并核验并发输入进入时复用同一范围和修订号。[双 Gateway 验收夹具](../../../../gateway/tests/fixtures/versioned-node-service.mjs)观察到预备创建只有一条所属端查询，首条消息前无执行根，重试后各有一条执行根与收件箱记录。
 
 针对 PostgreSQL 的存储回归核验一次读取、错误所有者与电脑拒绝，以及不启动进程。带查询计数的个人 HTTP 代理在转发前执行八条治理语句，响应结束后执行一条；删去重复修订读取前分别为九条和一条。此计数不包含入口路由与节点通道。浏览器夹具用合成延迟测量各目标独立响应，不能代表原生 Windows 或跨国生产网络的响应时间。
 

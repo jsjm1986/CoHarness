@@ -53,10 +53,13 @@ function activeOwnerPredicate(target: RuntimeTarget): string {
     : `owner.status='active'`
 }
 
+const RUNTIME_TOKEN_CACHE_CAPACITY = 256
+
 /** PostgreSQL instance rows scoped to one organization and compute node. */
 export class PostgresInstanceRepository implements InstanceRepository {
   private readonly tokenCache = new Map<string, { subject: RuntimeCredentialSubject | null; expiresAt: number }>()
   private readonly tokenFlights = new Map<string, Promise<RuntimeCredentialSubject | null>>()
+  private readonly personalExecutionCandidates = new Map<string, RuntimeCredentialSubject>()
 
   constructor(
     private readonly context: PostgresRuntimeContext,
@@ -69,7 +72,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
   /** Node-private verified data paths. Missing required evidence throws; omitted dshHome preserves a new Runtime's layout. */
   resolveLocalPaths?:(target:RuntimeTarget)=>Promise<GovernanceLocalPaths|undefined>
 
-  /** Drop every memoized credential verdict; access invalidation and local fencing call this. */
+  /** Drop memoized authorization and in-flight lookups. Personal write coordinates require fresh SQL qualification. */
   invalidateRuntimeTokenCache(): void {
     this.tokenCache.clear()
     this.tokenFlights.clear()
@@ -676,12 +679,10 @@ export class PostgresInstanceRepository implements InstanceRepository {
   /**
    * Recover coordinates from a verified personal bearer for a write that rechecks authority in PostgreSQL.
    * @param token - private Runtime bearer.
-   * @returns Previously verified personal identity, potentially older than the authorization cache lifetime, or null.
+   * @returns Personal Runtime coordinates learned from a previous run or control authentication, or null. Only the write may authorize them.
    */
   personalExecutionCandidate(token: string): RuntimeCredentialSubject | null {
-    const hash = createHash('sha256').update(token).digest('hex')
-    const subject = this.tokenCache.get(`run:${hash}`)?.subject
-    return subject?.target.kind === 'user' && subject.target.runtimeId !== undefined ? subject : null
+    return this.personalExecutionCandidates.get(createHash('sha256').update(token).digest('hex')) ?? null
   }
 
   /**
@@ -724,7 +725,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
     if (flight !== undefined) return flight
     const pending: Promise<RuntimeCredentialSubject | null> = this.authenticateTokenQuery(hash, use).then(subject => {
       if (this.tokenFlights.get(key) === pending) {
-        if (this.tokenCache.size >= 256) this.tokenCache.clear()
+        if (this.tokenCache.size >= RUNTIME_TOKEN_CACHE_CAPACITY) this.tokenCache.clear()
         this.tokenCache.set(key, { subject, expiresAt: Date.now() + this.runtimeTokenCacheMs })
       }
       return subject
@@ -783,12 +784,21 @@ export class PostgresInstanceRepository implements InstanceRepository {
     const row = result.rows[0]
     if (row === undefined) return null
     if (row.user_internal_id !== null && row.user_public_id !== null) {
-      return {
+      const subject: RuntimeCredentialSubject = {
         organizationId: row.organization_id,
         target: { kind: 'user', id: publicNumber(row.user_public_id, 'user'), runtimeId: row.runtime_id },
         generation: Number(row.generation),
         userInternalId: row.user_internal_id,
       }
+      if (use === 'run') {
+        const key = hash.toString('hex')
+        this.personalExecutionCandidates.delete(key)
+        if (this.personalExecutionCandidates.size === RUNTIME_TOKEN_CACHE_CAPACITY) {
+          this.personalExecutionCandidates.delete(this.personalExecutionCandidates.keys().next().value!)
+        }
+        this.personalExecutionCandidates.set(key, subject)
+      }
+      return subject
     }
     if (row.project_internal_id !== null && row.project_public_id !== null) {
       return {

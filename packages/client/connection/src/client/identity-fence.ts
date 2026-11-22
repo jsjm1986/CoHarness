@@ -5,6 +5,71 @@ import { ApiTransportError } from './api.ts'
 const RESPONSE_ID = 'x-dsh-principal-id'
 const EXPECTED_ID = 'x-dsh-expected-principal-id'
 
+const ADVISORY_READS = new Set([
+  '/api/agentPresets/list',
+  '/api/dynamicCordisRunner/inventory',
+  '/api/llm.models',
+  '/api/llm.providers',
+  '/api/session.models',
+  '/api/skill.list',
+  '/api/subagents/list',
+  '/api/terminal/list',
+])
+const HTTP1_ADVISORY_READS = new Set(['/api/permissionPresets/catalog', '/api/settings.describe'])
+const HTTP1_NAVIGATION_READS = new Set(['/api/session.list', '/api/session.historyIndex'])
+const HTTP1_SYNCHRONIZATION = new Set(['/api/session.activate', '/api/dynamicCordisRunner/syncInspectManifest'])
+const HTTP1_CONVERSATION_ACTIONS = new Set([
+  '/api/prepare/v1/session.create',
+  '/api/admit/v1/session.prompt',
+  '/api/admit/v1/session.status',
+])
+
+function navigationRead(url: URL, method: string): boolean {
+  if (method === 'POST') return HTTP1_NAVIGATION_READS.has(url.pathname)
+  const params = url.searchParams
+  return method === 'GET' && url.pathname === '/account/api/workbench/rows'
+    && params.get('kind') === 'workspaces' && params.get('include') === 'conversations'
+    && !params.has('q') && !params.has('workspaceId') && !params.has('cursor')
+}
+
+type BackgroundRequest = 'synchronization' | 'navigation' | 'catalog'
+
+function http1BackgroundAdmission(): (signal: AbortSignal, kind: BackgroundRequest) => Promise<() => void> {
+  // Draft persistence and conversation actions share the remaining HTTP/1 connections.
+  let active = 0
+  let readers = 0
+  const waiting = { synchronization: new Set<() => void>(), navigation: new Set<() => void>(), catalog: new Set<() => void>() }
+  const begin = (kind: BackgroundRequest): (() => void) => {
+    active++
+    if (kind !== 'synchronization') readers++
+    return () => {
+      active--
+      if (kind !== 'synchronization') readers--
+      const reader = readers < 2 ? waiting.navigation.values().next().value ?? waiting.catalog.values().next().value : undefined
+      const next = waiting.synchronization.values().next().value ?? reader
+      next?.()
+    }
+  }
+  return async (signal, kind) => {
+    signal.throwIfAborted()
+    if (active < 3 && (kind === 'synchronization' || readers < 2)) return begin(kind)
+    const admitted = Promise.withResolvers<() => void>()
+    const queue = waiting[kind]
+    const start = (): void => {
+      queue.delete(start)
+      signal.removeEventListener('abort', cancel)
+      admitted.resolve(begin(kind))
+    }
+    const cancel = (): void => {
+      queue.delete(start)
+      admitted.reject(signal.reason)
+    }
+    queue.add(start)
+    signal.addEventListener('abort', cancel, { once: true })
+    return admitted.promise
+  }
+}
+
 /** A changed cookie cannot transfer an existing document's retained resources to another account. */
 export class BrowserIdentityChanged extends Error {
   constructor() { super('Gateway account changed; reload the Client'); this.name = 'BrowserIdentityChanged' }
@@ -37,6 +102,9 @@ export interface BrowserIdentityFence {
  * @returns one fence shared by every pooled runtime connection.
  */
 export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string, reload: () => void, search = ''): BrowserIdentityFence {
+  const navigation = globalThis.performance?.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+  const protocol = navigation?.nextHopProtocol
+  const admitBackground = protocol === 'h2' || protocol?.startsWith('h3') ? undefined : http1BackgroundAdmission()
   let principal: number | undefined
   let invalid = false
   let runtime: ClientRuntimeTarget | undefined
@@ -100,28 +168,42 @@ export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string
       && !url.searchParams.has('dshRuntime') && !url.searchParams.has('dshNode')) {
       await waitFor(runtimeReady.promise, signal)
     }
-    if (principal !== undefined) headers.set(EXPECTED_ID, String(principal))
     const originalUrl = url.toString()
     pinRuntime(url)
     const target = url.toString() === originalUrl ? input : request === undefined ? url : new Request(url, request)
-    let response: Response
+    const method = (init?.method ?? request?.method ?? 'GET').toUpperCase()
+    const scoped = url.searchParams.has('dshRuntime')
+    const limited = scoped && admitBackground !== undefined
+    const navigation = limited && navigationRead(url, method)
+    const catalog = method === 'POST' && (ADVISORY_READS.has(url.pathname) || limited && HTTP1_ADVISORY_READS.has(url.pathname))
+    const advisory = scoped && (navigation || catalog) && init?.priority !== 'high'
+    const synchronization = limited && method === 'POST' && HTTP1_SYNCHRONIZATION.has(url.pathname) && init?.priority !== 'high'
+    const foreground = limited && method === 'POST' && HTTP1_CONVERSATION_ACTIONS.has(url.pathname)
+    const priority = advisory ? 'low' : foreground && init?.priority === undefined ? 'high' : undefined
+    const release = (advisory || synchronization) && admitBackground !== undefined
+      ? await admitBackground(signal, synchronization ? 'synchronization' : navigation ? 'navigation' : 'catalog') : undefined
     try {
-      response = await fetcher(target, { ...init, headers, signal })
-    } catch (cause: unknown) {
       signal.throwIfAborted()
-      throw new ApiTransportError(0, url.pathname, { cause })
-    }
-    lifetime.signal.throwIfAborted()
-    const identity = response.headers.get(RESPONSE_ID)
-    if (identity !== null) {
-      const id = Number(identity)
-      if (!Number.isSafeInteger(id) || id <= 0 || String(id) !== identity) { invalidate(); throw new BrowserIdentityChanged() }
-      confirm(id)
-    } else if (response.status === 401 && principal !== undefined) {
-      invalidate(); throw new BrowserIdentityChanged()
-    }
-    ready.resolve()
-    return response
+      if (principal !== undefined) headers.set(EXPECTED_ID, String(principal))
+      let response: Response
+      try {
+        response = await fetcher(target, { ...init, ...(priority === undefined ? {} : { priority }), headers, signal })
+      } catch (cause: unknown) {
+        signal.throwIfAborted()
+        throw new ApiTransportError(0, url.pathname, { cause })
+      }
+      lifetime.signal.throwIfAborted()
+      const identity = response.headers.get(RESPONSE_ID)
+      if (identity !== null) {
+        const id = Number(identity)
+        if (!Number.isSafeInteger(id) || id <= 0 || String(id) !== identity) { invalidate(); throw new BrowserIdentityChanged() }
+        confirm(id)
+      } else if (response.status === 401 && principal !== undefined) {
+        invalidate(); throw new BrowserIdentityChanged()
+      }
+      ready.resolve()
+      return response
+    } finally { release?.() }
   }
   return {
     fetch: fencedFetch,

@@ -7,8 +7,8 @@ import { Context, FiberState, Service, type Fiber } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import { assertNever, deepFreeze } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, LlmRuntime, MessageId } from '@deepseek-ai/dsh-llm'
+import { assertNever, chunkHasVisibleText, deepFreeze } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, LlmRuntime, MessageId, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type {
   Session,
   SessionEvent,
@@ -299,7 +299,7 @@ interface ProviderRegistration {
   closing: boolean
 }
 
-/** Automatic work waiting for the matching main-request header. */
+/** Automatic work bound to one human input revision. */
 interface PendingAutomaticWork {
   readonly registration: ProviderRegistration
   readonly revision: number
@@ -316,8 +316,22 @@ interface ActiveProviderWork extends PendingAutomaticWork {
 interface SessionTitleWorkState {
   revision: number
   fallback?: Promise<SessionTitleSnapshot | undefined>
-  pending?: PendingAutomaticWork & { readonly inputId: MessageId }
+  pending?: PendingAutomaticWork & { readonly inputId: MessageId; route?: SessionTitleModelIdentity }
   active?: ActiveProviderWork
+}
+
+/** Let a budgeted reply reach visible output before starting its auxiliary provider. */
+async function* afterReplyStarts(stream: AsyncIterable<StreamChunk>, startTitle: () => void): AsyncIterable<StreamChunk> {
+  let start: (() => void) | undefined = startTitle
+  try {
+    for await (const chunk of stream) {
+      if (start !== undefined && chunkHasVisibleText(chunk)) {
+        start()
+        start = undefined
+      }
+      yield chunk
+    }
+  } finally { start?.() }
 }
 
 /** Validate one positive integer configuration field. */
@@ -412,6 +426,12 @@ export class SessionTitleService extends Service {
         case 'request/header':
           this.onRequestHeader(session, event)
           break
+        case 'turn/end': {
+          const state = this.work.get(session)
+          const pending = state?.pending
+          if (state !== undefined && pending?.route !== undefined) this.startPending(session, state, pending, pending.route)
+          break
+        }
         default:
           break
       }
@@ -419,8 +439,9 @@ export class SessionTitleService extends Service {
     const onMainRequest = this.onMainRequest.bind(this)
     for (const event of ['llm/stream', 'llm/orchestration'] as const) {
       ctx.on(event, function (this: LlmRuntime, options, next) {
-        onMainRequest(this, options)
-        return next()
+        const startTitle = onMainRequest(this, options)
+        const stream = next()
+        return startTitle === undefined ? stream : afterReplyStarts(stream, startTitle)
       }, { global: true, prepend: true })
     }
     ctx.on('session/disposed', (session) => {
@@ -579,7 +600,7 @@ export class SessionTitleService extends Service {
     })
   }
 
-  /** Start pending automatic work only after its exact main-request route is logged. */
+  /** Bind automatic work to its logged route, retaining managed replies' first-output priority. */
   private onRequestHeader(session: Session, event: Extract<SessionEvent, { type: 'request/header' }>): void {
     if (!this.serviceActive()) return
     const state = this.work.get(session)
@@ -589,11 +610,12 @@ export class SessionTitleService extends Service {
       provider: event.data.header.config.provider,
       model: event.data.header.config.model,
     }
-    this.startPending(session, state, pending, route)
+    if (this.ctx.get('resourceBudgetRequired') === true) pending.route = route
+    else this.startPending(session, state, pending, route)
   }
 
-  /** Start unchanged-route work from the marked loop request after its header fold is current. */
-  private onMainRequest(runtime: LlmRuntime, options: GenerateOptions): void {
+  /** Select automatic work from the matching loop request, including when its route has not changed. */
+  private onMainRequest(runtime: LlmRuntime, options: GenerateOptions): (() => void) | undefined {
     if (!this.serviceActive() || options.sessionId === undefined || !runtime.isAgentLoopRequest(options)) return
     const session = this.ctx.sessions.get(options.sessionId)
     const state = session === undefined ? undefined : this.work.get(session)
@@ -606,7 +628,12 @@ export class SessionTitleService extends Service {
       || !options.messages.some(message => 'id' in message && message.id === pending.inputId)
       || route?.provider !== options.provider
       || route.model !== options.model) return
-    this.startPending(session, state, pending, { provider: options.provider, model: options.model })
+    const selected = { provider: options.provider, model: options.model }
+    if (this.ctx.get('resourceBudgetRequired') === true) {
+      pending.route = selected
+      return () => { this.startPending(session, state, pending, selected) }
+    }
+    this.startPending(session, state, pending, selected)
   }
 
   /** Consume one pending revision and schedule its non-blocking provider call. */
@@ -616,6 +643,7 @@ export class SessionTitleService extends Service {
     pending: PendingAutomaticWork,
     route: SessionTitleModelIdentity,
   ): void {
+    if (state.pending !== pending) return
     delete state.pending
     this.defer(async () => {
       if (this.registration !== pending.registration

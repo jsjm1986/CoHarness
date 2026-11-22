@@ -9,9 +9,11 @@ kind: "package-reference"
 
 所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?, coldSummaryCacheMaxEntries?, coldSummaryCacheMaxBytes?, workspaceFileMaxBytes?, workspaceFileMaxLines?, workspaceFileMaxEntries?, workspaceFileMaxResources?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
 
-版本化准备接口接收原生 `session.create` 和 `session.history` 请求。新建可登记 Host 的默认工作区并返回其位置。打开历史要求 Session 可读且未归档。`/api/admit/v1/session.prompt` 要求固定的请求 ID，并在核验收件箱事件落盘后返回成功。核验只读取该序号的已提交事件，允许模型同时追加后续输出。响应丢失后使用原账号、电脑、Runtime、Session 和请求 ID 调用 `/api/admit/v1/session.status`。传入 `confirmInput: true` 时，已确认的回执提供该次操作专用的 `inputProof`，供客户端匹配待确认输入。状态查询不会投递消息。
+版本化准备接口接收原生 `session.create` 和 `session.history` 请求。新建可登记 Host 的默认工作区并返回其位置。打开历史要求 Session 可读且未归档。`/api/admit/v1/session.prompt` 要求固定的请求 ID，并在核验收件箱事件落盘后返回成功。核验只读取该序号的已提交事件，允许模型同时追加后续输出。响应丢失后使用原账号、电脑、Runtime、Session 和请求 ID 调用 `/api/admit/v1/session.status`。传入 `confirmInput: true` 时，已确认的回执提供该次操作专用的 `inputProof`，供客户端匹配待确认输入。状态查询不会投递消息。 当前个人 JSONL 日志的提供方只定位和校验一次已提交前缀，即可读回该回执。
 
-携带版本化操作 UUID 的持久提示请求通过 `x-dsh-host-admission-ms` 报告 Host 受理耗时。字段区分会话授权、Agent 准备、等待 Agent 受理、签注执行回执、追加收件箱事件、刷盘和核验已提交的回执。字段值为毫秒，模型回复单独计时。
+携带版本化操作 UUID 的持久提示请求通过 `x-dsh-host-admission-ms` 报告 Host 受理耗时。字段区分会话授权、Agent 准备、等待 Agent 受理、签注执行身份、收件箱追加、刷盘和核验。`inboxAppend` 内的 `inboxPublish` 截止到发送插入通知，`inboxWake` 衡量该次调用剩余的同步工作。字段值为毫秒。
+
+Mux 实时队列快照可复用相同事件序号下已校验的收件箱投影。初始快照和缺少该投影的组合可以读取 Agent 持有的队列。
 
 `workspaceFiles.*` 在 Session 授权、canonical containment、符号链接检查和已组合的 `workspace-files/authorize` 目录策略通过后，读取 Session 相对文件。冷读取只加载 header。Host 在返回相对元数据、UTF-8 文本页或 Base64 窗口前复核文件身份与权限；可选版本保护拒绝混合版本分页。`host.describe.workspaceFiles` 声明支持情况与配置上限：默认每页／窗口 2 MiB、5,000 行、2,000 个目录项和 512 条 Client 元数据记录。Agent 工具继续拥有写入、CAS 与审计语义。
 
@@ -32,6 +34,10 @@ kind: "package-reference"
 `desktop.status` 和 `desktop.confirm` 使用会话写入授权及部署的交互确认控制器，不启动模型回合。未配置控制器且没有已知的提供方或环境限制时，状态返回 null，写入被拒绝；确认绑定页面显示的根会话、节点和桌面。Host 在异步操作完成后复核访问权限，取消或卸载后不能返回迟到的成功响应。
 
 版本化的准备与受理请求在 `x-dsh-operation-id` 中发送 UUID。新建会话使用草稿意图的 UUID，提交提示与查询受理状态共用提交 UUID。其余版本化请求使用 RPC UUID。普通 RPC 省略该请求头。 预留会话的版本化创建请求可通过 `includeInitialHistory` 同时读取首屏对话。Host 核验会话和工作区后，使用同一账号和 Runtime 代次读取活动会话的尾页。尾页放不进历史响应的大小限制时，客户端仍使用同一会话单独读取。
+
+Fetch 载体将 [Connection 历史上限](../../client/connection/README.zh.md#host-configuration) 应用于无游标且采用 `detail: 'conversation'` 的准备页。更早的页面和完整详情继续使用普通历史分页。恢复已保存的个人根会话时，调用方可请求 `restoreSelection: true`。会话处于活动状态、可见且具有工作目录时，Host 可以在有界尾页中附带 `restoredSelection`。
+
+Fetch 载体为带操作 ID 的准备响应附加 `x-dsh-host-prepare-ms`。数值字段记录正文解码、对话处理以及按需读取初始历史的耗时。对话处理包含响应前完成的执行登记。
 
 Host 为 `hostSessionLifecycle` 保存创建、恢复与 fork 句柄。永久清理只释放这些确切的空闲所有者，并将标识预留保持到存储删除和 Gateway 回执完成。忙碌或所有权不明时，在删除前拒绝。
 

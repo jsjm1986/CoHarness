@@ -541,6 +541,32 @@ describe('SessionTitleService Provider lifecycle', () => {
     expect(generate).not.toHaveBeenCalled()
   })
 
+  it('generates the title after a managed turn ends before opening its model stream', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    ctx.effect(() => ctx.provide('resourceBudgetRequired', true))
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionTitleService, CONFIG)
+    const generate = vi.fn(async (request: SessionTitleProviderRequest) => ({
+      title: 'Deferred title', messageSeqs: request.messages.map(message => message.seq),
+    }))
+    ctx.sessionTitle.register({ id: SessionTitleProviderId('managed-turn-end'), automatic: 'first-prompt', generate })
+    const session = ctx.sessions.create(SessionId('managed-title-without-reply'))
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    const prompt = appendHumanPrompt(session, 'Fallback for this reply')
+    appendRoute(session)
+    await settle()
+    expect(ctx.sessionTitle.get(session)?.source.kind).toBe('fallback')
+    expect(generate).not.toHaveBeenCalled()
+
+    session.append('step/end', { turn: 1, step: 1 })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await settle()
+    expect(generate).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ route: { provider: 'main-route', model: 'chat-model' } }))
+    expect(ctx.sessionTitle.get(session)).toMatchObject({ title: 'Deferred title', messageSeqs: [prompt.seq] })
+  })
+
   it('contains automatic failures but lets explicit refresh reject', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

@@ -28,6 +28,8 @@ The user-global file is fixed at `$DSH_HOME/AGENTS.md`, is not affected by eithe
 
 ### Baseline Injection
 
+Independent baseline metadata probes and bounded reads overlap within one observation. Rendering applies configured precedence after each batch so filesystem completion order cannot change which instructions enter the durable prompt.
+
 At the first `agent/pre-step` of an agent-loop instance, the plugin composes one sourced user-role baseline. When the downstream decision enters a nonempty first-step batch, the plugin folds the baseline into that final batch right after the claimed prompt, so it becomes durable with the direct prompt and reaches the first request. Rejection or an empty first-step decision leaves the baseline in the next-step inbox for a later wakeup. The plugin loads the user-global file first, then finds the project root by walking upward from `agent.session.header.cwd` to a configured root marker (default `.git`), then loads the configured candidates from each directory from the root to the cwd. A `.git` file and a `.git` directory are both valid markers, covering linked worktrees and submodules. Without a marker, the cwd itself is the root.
 
 The baseline becomes a durable `user/message` with a typed `agent-instructions` source. Its `baseline: true` marker distinguishes a complete baseline from later deltas, its `baselineIdentity` records normalized discovery, precedence, project-root, and budget semantics, and its change list persists the included scopes and content digests. If a previously queued workspace baseline is still pending, the plugin removes that exact message and prepends its replacement instead of accumulating duplicates.

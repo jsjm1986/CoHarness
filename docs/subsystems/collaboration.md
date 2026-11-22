@@ -50,6 +50,8 @@ interface GatewayPrincipalClaims {
   purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch' | 'runtime-asset'
   /** Exact resource coordinates; required only for a read-only asset assertion. */
   asset?: { method: 'GET' | 'HEAD'; path: string }
+  /** Request step for an empty draft in the selected personal Runtime. */
+  personalDraft?: 'prepare' | 'admit-input'
 }
 ```
 

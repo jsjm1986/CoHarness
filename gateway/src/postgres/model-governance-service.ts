@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { decimalToMicros, microsToDecimal } from '../money.ts'
-import { verifyExecutionAttribution } from '../execution-identity.ts'
+import { verifyExecutionAttribution, type PersonalExecutionWriteFence } from '../execution-identity.ts'
+import type { RuntimeCredentialSubject } from '../runtime-api.ts'
 import type { UserRow } from '../auth.ts'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import type {
@@ -55,6 +56,10 @@ import type {
   OrganizationCredentialView,
   OrganizationModelSettingsView,
 } from '../model-governance.ts'
+
+type OrganizationCredentialLookup = { verdict: 'open' | 'stale-epoch' | 'maintenance' } & (
+  { provider_id: null } | { provider_id: string; key_version: number; nonce: Buffer; ciphertext: Buffer; auth_tag: Buffer }
+)
 
 const nonEmpty = (value: string, name: string): string => {
   const accepted = value.trim()
@@ -1280,13 +1285,35 @@ export class PostgresModelGovernanceService {
     if (subject.kind === 'project' && ref.startsWith('DSH_PROJECT_')) {
       return this.resolveProjectCredential(subject.id, ref)
     }
-    const subjectId = subject.kind === 'user'
-      ? await internalUserId(this.context.pool, this.context.organizationId, subject.id)
-      : await internalProjectId(this.context.pool, this.context.organizationId, subject.id)
-    if (subjectId === null) return null
+    const row = await this.readOrganizationCredential(subject, ref)
+    return row === undefined ? null : this.decryptOrganizationCredential(row)
+  }
+
+  /**
+   * Read the current Runtime, serving state and organization credential in one database snapshot.
+   * @param subject - recognized personal Runtime coordinates.
+   * @param ref - managed Provider's credential reference.
+   * @param fence - exact Runtime bearer and the Gateway's write epoch.
+   * @returns The credential result, an invalid Runtime, or a closed maintenance gate.
+   */
+  async resolvePersonalRuntimeCredential(subject: RuntimeCredentialSubject, ref: string, fence: PersonalExecutionWriteFence):
+    Promise<{ status: 'ok'; value: string | null } | { status: 'invalid-runtime-token' | 'stale-epoch' | 'maintenance' }> {
+    if (subject.organizationId !== this.context.organizationId || subject.target.kind !== 'user'
+      || subject.target.runtimeId === undefined || subject.contentBinding !== undefined) return { status: 'invalid-runtime-token' }
+    const row = await this.readOrganizationCredential(subject.target, ref, {
+      runtimeId: subject.target.runtimeId, generation: subject.generation,
+      bearerHash: createHash('sha256').update(fence.bearer).digest(), epoch: fence.epoch,
+    })
+    if (row === undefined) return { status: 'invalid-runtime-token' }
+    if (row.verdict !== 'open') return { status: row.verdict }
+    return { status: 'ok', value: this.decryptOrganizationCredential(row) }
+  }
+
+  private async readOrganizationCredential(subject: ModelUsageSubject, ref: string,
+    runtime?: { runtimeId: RuntimeId; generation: number; bearerHash: Buffer; epoch: bigint }): Promise<OrganizationCredentialLookup | undefined> {
     const authorization = subject.kind === 'user'
       ? `EXISTS(SELECT 1 FROM harness.model_catalog model
-          JOIN harness.users target ON target.organization_id=model.organization_id AND target.id=$3
+          JOIN harness.users target ON target.organization_id=model.organization_id AND target.public_id=$3 AND target.deleted_at IS NULL
           JOIN harness.memberships membership ON membership.organization_id=target.organization_id
             AND membership.user_id=target.id AND membership.status='active'
           LEFT JOIN harness.model_role_access role_access ON role_access.organization_id=model.organization_id
@@ -1297,28 +1324,41 @@ export class PostgresModelGovernanceService {
             AND provider.source='managed' AND provider.status <> 'archived'
             AND model.enabled AND COALESCE(user_access.allowed,role_access.allowed,membership.role='admin'))`
       : `EXISTS(SELECT 1 FROM harness.model_catalog model
-          JOIN harness.projects project ON project.id=$3 AND project.organization_id=model.organization_id
+          JOIN harness.projects project ON project.public_id=$3 AND project.organization_id=model.organization_id
           LEFT JOIN harness.model_project_access access ON access.organization_id=model.organization_id
             AND access.model_id=model.id AND access.project_id=project.id
           WHERE model.organization_id=provider.organization_id AND model.provider_id=provider.id
             AND provider.source='managed' AND provider.status <> 'archived'
             AND model.enabled AND COALESCE(access.allowed,project.model_access_default_allowed))`
-    const result = await this.context.pool.query<{
-      provider_id: string
-      key_version: number
-      nonce: Buffer
-      ciphertext: Buffer
-      auth_tag: Buffer
-    }>(`SELECT provider.id provider_id,credential.key_version,credential.nonce,
+    const credential = `SELECT provider.id provider_id,credential.key_version,credential.nonce,
       credential.ciphertext,credential.auth_tag
       FROM harness.model_providers provider
       JOIN harness.organization_model_credentials credential ON credential.organization_id=provider.organization_id
         AND credential.provider_id=provider.id
       WHERE provider.organization_id=$1 AND provider.credential_ref=$2
         AND provider.source='managed' AND provider.status='enabled' AND ${authorization}
-      LIMIT 1`, [this.context.organizationId, ref, subjectId])
-    const row = result.rows[0]
-    if (row === undefined) return null
+      LIMIT 1`
+    const coordinates = [this.context.organizationId, ref, subject.id]
+    const result = runtime === undefined
+      ? await this.context.pool.query<OrganizationCredentialLookup>(`SELECT 'open' verdict,credential.* FROM (${credential}) credential`, coordinates)
+      : await this.context.pool.query<OrganizationCredentialLookup>(`WITH authority AS MATERIALIZED (
+          SELECT CASE WHEN COALESCE(control.write_epoch,1)<>$8 THEN 'stale-epoch'
+            WHEN COALESCE(control.mode,'serving')<>'serving' THEN 'maintenance' ELSE 'open' END AS verdict
+          FROM harness.instances i
+          JOIN harness.users owner ON (owner.organization_id,owner.id)=(i.organization_id,i.user_id) AND owner.public_id=$3
+          LEFT JOIN harness.cluster_control control ON control.organization_id=i.organization_id
+          WHERE i.organization_id=$1 AND i.assigned_node_id=$4 AND i.runtime_id=$5 AND i.generation=$6 AND i.runtime_token_hash=$7
+            AND i.provisioning_state='ready' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
+            AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
+            AND harness.computer_use_allowed(i.organization_id,i.user_id,i.assigned_node_id)
+        ) SELECT authority.verdict,credential.* FROM authority
+          LEFT JOIN LATERAL (${credential}) credential ON authority.verdict='open'`,
+        [...coordinates, this.context.nodeId, runtime.runtimeId, runtime.generation, runtime.bearerHash, String(runtime.epoch)])
+    return result.rows[0]
+  }
+
+  private decryptOrganizationCredential(row: OrganizationCredentialLookup): string | null {
+    if (row.provider_id === null) return null
     return this.credentialCipher.decrypt(this.context.organizationId, row.provider_id, {
       keyVersion: row.key_version as 1,
       nonce: row.nonce,

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { Agent, request, STATUS_CODES, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
 import type { UserRow } from './auth.ts'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
 import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
@@ -13,7 +13,7 @@ import { parseCookies, SCOPE_COOKIE, SESSION_COOKIE } from './server.ts'
 import { RuntimeCatalogError } from './runtime-catalog.ts'
 import { nodeUuidSchema } from './node-access.ts'
 import { NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
-import { FORWARDED_PRINCIPAL_HEADER, type PersonalHistoryAdmission } from './forwarded-principal.ts'
+import { FORWARDED_PRINCIPAL_HEADER, type PersonalReadAdmission } from './forwarded-principal.ts'
 import type { GatewayNodeServices } from './node-service.ts'
 import type { NodeServiceConfig } from './node-service.ts'
 import { NodeServiceHttpPool } from './node-service-http-pool.ts'
@@ -35,8 +35,8 @@ export interface NodeServiceProxyDirectory {
   /** Recheck the account's use permission without requiring a personal Runtime on the computer. */
   authorizeAccountNode?(actor: UserRow, id: RuntimeNodeId): Promise<void>
   /** Fresh primary-owned authority before forwarding and before releasing the result. */
-  approvePersonalHistory?(input: { actorId: number; sessionToken: string; runtimeId: RuntimeId;
-    nodeId: RuntimeNodeId; target: 'personal' }): Promise<PersonalHistoryAdmission | null>
+  approvePersonalRead?(input: { actorId: number; sessionToken: string; runtimeId: RuntimeId;
+    nodeId: RuntimeNodeId; target: 'personal' }): Promise<PersonalReadAdmission | null>
 }
 
 interface Target { nodeId: RuntimeNodeId; runtimeId?: RuntimeId; projectId?: number; resetCookie?: string;
@@ -116,7 +116,7 @@ export class GatewayNodeServiceProxy {
     private readonly timeoutMs: number,
     config: NodeServiceConfig,
     private readonly monitor?: GatewayAccessMonitor,
-    private readonly forwardIssuer?: (target: Target, user: UserRow, request: ForwardRequest, personalHistory?: PersonalHistoryAdmission) => Promise<string>) {
+    private readonly forwardIssuer?: (target: Target, user: UserRow, request: ForwardRequest, personalRead?: PersonalReadAdmission) => Promise<string>) {
     if (directory.resolvePlacement !== undefined && directory.resetScopeCookie === undefined) {
       throw new Error('Node service owner routing requires the Gateway scope-cookie formatter')
     }
@@ -316,14 +316,17 @@ export class GatewayNodeServiceProxy {
         || req.method === 'POST' && (url.pathname === '/api/session.history' || url.pathname === '/api/host.describe')
         || req.method === 'GET' && url.pathname === '/' && url.searchParams.get('dshBootstrap') === '1')
       const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
-      const approval = typeof actor !== 'number' && this.forwardIssuer !== undefined && token !== undefined
-        && this.directory.approvePersonalHistory !== undefined && target.resolvedTarget === 'personal' && target.runtimeId !== undefined
-        && req.method === 'POST' && url.pathname === '/api/prepare/v1/session.history'
+      const approval = typeof actor !== 'number' && actor.status === 'active' && !actor.mustChangePassword
+        && this.forwardIssuer !== undefined && token !== undefined
+        && this.directory.approvePersonalRead !== undefined && target.resolvedTarget === 'personal' && target.runtimeId !== undefined
+        && isDelegatablePersonalRead(req.method, url, req.headers['x-dsh-expected-principal-id'] === String(actor.id), req.headers.accept)
+        && req.headers['x-dsh-prepare-continuation'] === undefined
         && url.searchParams.getAll('dshRuntime').length === 1 && url.searchParams.getAll('dshTarget').length === 1
+        && url.searchParams.getAll('dshNode').length <= 1
         ? { actorId: actor.id, sessionToken: token, runtimeId: target.runtimeId, nodeId: target.nodeId, target: 'personal' as const }
         : undefined
-      const personalHistory = approval === undefined ? undefined
-        : await timeOperation('entryReadApproval', () => this.directory.approvePersonalHistory!(approval)) ?? undefined
+      const personalRead = approval === undefined ? undefined
+        : await timeOperation('entryReadApproval', () => this.directory.approvePersonalRead!(approval)) ?? undefined
       signal.throwIfAborted()
       const lease = await timeOperation('nodeConnection',()=>this.httpPool.acquire(target.nodeId, signal, interactive))
       recordNodeTransport(lease.reused ? 'reused' : 'opened')
@@ -334,7 +337,7 @@ export class GatewayNodeServiceProxy {
       signal.throwIfAborted()
       let complete = false
       const assertion = typeof actor === 'number' || this.forwardIssuer === undefined
-        ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req), personalHistory)
+        ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req), personalRead)
       mark('assertionReady')
       const operation = this.outgoing(req, target, lease.agent, false, body, assertion)
       dispose = () => {
@@ -359,11 +362,11 @@ export class GatewayNodeServiceProxy {
               receivedHeaders()
               mark('responseHeaders')
               if (response.headers[NODE_SERVICE_TARGET_HEADER] !== target.nodeId) throw new NodeServiceError(409, 'node-service/mismatch')
-              if (approval !== undefined && personalHistory !== undefined) {
-                const current = await timeOperation('entryReadRelease', () => this.directory.approvePersonalHistory!(approval))
-                if (current === null || current.accessRevision !== personalHistory.accessRevision
-                  || current.generation !== personalHistory.generation || current.port !== personalHistory.port
-                  || current.startedAt !== personalHistory.startedAt || current.launchStamp !== personalHistory.launchStamp) {
+              if (approval !== undefined && personalRead !== undefined) {
+                const current = await timeOperation('entryReadRelease', () => this.directory.approvePersonalRead!(approval))
+                if (current === null || current.accessRevision !== personalRead.accessRevision
+                  || current.generation !== personalRead.generation || current.port !== personalRead.port
+                  || current.startedAt !== personalRead.startedAt || current.launchStamp !== personalRead.launchStamp) {
                   throw new NodeServiceError(409, 'node-service/cancelled')
                 }
               }

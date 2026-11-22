@@ -1,6 +1,6 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { mkdir, readdir, readFile, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
@@ -177,6 +177,43 @@ describe('dsh-skill-filesystem plugin exports', () => {
 })
 
 describe('FileSystemSkillProvider', () => {
+  it('reads a bounded batch of skill files through the caller filesystem and retains duplicate precedence', async () => {
+    const home = await tempDir('skill-concurrent-catalog')
+    const root = join(home, '.dsh/skills')
+    const ctx = new Context()
+    onTestFinished(async () => {
+      await ctx.fiber.dispose()
+      await rm(home, { recursive: true, force: true })
+    })
+    await ctx.plugin(TestFileSystem)
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(SkillFileSystem, { dshHome: join(home, '.dsh'), agentsHome: join(home, '.agents'), watch: false })
+    const fs = ctx.fs as TestFileSystem
+    const basenames = Array.from({ length: 7 }, (_, index) => `candidate-${index}`)
+    for (const filename of basenames) {
+      await writeFlatSkill(root, filename, filename)
+      fs.statOverrides.set(join(root, filename + '.md'), { type: 'file', version: FsVersion('test') })
+    }
+    const signal = new AbortController().signal
+    let pending = 0
+    let peak = 0
+    fs.readTextOverride = async (target) => {
+      peak = Math.max(peak, ++pending)
+      try {
+        await new Promise<void>(settled => setImmediate(settled))
+        const label = basename(target.displayPath, '.md')
+        const name = label === 'candidate-1' ? 'candidate-0' : label
+        return `---\nname: ${name}\ndescription: ${label}\n---\n\nSkill body.\n`
+      } finally { pending -= 1 }
+    }
+
+    const skills = await ctx.skills.list({ signal })
+    expect(skills.map(skill => skill.description)).toEqual(basenames.filter(label => label !== 'candidate-1'))
+    expect(peak).toBeGreaterThan(1)
+    expect(peak).toBeLessThanOrEqual(4)
+    expect(fs.readTextSignals).toEqual(basenames.map(() => signal))
+  })
+
   it('discovers project, custom, user, and agents skill roots in priority order', async () => {
     const home = await tempDir('skill-home')
     const project = await tempDir('skill-project')

@@ -4,6 +4,143 @@ import { BrowserIdentityChanged, createBrowserIdentityFence } from '../src/clien
 import { ApiTransportError } from '../src/client/api.ts'
 
 const ORIGIN = 'https://gateway.example'
+const ADVISORY_RUNTIME = '10000000-0000-4000-8000-000000000001'
+
+it('leaves HTTP/1 capacity for a turn and new conversation while advisory reads wait', async () => {
+  const catalog = Promise.withResolvers<Response>()
+  const held = new Set(['/api/skill.list', '/api/subagents/list'])
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async input =>
+    held.has(requestedUrl(input).pathname) ? catalog.promise : new Response('{}'))
+  const fence = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn(), `?dshRuntime=${ADVISORY_RUNTIME}`)
+  fence.confirm(7)
+  const signal = new AbortController()
+  const post = (path: string, init?: RequestInit): Promise<Response> =>
+    fence.fetch(`${ORIGIN}${path}?dshRuntime=${ADVISORY_RUNTIME}`, { method: 'POST', ...init })
+  const reads = [post('/api/skill.list'), post('/api/subagents/list'), post('/api/session.models', { signal: signal.signal })]
+  try {
+    const canceled = reads[2]!.catch((reason: unknown) => reason)
+    await vi.waitFor(() => expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(2))
+    await Promise.all([post('/api/admit/v1/session.prompt'), post('/api/prepare/v1/session.create')])
+    expect(fetcher.mock.calls.map(([url, init]) => [requestedUrl(url).pathname, init?.priority])).toEqual([
+      ['/api/skill.list', 'low'], ['/api/subagents/list', 'low'],
+      ['/api/admit/v1/session.prompt', 'high'], ['/api/prepare/v1/session.create', 'high'],
+    ])
+    signal.abort('selection changed')
+    expect(await canceled).toBe('selection changed')
+    const fourth = post('/api/llm.providers')
+    expect(fetcher).toHaveBeenCalledTimes(4)
+    catalog.resolve(new Response('{}'))
+    await Promise.all([reads[0], reads[1], fourth])
+    expect(fetcher).toHaveBeenCalledTimes(5)
+    expect(requestedUrl(fetcher.mock.calls[4]?.[0]).pathname).toBe('/api/llm.providers')
+    const fourthHeaders = new Headers(fetcher.mock.calls[4]?.[1]?.headers)
+    expect(fourthHeaders.get('x-dsh-expected-principal-id')).toBe('7')
+  } finally {
+    signal.abort('test finished')
+    fence.dispose()
+    catalog.resolve(new Response('{}'))
+    await Promise.allSettled(reads)
+  }
+})
+
+it('shares HTTP/1 admission across startup catalogs and directory reads while draft writes and conversation actions proceed', async () => {
+  const permissionCatalog = Promise.withResolvers<Response>()
+  const historyIndex = Promise.withResolvers<Response>()
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    const path = requestedUrl(input).pathname
+    if (path === '/api/permissionPresets/catalog') return permissionCatalog.promise
+    if (path === '/api/session.historyIndex') return historyIndex.promise
+    return new Response('{}')
+  })
+  const fence = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn(), `?dshRuntime=${ADVISORY_RUNTIME}`)
+  fence.confirm(7)
+  const request = (path: string, method = 'POST', query = ''): Promise<Response> =>
+    fence.fetch(`${ORIGIN}${path}?dshRuntime=${ADVISORY_RUNTIME}${query}`, { method })
+  const foreground = () => fetcher.mock.calls.map(([input, init]) => [requestedUrl(input).pathname, init?.method, init?.priority])
+  const rows = '/account/api/workbench/rows'
+  const draft = '/account/api/drafts/20000000-0000-4000-8000-000000000001'
+  const reads = [request('/api/permissionPresets/catalog'), request('/api/session.historyIndex'),
+    request('/api/settings.describe'), request('/api/session.list'), request(rows, 'GET', '&kind=workspaces&include=conversations')]
+  try {
+    await vi.waitFor(() => expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(2))
+    expect(foreground()).toEqual([
+      ['/api/permissionPresets/catalog', 'POST', 'low'], ['/api/session.historyIndex', 'POST', 'low'],
+    ])
+    await Promise.all([
+      request('/api/prepare/v1/session.create'), request(draft, 'GET'), request(draft, 'PUT'),
+      request('/api/admit/v1/session.prompt'), request('/api/admit/v1/session.status'),
+      request(rows, 'GET', '&kind=conversations&q=query'), request('/api/dynamicCordisRunner/syncInspectManifest'),
+    ])
+    expect(foreground().slice(2)).toEqual([
+      ['/api/prepare/v1/session.create', 'POST', 'high'], [draft, 'GET', undefined], [draft, 'PUT', undefined],
+      ['/api/admit/v1/session.prompt', 'POST', 'high'], ['/api/admit/v1/session.status', 'POST', 'high'],
+      [rows, 'GET', undefined], ['/api/dynamicCordisRunner/syncInspectManifest', 'POST', undefined],
+    ])
+    permissionCatalog.resolve(new Response('{}'))
+    await Promise.all(reads.filter((_read, index) => index !== 1))
+    expect(foreground().slice(-3)).toEqual([
+      ['/api/session.list', 'POST', 'low'], [rows, 'GET', 'low'], ['/api/settings.describe', 'POST', 'low'],
+    ])
+    for (const [input, init] of fetcher.mock.calls) {
+      expect(requestedUrl(input).searchParams.get('dshRuntime')).toBe(ADVISORY_RUNTIME)
+      expect(new Headers(init?.headers).get('x-dsh-expected-principal-id')).toBe('7')
+    }
+  } finally {
+    fence.dispose()
+    permissionCatalog.resolve(new Response('{}'))
+    historyIndex.resolve(new Response('{}'))
+    await Promise.allSettled(reads)
+  }
+})
+
+it('reserves capacity when activation, plugin synchronization and draft saving overlap a directory refresh', async () => {
+  const synchronization = '/api/dynamicCordisRunner/syncInspectManifest'
+  const activation = '/api/session.activate'
+  const listing = '/api/session.list'
+  const rows = '/account/api/workbench/rows'
+  const held = new Map([synchronization, activation, listing].map(path => [path, Promise.withResolvers<Response>()]))
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async input =>
+    held.get(requestedUrl(input).pathname)?.promise ?? new Response('{}'))
+  const fence = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn(), `?dshRuntime=${ADVISORY_RUNTIME}`)
+  const request = (path: string, method = 'POST', query = ''): Promise<Response> =>
+    fence.fetch(`${ORIGIN}${path}?dshRuntime=${ADVISORY_RUNTIME}${query}`, { method })
+  const pending = [request(synchronization), request(listing), request(activation),
+    request(rows, 'GET', '&kind=workspaces&include=conversations')]
+  try {
+    await vi.waitFor(() => expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(3))
+    const issued = () => fetcher.mock.calls.map(([input, init]) => [requestedUrl(input).pathname, init?.priority])
+    expect(issued()).toEqual([[synchronization, undefined], [listing, 'low'], [activation, undefined]])
+    const draft = '/account/api/drafts/20000000-0000-4000-8000-000000000001'
+    await request(draft, 'PUT')
+    await request('/api/admit/v1/session.prompt')
+    expect(issued().slice(3)).toEqual([[draft, undefined], ['/api/admit/v1/session.prompt', 'high']])
+    held.get(synchronization)!.resolve(new Response('{}'))
+    await pending[3]
+    expect(issued().slice(-1)).toEqual([[rows, 'low']])
+  } finally {
+    fence.dispose()
+    for (const response of held.values()) response.resolve(new Response('{}'))
+    await Promise.allSettled(pending)
+  }
+})
+
+it('keeps simultaneous advisory reads on a multiplexed document', async () => {
+  const navigation = { nextHopProtocol: 'h2' } as PerformanceNavigationTiming
+  const protocol = vi.spyOn(performance, 'getEntriesByType').mockReturnValue([navigation])
+  const pending = Promise.withResolvers<Response>()
+  const fetcher = vi.fn<typeof fetch>().mockReturnValue(pending.promise)
+  const fence = createBrowserIdentityFence(fetcher, ORIGIN, vi.fn(), `?dshRuntime=${ADVISORY_RUNTIME}`)
+  const reads = ['/api/skill.list', '/api/session.models', '/api/llm.models', '/api/session.list', '/api/settings.describe'].map(path =>
+    fence.fetch(`${ORIGIN}${path}?dshRuntime=${ADVISORY_RUNTIME}`, { method: 'POST' }))
+  try {
+    expect(fetcher.mock.calls.map(([, init]) => init?.priority)).toEqual(['low', 'low', 'low', undefined, undefined])
+  } finally {
+    pending.resolve(new Response('{}'))
+    await Promise.allSettled(reads)
+    fence.dispose()
+    protocol.mockRestore()
+  }
+})
 
 it('pins two personal Runtime tabs independently and keeps document locations independent of execution', async () => {
   const first = '10000000-0000-4000-8000-000000000001' as NonNullable<import('../src/client/index.ts').ConnectionRuntimeTarget['runtimeId']>

@@ -39,6 +39,14 @@ export class ReviewCapacityError extends Error {
   constructor(readonly requiredBytes: number) { super('Historical review exceeds its configured storage limit') }
 }
 
+/** Wall time in milliseconds spent in each storage probe operation, including asynchronous dispatch. */
+export type ReviewProbeTiming = Partial<Record<
+  'directoryMs' | 'ancestorMetadataMs' | 'ancestorSyncMs' | 'capacityMs' | 'probeIoMs'
+  | 'probeFileSyncMs' | 'probeDirectorySyncMs' | 'cleanupMs', number
+>>
+
+const maxProbeDirectoryHandles = 4
+
 function digest(data: string | Buffer): string { return createHash('sha256').update(data).digest('hex') }
 function missing(error: unknown): boolean { return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT' }
 
@@ -63,18 +71,35 @@ async function syncDirectory(directory: string): Promise<void> {
   finally { await handle.close() }
 }
 
+async function checkDirectory(directory: string): Promise<void> {
+  const entry = await lstat(directory)
+  // System path aliases are resolved by the caller's canonical root before publication.
+  if (entry.isSymbolicLink()) throw new Error('Historical review storage contains a symbolic-link directory')
+  if (!entry.isDirectory()) throw new Error('Historical review storage is not an owned directory')
+}
+
 async function durableDirectory(directory: string): Promise<void> {
   await mkdir(directory, { recursive: true, mode: 0o700 })
   let current = directory
   while (current !== parse(current).root) {
-    const entry = await lstat(current)
-    if (entry.isSymbolicLink()) {
-      // System path aliases are resolved by the caller's canonical root before publication.
-      throw new Error('Historical review storage contains a symbolic-link directory')
-    }
+    await checkDirectory(current)
     await syncDirectory(dirname(current))
     current = dirname(current)
   }
+}
+
+/** Wait for every opened directory in a batch even when one check fails. */
+async function checkProbeDirectories(directories: readonly string[], check: (path: string) => Promise<void>): Promise<void> {
+  for (let i = 0; i < directories.length; i += maxProbeDirectoryHandles) {
+    const results = await Promise.allSettled(directories.slice(i, i + maxProbeDirectoryHandles).map(check))
+    for (const result of results) if (result.status === 'rejected') throw result.reason
+  }
+}
+
+async function measureProbe<T>(timing: ReviewProbeTiming | undefined, phase: keyof ReviewProbeTiming, work: () => Promise<T>): Promise<T> {
+  if (timing === undefined) return work()
+  const started = performance.now()
+  try { return await work() } finally { timing[phase] = (timing[phase] ?? 0) + performance.now() - started }
 }
 
 /** Content-addressed review artifacts; successful publication includes file durability. */
@@ -193,20 +218,34 @@ export class ReviewStore {
    * Verify durable storage is writable before resuming a Session after a storage failure.
    * @param sessionId - affected Session; no historical artifact is replaced.
    * @param requiredBytes - previously recorded capacity requirement; zero when none was recorded.
+   * @param timing - optional destination for aggregate wall time by operation.
    */
-  async probe(sessionId: SessionId, requiredBytes = 0): Promise<void> {
+  async probe(sessionId: SessionId, requiredBytes = 0, timing?: ReviewProbeTiming): Promise<void> {
     this.assertCapacity(requiredBytes)
-    const directory = await this.directory(sessionId, true)
-    await durableDirectory(directory)
-    const space = await statfs(directory, { bigint: true })
+    const directory = await measureProbe(timing, 'directoryMs', async () => {
+      const path = await this.directory(sessionId, true)
+      await mkdir(path, { recursive: true, mode: 0o700 })
+      return path
+    })
+    const ancestors: string[] = []
+    for (let current = directory; current !== parse(current).root; current = dirname(current)) ancestors.push(current)
+    await measureProbe(timing, 'ancestorMetadataMs', () => checkProbeDirectories(ancestors, checkDirectory))
+    // A probe can sync parent entries in any order before returning success.
+    await measureProbe(timing, 'ancestorSyncMs', () => checkProbeDirectories(ancestors.map(dirname), syncDirectory))
+    const space = await measureProbe(timing, 'capacityMs', () => statfs(directory, { bigint: true }))
     if (space.bavail * space.bsize < BigInt(this.maxBytes)) throw new Error('Historical review storage has insufficient free space')
     const file = join(directory, `.${randomUUID()}.probe`)
     try {
-      const handle = await open(file, 'wx', 0o600)
-      try { await handle.writeFile('review storage probe\n'); await handle.sync() } finally { await handle.close() }
-      await syncDirectory(directory)
+      const handle = await measureProbe(timing, 'probeIoMs', () => open(file, 'wx', 0o600))
+      try {
+        await measureProbe(timing, 'probeIoMs', () => handle.writeFile('review storage probe\n'))
+        await measureProbe(timing, 'probeFileSyncMs', () => handle.sync())
+      } finally {
+        await measureProbe(timing, 'probeIoMs', () => handle.close())
+      }
+      await measureProbe(timing, 'probeDirectorySyncMs', () => syncDirectory(directory))
     } finally {
-      try { await unlink(file) } catch (error) { if (!missing(error)) throw error }
+      try { await measureProbe(timing, 'cleanupMs', () => unlink(file)) } catch (error) { if (!missing(error)) throw error }
     }
   }
 }

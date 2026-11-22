@@ -56,6 +56,8 @@ kind: "package-reference"
 
 本插件为所属应用标记 `executionAuthorityRequired`。该要求一直保留到应用销毁，授权提供者卸载也不会移除。[Gateway Execution](../gateway-execution/README.zh.md) 拥有执行、权限预设和 profile 管理策略。它使用本包已验证的交互调用者与私有传输；对于委派和恢复工作，则使用真正 Agent 的持久参与者引用。
 
+可选的 `personalDraft` 声明将普通个人主体绑定到确切分配的 Runtime 及一次预备 HTTP 操作。`prepare` 仅用于 `POST /api/prepare/v1/session.create`。`admit-input` 仅用于 `POST /api/admit/v1/session.prompt`。执行提供者只在原 HTTP 请求仍活跃时使用该声明。缺少声明时沿用常规登记。
+
 项目凭据会在应用根上下文中保留[协作要求](../collaboration/README.zh.md#application-authorization)，覆盖运行时或授权提供方的替换过程。
 
 <a id="resource-admission"></a>
@@ -67,11 +69,13 @@ kind: "package-reference"
 
 `modelTimings` 默认关闭。受管启动配置随 Gateway 性能诊断启用，将计时元数据写入 Runtime 日志或 systemd 单元日志。采样覆盖[输入与请求准备](../gateway-execution/README.zh.md#execution-authorization)、资源准入及模型尝试到首段文本。沿用现有日志保留策略。
 
-`model-resource-timing` 记录来源绑定、本地登记排队、提交与状态请求、排队响应次数和轮询间隔。内部响应可以附带入口验凭据、写入准入、处理器验凭据、操作授权和账务事务耗时。这些耗时包含在请求时间内，批量请求的样本共享其耗时。轮询间隔描述 Runtime 观察状态的时间。样本只包含时间戳、耗时、次数和结果。
+`model-resource-timing` 记录来源绑定、本地登记、提交、状态请求和轮询间隔。核验通过的响应可以报告 `grantQueueMs`，即预留落盘到获得额度的时间。协调器的分段耗时包含在对应请求内。样本包含时间戳、耗时、次数和结果。
 
 提供方在进入有界注册队列前，捕获 Session 范围、签名交互调用者或明确的基础设施归属。归属解析失败会立即拒绝。捕获调用方范围后，由 Runtime 服务负责注册、重复轮询和完成结算。尚未发送的请求被取消时，会独立于此前的 HTTP 请求释放本地排队容量。已验证且仍有效的条目串行注册；已尝试注册的请求则保留精确的完成记账，直到得到确认。
 
 它使用已提交的节点策略与串行操作身份。提供方在 Gateway 核验该精确操作后交付活跃许可。一次轮询涉及多笔操作时，提供方会在交付前逐笔复核活跃结果。`requestTimeoutMs` 默认为 5000，`cleanupTimeoutMs` 默认为 30000，清理预算必须大于单次请求。许可取消跟随提供方生命周期、调用方和操作，不依赖不确定确认后已移除的本地条目。销毁时取消所有者，在该预算内等待确认清理，并保留不确定占用。之后精确的原所有者仍可通过捕获的私有传输报告静止状态。
+
+个人模型预留可随立即授予的许可携带确认，表明 Gateway 已在同一事务内复核执行范围。Runtime 消费该操作的精确许可。缺少确认时，Runtime 发出带 `x-dsh-active-model-check: 1` 的状态请求。单个个人模型请求排队时，协调器可提供变更游标，让 Runtime 立即发出下一次状态请求。协调器在本地等待压力采样或完成更新，然后核验预留和当前权限。缺少游标或有多个待处理操作时，使用定期批量查询。实际派发模型请求时仍复核当前执行权限。
 
 模型适配器确认静止后，如果提交完成状态失败，可由 Runtime 提供方继续等待确认。回复可以先完成，提供方按请求超时间隔重新提交同一序号和操作 ID。PostgreSQL 保留预留，直到提交完成状态或确认精确 Runtime 代次已停止。明确拒绝会结束重试。提供方销毁时取消等待中的重试，并在现有清理预算内报告已知的静止状态。
 

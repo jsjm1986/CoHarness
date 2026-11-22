@@ -12,9 +12,12 @@ import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresAuditService } from '../src/postgres/audit-service.ts'
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresMaintenanceService, type WriteGateVerdict } from '../src/postgres/maintenance-service.ts'
+import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import { PostgresUserService } from '../src/postgres/user-service.ts'
 import { InstanceManager } from '../src/instances.ts'
+import { OperationTimings } from '../src/operation-timing.ts'
+import { PRINCIPAL_HEADER } from '../src/principal.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { createExecutionFixture } from './execution-fixture.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
@@ -66,6 +69,38 @@ describePg('execution Runtime identity isolation', () => {
     return { receipt, state: result.body }
   }
 
+  it('registers a prepared root and its first input atomically across a retry', async () => {
+    const f = await fixture(), sessionId = randomUUID(), messageId = randomUUID()
+    const payload = { sessionId, messageId, kind: 'message', registerRoot: true,
+      contentHash: createHash('sha256').update(messageId).digest('hex') }
+    const signed = f.principals.issue({ user: f.admin, scope: { kind: 'personal' },
+      runtime: { kind: 'user', id: f.personal.id, runtimeId: f.personal.runtimeId, generation: f.personal.generation },
+      personalDraft: 'admit-input' })
+    const call = async (value: typeof payload, runtime = f.personal) => {
+      const response = await fetch(`${f.base}/internal/runtime/execution/input`, { method: 'POST',
+        headers: { ...f.headers(runtime), [PRINCIPAL_HEADER]: signed }, body: JSON.stringify(value) })
+      return { status: response.status, body: await response.json() as unknown }
+    }
+    const roots = async (id: string) => (await pool.query(`SELECT runtime_id FROM harness.execution_sessions
+      WHERE organization_id=$1 AND session_id=$2`, [f.organizationId, id])).rows
+    expect(await f.call('input', payload, f.admin, f.personal)).toMatchObject({ status: 403 })
+    expect(await call(payload, f.sibling)).toMatchObject({ status: 403 })
+    expect(await roots(sessionId)).toEqual([])
+    const first = await call(payload)
+    expect(first).toMatchObject({ status: 200, body: { inputId: expect.any(String) } })
+    expect(await call(payload)).toEqual(first)
+    expect(await roots(sessionId)).toEqual([{ runtime_id: f.personal.runtimeId }])
+    expect((await pool.query('SELECT id FROM harness.execution_inputs WHERE organization_id=$1 AND session_id=$2',
+      [f.organizationId, sessionId])).rowCount).toBe(1)
+    const child = randomUUID()
+    await register(f, f.personal, child, sessionId)
+    expect(await call({ ...payload, sessionId: child })).toMatchObject({ status: 409 })
+    await pool.query("INSERT INTO harness.cluster_control(organization_id,mode,write_epoch) VALUES($1,'serving',2)", [f.organizationId])
+    const refused = randomUUID()
+    expect(await call({ ...payload, sessionId: refused })).toMatchObject({ status: 503 })
+    expect(await roots(refused)).toEqual([])
+  })
+
   it('registers equal Session IDs independently in sibling personal Runtimes without changing their Host IDs', async () => {
     const f = await fixture(), sessionId = 'same-host-session'
     expect(f.sibling.runtimeId).not.toBe(f.personal.runtimeId)
@@ -103,16 +138,19 @@ describePg('execution Runtime identity isolation', () => {
   it('checks the computer grant again after waiting for the account lock and commits no receipt on revocation', async () => {
     const f = await fixture(), sessionId = await f.session(f.personal), messageId = randomUUID()
     const lease = await pool.connect()
+    let pending: ReturnType<typeof f.call> | undefined
     try {
       await lease.query('BEGIN')
       await lease.query('SELECT id FROM harness.users WHERE id=$1 FOR UPDATE', [f.admin.uuid])
-      const pending = f.call('input', { sessionId, messageId, kind: 'message',
+      const holder = Number((await lease.query('SELECT pg_backend_pid() AS pid')).rows[0]!.pid)
+      pending = f.call('input', { sessionId, messageId, kind: 'message',
         contentHash: createHash('sha256').update(messageId).digest('hex') }, f.admin, f.personal)
+      void pending.catch(() => { /* The request is joined when the lock is released. */ })
       const stopAt = performance.now() + 3000
       for (;;) {
         const { rows: [block] } = await pool.query<{ waiting: boolean }>(`SELECT EXISTS(
-          SELECT FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'
-            AND query LIKE 'SELECT * FROM harness.admit_personal_execution_input(%') AS waiting`)
+          SELECT FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid))
+            AND query LIKE '%FROM harness.admit_personal_execution_input(%') AS waiting`, [holder])
         if (block?.waiting === true) break
         if (performance.now() >= stopAt) throw new Error('Personal input did not wait for the account grant change')
         await delay(10)
@@ -126,6 +164,7 @@ describePg('execution Runtime identity isolation', () => {
     } finally {
       await lease.query('ROLLBACK')
       lease.release()
+      await pending?.catch(() => { /* Preserve the test's failure after releasing the lock. */ })
     }
   })
 
@@ -141,26 +180,39 @@ describePg('execution Runtime identity isolation', () => {
     expect((await pool.query('SELECT session_id FROM harness.execution_sessions WHERE organization_id=$1 AND session_id=$2', [organizationId, root])).rows).toHaveLength(0)
   })
 
-  it('admits ordinary personal execution in two SQL trips while retaining write, bearer and epoch fences', async () => {
+  it('admits ordinary personal execution in one statement while retaining write, bearer and epoch fences', async () => {
     const f = await fixture()
     const root = await mkdtemp(join(tmpdir(), 'hgw-execution-admission-'))
     cleanups.push(() => rm(root, { recursive: true, force: true }))
     const cfg = testConfig(root, { HGW_RUNTIME_API_BODY_LIMIT_BYTES: '512' })
+    const credentials = new PostgresInstanceRepository(f.context, cfg.instancePortBase)
+    expect(credentials.personalExecutionCandidate(f.personal.token)).toBeNull()
+    const running = await credentials.authenticateRuntimeControlToken(f.personal.token, pool, 1n)
+    expect(running?.generation).toBe(f.personal.generation)
+    await credentials.authenticateRuntimeControlToken(f.project.token, pool, 1n)
+    expect(credentials.personalExecutionCandidate(f.project.token)).toBeNull()
+    credentials.invalidateRuntimeTokenCache()
+    expect(credentials.personalExecutionCandidate(f.personal.token)).toEqual(running)
     const maintenance = new PostgresMaintenanceService(f.context, cfg.nodeStaleMs)
     const instances = new InstanceManager(f.instances, cfg)
     await instances.portOf(f.personal)
     let stopping = false, writers = 0
     const writerArrival: number[] = []
     const maintenanceGate = vi.fn(async () => (await maintenance.writeGate(1n)).verdict)
+    const timings = new OperationTimings(8)
+    const handler = Object.assign((...args: Parameters<typeof f.handler>) =>
+      timings.run(args[0], args[1], () => f.handler(...args)), f.handler)
     const deps: GatewayDeps = { cfg, maintenanceGate, writerSpan: () => {
       writers++
       writerArrival.push(writers)
       return () => { writers-- }
     }, users: new PostgresUserService(f.context, cfg), auth: new PostgresAuthService(f.context, cfg),
     projects: new PostgresProjectService(f.context, cfg), audit: new PostgresAuditService(f.context), instances }
-    const listen = async (stopGate?: () => WriteGateVerdict) => {
-      const server = createGatewayServer(deps, { runtime: f.handler, runtimeAuthorize: async req =>
+    const listen = async (stopGate?: () => WriteGateVerdict, useCandidate = true) => {
+      const server = createGatewayServer(deps, { runtime: handler, runtimeAuthorize: async req =>
         await f.instances.authenticateRuntimeToken(req.headers.authorization?.slice('Bearer '.length) ?? '') ?? false,
+      runtimePersonalExecutionCandidate: req => useCandidate
+        ? credentials.personalExecutionCandidate(req.headers.authorization?.slice('Bearer '.length) ?? '') : null,
       runtimePersonalExecutionStopGate: stopGate })
       cleanups.push(() => new Promise<void>((resolve, reject) => {
         server.close(error => error === undefined ? resolve() : reject(error))
@@ -170,14 +222,55 @@ describePg('execution Runtime identity isolation', () => {
       return `http://127.0.0.1:${(server.address() as AddressInfo).port}`
     }
     const baseline = await listen()
+    const unrecognized = await listen(() => 'open', false)
     const candidate = await listen(() => stopping ? 'maintenance' : 'open')
     const call = (base: string, action: string, value: unknown, headers = f.headers(f.personal, f.admin)) =>
       fetch(`${base}/internal/runtime/execution/${action}`, { method: 'POST', headers, body: JSON.stringify(value) })
     const sessionId = randomUUID(), messageId = randomUUID()
     const message = { sessionId, messageId, kind: 'message', contentHash: createHash('sha256').update(messageId).digest('hex') }
+    await register(f, f.personal, sessionId)
+    const receipt = await f.admit(sessionId, f.admin, f.personal, messageId)
+    const inputOperation = randomUUID()
+    const observedInput = await call(candidate, 'input', message, {
+      ...f.headers(f.personal, f.admin), 'x-dsh-operation-id': inputOperation,
+    })
+    expect(observedInput.status).toBe(200)
+    expect(await observedInput.json()).toMatchObject({ inputId: receipt.inputId })
+    expect(timings.samples(inputOperation)[0]).toMatchObject({
+      sql: { governance: { count: 1 } },
+      phases: { executionInputServer: expect.any(Number) },
+    })
+    const enterBody = { sessionId, messageId, inputId: receipt.inputId, contentHash: receipt.contentHash, currentScopeId: null }
+    const enterOnce = async () => {
+      const id = randomUUID()
+      const response = await call(candidate, 'enter', enterBody, { ...f.headers(f.personal), 'x-dsh-operation-id': id })
+      expect(response.status).toBe(200)
+      const state = await response.json() as ExecutionIdentityState
+      const count = timings.samples(id)[0]?.sql.governance.count
+      return { state, count }
+    }
+    const entries = await Promise.all([enterOnce(), enterOnce()])
+    expect(entries.map(entry => entry.count)).toContain(1)
+    expect(entries[0]!.state).toEqual(entries[1]!.state)
+    expect(entries[0]!.state).toMatchObject({ revision: '2', inputs: [receipt.inputId] })
+    const authorize = { sessionId, capability: 'execute', scopeId: entries[0]!.state.scopeId, unverifiedHistory: false }
+    expect(authorize.scopeId).toBeDefined()
+    maintenanceGate.mockClear()
+    writerArrival.length = 0
     const query = vi.spyOn(pool, 'query')
     try {
-      for (const [action, payload] of [['register-session', { sessionId }], ['input', message]] as const) {
+      const firstRoot = { sessionId: randomUUID() }
+      const withLookup = await call(unrecognized, 'register-session', firstRoot)
+      expect(withLookup.status).toBe(200)
+      const registration: unknown = await withLookup.json()
+      expect(query, 'root registration with an unknown bearer lookup').toHaveBeenCalledTimes(2)
+      query.mockClear()
+      const fromControl = await call(candidate, 'register-session', firstRoot)
+      expect(fromControl.status).toBe(200)
+      expect(await fromControl.json()).toEqual(registration)
+      expect(query, 'root registration after the control route qualified the bearer').toHaveBeenCalledTimes(1)
+      query.mockClear()
+      for (const [action, payload] of [['register-session', { sessionId }], ['input', message], ['enter', enterBody], ['authorize', authorize]] as const) {
         const before = await call(baseline, action, payload)
         expect(before.status).toBe(200)
         const accepted: unknown = await before.json()
@@ -188,11 +281,11 @@ describePg('execution Runtime identity isolation', () => {
         const after = await call(candidate, action, payload)
         expect(after.status).toBe(200)
         expect(await after.json()).toEqual(accepted)
-        expect(query, `${action} with the transaction's write fence`).toHaveBeenCalledTimes(2)
+        expect(query, `${action} with the transaction's write fence`).toHaveBeenCalledTimes(1)
         expect(maintenanceGate).not.toHaveBeenCalled()
         query.mockClear()
       }
-      expect(writerArrival).toEqual([1, 1, 1, 1])
+      expect(writerArrival).toEqual(Array<number>(10).fill(1))
       expect(writers).toBe(0)
       const oversized = 'x'.repeat(513)
       const badToken = await call(candidate, 'input', oversized, { ...f.headers(f.personal), authorization: 'Bearer invalid' })
@@ -210,19 +303,51 @@ describePg('execution Runtime identity isolation', () => {
       expect(await stopped.json()).toEqual({ error: 'maintenance' })
       expect(maintenanceGate).not.toHaveBeenCalled()
       stopping = false
+      const wrongReceipt = await call(candidate, 'enter', { ...enterBody, contentHash: 'f'.repeat(64) })
+      expect(wrongReceipt.status).toBe(403)
+      await wrongReceipt.json()
+      expect(maintenanceGate).toHaveBeenCalledOnce()
+      maintenanceGate.mockClear()
       const seeded = await call(candidate, 'register-session', { sessionId: randomUUID(), parentSessionId: sessionId, isSeeded: true })
       expect(seeded.status).toBe(200)
       await seeded.json()
       expect(maintenanceGate).toHaveBeenCalledOnce()
+      maintenanceGate.mockClear()
+      const unverified = await call(candidate, 'authorize', { ...authorize, unverifiedHistory: true })
+      expect(unverified.status).toBe(200)
+      await unverified.json()
+      expect(maintenanceGate).toHaveBeenCalledOnce()
     } finally { query.mockRestore() }
     const refusedSession = randomUUID(), refusedMessage = randomUUID()
+    const untouchedRoot = await f.session(f.personal)
+    const untouched = await f.admit(untouchedRoot, f.admin, f.personal, randomUUID())
+    const untouchedEntry = { sessionId: untouchedRoot, inputId: untouched.inputId,
+      messageId: untouched.messageId, contentHash: untouched.contentHash, currentScopeId: null }
     await pool.query("INSERT INTO harness.cluster_control(organization_id,mode,write_epoch) VALUES($1,'serving',2)", [f.organizationId])
-    for (const [action, payload] of [['register-session', { sessionId: refusedSession }], ['input', { ...message, messageId: refusedMessage }]] as const) {
+    for (const [action, payload] of [['register-session', { sessionId: refusedSession }],
+      ['input', { ...message, messageId: refusedMessage }], ['enter', untouchedEntry], ['authorize', authorize]] as const) {
       const response = await call(candidate, action, payload)
       expect(response.status).toBe(503)
       expect(await response.json()).toMatchObject({ error: 'execution-writes-unavailable' })
     }
-    expect((await pool.query('SELECT id FROM harness.execution_inputs WHERE organization_id=$1 AND message_id<>$2', [f.organizationId, messageId])).rows).toHaveLength(0)
+    expect((await pool.query('SELECT id FROM harness.execution_inputs WHERE organization_id=$1 AND message_id=$2', [f.organizationId, refusedMessage])).rows).toHaveLength(0)
+    expect((await pool.query('SELECT entered_at FROM harness.execution_inputs WHERE id=$1', [untouched.inputId])).rows)
+      .toEqual([{ entered_at: null }])
+    expect((await pool.query('SELECT session_id FROM harness.execution_sessions WHERE organization_id=$1 AND session_id=$2', [f.organizationId, refusedSession])).rows).toHaveLength(0)
+
+    expect(credentials.personalExecutionCandidate(f.personal.token)).not.toBeNull()
+    await pool.query('UPDATE harness.cluster_control SET write_epoch=1 WHERE organization_id=$1', [f.organizationId])
+    await pool.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE (organization_id,node_id,user_id)=($1,$2,$3)',
+      [f.organizationId, f.context.nodeId, f.admin.uuid])
+    credentials.invalidateRuntimeTokenCache()
+    expect(credentials.personalExecutionCandidate(f.personal.token)).toEqual(running)
+    for (const [action, payload] of [['register-session', { sessionId: refusedSession }],
+      ['input', { ...message, messageId: refusedMessage }], ['enter', untouchedEntry], ['authorize', authorize]] as const) {
+      const response = await call(candidate, action, payload)
+      expect(response.status).toBe(401)
+      expect(await response.json()).toEqual({ error: 'invalid-runtime-token' })
+    }
+    expect((await pool.query('SELECT id FROM harness.execution_inputs WHERE organization_id=$1 AND message_id=$2', [f.organizationId, refusedMessage])).rows).toHaveLength(0)
     expect((await pool.query('SELECT session_id FROM harness.execution_sessions WHERE organization_id=$1 AND session_id=$2', [f.organizationId, refusedSession])).rows).toHaveLength(0)
   })
 

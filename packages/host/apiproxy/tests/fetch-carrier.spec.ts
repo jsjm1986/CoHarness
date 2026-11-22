@@ -574,10 +574,19 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
       ({ rpcId: request.rpcId, result: { ok: true, value: { sessionId: id, workspace } } }))
     const history = vi.spyOn(api.sessions, 'history').mockImplementation(async request =>
       ({ rpcId: request.rpcId, result: { ok: true, value: SCRIPTED_HISTORY_PAGE } }))
-    const call = async (body: object, bounded = false) => {
-      const handler = toFetchHandler(api, bounded ? { historyPageTargetBytes: 64 } : {})
+    const call = async (body: object, bounded = false, trace = false, preparedHistoryMessages?: number) => {
+      const handler = toFetchHandler(api, { ...(bounded ? { historyPageTargetBytes: 64 } : {}),
+        ...(preparedHistoryMessages === undefined ? {} : { preparedHistoryMessages }) })
       const response = await handler.fetch('http://test/api/prepare/v1/session.create', { method: 'POST',
-        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'qa', method: 'session.create', payload: body }) })
+        headers: { 'content-type': 'application/json', ...(trace ? { 'x-dsh-operation-id': '00000000-0000-4000-8000-000000000001' } : {}) },
+        body: JSON.stringify({ type: 'client-request', rpcId: 'qa', method: 'session.create', payload: body }) })
+      const timing = response.headers.get('x-dsh-host-prepare-ms')
+      if (trace) {
+        if (timing === null) throw new Error('Missing prepared response timing')
+        expect(JSON.parse(timing)).toEqual({
+          bodyMs: expect.any(Number), sessionMs: expect.any(Number), initialHistoryMs: expect.any(Number),
+        })
+      } else expect(timing).toBeNull()
       const envelope = await response.json() as { result: {
         ok: boolean
         value?: { sessionId?: string; initialHistory?: unknown }
@@ -592,11 +601,41 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     expect(history).not.toHaveBeenCalled()
     expect((await call({ ...exact, includeInitialHistory: undefined })).value?.initialHistory).toBeUndefined()
     expect(history).not.toHaveBeenCalled()
-    expect((await call(exact, true)).value).toEqual({ sessionId: id, workspace })
+    expect((await call(exact, true, true)).value).toEqual({ sessionId: id, workspace })
     expect(history.mock.calls[0]?.[0].payload).toEqual({ sessionId: id, detail: 'conversation', onlyActive: true })
+    expect((await call(exact, false, false, 2)).value?.initialHistory).toBeDefined()
+    expect(history.mock.calls[1]?.[0].payload).toEqual({ sessionId: id, detail: 'conversation', onlyActive: true, maxMessages: 2 })
     history.mockImplementationOnce(async request => ({ rpcId: request.rpcId, result: { ok: false,
       error: { code: 'collaboration-forbidden', message: 'access revoked', details: { action: 'read', reason: 'forbidden', sessionId: id } } } }))
     expect((await call(exact)).error?.code).toBe('collaboration-forbidden')
+  })
+
+  it('limits prepared conversation tails while preserving older, full-detail and ordinary history reads', async () => {
+    const api = fakeApi()
+    const history = vi.spyOn(api.sessions, 'history')
+    const handler = toFetchHandler(api, { preparedHistoryMessages: 2 })
+    const sessionId = 'scripted-history'
+    const request = async (payload: object, prepared = true) => {
+      const path = prepared ? '/api/prepare/v1/session.history' : '/api/session.history'
+      const response = await handler.fetch('http://test' + path, { method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId: 'qa', method: 'session.history', payload: { sessionId, ...payload } }) })
+      return (await response.json() as { result: { ok: boolean; error?: { code: string } } }).result
+    }
+    for (const { input, expected, prepared } of [
+      { input: { detail: 'conversation', maxMessages: 50 }, expected: { maxMessages: 2 }, prepared: true },
+      { input: { detail: 'conversation' }, expected: { maxMessages: 2 }, prepared: true },
+      { input: { detail: 'conversation', maxMessages: 1 }, expected: { maxMessages: 1 }, prepared: true },
+      { input: { detail: 'conversation', maxMessages: 50, beforeSeq: 1 }, expected: { maxMessages: 50, beforeSeq: 1 }, prepared: true },
+      { input: { detail: 'conversation', maxMessages: 50 }, expected: { maxMessages: 50 }, prepared: false },
+      { input: { detail: 'full', maxMessages: 50 }, expected: { maxMessages: 50 }, prepared: true },
+    ]) {
+      expect((await request(input, prepared)).ok).toBe(true)
+      expect(history.mock.lastCall?.[0].payload).toEqual({ sessionId, ...input, ...expected, ...(prepared ? { onlyActive: true } : {}) })
+    }
+    expect((await request({ detail: 'conversation', maxMessages: 0 })).error?.code).toBe('bad-request')
+    expect(history).toHaveBeenCalledTimes(6)
+    expect(() => toFetchHandler(api, { preparedHistoryMessages: -1 })).toThrow('preparedHistoryMessages')
   })
 
   it('packs session history on Fetch and restores the exact logical page for IApiClient', async () => {

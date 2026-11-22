@@ -2234,16 +2234,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const persistence = ctx.get('sessionPersistence')
     if (marker === undefined || persistence === undefined
       || !await timeAdmission(observe, 'flushReceipt', () => ctx.sessions.flush(session))) return false
-    const options = signal === undefined ? undefined : { signal }
     return timeAdmission(observe, 'readReceipt', async () => {
-      const reader = await persistence.open(session.id, 'read', options)
-      try {
-        if (reader.id !== session.id || reader.header.id !== session.id) return false
-        const { events } = await reader.read(marker.seq, 1, options)
-        const [event] = events
-        return events.length === 1 && event?.seq === marker.seq
-          && admittedPrompts(event).some(item => item.key === key && item.digest === marker.digest)
-      } finally { await reader.close() }
+      const event = await persistence.readCommittedEvent(session.id, SessionLogOffset(marker.seq), signal)
+      return event?.seq === marker.seq && admittedPrompts(event).some(item => item.key === key && item.digest === marker.digest)
     })
   }
 
@@ -2738,8 +2731,14 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   // mints the wire frame (the Service Definition package holds no wire vocabulary); the
   // child activates only when a projection registry is composed, and the
   // subscription unwinds with this gateway's fiber.
+  const publishedInboxes = new WeakMap<Session, { seq: number; items: QueuedInboxItem[] }>()
   ctx.inject(['sessionProjections'], (projectionCtx) => {
     projectionCtx.sessionProjections.onChanged((session, key, value, seq) => {
+      if (muxQueues.size === 0) return
+      if (key === 'queuedInbox') {
+        // This registry key's view has passed queuedInboxItemsSchema before publication.
+        publishedInboxes.set(session, { seq, items: value as QueuedInboxItem[] })
+      }
       broadcast({ type: 'session/projection', sessionId: session.id, key, value, seq })
     })
   })
@@ -2835,11 +2834,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     ]
   }
 
+  const promptAppends = new WeakMap<Agent, (messageId: UserMessage['id']) => void>()
+  ctx.on('agent/inbox/inserted', ({ agent, message }) => {
+    promptAppends.get(agent)?.(message.id)
+  }, { prepend: true })
+
   ctx.on('session/event', (session, event) => {
-    if (event.type !== 'agent/inbox/spliced') return
+    if (event.type !== 'agent/inbox/spliced' || muxQueues.size === 0) return
     const agent = ctx.agents.get(session.id)
     if (agent?.session !== session) return
-    broadcast({ type: 'session/queue', sessionId: session.id, items: queueItems(agent) })
+    const published = publishedInboxes.get(session)
+    publishedInboxes.delete(session)
+    broadcast({ type: 'session/queue', sessionId: session.id,
+      items: published?.seq === event.seq ? published.items : queueItems(agent) })
   })
 
   /** Remove a wait before settling it: synchronous deletion makes the first claimant win. */
@@ -5271,10 +5278,24 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             const archived = archivedInputError(sessionId)
             if (archived !== undefined) return err(request, archived)
             const appendStarted = observe === undefined ? 0 : performance.now()
+            let published: number | undefined
+            if (observe !== undefined) promptAppends.set(agent, (messageId) => {
+              if (messageId === message.id) published = performance.now()
+            })
             try {
               if (mode === 'steer') agent.steer(message)
               else agent.followup(message)
-            } finally { observe?.('inboxAppend', performance.now() - appendStarted) }
+            } finally {
+              if (observe !== undefined) {
+                promptAppends.delete(agent)
+                const finished = performance.now()
+                observe('inboxAppend', finished - appendStarted)
+                if (published !== undefined) {
+                  observe('inboxPublish', published - appendStarted)
+                  observe('inboxWake', finished - published)
+                }
+              }
+            }
           } catch (error: unknown) {
             if (error instanceof AttachmentError) {
               return err(request, {

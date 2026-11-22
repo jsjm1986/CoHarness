@@ -24,6 +24,7 @@ gateway/deploy/postgres/migrations/145_unifiedpush_provider.sql
 gateway/deploy/postgres/migrations/146_retired_node_enrollment_receipts.sql
 gateway/deploy/windows/node-agent-task.ps1
 gateway/lib/config.js
+gateway/lib/deferred-runtime-bootstrap.js
 gateway/lib/index.js
 gateway/lib/launch-stamp.js
 gateway/lib/launcher.js

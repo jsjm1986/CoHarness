@@ -63,6 +63,8 @@ export interface GatewayPrincipalClaims {
   purpose?: GatewayPrincipalPurpose
   /** Exact resource coordinates; required only for a read-only asset assertion. */
   asset?: { method: 'GET' | 'HEAD'; path: string }
+  /** Request step for an empty draft in the selected personal Runtime. */
+  personalDraft?: 'prepare' | 'admit-input'
 }
 
 /** Immutable runtime session header bound into a delayed-creation authorization. */
@@ -130,6 +132,7 @@ type PrincipalInput = {
     runtime: { kind: 'user' | 'project'; id: number; generation: number; runtimeId?: RuntimeId }
     purpose?: GatewayPrincipalPurpose
     asset?: GatewayPrincipalClaims['asset']
+    personalDraft?: GatewayPrincipalClaims['personalDraft']
     now?: number
   }
 
@@ -226,6 +229,7 @@ export class GatewayPrincipalSigner {
       nonce: randomUUID(),
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
       ...(input.asset === undefined ? {} : { asset: input.asset }),
+      ...(input.personalDraft === undefined ? {} : { personalDraft: input.personalDraft }),
     }
     return signedPayload(claims, this.privateKey)
   }
@@ -343,6 +347,9 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     ? (asset?.method !== 'GET' && asset?.method !== 'HEAD') || typeof asset.path !== 'string'
       || !isImmutableRuntimeAssetRequest(asset.method, asset.path) || runtimeRequestPath(asset.path) !== asset.path
     : claims.asset !== undefined) throw new Error('invalid principal asset assertion')
+  if (claims.personalDraft !== undefined && ((claims.personalDraft !== 'prepare' && claims.personalDraft !== 'admit-input')
+    || claims.purpose !== undefined || scope.kind !== 'personal' || runtime.kind !== 'user' || runtime.id !== user.id
+    || runtime.runtimeId === undefined)) throw new Error('invalid personal draft assertion')
   if (scope.kind === 'project' && (!positiveId(scope.projectId) || typeof scope.projectName !== 'string'
     || scope.projectName === '' || (scope.mode !== 'ro' && scope.mode !== 'rw')
     || (scope.canManage !== undefined && typeof scope.canManage !== 'boolean'))) {

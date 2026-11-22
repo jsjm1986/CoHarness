@@ -503,11 +503,11 @@ const nodeServiceProxy = new GatewayNodeServiceProxy({
   authorizeAdministratorNode: (actor, id) => nodeAccess.authorizeAdministratorNode(actor, id),
   authorizeAccountNode: (actor, id) => computerAccess.authorize(actor.id, id),
   ...(cfg.nodeService.preparedReadDelegation === true ? {
-    approvePersonalHistory: (request: Parameters<typeof runtimeAdmission.approvePersonalHistory>[0]) =>
-      runtimeAdmission.approvePersonalHistory(request, principalKeys.publicKeyPem),
+    approvePersonalRead: (request: Parameters<typeof runtimeAdmission.approvePersonalRead>[0]) =>
+      runtimeAdmission.approvePersonalRead(request, principalKeys.publicKeyPem),
   } : {}),
 }, nodeServices, cfg.upstreamTimeoutMs, cfg.nodeService, accessMonitor,
-async (target, user, request, personalHistory) => {
+async (target, user, request, personalRead) => {
   // Attach the placement this Gateway already authorized so the destination
   // can adopt it as a checked placement; scope and runtime storage are
   // node-local data the destination resolves itself.
@@ -517,7 +517,7 @@ async (target, user, request, personalHistory) => {
     selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
     ...(environment === undefined || target.resolvedTarget === undefined
       ? {} : { context: { environment: { id: environment.id, nodeId: environment.node.id, nodeName: environment.node.name },
-        ...(personalHistory === undefined ? {} : { personalHistory }),
+        ...(personalRead === undefined ? {} : { personalRead }),
       } }),
     request,
   })
@@ -641,7 +641,8 @@ try {
   if (!(error instanceof RuntimeStartBlockedError) || error.reason !== 'maintenance') throw error
 }
 
-const proxyHandlers = createProxyHandlers(deps, principalKeys.signer, runtimeAdmission)
+const personalExecutionStopGate = (): WriteGateVerdict => stoppingWriters ? 'maintenance' : 'open'
+const proxyHandlers = createProxyHandlers(deps, principalKeys.signer, runtimeAdmission, personalExecutionStopGate)
 const runtimeAssets = new RuntimeAssets({
   cfg, localNodeId: context.nodeId as RuntimeNodeId, admission: runtimeAdmission,
   instances, monitor: accessMonitor, signer: principalKeys.signer,
@@ -768,7 +769,7 @@ const server = createGatewayServer(deps, {
       return false
     }
   },
-  runtimePersonalExecutionStopGate: () => stoppingWriters ? 'maintenance' : 'open',
+  runtimePersonalExecutionStopGate: personalExecutionStopGate,
   runtimePersonalExecutionCandidate: req => {
     const value = req.headers.authorization
     if (typeof value !== 'string' || !value.startsWith('Bearer ')) return null
@@ -816,6 +817,7 @@ const server = createGatewayServer(deps, {
   runtime: createRuntimeApiHandler({
     executionIdentity,
     executionWriteEpoch: baselineWriteEpoch,
+    resourceStatusWaitMs: cfg.runtimeRequestTimeoutMs >= 2 * cfg.resourceBudget.sampleMs ? cfg.resourceBudget.sampleMs : 0,
     performanceEnabled: cfg.performanceEnabled,
     nodeContent: contentVolume,
     workspaceCatalog,
@@ -1006,12 +1008,13 @@ const governanceRebuildTimer = governanceRebuildTask === undefined ? undefined
 governanceRebuildTimer?.unref()
 governanceRebuildTask?.run()
 
+const canSampleResourcePressure = () => !stoppingWriters && (heartbeatVerdict === undefined || heartbeatVerdict === 'open')
 const resourcePressure = new NodeResourcePressure(cfg.resourceBudget,
   sample => trackWriter(async () => {
-    if (await maintenanceGate() === 'open') await resourceBudget.observe(sample)
+    if (canSampleResourcePressure()) await resourceBudget.observe(sample, baselineWriteEpoch)
   }),
   error => { console.error('[gateway] resource pressure sample failed:', error) },
-  () => heartbeatVerdict === undefined || heartbeatVerdict === 'open')
+  canSampleResourcePressure)
 resourcePressure.start()
 
 /**

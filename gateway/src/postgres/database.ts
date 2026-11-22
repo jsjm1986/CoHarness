@@ -1,4 +1,4 @@
-import { observeOperationCheckout, observeOperationSql, type ConnectionCheckout } from '../operation-timing.ts'
+import { hasOperationTiming, observeOperationCheckout, observeOperationSql, type ConnectionCheckout } from '../operation-timing.ts'
 import { backfillConversationQueryFieldsV1 } from './conversation-query-migration-v1.ts'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash } from 'node:crypto'
@@ -131,7 +131,7 @@ class GatewayPostgresPool extends Pool {
   private acquire(callback: CheckoutCallback, record: (result: ConnectionCheckout) => void): void {
     const shouldOfferHandoff = this.keepsWarmClients && this.idleCount === 0 && this.waitingCount === 0
       && this.totalCount > 0 && this.totalCount < this.options.max
-    const deliver = shouldOfferHandoff ? AsyncLocalStorage.bind(callback) : callback
+    const deliver = shouldOfferHandoff || hasOperationTiming() ? AsyncLocalStorage.bind(callback) : callback
     let delivered = false
     const finish = (error: Error | undefined, client: PoolClient | undefined, release: Parameters<CheckoutCallback>[2], handoff = false): void => {
       const setupMs = client === undefined ? undefined : this.freshSetup.get(client)
