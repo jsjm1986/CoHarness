@@ -21,7 +21,7 @@ export class GatewayUserTerminalAuthorization implements UserTerminalAuthorizati
   private readonly grants = new Map<string, Grant>()
   private revision = 0
 
-  constructor(private readonly runtime: Pick<GatewayRuntime, 'interactive' | 'request' | 'identity' | 'organization'>,
+  constructor(private readonly runtime: Pick<GatewayRuntime, 'interactive' | 'request' | 'identity' | 'organization'> & Partial<Pick<GatewayRuntime, 'current'>>,
     private readonly available: () => boolean) {}
 
   /**
@@ -59,6 +59,22 @@ export class GatewayUserTerminalAuthorization implements UserTerminalAuthorizati
     return { creator,
       creatorUserId: value.userId, signal: grant.lifetime.signal, retain: () => this.retain(retained),
       [Symbol.dispose]: () => { borrowed[Symbol.dispose]() } }
+  }
+
+  /**
+   * Confirm that an upgraded terminal input socket carries an unexpired, non-purpose
+   * principal matching the exact creator who opened the live output stream.
+   * @param creator - creator identity bound to the active output attachment.
+   * @returns true only when the watch stream is live and the verified user matches.
+   */
+  verifyUpgradeCreator(creator: TerminalCreatorId): boolean {
+    const principal = this.runtime.current?.()
+    if (!this.available() || principal === undefined || principal.claims.purpose !== undefined
+      || principal.claims.expiresAt <= Date.now()) return false
+    const expected = JSON.stringify([
+      this.runtime.organization, this.runtime.identity.kind, this.runtime.identity.id, principal.claims.user.id,
+    ]) as TerminalCreatorId
+    return expected === creator
   }
 
   /**

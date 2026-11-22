@@ -12,6 +12,8 @@
     "src/client/retention.ts",
     "src/client/shell-preference.ts",
     "src/types.ts",
+    "src/input-protocol.ts",
+    "src/client/input-channel.ts",
     "src/client/close-requests.ts"
   ],
   "references": [

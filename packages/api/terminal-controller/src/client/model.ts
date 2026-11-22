@@ -10,6 +10,14 @@ import type {
   TerminalAttachmentId, TerminalEnvironment, TerminalFrame,
   WebTerminalId, WebTerminalInfo,
 } from '../types.ts'
+import {
+  TerminalInputChannelClosedError,
+  TerminalInputChannelUnavailableError,
+  type TerminalInputChannel,
+  type TerminalInputChannelFactory,
+} from './input-channel.ts'
+
+export type { TerminalInputChannel, TerminalInputChannelFactory, TerminalInputChannelTarget } from './input-channel.ts'
 
 /** The generated terminal namespace's browser-facing operations. */
 export type TerminalRemote = Pick<ClientRemote['terminal'], 'environment' | 'shells' | 'list' | 'create' | 'retain' | 'follow' | 'write' | 'resize' | 'rename' | 'close'>
@@ -78,6 +86,7 @@ export class TerminalView {
   private writes: Promise<void> = Promise.resolve()
   private queuedInput = 0
   private pendingInput: { attachmentId: TerminalAttachmentId; data: string; bytes: number } | undefined
+  private inputChannel: { attachmentId: TerminalAttachmentId; channel: TerminalInputChannel } | undefined
   private readonly detaching = new Set<Promise<void>>()
 
   /**
@@ -87,8 +96,9 @@ export class TerminalView {
    * @param id - Host terminal identity, reused when recovering an item from its Session list.
    * @param createWhenMissing - allow allocation only for a new tab, never a listed terminal.
    * @param shellPath - explicit shell chosen at the guide; omission uses the remembered available shell.
-   * @param preferenceKey - verified persistence identity; omission disables saved shell preferences.
    * @param retain - window hold acknowledgement required before output attachment.
+   * @param preferenceKey - verified persistence identity; omission disables saved shell preferences.
+   * @param openInputChannel - optional low-latency bidirectional WebSocket input channel factory.
    */
   constructor(
     private readonly sessionId: SessionId,
@@ -99,6 +109,7 @@ export class TerminalView {
     private readonly shellPath?: string,
     private readonly retain?: (signal: AbortSignal) => Promise<void>,
     private readonly preferenceKey?: string,
+    private readonly openInputChannel?: TerminalInputChannelFactory,
   ) {}
 
   /**
@@ -189,7 +200,12 @@ export class TerminalView {
         yield* this.remote.follow(this.sessionId, info.id, attachmentId, signal)
       }.bind(this),
       ended: () => new TerminalViewError('attachmentEnded'),
-      carrierFailed: () => { if (this.stream === stream) this.patch({ phase: 'disconnected', writable: false }) },
+      carrierFailed: () => {
+        if (this.stream === stream) {
+          this.dropInputChannel()
+          this.patch({ phase: 'disconnected', writable: false })
+        }
+      },
     })
     this.stream = stream
     this.patch({ phase: 'connecting', writable: false, error: undefined, issue: undefined, render: undefined })
@@ -229,6 +245,20 @@ export class TerminalView {
     this.writes = this.writes.then(async () => {
       if (this.pendingInput === input) this.pendingInput = undefined
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable) return
+      const channel = this.inputChannel?.attachmentId === attachmentId ? this.inputChannel.channel : undefined
+      if (channel?.isOpen) {
+        try {
+          await channel.write(input.data)
+          return
+        } catch (error) {
+          if (error instanceof TerminalInputChannelClosedError) {
+            this.dropInputChannel(attachmentId)
+            return
+          }
+          if (!(error instanceof TerminalInputChannelUnavailableError)) throw error
+          this.dropInputChannel(attachmentId)
+        }
+      }
       valueOf(await this.remote.write(this.sessionId, id, attachmentId, input.data))
     }).catch((error: unknown) => { if (this.attachmentId === attachmentId) this.fail(error) })
       .finally(() => { this.queuedInput -= input.bytes })
@@ -250,6 +280,19 @@ export class TerminalView {
     this.pendingInput = undefined
     this.writes = this.writes.then(async () => {
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable) return
+      const channel = this.inputChannel?.attachmentId === attachmentId ? this.inputChannel.channel : undefined
+      if (channel?.isOpen) {
+        try {
+          await channel.resize(cols, rows)
+          return
+        } catch (error) {
+          if (error instanceof TerminalInputChannelClosedError || error instanceof TerminalInputChannelUnavailableError) {
+            this.dropInputChannel(attachmentId)
+          } else {
+            throw error
+          }
+        }
+      }
       valueOf(await this.remote.resize(this.sessionId, id, attachmentId, cols, rows))
     }).catch((error: unknown) => { if (this.attachmentId === attachmentId) this.fail(error) })
   }
@@ -303,12 +346,29 @@ export class TerminalView {
     this.stream = undefined
     this.attachmentId = undefined
     this.pendingInput = undefined
+    this.dropInputChannel()
     this.pendingRender?.resolve()
     this.pendingRender = undefined
     if (previous !== undefined) {
       const cleanup = previous.dispose().finally(() => { this.detaching.delete(cleanup) })
       this.detaching.add(cleanup)
     }
+  }
+
+  private ensureInputChannel(terminalId: WebTerminalId, attachmentId: TerminalAttachmentId): void {
+    if (this.openInputChannel === undefined || this.lifetime.signal.aborted) return
+    if (this.inputChannel?.attachmentId === attachmentId) return
+    this.dropInputChannel()
+    const channel = this.openInputChannel({ sessionId: this.sessionId, terminalId, attachmentId })
+    if (channel !== undefined) this.inputChannel = { attachmentId, channel }
+  }
+
+  private dropInputChannel(attachmentId?: TerminalAttachmentId): void {
+    if (this.inputChannel === undefined) return
+    if (attachmentId !== undefined && this.inputChannel.attachmentId !== attachmentId) return
+    const current = this.inputChannel
+    this.inputChannel = undefined
+    current.channel.close()
   }
 
   private async consume(stream: RemoteStream<TerminalFrame>): Promise<void> {
@@ -328,7 +388,10 @@ export class TerminalView {
           sequence = frame.sequence
         } else if (frame.type === 'snapshot') throw new TerminalViewError('invalidOutput', 'Unexpected terminal screen snapshot')
         if (frame.type !== 'output') {
-          this.patch({ info: frame.info, title: frame.info.title, phase: 'connected', writable: frame.info.state === 'running' && frame.info.controllerId === this.attachmentId })
+          const writable = frame.info.state === 'running' && frame.info.controllerId === this.attachmentId
+          this.patch({ info: frame.info, title: frame.info.title, phase: 'connected', writable })
+          if (writable && this.attachmentId !== undefined) this.ensureInputChannel(frame.info.id, this.attachmentId)
+          else this.dropInputChannel()
         }
         if (frame.type !== 'state') {
           const revision = ++this.revision

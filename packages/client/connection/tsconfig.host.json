@@ -15,6 +15,7 @@
     "src/loopback-hostname.ts",
     "src/rpc-host.ts",
     "src/rpc.ts",
+    "src/websocket-channel.ts",
     "src/websocket-downlink.ts",
     "src/rpc-stream.ts",
     "src/rpc-stream-host.ts",

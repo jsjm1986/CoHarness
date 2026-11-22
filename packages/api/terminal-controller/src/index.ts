@@ -12,6 +12,11 @@ import { discoverShells, resolveShell } from './shells.ts'
 import { BrowserTerminal } from './terminal.ts'
 import { TerminalRetention } from './retention.ts'
 import { TerminalAccess, type TerminalAuthority, type TerminalCreatorId } from './authorization.ts'
+import { TERMINAL_INPUT_PATH } from './input-protocol.ts'
+import {
+  bindTerminalInputSocket, resolveAuthorizedTerminalAttachment, terminalAttachmentKey,
+  type ActiveTerminalAttachment, type TerminalInputConnectionService,
+} from './input-channel.ts'
 export type { TerminalAuthority, TerminalCreatorId, UserTerminalAuthorization, UserTerminalAdministration } from './authorization.ts'
 import type {
   TerminalShell, TerminalAttachmentId, TerminalCreateRequest, TerminalEnvironment, TerminalFrame, TerminalRetentionFrame,
@@ -103,6 +108,7 @@ export class TerminalController extends TypertRemoteService {
 
   private readonly owners = new Map<string, OwnedSession>()
   private readonly pendingCreations = new Map<SessionId, number>()
+  private readonly activeAttachments = new Map<string, ActiveTerminalAttachment>()
   private readonly lifetime = new AbortController()
   private readonly access: TerminalAccess
   private readonly cleanupTasks = new Set<Promise<void>>()
@@ -117,8 +123,38 @@ export class TerminalController extends TypertRemoteService {
     ctx.on('agent/idle-release-check', ({ agent }) => this.pendingCreations.has(agent.id)
       || [...this.owners.values()].some(owner => owner.sessionId === agent.id
         && (owner.terminals.size > 0 || owner.pending.size > 0 || owner.allocations.size > 0)) ? 'busy' : undefined, { global: true })
+    ctx.inject(['connection'], (connCtx) => {
+      const connection = connCtx.get('connection') as TerminalInputConnectionService | undefined
+      connection?.ws?.handle(TERMINAL_INPUT_PATH, (socket, request) => {
+        const attachment = resolveAuthorizedTerminalAttachment(
+          request,
+          key => this.activeAttachments.get(key),
+          creator => this.access.verifyUpgrade(creator),
+        )
+        if (attachment === undefined) {
+          socket.close(1008, 'terminal unavailable')
+          return
+        }
+        bindTerminalInputSocket(socket, attachment, {
+          maxInputBytes: this.config.maxInputBytes,
+          validateDimensions: (cols, rows) => { this.dimensions(cols, rows) },
+        }, this.lifetime.signal)
+      }, {
+        authority: 'trusted-host',
+        maxMessageBytes: Math.max(64 * 1024, this.config.maxInputBytes * 2 + 4096),
+        authorize: request => resolveAuthorizedTerminalAttachment(
+          request,
+          key => this.activeAttachments.get(key),
+          creator => this.access.verifyUpgrade(creator),
+        ) !== undefined,
+      })
+    })
     ctx.effect(() => async () => {
       this.lifetime.abort(new Error('Terminal controller disposed'))
+      for (const attachment of this.activeAttachments.values()) {
+        attachment.inputSocket?.close(1001, 'terminal controller disposed')
+      }
+      this.activeAttachments.clear()
       const results = await Promise.allSettled([...this.owners].map(([id, owner]) => this.disposeOwner(id, owner)))
       await Promise.allSettled(this.cleanupTasks)
       const errors = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown)
@@ -271,9 +307,29 @@ export class TerminalController extends TypertRemoteService {
     using authority = await this.access.authorize(agent.id, signal)
     const { owner, terminal } = this.ownedTerminal(agent, id, authority.creator)
     const combined = AbortSignal.any([signal, authority.signal, owner.lifetime.signal])
-    for await (const frame of terminal.follow(attachmentId, combined)) {
-      combined.throwIfAborted()
-      yield frame
+    const key = terminalAttachmentKey(agent.id, id, attachmentId)
+    const active: ActiveTerminalAttachment = {
+      key,
+      sessionId: agent.id,
+      terminalId: id,
+      attachmentId,
+      creator: authority.creator,
+      terminal,
+      signal: combined,
+      isClosed: () => owner.lifetime.signal.aborted || owner.closedIds.has(id),
+    }
+    const previous = this.activeAttachments.get(key)
+    previous?.inputSocket?.close(1000, 'replaced')
+    this.activeAttachments.set(key, active)
+    try {
+      for await (const frame of terminal.follow(attachmentId, combined)) {
+        combined.throwIfAborted()
+        yield frame
+      }
+    } finally {
+      if (this.activeAttachments.get(key) === active) this.activeAttachments.delete(key)
+      active.inputSocket?.close(1000, 'attachment ended')
+      delete active.inputSocket
     }
   }
 

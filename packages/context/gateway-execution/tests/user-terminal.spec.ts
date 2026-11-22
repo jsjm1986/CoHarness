@@ -183,3 +183,35 @@ it('limits terminal management to the dedicated administrator purpose and a fres
   }
   await expect(f.policy.authorize(session, f.signal)).rejects.toMatchObject({ code: 'terminal/forbidden' })
 })
+
+it('verifies upgrade creators strictly against current non-purpose unexpired principals and live watch state', () => {
+  let current: GatewayRequestPrincipal | undefined =
+    { claims: { user: { id: 12 }, expiresAt: Date.now() + 60_000 } } as GatewayRequestPrincipal
+  let available = true
+  const policy = new GatewayUserTerminalAuthorization({
+    interactive: () => undefined,
+    current: () => current,
+    request: vi.fn(),
+    organization: 'org',
+    identity: { kind: 'project', id: 7, generation: 1 },
+  }, () => available)
+  policies.push(policy)
+  const expected = JSON.stringify(['org', 'project', 7, 12]) as import('@deepseek-ai/dsh-api-terminal-controller').TerminalCreatorId
+  const other = JSON.stringify(['org', 'project', 7, 99]) as import('@deepseek-ai/dsh-api-terminal-controller').TerminalCreatorId
+
+  expect(policy.verifyUpgradeCreator(expected)).toBe(true)
+  expect(policy.verifyUpgradeCreator(other)).toBe(false)
+
+  available = false
+  expect(policy.verifyUpgradeCreator(expected)).toBe(false)
+  available = true
+
+  current = { claims: { user: { id: 12 }, purpose: 'terminal-admin', expiresAt: Date.now() + 60_000 } } as GatewayRequestPrincipal
+  expect(policy.verifyUpgradeCreator(expected)).toBe(false)
+
+  current = { claims: { user: { id: 12 }, expiresAt: 0 } } as GatewayRequestPrincipal
+  expect(policy.verifyUpgradeCreator(expected)).toBe(false)
+
+  current = undefined
+  expect(policy.verifyUpgradeCreator(expected)).toBe(false)
+})

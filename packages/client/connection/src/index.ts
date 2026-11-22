@@ -36,6 +36,12 @@ export type {
   HostConnectionHandle,
   HostConnectionHttp,
 } from './rpc-host.ts'
+export type {
+  ConnectionWebSocket,
+  ConnectionWebSocketHandler,
+  ConnectionWebSocketOptions,
+  HostConnectionWebSocket,
+} from './websocket-channel.ts'
 export { HostConnectionService } from './rpc-host.ts'
 
 export { API_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from './api-path.ts'
@@ -290,6 +296,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     ctx,
     trustedHosts,
     browserAuth,
+    websocketHeartbeatIntervalMs,
   )
   // Bind each accepted request's interaction scope before any downstream
   // waterfall listener or dispatch runs: the same propagation point

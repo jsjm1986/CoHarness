@@ -4,7 +4,8 @@ import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import { TerminalView, terminalIssueOf, type TerminalRemote, type TerminalViewIssue } from './model.ts'
+import { TerminalView, terminalIssueOf, type TerminalInputChannelFactory, type TerminalRemote, type TerminalViewIssue } from './model.ts'
+import { openWebSocketTerminalInputChannel } from './input-channel.ts'
 import { createSnapshotStore, sessionPersistenceKey, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { TerminalShell, WebTerminalId, WebTerminalInfo } from '../types.ts'
@@ -64,8 +65,14 @@ export class ClientTerminals extends Service {
    * @param ctx - Client root Context with Gateway and terminal Remote namespace.
    * @param remote - generated terminal namespace.
    * @param identity - verified account/runtime identity and invalidation notifications.
+   * @param openInputChannel - optional low-latency WebSocket input channel factory.
    */
-  constructor(ctx: Context, private readonly remote: TerminalRemote, private readonly identity: TerminalIdentitySource) {
+  constructor(
+    ctx: Context,
+    private readonly remote: TerminalRemote,
+    private readonly identity: TerminalIdentitySource,
+    private readonly openInputChannel?: TerminalInputChannelFactory,
+  ) {
     super(ctx, 'webTerminals')
     this.requests = new TerminalCloseRequests(sessionId => identity.key(sessionId))
     this.bindings = new TerminalBindings(sessionId => identity.key(sessionId))
@@ -101,7 +108,7 @@ export class ClientTerminals extends Service {
       const id = saved ?? randomUUID() as WebTerminalId
       this.bindings.set(sessionId, contentId, id)
       view = new TerminalView(sessionId, this.remote, this.ctx.remote, id, saved === undefined, shellPath,
-        signal => this.hold(sessionId, id).ready(signal), identity)
+        signal => this.hold(sessionId, id).ready(signal), identity, this.openInputChannel)
       views.set(key, view)
       this.reconcileHolds()
       void view.refresh()
@@ -358,5 +365,8 @@ export async function apply(ctx: Context): Promise<void> {
         ctx.projectUiPolicy.subscribe(listener)]
       return () => { for (const dispose of disposers) dispose() }
     },
-  })
+  }, target => openWebSocketTerminalInputChannel(
+    target,
+    (value, sid) => (connection.forSession?.(sid) ?? connection).privateResourceUrl?.(value) ?? value,
+  ))
 }
