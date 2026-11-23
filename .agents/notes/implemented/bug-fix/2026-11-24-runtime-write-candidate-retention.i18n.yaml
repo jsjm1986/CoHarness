@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-24-runtime-write-candidate-retention.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-24-runtime-write-candidate-retention.md
+document:
+  en: 584d44e51243c505750fab84437e17481dd88ea4
+  zh: 78b70a08120cf06951a1d2a841251d7c53bf9488
+/agent-note-access-invalidation-retains-runtime-write-candidates:
+  en: a7328b3580601d64
+  zh: f0637629050d5f05
+/agent-note-access-invalidation-retains-runtime-write-candidates/problem:
+  en: 2b5a7ef7191f84a7
+  zh: f4739c722461b906
+/agent-note-access-invalidation-retains-runtime-write-candidates/decision:
+  en: 0b319a117812d087
+  zh: 26b8717272536296
+/agent-note-access-invalidation-retains-runtime-write-candidates/alternatives-considered:
+  en: 96ce67ad7f9ec9c7
+  zh: 37cce18f2a8073b7
+/agent-note-access-invalidation-retains-runtime-write-candidates/consequences:
+  en: 45668619b23e23dd
+  zh: 88d58b526d81602c

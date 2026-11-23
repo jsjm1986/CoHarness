@@ -72,11 +72,10 @@ export class PostgresInstanceRepository implements InstanceRepository {
   /** Node-private verified data paths. Missing required evidence throws; omitted dshHome preserves a new Runtime's layout. */
   resolveLocalPaths?:(target:RuntimeTarget)=>Promise<GovernanceLocalPaths|undefined>
 
-  /** Drop cached authorization, write candidates, and in-flight lookups. */
+  /** Drop memoized authorization and in-flight lookups. Write candidates require fresh SQL qualification at admission. */
   invalidateRuntimeTokenCache(): void {
     this.tokenCache.clear()
     this.tokenFlights.clear()
-    this.executionWriteCandidates.clear()
   }
 
   private async afterStopIntent<T extends boolean | RuntimeStopLease>(work: Promise<T>): Promise<T> {
