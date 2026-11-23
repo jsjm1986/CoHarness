@@ -21,12 +21,13 @@ export interface SyntheticProviderRow {
 
 /**
  * Invoke the real projection with synthetic query results, without credentials or a database.
+ * @param project - Projection implementation; the source export by default, the built lib for diagnostics.
  * @returns A reusable projection driver, with fresh query rows on each invocation.
  */
-export function createProjectionHarness(): (
+export function createProjectionHarness(project: typeof runtimePolicyFromRows = runtimePolicyFromRows): (
   scope: ProjectionScope, rows: SyntheticProviderRow[],
 ) => Promise<RuntimeModelProvider[]> {
-  return async (scope, rows) => runtimePolicyFromRows(1, rows.map(row => ({
+  return async (scope, rows) => project(1, rows.map(row => ({
     ...row,
     project_owned: scope === 'project',
   })), scope === 'project' ? 42 : undefined).providers

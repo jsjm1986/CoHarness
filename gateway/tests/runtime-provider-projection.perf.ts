@@ -1,10 +1,11 @@
 /** Offline built-Provider work-count diagnostic; it makes no latency or capacity claim. */
 import assert from 'node:assert/strict'
-import { createProjectionHarness, syntheticProviderRows, type ProjectionOwner, type ProjectionScope } from './runtime-provider-projection.fixture.ts'
+import { createProjectionHarness, syntheticProviderRows, type ProjectionScope } from './runtime-provider-projection.fixture.ts'
 import { writePerformanceReport } from './performance-report.ts'
+import type { runtimePolicyFromRows } from '../src/postgres/model-governance-service.ts'
 
 const builtModule = new URL('../lib/postgres/model-governance-service.js', import.meta.url)
-const { PostgresModelGovernanceService } = await import(builtModule.href) as { PostgresModelGovernanceService: ProjectionOwner }
+const { runtimePolicyFromRows: builtProjection } = await import(builtModule.href) as { runtimePolicyFromRows: typeof runtimePolicyFromRows }
 const clone = globalThis.structuredClone
 let cloneCalls = 0
 let clonedModels = 0
@@ -19,13 +20,13 @@ try {
   for (const scope of ['organization', 'project'] satisfies ProjectionScope[]) {
     for (const count of [16, 64, 256]) {
       const rows = syntheticProviderRows(count)
-      const project = createProjectionHarness(PostgresModelGovernanceService)
+      const project = createProjectionHarness(builtProjection)
       cloneCalls = 0
       clonedModels = 0
       const result = await project(scope, rows)
       assert.equal(result.length, 1)
       assert.equal(result[0]!.models.length, count)
-      assert.deepEqual(result[0]!.models.map(model => model.id), rows.map(row => row.model_id))
+      assert.deepEqual(result[0]!.models.map(model => model.id), rows.map(row => row.model))
       assert.ok(result[0]!.models.every(model => model.contextWindow === 8192 && model.maxTokens === 1024))
       samples.push({ scope, models: count, providers: result.length, cloneCalls, clonedModels })
     }
