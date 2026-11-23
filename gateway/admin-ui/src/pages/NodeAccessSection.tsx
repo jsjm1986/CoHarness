@@ -2,12 +2,13 @@
 import { usePendingEdits } from '../pending-edits.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Plus, RefreshCw } from 'lucide-react'
-import type { NodeEnrollmentId, NodeRemovalBlocker } from '../../../src/node-access.ts'
+import { nodeAccessPageSchema, type NodeEnrollmentId, type NodeRemovalBlocker } from '../../../src/node-access.ts'
 import { randomUUID } from '../../../../packages/util/crypto/src/index.ts'
 import {
   AdminRequestError, issueNodeEnrollment, listNodeAccess, reissueNodeEnrollment, revokeNodeAccess, detachNodeAccess, listDeploymentCandidates,
   checkNodeRemoval, removeNodeAccess, type NodeAccessEntry, type NodeAccessPage, type NodeEnrollment, type NodeRemovalCheck,
 } from '../api.ts'
+import { unwrapDeploymentOverviewSlice, useDeploymentOverview } from '../deployment-overview.tsx'
 import { adminLanguage, translateCopy, type CopyTranslate } from '../language.ts'
 import { Button, Dialog, EmptyState, ErrorBanner, Field, IconButton, LoadingState, Section, StatusBadge } from '../components/ui.tsx'
 import { zh, en, type NodeAccessCopyKey } from './node-access.copy.ts'
@@ -102,9 +103,22 @@ export function NodeAccessSection() {
     return () => { controller.abort() }
   }, [action, t])
 
+  const overview = useDeploymentOverview()
+  const hydratedOverview = useRef<typeof overview>(null)
+
   useEffect(() => {
+    if (cursor === undefined && refresh === 0 && hydratedOverview.current === null && overview !== null && overview.requested.has('nodeAccess') && overview.status === 'loading') {
+      setLoading(true)
+      return
+    }
     let disposed = false, pending = false
     let controller: AbortController | undefined
+    const applyError = (cause: unknown) => {
+      if (cause instanceof AdminRequestError && (cause.status === 401 || cause.status === 403)) {
+        ticketRevision.current += 1
+        setPage(null); setTicket(null); setAction(null); setError(t('denied'))
+      } else setError(t('readFailed'))
+    }
     const load = async () => {
       if (pending || disposed) return
       pending = true
@@ -115,21 +129,33 @@ export function NodeAccessSection() {
         if (!disposed) { setPage(next); setError('') }
       } catch (cause) {
         if (disposed || controller.signal.aborted) return
-        if (cause instanceof AdminRequestError && (cause.status === 401 || cause.status === 403)) {
-          ticketRevision.current += 1
-          setPage(null); setTicket(null); setAction(null); setError(t('denied'))
-        } else setError(t('readFailed'))
+        applyError(cause)
       } finally {
         pending = false
         if (!disposed) setLoading(false)
       }
     }
-    void load()
+    let skipInitial = false
+    if (cursor === undefined && refresh === 0 && overview?.status === 'ready' && overview.sections?.nodeAccess !== undefined) {
+      skipInitial = true
+      if (hydratedOverview.current !== overview) {
+        hydratedOverview.current = overview
+        try {
+          const parsed = nodeAccessPageSchema.parse(unwrapDeploymentOverviewSlice(overview.sections.nodeAccess))
+          setPage(parsed); setError('')
+        } catch (cause) {
+          applyError(cause)
+        } finally {
+          setLoading(false)
+        }
+      }
+    }
+    if (!skipInitial) void load()
     const whenVisible = () => { if (document.visibilityState === 'visible') void load() }
     const timer = setInterval(whenVisible, 10_000)
     document.addEventListener('visibilitychange', whenVisible)
     return () => { disposed = true; clearInterval(timer); controller?.abort(); document.removeEventListener('visibilitychange', whenVisible) }
-  }, [cursor, refresh, t])
+  }, [cursor, overview, refresh, t])
 
   const reread = () => { setRefresh(value => value + 1) }
   const open = (next: Action) => {

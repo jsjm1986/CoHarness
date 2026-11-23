@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto'
-import { EventEmitter } from 'node:events'
+import { once } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PassThrough } from 'node:stream'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { AddressInfo } from 'node:net'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
 import { openDb } from '../src/db.ts'
@@ -17,33 +17,6 @@ import type { RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { createGatewayServer, SESSION_COOKIE, type GatewayDeps, type ReadySessionHandler } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
 import { testConfig } from './test-config.ts'
-
-class FakeResponse extends EventEmitter {
-  statusCode = 200
-  headers = new Map<string, string>()
-  body = ''
-  writableEnded = false
-  writableFinished = false
-  destroyed = false
-
-  setHeader(name: string, value: string): void {
-    this.headers.set(name.toLowerCase(), value)
-  }
-
-  writeHead(status: number, headers: Record<string, string> = {}): this {
-    this.statusCode = status
-    for (const [key, value] of Object.entries(headers)) this.headers.set(key.toLowerCase(), value)
-    return this
-  }
-
-  end(chunk = ''): this {
-    this.body += chunk
-    this.writableEnded = true
-    this.writableFinished = true
-    this.emit('finish')
-    return this
-  }
-}
 
 const cleanups: Array<() => void> = []
 afterEach(() => {
@@ -140,32 +113,27 @@ describe('forwarded readySession fallback routing', () => {
     })
     const server = createGatewayServer(deps, { readySession, proxy })
 
-    const req = new PassThrough() as PassThrough & {
-      method?: string
-      url?: string
-      headers: Record<string, string>
-      socket: { remoteAddress: string }
-    }
-    req.method = 'POST'
-    req.url = `${path}?dshRuntime=${runtimeId}&dshTarget=personal&dshNode=${nodeId}`
+    server.listen(0, '127.0.0.1')
+    onTestFinished(() => new Promise<void>((resolve, reject) => {
+      server.close(error => { if (error) reject(error); else resolve() })
+    }))
+    await once(server, 'listening')
     const origin = cfg.publicOrigins[0] ?? 'http://127.0.0.1:8080'
-    req.headers = {
-      cookie: `${SESSION_COOKIE}=${token}`,
-      origin,
-      host: new URL(origin).host,
-      'content-type': 'application/json',
-      [NODE_SERVICE_TARGET_HEADER]: nodeId,
-      'x-dsh-gateway-forward': 'signed-assertion',
-    }
-    req.socket = { remoteAddress: '127.0.0.1' }
-    req.end('{}')
-    const res = new FakeResponse()
-    const finished = new Promise<void>(resolve => res.once('finish', resolve))
-
-    server.emit('request', req as unknown as IncomingMessage, res as unknown as ServerResponse)
-    await finished
-
-    expect(res.statusCode).toBe(200)
+    const port = (server.address() as AddressInfo).port
+    const response = await fetch(`http://127.0.0.1:${port}${path}?dshRuntime=${runtimeId}&dshTarget=personal&dshNode=${nodeId}`, {
+      method: 'POST',
+      headers: {
+        cookie: `${SESSION_COOKIE}=${token}`,
+        origin,
+        host: new URL(origin).host,
+        'content-type': 'application/json',
+        [NODE_SERVICE_TARGET_HEADER]: nodeId,
+        'x-dsh-gateway-forward': 'signed-assertion',
+      },
+      body: '{}',
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ route: 'proxy' })
     expect(readySession).toHaveBeenCalledTimes(1)
     expect(readySession).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ forwarded: candidate }))
     expect(proxy).toHaveBeenCalledTimes(1)

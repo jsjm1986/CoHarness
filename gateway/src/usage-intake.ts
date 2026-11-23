@@ -61,7 +61,7 @@ export interface UsageIntakeWrites {
  * @returns An unbound server whose caller owns listening and closure.
  */
 export function createUsageIntakeServer(
-  governance: GatewayModelGovernanceService,
+  governance: Pick<GatewayModelGovernanceService, 'subjectForIntakeToken' | 'ingest' | 'ingestRegistration'>,
   audit?: GatewayAuditService,
   writes?: UsageIntakeWrites,
   performanceObserver?: GatewayPerformanceObserver,

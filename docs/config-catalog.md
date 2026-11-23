@@ -373,7 +373,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-terminal-controller`
 
 - `inject`: `subprocess` · `sandboxPolicy` · `typert` · `workingDirectory`
-- `source`: [`packages/api/terminal-controller/src/index.ts:31`](../packages/api/terminal-controller/src/index.ts)
+- `source`: [`packages/api/terminal-controller/src/index.ts:36`](../packages/api/terminal-controller/src/index.ts)
 
 ```ts config-catalog
 /** Deployment limits and an optional shell profile. */
@@ -522,7 +522,7 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-client-connection`
 
 - `inject`: `credentials`
-- `source`: [`packages/client/connection/src/index.ts:113`](../packages/client/connection/src/index.ts)
+- `source`: [`packages/client/connection/src/index.ts:120`](../packages/client/connection/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment's non-loopback serving authorities. */
@@ -1957,7 +1957,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-llm`
 
-- `source`: [`packages/llm/llm/src/index.ts:400`](../packages/llm/llm/src/index.ts)
+- `source`: [`packages/llm/llm/src/index.ts:402`](../packages/llm/llm/src/index.ts)
 
 ```ts config-catalog
 /** Runtime controls for bounded adapter-stream teardown. */
@@ -3295,7 +3295,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-session-persistence-gateway`
 
 - `inject`: `sessions` · `gatewayRuntime`
-- `source`: [`packages/session/session-persistence-gateway/src/index.ts:90`](../packages/session/session-persistence-gateway/src/index.ts)
+- `source`: [`packages/session/session-persistence-gateway/src/index.ts:94`](../packages/session/session-persistence-gateway/src/index.ts)
 
 ```ts config-catalog
 /** Provider tunables for coordinator caching, write coalescing, and loopback requests. */
@@ -3393,7 +3393,7 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 ## `@deepseek-ai/dsh-session-projection-cache`
 
 - `inject`: `storageDomain` · `sessionProjections` · `sessions`
-- `source`: [`packages/session/session-projection-cache/src/index.ts:62`](../packages/session/session-projection-cache/src/index.ts)
+- `source`: [`packages/session/session-projection-cache/src/index.ts:63`](../packages/session/session-projection-cache/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -3419,7 +3419,7 @@ export interface Config {
 
 - `inject`: `sessions`
 - `refs`: [`SessionQueryConfig`](../packages/session-query/session-query/src/index.ts)
-- `source`: [`packages/session-query/session-query-sqlite/src/index.ts:96`](../packages/session-query/session-query-sqlite/src/index.ts)
+- `source`: [`packages/session-query/session-query-sqlite/src/index.ts:95`](../packages/session-query/session-query-sqlite/src/index.ts)
 
 ```ts config-catalog
 /** Combined session-query configuration backed by SQLite full-text search. */
@@ -3446,7 +3446,7 @@ export interface Config extends SessionQueryConfig {
   maxLimit?: number
   /** Maximum snippet length in Unicode code points. Defaults to 240. */
   snippetChars?: number
-  /** Maximum concurrent persisted-log reads in one inherited batch read. Defaults to 4. */
+  /** Maximum concurrent persisted-log inspections for one search or inherited batch read. Defaults to 4. */
   persistedReadConcurrency?: number
 }
 

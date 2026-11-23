@@ -123,7 +123,7 @@ it('reviews an exact computer before removal and keeps blocked or cancelled comp
   onTestFinished(() => fixture.close())
   fixture.state.scope = 'organization'
   const android = adminAndroidEndpoint === undefined ? undefined : await connectAdminAndroid(fixture.base)
-  const browser = android?.browser ?? await chromium.launch()
+  const browser = android?.browser ?? await chromium.launch({ executablePath: process.env.DSH_TEST_BROWSER_EXECUTABLE })
   onTestFinished(() => android === undefined ? browser.close() : android.close())
   const sizes = android === undefined ? widths : [[0, 0]] as const
   for (const [width, height] of sizes) {

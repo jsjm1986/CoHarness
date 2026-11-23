@@ -19,6 +19,8 @@ export interface NodeServiceConfig {
   forwarding: boolean
   /** The current primary can authorize and revalidate personal history on its managed transport. */
   preparedReadDelegation?: true
+  /** Skip the second primary release query when the connected access monitor still matches the approved revision. */
+  preparedReadFastRelease?: true
   maxConnections: number
   maxPerNode: number
   connectTimeoutMs: number
@@ -28,6 +30,8 @@ export interface NodeServiceConfig {
   httpMaxPendingRequests: number
   httpMaxPendingPerNode: number
   httpQueueTimeoutMs: number
+  /** Optional invalidation-coupled cache window (ms) for pooled node-lease rechecks; 0 checks every reuse. */
+  leaseCacheMs?: number
 }
 
 /** Authenticated control-channel request; disposal withdraws only this connection. */
@@ -63,6 +67,16 @@ function setting(env: NodeJS.ProcessEnv, key: string, fallback: number): number 
   return value
 }
 
+function optionalSetting(env: NodeJS.ProcessEnv, key: string, fallback: number, max: number): number {
+  const raw = env[key]
+  if (raw === undefined) return fallback
+  const value = Number(raw)
+  if (!/^(?:0|[1-9][0-9]*)$/u.test(raw) || !Number.isSafeInteger(value) || value > max) {
+    throw new Error(`${key} must be a non-negative safe integer <= ${String(max)}`)
+  }
+  return value
+}
+
 /**
  * Resolve the existing-service transport's independent admission limits.
  * @param env - operator deployment settings.
@@ -73,6 +87,10 @@ export function loadNodeServiceConfig(env: NodeJS.ProcessEnv): NodeServiceConfig
   if (forwarding !== 'on' && forwarding !== 'off') throw new Error('HGW_NODE_SERVICE_FORWARDING must be on or off')
   const prepared = env.HGW_NODE_SERVICE_PREPARED_READ_DELEGATION ?? 'off'
   if (prepared !== 'on' && prepared !== 'off') throw new Error('HGW_NODE_SERVICE_PREPARED_READ_DELEGATION must be on or off')
+  const preparedFastRelease = env.HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE ?? 'off'
+  if (preparedFastRelease !== 'on' && preparedFastRelease !== 'off') {
+    throw new Error('HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE must be on or off')
+  }
   const maxConnections = setting(env, 'HGW_NODE_SERVICE_MAX_CONNECTIONS', 64)
   const maxPerNode = setting(env, 'HGW_NODE_SERVICE_MAX_PER_NODE', 16)
   if (maxPerNode > maxConnections) throw new Error('HGW_NODE_SERVICE_MAX_PER_NODE must not exceed HGW_NODE_SERVICE_MAX_CONNECTIONS')
@@ -84,10 +102,13 @@ export function loadNodeServiceConfig(env: NodeJS.ProcessEnv): NodeServiceConfig
   const httpMaxPendingRequests = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS', 256)
   const httpMaxPendingPerNode = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE', Math.min(httpMaxPendingRequests, 32))
   if (httpMaxPendingPerNode > httpMaxPendingRequests) throw new Error('HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE must not exceed HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS')
+  const leaseCacheMs = optionalSetting(env, 'HGW_NODE_SERVICE_LEASE_CACHE_MS', 0, 30_000)
   return { forwarding: forwarding === 'on', ...(prepared === 'on' ? { preparedReadDelegation: true as const } : {}),
+    ...(preparedFastRelease === 'on' ? { preparedReadFastRelease: true as const } : {}),
     maxConnections, maxPerNode, connectTimeoutMs: setting(env, 'HGW_NODE_SERVICE_CONNECT_TIMEOUT_MS', 10_000),
     httpIdleTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_IDLE_TIMEOUT_MS', 30_000), httpMaxIdleConnections, httpMaxIdlePerNode,
-    httpMaxPendingRequests, httpMaxPendingPerNode, httpQueueTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS', 60_000) }
+    httpMaxPendingRequests, httpMaxPendingPerNode, httpQueueTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS', 60_000),
+    ...(leaseCacheMs > 0 ? { leaseCacheMs } : {}) }
 }
 
 /** One center's transport owner; HTTP/user authorization belongs to the existing Gateway request path. */
@@ -99,6 +120,7 @@ export class GatewayNodeServices {
   private readonly paused = new Set<RuntimeNodeId>()
   private readonly sockets = new Map<WebSocket, Promise<void>>()
   private readonly streamOwners = new WeakMap<Duplex, Connection>()
+  private readonly leaseCache = new Map<string, { nodeId: RuntimeNodeId; validUntil: number }>()
   private readonly work = new Set<Promise<unknown>>()
   private readonly lifetime = new AbortController()
   private checking = 0
@@ -196,21 +218,48 @@ export class GatewayNodeServices {
   }
 
   /**
+   * Drop cached lease-revalidation entries for one computer or the entire organization.
+   * @param nodeId - computer whose lease cache should be cleared; omitted clears all nodes.
+   */
+  invalidateLeaseCache(nodeId?: RuntimeNodeId): void {
+    if (nodeId === undefined) {
+      this.leaseCache.clear()
+      return
+    }
+    for (const [key, entry] of this.leaseCache) {
+      if (entry.nodeId === nodeId) this.leaseCache.delete(key)
+    }
+  }
+
+  /**
    * Recheck an idle transport's exact credential and connection lease before another HTTP request.
    * @param stream - previously admitted service transport.
-   * @returns after current center authority accepts the same node connection and epoch.
+   * @returns `'cached'` when satisfied from an unexpired invalidation-coupled lease entry, otherwise `undefined`.
    */
-  revalidate(stream: Duplex): Promise<void> {
+  revalidate(stream: Duplex): Promise<'cached' | void> {
     const connection = this.streamOwners.get(stream)
     if (connection === undefined || connection.finished || connection.lease === undefined || connection.credential === undefined
       || this.lifetime.signal.aborted || this.paused.has(connection.nodeId)) return Promise.reject(new NodeServiceError(503, 'node-service/unavailable'))
     const expected = connection.lease, credential = connection.credential
+    const cacheMs = this.config.leaseCacheMs ?? 0
+    const cacheKey = cacheMs > 0 ? `${connection.nodeId}:${expected.connectionId}:${expected.epoch}:${credential}` : undefined
+    if (cacheKey !== undefined) {
+      const cached = this.leaseCache.get(cacheKey)
+      if (cached !== undefined && cached.validUntil > Date.now()) return Promise.resolve('cached')
+      if (cached !== undefined) this.leaseCache.delete(cacheKey)
+    }
     return this.track((async () => {
       try {
         const lease = await this.authority.authorizeChannel(credential, { connectionId: expected.connectionId, epoch: expected.epoch })
         if (connection.finished || stream.destroyed || lease.nodeId !== connection.nodeId || lease.organizationId !== expected.organizationId
           || lease.connectionId !== expected.connectionId || lease.epoch !== expected.epoch) throw new NodeServiceError(503, 'node-service/unavailable')
+        if (cacheKey !== undefined) {
+          const leaseExpiresAt = Date.parse(lease.expiresAt)
+          const validUntil = Number.isFinite(leaseExpiresAt) ? Math.min(Date.now() + cacheMs, leaseExpiresAt) : Date.now() + cacheMs
+          if (validUntil > Date.now()) this.leaseCache.set(cacheKey, { nodeId: connection.nodeId, validUntil })
+        }
       } catch (error) {
+        if (cacheKey !== undefined) this.leaseCache.delete(cacheKey)
         connection.fail(error)
         throw error
       }
@@ -235,6 +284,7 @@ export class GatewayNodeServices {
    */
   pauseIdle(nodeId: RuntimeNodeId): () => void {
     if (this.paused.has(nodeId) || (this.perNode.get(nodeId) ?? 0) !== 0) throw new NodeServiceError(409, 'node-service/busy')
+    this.invalidateLeaseCache(nodeId)
     this.paused.add(nodeId)
     return () => { this.paused.delete(nodeId) }
   }

@@ -2,7 +2,7 @@
 import { usePendingEdits } from '../pending-edits.tsx'
 import { RefreshCw, ShieldCheck } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { AdminLink } from '../admin-navigation.tsx'
 import {
   getStewardOverview,
   setStewardPolicy,
@@ -238,9 +238,9 @@ function MemberRow({ entry, busy, onToggle }: {
   return (
     <tr>
       <td>
-        <Link className="userLink" to={`/users/${entry.userId}`}>
+        <AdminLink className="userLink" to={`/users/${entry.userId}`}>
           <UserIdentity user={{ id: entry.userId, username: entry.username, displayName: entry.displayName }} />
-        </Link>
+        </AdminLink>
       </td>
       <td>
         <span className="pageBadges">
@@ -263,9 +263,9 @@ function MemberCard({ entry, busy, onToggle }: {
   return (
     <article className="mobileItem">
       <div className="mobileItemHeader">
-        <Link className="userLink" to={`/users/${entry.userId}`}>
+        <AdminLink className="userLink" to={`/users/${entry.userId}`}>
           <UserIdentity user={{ id: entry.userId, username: entry.username, displayName: entry.displayName }} />
-        </Link>
+        </AdminLink>
         {admissionBadge(entry, t)}
       </div>
       <div className="mobileItemBody">

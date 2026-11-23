@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/README.md
 document:
-  en: a72e0352e892ce56c22ad1c2a7b0b80abd851ca0
-  zh: 7e657d5499b226b6ce1df2ce0e183869604de1d6
+  en: 20f796f08c791ddeaf02f635a22d71ea0c025b34
+  zh: 028911bac734aedf9ae1da8c06103600283f52f8
 /production-deployment-runbook:
   en: bab9204fe333e354
   zh: dda096b4b8c30c4b
@@ -24,8 +24,8 @@ document:
   en: 27bfd905af326534
   zh: e27e57ea234c3657
 /production-deployment-runbook/tls-entry-and-cutover:
-  en: bb7abf04651a480a
-  zh: 3214e1a3df3cb263
+  en: 5a4f5022b7984b8c
+  zh: 083e8dbd3f435bd3
 /production-deployment-runbook/acceptance:
   en: 6381007832bdb568
   zh: 6e4727e1fad60137

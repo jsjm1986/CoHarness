@@ -257,6 +257,24 @@ it('caches captured remote immutable assets on Center while still enforcing fres
   expect(f.admit).toHaveBeenCalledTimes(2)
   expect(f.assets.diagnostics().remoteCacheHits).toBe(1)
 
+  // Another authorized Runtime on the same remote node reuses the content-addressed immutable cache after its own admission check.
+  const otherRuntimeId = randomUUID() as RuntimeId
+  const otherPath = f.path.replace(f.admission.placement.environment!.id, otherRuntimeId)
+  f.admit.mockResolvedValueOnce({
+    ...f.admission,
+    placement: {
+      ...f.admission.placement,
+      environment: { ...f.admission.placement.environment!, id: otherRuntimeId },
+    },
+    snapshot: { ...f.admission.snapshot, generation: 9 },
+  })
+  const sharedHit = await fetch(f.origin + otherPath, { headers: { ...f.headers, 'accept-encoding': 'br, gzip' } })
+  expect(sharedHit.status).toBe(200)
+  expect(await sharedHit.text()).toBe(payload)
+  expect(f.forward).toHaveBeenCalledTimes(1)
+  expect(f.admit).toHaveBeenCalledTimes(3)
+  expect(f.assets.diagnostics().remoteCacheHits).toBe(2)
+
   // Conditional ETag check answers 304 directly from Center cache for both strong and weakened forms.
   const notModified = await fetch(f.origin + f.path, { headers: { ...f.headers, 'if-none-match': '"remote-v1"' } })
   expect(notModified.status).toBe(304)

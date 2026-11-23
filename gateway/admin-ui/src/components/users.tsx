@@ -2,7 +2,7 @@
 import { usePendingEdits } from '../pending-edits.tsx'
 import { Play, RefreshCw, Square } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { AdminLink } from '../admin-navigation.tsx'
 import { controlInstance, type AdminUser } from '../api.ts'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { Button, ConfirmDialog, Dialog, ErrorBanner, Field, IconButton, StatusBadge, Switch } from './ui.tsx'
@@ -58,7 +58,7 @@ export function InstanceCell({ user, pending, run }: { user: AdminUser; pending:
 export function InstanceControls({ user, pending, run }: { user: AdminUser; pending: string; run: UserActionRunner }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const busy = pending.startsWith(`instance:${user.id}:`)
-  if ((user.runtimeCount ?? 1) > 1) return <Link className="backLink" to={`/users/${user.id}`}>{t('multipleRuntimes', { count: String(user.runtimeCount) })}</Link>
+  if ((user.runtimeCount ?? 1) > 1) return <AdminLink className="backLink" to={`/users/${user.id}`}>{t('multipleRuntimes', { count: String(user.runtimeCount) })}</AdminLink>
   return (
     <div className="compactActions" aria-label={t('instanceActionsAria', { name: user.username })}>
       <IconButton

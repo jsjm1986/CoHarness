@@ -43,7 +43,7 @@ export async function verifyNodePluginStorage(context:PostgresRuntimeContext,sto
   expect(created.state).toEqual(desired)
   expect(await plugins.get(target)).toEqual(created)
   expect(await plugins.projection(target)).toEqual(created)
-  await plugins.markApplied(target,created.revision)
+  await plugins.markApplied(target,created.revision,1)
   expect(await plugins.projection(target)).toBe('current')
   await expect(plugins.set(target,{entries:[{id:'unknown-custom',name:'unregistered-test-plugin',disabled:false}],bundles:[]},created.revision,actor)).rejects.toBeInstanceOf(NodeContentUnavailable)
   await expect(plugins.set(target,desired,'0',actor)).rejects.toMatchObject({status:409})

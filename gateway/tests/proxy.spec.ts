@@ -14,6 +14,7 @@ import { AuthService } from '../src/auth.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager, RuntimeLeaseUnavailableError, type RuntimeLaunchContext } from '../src/instances.ts'
+import { ModelGovernanceService } from '../src/model-governance.ts'
 import type { Launcher, LaunchRuntime } from '../src/launcher.ts'
 import { RUNTIME_READINESS_NONCE_HEADER, RUNTIME_READINESS_PATH, runtimeReadinessResponseProof } from '../src/runtime-readiness.ts'
 import { ProjectService } from '../src/projects.ts'
@@ -268,7 +269,32 @@ describe('proxy handlers', () => {
     expect(project).toHaveBeenCalledWith(runtime.dshHome, state)
     expect(markApplied).not.toHaveBeenCalled()
     await prepare(runtime, 'launch')
-    expect(markApplied).toHaveBeenCalledExactlyOnceWith(runtime.target, 'reviewed')
+    expect(markApplied).toHaveBeenCalledExactlyOnceWith(runtime.target, 'reviewed', runtime.generation)
+  })
+
+  it('drains a pending plugin read after a policy failure without projecting the profile', async () => {
+    const { deps, alice, db } = await setup()
+    const entered = barrier(), release = barrier(), policyRead = barrier()
+    const state = { entries: [], bundles: [] }
+    const projection = vi.fn(async () => { entered.resolve(); await release.promise; return { revision: '1', state } })
+    const project = vi.fn(async () => {})
+    const markApplied = vi.fn(async () => {})
+    const unrelated = () => { throw new Error('Unexpected plugin state operation') }
+    deps.pluginState = { projection, project, markApplied, applied: unrelated, set: unrelated, list: unrelated,
+      get: unrelated, observed: unrelated, readForSubject: unrelated, publishForSubject: unrelated }
+    const governance = new ModelGovernanceService(db)
+    vi.spyOn(governance, 'policyFor').mockImplementation(() => { policyRead.resolve(); throw new Error('Policy unavailable') })
+    deps.governance = governance
+    const starting = expect(deps.instances.ensureRunning(alice)).rejects.toThrow('Policy unavailable')
+    try {
+      await Promise.all([entered.promise, policyRead.promise])
+    } finally {
+      release.resolve()
+      await starting
+    }
+    expect(project).not.toHaveBeenCalled()
+    expect(markApplied).not.toHaveBeenCalled()
+    expect(await deps.instances.isLive(alice.id)).toBe(false)
   })
 
   it('reports unavailable supervision without restarting or releasing the live Runtime', async () => {

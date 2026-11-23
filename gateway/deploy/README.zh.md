@@ -88,7 +88,7 @@ server {
 }
 ```
 
-跨高延迟 PostgreSQL 隧道的多电脑部署可设置 `HGW_DATABASE_MIN_CONNECTIONS`（例如远端电脑设为 `2`）维持暖连接池，在 `LISTEN` 连通时通过 `HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS`（默认 `15000`）降低空闲权限失效轮询频率，通过 `HGW_NODE_SERVICE_IDENTITY_CACHE_MS`（默认 `5000`）缓存远端桥接节点身份校验，通过 `HGW_RUNTIME_ASSET_CACHE_MAX_BYTES`（默认 `33554432`）在中心节点缓存已鉴权的远端不可变插件包，并通过 `HGW_RUNTIME_PREPARE_WAIT_MS`（默认 `1500`）吸收短时冷启动等待。
+跨高延迟 PostgreSQL 隧道的多电脑部署可设置 `HGW_DATABASE_MIN_CONNECTIONS`（例如远端电脑设为 `2`）维持暖连接池，在 `LISTEN` 连通时通过 `HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS`（默认 `15000`）降低空闲权限失效轮询频率，通过 `HGW_NODE_SERVICE_IDENTITY_CACHE_MS`（默认 `5000`）缓存远端桥接节点身份校验，可选通过 `HGW_NODE_SERVICE_LEASE_CACHE_MS`（默认 `0`，上限 `30000`，节点或组织级失效时立即清除）缓存连接池节点租约复验，通过 `HGW_NODE_SERVICE_PREPARED_READ_DELEGATION=on`（默认 `off`）开启主节点委托个人读准入并可选配合单主节点快速放行 `HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE=on`（默认 `off`），通过 `HGW_RUNTIME_ASSET_CACHE_MAX_BYTES`（默认 `33554432`）在中心节点缓存已鉴权的远端不可变插件包，并通过 `HGW_RUNTIME_PREPARE_WAIT_MS`（默认 `1500`）吸收短时冷启动等待。
 
 登录失败只会让该用户名在产生失败的客户端来源上被锁定；同一来源跨用户名累计 20 次失败会锁定该来源；IPv6 来源按 /64 归组。Gateway 从 `X-Forwarded-For` 中最右侧且不在 `HGW_TRUSTED_PROXIES`（默认 `127.0.0.1,::1`）内的一跳读取客户端地址，因此入口必须像上面那样追加该请求头；Cloudflare Tunnel 已自带该请求头。缺少该请求头时，所有请求共用回环来源，只有按用户名的锁定生效。
 

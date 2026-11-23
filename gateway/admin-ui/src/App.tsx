@@ -19,16 +19,18 @@ import {
   Webhook,
   type LucideIcon,
 } from 'lucide-react'
-import { Link, NavLink, Navigate, Route, createBrowserRouter, RouterProvider, Routes, useLocation } from 'react-router-dom'
+import { NavLink, Navigate, Outlet, createBrowserRouter, RouterProvider, useLocation, useNavigate, useParams, type RouteObject } from 'react-router-dom'
 import { UsersPage } from './pages/UsersPage.tsx'
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPageImport, lazyPage, PageLoading } from './components/async-route.tsx'
 import { Button, Dialog, ErrorBanner, PageHeader } from './components/ui.tsx'
+import { clearAdminProjectDisplayCache } from './project-display-cache.ts'
 import { adminLanguage, setAdminLanguage, translateCopy } from './language.ts'
 import { zh as chromeZh, en as chromeEn, type ChromeCopyKey } from './chrome.copy.ts'
 import { ComputerSelectorProvider } from './ComputerSelector.tsx'
-import { adminComputerBase, adminComputerTarget } from './computer-target.ts'
-import { PendingEditsProvider, useProtectedNavigation, type PendingEditsGuard } from './pending-edits.tsx'
+import { adminComputerBase, adminComputerTarget, bindAdminPath } from './computer-target.ts'
+import { AdminLink, useAdminPath } from './admin-navigation.tsx'
+import { PendingEditsProvider, useProtectedNavigation } from './pending-edits.tsx'
 import { zh as computerZh, en as computerEn } from './computer.copy.ts'
 
 const ArchivesPage = lazyPage(async () => ({ default: (await import('./pages/ArchivesPage.tsx')).ArchivesPage }))
@@ -54,6 +56,7 @@ const TerminalsPage = lazyPage(async () => ({ default: (await import('./pages/Te
 const UsagePage = lazyPage(async () => ({ default: (await import('./pages/UsagePage.tsx')).UsagePage }))
 const UserDetailPage = lazyPage(async () => ({ default: (await import('./pages/UserDetailPage.tsx')).UserDetailPage }))
 const WebhooksPage = lazyPage(async () => ({ default: (await import('./pages/WebhooksPage.tsx')).WebhooksPage }))
+const ADMIN_ROOT = adminComputerBase()
 
 export function App() {
   const path = window.location.pathname
@@ -70,121 +73,58 @@ function readComputerTarget(pathname: string): { nodeId: ReturnType<typeof admin
 }
 
 function OrdinaryAdminApp() {
-  const [computer, setComputer] = useState(() => readComputerTarget(window.location.pathname))
-  const computerRef = useRef(computer)
-  const currentUrlRef = useRef(`${window.location.pathname}${window.location.search}${window.location.hash}`)
-  const pendingGuardRef = useRef<PendingEditsGuard | undefined>(undefined)
-  const switchedComputerRef = useRef(false)
-  const t = useMemo(() => translateCopy(adminLanguage(), { zh: computerZh, en: computerEn }), [])
-  const switchComputer = useCallback((nextNodeId: ReturnType<typeof adminComputerTarget>, nextUrl: string) => {
-    window.history.pushState(null, '', nextUrl)
-    currentUrlRef.current = nextUrl
-    switchedComputerRef.current = true
-    const next = { nodeId: nextNodeId, invalid: false }
-    computerRef.current = next
-    setComputer(next)
-  }, [])
+  const [router, setRouter] = useState<ReturnType<typeof createBrowserRouter>>()
   useEffect(() => {
-    const syncFromHistory = (event: PopStateEvent): void => {
-      const attemptedUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
-      const next = readComputerTarget(window.location.pathname)
-      const current = computerRef.current
-      if (current.nodeId === next.nodeId && current.invalid === next.invalid) return
-      event.stopImmediatePropagation()
-      if (pendingGuardRef.current?.hasChanges() === true) {
-        window.history.pushState(null, '', currentUrlRef.current)
-        pendingGuardRef.current.block(attemptedUrl)
-        return
-      }
-      currentUrlRef.current = attemptedUrl
-      switchedComputerRef.current = true
-      computerRef.current = next
-      setComputer(next)
-    }
-    window.addEventListener('popstate', syncFromHistory)
-    return () => { window.removeEventListener('popstate', syncFromHistory) }
+    const owned = createBrowserRouter([{
+      element: <PendingEditsProvider protectHistory><AdminDocument /></PendingEditsProvider>,
+      children: [
+        { path: 'computers/:nodeId', children: ADMIN_PAGES },
+        { children: ADMIN_PAGES },
+      ],
+    }], { basename: ADMIN_ROOT })
+    const unbind = bindAdminPath(() => owned.state.location.pathname)
+    setRouter(owned)
+    return () => { unbind(); owned.dispose() }
   }, [])
-  if (computer.invalid) return <main className="mainContent">
-    <div className="page adminEntryNotice">
-      <ErrorBanner message={t('invalid')} />
-      <a className="button button-secondary" href="/admin/">{t('returnCenter')}</a>
-    </div>
-  </main>
   return <DeploymentContextProvider>
-    <AdminWorkspace
-      nodeId={computer.nodeId}
-      onSwitchComputer={switchComputer}
-      currentUrlRef={currentUrlRef}
-      pendingGuardRef={pendingGuardRef}
-      switchedComputerRef={switchedComputerRef}
-    />
+    {router === undefined ? <PageLoading /> : <RouterProvider router={router} />}
   </DeploymentContextProvider>
 }
 
-function AdminWorkspace({ nodeId, onSwitchComputer, currentUrlRef, pendingGuardRef, switchedComputerRef }: {
-  nodeId: ReturnType<typeof adminComputerTarget>
-  onSwitchComputer(nextNodeId: ReturnType<typeof adminComputerTarget>, nextUrl: string): void
-  currentUrlRef: MutableRefObject<string>
-  pendingGuardRef: MutableRefObject<PendingEditsGuard | undefined>
-  switchedComputerRef: MutableRefObject<boolean>
-}) {
-  const deployment = useDeploymentContext()
-  const selectComputerRef = useRef<(nextNodeId?: ReturnType<typeof adminComputerTarget>) => void>(() => {})
-  const expectedBase = adminComputerBase(nodeId)
-  const [router, setRouter] = useState<{ base: string; instance: ReturnType<typeof createBrowserRouter> }>()
-  useEffect(() => {
-    const owned = createBrowserRouter([{ path: '*', element: <PendingEditsProvider protectHistory guardRef={pendingGuardRef}>
-      <AdminDocument
-        nodeId={nodeId}
-        onSwitchComputer={onSwitchComputer}
-        selectComputerRef={selectComputerRef}
-        currentUrlRef={currentUrlRef}
-        switchedComputerRef={switchedComputerRef}
-      />
-    </PendingEditsProvider> }], { basename: expectedBase })
-    setRouter({ base: expectedBase, instance: owned })
-    return () => { owned.dispose() }
-  }, [currentUrlRef, expectedBase, nodeId, onSwitchComputer, pendingGuardRef, switchedComputerRef])
-  return <ComputerSelectorProvider enabled={deployment.value?.scope === 'organization'} nodeId={nodeId}
-    onSelect={nextNodeId => selectComputerRef.current(nextNodeId)}>
-    {router === undefined || router.base !== expectedBase ? <PageLoading /> : <RouterProvider key={router.base} router={router.instance} />}
-  </ComputerSelectorProvider>
-}
-
-function AdminDocument({ nodeId, onSwitchComputer, selectComputerRef, currentUrlRef, switchedComputerRef }: {
-  nodeId: ReturnType<typeof adminComputerTarget>
-  onSwitchComputer(nextNodeId: ReturnType<typeof adminComputerTarget>, nextUrl: string): void
-  selectComputerRef: MutableRefObject<(nextNodeId?: ReturnType<typeof adminComputerTarget>) => void>
-  currentUrlRef: MutableRefObject<string>
-  switchedComputerRef: MutableRefObject<boolean>
-}) {
+function AdminDocument() {
   const navigation = useProtectedNavigation()
+  const navigate = useNavigate()
   const deployment = useDeploymentContext()
   const location = useLocation()
+  const documentPath = `${ADMIN_ROOT}${location.pathname}`
+  const { nodeId, invalid } = readComputerTarget(documentPath)
+  const pagePath = documentPath.slice(adminComputerBase(nodeId).length) || '/'
+  const previousNode = useRef(nodeId)
   const mainRef = useRef<HTMLElement>(null)
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: computerZh, en: computerEn }), [])
   const unavailable = nodeId !== undefined && deployment.value !== null && deployment.value.scope === 'local' && nodeId !== deployment.value.entry.nodeId
   useLayoutEffect(() => {
-    currentUrlRef.current = `${window.location.pathname}${window.location.search}${window.location.hash}`
-  }, [currentUrlRef, location.hash, location.pathname, location.search])
-  useLayoutEffect(() => {
-    selectComputerRef.current = nextNodeId => {
-      const nextUrl = `${adminComputerBase(nextNodeId)}${location.pathname}${location.search}${location.hash}`
-      navigation.navigate(nextUrl, () => onSwitchComputer(nextNodeId, nextUrl))
+    if (previousNode.current !== nodeId) {
+      previousNode.current = nodeId
+      mainRef.current?.focus({ preventScroll: true })
     }
-  }, [location.hash, location.pathname, location.search, navigation, onSwitchComputer, selectComputerRef])
-  useEffect(() => {
-    if (!switchedComputerRef.current) return
-    switchedComputerRef.current = false
-    mainRef.current?.focus({ preventScroll: true })
-  }, [switchedComputerRef])
+  }, [nodeId])
   useEffect(() => {
     const previous = document.documentElement.lang
     document.documentElement.lang = adminLanguage()
     return () => { document.documentElement.lang = previous }
   }, [])
+  if (invalid) return <main className="mainContent">
+    <div className="page adminEntryNotice">
+      <ErrorBanner message={t('invalid')} />
+      <a className="button button-secondary" href="/admin/">{t('returnCenter')}</a>
+    </div>
+  </main>
   return (
-    <>
+    <ComputerSelectorProvider enabled={deployment.value?.scope === 'organization'} nodeId={nodeId} onSelect={nextNodeId => {
+      const nextUrl = `${adminComputerBase(nextNodeId)}${pagePath}${location.search}${location.hash}`
+      navigation.navigate(nextUrl, () => { void navigate(nextUrl.slice(ADMIN_ROOT.length)) })
+    }}>
       <div className="adminShell" data-testid="admin-app">
         <aside className="sidebar">
           <Brand />
@@ -198,7 +138,7 @@ function AdminDocument({ nodeId, onSwitchComputer, selectComputerRef, currentUrl
           <AccountActions compact />
         </header>
         <main ref={mainRef} tabIndex={-1} className="mainContent">
-          {deployment.error && location.pathname !== '/deployment' && <div className="page adminEntryNotice">
+          {deployment.error && pagePath !== '/deployment' && <div className="page adminEntryNotice">
             <ErrorBanner message={t('policyFailed')} />
             <Button onClick={() => void deployment.refresh()}>{t('retryPolicy')}</Button>
           </div>}
@@ -206,38 +146,43 @@ function AdminDocument({ nodeId, onSwitchComputer, selectComputerRef, currentUrl
             <ErrorBanner message={t('entryUnavailable')} />
             <a className="button button-secondary" href="/admin/" target="_blank" rel="noopener noreferrer">{t('openLocal')}</a>
           </div>}
-          <div className="adminRouteContent" inert={unavailable || undefined} aria-disabled={unavailable || undefined}>
-            <Suspense fallback={<PageLoading />}>
-              <Routes>
-                <Route path="/" element={<UsersPage prepareNextPage={
-                  deployment.value !== null && !deployment.error && !unavailable ? modelCatalog.prepare : undefined
-                } />} />
-                <Route path="/users" element={<Navigate to="/" replace />} />
-                <Route path="/users/:id" element={<UserDetailPage />} />
-                <Route path="/projects" element={<ProjectListPage />} />
-                <Route path="/projects/:id" element={<ProjectDetailPage />} />
-                <Route path="/plugins" element={<PluginsPage />} />
-                <Route path="/models" element={<ModelsPage />} />
-                <Route path="/usage" element={<UsagePage />} />
-                <Route path="/documents" element={<DocumentsPage />} />
-                <Route path="/archives" element={<ArchivesPage />} />
-                <Route path="/terminals" element={<TerminalsPage />} />
-                <Route path="/ssh" element={<SshPage />} />
-                <Route path="/deployment" element={<DeploymentPage />} />
-                <Route path="/steward" element={<StewardPage />} />
-                <Route path="/webhooks" element={<WebhooksPage />} />
-                <Route path="/desktops" element={<DesktopsPage />} />
-                <Route path="/remote-desktops" element={<RemoteDesktopPage />} />
-                <Route path="/audit" element={<AuditPage />} />
-                <Route path="*" element={<AdminPageNotFound />} />
-              </Routes>
-            </Suspense>
+          <div key={nodeId ?? 'center'} className="adminRouteContent" inert={unavailable || undefined} aria-disabled={unavailable || undefined}>
+            <Suspense fallback={<PageLoading />}><Outlet /></Suspense>
           </div>
         </main>
         <AdminNav className="mobileNav" />
       </div>
-    </>
+    </ComputerSelectorProvider>
   )
+}
+
+const ADMIN_PAGES: RouteObject[] = [
+  { index: true, element: <AdminUsersPage /> },
+  { path: 'users', element: <Navigate to=".." replace /> },
+  { path: 'users/:id', element: <UserDetailPage /> },
+  { path: 'projects', element: <ProjectListPage /> },
+  { path: 'projects/:id', element: <ProjectDetailPage /> },
+  { path: 'plugins', element: <PluginsPage /> },
+  { path: 'models', element: <ModelsPage /> },
+  { path: 'usage', element: <UsagePage /> },
+  { path: 'documents', element: <DocumentsPage /> },
+  { path: 'archives', element: <ArchivesPage /> },
+  { path: 'terminals', element: <TerminalsPage /> },
+  { path: 'ssh', element: <SshPage /> },
+  { path: 'deployment', element: <DeploymentPage /> },
+  { path: 'steward', element: <StewardPage /> },
+  { path: 'webhooks', element: <WebhooksPage /> },
+  { path: 'desktops', element: <DesktopsPage /> },
+  { path: 'remote-desktops', element: <RemoteDesktopPage /> },
+  { path: 'audit', element: <AuditPage /> },
+  { path: '*', element: <AdminPageNotFound /> },
+]
+
+function AdminUsersPage() {
+  const deployment = useDeploymentContext()
+  const { nodeId } = useParams<'nodeId'>()
+  const available = deployment.value !== null && (nodeId === undefined || deployment.value.scope === 'organization' || deployment.value.entry.nodeId === nodeId)
+  return <UsersPage prepareNextPage={available && !deployment.error ? modelCatalog.prepare : undefined} />
 }
 
 const NAV_ITEMS: Array<{ to: string; labelKey: ChromeCopyKey; icon: LucideIcon; end?: boolean }> = [
@@ -262,7 +207,7 @@ function AdminPageNotFound() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
   return <div className="page">
     <PageHeader title={t('pageNotFound')} description={t('pageNotFoundDetail')}
-      actions={<Link to="/" className="button button-primary">{t('returnToUsers')}</Link>} />
+      actions={<AdminLink to="/" className="button button-primary">{t('returnToUsers')}</AdminLink>} />
   </div>
 }
 
@@ -319,7 +264,12 @@ function AccountActions({ compact = false }: { compact?: boolean }) {
 function LogoutButton({ compact = false }: { compact?: boolean }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
   return (
-    <form className={`logoutForm ${compact ? 'logoutFormCompact' : ''}`} method="post" action="/logout">
+    <form
+      className={`logoutForm ${compact ? 'logoutFormCompact' : ''}`}
+      method="post"
+      action="/logout"
+      onSubmit={() => { clearAdminProjectDisplayCache() }}
+    >
       <button
         type="submit"
         className={`button button-ghost logoutButton ${compact ? 'logoutButtonCompact' : ''}`}
@@ -337,14 +287,15 @@ function AdminNav({ className }: { className: string }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
   const [moreOpen, setMoreOpen] = useState(false)
   const { pathname } = useLocation()
+  const adminPath = useAdminPath()
   const mobile = className === 'mobileNav'
   const moreItems = NAV_ITEMS.slice(5)
-  const moreActive = moreItems.some(item => pathname === item.to || pathname.startsWith(`${item.to}/`))
+  const moreActive = moreItems.some(item => pathname === adminPath(item.to) || pathname.startsWith(`${adminPath(item.to)}/`))
   return (
     <>
       <nav className={className} aria-label={t('navAria')}>
         {(mobile ? NAV_ITEMS.slice(0, 5) : NAV_ITEMS).map(({ to, labelKey, icon: Icon, end }) => (
-          <NavLink key={to} to={to} end={end}>
+          <NavLink key={to} to={adminPath(to)} end={end}>
             <Icon aria-hidden="true" />
             <span>{t(labelKey)}</span>
           </NavLink>
@@ -357,7 +308,7 @@ function AdminNav({ className }: { className: string }) {
       </nav>
       {mobile ? <Dialog open={moreOpen} title={t('moreTitle')} onClose={() => setMoreOpen(false)}>
         <nav className="mobileMoreNav" aria-label={t('moreAria')}>
-          {moreItems.map(({ to, labelKey, icon: Icon, end }) => <NavLink key={to} to={to} end={end}
+          {moreItems.map(({ to, labelKey, icon: Icon, end }) => <NavLink key={to} to={adminPath(to)} end={end}
             onClick={() => setMoreOpen(false)}>
             <Icon aria-hidden="true" /><span>{t(labelKey)}</span>
           </NavLink>)}

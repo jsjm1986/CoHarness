@@ -1,7 +1,7 @@
-/** Verified project display cache prevents `#id` flashes while preserving live authority checks and isolation. */
+/** Instance-owned verified project display cache prevents `#id` flashes while preserving live authority checks and isolation. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EntryDirectory } from '../src/client/entry-directory.ts'
-import { clearVerifiedProjectDisplayCache } from '../src/client/project-display-cache.ts'
+import { VerifiedProjectDisplayCache } from '../src/client/project-display-cache.ts'
 import type { SessionRuntimeTarget } from '../src/client/contract/sessions.ts'
 
 const nodeA = '20000000-0000-4000-8000-000000000001' as NonNullable<SessionRuntimeTarget['nodeId']>
@@ -35,18 +35,29 @@ function makeReader(options: { account?: number; nodeId?: string; runtimeId?: st
   })
 }
 
+function createMemoryStorage(): Storage {
+  const store = new Map<string, string>()
+  return {
+    get length() { return store.size },
+    clear() { store.clear() },
+    getItem(key: string) { return store.get(key) ?? null },
+    key(index: number) { return [...store.keys()][index] ?? null },
+    removeItem(key: string) { store.delete(key) },
+    setItem(key: string, value: string) { store.set(key, value) },
+  }
+}
+
 describe('verified project display cache', () => {
   beforeEach(() => {
     vi.stubGlobal('location', new URL('https://harness.invalid'))
-    clearVerifiedProjectDisplayCache()
+    vi.stubGlobal('sessionStorage', createMemoryStorage())
   })
 
   afterEach(() => {
-    clearVerifiedProjectDisplayCache()
     vi.unstubAllGlobals()
   })
 
-  it('hydrates verified names across directory reloads while keeping projectRef pending for live refresh', async () => {
+  it('hydrates verified names across directory reloads via sessionStorage while isolating instances in memory', async () => {
     const bootstrap: SessionRuntimeTarget = { kind: 'personal', runtimeId: personalRuntime }
     const first = new EntryDirectory(makeReader())
     await first.manifest(7, bootstrap)
@@ -76,9 +87,17 @@ describe('verified project display cache', () => {
     const newRuntime = new EntryDirectory(makeReader({ runtimeId: projectRuntimeNext }))
     await newRuntime.manifest(7, bootstrap)
     expect((newRuntime.snapshot() as { projects: Array<{ name: string }> }).projects[0]!.name).toBe('#9')
+
+    // Without sessionStorage, independent instances never share module-level state.
+    vi.stubGlobal('sessionStorage', undefined)
+    const isolatedA = new VerifiedProjectDisplayCache()
+    const isolatedB = new VerifiedProjectDisplayCache()
+    isolatedA.remember(7, [{ projectId: 9, nodeId: nodeA, runtimeId: projectRuntime, name: 'Isolated Only', rootPath: '/isolated' }])
+    expect(isolatedA.lookup(7, nodeA, 9, projectRuntime)).toEqual({ name: 'Isolated Only', rootPath: '/isolated' })
+    expect(isolatedB.lookup(7, nodeA, 9, projectRuntime)).toBeUndefined()
   })
 
-  it('evicts cached project labels on clear(true) and 403 withdrawal', async () => {
+  it('evicts cached project labels on clear(true), 403 withdrawal, and direct evictProjectDisplays', async () => {
     const bootstrap: SessionRuntimeTarget = { kind: 'personal', runtimeId: personalRuntime }
     const directory = new EntryDirectory(makeReader())
     await directory.manifest(7, bootstrap)
@@ -91,10 +110,20 @@ describe('verified project display cache', () => {
     await after403.manifest(7, bootstrap)
     expect((after403.snapshot() as { projects: Array<{ name: string }> }).projects[0]!.name).toBe('#9')
 
+    // rememberProjectDisplays + evictProjectDisplays round-trip cleanly.
+    after403.rememberProjectDisplays(7, [{ projectId: 9, nodeId: nodeA, runtimeId: projectRuntime, name: 'Batch Name', rootPath: '/srv/batch' }])
+    const hydrated = new EntryDirectory(makeReader())
+    await hydrated.manifest(7, bootstrap)
+    expect((hydrated.snapshot() as { projects: Array<{ name: string }> }).projects[0]!.name).toBe('Batch Name')
+    hydrated.evictProjectDisplays(7, nodeA, [{ projectId: 9, runtimeId: projectRuntime }])
+    const afterEvict = new EntryDirectory(makeReader())
+    await afterEvict.manifest(7, bootstrap)
+    expect((afterEvict.snapshot() as { projects: Array<{ name: string }> }).projects[0]!.name).toBe('#9')
+
     // clear(true) purges cached labels for the account.
-    const ref2 = after403.projectRef(after403.target('9')!)!
-    after403.receiveProject({ projectId: 9, nodeId: nodeA, runtimeId: projectRuntime, name: 'Restored', rootPath: '/srv/restored' }, ref2.version)
-    after403.clear(true)
+    const ref2 = afterEvict.projectRef(afterEvict.target('9')!)!
+    afterEvict.receiveProject({ projectId: 9, nodeId: nodeA, runtimeId: projectRuntime, name: 'Restored', rootPath: '/srv/restored' }, ref2.version)
+    afterEvict.clear(true)
     const afterClear = new EntryDirectory(makeReader())
     await afterClear.manifest(7, bootstrap)
     expect((afterClear.snapshot() as { projects: Array<{ name: string }> }).projects[0]!.name).toBe('#9')

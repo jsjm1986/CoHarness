@@ -8,6 +8,12 @@ import type { RuntimeId, RuntimeNodeId } from '../../src/runtime-catalog.ts'
 export type { ConversationArchiveId } from '../../src/archive-identity.ts'
 import { adminComputerRequestUrl, adminComputerTarget } from './computer-target.ts'
 import { computerErrorMessage } from './computer.copy.ts'
+import {
+  clearAdminProjectDisplayCache,
+  evictAdminProjectDisplayById,
+  lookupAdminProjectDisplay,
+  rememberAdminProjectDisplays,
+} from './project-display-cache.ts'
 import type { DesktopEnvironment } from '@deepseek-ai/dsh-native-command'
 export type { DesktopEnvironment } from '@deepseek-ai/dsh-native-command'
 
@@ -304,16 +310,21 @@ async function responseError(res: Response): Promise<AdminRequestError> {
   return new AdminRequestError(res.status, computerErrorMessage(message, code), code ?? message)
 }
 
-async function request<T>(url: string, init: RequestInit = {}, target?: 'computer' | 'organization'): Promise<T> {
+export async function adminRequest<T>(url: string, init: RequestInit = {}, target?: 'computer' | 'organization'): Promise<T> {
   const res = await fetch(adminComputerRequestUrl(url, undefined, target), {
     ...init,
     credentials: 'same-origin',
     headers: { 'content-type': 'application/json', ...init.headers },
   })
-  if (!res.ok) throw await responseError(res)
+  if (!res.ok) {
+    if (res.status === 401) clearAdminProjectDisplayCache()
+    throw await responseError(res)
+  }
   if (res.status === 204) return undefined as T
   return await readResponseJson<T>(res)
 }
+
+const request = adminRequest
 
 /** Read or confirm a reviewed personal directory or account UserDoc publication at its exact computer. */
 export function personalPublication<T>(kind:'directory'|'documents', userId:number, runtimeId:string,nodeId:string, signal:AbortSignal,approval?:Record<string,unknown>):Promise<T> {
@@ -430,14 +441,22 @@ export function inspectBackupNodeConfiguration(id: string): Promise<BackupNodeCo
 export async function getOwnerProjectDisplays(projects: readonly Project[], signal?: AbortSignal): Promise<Map<number, { name: string; path: string }>> {
   if (!projects.length) return new Map()
   const node = projects[0]?.nodeId
-  const selected = adminComputerTarget(globalThis.location?.pathname ?? '/admin')
+  const selected = adminComputerTarget()
   const uuid = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/iu
   if (!node || !uuid.test(node) || selected && selected !== node || projects.length > 32 || projects.some(row => !row.metadataOnNode || row.nodeId !== node || !row.runtimeId || !uuid.test(row.runtimeId)
     || !Number.isSafeInteger(row.id) || row.id <= 0)) throw new Error('Invalid project owner selection')
   const expected = new Map(projects.map(row => [row.id, row.runtimeId]))
   if (expected.size !== projects.length) throw new Error('Duplicate project selection')
   const query = new URLSearchParams({ dshNode: node, ids: [...expected.keys()].join(',') })
-  const raw = await request<unknown>(`/admin/api/project-metadata?${query}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
+  let raw: unknown
+  try {
+    raw = await request<unknown>(`/admin/api/project-metadata?${query}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
+  } catch (error) {
+    if (error instanceof AdminRequestError && (error.status === 401 || error.status === 403)) {
+      for (const projectId of expected.keys()) evictAdminProjectDisplayById(projectId)
+    }
+    throw error
+  }
   if (!raw || typeof raw !== 'object' || !('items' in raw) || !Array.isArray(raw.items)) throw new Error('Invalid project metadata')
   const result = new Map<number, { name: string; path: string }>()
   for (const item of raw.items as unknown[]) {
@@ -448,6 +467,12 @@ export async function getOwnerProjectDisplays(projects: readonly Project[], sign
     result.set(item.projectId, { name: item.name, path: item.rootPath })
   }
   if (result.size !== expected.size) throw new Error('Project names unavailable from their computer')
+  rememberAdminProjectDisplays(node, [...result.entries()].map(([projectId, display]) => ({
+    projectId,
+    runtimeId: expected.get(projectId)!,
+    name: display.name,
+    path: display.path,
+  })))
   return result
 }
 
@@ -457,12 +482,13 @@ export async function listProjects(origin?: 'admin' | 'user', display?: 'directo
   if (display) query.set('display', display)
   const rows = await request<Project[]>(`/admin/api/projects${query.size ? `?${query}` : ''}`, signal === undefined ? {} : { signal })
   if (display !== 'directory') return rows
-  const selected = adminComputerTarget(globalThis.location?.pathname ?? '/admin')
+  const selected = adminComputerTarget()
   const nodes = new Set(rows.filter(row => row.metadataOnNode).map(row => row.nodeId))
   if (nodes.size > 1 || selected && nodes.size && !nodes.has(selected)) throw new Error('Project directory belongs to another computer')
   return rows.map(row => {
     if (!row.metadataOnNode) return row
-    const neutral = { ...row, name: `#${row.id}`, path: '' }
+    const cached = lookupAdminProjectDisplay(row.nodeId, row.id, row.runtimeId)
+    const neutral = { ...row, name: cached?.name ?? `#${row.id}`, path: cached?.path ?? '' }
     delete neutral.ownerDisplayLoaded
     return neutral
   })
@@ -486,12 +512,14 @@ export async function getProject(id: number, display?: 'directory' | 'members', 
   return { ...row, ...values.get(id)!, ownerDisplayLoaded: true }
 }
 
-export function renameProject(id: number, name: string): Promise<void> {
-  return request(`/admin/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+export async function renameProject(id: number, name: string): Promise<void> {
+  await request(`/admin/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+  evictAdminProjectDisplayById(id)
 }
 
-export function deleteProject(id: number): Promise<void> {
-  return request(`/admin/api/projects/${id}`, { method: 'DELETE' })
+export async function deleteProject(id: number): Promise<void> {
+  await request(`/admin/api/projects/${id}`, { method: 'DELETE' })
+  evictAdminProjectDisplayById(id)
 }
 
 export function setMember(projectId: number, userId: number, mode: GrantMode): Promise<void> {
@@ -1552,6 +1580,42 @@ export interface DeploymentBackup {
   verifiedAt: string | null
   restoredAt: string | null
   error: string | null
+}
+
+export type DeploymentOverviewSectionKey =
+  | 'deployment'
+  | 'backups'
+  | 'tunnel'
+  | 'nodeConfiguration'
+  | 'nodeConnection'
+  | 'runtimeAllocationPolicy'
+  | 'nodeAccess'
+
+export type DeploymentOverviewSlice<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly status: number; readonly error: string; readonly code?: string }
+
+export interface DeploymentOverviewSections {
+  deployment?: DeploymentOverviewSlice<DeploymentState>
+  backups?: DeploymentOverviewSlice<{ backups: DeploymentBackup[] }>
+  tunnel?: DeploymentOverviewSlice<TunnelAccessView>
+  nodeConfiguration?: DeploymentOverviewSlice<import('../../src/node-config-fields.ts').NodeConfigurationView>
+  nodeConnection?: DeploymentOverviewSlice<NodeConnectionView>
+  runtimeAllocationPolicy?: DeploymentOverviewSlice<RuntimeAllocationPolicy>
+  nodeAccess?: DeploymentOverviewSlice<import('../../src/node-access.ts').NodeAccessPage>
+}
+
+export interface DeploymentOverviewResponse {
+  sections: DeploymentOverviewSections
+}
+
+/** Read multiple deployment sections in one compressed Admin snapshot. */
+export function getDeploymentOverview(
+  sections?: readonly DeploymentOverviewSectionKey[],
+  signal?: AbortSignal,
+): Promise<DeploymentOverviewResponse> {
+  const query = sections === undefined || sections.length === 0 ? '' : `?sections=${encodeURIComponent(sections.join(','))}`
+  return request(`/admin/api/deployment/overview${query}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
 }
 
 export function getDeployment(signal?: AbortSignal): Promise<DeploymentState> {

@@ -4,8 +4,8 @@ import { useDeploymentContext } from '../deployment-context.tsx'
 import { usePendingEdits } from '../pending-edits.tsx'
 import { adminComputerTarget } from '../computer-target.ts'
 import { AdminRequestError, getDeploymentTopology, getNodeConnection, preflightDeploymentTopology, saveDeploymentTopology, saveNodeConnection, startNodeConnection } from '../api.ts'
-import type { DeploymentContext, DeploymentPreflight } from '../../../src/deployment-protocol.ts'
-import type { NodeConnectionView } from '../../../src/deployment-protocol.ts'
+import { unwrapDeploymentOverviewSlice, useDeploymentOverview } from '../deployment-overview.tsx'
+import { nodeConnectionViewSchema, type DeploymentContext, type DeploymentPreflight, type NodeConnectionView } from '../../../src/deployment-protocol.ts'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { Button, Dialog, ErrorBanner, Field, LoadingState, Section } from '../components/ui.tsx'
 import { zh, en } from './topology.copy.ts'
@@ -85,17 +85,35 @@ export function NodeConnectionSection() {
   const [center, setCenter] = useState(''), [code, setCode] = useState('')
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false)
   const owner = useRef<AbortController | undefined>(undefined)
+  const overview = useDeploymentOverview()
+  const hydratedOverview = useRef<{ overview: typeof overview; revision: string | undefined } | null>(null)
   useEffect(() => { const current = new AbortController(); owner.current = current; return () => { current.abort() } }, [])
-  const selected = adminComputerTarget(window.location.pathname) ?? deployment?.entry.nodeId
+  const selected = adminComputerTarget() ?? deployment?.entry.nodeId
   const available = deployment?.mode === 'multi' && selected !== deployment.primary?.nodeId
   usePendingEdits(busy || code !== '' || view !== null && center !== (view.centerUrl ?? deployment?.primary?.origin ?? ''))
   useEffect(() => {
     if (!available) return
+    const revision = deployment?.revision
+    if (overview !== null && overview.requested.has('nodeConnection')) {
+      if (hydratedOverview.current === null && overview.status === 'loading') return
+      if (overview.status === 'ready' && overview.sections?.nodeConnection !== undefined
+        && (hydratedOverview.current === null || (hydratedOverview.current.overview === overview && hydratedOverview.current.revision === revision))) {
+        if (hydratedOverview.current === null) {
+          hydratedOverview.current = { overview, revision }
+          try {
+            const next = nodeConnectionViewSchema.parse(unwrapDeploymentOverviewSlice(overview.sections.nodeConnection))
+            setView(next)
+            setCenter(current => current === '' ? next.centerUrl ?? deployment?.primary?.origin ?? '' : current)
+          } catch { setError(t('readFailed')) }
+        }
+        return
+      }
+    }
     const controller = new AbortController()
     void getNodeConnection(controller.signal).then(next => { if (controller.signal.aborted) return; setView(next); setCenter(current => current === '' ? next.centerUrl ?? deployment?.primary?.origin ?? '' : current) })
       .catch(() => { if (!controller.signal.aborted) setError(t('readFailed')) })
     return () => { controller.abort() }
-  }, [available, deployment?.primary?.origin, deployment?.revision, t])
+  }, [available, deployment?.primary?.origin, deployment?.revision, overview, t])
   if (!available && view === null) return null
   const run = async (start: boolean): Promise<void> => {
     if (view === null || busy || !available) return

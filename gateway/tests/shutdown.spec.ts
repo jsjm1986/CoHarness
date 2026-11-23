@@ -80,7 +80,7 @@ function fixture(failing: readonly string[]) {
     reaperTask: { wait: asynchronous('reaper') }, archiveRetentionTask: { wait: asynchronous('archives') },
     documentRetentionTask: { wait: asynchronous('retention') }, desktopSweepTask: { wait: asynchronous('desktop') },
     progressSweepTask: { wait: asynchronous('progress-sweep') }, proxyHandlers: { close: operation('proxy') },
-    localDocuments: { dispose: asynchronous('documents') }, accessMonitor: { close: asynchronous('access') },
+    localDocuments: { dispose: asynchronous('documents') }, topology: { dispose: asynchronous('topology') }, accessMonitor: { close: asynchronous('access') },
     server, intake, closeListeningServer: async (listener: unknown) => { operation(listener === server ? 'server' : 'intake')() },
     waitForWriters: asynchronous('writers'), heartbeatInFlight: Promise.resolve(),
     localDrafts: { close: asynchronous('drafts') }, personalIndex: { close: asynchronous('index') },
@@ -93,10 +93,10 @@ function fixture(failing: readonly string[]) {
 }
 
 const CLEANUP_ORDER = ['peer-backups', 'relay', 'progress', 'model-budget', 'pressure', 'tunnel', 'reaper', 'archives',
-  'retention', 'desktop', 'progress-sweep', 'proxy', 'instances', 'channels', 'services', 'documents', 'access', 'server', 'intake',
+  'retention', 'desktop', 'progress-sweep', 'proxy', 'instances', 'channels', 'services', 'documents', 'topology', 'access', 'server', 'intake',
   'writers', 'drafts', 'index', ...POOL_CLEANUP_ORDER, 'volume', 'performance']
 
-it.each(['peer-backups', 'relay', 'progress', 'reaper', 'channels', 'services', 'proxy', 'documents', 'access', 'server',
+it.each(['peer-backups', 'relay', 'progress', 'reaper', 'channels', 'services', 'proxy', 'documents', 'topology', 'access', 'server',
   'drafts', 'index', 'instances', 'volume', 'performance'])(
   'continues later shutdown stages after %s fails', async (failing) => {
     const f = fixture([failing])
@@ -154,7 +154,7 @@ const progress = { close }, gatewayModelBudget = { close }, resourcePressure = {
 const tunnelAccess = { shutdown: close };
 const reaperTask = { wait: close }, archiveRetentionTask = { wait: close }, documentRetentionTask = { wait: close };
 const desktopSweepTask = { wait: close }, progressSweepTask = { wait: close };
-const proxyHandlers = { close }, localDocuments = { dispose: close }, accessMonitor = { close };
+const proxyHandlers = { close }, localDocuments = { dispose: close }, topology = { dispose: close }, accessMonitor = { close };
 const server = {}, intake = {}, closeListeningServer = close;
 const waitForWriters = close, heartbeatInFlight = Promise.resolve();
 const localDrafts = { close }, personalIndex = { close };
@@ -255,7 +255,7 @@ it('cancels accepted tunnel startup before waiting for its HTTP writer to drain'
     SHUTDOWN_TIMEOUT_MS: 10000, setTimeout: () => timer, clearTimeout: () => {}, clearInterval: () => {},
     process: { exit }, progress: { close }, gatewayModelBudget: { close }, resourcePressure: { dispose: close },
     reaperTask: { wait: close }, archiveRetentionTask: { wait: close }, documentRetentionTask: { wait: close },
-    desktopSweepTask: { wait: close }, progressSweepTask: { wait: close }, proxyHandlers: { close }, localDocuments: { dispose: close },
+    desktopSweepTask: { wait: close }, progressSweepTask: { wait: close }, proxyHandlers: { close }, localDocuments: { dispose: close }, topology: { dispose: close },
     accessMonitor: { close }, server: {}, intake: {}, closeListeningServer: close,
     governanceRebuildLifetime: { abort: () => {} }, governanceRebuildTimer: undefined, governanceRebuildTask: undefined,
     closeModelGovernanceRefresh: close, runtimeAssets: { close },

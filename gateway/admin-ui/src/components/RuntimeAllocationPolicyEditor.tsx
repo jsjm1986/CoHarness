@@ -1,8 +1,9 @@
 /** Revision-checked Runtime allocation limits for the organization or one account. */
 import { useDeploymentContext } from '../deployment-context.tsx'
 import { usePendingEdits } from '../pending-edits.tsx'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { getRuntimeAllocationPolicy, saveRuntimeAllocationPolicy, type RuntimeAllocationPolicy } from '../api.ts'
+import { unwrapDeploymentOverviewSlice, useDeploymentOverview } from '../deployment-overview.tsx'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { zh, en } from '../runtime.copy.ts'
 import { Button, ErrorBanner, Field, LoadingState } from './ui.tsx'
@@ -19,8 +20,26 @@ export function RuntimeAllocationPolicyEditor({ userId }: { userId?: number }) {
   const [error, setError] = useState('')
   const [needsRefresh, setNeedsRefresh] = useState(false)
   const [notice, setNotice] = useState('')
+  const overview = useDeploymentOverview()
+  const hydratedOverview = useRef<typeof overview>(null)
   const validationId = useId()
   useEffect(() => {
+    if (userId === undefined && refresh === 0 && overview !== null && overview.requested.has('runtimeAllocationPolicy')) {
+      if (hydratedOverview.current === null && overview.status === 'loading') { setLoading(true); return }
+      if (overview.status === 'ready' && overview.sections?.runtimeAllocationPolicy !== undefined) {
+        if (hydratedOverview.current !== overview) {
+          hydratedOverview.current = overview
+          try {
+            const value = unwrapDeploymentOverviewSlice(overview.sections.runtimeAllocationPolicy)
+            setPolicy(value); setTotal(String(value.maxTotal)); setPerNode(String(value.maxPerNode)); setError(''); setNeedsRefresh(false)
+          } catch (cause) {
+            setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : t('limitsReadFailed'))
+            setNeedsRefresh(true)
+          } finally { setLoading(false) }
+        }
+        return
+      }
+    }
     const controller = new AbortController(); setLoading(true)
     void getRuntimeAllocationPolicy(userId, controller.signal).then(value => {
       if (controller.signal.aborted) return
@@ -28,7 +47,7 @@ export function RuntimeAllocationPolicyEditor({ userId }: { userId?: number }) {
     }).catch((cause: unknown) => { if (!controller.signal.aborted) { setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : t('limitsReadFailed')); setNeedsRefresh(true) } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => { controller.abort() }
-  }, [userId, refresh, t])
+  }, [userId, refresh, overview, t])
   const limits = { maxTotal: Number(total), maxPerNode: Number(perNode) }
   const valid = Number.isSafeInteger(limits.maxTotal) && Number.isSafeInteger(limits.maxPerNode) && limits.maxTotal > 0 && limits.maxPerNode > 0 && limits.maxPerNode <= limits.maxTotal
   async function save(inherit: boolean): Promise<void> {

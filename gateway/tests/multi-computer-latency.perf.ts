@@ -73,7 +73,7 @@ async function close(server: Server): Promise<void> {
   await new Promise<void>((resolve, reject) => { server.close(error => { if (error) reject(error); else resolve() }) })
 }
 
-class SyntheticAccessMonitor implements Pick<GatewayAccessMonitor, 'subscribe' | 'synchronize' | 'available' | 'currentRevision' | 'ensureAtLeast'> {
+class SyntheticAccessMonitor implements GatewayAccessMonitor {
   readonly available = true
   private readonly listeners = new Set<(subject: AccessInvalidationSubject) => void | Promise<void>>()
   private revision = 1n
@@ -209,7 +209,7 @@ export async function runMultiComputerBenchmark(options: MultiComputerBenchmarkO
       authorizeAccountNode: async () => {},
       resolvePlacement: (actor, selection) => centerRouter.placement(actor, selection),
       resetScopeCookie: () => scopeCookie('personal', centerConfig),
-    }, services, 15_000, centerConfig.nodeService, centerMonitor as unknown as GatewayAccessMonitor,
+    }, services, 15_000, centerConfig.nodeService, centerMonitor,
     async (target, user, request) => {
       const rev = centerMonitor.currentRevision()
       return forwardSigner.issueForward({
@@ -244,7 +244,7 @@ export async function runMultiComputerBenchmark(options: MultiComputerBenchmarkO
     const centerRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(centerDeps), { localNodeId, catalog })
     centerDeps.runtimeRouter = centerRouter
     remoteDeps.runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(remoteDeps), { localNodeId: remoteNodeId, catalog })
-    remoteDeps.accessMonitor = remoteMonitor as unknown as GatewayAccessMonitor
+    remoteDeps.accessMonitor = remoteMonitor
     remoteDeps.forwardedPrincipal = async assertion => verifyGatewayForward(assertion, forwardKeys.publicKey, {
       audienceNode: remoteNodeId,
       organization: lease.organizationId,

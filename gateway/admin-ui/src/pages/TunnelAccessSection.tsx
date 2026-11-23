@@ -5,6 +5,7 @@ import { Copy, Download, ExternalLink, Globe, Link2, Square, Trash2 } from 'luci
 import {
   getTunnelAccess, installTunnelBinary, tunnelAccessAction, type TunnelAccessView,
 } from '../api.ts'
+import { unwrapDeploymentOverviewSlice, useDeploymentOverview } from '../deployment-overview.tsx'
 import {
   Button, ConfirmDialog, ErrorBanner, Field, LoadingState, Section, StatusBadge,
 } from '../components/ui.tsx'
@@ -44,6 +45,9 @@ export function TunnelAccessSection() {
   usePendingEdits(action !== null || apiToken !== '' || view !== null && (hostname !== (view.hostname ?? '') || domain !== (view.domain ?? '')))
   const ownership = useRef({ mounted: false, action: 0, query: 0, feedback: 0, pending: null as Action | null })
   const draftInitialized = useRef(false)
+  const overview = useDeploymentOverview()
+  const hydratedOverview = useRef<typeof overview>(null)
+  const lastFetchedAt = useRef(0)
 
   const publish = useCallback((next: TunnelAccessView) => {
     setView(next)
@@ -62,6 +66,7 @@ export function TunnelAccessSection() {
     try {
       const next = await getTunnelAccess()
       if (!current()) return
+      lastFetchedAt.current = Date.now()
       publish(next)
       setReadError('')
     } catch (cause) {
@@ -70,22 +75,45 @@ export function TunnelAccessSection() {
   }, [publish])
 
   useEffect(() => {
+    if (hydratedOverview.current === null && overview !== null && overview.requested.has('tunnel') && overview.status === 'loading') return
     const owner = ownership.current
     owner.mounted = true
+    let skipInitial = false
+    if (overview?.status === 'ready' && overview.sections?.tunnel !== undefined) {
+      skipInitial = true
+      if (hydratedOverview.current !== overview) {
+        hydratedOverview.current = overview
+        lastFetchedAt.current = Date.now()
+        try {
+          publish(unwrapDeploymentOverviewSlice(overview.sections.tunnel))
+          setReadError('')
+        } catch (cause) {
+          setReadError(messageOf(cause))
+        }
+      }
+    }
     let polling = false
-    const poll = () => {
+    const poll = (force = false) => {
       if (polling) return
+      if (!force && document.visibilityState === 'hidden') return
       polling = true
       void refresh().finally(() => { polling = false })
     }
-    poll()
-    const timer = setInterval(poll, 10_000)
+    if (!skipInitial) poll(true)
+    const timer = setInterval(() => { poll() }, 10_000)
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - lastFetchedAt.current < 2_000) return
+      poll()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
       clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
       owner.mounted = false
       owner.action++; owner.query++; owner.feedback++
     }
-  }, [refresh])
+  }, [overview, publish, refresh])
 
   const run = async (kind: Action, work: () => Promise<TunnelAccessView>, ok: string, saved?: () => void) => {
     const owner = ownership.current

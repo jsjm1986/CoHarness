@@ -150,11 +150,11 @@ export class TerminalController extends TypertRemoteService {
       })
     })
     ctx.effect(() => async () => {
-      this.lifetime.abort(new Error('Terminal controller disposed'))
       for (const attachment of this.activeAttachments.values()) {
         attachment.inputSocket?.close(1001, 'terminal controller disposed')
       }
       this.activeAttachments.clear()
+      this.lifetime.abort(new Error('Terminal controller disposed'))
       const results = await Promise.allSettled([...this.owners].map(([id, owner]) => this.disposeOwner(id, owner)))
       await Promise.allSettled(this.cleanupTasks)
       const errors = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown)

@@ -22,7 +22,7 @@ const blockers: Record<NodeMigrationBlocker, readonly [string,string]> = {
 
 /** Preserve the current Admin document’s computer across selection, review and publication. */
 export function NodeContentMigrationSection() {
-  const target = adminComputerTarget(globalThis.location.pathname)
+  const target = adminComputerTarget()
   return <MigrationControls key={target ?? 'entry'} target={target} />
 }
 

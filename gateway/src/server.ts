@@ -1642,7 +1642,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (req.method !== 'GET') { res.setHeader('allow', 'GET'); send(res, 405, '{"error":"method-not-allowed"}', 'application/json'); return }
       if (deps.documentLocations === undefined) { send(res, 501, '{"error":"document-locations-unavailable"}', 'application/json'); return }
       const query = new URL(req.url ?? '/', 'http://gateway').searchParams
-      try { send(res, 200, JSON.stringify(await deps.documentLocations.page(user.id, {
+      try { await sendCompressed(req, res, 200, JSON.stringify(await deps.documentLocations.page(user.id, {
         ...(query.has('cursor') ? { cursor: query.get('cursor')! } : {}),
         ...(query.has('limit') ? { limit: query.get('limit')! } : {}),
       })), 'application/json') } catch (error) {
@@ -1688,7 +1688,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             catch (error) { if (error instanceof BodyTooLargeError) throw error; throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document request JSON.') }
           }
           const result = await handlers.browserDocuments(req, user, operation, payload, abort.signal)
-          if (!abort.signal.aborted) send(res, 200, JSON.stringify(result), 'application/json')
+          if (!abort.signal.aborted) await sendCompressed(req, res, 200, JSON.stringify(result), 'application/json')
         }
       } catch (error) {
         if (abort.signal.aborted || res.destroyed) return
@@ -2566,14 +2566,17 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
       res.setHeader('cache-control', 'no-store')
-      const scopes = await deps.collaboration.projectsForUser(user.id)
       const abort = requestAbort(req, res)
+      let scopes: Awaited<ReturnType<NonNullable<typeof deps.collaboration>['projectsForUser']>>
       let catalog: Awaited<ReturnType<GatewayWorkbenchCatalogHandler>>
       try {
-        catalog = handlers.workbenchCatalog === undefined
-          ? { items: await deps.collaboration.listAccountConversations(user.id), personalComplete: false }
-          : await handlers.workbenchCatalog(user, abort.signal, { kind: activeRuntime.kind,
-            ...(environment === undefined ? {} : { runtimeId: environment.id }) })
+        [scopes, catalog] = await Promise.all([
+          deps.collaboration.projectsForUser(user.id),
+          handlers.workbenchCatalog === undefined
+            ? Promise.resolve(deps.collaboration.listAccountConversations(user.id)).then(items => ({ items, personalComplete: false }))
+            : handlers.workbenchCatalog(user, abort.signal, { kind: activeRuntime.kind,
+              ...(environment === undefined ? {} : { runtimeId: environment.id }) }),
+        ])
       } finally {
         abort.dispose()
       }
@@ -2765,7 +2768,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       try {
         if (req.method === 'GET') {
           const targets = await deps.sshTargets.listForProject(user.id, projectId)
-          send(res, 200, JSON.stringify({ targets }), 'application/json')
+          await sendCompressed(req, res, 200, JSON.stringify({ targets }), 'application/json')
           return
         }
         if (req.method === 'POST') {
@@ -2859,7 +2862,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           if (!await deps.governance.authorizeProjectModelRead(projectId, user.id)) {
             throw new CollaborationDeniedError('forbidden')
           }
-          send(res, 200, JSON.stringify({ models }), 'application/json')
+          await sendCompressed(req, res, 200, JSON.stringify({ models }), 'application/json')
           return
         }
         if (suffix === 'credentials') {
@@ -3002,7 +3005,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const active = all.filter(u => u.status === 'active').map(u => ({
         id: u.id, username: u.username, displayName: u.displayName,
       }))
-      send(res, 200, JSON.stringify(active), 'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify(active), 'application/json')
       return
     }
 
@@ -3129,7 +3132,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           if (deps.projects.listInvitableUsers === undefined) { send(res, 503, '{"error":"users-unavailable"}', 'application/json'); return }
           const cursor = selection.get('cursor')
           if (cursor !== null && !/^[1-9][0-9]*$/u.test(cursor)) { send(res, 400, '{"error":"invalid-user-cursor"}', 'application/json'); return }
-          send(res, 200, JSON.stringify(await deps.projects.listInvitableUsers(projectId, user.id,
+          await sendCompressed(req, res, 200, JSON.stringify(await deps.projects.listInvitableUsers(projectId, user.id,
             cursor === null ? undefined : Number(cursor))), 'application/json'); return
         }
         if (isInvitationPath) {
@@ -3142,7 +3145,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             const current = (await readPublicationAuthority('project', () => deps.collaboration!.projectReadAuthorities!(user.id, projectId)))
               .find(current => current.nodeId === selectedNodeId)
             if (current === undefined) throw new CollaborationDeniedError('forbidden')
-            send(res, 200, JSON.stringify(current.canManage ? invitations : invitations.filter(invitation =>
+            await sendCompressed(req, res, 200, JSON.stringify(current.canManage ? invitations : invitations.filter(invitation =>
               invitation.invitee.id === user.id || invitation.inviter.id === user.id)), 'application/json'); return
           }
           if (req.method === 'POST') {
@@ -3167,7 +3170,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           const current = (await readPublicationAuthority('project', () => deps.collaboration!.projectReadAuthorities!(user.id, projectId)))
             .find(current => current.nodeId === selectedNodeId)
           if (current === undefined) throw new CollaborationDeniedError('forbidden')
-          send(res, 200, JSON.stringify({ ...project,
+          await sendCompressed(req, res, 200, JSON.stringify({ ...project,
             owner: current.owner,
             uiThemePolicy: current.uiThemePolicy, canManage: current.canManage,
           }), 'application/json'); return
@@ -3194,7 +3197,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 400, '{"error":"project-scope-required"}', 'application/json')
         return
       }
-      send(res, 200, JSON.stringify({
+      await sendCompressed(req, res, 200, JSON.stringify({
         items: await deps.collaboration.listConversations(user.id, conversationRuntime(resolved.context), resolved.context.scope.projectId),
       }), 'application/json')
       return
@@ -3221,7 +3224,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
       try {
-        send(res, 200, JSON.stringify(await deps.collaboration.listActivity(
+        await sendCompressed(req, res, 200, JSON.stringify(await deps.collaboration.listActivity(
           user.id, conversationRuntime(resolved.context), resolved.context.scope.projectId, { limit, before, member })), 'application/json')
       } catch (error) {
         if (error instanceof CollaborationDeniedError) {
@@ -3240,7 +3243,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
       try {
-        send(res, 200, JSON.stringify(await deps.progress.progressForUser(
+        await sendCompressed(req, res, 200, JSON.stringify(await deps.progress.progressForUser(
           resolved.context.scope.projectId, user.id)), 'application/json')
       } catch (error) {
         if (error instanceof CollaborationDeniedError) {
@@ -3259,7 +3262,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
       try {
-        send(res, 200, JSON.stringify(await deps.progress.generateNow(
+        await sendCompressed(req, res, 200, JSON.stringify(await deps.progress.generateNow(
           resolved.context.scope.projectId, user.id)), 'application/json')
       } catch (error) {
         if (error instanceof CollaborationDeniedError) {
@@ -3289,7 +3292,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             send(res, 404, '{"error":"conversation-not-found"}', 'application/json'); return
           }
           const items = await deps.collaboration.listConversations(user.id, runtimeId, access.projectId)
-          send(res, 200, JSON.stringify({ access, conversation: items.find(item => item.sessionId === access.rootSessionId) ?? null }), 'application/json')
+          await sendCompressed(req, res, 200, JSON.stringify({ access, conversation: items.find(item => item.sessionId === access.rootSessionId) ?? null }), 'application/json')
           return
         }
         if (req.method === 'PATCH') {

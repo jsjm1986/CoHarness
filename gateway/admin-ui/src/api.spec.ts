@@ -1,10 +1,11 @@
 import { parseConversationSessionIdentity } from '../../src/session-identity.ts'
 import { parseConversationArchiveId } from '../../src/archive-identity.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { clearAdminProjectDisplayCache } from './project-display-cache.ts'
 import {
   applyArchiveAction,
   AdminRequestError,
-  getOwnerProjectDisplays, getProject, listProjects, type Project,
+  getOwnerProjectDisplays, getProject, listProjects, renameProject, deleteProject, type Project,
   getArchive,
   getArchiveStatus,
   listArchives,
@@ -29,6 +30,7 @@ import {
 } from './api.ts'
 
 afterEach(() => {
+  clearAdminProjectDisplayCache()
   vi.unstubAllGlobals()
 })
 
@@ -309,4 +311,36 @@ it('loads only a bounded owner page for the selected Admin computer and refuses 
     fetch.mockResolvedValueOnce(jsonOk({ items }))
     await expect(getOwnerProjectDisplays(page)).rejects.toThrow()
   }
+})
+
+it('hydrates previously verified Admin project displays on repeat directory reads while leaving live refresh pending', async () => {
+  const nodeId = '20000000-0000-4000-8000-000000000001' as NonNullable<Project['nodeId']>
+  const runtimeId = '10000000-0000-4000-8000-000000000001' as NonNullable<Project['runtimeId']>
+  const row: Project = { id: 9, metadataOnNode: true, runtimeId, nodeId, name: 'unverified', path: '/unverified', memberCount: 1 }
+  const display = { projectId: row.id, runtimeId, nodeId, name: 'From Ubuntu', rootPath: '/srv/ubuntu' }
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(jsonOk([row]))
+    .mockResolvedValueOnce(jsonOk({ items: [display] }))
+    .mockResolvedValueOnce(jsonOk([row]))
+    .mockResolvedValueOnce(jsonOk(undefined, 204))
+    .mockResolvedValueOnce(jsonOk([row]))
+    .mockResolvedValueOnce(jsonOk(undefined, 204))
+  vi.stubGlobal('fetch', fetch)
+  vi.stubGlobal('location', new URL(`https://harness.invalid/admin/computers/${nodeId}/projects`))
+
+  const first = await listProjects(undefined, 'directory')
+  expect(first[0]).toMatchObject({ id: 9, name: '#9', path: '' })
+  await getOwnerProjectDisplays(first)
+
+  // Repeat directory read pre-fills verified display without setting ownerDisplayLoaded.
+  const second = await listProjects(undefined, 'directory')
+  expect(second[0]).toMatchObject({ id: 9, name: 'From Ubuntu', path: '/srv/ubuntu' })
+  expect(second[0]!.ownerDisplayLoaded).toBeUndefined()
+
+  // Renaming evicts the cached display immediately.
+  await renameProject(9, 'Renamed')
+  const afterRename = await listProjects(undefined, 'directory')
+  expect(afterRename[0]).toMatchObject({ id: 9, name: '#9', path: '' })
+
+  await deleteProject(9)
 })

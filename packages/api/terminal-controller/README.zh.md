@@ -59,7 +59,7 @@ Shell 探测结果首先列出执行环境声明的默认 shell。仅当 provide
 <details>
 <summary>实现细节</summary>
 
-Host 使用 `ctx.subprocess.spawnTerminal` 并设置 `TERM=xterm-256color`，不会启动桌面终端应用。流式 UTF-8 解码保留跨块字符和开头的 BOM，并在 EOF 替换未完整结束的字节。一元控制经过 Gateway，`follow` 使用独立、有界的 NDJSON Remote 响应。每项输出重新核验保留的创建者授权；业务拒绝结束流，不会以另一身份重连。无界面的 xterm 及其序列化器在先前输出完成后生成初始屏幕，后续帧使用单调递增的输出序号。慢消费者明确失败；新连接恢复当前屏幕。
+Host 使用 `ctx.subprocess.spawnTerminal` 并设置 `TERM=xterm-256color`，不会启动桌面终端应用。流式 UTF-8 解码保留跨块字符和开头的 BOM，并在 EOF 替换未完整结束的字节。一元控制经过 Gateway，`follow` 使用独立、有界的 NDJSON Remote 响应，交互输入（`write` 与 `resize`）优先通过 `ctx.connection.ws.handle(...)` 注册的持久化 `/api/terminal/input` 文本 WebSocket 通道传输。浏览器通过带 Runtime 归属的 Session 键选择目标，并向该 Runtime 发送原始 Session ID。升级准入将精确的 `(sessionId, terminalId, attachmentId)` 坐标与存活的 `follow()` 连接核对，并通过 `userTerminalAuthorization.verifyUpgradeCreator` 确认创建者身份；权限撤销或连接结束会立即以 `1008` 关闭 socket，controller 销毁以 `1001` 关闭活跃 socket。每帧返回带序号的 `ack` 或序列化 `RemoteError`；浏览器实施有界确认超时（默认 `15000` ms），在通道不可用时透明回退至 HTTP `write`/`resize`，在途断开时不重复发送非幂等输入，并在连接仍可写时按有界延迟重连 WebSocket。`follow` 每项输出重新核验保留的创建者授权；业务拒绝结束流，不会以另一身份重连。无界面的 xterm 及其序列化器在先前输出完成后生成初始屏幕，后续帧使用单调递增的输出序号。慢消费者明确失败；新连接恢复当前屏幕。
 
 最新连接持有输入和尺寸控制权。断开连接只释放输入权，不结束进程。显式关闭等待进程清理和最后输出；清理失败时保留资源以便重试。Session 记住已关闭的标识并拒绝迟到或重复的创建请求，包括关闭到达时仍在进行的创建。新终端使用新标识。取消创建且清理失败时，已分配的进程仍有所有者。Session owner 和 controller 卸载也会终止所拥有的进程。改变 Session 的沙箱模式时，用户终端继续以原有权限运行。控制权转移或进程退出后被拒绝的输入和尺寸请求保留输出连接并禁用输入，不重发被拒绝的输入。
 
@@ -67,7 +67,7 @@ Client 在分配前，将每个 Session/content 到终端的关联写入自己�
 
 独立的 `retain(sessionId, id, signal)` Remote 流确认窗口持有关系，不激活 Agent、发送屏幕输出、转移输入权或创建进程。终端 provider 提供侧栏的完整打开标签清单，Client 将其与自己保存的身份取交集。同一窗口中的重复 occurrence 共用一个持有流；孤立的旧关联不会保活任何终端。恢复输出连接前必须等待当前持有关系确认。传输取消只释放对应的物理流代次；插件卸载等待全部持有流结束。清理失败时保留所有权并重试，不重新接受连接，也不重新计算空闲宽限期。
 
-新视图自动启动终端，使用明确选择的 shell 或记住的可用 shell。最近选择的 shell 路径保存在按账号/runtime/Session 隔离的 `dsh.terminal.shell.v2.*` localStorage 键中。默认启动通过 Host 发现核验保存路径；不存在时回到当前默认值。引导页在打开标签前保存选择，每个新标签保留自己的路径和分配身份。存储失败不阻止启动。恢复已有终端不读取此偏好，也不重新发现 shell。
+新视图自动启动终端，使用明确选择的 shell 或记住的可用 shell，并将默认 shell 发现与环境、终端清单查询并行执行以在冷启动时省去一次往返。最近选择的 shell 路径保存在按账号/runtime/Session 隔离的 `dsh.terminal.shell.v2.*` localStorage 键中。默认启动通过 Host 发现核验保存路径；不存在时回到当前默认值。引导页在打开标签前保存选择，每个新标签保留自己的路径和分配身份。存储失败不阻止启动。恢复已有终端不读取此偏好，也不重新发现 shell。
 
 关闭操作先保存未完成的清理请求，再释放标签，并在后台等待 Host 清理。失败显示可重试通知。每个请求保留原始私有地址及终端 ID 的 localStorage 键，清理成功或收到确定的 `session/not-found` 后删除；启动时重试保存的请求。传输失败保留请求。清理请求独立于标签关联和侧栏布局持久化。浏览器存储不可用时，清理仍可在内存中进行，但刷新后无法恢复。
 

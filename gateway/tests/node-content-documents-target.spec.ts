@@ -412,3 +412,81 @@ it('reads or creates only the requested folder operation after pure validation a
     await new Promise<void>(resolve => server.close(() => resolve()))
   }
 })
+
+it('skips redundant monitor.synchronize calls on provisional overview frames while LISTEN is available and still synchronizes on complete', async () => {
+  const local = row('z-local-report.txt', source)
+  const remoteRow = row('a-remote-report.txt', target)
+  let release = () => {}
+  const pending = new Promise<void>(resolve => { release = resolve })
+  let remoteStarted = () => {}
+  const started = new Promise<void>(resolve => { remoteStarted = resolve })
+  let synchronizeCalls = 0
+  const monitor = {
+    available: true,
+    synchronize: async () => { synchronizeCalls += 1 },
+    subscribe: () => () => {},
+  }
+  const handler = createBrowserDocumentHandler({
+    transfer: {} as Parameters<typeof createBrowserDocumentHandler>[0]['transfer'],
+    organizationId: org, origin: 'https://synthetic.test', responseLimit: 16384,
+    overviewConcurrency: 2, overviewDeadlineMs: 125, overviewTimeoutMs: 10000,
+    overviewAccessMonitor: monitor,
+    locations: { page: async () => ({ items: [], nextCursor: null }), resolve: async () => { throw new Error('unexpected') } },
+    overview: { overview: async (_actor, opts, _all, fetchNode, signal, concurrency, progress) => mergeDocumentOverview(
+      { organizationId: org, userId: actor.id, entryNodeId: source }, opts ?? {}, [
+        { id: source, read: async offset => ({ documents: offset === 0 ? [local] : [], totalDocuments: 1, metrics }) },
+        { id: target, read: (offset, limit, lifetime) => fetchNode!(target, offset, limit, lifetime) },
+      ], concurrency ?? 2, signal, progress,
+    ) },
+  })
+  const server = createServer((req, res) => {
+    const url = new URL(req.url ?? '/', 'http://fixture')
+    if (url.pathname === '/account/api/node-document-overview') {
+      remoteStarted()
+      void pending.then(() => {
+        if (res.destroyed) return
+        res.setHeader('x-dsh-target-node', target)
+        res.end(JSON.stringify({ documents: [remoteRow], metrics, totalDocuments: 1 }))
+      })
+      return
+    }
+    const abort = new AbortController()
+    void handler(req, actor, 'overview', { limit: 1, sort: 'name-asc' }, abort.signal, {
+      response: res, authorize: async () => true,
+    }).catch(() => { if (!res.headersSent) res.writeHead(500); res.end() })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('loopback listener required')
+    const response = await fetch(`http://127.0.0.1:${address.port}/test`)
+    await started
+    const reader = response.body!.getReader()
+    const decoder = new TextDecoder()
+    let text = ''
+    try {
+      while (!text.includes('\n')) {
+        const chunk = await reader.read()
+        if (chunk.done) throw new Error('missing provisional frame')
+        text += decoder.decode(chunk.value, { stream: true })
+      }
+      expect(JSON.parse(text)).toMatchObject({ type: 'progress', pending: 1 })
+      // Provisional frame skipped monitor.synchronize because LISTEN is connected and subscribed.
+      expect(synchronizeCalls).toBe(0)
+      release()
+      text = ''
+      for (;;) {
+        const chunk = await reader.read()
+        if (chunk.done) break
+        text += decoder.decode(chunk.value, { stream: true })
+      }
+      expect(JSON.parse(text)).toMatchObject({ type: 'complete' })
+      // Terminal completion still runs an explicit synchronize check.
+      expect(synchronizeCalls).toBe(1)
+    } finally { reader.releaseLock() }
+  } finally {
+    release()
+    server.closeAllConnections()
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+})

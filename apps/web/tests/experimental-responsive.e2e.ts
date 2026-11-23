@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import type { Browser, Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
@@ -54,7 +55,7 @@ describe('web e2e: opt-in plugin responsive pages', () => {
       'commit', '--allow-empty', '-m', 'Initial fixture'], { cwd: scaffold.workspaceCwd })
     await writeFile(join(scaffold.workspaceCwd, 'responsive-preview.txt'), 'A local change that remains readable on every viewport.\n')
     await seedSession(scaffold, await readFile(await selectedSessionFixture(
-      join(REPO_ROOT, 'snapshots/web/fresh-round-trip/session.v7.jsonl'),
+      fileURLToPath(new URL('../../../snapshots/web/fresh-round-trip/session.v7.jsonl', import.meta.url)),
     ), 'utf8'), 'experimental-responsive')
     browser = await responsiveBrowser.launch()
   }, 120_000)

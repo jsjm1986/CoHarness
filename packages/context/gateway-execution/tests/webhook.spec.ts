@@ -1,9 +1,7 @@
 /** The managed webhook dispatch route admits only purpose-bound principals and bounded bodies. */
 import { EventEmitter } from 'node:events'
-import { createServer } from 'node:http'
-import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { AddressInfo } from 'node:net'
-import { PassThrough } from 'node:stream'
+import { createServer, IncomingMessage, ServerResponse } from 'node:http'
+import { Socket, type AddressInfo } from 'node:net'
 import { GatewayCollaboration } from '@deepseek-ai/dsh-collaboration-gateway'
 import { Context } from '@deepseek-ai/cordis'
 import type { GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
@@ -22,13 +20,7 @@ interface Fixture {
   sessionCalls: string[]
 }
 
-interface FakeResponse {
-  status: number
-  body: string
-  writableEnded: boolean
-  writeHead(status: number): FakeResponse
-  end(body?: string): void
-}
+type FakeResponse = ServerResponse & { body: string }
 
 function fixture(options: { withRoute?: boolean; failSession?: unknown } = {}): Fixture {
   let principal: GatewayRequestPrincipal | undefined = {
@@ -87,13 +79,14 @@ function fixture(options: { withRoute?: boolean; failSession?: unknown } = {}): 
     failSession(error) { options.failSession = error },
     sessionCalls,
     respond(res, body) {
-      const req = Object.assign(new PassThrough(), { method: 'POST' })
+      const req = postRequest()
       const raw = typeof body === 'string' ? body : JSON.stringify(body)
-      route(req as unknown as IncomingMessage, res as unknown as ServerResponse)
-      req.end(Buffer.from(raw))
+      route(req, res)
+      req.push(Buffer.from(raw))
+      req.push(null)
       return new Promise((resolve) => {
         const check = () => {
-          if (res.writableEnded) { resolve({ status: res.status, json: JSON.parse(res.body) }); return }
+          if (res.writableEnded) { resolve({ status: res.statusCode, json: JSON.parse(res.body) }); return }
           setImmediate(check)
         }
         check()
@@ -102,14 +95,18 @@ function fixture(options: { withRoute?: boolean; failSession?: unknown } = {}): 
   }
 }
 
+function postRequest(): IncomingMessage {
+  return Object.assign(new IncomingMessage(new Socket()), { method: 'POST' })
+}
+
 function fakeResponse(): FakeResponse {
-  return {
-    status: 0,
-    body: '',
-    writableEnded: false,
-    writeHead(status) { this.status = status; return this },
-    end(body) { this.body = body ?? ''; this.writableEnded = true },
-  }
+  const res = Object.assign(new ServerResponse(postRequest()), { body: '' })
+  const end = res.end.bind(res)
+  vi.spyOn(res, 'end').mockImplementation((body?: unknown) => {
+    if (typeof body === 'string') res.body = body
+    return end(res.body)
+  })
+  return res
 }
 
 const validBody = {
@@ -173,27 +170,29 @@ it.each([
   disposers.push(async () => { await consumer.dispose(); await presets.dispose() })
   await consumer.await()
   await vi.waitFor(() => { expect(handler).toBeDefined() })
-  const req = Object.assign(new PassThrough(), { method: 'POST' })
+  const req = postRequest()
   const res = fakeResponse()
-  handler!(req as unknown as IncomingMessage, res as unknown as ServerResponse)
+  handler!(req, res)
   const body = { ...validBody, request: { ...validBody.request, projectVisibility: visibility } }
-  req.end(Buffer.from(JSON.stringify(body)))
+  req.push(Buffer.from(JSON.stringify(body)))
+  req.push(null)
   await vi.waitFor(() => { expect(res.writableEnded).toBe(true) })
-  expect(res.status).toBe(status)
+  expect(res.statusCode).toBe(status)
   if (status === 403) { expect(followup).not.toHaveBeenCalled(); return }
   expect(followup).toHaveBeenCalledOnce()
   holdPreset = true
-  const pending = Object.assign(new PassThrough(), { method: 'POST' })
+  const pending = postRequest()
   const cancelled = fakeResponse()
-  handler!(pending as unknown as IncomingMessage, cancelled as unknown as ServerResponse)
-  pending.end(Buffer.from(JSON.stringify(body)))
+  handler!(pending, cancelled)
+  pending.push(Buffer.from(JSON.stringify(body)))
+  pending.push(null)
   await resolving.promise
   await presets.dispose()
   resume.resolve(undefined)
   await vi.waitFor(() => { expect(removed).toHaveBeenCalledOnce() })
   expect(handler).toBeUndefined()
   await vi.waitFor(() => { expect(cancelled.writableEnded).toBe(true) })
-  expect(cancelled.status).toBe(502)
+  expect(cancelled.statusCode).toBe(502)
   expect(followup).toHaveBeenCalledOnce()
 })
 
@@ -216,10 +215,10 @@ it.each([undefined,
   const res = fakeResponse()
   const req = new EventEmitter() as IncomingMessage
   req.method = 'POST'
-  f.handler(req, res as unknown as ServerResponse)
+  f.handler(req, res)
   req.emit('end')
   await vi.waitFor(() => { expect(res.writableEnded).toBe(true) })
-  expect(res.status).toBe(403)
+  expect(res.statusCode).toBe(403)
   expect(JSON.parse(res.body)).toEqual({ error: 'webhook-dispatch-required' })
   expect(f.sessionCalls).toEqual([])
 })
@@ -229,9 +228,9 @@ it('rejects non-POST methods before reading the body', async () => {
   const res = fakeResponse()
   const req = new EventEmitter() as IncomingMessage
   req.method = 'GET'
-  f.handler(req, res as unknown as ServerResponse)
+  f.handler(req, res)
   await vi.waitFor(() => { expect(res.writableEnded).toBe(true) })
-  expect(res.status).toBe(403)
+  expect(res.statusCode).toBe(403)
 })
 
 it('rejects invalid JSON and schema violations', async () => {
@@ -317,9 +316,9 @@ it('logs non-Error dispatch failures verbatim', async () => {
 it('leaves an already-committed response untouched when its write fails', async () => {
   const f = fixture()
   const res = fakeResponse()
-  res.end = (body?: string) => {
-    res.body = body ?? ''
-    res.writableEnded = true
+  const end = res.end.bind(res)
+  res.end = (body?: unknown) => {
+    end(typeof body === 'string' ? body : '')
     throw new TypeError('socket closed')
   }
   const result = await f.respond(res, validBody)

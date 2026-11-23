@@ -448,7 +448,7 @@ Query rows and dry-run plan rows are retained as an ordered prefix within the re
 
 ## User terminals
 
-The **Terminals** page in `/admin` controls revisioned project qualification; per-user grants are edited on the user detail page. Personal terminals require user qualification; project terminals also require project authorization and writable membership. Session access remains independently checked. Qualification revocation stops retained processes and waits for cleanup; Agent permission selection and Auto eligibility do not grant terminal access.
+The **Terminals** page in `/admin` controls revisioned project qualification; per-user grants are edited on the user detail page. Personal terminals require user qualification; project terminals also require project authorization and writable membership, including for administrators. A private project Session requires its creator. Qualification revocation stops retained processes and waits for cleanup; Agent permission selection and Auto eligibility do not grant terminal access.
 
 Select a user or project to list terminal identities, Sessions, creators and process states on the current node. Reading inventory does not start an idle runtime. Administrators can explicitly close a reviewed entry but cannot read terminal output or send input. Closing binds the node and runtime generation; a restart requires fresh inventory. Cleanup failure remains visible for refresh and retry. The [terminal controller](../packages/api/terminal-controller/README.md) owns process lifetime and browser recovery.
 

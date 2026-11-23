@@ -1,6 +1,7 @@
 /** Dynamic HTTP response compression for Gateway JSON and HTML payloads. */
 import type { IncomingMessage, OutgoingHttpHeaders, ServerResponse } from 'node:http'
-import type { Transform } from 'node:stream'
+import type { Readable, Transform } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
 import { brotliCompress, constants, createBrotliCompress, createGzip, gzip } from 'node:zlib'
 
@@ -89,12 +90,19 @@ export function compressBuffer(raw: Buffer, coding: ContentCoding): Promise<Buff
 /**
  * Create a streaming Brotli or gzip compressor for proxied HTTP responses without full-body buffering.
  * @param coding - negotiated content coding.
+ * @param flushChunks - when true, flush after every input chunk so incremental chunked streams never stall.
  * @returns transform stream using the same interactive quality settings as {@link compressBuffer}.
  */
-export function createStreamCompressor(coding: ContentCoding): Transform {
+export function createStreamCompressor(coding: ContentCoding, flushChunks = false): Transform {
   return coding === 'br'
-    ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY } })
-    : createGzip({ level: GZIP_LEVEL })
+    ? createBrotliCompress({
+      ...(flushChunks ? { flush: constants.BROTLI_OPERATION_FLUSH } : {}),
+      params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY },
+    })
+    : createGzip({
+      ...(flushChunks ? { flush: constants.Z_SYNC_FLUSH } : {}),
+      level: GZIP_LEVEL,
+    })
 }
 
 /**
@@ -119,6 +127,35 @@ export function mergeVaryValue(existing: string | string[] | number | undefined,
  */
 export function appendVary(res: ServerResponse, token: string): void {
   res.setHeader('vary', mergeVaryValue(res.getHeader('vary'), token))
+}
+
+/**
+ * Pipe an upstream HTTP response to `res`, applying streaming Brotli or gzip compression.
+ * Chunked responses (`declaredLength === undefined`) flush every chunk immediately so
+ * incremental streams never stall waiting for an internal compressor buffer.
+ * @param upstream - readable upstream response stream.
+ * @param res - destination HTTP response whose headers have not yet been sent.
+ * @param status - HTTP status code.
+ * @param forwardedHeaders - mutable copy of upstream headers to publish on `res`.
+ * @param coding - negotiated compression coding (`'br'` or `'gzip'`).
+ * @param declaredLength - parsed upstream `content-length`, or `undefined` for chunked responses.
+ */
+export async function pipeCompressedResponse(
+  upstream: Readable,
+  res: ServerResponse,
+  status: number,
+  forwardedHeaders: OutgoingHttpHeaders,
+  coding: ContentCoding,
+  declaredLength: number | undefined,
+): Promise<void> {
+  delete forwardedHeaders['content-length']
+  forwardedHeaders['content-encoding'] = coding
+  forwardedHeaders.vary = mergeVaryValue(forwardedHeaders.vary, 'accept-encoding')
+  if (typeof forwardedHeaders.etag === 'string' && !forwardedHeaders.etag.startsWith('W/')) {
+    forwardedHeaders.etag = `W/${forwardedHeaders.etag}`
+  }
+  res.writeHead(status, forwardedHeaders)
+  await pipeline(upstream, createStreamCompressor(coding, declaredLength === undefined), res)
 }
 
 /**

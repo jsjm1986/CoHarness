@@ -233,8 +233,9 @@ export class NodeServiceHttpPool {
     try {
       const stream = entry.stream
       if (stream === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
-      this.metrics.revalidateCalls += 1
-      await timeOperation('nodeLeaseCheck', () => this.services.revalidate(stream))
+      const outcome = await timeOperation('nodeLeaseCheck', () => this.services.revalidate(stream))
+      if (outcome === 'cached') this.metrics.revalidateSkipped += 1
+      else this.metrics.revalidateCalls += 1
       if (this.closed || signal.aborted || entry.owner.signal.aborted || stream.destroyed) {
         throw new NodeServiceError(409, 'node-service/cancelled')
       }

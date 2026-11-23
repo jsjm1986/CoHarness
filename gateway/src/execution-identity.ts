@@ -1091,11 +1091,11 @@ export class GatewayExecutionIdentity {
    */
   async authorizeTerminal(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, nodeId: string,
     value: unknown, fence?: PersonalExecutionWriteFence): Promise<{ userId: number; grantId: string }> {
+    if (principal.purpose !== undefined) throw new ExecutionIdentityError(403, 'terminal authority requires an interactive principal')
     const request = object(value, ['sessionId'])
     const sessionId = identity(request.sessionId)
     const runtimeId = subject.target.runtimeId
-    if (fence !== undefined && subject.target.kind === 'user' && runtimeId !== undefined
-      && principal.purpose === undefined && nodeId === this.nodeId) {
+    if (fence !== undefined && subject.target.kind === 'user' && runtimeId !== undefined && nodeId === this.nodeId) {
       if (principal.user.id !== subject.target.id) throw new ExecutionIdentityError(403, 'personal execution cannot borrow another account')
       const { rows: [granted] } = await this.personalWrite(() => this.pool.query<{ grant_id: string }>(`WITH authorized AS MATERIALIZED (
           SELECT harness.personal_execution_actor($1,$2,$3,$4,$5,$6,$7) AS actor
@@ -1121,7 +1121,7 @@ export class GatewayExecutionIdentity {
       return { userId: principal.user.id, grantId: granted.grant_id }
     }
     return this.inRuntime(subject, async (client, subject) => {
-      const actor = await this.principalActor(client, subject, sessionId, principal)
+      const actor = await this.principalActor(client, subject, sessionId, principal, 'user-terminal')
       const revisions = await this.terminalRevisions(client, subject, actor)
       const granted = await client.query<{ grant_id: string }>(`INSERT INTO harness.terminal_session_grants AS g
           (organization_id,node_id,runtime_kind,runtime_public_id,generation,session_id,user_id,user_policy_revision,project_policy_revision)
@@ -1174,12 +1174,13 @@ export class GatewayExecutionIdentity {
     return { user, project }
   }
 
-  private async principalActor(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string, principal: GatewayPrincipalClaims): Promise<string> {
+  private async principalActor(client: PoolClient, subject: ExecutionRuntimeSubject, sessionId: string, principal: GatewayPrincipalClaims,
+    capability: 'execute' | 'user-terminal' = 'execute'): Promise<string> {
     if (principal.purpose !== undefined && principal.purpose !== 'webhook-dispatch') throw new ExecutionIdentityError(403, 'restricted-purpose principals cannot introduce execution inputs')
     const actor = await client.query<{ id: string }>('SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2', [subject.organizationId, principal.user.id])
     const id = actor.rows[0]?.id
     if (id === undefined) throw new ExecutionIdentityError(403, 'execution actor is unavailable')
-    await this.eligibleActors(client, subject, sessionId, [id], 'execute')
+    await this.eligibleActors(client, subject, sessionId, [id], capability)
     return id
   }
 
@@ -1208,8 +1209,7 @@ export class GatewayExecutionIdentity {
     const resource = capability === 'plugin-management' ? 'plugin'
       : capability === 'desktop' ? 'desktop'
       : capability === 'ssh' ? 'ssh'
-      : capability === 'memory' ? 'memory'
-      : capability === 'user-terminal' ? 'terminal' : undefined
+      : capability === 'memory' ? 'memory' : undefined
     if (resource !== undefined) {
       // Plugin management keeps administrators unqualified by policy; every
       // other actor needs an enabled grant, and a project target needs the

@@ -1324,3 +1324,57 @@ it.each(['verify', 'node-configuration'])('refuses malformed %s backup selection
   if (operation === 'verify') expect(lookup).toHaveBeenCalledExactlyOnceWith(id, undefined, administrator.id)
   else expect(lookup).toHaveBeenCalledExactlyOnceWith(id, administrator.id)
 })
+
+it('aggregates requested deployment sections in one /admin/api/deployment/overview read with per-slice error isolation', async () => {
+  const { deps, base, cookie } = await setup()
+  deps.maintenance = {
+    administration: async () => ({
+      mode: 'serving', maintenanceEpoch: '1', writeEpoch: '2', reason: null,
+      enteredAt: null, updatedAt: '2026-11-23T00:00:00Z', nodes: [], writersQuiesced: true, operations: [],
+    }),
+    state: vi.fn(),
+    enterMaintenance: vi.fn(),
+    exitMaintenance: vi.fn(),
+    setNodeStatus: vi.fn(),
+    listOperations: vi.fn(),
+    requestRestore: vi.fn(),
+    logOperation: vi.fn(),
+  }
+  deps.backups = {
+    list: async () => [],
+    get: async () => { throw new Error('unused') },
+    record: async () => { throw new Error('unused') },
+    setVerified: async () => { throw new Error('unused') },
+  }
+  deps.tunnelAccess = {
+    view: async () => ({
+      supported: true, binary: null, mode: 'off', desired: 'stopped', state: 'stopped',
+      publicUrl: null, hostname: null, domain: null, apiTokenConfigured: false,
+      lastError: null, revision: 1, startedAt: null, updatedAt: '2026-11-23T00:00:00Z',
+    }),
+    install: vi.fn(),
+    startQuick: vi.fn(),
+    startNamed: vi.fn(),
+    stop: vi.fn(),
+    clear: vi.fn(),
+  }
+
+  const invalid = await fetch(`${base}/admin/api/deployment/overview?sections=deployment,bogus`, { headers: { cookie } })
+  expect(invalid.status).toBe(400)
+  expect(await invalid.json()).toEqual({ error: 'invalid-deployment-overview-sections' })
+
+  const response = await fetch(`${base}/admin/api/deployment/overview?sections=deployment,backups,tunnel,nodeConfiguration`, {
+    headers: { cookie },
+  })
+  expect(response.status).toBe(200)
+  const payload = await response.json() as { sections: Record<string, { ok: boolean; status?: number; error?: string; value?: unknown }> }
+  expect(payload.sections.deployment).toMatchObject({ ok: true, value: { mode: 'serving', migrations: null } })
+  expect(payload.sections.backups).toEqual({ ok: true, value: { backups: [] } })
+  expect(payload.sections.tunnel).toMatchObject({ ok: true, value: { mode: 'off', revision: 1 } })
+  expect(payload.sections.nodeConfiguration).toEqual({ ok: false, status: 503, error: 'node-configuration-unavailable' })
+  expect(payload.sections.nodeAccess).toBeUndefined()
+
+  const memberCookie = await login(base, 'worker', 'pw-12345678')
+  const denied = await fetch(`${base}/admin/api/deployment/overview?sections=deployment`, { headers: { cookie: memberCookie } })
+  expect(denied.status).toBe(403)
+})

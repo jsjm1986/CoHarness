@@ -3261,6 +3261,19 @@ summary {
   font-weight: 600;
 }
 
+.metric .metricSub {
+  margin-top: 4px;
+  font-weight: 400;
+  font-size: 0.72rem;
+}
+
+.diagnosticsNoteIcon {
+  width: 12px;
+  height: 12px;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+
 .metric strong {
   display: block;
   margin-top: 5px;

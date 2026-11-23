@@ -18,7 +18,7 @@ import type { GatewayNodeServices } from './node-service.ts'
 import type { NodeServiceConfig } from './node-service.ts'
 import { NodeServiceHttpPool, type NodeServiceHttpPoolDiagnostics } from './node-service-http-pool.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
-import { createStreamCompressor, isCompressibleContentType, mergeVaryValue, MIN_COMPRESS_BYTES, preferredCompression } from './http-compression.ts'
+import { isCompressibleContentType, MIN_COMPRESS_BYTES, pipeCompressedResponse, preferredCompression } from './http-compression.ts'
 
 /** Organization directory and current Admin authority; paths remain owned by the selected Gateway. */
 export interface NodeServiceProxyDirectory {
@@ -131,6 +131,7 @@ export class GatewayNodeServiceProxy {
   private closed = false
   private readonly unsubscribe?: () => void
   private readonly httpPool: NodeServiceHttpPool
+  private readonly preparedReadFastRelease: boolean
   private readonly metrics = {
     httpTotal: 0, upgradeTotal: 0, accessSyncCalls: 0, accessSyncSkipped: 0,
     preparedReadEligible: 0, preparedReadHit: 0, preparedReadFallback: 0,
@@ -145,7 +146,7 @@ export class GatewayNodeServiceProxy {
    * @param monitor - existing durable permission-change monitor, when present.
    */
   constructor(private readonly directory: NodeServiceProxyDirectory,
-    private readonly services: Pick<GatewayNodeServices, 'open' | 'revalidate' | 'released' | 'capacity'>,
+    private readonly services: Pick<GatewayNodeServices, 'open' | 'revalidate' | 'released' | 'capacity'> & Partial<Pick<GatewayNodeServices, 'invalidateLeaseCache'>>,
     private readonly timeoutMs: number,
     config: NodeServiceConfig,
     private readonly monitor?: GatewayAccessMonitor,
@@ -153,14 +154,20 @@ export class GatewayNodeServiceProxy {
     if (directory.resolvePlacement !== undefined && directory.resetScopeCookie === undefined) {
       throw new Error('Node service owner routing requires the Gateway scope-cookie formatter')
     }
+    this.preparedReadFastRelease = config.preparedReadFastRelease === true
     this.httpPool = new NodeServiceHttpPool(services, config)
     this.unsubscribe = monitor?.subscribe(subject => { this.invalidate(subject) })
   }
 
-  private invalidate(subject: AccessInvalidationSubject): void {
+  /**
+   * Immediately abort matching forwarded HTTP/WebSocket operations and drain idle transports on node/global invalidation.
+   * @param subject - revoked user, project, node, or organization scope (such as explicit logout or permission revocation).
+   */
+  invalidate(subject: AccessInvalidationSubject): void {
     // Idle node transports carry no user or project credentials; only node- or
     // organization-scoped invalidations need to drain unused byte connections.
     if (subject.userId === undefined && subject.projectId === undefined) {
+      this.services.invalidateLeaseCache?.(subject.nodeId)
       void this.httpPool.closeIdle(subject.nodeId)
     }
     for (const operation of this.active) {
@@ -415,12 +422,21 @@ export class GatewayNodeServiceProxy {
               mark('responseHeaders')
               if (response.headers[NODE_SERVICE_TARGET_HEADER] !== target.nodeId) throw new NodeServiceError(409, 'node-service/mismatch')
               if (approval !== undefined && personalRead !== undefined) {
-                this.metrics.preparedReadReleaseChecks += 1
-                const current = await timeOperation('entryReadRelease', () => this.directory.approvePersonalRead!(approval))
-                if (current === null || current.accessRevision !== personalRead.accessRevision
-                  || current.generation !== personalRead.generation || current.port !== personalRead.port
-                  || current.startedAt !== personalRead.startedAt || current.launchStamp !== personalRead.launchStamp) {
-                  throw new NodeServiceError(409, 'node-service/cancelled')
+                const fastRelease = this.preparedReadFastRelease
+                  && !signal.aborted
+                  && personalRead.expiresAt > Date.now()
+                  && this.monitor?.available === true
+                  && this.monitor.matchesRevision?.(BigInt(personalRead.accessRevision)) === true
+                if (fastRelease) {
+                  this.metrics.preparedReadReleaseSkipped += 1
+                } else {
+                  this.metrics.preparedReadReleaseChecks += 1
+                  const current = await timeOperation('entryReadRelease', () => this.directory.approvePersonalRead!(approval))
+                  if (current === null || current.accessRevision !== personalRead.accessRevision
+                    || current.generation !== personalRead.generation || current.port !== personalRead.port
+                    || current.startedAt !== personalRead.startedAt || current.launchStamp !== personalRead.launchStamp) {
+                    throw new NodeServiceError(409, 'node-service/cancelled')
+                  }
                 }
               }
               signal.throwIfAborted()
@@ -453,21 +469,16 @@ export class GatewayNodeServiceProxy {
                 ? response.headers['content-type'] : 'application/octet-stream'
               const streamCoding = status === 200 && req.method !== 'HEAD' && req.headers.range === undefined
                 && response.headers['content-encoding'] === undefined
-                && declaredLength !== undefined && Number.isSafeInteger(declaredLength) && declaredLength >= MIN_COMPRESS_BYTES
+                && (declaredLength === undefined || (Number.isSafeInteger(declaredLength) && declaredLength >= MIN_COMPRESS_BYTES))
                 && isCompressibleContentType(contentType)
                 ? preferredCompression(req.headers['accept-encoding'])
                 : undefined
               if (streamCoding !== undefined) {
-                delete forwardedHeaders['content-length']
-                forwardedHeaders['content-encoding'] = streamCoding
-                forwardedHeaders.vary = mergeVaryValue(forwardedHeaders.vary, 'accept-encoding')
-                if (typeof forwardedHeaders.etag === 'string' && !forwardedHeaders.etag.startsWith('W/')) {
-                  forwardedHeaders.etag = `W/${forwardedHeaders.etag}`
-                }
+                await pipeCompressedResponse(response, res, status, forwardedHeaders, streamCoding, declaredLength)
+              } else {
+                res.writeHead(status, forwardedHeaders)
+                await pipeline(response, res)
               }
-              res.writeHead(status, forwardedHeaders)
-              if (streamCoding !== undefined) await pipeline(response, createStreamCompressor(streamCoding), res)
-              else await pipeline(response, res)
               if (capturedChunks !== undefined && !signal.aborted) {
                 const etag = typeof response.headers.etag === 'string' ? response.headers.etag : undefined
                 const cacheControl = typeof response.headers['cache-control'] === 'string'

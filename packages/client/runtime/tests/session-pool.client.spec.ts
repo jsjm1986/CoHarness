@@ -1158,3 +1158,40 @@ it('forwards pooled job reads and kills to the owner runtime under the original 
     expect(pool.list.getSnapshot().observedJobs['bash-1']).toBeUndefined()
   } finally { await ctx.fiber.dispose() }
 })
+
+it('starts workspace.list concurrently with session.list when a target runtime connects', async () => {
+  const ctx = new Context()
+  const baseApi = new FakeApiClient()
+  const projectApi = new FakeApiClient()
+  const listGate = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+  const workspaceGate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+  projectApi.onList = () => listGate.promise
+  projectApi.onWorkspaceList = () => workspaceGate.promise
+  const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+  const targetConnection = connection(projectApi, (sinks) => {
+    queueMicrotask(() => sinks.onConnected?.({
+      version: 'test', cwd: '/projects/parallel', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+    }))
+  })
+  const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => targetConnection }, fakeRemote())
+  try {
+    const target = { kind: 'project' as const, projectId: 19 }
+    const ready = pool.prepareRuntime(target, new AbortController().signal)
+    await vi.waitFor(() => {
+      expect(projectApi.callsOf('session.list')).toHaveLength(1)
+      // Workspace baseline starts immediately without waiting for session.list to settle.
+      expect(projectApi.callsOf('workspace.list')).toHaveLength(1)
+    })
+    listGate.resolve(ok({ items: [{ sessionId: 's-parallel' as SessionId, updatedAt: 1, running: false, blank: false }] }))
+    await ready
+    workspaceGate.resolve(ok({ items: [], archivedSessionIds: ['s-parallel' as SessionId] }))
+    await vi.waitFor(() => {
+      const key = clientSessionKey(target, 's-parallel' as SessionId)
+      expect(pool.list.getSnapshot().archivedById[key]?.id).toBe(key)
+    })
+  } finally {
+    listGate.resolve(ok({ items: [] }))
+    workspaceGate.resolve(ok({ items: [] }))
+    await ctx.fiber.dispose()
+  }
+})

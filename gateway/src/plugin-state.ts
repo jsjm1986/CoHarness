@@ -586,15 +586,17 @@ export class PostgresPluginState {
    * Record the desired-state revision a launch materialized, so later starts
    * skip re-projecting and the runtime's write-back detects administrator
    * writes that landed after it.
-   * @param target - launched runtime owner.
+   * @param target - launching Runtime owner.
    * @param revision - the projected revision.
+   * @param generation - launch generation that owns the projection. A replaced generation is refused.
    */
-  async markApplied(target: RuntimeTarget, revision: string): Promise<void> {
+  async markApplied(target: RuntimeTarget, revision: string, generation: number): Promise<void> {
     const internal = await this.resolveOwner(target)
-    await this.context.pool.query(
+    const result = await this.context.pool.query(
       `UPDATE harness.instances SET applied_policy_revision=$3,updated_at=now()
-        WHERE organization_id=$1 AND runtime_id=$2 AND assigned_node_id=$4`,
-      [internal.organizationId, internal.runtimeId, revision, this.context.nodeId])
+        WHERE organization_id=$1 AND runtime_id=$2 AND assigned_node_id=$4 AND generation=$5`,
+      [internal.organizationId, internal.runtimeId, revision, this.context.nodeId, generation])
+    if (result.rowCount !== 1) throw new PluginStateError(409, 'plugin projection belongs to another Runtime generation')
   }
 
   /**

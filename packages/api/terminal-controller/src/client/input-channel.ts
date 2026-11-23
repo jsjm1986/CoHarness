@@ -77,16 +77,27 @@ function parseServerFrame(raw: unknown): TerminalInputServerFrame | undefined {
   return undefined
 }
 
+/** Default per-frame acknowledgement deadline preventing half-open sockets from wedging input. */
+export const DEFAULT_TERMINAL_INPUT_ACK_TIMEOUT_MS = 15_000
+
+/** Optional tuning parameters for {@link openWebSocketTerminalInputChannel}. */
+export interface TerminalInputChannelOptions {
+  /** Maximum milliseconds to wait for a Host acknowledgement before closing the socket. */
+  readonly ackTimeoutMs?: number
+}
+
 /**
  * Open a browser WebSocket bound to one verified Session and attachment identity.
  * Returns undefined in environments without `WebSocket` or a page origin.
  * @param target - active Session, terminal, and attachment identifiers.
  * @param privateResourceUrl - pins the upgrade URL to the verified principal and Runtime.
+ * @param options - optional acknowledgement deadline override.
  * @returns an input channel whose `isOpen` flips true once the handshake succeeds.
  */
 export function openWebSocketTerminalInputChannel(
   target: TerminalInputChannelTarget,
   privateResourceUrl?: (value: string, sessionId: SessionId) => string,
+  options?: TerminalInputChannelOptions,
 ): TerminalInputChannel | undefined {
   const WS = globalThis.WebSocket
   const href = (globalThis as { location?: { href?: string } }).location?.href
@@ -113,15 +124,23 @@ export function openWebSocketTerminalInputChannel(
     return undefined
   }
 
+  const ackTimeoutMs = options?.ackTimeoutMs ?? DEFAULT_TERMINAL_INPUT_ACK_TIMEOUT_MS
   let closed = false
   let nextSeq = 1
-  const pending = new Map<number, { resolve: () => void; reject: (error: unknown) => void }>()
+  const pending = new Map<number, {
+    resolve: () => void
+    reject: (error: unknown) => void
+    timer: ReturnType<typeof setTimeout>
+  }>()
 
   const failPending = (): void => {
     if (closed) return
     closed = true
     const error = new TerminalInputChannelClosedError()
-    for (const waiter of pending.values()) waiter.reject(error)
+    for (const waiter of pending.values()) {
+      clearTimeout(waiter.timer)
+      waiter.reject(error)
+    }
     pending.clear()
   }
 
@@ -131,6 +150,7 @@ export function openWebSocketTerminalInputChannel(
     const waiter = pending.get(frame.seq)
     if (waiter === undefined) return
     pending.delete(frame.seq)
+    clearTimeout(waiter.timer)
     if (frame.type === 'ack') {
       waiter.resolve()
       return
@@ -147,15 +167,25 @@ export function openWebSocketTerminalInputChannel(
     if (socket.readyState === WS.OPEN || socket.readyState === WS.CONNECTING) socket.close()
   })
 
-  const send = (frame: TerminalInputClientFrame): Promise<void> => {
+  const send = (payload: { readonly type: 'write'; readonly data: string } | { readonly type: 'resize'; readonly cols: number; readonly rows: number }): Promise<void> => {
     if (closed || socket.readyState !== WS.OPEN) {
       return Promise.reject(new TerminalInputChannelUnavailableError())
     }
+    const frame: TerminalInputClientFrame = payload.type === 'write'
+      ? { type: 'write', seq: nextSeq++, data: payload.data }
+      : { type: 'resize', seq: nextSeq++, cols: payload.cols, rows: payload.rows }
     return new Promise<void>((resolve, reject) => {
-      pending.set(frame.seq, { resolve, reject })
+      const timer = setTimeout(() => {
+        failPending()
+        if (socket.readyState === WS.OPEN || socket.readyState === WS.CONNECTING) {
+          socket.close(1001, 'ack timeout')
+        }
+      }, ackTimeoutMs)
+      pending.set(frame.seq, { resolve, reject, timer })
       try {
         socket.send(JSON.stringify(frame))
       } catch {
+        clearTimeout(timer)
         pending.delete(frame.seq)
         failPending()
         reject(new TerminalInputChannelUnavailableError())
@@ -168,10 +198,10 @@ export function openWebSocketTerminalInputChannel(
       return !closed && socket.readyState === WS.OPEN
     },
     write(data: string) {
-      return send({ type: 'write', seq: nextSeq++, data })
+      return send({ type: 'write', data })
     },
     resize(cols: number, rows: number) {
-      return send({ type: 'resize', seq: nextSeq++, cols, rows })
+      return send({ type: 'resize', cols, rows })
     },
     close() {
       failPending()

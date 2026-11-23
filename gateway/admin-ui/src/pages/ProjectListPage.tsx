@@ -1,7 +1,7 @@
 import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowUpRight, CheckCircle2, Folder, FolderKanban, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { AdminLink } from '../admin-navigation.tsx'
 import { createProject, getOwnerProjectDisplays, listProjects, type Project } from '../api.ts'
 import { ProjectDirectoryBrowser } from '../components/ProjectDirectoryBrowser.tsx'
 import {
@@ -159,10 +159,10 @@ export function ProjectListPage() {
                   {visibleProjects.map(project => (
                     <tr key={project.id}>
                       <td>
-                        <Link className="projectLink" to={`/projects/${project.id}`}>
+                        <AdminLink className="projectLink" to={`/projects/${project.id}`}>
                           <Folder aria-hidden="true" />
                           <span>{project.name}</span>
-                        </Link>
+                        </AdminLink>
                       </td>
                       <td>
                         <div className="projectOriginCell">
@@ -172,7 +172,7 @@ export function ProjectListPage() {
                       </td>
                       <td><span className="pathText">{project.path}</span></td>
                       <td><StatusBadge tone={project.memberCount === 0 ? 'neutral' : 'info'}>{t('membersCount', { count: String(project.memberCount) })}</StatusBadge></td>
-                      <td className="alignRight"><Link className="iconLink" to={`/projects/${project.id}`} aria-label={t('openProjectAria', { name: project.name })} title={t('openProjectTitle')}><ArrowUpRight aria-hidden="true" /></Link></td>
+                      <td className="alignRight"><AdminLink className="iconLink" to={`/projects/${project.id}`} aria-label={t('openProjectAria', { name: project.name })} title={t('openProjectTitle')}><ArrowUpRight aria-hidden="true" /></AdminLink></td>
                     </tr>
                   ))}
                 </tbody>
@@ -180,7 +180,7 @@ export function ProjectListPage() {
             </div>
             <div className="mobileList">
               {visibleProjects.map(project => (
-                <Link className="mobileItem mobileProjectLink" key={project.id} to={`/projects/${project.id}`}>
+                <AdminLink className="mobileItem mobileProjectLink" key={project.id} to={`/projects/${project.id}`}>
                   <div className="mobileItemHeader">
                     <div className="projectIdentity">
                       <span className="itemIcon"><Folder aria-hidden="true" /></span>
@@ -193,7 +193,7 @@ export function ProjectListPage() {
                     <span className="pathText">{project.path}</span>
                     <StatusBadge tone={project.memberCount === 0 ? 'neutral' : 'info'}>{t('membersCount', { count: String(project.memberCount) })}</StatusBadge>
                   </div>
-                </Link>
+                </AdminLink>
               ))}
             </div>
           </>

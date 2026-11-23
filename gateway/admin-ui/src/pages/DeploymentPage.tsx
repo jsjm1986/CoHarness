@@ -1,4 +1,10 @@
 import { useDeploymentContext } from '../deployment-context.tsx'
+import { adminComputerTarget } from '../computer-target.ts'
+import {
+  DeploymentOverviewProvider,
+  unwrapDeploymentOverviewSlice,
+  type DeploymentOverviewState,
+} from '../deployment-overview.tsx'
 import { NodeContentMigrationSection } from './NodeContentMigrationSection.tsx'
 import { NodeContentSection } from './NodeContentSection.tsx'
 import { PeerBackupSection } from './PeerBackupSection.tsx'
@@ -14,9 +20,11 @@ import { TunnelAccessSection } from './TunnelAccessSection.tsx'
 import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import { DatabaseBackup, HardDriveDownload, RefreshCw, ShieldCheck, Wrench } from 'lucide-react'
 import {
-  createBackup, getDeployment, listBackups, requestDeploymentRestore, setDeploymentNodeStatus,
-  setMaintenance, verifyBackup, inspectBackupNodeConfiguration, getNodeConfiguration,
-  type BackupNodeConfigurationPreview, type NodeConfigurationView, type DeploymentBackup, type DeploymentNode, type DeploymentState,
+  AdminRequestError, createBackup, getDeployment, getDeploymentOverview, listBackups,
+  requestDeploymentRestore, setDeploymentNodeStatus, setMaintenance, verifyBackup,
+  inspectBackupNodeConfiguration, getNodeConfiguration,
+  type BackupNodeConfigurationPreview, type DeploymentOverviewSectionKey,
+  type NodeConfigurationView, type DeploymentBackup, type DeploymentNode, type DeploymentState,
 } from '../api.ts'
 import {
   Button, ConfirmDialog, Dialog, EmptyState, ErrorBanner, Field, IconButton, LoadingState,
@@ -56,12 +64,33 @@ function heartbeatText(node: DeploymentNode): string {
   return t('heartbeatMinutesAgo', { value: String(Math.round(node.heartbeatAgeMs / 60_000)) })
 }
 
+/** Longest wait before descendant sections stop waiting for the aggregated first snapshot. */
+const OVERVIEW_SECTION_HEDGE_MS = 1_000
+
 export function DeploymentPage() {
   const deployment = useDeploymentContext()
   const policyReady = deployment.value !== null
+  const computerTarget = adminComputerTarget()
+  const expectedSections = useMemo<ReadonlySet<DeploymentOverviewSectionKey>>(() => {
+    const sections = new Set<DeploymentOverviewSectionKey>(['deployment', 'backups', 'tunnel', 'nodeConfiguration'])
+    const value = deployment.value
+    const selected = computerTarget ?? value?.entry.nodeId
+    if (value?.mode === 'multi' && selected !== value.primary?.nodeId) sections.add('nodeConnection')
+    if (computerTarget === undefined) {
+      sections.add('runtimeAllocationPolicy')
+      if (value === null || value.scope === 'organization') sections.add('nodeAccess')
+    }
+    return sections
+  }, [deployment.value, computerTarget])
+  const initialSections = useMemo<readonly DeploymentOverviewSectionKey[]>(() => [...expectedSections], [expectedSections])
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
   const [state, setState] = useState<DeploymentState | null>(null)
   const [backups, setBackups] = useState<DeploymentBackup[] | null>(null)
+  const [overview, setOverview] = useState<DeploymentOverviewState>(() => ({
+    status: 'loading',
+    requested: expectedSections,
+    sections: null,
+  }))
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [reason, setReason] = useState('')
@@ -73,6 +102,17 @@ export function DeploymentPage() {
   const flight = useRef<Promise<void> | undefined>(undefined)
   const queued = useRef<Promise<void> | undefined>(undefined)
   const lastFetchedAt = useRef(0)
+  const seeded = useRef(false)
+  const overviewSupported = useRef(true)
+  const initialSectionsRef = useRef(initialSections)
+  initialSectionsRef.current = initialSections
+
+  useEffect(() => {
+    if (deployment.error && !seeded.current) {
+      seeded.current = true
+      setOverview({ status: 'fallback', requested: new Set(), sections: null })
+    }
+  }, [deployment.error])
 
   const refresh = useCallback((): Promise<void> => {
     const owner = lifetime.current
@@ -86,16 +126,69 @@ export function DeploymentPage() {
       queued.current = next
       return next
     }
-    const request = Promise.all([getDeployment(owner.signal), listBackups(owner.signal)]).then(([next, list]) => {
-      if (owner.signal.aborted) return
-      lastFetchedAt.current = Date.now()
-      setState(next); setBackups(list.backups); setError('')
-    }).catch(cause => {
+    const fetchLegacy = (): Promise<void> =>
+      Promise.all([getDeployment(owner.signal), listBackups(owner.signal)]).then(([next, list]) => {
+        if (owner.signal.aborted) return
+        lastFetchedAt.current = Date.now()
+        setState(next); setBackups(list.backups); setError('')
+      })
+    const sectionsToLoad: readonly DeploymentOverviewSectionKey[] = !seeded.current
+      ? initialSectionsRef.current
+      : ['deployment', 'backups']
+    // A slow slice must not hold every section on its loading state; after the hedge,
+    // sections read independently and the aggregate only refreshes the page's own state.
+    const hedge = overviewSupported.current && !seeded.current ? setTimeout(() => {
+      if (seeded.current || owner.signal.aborted) return
+      seeded.current = true
+      setOverview({ status: 'fallback', requested: new Set(), sections: null })
+    }, OVERVIEW_SECTION_HEDGE_MS) : undefined
+    const request = (overviewSupported.current
+      ? getDeploymentOverview(sectionsToLoad, owner.signal).then(response => {
+        if (owner.signal.aborted) return
+        const isInitial = !seeded.current
+        if (isInitial) {
+          seeded.current = true
+          setOverview({ status: 'ready', requested: new Set(sectionsToLoad), sections: response.sections })
+        }
+        lastFetchedAt.current = Date.now()
+        const deploymentSlice = response.sections.deployment
+        const backupsSlice = response.sections.backups
+        if (deploymentSlice === undefined || backupsSlice === undefined) {
+          throw new Error('Incomplete deployment overview response')
+        }
+        const nextState = unwrapDeploymentOverviewSlice(deploymentSlice)
+        const nextBackups = unwrapDeploymentOverviewSlice(backupsSlice)
+        setState(nextState); setBackups(nextBackups.backups); setError('')
+      }).catch(cause => {
+        if (owner.signal.aborted) return
+        if (cause instanceof AdminRequestError && cause.status === 404) {
+          overviewSupported.current = false
+          if (!seeded.current) {
+            seeded.current = true
+            setOverview({ status: 'fallback', requested: new Set(), sections: null })
+          }
+          return fetchLegacy()
+        }
+        if (!seeded.current) {
+          seeded.current = true
+          setOverview({ status: 'fallback', requested: new Set(), sections: null })
+        }
+        throw cause
+      })
+      : fetchLegacy()
+    ).catch(cause => {
       if (!owner.signal.aborted) setError(messageOf(cause))
-    }).finally(() => { if (flight.current === request) flight.current = undefined })
+    }).finally(() => {
+      clearTimeout(hedge)
+      if (flight.current === request) flight.current = undefined
+    })
     flight.current = request
     return request
   }, [])
+
+  const overviewValue = useMemo<DeploymentOverviewState>(() => (
+    overview.status === 'loading' ? { status: 'loading', requested: expectedSections, sections: null } : overview
+  ), [overview, expectedSections])
 
   useEffect(() => {
     if (!policyReady) return
@@ -133,6 +226,7 @@ export function DeploymentPage() {
   const mode = state === null ? null : MODE_LABEL[state.mode]
 
   return (
+    <DeploymentOverviewProvider value={overviewValue}>
     <div>
       <PageHeader
         title={t('pageTitle')}
@@ -354,5 +448,6 @@ export function DeploymentPage() {
         }}
       />
     </div>
+    </DeploymentOverviewProvider>
   )
 }

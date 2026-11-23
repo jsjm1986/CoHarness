@@ -3,7 +3,8 @@ import { useProjectChoices } from '../components/project-choices.tsx'
 import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowLeft, KeyRound, Pencil, Power, Trash2, UserRound } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { AdminLink, useAdminPath } from '../admin-navigation.tsx'
 import {
   AdminRequestError,
   deleteUser,
@@ -80,7 +81,7 @@ export function UserDetailPage() {
   if (!Number.isSafeInteger(userId) || userId <= 0) {
     return (
       <div className="page">
-        <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
+        <AdminLink className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</AdminLink>
         <EmptyState icon={UserRound} title={t('notFoundTitle')} detail={t('notFoundDetail')} />
       </div>
     )
@@ -113,6 +114,7 @@ function UserComputerProfile({ userId, reload }: { userId: number; reload: numbe
 function UserDetail({ userId }: { userId: number }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const navigate = useNavigate()
+  const adminPath = useAdminPath()
   const [profileRevision, setProfileRevision] = useState(0)
   const alive = useRef(true)
   useEffect(() => {
@@ -180,13 +182,13 @@ function UserDetail({ userId }: { userId: number }) {
   async function onDelete() {
     const saved = await run(`delete:${userId}`, () => deleteUser(userId))
     // A stale instance's delete cannot navigate away from a remounted detail.
-    if (saved && alive.current) { setDeleteOpen(false); navigate('/') }
+    if (saved && alive.current) { setDeleteOpen(false); navigate(adminPath('/')) }
   }
 
   if (notFound) {
     return (
       <div className="page">
-        <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
+        <AdminLink className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</AdminLink>
         <EmptyState icon={UserRound} title={t('notFoundTitle')} detail={t('notFoundDetail')} />
       </div>
     )
@@ -194,7 +196,7 @@ function UserDetail({ userId }: { userId: number }) {
 
   return (
     <div className="page">
-      <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
+      <AdminLink className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</AdminLink>
       <PageHeader
         title={user === null ? t('pageTitle') : t('pageTitleUser', { name: user.displayName || user.username })}
         description={user === null ? undefined : t('pageDescription', { username: user.username, id: String(user.id) })}
@@ -535,7 +537,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
                   <tbody>
                     {memberships.map(row => (
                       <tr key={row.projectId}>
-                        <td><Link className="projectLink" to={`/projects/${row.projectId}`}>{row.name}</Link></td>
+                        <td><AdminLink className="projectLink" to={`/projects/${row.projectId}`}>{row.name}</AdminLink></td>
                         <td><span className="pathText">{row.path}</span></td>
                         <td>
                           <select
@@ -559,7 +561,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
                 {memberships.map(row => (
                   <article className="mobileItem" key={row.projectId}>
                     <div className="mobileItemHeader">
-                      <Link className="projectLink" to={`/projects/${row.projectId}`}><strong>{row.name}</strong></Link>
+                      <AdminLink className="projectLink" to={`/projects/${row.projectId}`}><strong>{row.name}</strong></AdminLink>
                       <IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => { setError(''); setRemoveTarget(row) }} />
                     </div>
                     <div className="mobileItemBody">

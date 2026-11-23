@@ -1,5 +1,5 @@
 /** Read-only Admin API client for live Gateway performance and multi-computer forwarding diagnostics. */
-import { adminComputerRequestUrl } from './computer-target.ts'
+import { adminRequest } from './api.ts'
 
 /** Cumulative duration histogram summary reported by GatewayPerformanceObserver. */
 export interface DurationHistogramView {
@@ -112,15 +112,9 @@ export interface PerformanceDiagnosticsSnapshot {
  * @returns cumulative process diagnostics snapshot.
  */
 export async function getPerformanceDiagnostics(signal?: AbortSignal): Promise<PerformanceDiagnosticsSnapshot> {
-  const url = adminComputerRequestUrl('/admin/api/performance')
-  const response = await fetch(url, {
-    credentials: 'same-origin',
+  return await adminRequest<PerformanceDiagnosticsSnapshot>('/admin/api/performance', {
     cache: 'no-store',
     headers: { accept: 'application/json' },
     ...(signal === undefined ? {} : { signal }),
   })
-  if (!response.ok) {
-    throw new Error(`HTTP ${String(response.status)}`)
-  }
-  return await response.json() as PerformanceDiagnosticsSnapshot
 }

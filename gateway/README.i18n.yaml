@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/README.md
 document:
-  en: f5b3cd31a00b3f4cc63a435dbaea654ce495ebd5
-  zh: 26c75cfdd45b6d34126ed9756b62794174daaf10
+  en: 6ecca39d8f125857089f5337b2b6ceeb51f8b563
+  zh: f969b366e2e41cd3a797184dfbe200b4f1203a02
 /harness-gateway:
   en: d06b73ef2a831bb8
   zh: 8a3e3f0d5c13677e
@@ -33,8 +33,8 @@ document:
   en: 70ff1f2e23a128d2
   zh: 0978c42d651ff3ea
 /harness-gateway/user-terminals:
-  en: bc98d4118d93d62c
-  zh: 80109f508a0090ed
+  en: ae20bf6b23f64cca
+  zh: 06c32c6ef4c1a08b
 /harness-gateway/android-shell-and-completion-notifications:
   en: ecf12b6ced71a730
   zh: 4d39a9e54e9a3f3c

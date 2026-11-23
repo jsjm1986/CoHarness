@@ -1,7 +1,8 @@
 /** Deterministic tests for Wave 4 model first-token fast paths on project and node_content Runtimes. */
 import { randomBytes, randomUUID } from 'node:crypto'
-import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { Pool, PoolClient } from 'pg'
+import { IncomingMessage, ServerResponse } from 'node:http'
+import { Socket } from 'node:net'
+import type { QueryResultRow } from 'pg'
 import { describe, expect, it, vi } from 'vitest'
 import {
   RESOURCE_ACTIVE_MODEL_CHECK_HEADER,
@@ -16,6 +17,7 @@ import { PostgresModelGovernanceService } from '../src/postgres/model-governance
 import type { RuntimeId } from '../src/runtime-catalog.ts'
 import type { RuntimeCredentialSubject } from '../src/runtime-api.ts'
 import { handleRuntimeResourceApi } from '../src/runtime-resource-api.ts'
+import { fixtureQueryClient, fixtureQueryPool } from './postgres-query-fixture.ts'
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001'
 const NODE_ID = '00000000-0000-4000-8000-000000000002'
@@ -44,20 +46,23 @@ const nodeContentProjectSubject: RuntimeCredentialSubject = {
   },
 }
 
+function postRequest(headers: IncomingMessage['headers'] = {}): IncomingMessage {
+  return Object.assign(new IncomingMessage(new Socket()), { method: 'POST', headers })
+}
+
 function fakeResponse() {
-  const headers = new Map<string, string>()
-  let statusCode = 200
+  const res = new ServerResponse(postRequest())
   let body = ''
-  const res = {
-    setHeader(name: string, value: string) { headers.set(name.toLowerCase(), value) },
-    writeHead(status: number, extra: Record<string, string> = {}) {
-      statusCode = status
-      for (const [k, v] of Object.entries(extra)) headers.set(k.toLowerCase(), v)
-      return res
-    },
-    end(chunk = '') { body += chunk; return res },
-  } as unknown as ServerResponse
-  return { res, status: () => statusCode, headers, json: () => JSON.parse(body) as unknown }
+  vi.spyOn(res, 'end').mockImplementation((chunk?: unknown) => {
+    if (typeof chunk === 'string') body += chunk
+    return res
+  })
+  return {
+    res,
+    status: () => res.statusCode,
+    headers: { get: (name: string) => res.getHeader(name) },
+    json: (): unknown => JSON.parse(body),
+  }
 }
 
 describe('Wave 4: single-statement project model credential resolution', () => {
@@ -65,8 +70,8 @@ describe('Wave 4: single-statement project model credential resolution', () => {
     const cipher = new OrganizationModelCredentialCipher(randomBytes(32))
     const encryptedOrg = cipher.encrypt(ORG_ID, 'prov-org', 'sk-org-secret')
     const encryptedProj = cipher.encrypt(ORG_ID, 'prov-proj', 'sk-proj-secret')
-    const query = vi.fn()
-    const pool = { query } as unknown as Pool
+    const query = vi.fn<(sql: string) => Promise<QueryResultRow[]>>()
+    const pool = fixtureQueryPool(query)
     const governance = new PostgresModelGovernanceService(
       { pool, organizationId: ORG_ID, organizationSlug: 'org', nodeId: NODE_ID, nodeName: 'n1' },
       cipher,
@@ -82,10 +87,7 @@ describe('Wave 4: single-statement project model credential resolution', () => {
       auth_tag: enc.authTag,
     })
 
-    query.mockResolvedValueOnce({
-      rows: [toDbRow('prov-org', encryptedOrg)],
-      rowCount: 1,
-    })
+    query.mockResolvedValueOnce([toDbRow('prov-org', encryptedOrg)])
     const orgResult = await governance.resolveRuntimeCredential(nodeContentProjectSubject, 'DSH_ORG_DEEPSEEK_KEY', fence)
     expect(orgResult).toEqual({ status: 'ok', value: 'sk-org-secret' })
     expect(query).toHaveBeenCalledTimes(1)
@@ -93,20 +95,17 @@ describe('Wave 4: single-statement project model credential resolution', () => {
     expect(query.mock.calls[0]![0]).toContain('organization_model_credentials')
 
     query.mockClear()
-    query.mockResolvedValueOnce({
-      rows: [toDbRow('prov-proj', encryptedProj)],
-      rowCount: 1,
-    })
+    query.mockResolvedValueOnce([toDbRow('prov-proj', encryptedProj)])
     const projResult = await governance.resolveRuntimeCredential(projectSubject, 'DSH_PROJECT_CUSTOM_KEY', fence)
     expect(projResult).toEqual({ status: 'ok', value: 'sk-proj-secret' })
     expect(query).toHaveBeenCalledTimes(1)
     expect(query.mock.calls[0]![0]).toContain('project_model_credentials')
 
-    query.mockResolvedValueOnce({ rows: [{ verdict: 'maintenance', provider_id: null }], rowCount: 1 })
+    query.mockResolvedValueOnce([{ verdict: 'maintenance', provider_id: null }])
     expect(await governance.resolveRuntimeCredential(projectSubject, 'DSH_PROJECT_CUSTOM_KEY', fence))
       .toEqual({ status: 'maintenance' })
 
-    query.mockResolvedValueOnce({ rows: [], rowCount: 0 })
+    query.mockResolvedValueOnce([])
     expect(await governance.resolveRuntimeCredential(projectSubject, 'DSH_ORG_DEEPSEEK_KEY', fence))
       .toEqual({ status: 'invalid-runtime-token' })
   })
@@ -120,7 +119,7 @@ describe('Wave 4: immediate qualified project model grants and cursor wakeups', 
     }))
     const budgetRequest = vi.fn<() => Promise<{ state: 'active' | 'queued' }>>(async () => ({ state: 'active' }))
     const deps = {
-      pool: {} as Pool,
+      pool: fixtureQueryPool(() => { throw new Error('Unexpected direct query during scoped admission') }),
       principals: {} as never,
       execution: { authorize } as never,
       budget: { request: budgetRequest, changeCursor: '11111111-1111-4111-8111-111111111111.5' } as never,
@@ -133,7 +132,7 @@ describe('Wave 4: immediate qualified project model grants and cursor wakeups', 
 
     // Case 1: active grant confirmed post-reservation -> sets RESOURCE_QUALIFIED_GRANT_HEADER=1.
     const r1 = fakeResponse()
-    await handleRuntimeResourceApi(deps, projectSubject, { method: 'POST' } as IncomingMessage, r1.res,
+    await handleRuntimeResourceApi(deps, projectSubject, postRequest(), r1.res,
       '/internal/runtime/resources/request', payload)
     expect(r1.status()).toBe(200)
     expect(r1.json()).toEqual({ state: 'active' })
@@ -147,7 +146,7 @@ describe('Wave 4: immediate qualified project model grants and cursor wakeups', 
       primaryActorUserId: 7, unverifiedHistory: false,
     }).mockRejectedValueOnce(new ExecutionIdentityError(403, 'revoked'))
     const r2 = fakeResponse()
-    await handleRuntimeResourceApi(deps, projectSubject, { method: 'POST' } as IncomingMessage, r2.res,
+    await handleRuntimeResourceApi(deps, projectSubject, postRequest(), r2.res,
       '/internal/runtime/resources/request', payload)
     expect(r2.status()).toBe(200)
     expect(r2.json()).toEqual({ state: 'refused', reason: 'authority-unavailable' })
@@ -161,7 +160,7 @@ describe('Wave 4: immediate qualified project model grants and cursor wakeups', 
     })
     budgetRequest.mockResolvedValueOnce({ state: 'queued' as const })
     const r3 = fakeResponse()
-    await handleRuntimeResourceApi(deps, projectSubject, { method: 'POST' } as IncomingMessage, r3.res,
+    await handleRuntimeResourceApi(deps, projectSubject, postRequest(), r3.res,
       '/internal/runtime/resources/request', payload)
     expect(r3.status()).toBe(200)
     expect(r3.json()).toEqual({ state: 'queued' })
@@ -190,13 +189,10 @@ describe('Wave 4: immediate qualified project model grants and cursor wakeups', 
     await handleRuntimeResourceApi(
       statusDeps,
       projectSubject,
-      {
-        method: 'POST',
-        headers: {
-          [RESOURCE_ACTIVE_MODEL_CHECK_HEADER]: '1',
-          [RESOURCE_CHANGE_CURSOR_HEADER]: '11111111-1111-4111-8111-111111111111.5',
-        },
-      } as unknown as IncomingMessage,
+      postRequest({
+        [RESOURCE_ACTIVE_MODEL_CHECK_HEADER]: '1',
+        [RESOURCE_CHANGE_CURSOR_HEADER]: '11111111-1111-4111-8111-111111111111.5',
+      }),
       r4.res,
       '/internal/runtime/resources/statuses',
       statusPayload,
@@ -215,26 +211,16 @@ describe('Wave 4: combined scope+actor and project/steward/members/placement SQL
   it('uses only 2 governance SQL statements for node_content project authorize (down from 4+)', async () => {
     const governanceQueries: string[] = []
     const localQueries: string[] = []
-    const client = {
-      query: vi.fn(async (sql: string) => {
-        if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: 0 }
-        governanceQueries.push(sql)
-        if (sql.includes('computer_use_allowed')) {
-          return { rows: [{ id: ACTOR_UUID, public_id: '7', role: 'member' }], rowCount: 1 }
-        }
-        if (sql.includes('project_content_placement')) {
-          return {
-            rows: [{
-              steward_ok: true,
-              members: [{ user_id: ACTOR_UUID, access_mode: 'rw' }],
-            }],
-            rowCount: 1,
-          }
-        }
-        throw new Error(`Unexpected governance query: ${sql}`)
-      }),
-      release: vi.fn(),
-    } as unknown as PoolClient
+    const client = fixtureQueryClient(sql => {
+      if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return []
+      governanceQueries.push(sql)
+      if (sql.includes('computer_use_allowed')) return [{ id: ACTOR_UUID, public_id: '7', role: 'member' }]
+      if (sql.includes('project_content_placement')) return [{
+        steward_ok: true,
+        members: [{ user_id: ACTOR_UUID, access_mode: 'rw' }],
+      }]
+      throw new Error(`Unexpected governance query: ${sql}`)
+    })
     const localDb = {
       query: vi.fn(async (sql: string) => {
         localQueries.push(sql)
@@ -254,7 +240,8 @@ describe('Wave 4: combined scope+actor and project/steward/members/placement SQL
         throw new Error(`Unexpected local query: ${sql}`)
       }),
     }
-    const pool = { connect: vi.fn(async () => client) } as unknown as Pool
+    const pool = fixtureQueryPool(() => { throw new Error('Project authorization requires a transaction') })
+    vi.spyOn(pool, 'connect').mockImplementation(async () => client)
     const nodeContent = {
       read: vi.fn(),
       write: vi.fn(async (_binding: unknown, fn: (tx: typeof localDb) => Promise<unknown>) => fn(localDb)),

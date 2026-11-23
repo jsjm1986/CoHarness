@@ -73,6 +73,23 @@ import { ResourceAccessError, resourcePolicyOwner } from './resource-access.ts'
 import { stewardPolicyOwner } from './steward-access.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 
+const DEPLOYMENT_OVERVIEW_SECTIONS = [
+  'deployment',
+  'backups',
+  'tunnel',
+  'nodeConfiguration',
+  'nodeConnection',
+  'runtimeAllocationPolicy',
+  'nodeAccess',
+] as const
+
+type DeploymentOverviewSectionKey = typeof DEPLOYMENT_OVERVIEW_SECTIONS[number]
+type DeploymentOverviewSlice =
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly status: number; readonly error: string; readonly code?: string }
+
+const DEPLOYMENT_OVERVIEW_SECTION_SET = new Set<string>(DEPLOYMENT_OVERVIEW_SECTIONS)
+
 /** Resolve optional Admin coordinates without borrowing the target owner's personal authority. */
 async function selectedAdminRuntime(deps: GatewayDeps, actor: UserRow, req: IncomingMessage, target: RuntimeTarget, bodyId?: unknown): Promise<RuntimeTarget> {
   const queryId = new URL(req.url ?? '/', 'http://admin').searchParams.get('dshRuntime')
@@ -491,6 +508,65 @@ async function dispatch(
     await deps.audit.write({ userId: admin.id, action: 'admin.webhook-deliveries.redispatch',
       detail: JSON.stringify({ receiptId: input.receiptId, redispatchId: receipt.id, state: receipt.state }), ip })
     await reply.json(200, receipt)
+    return true
+  }
+
+  if (pathname === '/admin/api/deployment/overview' && method === 'GET') {
+    res.setHeader('cache-control', 'no-store')
+    const raw = new URL(req.url ?? pathname, 'http://admin').searchParams.get('sections')
+    const selected = (raw === null || raw.trim() === ''
+      ? [...DEPLOYMENT_OVERVIEW_SECTIONS]
+      : [...new Set(raw.split(',').map(part => part.trim()).filter(part => part !== ''))]) as DeploymentOverviewSectionKey[]
+    if (selected.length === 0 || selected.some(key => !DEPLOYMENT_OVERVIEW_SECTION_SET.has(key))) {
+      await reply.error(400, 'invalid-deployment-overview-sections')
+      return true
+    }
+    const readSlice = async (load: () => Promise<unknown>): Promise<DeploymentOverviewSlice> => {
+      try { return { ok: true, value: await load() } }
+      catch (error) {
+        const mapped = mapError(error)
+        // Per-slice isolation must not hide the server faults the single-route handler logs.
+        if (mapped.status >= 500) console.error('[gateway] deployment overview slice failed:', error)
+        return { ok: false, status: mapped.status, error: mapped.error, ...(mapped.code === undefined ? {} : { code: mapped.code }) }
+      }
+    }
+    const unavailable = (error: string): DeploymentOverviewSlice => ({ ok: false, status: 503, error })
+    const loaders: Record<DeploymentOverviewSectionKey, () => Promise<DeploymentOverviewSlice>> = {
+      deployment: async () => {
+        if (deps.maintenance === undefined) return unavailable('deployment-unavailable')
+        return readSlice(async () => {
+          const [state, plan] = await Promise.all([
+            deps.maintenance!.administration(admin.id),
+            deps.migrationPlan?.() ?? Promise.resolve(undefined),
+          ])
+          return { ...state, migrations: plan ?? null }
+        })
+      },
+      backups: async () => deps.backups === undefined
+        ? unavailable('deployment-unavailable')
+        : readSlice(async () => ({ backups: await deps.backups!.list() })),
+      tunnel: async () => deps.tunnelAccess === undefined
+        ? unavailable('tunnel-unavailable')
+        : readSlice(() => deps.tunnelAccess!.view()),
+      nodeConfiguration: async () => deps.nodeConfiguration === undefined
+        ? unavailable('node-configuration-unavailable')
+        : readSlice(() => deps.nodeConfiguration!.view(admin.id)),
+      nodeConnection: async () => deps.nodeConnection === undefined
+        ? unavailable('node-connection-unavailable')
+        : readSlice(() => deps.nodeConnection!.view(admin)),
+      runtimeAllocationPolicy: async () => {
+        if (admin.role !== 'admin') {
+          return { ok: false, status: 403, error: 'runtime-management/forbidden', code: 'runtime-management/forbidden' }
+        }
+        if (deps.runtimeManagement === undefined) return unavailable('runtime-management/unavailable')
+        return readSlice(() => deps.runtimeManagement!.policy(admin, undefined))
+      },
+      nodeAccess: async () => deps.nodeAccess === undefined
+        ? unavailable('node-access/unavailable')
+        : readSlice(() => deps.nodeAccess!.list(admin, {})),
+    }
+    const entries = await Promise.all(selected.map(async key => [key, await loaders[key]()] as const))
+    await reply.json(200, { sections: Object.fromEntries(entries) })
     return true
   }
 

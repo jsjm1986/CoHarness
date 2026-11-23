@@ -1,7 +1,8 @@
 import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowLeft, ExternalLink, Pencil, Settings2, Sparkles, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { AdminLink, useAdminPath } from '../admin-navigation.tsx'
 import {
   controlProjectInstance,
   deleteProject,
@@ -58,7 +59,7 @@ export function ProjectDetailPage() {
   if (!Number.isSafeInteger(projectId) || projectId <= 0) {
     return (
       <div className="page projectDetailPage">
-        <Link className="breadcrumb" to="/projects"><ArrowLeft aria-hidden="true" />{t('backToProjects')}</Link>
+        <AdminLink className="breadcrumb" to="/projects"><ArrowLeft aria-hidden="true" />{t('backToProjects')}</AdminLink>
         <PageHeader title={t('pageTitle')} />
         <ErrorBanner message={t('invalidProjectId')} />
       </div>
@@ -69,6 +70,7 @@ export function ProjectDetailPage() {
 
 function ProjectDetail({ projectId }: { projectId: number }) {
   const navigate = useNavigate()
+  const adminPath = useAdminPath()
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -309,7 +311,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
       await deleteProject(projectId)
       // A stale instance's delete cannot navigate away from a remounted detail.
       if (!alive.current) return
-      navigate('/projects')
+      navigate(adminPath('/projects'))
     } catch (cause) {
       if (alive.current) {
         setError(messageFrom(cause))
@@ -372,7 +374,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
 
   return (
     <div className="page projectDetailPage">
-      <Link className="breadcrumb" to="/projects"><ArrowLeft aria-hidden="true" />{t('backToProjects')}</Link>
+      <AdminLink className="breadcrumb" to="/projects"><ArrowLeft aria-hidden="true" />{t('backToProjects')}</AdminLink>
       <PageHeader
         title={project?.name ?? t('pageTitle')}
         description={project?.path}

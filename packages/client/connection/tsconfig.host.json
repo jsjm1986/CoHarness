@@ -17,6 +17,7 @@
     "src/rpc.ts",
     "src/websocket-channel.ts",
     "src/websocket-downlink.ts",
+    "src/ws-upgrade.ts",
     "src/rpc-stream.ts",
     "src/rpc-stream-host.ts",
     "src/rpc-stream-reader.ts"

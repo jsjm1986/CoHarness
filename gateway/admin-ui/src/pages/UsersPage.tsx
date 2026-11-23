@@ -9,7 +9,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { AdminLink } from '../admin-navigation.tsx'
 import {
   createUser,
   deleteUser,
@@ -170,7 +170,7 @@ export function UsersPage({ prepareNextPage }: { prepareNextPage?: () => (() => 
                 <tbody>
                   {users.map(user => (
                     <tr key={user.id}>
-                      <td><Link className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></Link></td>
+                      <td><AdminLink className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></AdminLink></td>
                       <td><RoleBadge role={user.role} /></td>
                       <td><AutoReviewBadge eligible={user.autoReviewEligible} /></td>
                       <td><AccountBadge status={user.status} /></td>
@@ -196,7 +196,7 @@ export function UsersPage({ prepareNextPage }: { prepareNextPage?: () => (() => 
               {users.map(user => (
                 <article className="mobileItem" key={user.id}>
                   <div className="mobileItemHeader">
-                    <Link className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></Link>
+                    <AdminLink className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></AdminLink>
                     <AccountBadge status={user.status} />
                   </div>
                   <div className="mobileItemBody">
@@ -252,7 +252,7 @@ function UserActions({ user, pending, onEdit, onPassword, onDisable, onDelete, o
   if (mobile) {
     return (
       <div className="mobileActions">
-        <Link className="button button-secondary" to={`/users/${user.id}`}>{t('detail')}</Link>
+        <AdminLink className="button button-secondary" to={`/users/${user.id}`}>{t('detail')}</AdminLink>
         <Button icon={Pencil} onClick={onEdit}>{t('edit')}</Button>
         <Button icon={KeyRound} onClick={onPassword}>{t('password')}</Button>
         <Button
@@ -269,7 +269,7 @@ function UserActions({ user, pending, onEdit, onPassword, onDisable, onDelete, o
   }
   return (
     <div className="rowActions">
-      <Link className="iconButton iconButton-ghost" to={`/users/${user.id}`} aria-label={t('manageDetail')} title={t('manageDetail')}><ChevronRight /></Link>
+      <AdminLink className="iconButton iconButton-ghost" to={`/users/${user.id}`} aria-label={t('manageDetail')} title={t('manageDetail')}><ChevronRight /></AdminLink>
       <IconButton label={t('editUser')} icon={Pencil} onClick={onEdit} />
       <IconButton label={t('resetPassword')} icon={KeyRound} onClick={onPassword} />
       <IconButton

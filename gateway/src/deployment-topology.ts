@@ -1,6 +1,8 @@
 /** Organization deployment policy and browser-entry identity; Runtime placement remains independent. @module */
 import { z } from 'zod'
 import { isIP } from 'node:net'
+import { performance } from 'node:perf_hooks'
+import type { GatewayAccessMonitor } from './access-invalidation.ts'
 import type { UserRow } from './auth.ts'
 import type { RuntimeNodeId } from './runtime-catalog.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
@@ -33,11 +35,42 @@ function origin(value: string): string {
   return url.origin
 }
 
+/** Default bounded TTL for positive `entry_node_visible` caching while LISTEN is connected. */
+const DEFAULT_ASSERT_NODE_CACHE_MS = 5_000
+
 /** Durable organization settings; all resource traffic still uses existing computer and Runtime authorization. */
 export class PostgresDeploymentTopology {
+  private readonly visibleNodes = new Map<string, { revision: bigint; validUntil: number }>()
+  private readonly visibleInflight = new Map<string, { revision: bigint; check: Promise<void> }>()
+  private readonly unsubscribe?: () => void
+  private readonly assertNodeCacheMs: number
+
   constructor(private readonly context: PostgresRuntimeContext, private readonly options: {
     legacyForwarding: boolean; refreshAfterMs: number; pageSize: number; maxBytes: number; allowedOrigins: readonly string[]
-  }) {}
+    monitor?: GatewayAccessMonitor; assertNodeCacheMs?: number
+  }) {
+    this.assertNodeCacheMs = options.monitor === undefined ? 0 : (options.assertNodeCacheMs ?? DEFAULT_ASSERT_NODE_CACHE_MS)
+    this.unsubscribe = options.monitor?.subscribe(subject => {
+      if (subject.userId === undefined && subject.projectId === undefined) this.invalidateVisibility(subject.nodeId)
+    })
+  }
+
+  /** Drop cached and in-flight node visibility for the affected computer or the whole organization. */
+  invalidateVisibility(nodeId?: string): void {
+    if (nodeId === undefined) {
+      this.visibleNodes.clear()
+      this.visibleInflight.clear()
+    } else {
+      this.visibleNodes.delete(nodeId)
+      this.visibleInflight.delete(nodeId)
+    }
+  }
+
+  /** Release the access-invalidation subscription held by this topology service. */
+  dispose(): void {
+    this.unsubscribe?.()
+    this.invalidateVisibility()
+  }
 
   private async row(query: Queryable): Promise<Row> {
     const result = await query.query<Row>(`SELECT t.enabled,t.revision::text,t.primary_node_id,t.primary_origin,t.legacy_initialization_required,
@@ -168,14 +201,39 @@ export class PostgresDeploymentTopology {
       [this.context.organizationId, actor.id, addressIp !== undefined && isIP(addressIp) !== 0 ? addressIp : null,
         JSON.stringify({ mode: result.mode, revision: result.revision, primaryNodeId: result.primary?.nodeId ?? null })])
       return result
+    }).then(result => {
+      this.invalidateVisibility()
+      return result
     })
   }
 
   /** Refuse foreign targets outside this ingress's aggregation scope. @param nodeId - resolved resource computer. */
   async assertNode(nodeId: string): Promise<void> {
     if (nodeId === this.context.nodeId) return
-    const result = await this.context.pool.query<{ allowed: boolean }>('SELECT harness.entry_node_visible($1,$2,$3) allowed',
-      [this.context.organizationId, this.context.nodeId, nodeId])
-    if (result.rows[0]?.allowed !== true) throw new DeploymentTopologyError(409, 'deployment/remote-target-unavailable')
+    const monitor = this.options.monitor
+    const revision = this.assertNodeCacheMs > 0 && monitor?.available === true ? monitor.currentRevision?.() : undefined
+    if (revision === undefined) {
+      if (this.visibleNodes.size > 0 || this.visibleInflight.size > 0) this.invalidateVisibility()
+    } else {
+      const cached = this.visibleNodes.get(nodeId)
+      if (cached !== undefined && cached.revision === revision && performance.now() < cached.validUntil) return
+      const pending = this.visibleInflight.get(nodeId)
+      if (pending?.revision === revision) return pending.check
+    }
+    const query = this.context.pool.query<{ allowed: boolean }>('SELECT harness.entry_node_visible($1,$2,$3) allowed',
+      [this.context.organizationId, this.context.nodeId, nodeId]).then(result => {
+      if (result.rows[0]?.allowed !== true) throw new DeploymentTopologyError(409, 'deployment/remote-target-unavailable')
+    })
+    if (revision === undefined) return query
+    const check = query.then(() => {
+      if (this.visibleInflight.get(nodeId)?.check !== check || monitor?.available !== true || monitor.currentRevision?.() !== revision) {
+        throw new DeploymentTopologyError(409, 'deployment/remote-target-unavailable')
+      }
+      this.visibleNodes.set(nodeId, { revision, validUntil: performance.now() + this.assertNodeCacheMs })
+    }).finally(() => {
+      if (this.visibleInflight.get(nodeId)?.check === check) this.visibleInflight.delete(nodeId)
+    })
+    this.visibleInflight.set(nodeId, { revision, check })
+    return check
   }
 }

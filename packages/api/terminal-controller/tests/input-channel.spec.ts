@@ -1,29 +1,25 @@
-/** Bidirectional WebSocket terminal input channel: auth, revocation, framing, and HTTP fallback. */
-import { createServer } from 'node:http'
-import type { AddressInfo } from 'node:net'
+/** Bidirectional WebSocket terminal input channel: authorization, revocation, and framing. */
 import { PassThrough } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { apply as applyConnection, inject as connectionInject, type HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WebRoute, WebServer, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
-import { RemoteStream, type ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
-import { streamMethod } from '@deepseek-ai/dsh-remote-mock'
+import { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SubprocessTerminalEnvironment, SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
-import { RemoteError, type RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
+import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TerminalController, type Config, type TerminalCreatorId } from '../src/index.ts'
 import { TERMINAL_INPUT_PATH } from '../src/input-protocol.ts'
 import {
-  TerminalInputChannelClosedError,
-  TerminalInputChannelUnavailableError,
-  type TerminalInputChannel,
-} from '../src/client/input-channel.ts'
-import { TerminalView, type TerminalRemote } from '../src/client/model.ts'
-import type { TerminalAttachmentId, TerminalEnvironment, WebTerminalId, WebTerminalInfo } from '../src/types.ts'
+  bindTerminalInputSocket,
+  parseTerminalInputQuery,
+  resolveAuthorizedTerminalAttachment,
+  type ActiveTerminalAttachment,
+  type TerminalInputSocket,
+} from '../src/input-channel.ts'
+import type { TerminalAttachmentId, WebTerminalId } from '../src/types.ts'
 
 const cleanups: Array<() => void | Promise<void>> = []
 afterEach(async () => {
@@ -45,28 +41,16 @@ const config: Config = {
   cleanupRetryMs: 60_000,
 }
 
+function fixtureAgent(ctx: Context, id: SessionId): Agent {
+  return { id, ctx, session: { id, header: {} } as Agent['session'] } as Agent
+}
+
 async function createHostFixture(options: { managed?: boolean; verifyUpgradeCreator?: (creator: TerminalCreatorId) => boolean } = {}) {
   const ctx = new Context()
-  const routes: WebRoute[] = []
-  const upgrades: WebUpgradeRoute[] = []
-  const httpServer = createServer((req, res) => {
-    const pathname = new URL(req.url ?? '/', 'http://127.0.0.1').pathname
-    const route = routes.find(entry => entry.kind === 'exact' ? entry.path === pathname : pathname.startsWith(entry.path))
-    if (route === undefined) { res.writeHead(404).end(); return }
-    void Promise.resolve(route.handler(req, res)).catch(() => { if (!res.headersSent) res.writeHead(500).end() })
-  })
-  httpServer.on('upgrade', (req, socket, head) => {
-    const pathname = new URL(req.url ?? '/', 'http://127.0.0.1').pathname
-    const route = upgrades.find(entry => entry.path === pathname)
-    if (route === undefined) { socket.destroy(); return }
-    void Promise.resolve(route.handler(req, socket, head)).catch(() => { if (!socket.destroyed) socket.destroy() })
-  })
-  await new Promise<void>((resolve) => { httpServer.listen(0, '127.0.0.1', resolve) })
-  const port = (httpServer.address() as AddressInfo).port
-  cleanups.push(async () => {
-    await ctx.fiber.dispose()
-    await new Promise<void>((resolve) => { httpServer.close(() => { resolve() }) })
-  })
+  cleanups.push(() => ctx.fiber.dispose())
+  await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0, compression: 'none' }).await()
+  const port = ctx.webServer.port
+  if (port === undefined) throw new Error('The terminal fixture HTTP server did not bind')
 
   let credentialRecord: unknown
   ctx.provide('credentials', {
@@ -78,21 +62,6 @@ async function createHostFixture(options: { managed?: boolean; verifyUpgradeCrea
     },
     deleteRecord: async () => { credentialRecord = undefined },
   } as never)
-  ctx.provide('webServer', {
-    host: '127.0.0.1',
-    port,
-    protocol: 'http:',
-    register(route: WebRoute) {
-      routes.push(route)
-      return () => { const i = routes.indexOf(route); if (i >= 0) routes.splice(i, 1) }
-    },
-    registerUpgrade(route: WebUpgradeRoute) {
-      upgrades.push(route)
-      return () => { const i = upgrades.indexOf(route); if (i >= 0) upgrades.splice(i, 1) }
-    },
-    tapIndex: () => () => {},
-  } as unknown as WebServer)
-
   await ctx.plugin({ inject: [...connectionInject], apply: applyConnection }).await()
   const connection = ctx.get('connection') as HostConnectionHandle
 
@@ -140,7 +109,7 @@ async function createHostFixture(options: { managed?: boolean; verifyUpgradeCrea
   }
 
   const controller = new TerminalController(ctx, config)
-  const agent = { id: 'session-1' as SessionId, ctx, session: { id: 'session-1' as SessionId, header: {} } } as unknown as Agent
+  const agent = fixtureAgent(ctx, 'session-1' as SessionId)
   const token = new URL(connection.authenticatedUrl(`http://127.0.0.1:${port}`)).searchParams.get('token')!
   return { ctx, port, token, controller, agent, handle, writeSpy, resizeSpy, revoked }
 }
@@ -244,117 +213,212 @@ describe('Host terminal input WebSocket channel', () => {
     h.revoked.abort(new Error('revoked'))
     await expect(closed).resolves.toBe(1008)
   })
+
+  it('closes active input sockets on controller disposal and refuses late upgrades when attachment disappears mid-handshake', async () => {
+    const h = await createHostFixture()
+    const terminalId = 'term-ws-dispose' as WebTerminalId
+    const attachmentId = 'att-ws-dispose' as TerminalAttachmentId
+    // Use an independent agent context so disposing the controller closes live sockets with 1001 before owner teardown.
+    const agentCtx = new Context()
+    cleanups.push(() => agentCtx.fiber.dispose())
+    agentCtx.provide('subprocess', h.ctx.get('subprocess') as never)
+    agentCtx.provide('sandboxPolicy', h.ctx.get('sandboxPolicy') as never)
+    const detachedAgent = fixtureAgent(agentCtx, 'session-dispose' as SessionId)
+    await h.controller.create(detachedAgent, { id: terminalId, cols: 80, rows: 24 }, new AbortController().signal)
+
+    const followAbort = new AbortController()
+    const iterator = h.controller.follow(detachedAgent, terminalId, attachmentId, followAbort.signal)[Symbol.asyncIterator]()
+    cleanups.push(async () => { followAbort.abort(); await iterator.return?.() })
+    await iterator.next()
+
+    const wsUrl = `ws://127.0.0.1:${h.port}${TERMINAL_INPUT_PATH}?sessionId=${detachedAgent.id}&terminalId=${terminalId}&attachmentId=${attachmentId}&token=${h.token}`
+    const ws = await openClientWs(wsUrl)
+    cleanups.push(() => { ws.close() })
+    const disposedClose = new Promise<number>((resolve) => {
+      ws.addEventListener('close', (event) => { resolve(event.code) }, { once: true })
+    })
+    await h.ctx.fiber.dispose()
+    expect([1001, 1006]).toContain(await disposedClose)
+
+    // Attachment disappears between authorize() and handler callback -> handler closes socket with 1008.
+    let checks = 0
+    const h2 = await createHostFixture({
+      managed: true,
+      verifyUpgradeCreator: () => ++checks === 1,
+    })
+    await h2.controller.create(h2.agent, { id: terminalId, cols: 80, rows: 24 }, new AbortController().signal)
+    const followAbort2 = new AbortController()
+    const it2 = h2.controller.follow(h2.agent, terminalId, attachmentId, followAbort2.signal)[Symbol.asyncIterator]()
+    cleanups.push(async () => { followAbort2.abort(); await it2.return?.() })
+    await it2.next()
+    const wsUrl2 = `ws://127.0.0.1:${h2.port}${TERMINAL_INPUT_PATH}?sessionId=${h2.agent.id}&terminalId=${terminalId}&attachmentId=${attachmentId}&token=${h2.token}`
+    const raceWs = new WebSocket(wsUrl2)
+    cleanups.push(() => { raceWs.close() })
+    const raceCode = await new Promise<number>((resolve) => {
+      raceWs.addEventListener('close', (event) => { resolve(event.code) }, { once: true })
+    })
+    expect(raceCode).toBe(1008)
+  })
 })
 
-describe('TerminalView input channel integration and HTTP fallback', () => {
-  const sessionId = 'session' as SessionId
-  const info: WebTerminalInfo = {
-    id: 'terminal' as WebTerminalId,
-    shell: { name: 'bash', path: '/bin/bash', args: ['-i'] },
-    title: 'bash',
-    cwd: '/workspace',
-    rows: 24,
-    cols: 80,
-    state: 'running',
-    exitCode: null,
-  }
-  const environment: TerminalEnvironment = { cwd: '/workspace', maxInputBytes: 1000, maxCols: 200, maxRows: 100, scrollback: 100 }
-  const ok = <T>(value: T): RemoteResult<T> => ({ ok: true, value })
-
-  function clientFixture(factory: NonNullable<ConstructorParameters<typeof TerminalView>[8]>) {
-    const remote: TerminalRemote = {
-      retain: vi.fn<TerminalRemote['retain']>(streamMethod<TerminalRemote['retain']>(async function* (_s, _id, signal) {
-        yield { type: 'retained' }
-        await new Promise<void>((resolve) => { signal.addEventListener('abort', () => { resolve() }, { once: true }) })
-      })),
-      shells: vi.fn<TerminalRemote['shells']>(async () => ok([info.shell])),
-      environment: vi.fn<TerminalRemote['environment']>(async () => ok(environment)),
-      list: vi.fn<TerminalRemote['list']>(async () => ok([])),
-      create: vi.fn<TerminalRemote['create']>(async (_s, req) => ok({ ...info, id: req.id })),
-      close: vi.fn<TerminalRemote['close']>(async () => ok(undefined)),
-      rename: vi.fn<TerminalRemote['rename']>(async () => ok(undefined)),
-      write: vi.fn<TerminalRemote['write']>(async () => ok(undefined)),
-      resize: vi.fn<TerminalRemote['resize']>(async () => ok(undefined)),
-      follow: vi.fn<TerminalRemote['follow']>(streamMethod<TerminalRemote['follow']>(async function* (_s, id, attId, signal) {
-        yield { type: 'snapshot', sequence: 0, screen: 'ready', info: { ...info, id, controllerId: attId } }
-        await new Promise<void>((resolve) => { signal.addEventListener('abort', () => { resolve() }, { once: true }) })
-      })),
-    }
-    const generation = createSnapshotStore<ReturnType<ConstructorParameters<typeof RemoteStream>[0]['generation']['getSnapshot']>>(undefined)
-    const streams: RemoteStream<unknown>[] = []
-    const gateway: Pick<ClientRemote, '$stream'> = {
-      $stream: (option) => {
-        const stream = new RemoteStream({ generation }, option)
-        streams.push(stream)
-        return stream
+describe('Host input-channel unit edge cases', () => {
+  function makeMockSocket() {
+    const ac = new AbortController()
+    let state: 'open' | 'closing' | 'closed' = 'open'
+    const messageListeners = new Set<(frame: string) => void>()
+    const closeListeners = new Set<() => void>()
+    const sent: string[] = []
+    const closes: Array<{ code?: number; reason?: string }> = []
+    const socket: TerminalInputSocket = {
+      signal: ac.signal,
+      get readyState() { return state },
+      send(frame: string) { sent.push(frame) },
+      close(code?: number, reason?: string) {
+        closes.push({ ...(code === undefined ? {} : { code }), ...(reason === undefined ? {} : { reason }) })
+        state = 'closed'
+        ac.abort()
+        for (const fn of [...closeListeners]) fn()
+      },
+      onMessage(fn) {
+        messageListeners.add(fn)
+        return () => { messageListeners.delete(fn) }
+      },
+      onClose(fn) {
+        closeListeners.add(fn)
+        return () => { closeListeners.delete(fn) }
       },
     }
-    cleanups.push(async () => { await Promise.all(streams.map(s => s.dispose())) })
-    const model = new TerminalView(sessionId, remote, gateway, info.id, true, undefined, undefined, undefined, factory)
-    cleanups.push(() => model.dispose())
-    return { model, remote }
+    return {
+      socket,
+      sent,
+      closes,
+      setState(next: 'open' | 'closing' | 'closed') { state = next },
+      emitMessage(raw: string) { for (const fn of [...messageListeners]) fn(raw) },
+    }
   }
 
-  it('routes writes and resizes over an open input channel and transparently falls back to HTTP when unavailable', async () => {
-    let open = true
-    const writes: string[] = []
-    const resizes: string[] = []
-    const closeSpy = vi.fn()
-    const channel: TerminalInputChannel = {
-      get isOpen() { return open },
-      write: vi.fn(async (data: string) => {
-        if (!open) throw new TerminalInputChannelUnavailableError()
-        writes.push(data)
-      }),
-      resize: vi.fn(async (cols: number, rows: number) => {
-        if (!open) throw new TerminalInputChannelClosedError()
-        resizes.push(`${cols}x${rows}`)
-      }),
-      close: closeSpy,
+  function makeAttachment(overrides: Partial<ActiveTerminalAttachment> = {}): {
+    attachment: ActiveTerminalAttachment
+    abort: AbortController
+    writeSpy: ReturnType<typeof vi.fn<() => Promise<void>>>
+    resizeSpy: ReturnType<typeof vi.fn<() => Promise<void>>>
+  } {
+    const abort = new AbortController()
+    const writeSpy = vi.fn<() => Promise<void>>(async () => {})
+    const resizeSpy = vi.fn<() => Promise<void>>(async () => {})
+    const attachment: ActiveTerminalAttachment = {
+      key: 'k',
+      sessionId: 's1' as SessionId,
+      terminalId: 't1' as WebTerminalId,
+      attachmentId: 'a1' as TerminalAttachmentId,
+      creator: 'alice' as TerminalCreatorId,
+      terminal: { write: writeSpy, resize: resizeSpy } as never,
+      signal: abort.signal,
+      isClosed: () => false,
+      ...overrides,
     }
-    const factory = vi.fn(() => channel)
-    const { model, remote } = clientFixture(factory)
-    model.mount()
-    await model.refresh()
-    await expect.poll(() => model.state.getSnapshot().writable).toBe(true)
-    const render = model.state.getSnapshot().render
-    if (render !== undefined) model.acknowledge(render.revision)
+    return { attachment, abort, writeSpy, resizeSpy }
+  }
 
-    expect(factory).toHaveBeenCalledOnce()
-    model.write('hello')
-    model.resize(100, 30)
-    await expect.poll(() => resizes).toEqual(['100x30'])
-    expect(writes).toEqual(['hello'])
-    expect(remote.write).not.toHaveBeenCalled()
-    expect(remote.resize).not.toHaveBeenCalled()
+  it('validates query strings and authorized attachment resolution', () => {
+    expect(parseTerminalInputQuery(undefined)).toBeUndefined()
+    expect(parseTerminalInputQuery('http://[::1')).toBeUndefined()
+    expect(parseTerminalInputQuery('/api/terminal/input?sessionId=&terminalId=t1&attachmentId=a1')).toBeUndefined()
+    expect(parseTerminalInputQuery('/api/terminal/input?sessionId=s1&terminalId=bad!&attachmentId=a1')).toBeUndefined()
+    expect(parseTerminalInputQuery('/api/terminal/input?sessionId=s1&terminalId=t1&attachmentId=a1')).toEqual({
+      sessionId: 's1',
+      terminalId: 't1',
+      attachmentId: 'a1',
+    })
 
-    // Simulate WS drop -> subsequent operations transparently fall back to HTTP RPCs.
-    open = false
-    model.write('fallback')
-    model.resize(110, 35)
-    await expect.poll(() => vi.mocked(remote.resize).mock.calls.length).toBe(1)
-    expect(remote.write).toHaveBeenCalledWith(sessionId, info.id, expect.any(String), 'fallback')
-    expect(remote.resize).toHaveBeenCalledWith(sessionId, info.id, expect.any(String), 110, 35)
-
-    await model.dispose()
-    expect(closeSpy).toHaveBeenCalled()
+    const { attachment } = makeAttachment()
+    expect(resolveAuthorizedTerminalAttachment({ url: '/invalid' } as never, () => attachment, () => true)).toBeUndefined()
+    expect(resolveAuthorizedTerminalAttachment(
+      { url: '/api/terminal/input?sessionId=s1&terminalId=t1&attachmentId=a1' } as never,
+      () => undefined,
+      () => true,
+    )).toBeUndefined()
+    expect(resolveAuthorizedTerminalAttachment(
+      { url: '/api/terminal/input?sessionId=s1&terminalId=t1&attachmentId=a1' } as never,
+      () => ({ ...attachment, isClosed: () => true }),
+      () => true,
+    )).toBeUndefined()
+    expect(resolveAuthorizedTerminalAttachment(
+      { url: '/api/terminal/input?sessionId=s1&terminalId=t1&attachmentId=a1' } as never,
+      () => attachment,
+      () => false,
+    )).toBeUndefined()
   })
 
-  it('propagates RemoteError from the input channel identically to HTTP RPCs', async () => {
-    const channel: TerminalInputChannel = {
-      isOpen: true,
-      write: vi.fn(async () => {
-        throw new RemoteError('terminal/control-unavailable', 'read-only', { reason: 'read-only' })
-      }),
-      resize: vi.fn(async () => {}),
-      close: vi.fn(),
-    }
-    const { model } = clientFixture(() => channel)
-    model.mount()
-    await model.refresh()
-    await expect.poll(() => model.state.getSnapshot().writable).toBe(true)
-    model.write('blocked')
-    await expect.poll(() => model.state.getSnapshot().writable).toBe(false)
-    expect(model.state.getSnapshot()).toMatchObject({ phase: 'connected', writable: false, error: undefined })
+  it('handles aborted-on-entry, socket replacement, malformed frames, RemoteError, non-Error throws, and mid-flight endings', async () => {
+    const controller = new AbortController()
+
+    const defaultLimits = { maxInputBytes: 64, validateDimensions: () => {} }
+    // Already closed on entry.
+    const closedEntry = makeMockSocket()
+    const closedAtt = makeAttachment({ isClosed: () => true })
+    bindTerminalInputSocket(closedEntry.socket, closedAtt.attachment, defaultLimits, controller.signal)
+    expect(closedEntry.closes).toEqual([{ code: 1008, reason: 'terminal unavailable' }])
+
+    // Replace existing inputSocket with a new one.
+    const first = makeMockSocket()
+    const second = makeMockSocket()
+    const live = makeAttachment()
+    bindTerminalInputSocket(first.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    bindTerminalInputSocket(second.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    expect(first.closes).toEqual([{ code: 1000, reason: 'replaced' }])
+    expect(live.attachment.inputSocket).toBe(second.socket)
+
+    // RemoteError and non-Error serialization, plus sendFrame when socket not open.
+    live.writeSpy.mockRejectedValueOnce(new RemoteError('terminal/control-unavailable', 'denied', { reason: 'read-only' }))
+    live.writeSpy.mockRejectedValueOnce('raw-string-error')
+    second.emitMessage(JSON.stringify({ type: 'write', seq: 1, data: 'a' }))
+    second.emitMessage(JSON.stringify({ type: 'write', seq: 2, data: 'b' }))
+    await vi.waitFor(() => { expect(second.sent).toHaveLength(2) })
+    expect(JSON.parse(second.sent[0]!)).toEqual({
+      type: 'error', seq: 1, code: 'terminal/control-unavailable', message: 'denied', details: { reason: 'read-only' },
+    })
+    expect(JSON.parse(second.sent[1]!)).toEqual({ type: 'error', seq: 2, message: 'raw-string-error' })
+
+    // Invalid frames close with 1008.
+    const badJson = makeMockSocket()
+    bindTerminalInputSocket(badJson.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    badJson.emitMessage('{not-json')
+    expect(badJson.closes.at(-1)).toEqual({ code: 1008, reason: 'invalid terminal input frame' })
+
+    const badSeq = makeMockSocket()
+    bindTerminalInputSocket(badSeq.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    badSeq.emitMessage(JSON.stringify({ type: 'write', seq: 0, data: 'x' }))
+    expect(badSeq.closes.at(-1)).toEqual({ code: 1008, reason: 'invalid terminal input frame' })
+
+    const badType = makeMockSocket()
+    bindTerminalInputSocket(badType.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    badType.emitMessage(JSON.stringify({ type: 'unknown', seq: 1 }))
+    expect(badType.closes.at(-1)).toEqual({ code: 1008, reason: 'invalid terminal input frame' })
+
+    // Mid-flight ending before and after terminal.write + closed readyState sendFrame skip.
+    const mid = makeMockSocket()
+    let closedFlag = false
+    const midAtt = makeAttachment({ isClosed: () => closedFlag })
+    const gate = Promise.withResolvers<undefined>()
+    midAtt.writeSpy.mockImplementationOnce(async () => {
+      await gate.promise
+      closedFlag = true
+    })
+    bindTerminalInputSocket(mid.socket, midAtt.attachment, defaultLimits, controller.signal)
+    mid.emitMessage(JSON.stringify({ type: 'write', seq: 1, data: 'first' }))
+    mid.emitMessage(JSON.stringify({ type: 'write', seq: 2, data: 'queued-after-end' }))
+    gate.resolve(undefined)
+    await vi.waitFor(() => { expect(mid.closes.length).toBeGreaterThanOrEqual(2) })
+    expect(mid.closes[0]).toEqual({ code: 1008, reason: 'terminal unavailable' })
+
+    // sendFrame skips when socket is closing/closed while write succeeded.
+    const closingSock = makeMockSocket()
+    const closingAtt = makeAttachment()
+    closingAtt.writeSpy.mockImplementationOnce(async () => { closingSock.setState('closing') })
+    bindTerminalInputSocket(closingSock.socket, closingAtt.attachment, defaultLimits, controller.signal)
+    closingSock.emitMessage(JSON.stringify({ type: 'write', seq: 1, data: 'ok' }))
+    await vi.waitFor(() => { expect(closingAtt.writeSpy).toHaveBeenCalledOnce() })
+    expect(closingSock.sent).toEqual([])
   })
 })

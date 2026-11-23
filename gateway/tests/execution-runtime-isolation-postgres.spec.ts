@@ -83,7 +83,8 @@ describePg('execution Runtime identity isolation', () => {
     const call = async (value: typeof payload, runtime = f.personal) => {
       const response = await fetch(`${f.base}/internal/runtime/execution/input`, { method: 'POST',
         headers: { ...f.headers(runtime), [PRINCIPAL_HEADER]: signed }, body: JSON.stringify(value) })
-      return { status: response.status, body: await response.json() as unknown }
+      const body: unknown = await response.json()
+      return { status: response.status, body }
     }
     const roots = async (id: string) => (await pool.query(`SELECT runtime_id FROM harness.execution_sessions
       WHERE organization_id=$1 AND session_id=$2`, [f.organizationId, id])).rows

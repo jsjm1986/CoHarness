@@ -138,7 +138,7 @@ import { LocalDocumentBroker } from './documents-local.ts'
 import { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
 import { PostgresDocumentLocations } from './postgres/document-locations.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
-import { createGatewayServer, scopeCookie, type GatewayDeps } from './server.ts'
+import { createGatewayServer, scopeCookie, type GatewayAccessInvalidation, type GatewayDeps } from './server.ts'
 import { ReleaseAssets } from './release-assets.ts'
 import { GatewayPerformanceObserver } from './performance-observer.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
@@ -492,7 +492,7 @@ const nodeServices = new GatewayNodeServices(nodeAccess, nodeChannels, cfg.nodeS
 const computerAccess = new PostgresComputerAccess(context, cfg.runtimeCatalog, context.nodeId as import('./runtime-catalog.ts').RuntimeNodeId)
 const topology = new PostgresDeploymentTopology(context, { legacyForwarding: cfg.nodeService.forwarding,
   refreshAfterMs: cfg.deploymentContextRefreshMs, pageSize: cfg.runtimeCatalog.pageSize, maxBytes: cfg.runtimeCatalog.maxBytes,
-  allowedOrigins: cfg.publicOrigins })
+  allowedOrigins: cfg.publicOrigins, monitor: accessMonitor })
 const runtimeAdmission = new PostgresRuntimeAssetAdmission(context, baselineWriteEpoch, cfg.nodeContent === undefined ? undefined : nodeProjects)
 const nodeServiceProxy = new GatewayNodeServiceProxy({
   assertNode: id => topology.assertNode(id),
@@ -728,6 +728,10 @@ const peerBackups = await createPeerBackupGateway({ context, stateRoot: cfg.stat
     prepareProfile: target => instances.prepareRecoveryProfile(target)}:undefined,
   reservedRoots: [cfg.stateRoot, cfg.usersRoot, cfg.projectsRoot, cfg.userProjectsRoot, cfg.projectRuntimesRoot, cfg.backupDir, ...cfg.projectPathRoots] })
 instances.prepareRecovery = async runtime => await governanceRebuild?.execution.beforeStart(runtime) ?? peerBackups.beforeRuntimeStart(runtime)
+const invalidateAccess: GatewayAccessInvalidation = (subject) => {
+  proxyHandlers.invalidateAccess(subject)
+  nodeServiceProxy.invalidate(subject)
+}
 const server = createGatewayServer(deps, {
   governanceRecovery: governanceRebuild,
   peerBackups,
@@ -740,6 +744,7 @@ const server = createGatewayServer(deps, {
     transfer: { instances: deps.instances, users, projects, collaboration, principals: principalKeys.signer, audit, catalog: documentCatalog,
       maxResponseBytes: cfg.upstreamResponseLimitBytes, upstreamTimeoutMs: cfg.upstreamTimeoutMs } }),
   ...proxyHandlers,
+  invalidateAccess,
   runtimeAssets,
   workbenchCatalog: createGatewayWorkbenchCatalogHandler({
     workspaceCatalog,
@@ -815,7 +820,7 @@ const server = createGatewayServer(deps, {
     upstreamTimeoutMs: cfg.upstreamTimeoutMs,
     local: localDocuments,
   }),
-  admin: createAdminApiHandler(deps, documentAdmin, proxyHandlers.invalidateAccess),
+  admin: createAdminApiHandler(deps, documentAdmin, invalidateAccess),
   runtime: createRuntimeApiHandler({
     executionIdentity,
     executionWriteEpoch: baselineWriteEpoch,
@@ -1180,7 +1185,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
     }
   }])
   await settle([() => nodeChannels.close(), () => nodeServices.close()])
-  await settle([() => localDocuments.dispose()])
+  await settle([() => localDocuments.dispose(), () => topology.dispose()])
   await settle([() => accessMonitor.close()])
   await settle([() => closeListeningServer(server), () => closeListeningServer(intake)])
   await settle([() => waitForWriters()])

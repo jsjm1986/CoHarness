@@ -329,7 +329,9 @@ export class RuntimeAssets {
         throw new RuntimeAssetUnavailableError(409, 'runtime-asset/target-mismatch')
       }
       if (!placement.local) {
-        const cacheKey = `${placement.environment.node.id}:${runtimeId}:${snapshot.generation}:${runtimeRequestPath(req.url ?? '/')}`
+        // Every request reaching this branch passed isImmutableRuntimeAssetRequest (hashed /assets/* or rev=<hex> /plugins/*)
+        // AND fresh per-user admission + synchronizeTo checks, so immutable bytes can safely share one node-scoped cache entry.
+        const cacheKey = `${placement.environment.node.id}:immutable:${runtimeRequestPath(req.url ?? '/')}`
         if (await this.serveCachedRemote(req, res, cacheKey, owner.signal)) return true
         if (this.options.forward === undefined) {
           throw new RuntimeAssetUnavailableError(503, 'runtime-asset/unavailable')

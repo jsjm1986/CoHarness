@@ -113,7 +113,8 @@ function isolatedAgent(
 }
 
 async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false, failedDial?: 'control' | 'service',
-  mixedReleaseAgent?: 'compatible' | 'future-wire', approvePersonalRead?: NodeServiceProxyDirectory['approvePersonalRead']) {
+  mixedReleaseAgent?: 'compatible' | 'future-wire', approvePersonalRead?: NodeServiceProxyDirectory['approvePersonalRead'],
+  monitor?: import('../src/access-invalidation.ts').GatewayAccessMonitor) {
   const root = await mkdtemp(join(tmpdir(), 'hgw-node-service-'))
   releases.push(() => rm(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'accounts.sqlite'))
@@ -178,7 +179,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     },
     ...(resolveOwners ? { resolvePlacement: (actor, selection) => centerRouter.placement(actor, selection), resetScopeCookie: () => scopeCookie('personal', centerConfig) } : {}),
     ...(approvePersonalRead === undefined ? {} : { approvePersonalRead }),
-  }, services, 5000, centerConfig.nodeService, undefined,
+  }, services, 5000, centerConfig.nodeService, monitor,
   approvePersonalRead === undefined ? undefined : async () => 'fixture-forwarding-assertion')
   let attestationCalls = 0
   const makeDeps = (cfg: typeof centerConfig, id: RuntimeNodeId): GatewayDeps => ({
@@ -1626,4 +1627,135 @@ it('preserves idle node transports across user- and project-scoped invalidations
     idleInvalidationsGlobal: 1,
   })
   expect(opened).toHaveLength(0)
+})
+
+it('caches pooled node lease rechecks when HGW_NODE_SERVICE_LEASE_CACHE_MS is configured and clears on node invalidation', async () => {
+  const f = await fixture({ HGW_NODE_SERVICE_LEASE_CACHE_MS: '5000' })
+  for (let index = 0; index < 4; index++) {
+    const response = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })
+    expect(response.status).toBe(200)
+    await response.arrayBuffer()
+  }
+  expect(f.proxy.diagnostics().pool.reused).toBe(3)
+  expect(f.proxy.diagnostics().pool.revalidateCalls).toBe(1)
+  expect(f.proxy.diagnostics().pool.revalidateSkipped).toBe(2)
+
+  // Node-level invalidation drains idle transports and drops the cached lease immediately.
+  f.proxy.invalidate({ nodeId: f.nodeId })
+  await expect.poll(() => f.proxy.diagnostics().pool.idle).toBe(0)
+  f.expire()
+  const refused = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })
+  expect(refused.status).toBe(503)
+  await refused.arrayBuffer()
+})
+
+it('aborts active forwarded operations immediately when invalidate({ userId }) is invoked (for example on Center logout)', async () => {
+  const f = await fixture()
+  const response = await fetch(`${f.base}/api/slow?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })
+  const reader = response.body!.getReader()
+  await reader.read()
+  f.proxy.invalidate({ userId: f.admin.id })
+  await expect(reader.read()).rejects.toThrow()
+})
+
+it('streams compression for chunked remote responses and flushes incremental chunks without stalling', async () => {
+  const { PassThrough: StreamPassThrough } = await import('node:stream')
+  const { createServer: createHttp } = await import('node:http')
+  const { pipeCompressedResponse } = await import('../src/http-compression.ts')
+
+  const slowStream = new StreamPassThrough()
+  const server = createHttp((req, res) => {
+    if (req.url === '/incremental') {
+      void pipeCompressedResponse(slowStream, res, 200, { 'content-type': 'text/plain' }, 'br', undefined)
+      slowStream.write('first-chunk\n')
+      return
+    }
+    const upstream = new StreamPassThrough()
+    const payload = JSON.stringify({ data: 'a'.repeat(4096) })
+    void pipeCompressedResponse(upstream, res, 200, { 'content-type': 'application/json', etag: '"chunk-1"' }, 'br', undefined)
+    upstream.write(payload.slice(0, Math.floor(payload.length / 2)))
+    upstream.end(payload.slice(Math.floor(payload.length / 2)))
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const port = (server.address() as import('node:net').AddressInfo).port
+  releases.push(() => {
+    slowStream.end()
+    return new Promise<void>(resolve => server.close(() => { resolve() }))
+  })
+
+  // Large chunked response streams Brotli with weak ETag and Vary.
+  const large = await fetch(`http://127.0.0.1:${String(port)}/large`)
+  expect(large.status).toBe(200)
+  expect(large.headers.get('content-encoding')).toBe('br')
+  expect(large.headers.get('vary')).toBe('accept-encoding')
+  expect(large.headers.get('etag')).toBe('W/"chunk-1"')
+  const decoded = await large.json() as { data: string }
+  expect(decoded.data).toHaveLength(4096)
+
+  // Incremental tiny chunk arrives immediately before upstream EOF (zero buffering deadlock).
+  const incremental = await fetch(`http://127.0.0.1:${String(port)}/incremental`)
+  expect(incremental.status).toBe(200)
+  expect(incremental.headers.get('content-encoding')).toBe('br')
+  const reader = incremental.body!.getReader()
+  const first = await reader.read()
+  expect(new TextDecoder().decode(first.value)).toBe('first-chunk\n')
+  slowStream.end('tail')
+  const rest = await reader.read()
+  expect(new TextDecoder().decode(rest.value)).toBe('tail')
+  reader.releaseLock()
+})
+
+it('skips the second prepared-read release query when HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE=on and the monitor matches the approved revision', async () => {
+  expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE: 'maybe' })).toThrow(/HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE/)
+  expect(loadNodeServiceConfig({ HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE: 'on' }).preparedReadFastRelease).toBe(true)
+
+  let currentRevision = 7n
+  let monitorAvailable = true
+  const monitor: import('../src/access-invalidation.ts').GatewayAccessMonitor = {
+    get available() { return monitorAvailable },
+    synchronize: async () => {},
+    matchesRevision: revision => monitorAvailable && revision === currentRevision,
+    subscribe: () => () => {},
+  }
+  const approvalCalls: number[] = []
+  const f = await fixture(
+    { HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: 'on', HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE: 'on' },
+    true,
+    false,
+    undefined,
+    undefined,
+    async () => {
+      approvalCalls.push(approvalCalls.length + 1)
+      return { accessRevision: String(currentRevision), generation: 1, port: 40000, startedAt: 1, launchStamp: 'stamp-7', expiresAt: Date.now() + 60_000 }
+    },
+    monitor,
+  )
+  const bootstrapUrl = `${f.base}/?dshRuntime=${f.environment.id}&dshTarget=personal&dshNode=${f.nodeId}&dshBootstrap=1`
+  const first = await fetch(bootstrapUrl, {
+    headers: { cookie: f.cookie, accept: 'application/json', 'x-dsh-expected-principal-id': String(f.admin.id) },
+  })
+  expect(first.status).toBe(200)
+  await first.arrayBuffer()
+  expect(approvalCalls).toHaveLength(1)
+  expect(f.proxy.diagnostics()).toMatchObject({
+    preparedReadEligible: 1,
+    preparedReadHit: 1,
+    preparedReadReleaseChecks: 0,
+    preparedReadReleaseSkipped: 1,
+  })
+
+  // When the monitor becomes unavailable, the proxy falls back to the explicit release recheck.
+  monitorAvailable = false
+  const second = await fetch(bootstrapUrl, {
+    headers: { cookie: f.cookie, accept: 'application/json', 'x-dsh-expected-principal-id': String(f.admin.id) },
+  })
+  expect(second.status).toBe(200)
+  await second.arrayBuffer()
+  expect(approvalCalls).toHaveLength(3)
+  expect(f.proxy.diagnostics()).toMatchObject({
+    preparedReadEligible: 2,
+    preparedReadHit: 2,
+    preparedReadReleaseChecks: 1,
+    preparedReadReleaseSkipped: 1,
+  })
 })

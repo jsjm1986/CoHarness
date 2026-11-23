@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Pool } from 'pg'
 import { StewardQueryService } from '../src/postgres/steward-query.ts'
 import type { PostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import type { RuntimeId } from '../src/runtime-catalog.ts'
+import { fixtureQueryPool } from './postgres-query-fixture.ts'
 
 describe('StewardQueryService lane screening (unit)', () => {
   const subject = {
@@ -13,20 +13,18 @@ describe('StewardQueryService lane screening (unit)', () => {
   }
 
   function service() {
-    const journalQueries: unknown[][] = []
-    const context = {
+    const context: PostgresRuntimeContext = {
       organizationId: 'org-1',
+      organizationSlug: 'fixture',
       nodeId: 'node-1',
-      pool: {
-        query: vi.fn(async (_text: string, values?: unknown[]) => {
-          journalQueries.push(values ?? [])
-          return { rows: [] }
-        }),
-      },
-    } as unknown as PostgresRuntimeContext
-    const connect = vi.fn(async () => { throw new Error('statement pool must not be acquired for denied queries') })
-    const statements = { connect } as unknown as Pool
-    return { service: new StewardQueryService(context, true, statements), connect, journalQueries }
+      nodeName: 'fixture',
+      pool: fixtureQueryPool(() => []),
+    }
+    const statements = fixtureQueryPool(() => [])
+    const connect = vi.spyOn(statements, 'connect').mockImplementation(async () => {
+      throw new Error('statement pool must not be acquired for denied queries')
+    })
+    return { service: new StewardQueryService(context, true, statements), connect }
   }
 
   it.each([

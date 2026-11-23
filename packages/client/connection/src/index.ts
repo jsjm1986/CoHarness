@@ -17,7 +17,8 @@ import { bindRequestInteractions } from '@deepseek-ai/dsh-host-apiproxy/api/requ
 import { BrowserAuth } from './browser-auth.ts'
 import { DEFAULT_BROWSER_RPC_TIMEOUT_MS, DEFAULT_ENTRY_REQUEST_LIMIT } from './browser-timing.ts'
 import { HostConnectionService } from './rpc-host.ts'
-import { rejectWebSocketUpgrade, WebSocketDownlinks } from './websocket-downlink.ts'
+import { WebSocketDownlinks } from './websocket-downlink.ts'
+import { buildConnectionRequestBoundary, createUpgradeRouteHandler } from './ws-upgrade.ts'
 
 export type {
   ConnectionAuthenticationRequest,
@@ -352,13 +353,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           return
         }
         const startedAt = serverTiming && req.method === 'POST' ? performance.now() : undefined
-        await webCtx.waterfall('connection/request', {
-          kind: 'http',
-          headers: req.headers,
-          ...(req.method === undefined ? {} : { method: req.method }),
-          pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
-          ...(req.url === undefined ? {} : { url: req.url }),
-        }, async () => {
+        await webCtx.waterfall('connection/request', buildConnectionRequestBoundary('http', req), async () => {
           if (await connection.dispatchHttp(req, res)) return
           const handler = startedAt === undefined ? fetchHandler : {
             async fetch(request: Request): Promise<Response> {
@@ -382,31 +377,11 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     ): void => {
       apiCtx.effect(() => apiCtx.webServer.registerUpgrade({
         path,
-        handler: (req, socket, head) => {
-          if (connection.requestRejection(req, 'upgrade') !== undefined) {
-            rejectWebSocketUpgrade(socket)
-            return
-          }
-          const lifetime = new AbortController()
-          const close = (): void => {
-            socket.removeListener('close', close)
-            socket.removeListener('error', close)
-            lifetime.abort()
-          }
-          socket.once('close', close)
-          socket.once('error', close)
-          if (socket.destroyed) close()
-          return apiCtx.waterfall('connection/request', {
-            kind: 'upgrade',
-            signal: lifetime.signal,
-            headers: req.headers,
-            ...(req.method === undefined ? {} : { method: req.method }),
-            pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
-            ...(req.url === undefined ? {} : { url: req.url }),
-          }, async () => {
-            await handle(req, socket, head)
-          }).catch((error: unknown) => { close(); throw error })
-        },
+        handler: createUpgradeRouteHandler({
+          owner: apiCtx,
+          isRejected: req => connection.requestRejection(req, 'upgrade') !== undefined,
+          onAccepted: async (req, socket, head) => { await handle(req, socket, head) },
+        }),
       }), `client-connection: ${path} WebSocket`)
     }
     apiCtx.effect(() => () => downlinks.close(), 'client-connection: WebSocket downlinks')

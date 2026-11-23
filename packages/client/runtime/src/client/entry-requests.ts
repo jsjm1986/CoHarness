@@ -193,10 +193,21 @@ export class GatewayEntryRequests {
     const ids = [...new Set(projects.map(row => row.projectId))].sort((a, b) => a - b)
     if (ids.length !== projects.length) throw new Error('Duplicate project selection')
     const query = new URLSearchParams({ dshNode: nodeId, ids: ids.join(',') })
-    const value = await this.read(`/account/api/project-metadata?${query}`, signal)
+    let value: unknown
+    try {
+      value = await this.read(`/account/api/project-metadata?${query}`, signal)
+    } catch (error) {
+      if (!signal?.aborted && error instanceof Error && 'status' in error) {
+        if (error.status === 401) this.directory.clear()
+        else if (error.status === 403) this.directory.evictProjectDisplays(account, nodeId, projects)
+      }
+      throw error
+    }
     signal?.throwIfAborted()
     if (this.principal() !== account) throw new Error('Project viewer changed')
-    return readOwnerProjects(value, nodeId, projects)
+    const displays = readOwnerProjects(value, nodeId, projects)
+    this.directory.rememberProjectDisplays(account, displays)
+    return displays
   }
 
   /** Fetch the next central Runtime page on an explicit user action.

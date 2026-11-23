@@ -856,7 +856,7 @@ jobs:
     name: gateway / typecheck and unit tests
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17.6-bookworm
         env:
           POSTGRES_USER: hgw
           POSTGRES_PASSWORD: hgw
@@ -904,6 +904,8 @@ jobs:
       # and host addon produce both artifact planes.
       - name: Build the workspace libraries and native addon the Gateway graph consumes
         run: pnpm run build:native-system && pnpm run build:lib:host
+      - name: Link the standalone Gateway Runtime dependencies
+        run: pnpm exec tsx scripts/gateway-runtime-packages.ts
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their
@@ -943,8 +945,8 @@ jobs:
         run: npm test --prefix gateway
       - name: Test Gateway PostgreSQL authorization and invalidation
         env:
-          HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_dump"]'
-          HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_restore"]'
+          HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","/usr/lib/postgresql/17/bin/pg_dump"]'
+          HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","/usr/lib/postgresql/17/bin/pg_restore"]'
         run: npm run test:postgres --prefix gateway
       - name: Replay managed node maintenance control transcript
         run: DSH_SNAPSHOT=replay ./node_modules/.bin/vitest run --config vitest.snapshot.config.ts gateway/tests/node-maintenance.snapshot.ts --maxWorkers=1
@@ -1082,6 +1084,9 @@ jobs:
       - name: Build the workspace libraries the Gateway graph consumes
         shell: pwsh
         run: pnpm run build:native-system && pnpm run build:lib:host
+      - name: Link the standalone Gateway Runtime dependencies
+        shell: pwsh
+        run: pnpm exec tsx scripts/gateway-runtime-packages.ts
 
       - name: Test Gateway Windows spec set
         shell: pwsh

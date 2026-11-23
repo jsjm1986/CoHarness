@@ -93,7 +93,7 @@ async function typeBehindPendingInput(page: Page, input: Locator, outputPath: st
 }
 
 describe('web e2e: private user terminal lifecycle', () => {
-  let scaffold: WebScaffold | undefined, browser: Browser | undefined, page: Page
+  let scaffold: WebScaffold | undefined, browser: Browser | undefined
   beforeAll(async () => {
     scaffold = await launchWebScaffold({
       extraOverlayPath: fileURLToPath(new URL('./user-terminal-typing.overlay.yml', import.meta.url)),
@@ -101,8 +101,8 @@ describe('web e2e: private user terminal lifecycle', () => {
     const result = await scaffold.ctx.apiProxy.sessions.create({ rpcId: RpcId('terminal-create'), payload: { sessionId: SESSION, cwd: scaffold.workspaceCwd } })
     if (!result.result.ok) throw new Error(result.result.error.message)
     await (await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)).attachSession(SESSION)
-    browser = await responsiveBrowser.launch()
-    page = await newWorkflowPage(browser)
+    const executablePath = process.env.DSH_TEST_BROWSER_EXECUTABLE
+    browser = await responsiveBrowser.launch(executablePath === undefined ? {} : { executablePath })
   })
   afterEach(async () => {
     if (scaffold === undefined) return
@@ -115,9 +115,59 @@ describe('web e2e: private user terminal lifecycle', () => {
   })
   afterAll(async () => { try { await browser?.close() } finally { await scaffold?.close() } })
 
+  it('writes through the live terminal WebSocket and receives a Host acknowledgement', async () => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Terminal scaffold unavailable')
+    const proof = await newWorkflowPage(browser)
+    onTestFinished(() => proof.context().close())
+    let receivedAck = false
+    let fallbackWrites = 0
+    proof.on('websocket', (socket) => {
+      if (new URL(socket.url()).pathname !== '/api/terminal/input') return
+      const writes = new Set<number>()
+      socket.on('framesent', ({ payload }) => {
+        if (typeof payload !== 'string') return
+        const frame = JSON.parse(payload) as { type: string; seq: number }
+        if (frame.type === 'write') writes.add(frame.seq)
+      })
+      socket.on('framereceived', ({ payload }) => {
+        if (typeof payload !== 'string') return
+        const frame = JSON.parse(payload) as { type: string; seq: number }
+        if (frame.type === 'ack' && writes.has(frame.seq)) receivedAck = true
+      })
+    })
+    proof.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/terminal/write') fallbackWrites += 1
+    })
+    await proof.addInitScript(() => {
+      const NativeWebSocket = window.WebSocket
+      window.WebSocket = class extends NativeWebSocket {
+        constructor(url: string | URL, protocols?: string | string[]) {
+          super(url, protocols)
+          if (new URL(this.url).pathname === '/api/terminal/input') {
+            this.addEventListener('open', () => { document.documentElement.dataset.terminalInputReady = 'true' })
+          }
+        }
+      }
+    })
+    await proof.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await proof.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+    await proof.locator('[data-sidebar-right-guide-entry="terminal"]').getByRole('button', { name: /New terminal/ }).click()
+    const input = proof.getByRole('textbox', { name: 'Terminal', exact: true })
+    await proof.locator('html[data-terminal-input-ready="true"]').waitFor({ state: 'attached' })
+    await input.fill('echo websocket-ok > terminal-websocket-proof.txt')
+    await input.press('Enter')
+    const output = join(scaffold.workspaceCwd, 'terminal-websocket-proof.txt')
+    await expect.poll(() => readFile(output, 'utf8').catch(() => '')).toBe('websocket-ok\n')
+    await expect.poll(() => receivedAck).toBe(true)
+    expect(fallbackWrites).toBe(0)
+  })
+
   it('writes through a real shell, retains it while hidden and reloaded, and closes explicitly', async () => {
-    if (scaffold === undefined) throw new Error('Terminal scaffold unavailable')
+    if (scaffold === undefined || browser === undefined) throw new Error('Terminal scaffold unavailable')
     const world = scaffold
+    const page = await newWorkflowPage(browser)
+    onTestFinished(() => page.context().close())
+    await page.routeWebSocket(/\/api\/terminal\/input(?:\?|$)/u, socket => socket.close({ code: 1013 }))
     onTestFailed(() => saveFailureShot(page, 'web-user-terminal'))
     const tripwire = watchConsole(page)
     const errors: string[] = []

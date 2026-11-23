@@ -68,7 +68,7 @@ async function writeOverviewStream(
   const publish = async (frame: unknown, provisional = false): Promise<void> => {
     signal.throwIfAborted()
     if (!await stream.authorize()) throw changed
-    await monitor?.synchronize()
+    if (!provisional || !monitor?.available) await monitor?.synchronize()
     await write(frame, signal, provisional)
   }
   try {

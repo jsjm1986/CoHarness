@@ -249,40 +249,27 @@ export function createProxyHandlers(
   // Grants handoff is intrinsic to starting an instance: the manager calls this
   // just before every spawn, so the child always reads the current grants.
   instances.beforeStart = async (runtime, purpose): Promise<void> => {
-    const projectPlugins = async (): Promise<void> => {
-      if (deps.pluginState === undefined) return
-      // Desired state is newer than what this instance last applied when the
-      // manager's write-back already carried it: only pending revisions write.
-      const pending = await deps.pluginState.projection(runtime.target)
-      if (pending !== null && pending !== 'current') {
-        await deps.pluginState.project(runtime.dshHome, pending.state)
-        if (purpose === 'launch') await deps.pluginState.markApplied(runtime.target, pending.revision)
+    const { governance, pluginState } = deps
+    const { dshHome, user, project } = runtime
+    const retained = runtime.retainedData ? { existingHome: true as const } : undefined
+    const preparePolicy = async (): Promise<void> => {
+      if (user !== undefined) {
+        writeRuntimeGrantsFile(dshHome, await runtimeDirectoryGrants(user, projects), cfg.usersRoot, retained)
+        if (governance !== undefined) await writeModelGovernanceFile(cfg, governance, { ...user, dshHome }, retained)
+      } else {
+        if (project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
+        writeRuntimeGrantsFile(dshHome, projectRuntimeGrants(cfg, project), cfg.projectRuntimesRoot, retained)
+        if (governance !== undefined) await writeProjectModelGovernanceFile(cfg, governance, project, dshHome, retained)
       }
     }
-    if (runtime.user !== undefined) {
-      const user = runtime.user
-      await Promise.all([
-        (async () => {
-          writeRuntimeGrantsFile(runtime.dshHome, await runtimeDirectoryGrants(user, projects), cfg.usersRoot,
-            runtime.retainedData ? { existingHome: true } : undefined)
-          if (deps.governance !== undefined) {
-            await writeModelGovernanceFile(cfg, deps.governance, { ...user, dshHome: runtime.dshHome },
-              runtime.retainedData ? { existingHome: true } : undefined)
-          }
-        })(),
-        projectPlugins(),
-      ])
-    } else {
-      if (runtime.project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
-      const project = runtime.project
-      writeRuntimeGrantsFile(runtime.dshHome, projectRuntimeGrants(cfg, project), cfg.projectRuntimesRoot,
-        runtime.retainedData ? { existingHome: true } : undefined)
-      await Promise.all([
-        deps.governance === undefined ? Promise.resolve() : writeProjectModelGovernanceFile(cfg, deps.governance, project, runtime.dshHome,
-          runtime.retainedData ? { existingHome: true } : undefined),
-        projectPlugins(),
-      ])
-    }
+    // Launch ownership covers pending policy writes even when the plugin read fails.
+    const [policy, projection] = await Promise.allSettled([preparePolicy(), pluginState?.projection(runtime.target)])
+    if (policy.status === 'rejected') throw policy.reason
+    if (projection.status === 'rejected') throw projection.reason
+    const pending = projection.value
+    if (pluginState === undefined || pending === undefined || pending === null || pending === 'current') return
+    await pluginState.project(dshHome, pending.state)
+    if (purpose === 'launch') await pluginState.markApplied(runtime.target, pending.revision, runtime.generation)
   }
   instances.beforeUse = async (runtime): Promise<void> => {
     if (deps.governance === undefined) return
@@ -787,7 +774,9 @@ export function createProxyHandlers(
     const lang = gateLanguage(req.headers.cookie)
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
-    const eventConnection = ['/api/events.mux', '/api/events.host'].includes(new URL(req.url ?? '/', 'http://gateway.invalid').pathname)
+    const pathname = new URL(req.url ?? '/', 'http://gateway.invalid').pathname
+    const eventConnection = ['/api/events.mux', '/api/events.host'].includes(pathname)
+    const terminalInputConnection = pathname === '/api/terminal/input'
     let ready: { port: number; generation: number; target: RuntimeTarget }
     try {
       await synchronizeAccess(context.forwardedAccessRevision)
@@ -835,9 +824,10 @@ export function createProxyHandlers(
         return
       }
       let streamLogin: Awaited<ReturnType<typeof qualifyStream>> | undefined
-      if (eventConnection && principalSigner !== undefined) {
+      if ((eventConnection || terminalInputConnection) && principalSigner !== undefined) {
         streamLogin = token === undefined ? null : await qualifyStream(token, context)
-        await deps.accessMonitor?.synchronize()
+        if (eventConnection) await deps.accessMonitor?.synchronize()
+        else await synchronizeAccess(context.forwardedAccessRevision)
         if (streamLogin === null || streamLogin.expiresAt <= Date.now() || socket.destroyed) {
           releaseWebSocketLease()
           socket.destroy()
@@ -845,6 +835,11 @@ export function createProxyHandlers(
         }
         context.user = streamLogin.user
         context.scope = streamLogin.scope
+      }
+      if (terminalInputConnection && streamLogin !== undefined && streamLogin !== null) {
+        const expiry = setTimeout(() => { socket.destroy() }, Math.min(2_147_483_647, Math.max(0, streamLogin.expiresAt - Date.now())))
+        expiry.unref()
+        socket.once('close', () => { clearTimeout(expiry) })
       }
       forwardUpgrade(req, socket, head, context, ready, eventConnection, token, streamLogin?.expiresAt)
     } catch (error: unknown) {

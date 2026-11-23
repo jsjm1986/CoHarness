@@ -126,7 +126,7 @@ export function PerformanceDiagnosticsSection() {
                 <div className={snapshot.operationClasses.http.durationMs.p95Ms >= 500 ? 'metric metric-warning' : 'metric'}>
                   <span>{t('httpP95Label')}</span>
                   <strong>{formatMs(snapshot.operationClasses.http.durationMs.p95Ms)}</strong>
-                  <span>{t('httpSub', {
+                  <span className="metricSub">{t('httpSub', {
                     p50: formatMs(snapshot.operationClasses.http.durationMs.p50Ms),
                     p99: formatMs(snapshot.operationClasses.http.durationMs.p99Ms),
                     errors: String(snapshot.operationClasses.http.errors),
@@ -136,7 +136,7 @@ export function PerformanceDiagnosticsSection() {
                 <div className={snapshot.eventLoop.p95Ms >= 50 ? 'metric metric-warning' : 'metric'}>
                   <span>{t('eventLoopP95Label')}</span>
                   <strong>{formatMs(snapshot.eventLoop.p95Ms)}</strong>
-                  <span>{t('eventLoopSub', {
+                  <span className="metricSub">{t('eventLoopSub', {
                     util: `${(snapshot.eventLoop.utilization * 100).toFixed(1)}%`,
                     rss: formatMiB(snapshot.memory.rss),
                   })}</span>
@@ -146,7 +146,7 @@ export function PerformanceDiagnosticsSection() {
                   <div className={forwarding.pool.waiting > 0 ? 'metric metric-warning' : 'metric'}>
                     <span>{t('poolReuseLabel')}</span>
                     <strong>{formatPct(forwarding.pool.reused, forwarding.pool.reused + forwarding.pool.opened, t('na'))}</strong>
-                    <span>{t('poolSub', {
+                    <span className="metricSub">{t('poolSub', {
                       active: String(forwarding.pool.active),
                       idle: String(forwarding.pool.idle),
                       waiting: String(forwarding.pool.waiting),
@@ -156,7 +156,7 @@ export function PerformanceDiagnosticsSection() {
                   <div className="metric">
                     <span>{t('readySessionLabel')}</span>
                     <strong>{formatPct(combinedReadyHits, combinedReadyTotal, t('na'))}</strong>
-                    <span>{t('readySessionSub', {
+                    <span className="metricSub">{t('readySessionSub', {
                       hits: String(combinedReadyHits),
                       total: String(combinedReadyTotal),
                     })}</span>
@@ -167,7 +167,7 @@ export function PerformanceDiagnosticsSection() {
                   <div className="metric">
                     <span>{t('assetCacheLabel')}</span>
                     <strong>{formatPct(assets.remoteCacheHits, assets.remoteCacheHits + assets.remoteCacheMisses, t('na'))}</strong>
-                    <span>{t('assetCacheSub', {
+                    <span className="metricSub">{t('assetCacheSub', {
                       entries: String(assets.remoteCacheEntries),
                       mb: formatMiB(assets.remoteCacheBytes),
                     })}</span>
@@ -176,7 +176,7 @@ export function PerformanceDiagnosticsSection() {
                   <div className={(db?.waiting ?? 0) > 0 ? 'metric metric-warning' : 'metric'}>
                     <span>{t('dbPoolLabel')}</span>
                     <strong>{db === null ? t('na') : `${String(db.active ?? 0)} / ${String(db.maxConnections ?? 0)}`}</strong>
-                    <span>{db === null ? t('na') : t('dbPoolSub', {
+                    <span className="metricSub">{db === null ? t('na') : t('dbPoolSub', {
                       active: String(db.active ?? 0),
                       idle: String(db.idle ?? 0),
                       waiting: String(db.waiting ?? 0),
@@ -279,7 +279,7 @@ export function PerformanceDiagnosticsSection() {
                   </tbody>
                 </table>
               </div>
-              <span className="sectionMeta"><Activity aria-hidden="true" style={{ width: 12, height: 12, verticalAlign: '-2px', marginRight: 6 }} />{t('sectionMeta')}</span>
+              <span className="sectionMeta"><Activity className="diagnosticsNoteIcon" aria-hidden="true" />{t('sectionMeta')}</span>
             </>
           )}
         </div>

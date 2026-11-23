@@ -5,9 +5,7 @@ import type { Duplex } from 'node:stream'
 import WebSocket, { WebSocketServer } from 'ws'
 import type { ConnectionRpcAuthority } from './rpc.ts'
 import { rejectWebSocketUpgrade } from './websocket-downlink.ts'
-
-/** Allow a busy event loop to miss two protocol heartbeats before closing. */
-const MAX_MISSED_HEARTBEATS = 2
+import { createWebSocketHeartbeat, type WebSocketHeartbeat } from './ws-upgrade.ts'
 
 /** Default maximum incoming WebSocket text frame payload size in bytes. */
 const DEFAULT_MAX_MESSAGE_BYTES = 256 * 1024
@@ -154,10 +152,9 @@ function adaptWebSocket(ws: WebSocket, signal: AbortSignal): ConnectionWebSocket
  */
 export class ConnectionWebSocketChannel {
   private readonly server: WebSocketServer
+  private readonly heartbeat: WebSocketHeartbeat
   private readonly lifetime = new AbortController()
-  private readonly missedHeartbeats = new WeakMap<WebSocket, number>()
   private readonly pending = new Set<Promise<void>>()
-  private heartbeatTimer: NodeJS.Timeout | undefined
   private closing = false
 
   /**
@@ -165,13 +162,14 @@ export class ConnectionWebSocketChannel {
    * @param maxMessageBytes - maximum incoming WebSocket message size in bytes.
    */
   constructor(
-    private readonly heartbeatIntervalMs = 30_000,
+    heartbeatIntervalMs = 30_000,
     maxMessageBytes = DEFAULT_MAX_MESSAGE_BYTES,
   ) {
     if (!Number.isSafeInteger(maxMessageBytes) || maxMessageBytes < 1) {
       throw new RangeError('maxMessageBytes must be a positive safe integer')
     }
     this.server = new WebSocketServer({ noServer: true, maxPayload: maxMessageBytes })
+    this.heartbeat = createWebSocketHeartbeat(this.server, heartbeatIntervalMs)
   }
 
   /**
@@ -196,21 +194,13 @@ export class ConnectionWebSocketChannel {
       return Promise.resolve()
     }
     return new Promise<void>((resolve) => {
-      let settled = false
-      const settle = (): void => {
-        if (settled) return
-        settled = true
-        resolve()
-      }
       this.server.handleUpgrade(req, socket, head, (ws) => {
         if (this.closing || this.lifetime.signal.aborted) {
           ws.terminate()
-          settle()
+          resolve()
           return
         }
-        this.startHeartbeat()
-        this.missedHeartbeats.set(ws, 0)
-        ws.on('pong', () => { this.missedHeartbeats.set(ws, 0) })
+        this.heartbeat.track(ws)
         const closed = new AbortController()
         const onStop = (): void => { closed.abort() }
         ws.once('close', onStop)
@@ -229,7 +219,7 @@ export class ConnectionWebSocketChannel {
         }
         this.pending.add(work)
         void work.finally(() => { this.pending.delete(work) })
-        settle()
+        resolve()
       })
     })
   }
@@ -241,10 +231,7 @@ export class ConnectionWebSocketChannel {
   async close(): Promise<void> {
     this.closing = true
     this.lifetime.abort()
-    if (this.heartbeatTimer !== undefined) {
-      clearInterval(this.heartbeatTimer)
-      this.heartbeatTimer = undefined
-    }
+    this.heartbeat.stop()
     for (const ws of this.server.clients) ws.terminate()
     await new Promise<void>((resolve, reject) => {
       this.server.close((error) => {
@@ -253,24 +240,5 @@ export class ConnectionWebSocketChannel {
       })
     })
     await Promise.allSettled([...this.pending])
-  }
-
-  private startHeartbeat(): void {
-    if (this.heartbeatTimer !== undefined || this.closing) return
-    this.heartbeatTimer = setInterval(() => {
-      for (const ws of this.server.clients) {
-        if (ws.readyState !== WebSocket.OPEN) continue
-        const missed = this.missedHeartbeats.get(ws) ?? 0
-        if (missed >= MAX_MISSED_HEARTBEATS) {
-          setImmediate(() => {
-            if ((this.missedHeartbeats.get(ws) ?? 0) >= MAX_MISSED_HEARTBEATS) ws.terminate()
-          })
-          continue
-        }
-        this.missedHeartbeats.set(ws, missed + 1)
-        ws.ping()
-      }
-    }, this.heartbeatIntervalMs)
-    this.heartbeatTimer.unref()
   }
 }

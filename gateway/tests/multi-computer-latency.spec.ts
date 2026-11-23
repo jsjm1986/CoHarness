@@ -124,20 +124,20 @@ describe('multi-computer forwarding counter invariants', () => {
 
     try {
       responseHeaders = { 'cache-control': 'private, max-age=60' }
-      expect((await fetch(url)).status).toBe(200)
+      const r1 = await fetch(url); expect(r1.status).toBe(200); await r1.arrayBuffer()
       expect(onComplete).not.toHaveBeenCalled()
 
       responseHeaders = { 'cache-control': 'no-store' }
-      expect((await fetch(url)).status).toBe(200)
+      const r2 = await fetch(url); expect(r2.status).toBe(200); await r2.arrayBuffer()
       expect(onComplete).not.toHaveBeenCalled()
 
       responseHeaders = { 'cache-control': 'public, max-age=31536000, immutable', vary: 'accept-encoding, cookie' }
-      expect((await fetch(url)).status).toBe(200)
+      const r3 = await fetch(url); expect(r3.status).toBe(200); await r3.arrayBuffer()
       expect(onComplete).not.toHaveBeenCalled()
 
       responseHeaders = { 'cache-control': 'public, max-age=31536000, immutable', vary: 'Accept-Encoding' }
-      expect((await fetch(url)).status).toBe(200)
-      expect(onComplete).toHaveBeenCalledTimes(1)
+      const r4 = await fetch(url); expect(r4.status).toBe(200); await r4.arrayBuffer()
+      await expect.poll(() => onComplete.mock.calls.length).toBe(1)
     } finally {
       await proxy.close()
     }

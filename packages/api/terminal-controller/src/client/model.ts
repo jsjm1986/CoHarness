@@ -87,6 +87,7 @@ export class TerminalView {
   private queuedInput = 0
   private pendingInput: { attachmentId: TerminalAttachmentId; data: string; bytes: number } | undefined
   private inputChannel: { attachmentId: TerminalAttachmentId; channel: TerminalInputChannel } | undefined
+  private inputReconnectTimer: ReturnType<typeof setTimeout> | undefined
   private readonly detaching = new Set<Promise<void>>()
 
   /**
@@ -99,6 +100,7 @@ export class TerminalView {
    * @param retain - window hold acknowledgement required before output attachment.
    * @param preferenceKey - verified persistence identity; omission disables saved shell preferences.
    * @param openInputChannel - optional low-latency bidirectional WebSocket input channel factory.
+   * @param inputReconnectDelayMs - delay before re-opening a dropped input WebSocket while writable.
    */
   constructor(
     private readonly sessionId: SessionId,
@@ -110,6 +112,7 @@ export class TerminalView {
     private readonly retain?: (signal: AbortSignal) => Promise<void>,
     private readonly preferenceKey?: string,
     private readonly openInputChannel?: TerminalInputChannelFactory,
+    private readonly inputReconnectDelayMs = 2_000,
   ) {}
 
   /**
@@ -137,17 +140,37 @@ export class TerminalView {
     if (this.closing !== undefined || this.lifetime.signal.aborted) return Promise.resolve()
     this.patch({ phase: 'loading', error: undefined, issue: undefined })
     this.loading = (async () => {
+      // Overlap default shell discovery with environment/list lookup so opening a new tab saves one round trip.
+      const shellDiscovery = this.createWhenMissing && this.shellPath === undefined
+        ? new AbortController()
+        : undefined
+      const speculativeShells = shellDiscovery === undefined
+        ? undefined
+        : Promise.resolve().then(() => this.remote.shells(
+          this.sessionId,
+          AbortSignal.any([this.lifetime.signal, shellDiscovery.signal]),
+        )).then(
+          result => ({ ok: true as const, result }),
+          (error: unknown) => ({ ok: false as const, error }),
+        )
       const [environment, available] = await Promise.all([
         this.remote.environment(this.sessionId, this.lifetime.signal), this.remote.list(this.sessionId),
       ])
-      if (this.stopped()) return
+      if (this.stopped()) {
+        shellDiscovery?.abort()
+        return
+      }
       this.patch({ environment: valueOf(environment) })
       const info = valueOf(available).find(item => item.id === this.id)
-      if (info !== undefined) this.adopt(info)
-      else if (this.createWhenMissing) {
+      if (info !== undefined) {
+        shellDiscovery?.abort()
+        this.adopt(info)
+      } else if (this.createWhenMissing) {
         let path = this.shellPath
-        if (path === undefined) {
-          const shells = valueOf(await this.remote.shells(this.sessionId, this.lifetime.signal))
+        if (path === undefined && speculativeShells !== undefined) {
+          const settled = await speculativeShells
+          if (!settled.ok) throw settled.error
+          const shells = valueOf(settled.result)
           const previous = preferredShell(this.preferenceKey)
           path = shells.find(shell => shell.path === previous)?.path ?? shells[0]?.path
         }
@@ -253,10 +276,12 @@ export class TerminalView {
         } catch (error) {
           if (error instanceof TerminalInputChannelClosedError) {
             this.dropInputChannel(attachmentId)
+            this.scheduleInputChannelReconnect(id, attachmentId)
             return
           }
           if (!(error instanceof TerminalInputChannelUnavailableError)) throw error
           this.dropInputChannel(attachmentId)
+          this.scheduleInputChannelReconnect(id, attachmentId)
         }
       }
       valueOf(await this.remote.write(this.sessionId, id, attachmentId, input.data))
@@ -288,6 +313,7 @@ export class TerminalView {
         } catch (error) {
           if (error instanceof TerminalInputChannelClosedError || error instanceof TerminalInputChannelUnavailableError) {
             this.dropInputChannel(attachmentId)
+            this.scheduleInputChannelReconnect(id, attachmentId)
           } else {
             throw error
           }
@@ -363,7 +389,20 @@ export class TerminalView {
     if (channel !== undefined) this.inputChannel = { attachmentId, channel }
   }
 
+  private scheduleInputChannelReconnect(terminalId: WebTerminalId, attachmentId: TerminalAttachmentId): void {
+    if (this.stopped() || this.attachmentId !== attachmentId) return
+    this.inputReconnectTimer = setTimeout(() => {
+      this.inputReconnectTimer = undefined
+      if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable || this.stopped()) return
+      this.ensureInputChannel(terminalId, attachmentId)
+    }, this.inputReconnectDelayMs)
+  }
+
   private dropInputChannel(attachmentId?: TerminalAttachmentId): void {
+    if (this.inputReconnectTimer !== undefined) {
+      clearTimeout(this.inputReconnectTimer)
+      this.inputReconnectTimer = undefined
+    }
     if (this.inputChannel === undefined) return
     if (attachmentId !== undefined && this.inputChannel.attachmentId !== attachmentId) return
     const current = this.inputChannel

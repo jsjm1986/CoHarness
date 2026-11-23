@@ -32,7 +32,10 @@ type ScopedModelRequest = ResourceWireRequest & { kind: 'model'; origin: Require
 
 function boundedResourcePayload(body: string): unknown {
   if (Buffer.byteLength(body) > RESOURCE_MESSAGE_MAX_BYTES) return
-  try { return JSON.parse(body) as unknown } catch (error) {
+  try {
+    const value: unknown = JSON.parse(body)
+    return value
+  } catch (error) {
     if (error instanceof SyntaxError) return
     throw error
   }

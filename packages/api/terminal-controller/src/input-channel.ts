@@ -7,14 +7,14 @@ import type { TerminalInputClientFrame, TerminalInputServerFrame } from './input
 import type { BrowserTerminal } from './terminal.ts'
 import type { TerminalAttachmentId, WebTerminalId } from './types.ts'
 
-/** Minimal WebSocket surface provided by `ctx.connection.ws` without creating a circular host package dependency. */
-export interface TerminalInputSocket {
+/** Minimal text WebSocket contract consumed from `ctx.connection.ws` without circular host references. */
+export type TerminalInputSocket = {
   readonly signal: AbortSignal
   readonly readyState: 'open' | 'closing' | 'closed'
-  send(data: string): void
-  close(code?: number, reason?: string): void
-  onMessage(listener: (data: string) => void): () => void
-  onClose(listener: () => void): () => void
+  readonly send: (frame: string) => void
+  readonly close: (code?: number, reason?: string) => void
+  readonly onMessage: (onFrame: (frame: string) => void) => () => void
+  readonly onClose: (onEnd: () => void) => () => void
 }
 
 /** Structural subset of `ctx.connection` used to register the terminal input upgrade route. */

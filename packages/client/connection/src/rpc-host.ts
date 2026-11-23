@@ -34,6 +34,7 @@ import {
   type HostConnectionWebSocket,
 } from './websocket-channel.ts'
 import { rejectWebSocketUpgrade } from './websocket-downlink.ts'
+import { buildConnectionRequestBoundary, createUpgradeRouteHandler } from './ws-upgrade.ts'
 
 /** Handler for a streaming HTTP subtree mounted below Connection's trusted `/api` route. */
 export type ConnectionHttpHandler = (
@@ -166,7 +167,8 @@ export class HostConnectionService extends Service implements HostConnectionHand
 
   /** Authenticated bidirectional WebSocket registry scoped to the Context reading this service. */
   get ws(): HostConnectionWebSocket {
-    const owner = this.ctx
+    // The carrier's child plugin resolves its dependencies from the caller's own fiber.
+    const owner = this.ctx.fiber.ctx
     return {
       handle: (path, handler, options) =>
         this.registerWebSocket(owner, path, handler, options),
@@ -367,40 +369,18 @@ export class HostConnectionService extends Service implements HostConnectionHand
         )
         const unregister = webCtx.webServer.registerUpgrade({
           path,
-          handler: (req, socket, head) => {
-            if (this.rejectionFor(req, options.authority, 'upgrade') !== undefined) {
-              rejectWebSocketUpgrade(socket)
-              return
-            }
-            const lifetime = new AbortController()
-            const close = (): void => {
-              socket.removeListener('close', close)
-              socket.removeListener('error', close)
-              lifetime.abort()
-            }
-            socket.once('close', close)
-            socket.once('error', close)
-            if (socket.destroyed) close()
-            return webCtx.waterfall('connection/request', {
-              kind: 'upgrade',
-              signal: lifetime.signal,
-              headers: req.headers,
-              ...(req.method === undefined ? {} : { method: req.method }),
-              pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
-              ...(req.url === undefined ? {} : { url: req.url }),
-            }, async () => {
-              if (options.authorize !== undefined && !await options.authorize(req, lifetime.signal)) {
+          handler: createUpgradeRouteHandler({
+            owner: webCtx,
+            isRejected: req => this.rejectionFor(req, options.authority, 'upgrade') !== undefined,
+            rejectOnError: true,
+            onAccepted: async (req, socket, head, signal) => {
+              if (options.authorize !== undefined && !await options.authorize(req, signal)) {
                 rejectWebSocketUpgrade(socket)
-                close()
                 return
               }
-              await channel.upgrade(req, socket, head, lifetime.signal, handler)
-            }).catch((error: unknown) => {
-              close()
-              if (!socket.destroyed && !socket.writableEnded) rejectWebSocketUpgrade(socket)
-              throw error
-            })
-          },
+              await channel.upgrade(req, socket, head, signal, handler)
+            },
+          }),
         })
         return async () => {
           unregister()
@@ -432,13 +412,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
         // Every accepted request crosses the same `connection/request`
         // waterfall as the `/api` route, so authentication and request-context
         // plugins apply identically to generic channels.
-        await owner.waterfall('connection/request', {
-          kind: 'http',
-          headers: req.headers,
-          ...(req.method === undefined ? {} : { method: req.method }),
-          pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
-          ...(req.url === undefined ? {} : { url: req.url }),
-        }, async () => {
+        await owner.waterfall('connection/request', buildConnectionRequestBoundary('http', req), async () => {
           await bridge(req, res, fetchHandler)
         })
       },

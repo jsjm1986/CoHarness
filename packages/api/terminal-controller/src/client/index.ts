@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-api-gateway/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { TerminalView, terminalIssueOf, type TerminalInputChannelFactory, type TerminalRemote, type TerminalViewIssue } from './model.ts'
 import { openWebSocketTerminalInputChannel } from './input-channel.ts'
-import { createSnapshotStore, sessionPersistenceKey, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, parseClientSessionKey, sessionPersistenceKey, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { TerminalShell, WebTerminalId, WebTerminalInfo } from '../types.ts'
 import { preferredShell, rememberShell } from './shell-preference.ts'
@@ -366,7 +366,7 @@ export async function apply(ctx: Context): Promise<void> {
       return () => { for (const dispose of disposers) dispose() }
     },
   }, target => openWebSocketTerminalInputChannel(
-    target,
-    (value, sid) => (connection.forSession?.(sid) ?? connection).privateResourceUrl?.(value) ?? value,
+    { ...target, sessionId: parseClientSessionKey(target.sessionId)?.sessionId ?? target.sessionId },
+    value => (connection.forSession?.(target.sessionId) ?? connection).privateResourceUrl?.(value) ?? value,
   ))
 }

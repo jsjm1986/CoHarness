@@ -8,7 +8,7 @@ import { adminLanguage } from '../language.ts'
 
 /** @param props - current ingress and the computers visible to this administrator. @returns the selected computer's storage check. */
 export function NodeContentSection({ entry, nodes }: { entry: { nodeId: string; name: string }; nodes: readonly DeploymentNode[] }) {
-  const pinned = adminComputerTarget(window.location.pathname)
+  const pinned = adminComputerTarget()
   const [choice, setChoice] = useState(entry.nodeId)
   const selected = pinned ?? choice
   const [view, setView] = useState<NodeContentHealth>()

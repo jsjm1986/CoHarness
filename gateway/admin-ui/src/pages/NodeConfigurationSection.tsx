@@ -1,8 +1,9 @@
 /** Desired and effective deployment settings for the server-confirmed current node. */
 import { usePendingEdits } from '../pending-edits.tsx'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import { getNodeConfiguration, mutateNodeConfiguration, type NodeConfigurationView, type NodeSettingValues } from '../api.ts'
+import { unwrapDeploymentOverviewSlice, useDeploymentOverview } from '../deployment-overview.tsx'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { zh, en } from './node-configuration.copy.ts'
 import { Button, Dialog, ErrorBanner, Field, LoadingState, Section, StatusBadge } from '../components/ui.tsx'
@@ -48,14 +49,35 @@ export function NodeConfigurationSection() {
     window.addEventListener('hgw-node-connection-origin', appendOrigin)
     return () => { window.removeEventListener('hgw-node-connection-origin', appendOrigin) }
   }, [view?.nodeId, draft === null, busy, applying])
+  const overview = useDeploymentOverview()
+  const settled = useRef(false)
   const dirty = draft !== null && view !== null && NODE_CONFIG_FIELDS.some(field => draft[field.key] !== view.desired[field.key])
   usePendingEdits(dirty || busy)
   useEffect(() => {
+    if (settled.current) return
+    if (overview !== null && overview.requested.has('nodeConfiguration')) {
+      if (overview.status === 'loading') return
+      const slice = overview.status === 'ready' ? overview.sections?.nodeConfiguration : undefined
+      if (slice !== undefined) {
+        settled.current = true
+        try {
+          const value = unwrapDeploymentOverviewSlice(slice)
+          setView(value); setDraft(value.desired); setError('')
+        } catch (cause) { setError(configurationMessage(cause)) }
+        return
+      }
+    }
+    // Mark settled only after the read lands, so an aborted effect run (StrictMode remount or snapshot change) reads again.
     const lifetime = new AbortController()
-    void getNodeConfiguration(lifetime.signal).then(value => { if (!lifetime.signal.aborted) { setView(value); setDraft(value.desired) } })
-      .catch((cause: unknown) => { if (!lifetime.signal.aborted) setError(configurationMessage(cause)) })
+    void getNodeConfiguration(lifetime.signal).then(value => {
+      if (lifetime.signal.aborted) return
+      settled.current = true; setView(value); setDraft(value.desired)
+    }).catch((cause: unknown) => {
+      if (lifetime.signal.aborted) return
+      settled.current = true; setError(configurationMessage(cause))
+    })
     return () => { lifetime.abort() }
-  }, [])
+  }, [overview])
   useEffect(() => {
     if (!applying) return
     const lifetime = new AbortController()

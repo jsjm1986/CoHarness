@@ -55,6 +55,11 @@ interface RuntimeEntry {
   rejectReady?: (error: unknown) => void
   generation?: number
   archiveRevision?: number
+  connectArchive?: {
+    generation: number
+    settled: boolean
+    ok: boolean
+  } | undefined
   archiveRead?: {
     controller: AbortController
     waiters: number
@@ -527,16 +532,25 @@ export class SessionRuntimePool implements ISessions {
           this.cancelArchiveRead(establishedEntry, new Error('Target runtime connection changed'))
           establishedEntry.archiveRevision = 0
           runtime.handleConnected()
+          // Fetch Session and Workspace baselines concurrently so computer switches avoid a serial remote round trip.
+          const connectArchive = { generation, settled: false, ok: false }
+          establishedEntry.connectArchive = connectArchive
+          const workspacesReady = manager.refresh()
           void runtime.refresh().then(() => {
             if (this.entries.get(establishedEntry.key) !== establishedEntry || establishedEntry.generation !== generation) return
             if (runtime.list.getSnapshot().phase === 'ready') resolveReady()
             else rejectReady(new Error('target runtime session list unavailable'))
-            return manager.refresh()
-          }).then(() => {
-            if (manager.getSnapshot().phase === 'ready' && this.entries.get(establishedEntry.key) === establishedEntry) {
+          })
+          void workspacesReady.then(() => {
+            const ready = manager.getSnapshot().phase === 'ready'
+            if (ready
+              && this.entries.get(establishedEntry.key) === establishedEntry
+              && establishedEntry.generation === generation) {
               this.archivedByTarget.set(establishedEntry.key, new Set(manager.getSnapshot().archivedSessionIds))
               this.rebuild()
             }
+            connectArchive.ok = ready
+            connectArchive.settled = true
           })
         },
         onFailure: (failure) => {
@@ -650,13 +664,19 @@ export class SessionRuntimePool implements ISessions {
       this.indexEntry(entry); this.rebuild()
       return true
     }
+    const connecting = this.entries.get(targetKey(target))?.runtime.list.getSnapshot().phase !== 'ready'
     const entry = await this.runtimeForTarget(target, active)
     // An unreached or mid-release runtime cannot report absence; callers
     // classify a thrown failure as unverifiable, never as "not found".
     if (entry === undefined || entry.connection === undefined) throw new Error('target runtime unavailable for Session verification')
     const original = id
     if (!entry.runtime.list.getSnapshot().ids.includes(original)) return false
-    await this.refreshArchive(entry, active)
+    const settledConnectArchive = connecting
+      && entry.connectArchive !== undefined
+      && entry.connectArchive.generation === entry.generation
+      && entry.connectArchive.settled
+      && entry.connectArchive.ok
+    if (!settledConnectArchive) await this.refreshArchive(entry, active)
     active.throwIfAborted()
     if (this.entries.get(entry.key) !== entry) throw new Error('target runtime was released during Session verification')
     return this.archivedByTarget.get(entry.key)?.has(original) !== true
