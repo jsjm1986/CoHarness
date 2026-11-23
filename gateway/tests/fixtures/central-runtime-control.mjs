@@ -38,7 +38,8 @@ try {
   const cfg = loadConfig({ HGW_DSH_REPO_ROOT: resolve(import.meta.dirname, '../../..'), HGW_GATEWAY_DIR: resolve(import.meta.dirname, '../..'), HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state'),
     HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'), HGW_PROJECTS_ROOT: join(root, 'projects'),
     HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'), HGW_SYSTEMD_UNIT_DIR: join(root, 'units'),
-    HGW_STEWARD_ROOT: join(root, 'steward-root'), HGW_DEFAULT_ENV_FILE: '' })
+    HGW_STEWARD_ROOT: join(root, 'steward-root'), HGW_DEFAULT_ENV_FILE: '',
+    HGW_PERFORMANCE_ENABLED: 'false' }) // This fixture reserves stdout for its transcript.
   await mkdir(cfg.stateRoot, { recursive: true })
   const users = new PostgresUserService(context, cfg), projects = new PostgresProjectService(context, cfg)
   const admin = await users.create({ username: 'operator', password: 'test-password', role: 'admin' })

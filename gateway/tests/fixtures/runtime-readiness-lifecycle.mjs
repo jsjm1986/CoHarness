@@ -54,6 +54,7 @@ async function scenario(name) {
       HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),
       HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'), HGW_SYSTEMD_UNIT_DIR: join(root, 'units'),
       HGW_DEFAULT_ENV_FILE: '', HGW_GUARD_PATCH: 'off', HGW_DSH_REPO_ROOT: fileURLToPath(new URL('../../../', import.meta.url)),
+      HGW_PERFORMANCE_ENABLED: 'false', // This fixture reserves stdout for its transcript.
       HGW_READINESS_TIMEOUT_MS: String(timeoutMs) })
     db = openDb(join(root, 'gateway.sqlite'))
     const users = new UserService(db, cfg), actor = await users.create({ username: 'readiness-user', password: 'fixture-pw-12345' })

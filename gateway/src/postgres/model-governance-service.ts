@@ -323,7 +323,8 @@ interface RuntimeProviderProjection {
   models: Map<unknown, Record<string, unknown>>
 }
 
-type RuntimePolicyRow = {
+/** One catalog JOIN row consumed by {@link runtimePolicyFromRows}; `profile: null` marks an inaccessible Provider. */
+export type RuntimePolicyRow = {
   provider: string
   model: string
   provider_enabled: boolean
@@ -344,7 +345,14 @@ const runtimePolicyColumns = `provider.provider_key provider,model.model_key mod
   CASE WHEN provider.status='enabled' AND model.enabled THEN provider.profile END profile,
   model.display_name model_name`
 
-function runtimePolicyFromRows(version: number, rows: readonly RuntimePolicyRow[], projectId?: number): RuntimeModelPolicy {
+/**
+ * Project catalog JOIN rows into the Runtime model policy shared by organization and project reads.
+ * @param version - configuration revision stamped on the returned policy.
+ * @param rows - rows selected with {@link runtimePolicyColumns}; project-owned rows require `projectId`.
+ * @param projectId - project scope for `project_owned` rows; omitted for organization-only reads.
+ * @returns runtime policy carrying model permissions and projected Providers.
+ */
+export function runtimePolicyFromRows(version: number, rows: readonly RuntimePolicyRow[], projectId?: number): RuntimeModelPolicy {
   const providers = new Map<string, RuntimeProviderProjection>()
   const models: RuntimeModelPolicy['models'] = []
   for (const row of rows) {

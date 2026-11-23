@@ -82,7 +82,9 @@ try {
         HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'), HGW_SYSTEMD_UNIT_DIR: join(root, 'units'), HGW_DEFAULT_ENV_FILE: '',
         HGW_DSH_REPO_ROOT: fileURLToPath(new URL('../../../', import.meta.url)),
         HGW_RUNTIME_MAX_RESIDENT: '1', HGW_RUNTIME_MAX_STARTING: '1', HGW_READINESS_TIMEOUT_MS: '30000',
-        HGW_RESOURCE_SAMPLE_MS: '20', HGW_RESOURCE_STALE_MS: '30000' })
+        HGW_RESOURCE_SAMPLE_MS: '20', HGW_RESOURCE_STALE_MS: '30000',
+        HGW_PERFORMANCE_ENABLED: 'false', // This fixture reserves stdout for its transcript.
+      })
       cfg.dshRepoRoot = fileURLToPath(new URL('../../../', import.meta.url))
       cfg.dshCommand = [process.execPath, fileURLToPath(new URL('./personal-runtime-carrier.mjs', import.meta.url)), backend]
       const inspectPolicyArtifacts = scenario === 'current' && !administratorReplay
