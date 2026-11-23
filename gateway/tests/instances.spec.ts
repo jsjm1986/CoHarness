@@ -968,6 +968,44 @@ describe('InstanceManager', () => {
     expect(response.status).toBe(200)
   })
 
+  it('reports one cold launch through authenticated readiness for concurrent and warm callers', async () => {
+    const { alice, manager } = await setup({ HGW_PERFORMANCE_ENABLED: 'true' })
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      const [endpoint] = await Promise.all([manager.ensureRunning(alice), manager.ensureRunning(alice)])
+      await manager.ensureRunning(alice)
+      const lines = info.mock.calls.map(([line]) => String(line)).filter(line => line.startsWith('[runtime-start-timing] '))
+      expect(lines).toHaveLength(1)
+      const timing = JSON.parse(lines[0]!.slice('[runtime-start-timing] '.length)) as { stagesMs: Record<string, number>; elapsedMs: number; readinessProbes: number }
+      expect(timing).toMatchObject({ ownerId: alice.id, kind: 'user', intent: 'passive', generation: endpoint.generation, outcome: 'ready' })
+      const stages = ['targetResolved', 'lifecycleAcquired', 'capacityRequested', 'capacityGranted', 'startAdmitted', 'contextReady',
+        'portReady', 'stampReady', 'generationClaimed', 'profileReady', 'allocationRequested', 'allocationAuthorized', 'launcherReturned',
+        'readinessAuthenticated', 'readyPublished']
+      expect(timing.readinessProbes).toBeGreaterThanOrEqual(1)
+      expect(Object.keys(timing.stagesMs)).toEqual(stages)
+      const offsets = [0, ...stages.map(stage => timing.stagesMs[stage]!), timing.elapsedMs]
+      expect(offsets.every((ms, index) => Number.isFinite(ms) && (index === 0 || ms >= offsets[index - 1]!))).toBe(true)
+    } finally { info.mockRestore() }
+  })
+
+  it.each([true, false])('records only reached stages of a failed launch when diagnostics are %s', async enabled => {
+    const { alice, manager } = await setup({ HGW_PERFORMANCE_ENABLED: String(enabled) })
+    manager.beforeStart = () => { throw new Error('fixture-private-policy') }
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      await expect(manager.ensureRunning(alice, 'explicit')).rejects.toThrow('fixture-private-policy')
+      const lines = info.mock.calls.map(([line]) => String(line)).filter(line => line.startsWith('[runtime-start-timing] '))
+      expect(lines).toHaveLength(enabled ? 1 : 0)
+      if (enabled) {
+        const timing = JSON.parse(lines[0]!.slice('[runtime-start-timing] '.length)) as { stagesMs: Record<string, number> }
+        expect(timing).toMatchObject({ intent: 'explicit', outcome: 'failed', stagesMs: { generationClaimed: expect.any(Number), profileReady: expect.any(Number) } })
+        expect(timing.stagesMs).not.toHaveProperty('policiesReady')
+        expect(timing.stagesMs).not.toHaveProperty('readyPublished')
+        expect(lines[0]).not.toContain('fixture-private-policy')
+      }
+    } finally { info.mockRestore() }
+  })
+
   it('cancels before local allocation even when node admission resolves after stop', async () => {
     const { alice, cfg, db } = await setup()
     let entered!: () => void, grant!: () => void

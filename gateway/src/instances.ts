@@ -32,6 +32,7 @@ import { performance } from 'node:perf_hooks'
 import { connect } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import type Database from 'better-sqlite3'
+import { RuntimeLaunchTiming } from './runtime-launch-timing.ts'
 import type { UserRow } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
 import type { ProjectOrigin } from './projects.ts'
@@ -1365,8 +1366,9 @@ export class InstanceManager {
     const admission = new Promise<void>((resolve, reject) => { accept = resolve; refuse = reject })
     // ensureRunning consumers observe readiness only; keep the optional admission result contained.
     void admission.catch(() => {})
+    const entry = this.cfg.performanceEnabled ? { wall: Date.now(), tick: performance.now() } : undefined
     const run = this.dispatch(runtimeTargetOf(subject), target => this.ensureRunningNow(
-      { ...subject, runtimeId: target.runtimeId }, intent, controller.signal, accept, administratorUserId, recordActivity)).then(result => {
+      { ...subject, runtimeId: target.runtimeId }, intent, controller.signal, accept, administratorUserId, recordActivity, entry)).then(result => {
       accept()
       return result
     }, error => {
@@ -1383,9 +1385,12 @@ export class InstanceManager {
     return operation
   }
 
-  private ensureRunningNow(subject: RuntimeSubject, intent: RuntimeStartIntent, signal: AbortSignal, accept: () => void, administratorUserId?: number, recordActivity = true): Promise<RuntimeEndpoint> {
+  private ensureRunningNow(subject: RuntimeSubject, intent: RuntimeStartIntent, signal: AbortSignal, accept: () => void,
+    administratorUserId: number | undefined, recordActivity: boolean, entry?: { wall: number; tick: number }): Promise<RuntimeEndpoint> {
     const target = runtimeTargetOf(subject)
+    const resolved = entry === undefined ? undefined : performance.now()
     return this.serialize(target, async () => {
+      const acquired = entry === undefined ? undefined : performance.now()
       await this.initialized
       if (this.closedStartRequest !== undefined) throw new RuntimeCapacityError('cancelled')
       if (administratorUserId !== undefined) await this.repository.authorizeAdministrator(administratorUserId)
@@ -1486,22 +1491,34 @@ export class InstanceManager {
           throw new RuntimeStartBlockedError(eligible.stopReason)
         }
       }
-      const request = this.capacity.request(targetKey(target), signal)
-      accept()
-      const lease = await request.lease
-      this.residentLeases.set(targetKey(target), lease)
+      const timing = entry === undefined ? undefined : new RuntimeLaunchTiming(entry.wall, entry.tick)
+      timing?.mark('targetResolved', resolved)
+      timing?.mark('lifecycleAcquired', acquired)
+      timing?.mark('capacityRequested')
+      let reserved = false
       try {
+        const request = this.capacity.request(targetKey(target), signal)
+        accept()
+        const lease = await request.lease
+        this.residentLeases.set(targetKey(target), lease)
+        reserved = true
+        timing?.mark('capacityGranted')
         if (signal.aborted) throw new RuntimeCapacityError('cancelled')
         const start = async () => {
+          timing?.mark('startAdmitted')
           if (administratorUserId !== undefined) await this.repository.authorizeAdministrator(administratorUserId)
-          return this.start(await this.launchContext(subject), port, intent, signal, administratorUserId, recordActivity)
+          const descriptor = await this.launchContext(subject)
+          timing?.mark('contextReady')
+          return this.start(descriptor, port, intent, signal, administratorUserId, recordActivity, timing)
         }
         const result = await (this.startAdmission === undefined ? start() : this.startAdmission(start))
         lease.ready()
+        timing?.finish(target, intent, 'ready')
         return result
       } catch (error) {
         // Failed termination retains the process handle and its reservation.
-        if (!this.procs.has(targetKey(target))) this.releaseResident(targetKey(target))
+        if (reserved && !this.procs.has(targetKey(target))) this.releaseResident(targetKey(target))
+        timing?.finish(target, intent, signal.aborted ? 'cancelled' : 'failed')
         throw error
       }
     })
@@ -1682,12 +1699,15 @@ export class InstanceManager {
     signal: AbortSignal,
     administratorUserId?: number,
     recordActivity = true,
+    timing?: RuntimeLaunchTiming,
   ): Promise<RuntimeEndpoint> {
     const now = Date.now()
     const runtimeToken = randomBytes(32).toString('base64url')
     const runtimeTokenHash = createHash('sha256').update(runtimeToken).digest()
     const verifyPreparedStorage=await this.repository.checkProjectStorage?.(descriptor.target)
+    if (this.repository.checkProjectStorage !== undefined) timing?.mark('storageChecked')
     const claimedPort = await this.reclaimInstancePort(descriptor, port, signal)
+    timing?.mark('portReady')
     // Minted before the claim so an unmintable variant fails without consuming
     // a generation. The attempt still publishes quiescence for the existing
     // generation — the failed-start cleanup downstream of `beginStart` cannot
@@ -1695,6 +1715,7 @@ export class InstanceManager {
     let launchStamp: string
     try {
       launchStamp = this.stamps().stampFor(launchVariantOf(descriptor))
+      timing?.mark('stampReady')
     } catch (error) {
       const existing = await this.repository.generationOf(descriptor.target)
       await this.publishQuiescence(descriptor.target, existing, 'failed').catch((publishError: unknown) => {
@@ -1712,17 +1733,26 @@ export class InstanceManager {
       launchStamp,
     )
     const runtime: RuntimeLaunchContext = { ...descriptor, port: claimedPort, generation }
+    if (timing !== undefined) {
+      timing.generation = generation
+      timing.mark('generationClaimed')
+    }
     const key = targetKey(runtime.target)
     let proc: InstanceProc | undefined
     try {
       if (runtime.kind === 'project' && this.cfg.launcher === 'systemd') {
         await prepareProjectRuntimeData(this.cfg, runtime.ownerId, runtime.systemUser, INSTANCE_PROFILE, signal,runtime.dshHome)
+        timing?.mark('projectDataReady')
       }
       this.mountPolicyBundles(runtime)
       this.seedDefaultEnv(runtime)
+      timing?.mark('profileReady')
       await this.beforeStart?.(runtime, 'launch')
+      if (this.beforeStart !== undefined) timing?.mark('policiesReady')
       const recoveryPolicy = await this.prepareRecovery?.(runtime)
+      if (this.prepareRecovery !== undefined) timing?.mark('recoveryReady')
       await verifyPreparedStorage?.()
+      if (verifyPreparedStorage !== undefined) timing?.mark('storageVerified')
       if (signal.aborted) throw new RuntimeCapacityError('cancelled')
       const gatewayCredential = JSON.stringify({
         version: 1,
@@ -1739,13 +1769,16 @@ export class InstanceManager {
         ...runtime, credentialHash: runtimeTokenHash.toString('hex'), gatewayCredential, signal,
         ...(recoveryPolicy === undefined ? {} : { recoveryPolicy }),
         beforeAllocation: async () => {
+          timing?.mark('allocationRequested')
           await resources?.admitRuntimeStart(runtime.target, generation, signal)
+          if (resources !== undefined) timing?.mark('creditGranted')
           if (runtime.user !== undefined) {
             if (!await this.personalPolicyMatches(runtime.user, administratorUserId)) {
               throw new RuntimeStartBlockedError('unavailable', 'Runtime account policy changed before allocation. Retry with current authority.')
             }
           } else if (administratorUserId !== undefined) await this.repository.authorizeAdministrator(administratorUserId)
           if (signal.aborted) throw new RuntimeCapacityError('cancelled')
+          timing?.mark('allocationAuthorized')
         },
       }) } catch (launchError: unknown) {
         if (launchError instanceof RuntimeLaunchCleanupError) {
@@ -1757,6 +1790,7 @@ export class InstanceManager {
       }
       this.procGenerations.set(proc, generation)
       this.procs.set(key, proc)
+      timing?.mark('launcherReturned')
       if (proc.exited !== undefined) {
         const observed = proc
         void proc.exited.then(() => this.serialize(runtime.target, async () => {
@@ -1788,6 +1822,7 @@ export class InstanceManager {
           if (remaining <= 0) break
           const probeTimeoutMs = Math.max(1, Math.floor(Math.min(1000, remaining)))
           const authority = `127.0.0.1:${String(claimedPort)}`
+          if (timing !== undefined) timing.readinessProbes += 1
           const response = await fetch(`http://${authority}${RUNTIME_READINESS_PATH}`, {
             method: 'GET',
             headers: {
@@ -1820,10 +1855,13 @@ export class InstanceManager {
         }
         if (!withinDeadline()) break
         if (authenticated) {
+          timing?.mark('readinessAuthenticated')
           const registered = this.resources === undefined || await this.resources.registered(runtime.target, generation)
           if (!withinDeadline()) break
           if (registered) {
+            if (this.resources !== undefined) timing?.mark('registrationVerified')
             await this.repository.markReady(runtime.target, generation)
+            timing?.mark('readyPublished')
             if (!withinDeadline()) break
             return { port: claimedPort, generation, ...(runtime.target.runtimeId === undefined ? {} : { runtimeId: runtime.target.runtimeId }) }
           }

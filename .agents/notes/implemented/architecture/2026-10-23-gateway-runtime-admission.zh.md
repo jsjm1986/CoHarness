@@ -38,6 +38,8 @@ Runtime 提供方通过[迁移 138](../../../../gateway/deploy/postgres/migratio
 
 `startRequest.admission` 在有界队列接纳请求、立即预留槽位或可复用热运行时后完成；`startRequest.completion` 仅在通过鉴权的就绪检查后完成。普通 HTTP 代理先等待准入，再返回等待响应，因此队列已满时返回 HTTP 503 `INSTANCE_CAPACITY` 和 `Retry-After`。接纳后，HTML 请求沿用 200 等待页，API 请求沿用 503 `INSTANCE_STARTING`，启动在后台继续。之后的排队超时或取消会拒绝 completion，并保留在准入计数中，但不能替换已经返回的 HTTP 响应。
 
+所属 Gateway 用自身的单调时钟记录冷启动阶段。HTTP 调用方断开后，进程仍持有已接受的启动操作。因此同一条完成日志可以关联等待容量、准备配置、启动进程以及最终就绪和登记检查的耗时。热复用和重复调用共享已有代次或进行中的启动操作。
+
 冷启动就绪在同一进程单调期限内覆盖签名 HTTP 挑战、资源登记与就绪发布。每次探测使用剩余时间。后端等待之后及返回成功之前都检查取消与过期；已发出的发布可能先完成，再进行物理回滚。只有 HTTP 传输、响应数据和挑战证明失败会作为探测暂不可用重试。后端拒绝保留原始错误并发起所持有进程的清理，不能变成通用就绪超时。
 
 经过校验的节点设置提供 `HGW_RUNTIME_MAX_STARTING`、`HGW_RUNTIME_MAX_RESIDENT`、`HGW_RUNTIME_MAX_QUEUED` 与 `HGW_RUNTIME_QUEUE_WAIT_MS`。默认值为 2 个冷启、无常驻应急上限（`0`）、32 个排队目标和 30 秒容量排队期限。常驻上限可选正数；压力准入仍控制新启动。这些设置没有经过单 Runtime 内存校准，不证明 16 GiB Mac 能承载 300 个个人 Runtime 或 100 个混合 AI 任务。既有节点配置缺少新增设置时，读取启动环境值或声明的默认值；显式非法值仍会校验失败。
