@@ -678,7 +678,7 @@ it('delivers a fresh resource placement over the node channel without another in
   }
   const resolve = vi.spyOn(f.centerDeps.runtimeRouter!, 'placement')
   const selected = createServer((req, res) => {
-    void Promise.resolve().then(() => f.proxy.asset(req, res, f.admin, placement)).then(handled => {
+    void Promise.resolve().then(() => f.proxy.asset(req, res, f.admin, placement, 1)).then(handled => {
       if (!handled) res.writeHead(500).end('unexpected-local-resource')
     }, error => {
       if (res.headersSent) { res.destroy(); return }
@@ -1629,7 +1629,7 @@ it('preserves idle node transports across user- and project-scoped invalidations
   expect(opened).toHaveLength(0)
 })
 
-it('caches pooled node lease rechecks when HGW_NODE_SERVICE_LEASE_CACHE_MS is configured and clears on node invalidation', async () => {
+it('rechecks every reused node lease even with the former lease-cache setting', async () => {
   const f = await fixture({ HGW_NODE_SERVICE_LEASE_CACHE_MS: '5000' })
   for (let index = 0; index < 4; index++) {
     const response = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })
@@ -1637,16 +1637,14 @@ it('caches pooled node lease rechecks when HGW_NODE_SERVICE_LEASE_CACHE_MS is co
     await response.arrayBuffer()
   }
   expect(f.proxy.diagnostics().pool.reused).toBe(3)
-  expect(f.proxy.diagnostics().pool.revalidateCalls).toBe(1)
-  expect(f.proxy.diagnostics().pool.revalidateSkipped).toBe(2)
+  expect(f.proxy.diagnostics().pool.revalidateCalls).toBe(3)
+  expect(f.proxy.diagnostics().pool.revalidateSkipped).toBe(0)
 
-  // Node-level invalidation drains idle transports and drops the cached lease immediately.
-  f.proxy.invalidate({ nodeId: f.nodeId })
-  await expect.poll(() => f.proxy.diagnostics().pool.idle).toBe(0)
   f.expire()
   const refused = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })
   expect(refused.status).toBe(503)
   await refused.arrayBuffer()
+  expect(f.counters().remoteCalls).toBe(4)
 })
 
 it('aborts active forwarded operations immediately when invalidate({ userId }) is invoked (for example on Center logout)', async () => {
@@ -1705,19 +1703,14 @@ it('streams compression for chunked remote responses and flushes incremental chu
   reader.releaseLock()
 })
 
-it('skips the second prepared-read release query when HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE=on and the monitor matches the approved revision', async () => {
-  expect(() => loadNodeServiceConfig({ HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE: 'maybe' })).toThrow(/HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE/)
-  expect(loadNodeServiceConfig({ HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE: 'on' }).preparedReadFastRelease).toBe(true)
-
-  let currentRevision = 7n
-  let monitorAvailable = true
+it('refuses a prepared read from a replaced generation even when the access revision matches', async () => {
   const monitor: import('../src/access-invalidation.ts').GatewayAccessMonitor = {
-    get available() { return monitorAvailable },
+    available: true,
     synchronize: async () => {},
-    matchesRevision: revision => monitorAvailable && revision === currentRevision,
+    matchesRevision: revision => revision === 7n,
     subscribe: () => () => {},
   }
-  const approvalCalls: number[] = []
+  let approvalCalls = 0
   const f = await fixture(
     { HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: 'on', HGW_NODE_SERVICE_PREPARED_READ_FAST_RELEASE: 'on' },
     true,
@@ -1725,8 +1718,9 @@ it('skips the second prepared-read release query when HGW_NODE_SERVICE_PREPARED_
     undefined,
     undefined,
     async () => {
-      approvalCalls.push(approvalCalls.length + 1)
-      return { accessRevision: String(currentRevision), generation: 1, port: 40000, startedAt: 1, launchStamp: 'stamp-7', expiresAt: Date.now() + 60_000 }
+      approvalCalls += 1
+      return { accessRevision: '7', generation: approvalCalls < 4 ? 1 : 2,
+        port: 40000, startedAt: 1, launchStamp: 'stamp-7', expiresAt: Date.now() + 60_000 }
     },
     monitor,
   )
@@ -1736,26 +1730,17 @@ it('skips the second prepared-read release query when HGW_NODE_SERVICE_PREPARED_
   })
   expect(first.status).toBe(200)
   await first.arrayBuffer()
-  expect(approvalCalls).toHaveLength(1)
-  expect(f.proxy.diagnostics()).toMatchObject({
-    preparedReadEligible: 1,
-    preparedReadHit: 1,
-    preparedReadReleaseChecks: 0,
-    preparedReadReleaseSkipped: 1,
-  })
-
-  // When the monitor becomes unavailable, the proxy falls back to the explicit release recheck.
-  monitorAvailable = false
+  expect(approvalCalls).toBe(2)
   const second = await fetch(bootstrapUrl, {
     headers: { cookie: f.cookie, accept: 'application/json', 'x-dsh-expected-principal-id': String(f.admin.id) },
   })
-  expect(second.status).toBe(200)
+  expect(second.status).toBe(409)
   await second.arrayBuffer()
-  expect(approvalCalls).toHaveLength(3)
+  expect(approvalCalls).toBe(4)
   expect(f.proxy.diagnostics()).toMatchObject({
     preparedReadEligible: 2,
     preparedReadHit: 2,
-    preparedReadReleaseChecks: 1,
-    preparedReadReleaseSkipped: 1,
+    preparedReadReleaseChecks: 2,
+    preparedReadReleaseSkipped: 0,
   })
 })

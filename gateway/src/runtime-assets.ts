@@ -6,9 +6,9 @@ import type { UserRow } from './auth.ts'
 import { RuntimeLeaseUnavailableError, type InstanceManager } from './instances.ts'
 import type { GatewayPrincipalSigner } from './principal.ts'
 import { RuntimeAssetUnavailableError, type RuntimeAssetAdmission, type RuntimeAssetRequest } from './runtime-asset-admission.ts'
-import { isImmutableRuntimeAssetRequest, pinRuntimeRequestPath, runtimeRequestPath } from './runtime-request-path.ts'
+import { BROWSER_RUNTIME_ASSET_CACHE_CONTROL, isImmutableRuntimeAssetRequest, pinRuntimeRequestPath, runtimeRequestPath } from './runtime-request-path.ts'
 import { nodeUuidSchema } from './node-access.ts'
-import { NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
+import { NODE_SERVICE_ASSET_GENERATION_HEADER, NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
 import { parseCookies, SESSION_COOKIE } from './server.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import type { RuntimePlacement } from './runtime-router.ts'
@@ -39,18 +39,23 @@ export interface RuntimeAssetsOptions {
   /** Existing bounded node transport; omitted on an independent computer. */
   forward?: (request: IncomingMessage, response: ServerResponse, actor: UserRow,
     placement: RuntimePlacement & { environment: NonNullable<RuntimePlacement['environment']> },
-    capture?: RemoteAssetCapture) => Promise<boolean>
+    generation: number, capture?: RemoteAssetCapture) => Promise<boolean>
 }
 
 interface ActiveAsset { nodeId?: RuntimeNodeId; userId: number; projectId?: number; qualified: boolean; cancel(): void }
 
 type StoredCoding = 'identity' | ContentCoding
 
-interface CachedRemoteAsset {
+interface RemoteAssetOwner {
   readonly nodeId: RuntimeNodeId
+  readonly userId: number
+  readonly projectId?: number
+}
+
+interface CachedRemoteAsset extends RemoteAssetOwner {
   readonly contentType: string
   readonly etag?: string
-  readonly cacheControl?: string
+  readonly freshUntil: number
   readonly variants: Partial<Record<StoredCoding, Buffer>>
   bytes: number
 }
@@ -84,16 +89,12 @@ export class RuntimeAssets {
   }
 
   private invalidate(subject: AccessInvalidationSubject): void {
-    if (subject.nodeId !== undefined) {
-      for (const [key, entry] of this.remoteCache) {
-        if (entry.nodeId === subject.nodeId) {
-          this.remoteCacheBytes -= entry.bytes
-          this.remoteCache.delete(key)
-        }
-      }
-    } else if (subject.userId === undefined && subject.projectId === undefined) {
-      this.remoteCache.clear()
-      this.remoteCacheBytes = 0
+    for (const [key, entry] of this.remoteCache) {
+      if (subject.nodeId !== undefined && subject.nodeId !== entry.nodeId) continue
+      if (subject.userId !== undefined && subject.userId !== entry.userId) continue
+      if (subject.projectId !== undefined && subject.projectId !== entry.projectId) continue
+      this.remoteCacheBytes -= entry.bytes
+      this.remoteCache.delete(key)
     }
     for (const operation of this.active) {
       if (subject.nodeId !== undefined && operation.nodeId !== undefined && subject.nodeId !== operation.nodeId) continue
@@ -103,20 +104,22 @@ export class RuntimeAssets {
     }
   }
 
-  private storeRemoteVariant(key: string, nodeId: RuntimeNodeId, captured: {
+  private storeRemoteVariant(key: string, owner: RemoteAssetOwner, captured: {
     readonly contentType: string
     readonly etag?: string
-    readonly cacheControl?: string
+    readonly freshUntil: number
     readonly contentEncoding?: string
     readonly body: Buffer
   }): void {
-    if (this.closed || this.remoteCacheMaxBytes <= 0 || captured.body.byteLength > REMOTE_CACHE_MAX_ENTRY_BYTES) return
+    if (this.closed || captured.freshUntil <= Date.now() || this.remoteCacheMaxBytes <= 0
+      || captured.body.byteLength > REMOTE_CACHE_MAX_ENTRY_BYTES) return
     const coding: StoredCoding | undefined = captured.contentEncoding === undefined || captured.contentEncoding === 'identity'
       ? 'identity'
       : captured.contentEncoding === 'br' || captured.contentEncoding === 'gzip' ? captured.contentEncoding : undefined
     if (coding === undefined) return
     const existing = this.remoteCache.get(key)
-    if (existing !== undefined && existing.etag === captured.etag && existing.contentType === captured.contentType) {
+    if (existing !== undefined && existing.freshUntil > Date.now() && existing.etag === captured.etag
+      && existing.contentType === captured.contentType) {
       const prev = existing.variants[coding]
       const delta = captured.body.byteLength - (prev?.byteLength ?? 0)
       if (existing.bytes + delta > REMOTE_CACHE_MAX_ENTRY_BYTES) return
@@ -131,10 +134,10 @@ export class RuntimeAssets {
         this.remoteCache.delete(key)
       }
       const entry: CachedRemoteAsset = {
-        nodeId,
+        ...owner,
         contentType: captured.contentType,
+        freshUntil: captured.freshUntil,
         ...(captured.etag === undefined ? {} : { etag: captured.etag }),
-        ...(captured.cacheControl === undefined ? {} : { cacheControl: captured.cacheControl }),
         variants: { [coding]: captured.body },
         bytes: captured.body.byteLength,
       }
@@ -158,6 +161,10 @@ export class RuntimeAssets {
     const entry = this.remoteCache.get(key)
     if (entry === undefined) return false
     this.remoteCache.delete(key)
+    if (entry.freshUntil <= Date.now()) {
+      this.remoteCacheBytes -= entry.bytes
+      return false
+    }
     this.remoteCache.set(key, entry)
     const rawIfNoneMatch = req.headers['if-none-match']
     if (entry.etag !== undefined && typeof rawIfNoneMatch === 'string') {
@@ -171,7 +178,7 @@ export class RuntimeAssets {
         res.writeHead(304, {
           etag: entry.etag,
           vary: 'accept-encoding',
-          ...(entry.cacheControl === undefined ? {} : { 'cache-control': entry.cacheControl }),
+          'cache-control': BROWSER_RUNTIME_ASSET_CACHE_CONTROL,
         })
         res.end()
         return true
@@ -229,9 +236,9 @@ export class RuntimeAssets {
       'content-type': entry.contentType,
       'content-length': body.byteLength,
       vary: 'accept-encoding',
+      'cache-control': BROWSER_RUNTIME_ASSET_CACHE_CONTROL,
       ...(encoding === undefined ? {} : { 'content-encoding': encoding }),
       ...(responseEtag === undefined ? {} : { etag: responseEtag }),
-      ...(entry.cacheControl === undefined ? {} : { 'cache-control': entry.cacheControl }),
     })
     if (req.method === 'HEAD') res.end()
     else res.end(body)
@@ -329,9 +336,10 @@ export class RuntimeAssets {
         throw new RuntimeAssetUnavailableError(409, 'runtime-asset/target-mismatch')
       }
       if (!placement.local) {
-        // Every request reaching this branch passed isImmutableRuntimeAssetRequest (hashed /assets/* or rev=<hex> /plugins/*)
-        // AND fresh per-user admission + synchronizeTo checks, so immutable bytes can safely share one node-scoped cache entry.
-        const cacheKey = `${placement.environment.node.id}:immutable:${runtimeRequestPath(req.url ?? '/')}`
+        const cacheOwner: RemoteAssetOwner = { nodeId: placement.environment.node.id, userId: admission.user.id,
+          ...(admission.scope.kind === 'project' ? { projectId: admission.scope.projectId } : {}) }
+        const cacheKey = JSON.stringify([cacheOwner.nodeId, runtimeId, snapshot.generation, snapshot.launchStamp,
+          snapshot.startedAt, cacheOwner.userId, cacheOwner.projectId ?? null, admission.accessRevision, runtimeRequestPath(req.url ?? '/')])
         if (await this.serveCachedRemote(req, res, cacheKey, owner.signal)) return true
         if (this.options.forward === undefined) {
           throw new RuntimeAssetUnavailableError(503, 'runtime-asset/unavailable')
@@ -340,10 +348,12 @@ export class RuntimeAssets {
         const capture: RemoteAssetCapture | undefined = this.remoteCacheMaxBytes > 0 && req.method === 'GET' && req.headers.range === undefined
           ? {
             maxBytes: Math.min(REMOTE_CACHE_MAX_ENTRY_BYTES, this.remoteCacheMaxBytes),
-            onComplete: captured => { this.storeRemoteVariant(cacheKey, placement.environment.node.id, captured) },
+            onComplete: captured => {
+              if (!owner.signal.aborted) this.storeRemoteVariant(cacheKey, cacheOwner, captured)
+            },
           }
           : undefined
-        if (!await this.options.forward(req, res, admission.user, placement, capture)) {
+        if (!await this.options.forward(req, res, admission.user, placement, snapshot.generation, capture)) {
           throw new RuntimeAssetUnavailableError(503, 'runtime-asset/unavailable')
         }
         return true
@@ -352,7 +362,8 @@ export class RuntimeAssets {
       const path = runtimeRequestPath(req.url ?? '/')
       const assertion = this.options.signer.issueAsset({ user: admission.user, scope: admission.scope,
         runtime: { ...snapshot.target, generation: snapshot.generation }, method: req.method as 'GET' | 'HEAD', path }, admission.expiresAt)
-      await this.forwardLocal(req, res, snapshot.port, path, assertion, owner.signal)
+      await this.forwardLocal(req, res, snapshot.port, path, assertion, owner.signal,
+        entryNodeId !== undefined && expectedNode !== undefined ? snapshot.generation : undefined)
       return true
     } catch (error) {
       if (owner.signal.aborted || res.destroyed) return true
@@ -373,7 +384,8 @@ export class RuntimeAssets {
     res.end(JSON.stringify({ error: code }))
   }
 
-  private async forwardLocal(req: IncomingMessage, res: ServerResponse, port: number, path: string, assertion: string, signal: AbortSignal): Promise<void> {
+  private async forwardLocal(req: IncomingMessage, res: ServerResponse, port: number, path: string, assertion: string,
+    signal: AbortSignal, forwardedGeneration?: number): Promise<void> {
     const headers: Record<string, string> = {
       host: `127.0.0.1:${port}`, origin: `http://127.0.0.1:${port}`, 'x-dsh-gateway-principal': assertion,
     }
@@ -397,6 +409,9 @@ export class RuntimeAssets {
       delete response.headers['x-dsh-runtime-id']
       delete response.headers[NODE_SERVICE_TARGET_HEADER]
       for (const name of httpConnectionFields(response.headers.connection)) delete response.headers[name]
+      delete response.headers[NODE_SERVICE_ASSET_GENERATION_HEADER]
+      if (forwardedGeneration === undefined) response.headers['cache-control'] = BROWSER_RUNTIME_ASSET_CACHE_CONTROL
+      else response.headers[NODE_SERVICE_ASSET_GENERATION_HEADER] = String(forwardedGeneration)
       signal.throwIfAborted()
       res.writeHead(response.statusCode ?? 502, response.headers)
       await pipeline(response, res, { signal })

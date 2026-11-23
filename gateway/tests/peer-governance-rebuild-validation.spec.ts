@@ -1,7 +1,7 @@
 /** Persisted rebuilding metadata accepts only its reviewed management fields, including nested historical review receipts. */
 import { randomUUID } from 'node:crypto'
 import { expect,it } from 'vitest'
-import { governanceRebuildInventory,governanceRebuildSafeColumns,type GovernanceRebuildTable } from '../src/peer-governance-rebuild-manifest.ts'
+import { GOVERNANCE_REBUILD_SCHEMA_VERSION,governanceRebuildInventory,governanceRebuildSafeColumns,type GovernanceRebuildTable } from '../src/peer-governance-rebuild-manifest.ts'
 import { governanceRebuildRecordDigest,parseGovernanceRebuildRecord } from '../src/peer-governance-rebuild-validation.ts'
 import { governanceRebuildDefaults } from '../src/governance-rebuild-import.ts'
 
@@ -22,7 +22,10 @@ it('retains the shipped schema-135 inventory and excludes transient recovery app
   expect(governanceRebuildInventory(144)).toEqual(governanceRebuildInventory(145))
   expect(governanceRebuildInventory(145)).toEqual(governanceRebuildInventory(146))
   expect(governanceRebuildInventory(146)).toEqual(governanceRebuildInventory(147))
-  for(const version of [134,148])expect(governanceRebuildInventory(version)).toBeUndefined()
+  expect(governanceRebuildInventory(148)?.digest).toBe('f60c1eff534df5d72f06e224cba4c2d121a083ef81efa3a63b9e50f5dfe46d02')
+  expect(governanceRebuildInventory(148)?.tables.conversation_draft_reservations).toContainEqual({name:'model_selection',disposition:'node-owned'})
+  expect(governanceRebuildInventory(147)?.tables.conversation_draft_reservations).not.toContainEqual({name:'model_selection',disposition:'node-owned'})
+  for(const version of [134,GOVERNANCE_REBUILD_SCHEMA_VERSION+1])expect(governanceRebuildInventory(version)).toBeUndefined()
   for(const name of ['provider_msg_id','delivered_at','opened_at']){
     expect(governanceRebuildInventory(143)?.tables.push_deliveries).not.toContainEqual({name,disposition:'ephemeral'})
     expect(governanceRebuildInventory(145)?.tables.push_deliveries).toContainEqual({name,disposition:'ephemeral'})

@@ -5,7 +5,7 @@ import { Socket } from 'node:net'
 import { brotliDecompressSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GatewayNodeServiceProxy } from '../src/node-service-proxy.ts'
-import { NODE_SERVICE_TARGET_HEADER } from '../src/node-service-stream.ts'
+import { NODE_SERVICE_ASSET_GENERATION_HEADER, NODE_SERVICE_TARGET_HEADER, NodeServiceError } from '../src/node-service-stream.ts'
 import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { runMultiComputerBenchmark } from './multi-computer-latency.perf.ts'
 
@@ -53,7 +53,7 @@ describe('multi-computer forwarding counter invariants', () => {
     expect(scenarios.s6_remotePluginCacheAndCompression.cacheDiagnostics.remoteCacheHits).toBe(1)
   })
 
-  it('refuses remote asset cache capture when upstream sets private/no-store Cache-Control or unsafe Vary', async () => {
+  it('captures only explicitly immutable assets from the exact destination generation', async () => {
     const localNodeId = '00000000-0000-4000-8000-000000000001' as RuntimeNodeId
     const remoteNodeId = '00000000-0000-4000-8000-000000000002' as RuntimeNodeId
     const runtimeId = '00000000-0000-4000-8000-000000000003' as RuntimeId
@@ -62,6 +62,7 @@ describe('multi-computer forwarding counter invariants', () => {
     const upstream = createServer((_req, res) => {
       res.writeHead(200, {
         [NODE_SERVICE_TARGET_HEADER]: remoteNodeId,
+        [NODE_SERVICE_ASSET_GENERATION_HEADER]: '1',
         'content-type': 'text/javascript; charset=utf-8',
         ...responseHeaders,
       })
@@ -114,8 +115,9 @@ describe('multi-computer forwarding counter invariants', () => {
         res,
         { id: 1, username: 'u', displayName: 'u', role: 'user', status: 'active', homePath: '/', mustChangePassword: false, autoReviewEligible: false },
         { target: 'personal', local: false, resetScope: false, environment },
+        1,
         { maxBytes: 1024 * 1024, onComplete },
-      )
+      ).catch((error: unknown) => res.writeHead(error instanceof NodeServiceError ? error.status : 500).end())
     })
     await new Promise<void>(resolve => { front.listen(0, '127.0.0.1', resolve) })
     servers.push(front)
@@ -137,7 +139,17 @@ describe('multi-computer forwarding counter invariants', () => {
 
       responseHeaders = { 'cache-control': 'public, max-age=31536000, immutable', vary: 'Accept-Encoding' }
       const r4 = await fetch(url); expect(r4.status).toBe(200); await r4.arrayBuffer()
+      expect(r4.headers.get('cache-control')).toBe('private, no-store')
+      expect(r4.headers.has(NODE_SERVICE_ASSET_GENERATION_HEADER)).toBe(false)
       await expect.poll(() => onComplete.mock.calls.length).toBe(1)
+
+      responseHeaders = { 'cache-control': 'public, max-age=0, immutable' }
+      const revalidate = await fetch(url); expect(revalidate.status).toBe(200); await revalidate.arrayBuffer()
+      expect(onComplete).toHaveBeenCalledTimes(1)
+
+      responseHeaders = { 'cache-control': 'public, max-age=3600, immutable', [NODE_SERVICE_ASSET_GENERATION_HEADER]: '2' }
+      const replaced = await fetch(url); expect(replaced.status).toBe(409); await replaced.arrayBuffer()
+      expect(onComplete).toHaveBeenCalledTimes(1)
     } finally {
       await proxy.close()
     }

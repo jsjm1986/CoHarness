@@ -1,6 +1,6 @@
 /** Descendant deployment sections hydrate from DeploymentOverviewProvider without redundant mount GETs. */
 import { StrictMode } from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as api from './api.ts'
 import { DeploymentOverviewProvider, type DeploymentOverviewState } from './deployment-overview.tsx'
@@ -16,6 +16,7 @@ vi.mock('./api.ts', async original => ({
   getNodeConfiguration: vi.fn(),
   getTunnelAccess: vi.fn(),
   getRuntimeAllocationPolicy: vi.fn(),
+  saveRuntimeAllocationPolicy: vi.fn(),
   getDesktopEnvironment: vi.fn(),
 }))
 vi.mock('./deployment-context.tsx', () => ({ useDeploymentContext: vi.fn() }))
@@ -30,6 +31,24 @@ const policy = deploymentContextSchema.parse({
   role: 'standalone',
   refreshAfterMs: 30000,
   legacyMigrationRequired: false,
+})
+
+it('keeps quota edits when an unrelated computer overview arrives', async () => {
+  const value = { revision: '3', maxTotal: 8, maxPerNode: 4, source: 'organization' } as const
+  vi.mocked(api.getRuntimeAllocationPolicy).mockResolvedValue(value)
+  vi.mocked(api.saveRuntimeAllocationPolicy).mockResolvedValue({ ...value, revision: '4', maxTotal: 12 })
+  const requested = new Set<api.DeploymentOverviewSectionKey>(['nodeConnection'])
+  const tree = (overview: DeploymentOverviewState) => <DeploymentOverviewProvider value={overview}>
+    <RuntimeAllocationPolicyEditor />
+  </DeploymentOverviewProvider>
+  const view = render(tree({ status: 'loading', requested, sections: null }))
+  fireEvent.change(await screen.findByDisplayValue('8'), { target: { value: '12' } })
+  view.rerender(tree({ status: 'ready', requested, sections: {} }))
+  expect(screen.getByDisplayValue('12')).toBeTruthy()
+  expect(api.getRuntimeAllocationPolicy).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: 'Save Runtime limits' }))
+  await screen.findByText('Limits saved')
+  expect(api.saveRuntimeAllocationPolicy).toHaveBeenCalledWith(undefined, '3', { maxTotal: 12, maxPerNode: 4 })
 })
 
 beforeEach(() => {

@@ -4,7 +4,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { streamMethod } from '@deepseek-ai/dsh-remote-mock'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { RemoteError, type RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
   openWebSocketTerminalInputChannel,
   TerminalInputChannelClosedError,
@@ -57,6 +57,9 @@ describe('openWebSocketTerminalInputChannel browser client', () => {
     }
 
     close(code?: number, reason?: string): void {
+      if (code !== undefined && code !== 1000 && !(code >= 3000 && code <= 4999)) {
+        throw new DOMException('Invalid browser WebSocket close code', 'InvalidAccessError')
+      }
       this.closedWith.push({ ...(code === undefined ? {} : { code }), ...(reason === undefined ? {} : { reason }) })
       this.readyState = FakeWebSocket.CLOSED
       this.dispatchEvent(new Event('close'))
@@ -165,7 +168,8 @@ describe('openWebSocketTerminalInputChannel browser client', () => {
     const assertion = expect(hung).rejects.toBeInstanceOf(TerminalInputChannelClosedError)
     await vi.advanceTimersByTimeAsync(100)
     await assertion
-    expect(ws3.closedWith).toEqual([{ code: 1001, reason: 'ack timeout' }])
+    expect(ws3.closedWith).toEqual([{ code: 4000, reason: 'ack timeout' }])
+    expect(ch3.signal?.aborted).toBe(true)
 
     // Explicit close on CONNECTING socket uses 1000 detached.
     const ch4 = openWebSocketTerminalInputChannel(target)!
@@ -234,6 +238,44 @@ describe('TerminalView input channel integration and HTTP fallback', () => {
     cleanups.push(() => model.dispose())
     return { model, remote }
   }
+
+  it('recovers idle socket closures and only sends new input after an acknowledgement is lost', async () => {
+    const opened: Array<{ lifetime: AbortController; write: Mock<TerminalInputChannel['write']>; resize: Mock<TerminalInputChannel['resize']> }> = []
+    const initial = new AbortController()
+    initial.abort()
+    const factory = vi.fn((): TerminalInputChannel => {
+      const lifetime = opened.length === 0 ? initial : new AbortController()
+      const write = vi.fn<TerminalInputChannel['write']>(async () => {})
+      const resize = vi.fn<TerminalInputChannel['resize']>(async () => {})
+      opened.push({ lifetime, write, resize })
+      return { signal: lifetime.signal, isOpen: true, write, resize, close: () => lifetime.abort() }
+    })
+    const { model, remote } = clientFixture(factory)
+    model.mount()
+    await expect.poll(() => opened.length).toBe(2)
+    opened[1]!.lifetime.abort()
+    await expect.poll(() => opened.length).toBe(3)
+
+    const uncertain = Promise.withResolvers<undefined>()
+    opened[2]!.write.mockReturnValueOnce(uncertain.promise)
+    model.write('already submitted')
+    await expect.poll(() => opened[2]!.write.mock.calls).toEqual([['already submitted']])
+    opened[2]!.lifetime.abort()
+    uncertain.reject(new TerminalInputChannelClosedError())
+    await expect.poll(() => opened.length).toBe(4)
+    model.write('new input')
+    await expect.poll(() => opened[3]!.write.mock.calls).toEqual([['new input']])
+    expect(remote.write).not.toHaveBeenCalled()
+
+    const resize = Promise.withResolvers<undefined>()
+    opened[3]!.resize.mockReturnValueOnce(resize.promise)
+    model.resize(110, 35)
+    await expect.poll(() => opened[3]!.resize.mock.calls).toEqual([[110, 35]])
+    opened[3]!.lifetime.abort()
+    resize.reject(new TerminalInputChannelClosedError())
+    await expect.poll(() => opened.length).toBe(5)
+    expect(remote.resize).toHaveBeenCalledExactlyOnceWith(sessionId, info.id, expect.any(String), 110, 35)
+  })
 
   it('routes writes and resizes over an open input channel, falls back on unavailable/closed errors, and schedules reconnect', async () => {
     let open = true

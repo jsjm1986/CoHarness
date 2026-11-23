@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { Agent, request, STATUS_CODES, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isReadyRuntimeInteractive, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { BROWSER_RUNTIME_ASSET_CACHE_CONTROL, isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isReadyRuntimeInteractive, pinRuntimeRequestPath } from './runtime-request-path.ts'
 import type { UserRow } from './auth.ts'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
 import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
@@ -12,7 +12,7 @@ import type { RuntimePlacement, RuntimeSelection } from './runtime-router.ts'
 import { parseCookies, SCOPE_COOKIE, SESSION_COOKIE } from './server.ts'
 import { RuntimeCatalogError } from './runtime-catalog.ts'
 import { nodeUuidSchema } from './node-access.ts'
-import { NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
+import { NODE_SERVICE_ASSET_GENERATION_HEADER, NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
 import { FORWARDED_PRINCIPAL_HEADER, type PersonalReadAdmission } from './forwarded-principal.ts'
 import type { GatewayNodeServices } from './node-service.ts'
 import type { NodeServiceConfig } from './node-service.ts'
@@ -77,12 +77,25 @@ function headers(input: IncomingHttpHeaders, upgrade = false): OutgoingHttpHeade
 
 function responseHeaders(input: IncomingHttpHeaders, resetCookie?: string): OutgoingHttpHeaders {
   const result = headers(input)
+  delete result[NODE_SERVICE_ASSET_GENERATION_HEADER]
   if (resetCookie !== undefined) result['set-cookie'] = [...(input['set-cookie'] ?? []), resetCookie]
   if (typeof result.location === 'string') {
     const location = new URL(result.location, 'http://gateway.invalid')
     if (['127.0.0.1', '[::1]', 'localhost'].includes(location.hostname)) result.location = `${location.pathname}${location.search}${location.hash}`
   }
   return result
+}
+
+function immutableFreshness(cacheControl: string, age: string | undefined): number | undefined {
+  const directives = cacheControl.toLowerCase().split(',').map(directive => directive.trim())
+  if (!directives.includes('public') || !directives.includes('immutable')
+    || directives.some(directive => /^(?:private|no-store|no-cache|s-maxage)\b/u.test(directive))) return
+  const ages = directives.filter(directive => /^max-age\b/u.test(directive))
+  const seconds = ages.length === 1 ? /^max-age\s*=\s*([1-9][0-9]*)$/u.exec(ages[0]!)?.[1] : undefined
+  const maxAge = Number(seconds)
+  const elapsed = age === undefined ? 0 : /^[0-9]+$/u.test(age) ? Number(age) : NaN
+  if (!Number.isSafeInteger(maxAge) || !Number.isSafeInteger(elapsed) || elapsed >= maxAge) return
+  return Date.now() + Math.min(maxAge - elapsed, 31_536_000) * 1_000
 }
 
 function rawResponse(status: number, input: IncomingHttpHeaders, upgrade: boolean, resetCookie?: string): string {
@@ -116,8 +129,8 @@ export interface RemoteAssetCapture {
   onComplete(captured: {
     readonly status: number
     readonly contentType: string
+    readonly freshUntil: number
     readonly etag?: string
-    readonly cacheControl?: string
     readonly contentEncoding?: string
     readonly body: Buffer
   }): void
@@ -131,11 +144,10 @@ export class GatewayNodeServiceProxy {
   private closed = false
   private readonly unsubscribe?: () => void
   private readonly httpPool: NodeServiceHttpPool
-  private readonly preparedReadFastRelease: boolean
   private readonly metrics = {
     httpTotal: 0, upgradeTotal: 0, accessSyncCalls: 0, accessSyncSkipped: 0,
     preparedReadEligible: 0, preparedReadHit: 0, preparedReadFallback: 0,
-    preparedReadReleaseChecks: 0, preparedReadReleaseSkipped: 0,
+    preparedReadReleaseChecks: 0,
   }
 
   /**
@@ -146,7 +158,7 @@ export class GatewayNodeServiceProxy {
    * @param monitor - existing durable permission-change monitor, when present.
    */
   constructor(private readonly directory: NodeServiceProxyDirectory,
-    private readonly services: Pick<GatewayNodeServices, 'open' | 'revalidate' | 'released' | 'capacity'> & Partial<Pick<GatewayNodeServices, 'invalidateLeaseCache'>>,
+    private readonly services: Pick<GatewayNodeServices, 'open' | 'revalidate' | 'released' | 'capacity'>,
     private readonly timeoutMs: number,
     config: NodeServiceConfig,
     private readonly monitor?: GatewayAccessMonitor,
@@ -154,7 +166,6 @@ export class GatewayNodeServiceProxy {
     if (directory.resolvePlacement !== undefined && directory.resetScopeCookie === undefined) {
       throw new Error('Node service owner routing requires the Gateway scope-cookie formatter')
     }
-    this.preparedReadFastRelease = config.preparedReadFastRelease === true
     this.httpPool = new NodeServiceHttpPool(services, config)
     this.unsubscribe = monitor?.subscribe(subject => { this.invalidate(subject) })
   }
@@ -167,7 +178,6 @@ export class GatewayNodeServiceProxy {
     // Idle node transports carry no user or project credentials; only node- or
     // organization-scoped invalidations need to drain unused byte connections.
     if (subject.userId === undefined && subject.projectId === undefined) {
-      this.services.invalidateLeaseCache?.(subject.nodeId)
       void this.httpPool.closeIdle(subject.nodeId)
     }
     for (const operation of this.active) {
@@ -266,6 +276,7 @@ export class GatewayNodeServiceProxy {
     if (!(stream instanceof Agent)) agent.createConnection = () => stream
     const forwarded = headers(req.headers, upgrade)
     forwarded[NODE_SERVICE_TARGET_HEADER] = target.nodeId
+    delete forwarded[NODE_SERVICE_ASSET_GENERATION_HEADER]
     delete forwarded['x-dsh-gateway-principal']
     delete forwarded[FORWARDED_PRINCIPAL_HEADER]
     if (assertion !== undefined) forwarded[FORWARDED_PRINCIPAL_HEADER] = assertion
@@ -299,11 +310,13 @@ export class GatewayNodeServiceProxy {
    * @param res - response owned through the existing bounded node transport.
    * @param actor - current account returned by the asset admission query.
    * @param placement - exact Runtime and computer from the same admission; no cross-request reuse is permitted.
+   * @param generation - ready Runtime generation authorized by this request.
+   * @param capture - optional bounded capture of the destination's matching generation.
    * @returns true after remote delivery, or false for this computer.
    */
   asset(req: IncomingMessage, res: ServerResponse, actor: UserRow,
     placement: RuntimePlacement & { environment: NonNullable<RuntimePlacement['environment']> },
-    capture?: RemoteAssetCapture): Promise<boolean> {
+    generation: number, capture?: RemoteAssetCapture): Promise<boolean> {
     if (!isImmutableRuntimeAssetRequest(req.method, req.url ?? '/')) throw new NodeServiceError(400, 'node-service/invalid-target')
     const url = new URL(req.url ?? '/', 'http://gateway'), environment = placement.environment
     if (url.searchParams.getAll('dshRuntime').length !== 1 || url.searchParams.get('dshRuntime') !== environment.id
@@ -316,7 +329,7 @@ export class GatewayNodeServiceProxy {
     return this.track(this.forwardSelectedHttp(req, res, {
       nodeId: environment.node.id, runtimeId: environment.id, environment, resolvedTarget: placement.target,
       ...(environment.owner.kind === 'project' ? { projectId: environment.owner.id } : {}),
-    }, actor, undefined, capture))
+    }, actor, undefined, { generation, capture }))
   }
 
   /**
@@ -348,7 +361,9 @@ export class GatewayNodeServiceProxy {
   }
 
   private async forwardSelectedHttp(req: IncomingMessage, res: ServerResponse, target: Target, actor: UserRow | number,
-    body?: string, capture?: RemoteAssetCapture): Promise<boolean> {
+    body?: string, asset?: { generation: number; capture?: RemoteAssetCapture }): Promise<boolean> {
+    const capture = asset?.capture
+    const expectedAssetGeneration = asset === undefined ? undefined : String(asset.generation)
     if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
     await this.directory.assertNode?.(target.nodeId)
     this.metrics.httpTotal += 1
@@ -422,37 +437,35 @@ export class GatewayNodeServiceProxy {
               mark('responseHeaders')
               if (response.headers[NODE_SERVICE_TARGET_HEADER] !== target.nodeId) throw new NodeServiceError(409, 'node-service/mismatch')
               if (approval !== undefined && personalRead !== undefined) {
-                const fastRelease = this.preparedReadFastRelease
-                  && !signal.aborted
-                  && personalRead.expiresAt > Date.now()
-                  && this.monitor?.available === true
-                  && this.monitor.matchesRevision?.(BigInt(personalRead.accessRevision)) === true
-                if (fastRelease) {
-                  this.metrics.preparedReadReleaseSkipped += 1
-                } else {
-                  this.metrics.preparedReadReleaseChecks += 1
-                  const current = await timeOperation('entryReadRelease', () => this.directory.approvePersonalRead!(approval))
-                  if (current === null || current.accessRevision !== personalRead.accessRevision
-                    || current.generation !== personalRead.generation || current.port !== personalRead.port
-                    || current.startedAt !== personalRead.startedAt || current.launchStamp !== personalRead.launchStamp) {
-                    throw new NodeServiceError(409, 'node-service/cancelled')
-                  }
+                this.metrics.preparedReadReleaseChecks += 1
+                const current = await timeOperation('entryReadRelease', () => this.directory.approvePersonalRead!(approval))
+                if (current === null || current.accessRevision !== personalRead.accessRevision
+                  || current.generation !== personalRead.generation || current.port !== personalRead.port
+                  || current.startedAt !== personalRead.startedAt || current.launchStamp !== personalRead.launchStamp
+                  || Math.min(current.expiresAt, personalRead.expiresAt) <= Date.now()) {
+                  throw new NodeServiceError(409, 'node-service/cancelled')
                 }
               }
               signal.throwIfAborted()
               const status = response.statusCode ?? 502
+              const assetGeneration = response.headers[NODE_SERVICE_ASSET_GENERATION_HEADER]
+              if (expectedAssetGeneration !== undefined && assetGeneration !== undefined && assetGeneration !== expectedAssetGeneration) {
+                throw new NodeServiceError(409, 'node-service/mismatch')
+              }
               const forwardedHeaders = responseHeaders(response.headers, target.resetCookie)
+              if (asset !== undefined) forwardedHeaders['cache-control'] = BROWSER_RUNTIME_ASSET_CACHE_CONTROL
               const declaredLength = typeof response.headers['content-length'] === 'string'
                 ? Number(response.headers['content-length']) : undefined
               const rawCacheControl = typeof response.headers['cache-control'] === 'string' ? response.headers['cache-control'] : ''
-              const cacheableControl = !/\b(?:no-store|private|no-cache)\b/iu.test(rawCacheControl)
               const rawVary = Array.isArray(response.headers.vary) ? response.headers.vary.join(',')
                 : typeof response.headers.vary === 'string' ? response.headers.vary : ''
               const cacheableVary = rawVary.split(',').map(part => part.trim().toLowerCase()).filter(part => part !== '')
                 .every(token => token === 'accept-encoding')
+              const freshUntil = capture === undefined ? undefined : immutableFreshness(rawCacheControl, response.headers.age)
               const shouldCapture = capture !== undefined && req.method === 'GET' && status === 200
+                && assetGeneration !== undefined && assetGeneration === expectedAssetGeneration
                 && target.resetCookie === undefined && response.headers['set-cookie'] === undefined
-                && cacheableControl && cacheableVary
+                && freshUntil !== undefined && cacheableVary
                 && (declaredLength === undefined || (Number.isSafeInteger(declaredLength) && declaredLength >= 0 && declaredLength <= capture.maxBytes))
               let capturedChunks: Buffer[] | undefined = shouldCapture ? [] : undefined
               let capturedBytes = 0
@@ -479,17 +492,15 @@ export class GatewayNodeServiceProxy {
                 res.writeHead(status, forwardedHeaders)
                 await pipeline(response, res)
               }
-              if (capturedChunks !== undefined && !signal.aborted) {
+              if (capturedChunks !== undefined && freshUntil !== undefined && !signal.aborted) {
                 const etag = typeof response.headers.etag === 'string' ? response.headers.etag : undefined
-                const cacheControl = typeof response.headers['cache-control'] === 'string'
-                  ? response.headers['cache-control'] : undefined
                 const contentEncoding = typeof response.headers['content-encoding'] === 'string'
                   ? response.headers['content-encoding'].trim().toLowerCase() : undefined
                 capture!.onComplete({
                   status,
                   contentType,
+                  freshUntil,
                   ...(etag === undefined ? {} : { etag }),
-                  ...(cacheControl === undefined ? {} : { cacheControl }),
                   ...(contentEncoding === undefined ? {} : { contentEncoding }),
                   body: Buffer.concat(capturedChunks, capturedBytes),
                 })
@@ -521,7 +532,7 @@ export class GatewayNodeServiceProxy {
    * @returns Identifier-free counters for administrator performance inspection.
    */
   diagnostics(): NodeServiceForwardingDiagnostics {
-    return { ...this.metrics, pool: this.httpPool.diagnostics() }
+    return { ...this.metrics, preparedReadReleaseSkipped: 0, pool: this.httpPool.diagnostics() }
   }
 
   /**

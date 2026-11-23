@@ -162,6 +162,62 @@ describe('web e2e: private user terminal lifecycle', () => {
     expect(fallbackWrites).toBe(0)
   })
 
+  it('reopens terminal input after an acknowledgement timeout without resending the input', async () => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Terminal scaffold unavailable')
+    const page = await newWorkflowPage(browser)
+    onTestFinished(() => page.context().close())
+    const console = watchConsole(page)
+    let missedAcknowledgement = false
+    let httpWrites = 0
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/terminal/write') httpWrites += 1
+    })
+    await page.routeWebSocket(/\/api\/terminal\/input(?:\?|$)/u, (socket) => {
+      const host = socket.connectToServer()
+      const writes = new Set<number>()
+      socket.onMessage((message) => {
+        if (typeof message === 'string') {
+          const frame = JSON.parse(message) as { type: string; seq: number }
+          if (frame.type === 'write') writes.add(frame.seq)
+        }
+        host.send(message)
+      })
+      host.onMessage((message) => {
+        if (!missedAcknowledgement && typeof message === 'string') {
+          const frame = JSON.parse(message) as { type: string; seq: number }
+          if (frame.type === 'ack' && writes.has(frame.seq)) { missedAcknowledgement = true; return }
+        }
+        socket.send(message)
+      })
+    })
+    await page.addInitScript(() => {
+      const NativeWebSocket = window.WebSocket
+      window.WebSocket = class extends NativeWebSocket {
+        constructor(url: string | URL, protocols?: string | string[]) {
+          super(url, protocols)
+          if (new URL(this.url).pathname !== '/api/terminal/input') return
+          this.addEventListener('open', () => {
+            const data = document.documentElement.dataset
+            data.terminalInputOpens = String(Number(data.terminalInputOpens ?? '0') + 1)
+          })
+        }
+      }
+    })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+    await page.locator('[data-sidebar-right-guide-entry="terminal"]').getByRole('button', { name: /New terminal/ }).click()
+    await page.locator('html[data-terminal-input-opens="1"]').waitFor({ state: 'attached' })
+    const input = page.getByRole('textbox', { name: 'Terminal', exact: true })
+    await input.fill('printf "ack-timeout-ok\\n" >> terminal-timeout-proof.txt')
+    await expect.poll(() => missedAcknowledgement).toBe(true)
+    await page.locator('html[data-terminal-input-opens="2"]').waitFor({ state: 'attached', timeout: 35_000 })
+    await input.press('Enter')
+    const output = join(scaffold.workspaceCwd, 'terminal-timeout-proof.txt')
+    await expect.poll(() => readFile(output, 'utf8').catch(() => '')).toBe('ack-timeout-ok\n')
+    expect(httpWrites).toBe(0)
+    expect(console.pageErrors).toEqual([])
+  })
+
   it('writes through a real shell, retains it while hidden and reloaded, and closes explicitly', async () => {
     if (scaffold === undefined || browser === undefined) throw new Error('Terminal scaffold unavailable')
     const world = scaffold

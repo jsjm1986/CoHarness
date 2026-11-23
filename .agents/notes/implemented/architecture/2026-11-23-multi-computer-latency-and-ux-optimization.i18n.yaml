@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-23-multi-computer-latency-and-ux-optimization.md
 document:
-  en: 416126408d0214e573a838115518f9a9f8c3a778
-  zh: da5fa76b4b7bd00b340c8a8721514e3464ddf05c
+  en: d258edbf1b3da7f0b3e3a9d032cf14aff1a717f2
+  zh: 281a155cbe9ad00bf8c90813df53b55a3fb7a2fe
 /agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching:
   en: 4ae553e40f50246c
   zh: e0ce5641f9c31a86
@@ -12,11 +12,11 @@ document:
   en: 76442cd7ff2010bb
   zh: 75d6ec8c7d5a723a
 /agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching/decision:
-  en: fe28ddd2330c8d82
-  zh: 3ec6a28dd2e443ac
+  en: 2c7384d531959e7e
+  zh: 6c5a23b2b6157161
 /agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching/alternatives-considered:
-  en: 667c29bb14986219
-  zh: 54a0597565e16690
+  en: 73403fd691957892
+  zh: 72d749c97af430b3
 /agent-note-multi-computer-forwarding-governance-fast-paths-and-admin-spa-switching/consequences:
   en: 48ee80e8deea9ee5
   zh: 51585ea3ed8d2737

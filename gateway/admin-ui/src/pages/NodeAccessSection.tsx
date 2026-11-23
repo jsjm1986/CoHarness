@@ -104,10 +104,12 @@ export function NodeAccessSection() {
   }, [action, t])
 
   const overview = useDeploymentOverview()
-  const hydratedOverview = useRef<typeof overview>(null)
+  const waitingForOverview = overview?.status === 'loading' && overview.requested.has('nodeAccess')
+  const overviewPage = overview?.status === 'ready' ? overview.sections?.nodeAccess : undefined
+  const hydratedOverview = useRef<typeof overviewPage>(undefined)
 
   useEffect(() => {
-    if (cursor === undefined && refresh === 0 && hydratedOverview.current === null && overview !== null && overview.requested.has('nodeAccess') && overview.status === 'loading') {
+    if (cursor === undefined && refresh === 0 && hydratedOverview.current === undefined && waitingForOverview) {
       setLoading(true)
       return
     }
@@ -135,29 +137,25 @@ export function NodeAccessSection() {
         if (!disposed) setLoading(false)
       }
     }
-    let skipInitial = false
-    if (cursor === undefined && refresh === 0 && overview?.status === 'ready' && overview.sections?.nodeAccess !== undefined) {
-      skipInitial = true
-      if (hydratedOverview.current !== overview) {
-        hydratedOverview.current = overview
-        try {
-          const parsed = nodeAccessPageSchema.parse(unwrapDeploymentOverviewSlice(overview.sections.nodeAccess))
-          setPage(parsed); setError('')
-        } catch (cause) {
-          applyError(cause)
-        } finally {
-          setLoading(false)
-        }
+    if (cursor === undefined && refresh === 0 && overviewPage !== undefined && hydratedOverview.current !== overviewPage) {
+      hydratedOverview.current = overviewPage
+      try {
+        const parsed = nodeAccessPageSchema.parse(unwrapDeploymentOverviewSlice(overviewPage))
+        setPage(parsed); setError('')
+      } catch (cause) {
+        applyError(cause)
+      } finally {
+        setLoading(false)
       }
-    }
-    if (!skipInitial) void load()
+    } else void load()
     const whenVisible = () => { if (document.visibilityState === 'visible') void load() }
     const timer = setInterval(whenVisible, 10_000)
     document.addEventListener('visibilitychange', whenVisible)
     return () => { disposed = true; clearInterval(timer); controller?.abort(); document.removeEventListener('visibilitychange', whenVisible) }
-  }, [cursor, overview, refresh, t])
+  }, [cursor, overviewPage, waitingForOverview, refresh, t])
 
   const reread = () => { setRefresh(value => value + 1) }
+  const showPage = (next: string | undefined): void => { setPage(null); setLoading(true); setCursor(next) }
   const open = (next: Action) => {
     setRemoval(null); setAction(next); setName(''); setExisting(''); setCandidateCursor(undefined); setCandidates(undefined); setCandidateError(''); setActionError(''); setUncertain(false); setNotice('')
   }
@@ -269,8 +267,8 @@ export function NodeAccessSection() {
         )}
         {cursor === undefined && page?.nextCursor == null ? null : (
           <div className="formActions">
-            <Button disabled={loading || cursor === undefined} onClick={() => setCursor(undefined)}>{t('previous')}</Button>
-            <Button disabled={loading || page?.nextCursor == null} onClick={() => { if (page?.nextCursor != null) setCursor(page.nextCursor) }}>{t('more')}</Button>
+            <Button disabled={loading || cursor === undefined} onClick={() => showPage(undefined)}>{t('previous')}</Button>
+            <Button disabled={loading || page?.nextCursor == null} onClick={() => { if (page?.nextCursor != null) showPage(page.nextCursor) }}>{t('more')}</Button>
           </div>
         )}
       </Section>

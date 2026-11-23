@@ -19,6 +19,8 @@ export const NODE_SERVICE_STREAM_PROTOCOL = `dsh-node-service-v${NODE_SERVICE_PR
 export const NODE_SERVICE_IDENTITY_PATH = '/internal/nodes/service'
 /** Request fence checked by a Gateway before processing a forwarded operation. */
 export const NODE_SERVICE_TARGET_HEADER = 'x-dsh-target-node'
+/** Destination Gateway's generation for a forwarded Runtime asset response. */
+export const NODE_SERVICE_ASSET_GENERATION_HEADER = 'x-dsh-asset-generation'
 /** Port of the unopened loopback data socket this authenticated local probe owns. */
 export const NODE_SERVICE_LOCAL_PORT_HEADER = 'x-dsh-node-service-local-port'
 /** Maximum binary message size; arbitrary source chunks are split before transmission. */

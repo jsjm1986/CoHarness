@@ -97,7 +97,7 @@ export class NodeServiceHttpPool {
   private readonly waiters = new Set<PendingAcquisition>()
   private readonly waitingByNode = new Map<RuntimeNodeId, number>()
   private metrics = {
-    reused: 0, opened: 0, queued: 0, revalidateCalls: 0, revalidateSkipped: 0,
+    reused: 0, opened: 0, queued: 0, revalidateCalls: 0,
     idleInvalidationsGlobal: 0, idleInvalidationsNode: 0, closedIdleEntries: 0,
   }
 
@@ -233,9 +233,8 @@ export class NodeServiceHttpPool {
     try {
       const stream = entry.stream
       if (stream === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
-      const outcome = await timeOperation('nodeLeaseCheck', () => this.services.revalidate(stream))
-      if (outcome === 'cached') this.metrics.revalidateSkipped += 1
-      else this.metrics.revalidateCalls += 1
+      this.metrics.revalidateCalls += 1
+      await timeOperation('nodeLeaseCheck', () => this.services.revalidate(stream))
       if (this.closed || signal.aborted || entry.owner.signal.aborted || stream.destroyed) {
         throw new NodeServiceError(409, 'node-service/cancelled')
       }
@@ -318,7 +317,7 @@ export class NodeServiceHttpPool {
       if (entry.busy) active += 1
       else idle += 1
     }
-    return { ...this.metrics, active, idle, waiting: this.waiters.size }
+    return { ...this.metrics, revalidateSkipped: 0, active, idle, waiting: this.waiters.size }
   }
 
   /**

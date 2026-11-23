@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { nodeAccessEntrySchema, nodeEnrollmentSchema } from '../../../src/node-access.ts'
 import * as api from '../api.ts'
+import { DeploymentOverviewProvider } from '../deployment-overview.tsx'
 import { NodeAccessSection } from './NodeAccessSection.tsx'
 
 vi.mock('../api.ts', async original => ({
@@ -15,6 +16,24 @@ const receipt = nodeEnrollmentSchema.parse({ nodeId: node.nodeId, enrollmentId: 
   token: `dsh_enroll_${'A'.repeat(43)}`, expiresAt: '2026-10-28T11:00:00.000Z' })
 let storageValues: Map<string, string>
 const releases: Array<() => void> = []
+
+it('reads the first page again when returning from a later page', async () => {
+  const second = nodeAccessEntrySchema.parse({ ...node, nodeId: '61f22202-1c02-4a3c-8d34-f11222333445', name: '测试电脑' })
+  vi.mocked(api.listNodeAccess).mockImplementation(async cursor => cursor === undefined
+    ? { items: [node], nextCursor: node.nodeId } : { items: [second], nextCursor: null })
+  render(<DeploymentOverviewProvider value={{ status: 'ready', requested: new Set(['nodeAccess']),
+    sections: { nodeAccess: { ok: true, value: { items: [node], nextCursor: node.nodeId } } } }}>
+    <NodeAccessSection />
+  </DeploymentOverviewProvider>)
+  expect(screen.getByText('设计电脑')).toBeTruthy()
+  expect(api.listNodeAccess).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '下一页' }))
+  expect(await screen.findByText('测试电脑')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '返回首页' }))
+  expect(await screen.findByText('设计电脑')).toBeTruthy()
+  expect(screen.queryByText('测试电脑')).toBeNull()
+  expect(vi.mocked(api.listNodeAccess).mock.calls.map(([cursor]) => cursor)).toEqual([node.nodeId, undefined])
+})
 beforeEach(() => {
   vi.resetAllMocks()
   storageValues = new Map()

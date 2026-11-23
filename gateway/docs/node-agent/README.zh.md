@@ -83,11 +83,11 @@ Admin 部署页提供独立的电脑接入区域，包含登记、显式重发�
 
 主入口启用多电脑模式、代理配置 `HGW_NODE_LOCAL_GATEWAY_URL` 后，携带获授权 `dshRuntime` 的 API 请求选择该环境所在电脑。管理员 API 可显式选择 `dshNode=<节点 UUID>`，并重新核验当前管理员权限。目标 Gateway 继续检查现有浏览器会话、源站、账号及业务权限，处理请求前校验目标节点请求头。浏览器始终使用中心源站。
 
-现有个人／项目选择及空间 Cookie 也从中心元数据解析所在电脑。根 HTML、资源、账号 API 与运行时 HTTP／WebSocket 流量使用所选电脑。字节确定性的浏览器 URL——`/plugins` 下的 `??` combo 或带 `rev` 的 `client.*.js` chunk 及 source map、带内容哈希的 `/assets/*` 路径——在来源页选定的 Runtime 下完成授权后就地转发，而不是用 `dshRuntime` 重定向应答，因此未钉选的 URL 能在各电脑间共享同一份缓存；授权总是先于转发执行。Runtime 专属或未带 revision 的路径——`/plugins/events`、无 revision 的插件或资源 URL——保持重定向钉选。切换空间先解析有界请求体，再转发到精确 Runtime。属主选择存在歧义时返回409并要求 `dshRuntime`，不会选择第一个环境。组合了目录服务时，账号上下文和工作台目录响应包含 `environment: { id, nodeId }`。Admin 专用 API 不要求管理员在所选电脑拥有个人 Runtime。
+现有个人／项目选择及空间 Cookie 也从中心元数据解析所在电脑。根 HTML、资源、账号 API 与运行时 HTTP／WebSocket 流量使用所选电脑。字节确定性的浏览器 URL——`/plugins` 下的 `??` combo 或带 `rev` 的 `client.*.js` chunk 及 source map、带内容哈希的 `/assets/*` 路径——在来源页选定的 Runtime 下完成授权后就地转发，而不是用 `dshRuntime` 重定向应答，每次浏览器请求都由所选 Runtime 核验权限并提供资源。主入口只缓存目标 Gateway 明确标记为不可变且 Runtime 代次一致的响应。缓存条目绑定电脑、Runtime 代次、账号和空间。Runtime 专属或未带 revision 的路径——`/plugins/events`、无 revision 的插件或资源 URL——保持重定向钉选。切换空间先解析有界请求体，再转发到精确 Runtime。属主选择存在歧义时返回409并要求 `dshRuntime`，不会选择第一个环境。组合了目录服务时，账号上下文和工作台目录响应包含 `environment: { id, nodeId }`。Admin 专用 API 不要求管理员在所选电脑拥有个人 Runtime。
 
 账号偏好、推送设备登记及 `GET /account/api/projects` 使用共享账号存储，不选择或连接 Runtime。工作台目录使用已授权的归属元数据，所选分配在另一台电脑时也不要求本机存储。项目创建保留显式选择的目标电脑。浏览器 SVG 图标沿用来源标签页中已验证的 Runtime 选择。
 
-现有 Admin 外壳提供电脑选择。`/admin/computers/<节点 UUID>/...` 在现有页面、API 方法、插件安装流和归档导出中保留所选电脑。切换电脑会替换文档，未完成的页面操作仍绑定原目标。中心身份与一页有界的登记电脑元数据独立加载；节点登记仍由中心处理。元数据读取失败保留已显示分页；所选电脑不可用时不会回退中心。项目设置快捷入口解析项目所属环境，并检查管理员自身的电脑使用权限。
+现有 Admin 外壳提供电脑选择。`/admin/computers/<节点 UUID>/...` 在现有页面、API 方法、插件安装流和归档导出中保留所选电脑。切换电脑在 Admin 应用内完成。导航保护未保存的修改，在途操作仍绑定原电脑。中心身份与一页有界的登记电脑元数据独立加载；节点登记仍由中心处理。元数据读取失败保留已显示分页；所选电脑不可用时不会回退中心。项目设置快捷入口解析项目所属环境，并检查管理员自身的电脑使用权限。
 
 服务上限被当前 HTTP 借用者或正在清理的传输占用时，新 HTTP 请求会进入有界队列等待可复用连接。默认最多等待 256 个请求，等待期限为 60000 ms；取消和关闭会撤回等待者，不发送其请求。排队的 POST 取得连接后仅转发一次，目标端仍核验当前授权。仅由无关活跃流占用容量时仍拒绝准入。
 
@@ -159,8 +159,8 @@ Webhook 配置绑定精确 Runtime 及电脑。除非提交其他明确 Runtime�
 | `HGW_NODE_SERVICE_MAX_PER_NODE` | 16 | 单节点待连接及活动服务连接数 |
 | `HGW_NODE_SERVICE_CONNECT_TIMEOUT_MS` | 10000 | 服务连接获取期限 |
 | `HGW_NODE_SERVICE_HTTP_IDLE_TIMEOUT_MS` | 30000 | 可复用 HTTP 服务连接的最长空闲时间 |
-| `HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS` | 16 | 全局空闲 HTTP 连接上限，受服务连接总上限约束 |
-| `HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE` | 2 | 单电脑空闲 HTTP 连接上限，受全局空闲和单电脑服务连接上限共同约束 |
+| `HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS` | 32 | 全局空闲 HTTP 连接上限，受服务连接总上限约束 |
+| `HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE` | 6 | 单电脑空闲 HTTP 连接上限，受全局空闲和单电脑服务连接上限共同约束 |
 | `HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS` | 256 | 所有电脑的 HTTP 等待请求总数上限 |
 | `HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE` | 32 与总上限中的较小值 | 单台电脑的 HTTP 等待请求上限，最大为总上限 |
 | `HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS` | 60000 | HTTP 连接获取队列的最长等待时间 |

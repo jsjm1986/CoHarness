@@ -1,6 +1,6 @@
 /** On-demand collapsible diagnostics panel displaying live Gateway latency, forwarding pool, and asset cache metrics. */
 import { Activity, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { getPerformanceDiagnostics, type PerformanceDiagnosticsSnapshot } from '../performance-api.ts'
 import { Button, ErrorBanner, IconButton, LoadingState, Section, StatusBadge } from '../components/ui.tsx'
 import { adminLanguage, translateCopy } from '../language.ts'
@@ -50,6 +50,7 @@ export function PerformanceDiagnosticsSection() {
   const [loading, setLoading] = useState(false)
   const [snapshot, setSnapshot] = useState<PerformanceDiagnosticsSnapshot | null>(null)
   const [error, setError] = useState('')
+  const detailsId = useId()
   const activeRequest = useRef<AbortController | undefined>(undefined)
 
   const refresh = useCallback(async () => {
@@ -87,6 +88,8 @@ export function PerformanceDiagnosticsSection() {
   const forwarding = snapshot?.nodeForwarding ?? null
   const assets = snapshot?.runtimeAssets ?? null
   const db = snapshot?.databasePool ?? null
+  const dbActive = db === null ? 0 : Math.max(0, db.total - db.idle)
+  const formatMaximum = (maximum: number | null): string => maximum === null ? t('na') : String(maximum)
 
   return (
     <Section
@@ -100,6 +103,8 @@ export function PerformanceDiagnosticsSection() {
           <Button
             variant="ghost"
             icon={expanded ? ChevronUp : ChevronDown}
+            aria-expanded={expanded}
+            aria-controls={detailsId}
             onClick={() => setExpanded(current => !current)}
           >
             {expanded ? t('collapse') : t('expand')}
@@ -108,9 +113,9 @@ export function PerformanceDiagnosticsSection() {
       )}
     >
       {!expanded ? (
-        <p className="sectionMeta">{t('collapsedHint')}</p>
+        <p className="sectionMeta" id={detailsId}>{t('collapsedHint')}</p>
       ) : (
-        <div className="deploymentStatus">
+        <div className="deploymentStatus" id={detailsId}>
           <ErrorBanner message={error} />
           {loading && snapshot === null ? <LoadingState label={t('loading')} /> : null}
           {snapshot === null ? null : (
@@ -122,20 +127,20 @@ export function PerformanceDiagnosticsSection() {
                 {snapshot.enabled ? null : <span className="sectionMeta">{t('disabledNotice')}</span>}
               </div>
 
-              <div className="metricGrid" aria-label={t('metricsAria')}>
+              <div className="metricGrid" role="group" aria-label={t('metricsAria')}>
                 <div className={snapshot.operationClasses.http.durationMs.p95Ms >= 500 ? 'metric metric-warning' : 'metric'}>
                   <span>{t('httpP95Label')}</span>
-                  <strong>{formatMs(snapshot.operationClasses.http.durationMs.p95Ms)}</strong>
+                  <strong>{formatMs(snapshot.operationClasses.http.durationMs.count > 0 ? snapshot.operationClasses.http.durationMs.p95Ms : undefined)}</strong>
                   <span className="metricSub">{t('httpSub', {
-                    p50: formatMs(snapshot.operationClasses.http.durationMs.p50Ms),
-                    p99: formatMs(snapshot.operationClasses.http.durationMs.p99Ms),
+                    p50: formatMs(snapshot.operationClasses.http.durationMs.count > 0 ? snapshot.operationClasses.http.durationMs.p50Ms : undefined),
+                    p99: formatMs(snapshot.operationClasses.http.durationMs.count > 0 ? snapshot.operationClasses.http.durationMs.p99Ms : undefined),
                     errors: String(snapshot.operationClasses.http.errors),
                   })}</span>
                 </div>
 
                 <div className={snapshot.eventLoop.p95Ms >= 50 ? 'metric metric-warning' : 'metric'}>
                   <span>{t('eventLoopP95Label')}</span>
-                  <strong>{formatMs(snapshot.eventLoop.p95Ms)}</strong>
+                  <strong>{formatMs(snapshot.eventLoop.samples > 0 ? snapshot.eventLoop.p95Ms : undefined)}</strong>
                   <span className="metricSub">{t('eventLoopSub', {
                     util: `${(snapshot.eventLoop.utilization * 100).toFixed(1)}%`,
                     rss: formatMiB(snapshot.memory.rss),
@@ -175,11 +180,11 @@ export function PerformanceDiagnosticsSection() {
                 ) : (
                   <div className={(db?.waiting ?? 0) > 0 ? 'metric metric-warning' : 'metric'}>
                     <span>{t('dbPoolLabel')}</span>
-                    <strong>{db === null ? t('na') : `${String(db.active ?? 0)} / ${String(db.maxConnections ?? 0)}`}</strong>
+                    <strong>{db === null ? t('na') : `${String(dbActive)} / ${formatMaximum(db.maximum)}`}</strong>
                     <span className="metricSub">{db === null ? t('na') : t('dbPoolSub', {
-                      active: String(db.active ?? 0),
-                      idle: String(db.idle ?? 0),
-                      waiting: String(db.waiting ?? 0),
+                      active: String(dbActive),
+                      idle: String(db.idle),
+                      waiting: String(db.waiting),
                     })}</span>
                   </div>
                 )}
@@ -206,9 +211,9 @@ export function PerformanceDiagnosticsSection() {
                         <td>{t('throughputCounts', { completed: String(metrics.completed), errors: String(metrics.errors) })}</td>
                         <td>{t('liveInflight', { inflight: String(metrics.inflight), peak: String(metrics.peakInflight) })}</td>
                         <td>{t('latencyTriplet', {
-                          p50: formatMs(metrics.durationMs.p50Ms),
-                          p95: formatMs(metrics.durationMs.p95Ms),
-                          p99: formatMs(metrics.durationMs.p99Ms),
+                          p50: formatMs(metrics.durationMs.count > 0 ? metrics.durationMs.p50Ms : undefined),
+                          p95: formatMs(metrics.durationMs.count > 0 ? metrics.durationMs.p95Ms : undefined),
+                          p99: formatMs(metrics.durationMs.count > 0 ? metrics.durationMs.p99Ms : undefined),
                         })}</td>
                       </tr>
                     ))}
@@ -260,19 +265,16 @@ export function PerformanceDiagnosticsSection() {
                     {db === null ? null : (
                       <tr>
                         <td>{t('rowDatabase')}</td>
-                        <td>{t('dbCounts', {
-                          max: String(db.maxConnections ?? 0),
-                          errors: String(db.checkoutErrors ?? 0),
-                        })}</td>
+                        <td>{t('dbCounts', { max: formatMaximum(db.maximum) })}</td>
                         <td>{t('dbLive', {
-                          active: String(db.active ?? 0),
-                          idle: String(db.idle ?? 0),
-                          waiting: String(db.waiting ?? 0),
-                          maxWait: String(db.maxWaiting ?? 0),
+                          active: String(dbActive),
+                          idle: String(db.idle),
+                          waiting: String(db.waiting),
                         })}</td>
-                        <td>{t('dbLatency', {
-                          p95: formatMs(db.checkoutWaitMs?.p95Ms),
-                          max: formatMs(db.checkoutWaitMs?.maxMs),
+                        <td>{db.admission == null ? t('na') : t('dbAdmission', {
+                          pending: String(db.admission.pending),
+                          maxPending: String(db.admission.maxPending),
+                          rejected: String(db.admission.rejected),
                         })}</td>
                       </tr>
                     )}

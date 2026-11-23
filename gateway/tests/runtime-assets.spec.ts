@@ -222,21 +222,21 @@ it('reuses the exact fresh placement for remote delivery without invoking a loca
   expect(f.observed).toHaveLength(0)
 })
 
-it('caches captured remote immutable assets on Center while still enforcing fresh admission and node invalidation', async () => {
+it('caches immutable assets for one authorized Runtime, generation and account', async () => {
   const f = await fixture({ remote: true })
   const payload = 'export const plugin = ' + JSON.stringify('x'.repeat(2048)) + '\n'
-  f.forward.mockImplementation(async (_req, res, _actor, _placement, capture) => {
+  f.forward.mockImplementation(async (_req, res, _actor, _placement, _generation, capture) => {
     res.writeHead(200, {
       'content-type': 'text/javascript; charset=utf-8',
       etag: '"remote-v1"',
-      'cache-control': 'private, max-age=31536000, immutable',
+      'cache-control': 'private, no-store',
     })
     res.end(payload)
     capture?.onComplete({
       status: 200,
       contentType: 'text/javascript; charset=utf-8',
+      freshUntil: Date.now() + 60_000,
       etag: '"remote-v1"',
-      cacheControl: 'private, max-age=31536000, immutable',
       body: Buffer.from(payload, 'utf8'),
     })
     return true
@@ -252,12 +252,12 @@ it('caches captured remote immutable assets on Center while still enforcing fres
   const second = await fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': 'br, gzip' } })
   expect(second.status).toBe(200)
   expect(second.headers.get('etag')).toBe('W/"remote-v1"')
+  expect(second.headers.get('cache-control')).toBe('private, no-store')
   expect(await second.text()).toBe(payload)
   expect(f.forward).toHaveBeenCalledTimes(1)
   expect(f.admit).toHaveBeenCalledTimes(2)
   expect(f.assets.diagnostics().remoteCacheHits).toBe(1)
 
-  // Another authorized Runtime on the same remote node reuses the content-addressed immutable cache after its own admission check.
   const otherRuntimeId = randomUUID() as RuntimeId
   const otherPath = f.path.replace(f.admission.placement.environment!.id, otherRuntimeId)
   f.admit.mockResolvedValueOnce({
@@ -266,14 +266,17 @@ it('caches captured remote immutable assets on Center while still enforcing fres
       ...f.admission.placement,
       environment: { ...f.admission.placement.environment!, id: otherRuntimeId },
     },
-    snapshot: { ...f.admission.snapshot, generation: 9 },
+    snapshot: { ...f.admission.snapshot, target: { ...f.admission.snapshot.target, runtimeId: otherRuntimeId } },
   })
-  const sharedHit = await fetch(f.origin + otherPath, { headers: { ...f.headers, 'accept-encoding': 'br, gzip' } })
-  expect(sharedHit.status).toBe(200)
-  expect(await sharedHit.text()).toBe(payload)
-  expect(f.forward).toHaveBeenCalledTimes(1)
-  expect(f.admit).toHaveBeenCalledTimes(3)
-  expect(f.assets.diagnostics().remoteCacheHits).toBe(2)
+  const other = await fetch(f.origin + otherPath, { headers: f.headers })
+  expect(other.status).toBe(200)
+  await other.arrayBuffer()
+  expect(f.forward).toHaveBeenCalledTimes(2)
+  f.admit.mockResolvedValueOnce({ ...f.admission, snapshot: { ...f.admission.snapshot, generation: 8 } })
+  const restarted = await fetch(f.origin + f.path, { headers: f.headers })
+  expect(restarted.status).toBe(200)
+  await restarted.arrayBuffer()
+  expect(f.forward).toHaveBeenCalledTimes(3)
 
   // Conditional ETag check answers 304 directly from Center cache for both strong and weakened forms.
   const notModified = await fetch(f.origin + f.path, { headers: { ...f.headers, 'if-none-match': '"remote-v1"' } })
@@ -282,7 +285,7 @@ it('caches captured remote immutable assets on Center while still enforcing fres
   const notModifiedWeak = await fetch(f.origin + f.path, { headers: { ...f.headers, 'if-none-match': 'W/"remote-v1"' } })
   expect(notModifiedWeak.status).toBe(304)
   await notModifiedWeak.arrayBuffer()
-  expect(f.forward).toHaveBeenCalledTimes(1)
+  expect(f.forward).toHaveBeenCalledTimes(3)
 
   // Authority change STILL refuses even when bytes are warm in cache.
   const originalSync = f.monitor.synchronizeTo
@@ -292,11 +295,12 @@ it('caches captured remote immutable assets on Center while still enforcing fres
   await refused.arrayBuffer()
   f.monitor.synchronizeTo = originalSync
 
-  // Node invalidation evicts that node's cached bytes so the next fetch goes upstream again.
-  await f.invalidate({ nodeId: f.admission.placement.environment.node.id })
+  await f.invalidate({ userId: f.actor.id })
   expect(f.assets.diagnostics().remoteCacheEntries).toBe(0)
   const afterEvict = await fetch(f.origin + f.path, { headers: f.headers })
   expect(afterEvict.status).toBe(200)
   await afterEvict.arrayBuffer()
-  expect(f.forward).toHaveBeenCalledTimes(2)
+  expect(f.forward).toHaveBeenCalledTimes(4)
+  await f.invalidate({ nodeId: f.admission.placement.environment.node.id })
+  expect(f.assets.diagnostics().remoteCacheEntries).toBe(0)
 })

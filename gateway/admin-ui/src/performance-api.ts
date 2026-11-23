@@ -56,13 +56,11 @@ export interface RuntimeAssetCacheDiagnosticsView {
 
 /** PostgreSQL pool utilization snapshot, when backed by PostgreSQL. */
 export interface DatabasePoolDiagnosticsView {
-  readonly maxConnections?: number
-  readonly active?: number
-  readonly idle?: number
-  readonly waiting?: number
-  readonly maxWaiting?: number
-  readonly checkoutErrors?: number
-  readonly checkoutWaitMs?: { readonly p95Ms?: number; readonly maxMs?: number }
+  readonly total: number
+  readonly idle: number
+  readonly waiting: number
+  readonly maximum: number | null
+  readonly admission?: { readonly pending: number; readonly maxPending: number; readonly rejected: number } | null
 }
 
 /** Complete JSON payload returned by `GET /admin/api/performance`. */

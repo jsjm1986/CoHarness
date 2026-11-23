@@ -37,7 +37,7 @@ const sampleSnapshot: perfApi.PerformanceDiagnosticsSnapshot = {
   },
   eventLoop: { samples: 200, meanMs: 1.2, maxMs: 12, p50Ms: 1.0, p95Ms: 3.4, p99Ms: 8.5, utilization: 0.082 },
   memory: { rss: 96 * 1024 * 1024, heapUsed: 48 * 1024 * 1024, heapTotal: 64 * 1024 * 1024 },
-  databasePool: { maxConnections: 20, active: 2, idle: 6, waiting: 0, maxWaiting: 1, checkoutErrors: 0, checkoutWaitMs: { p95Ms: 1.5, maxMs: 5 } },
+  databasePool: { maximum: 20, total: 8, idle: 6, waiting: 1, admission: { pending: 3, maxPending: 30, rejected: 9 } },
   nodeForwarding: {
     httpTotal: 50, upgradeTotal: 4, accessSyncCalls: 12, accessSyncSkipped: 38,
     preparedReadEligible: 20, preparedReadHit: 18, preparedReadFallback: 2,
@@ -68,6 +68,9 @@ describe('PerformanceDiagnosticsSection', () => {
     expect(await screen.findByText('92.0%')).toBeTruthy()
     expect(screen.getByText('95.0%')).toBeTruthy()
     expect(screen.getByText('38 ms')).toBeTruthy()
+    expect(screen.getByText('连接上限 20')).toBeTruthy()
+    expect(screen.getByText('活跃 2 · 空闲 6 · 等待连接 1')).toBeTruthy()
+    expect(screen.getByText('等待取用 3 / 30 · 累计拒绝 9')).toBeTruthy()
     expect(perfApi.getPerformanceDiagnostics).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: '刷新诊断' }))

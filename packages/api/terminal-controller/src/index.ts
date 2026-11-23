@@ -112,6 +112,7 @@ export class TerminalController extends TypertRemoteService {
   private readonly lifetime = new AbortController()
   private readonly access: TerminalAccess
   private readonly cleanupTasks = new Set<Promise<void>>()
+  private readonly inputWork = new Set<Promise<void>>()
 
   /**
    * @param ctx - Host context carrying typed Remote and execution providers.
@@ -135,10 +136,14 @@ export class TerminalController extends TypertRemoteService {
           socket.close(1008, 'terminal unavailable')
           return
         }
-        bindTerminalInputSocket(socket, attachment, {
+        const work = bindTerminalInputSocket(socket, attachment, {
           maxInputBytes: this.config.maxInputBytes,
           validateDimensions: (cols, rows) => { this.dimensions(cols, rows) },
         }, this.lifetime.signal)
+        this.inputWork.add(work)
+        const untrack = (): void => { this.inputWork.delete(work) }
+        void work.then(untrack, untrack)
+        return work
       }, {
         authority: 'trusted-host',
         maxMessageBytes: Math.max(64 * 1024, this.config.maxInputBytes * 2 + 4096),
@@ -155,6 +160,7 @@ export class TerminalController extends TypertRemoteService {
       }
       this.activeAttachments.clear()
       this.lifetime.abort(new Error('Terminal controller disposed'))
+      await Promise.allSettled([...this.inputWork])
       const results = await Promise.allSettled([...this.owners].map(([id, owner]) => this.disposeOwner(id, owner)))
       await Promise.allSettled(this.cleanupTasks)
       const errors = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown)

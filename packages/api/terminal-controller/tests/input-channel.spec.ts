@@ -405,12 +405,13 @@ describe('Host input-channel unit edge cases', () => {
       await gate.promise
       closedFlag = true
     })
-    bindTerminalInputSocket(mid.socket, midAtt.attachment, defaultLimits, controller.signal)
+    const input = bindTerminalInputSocket(mid.socket, midAtt.attachment, defaultLimits, controller.signal)
     mid.emitMessage(JSON.stringify({ type: 'write', seq: 1, data: 'first' }))
     mid.emitMessage(JSON.stringify({ type: 'write', seq: 2, data: 'queued-after-end' }))
     gate.resolve(undefined)
-    await vi.waitFor(() => { expect(mid.closes.length).toBeGreaterThanOrEqual(2) })
-    expect(mid.closes[0]).toEqual({ code: 1008, reason: 'terminal unavailable' })
+    await input
+    expect(midAtt.writeSpy).toHaveBeenCalledExactlyOnceWith(midAtt.attachment.attachmentId, 'first')
+    expect(mid.closes).toEqual([{ code: 1008, reason: 'terminal unavailable' }])
 
     // sendFrame skips when socket is closing/closed while write succeeded.
     const closingSock = makeMockSocket()
@@ -420,5 +421,15 @@ describe('Host input-channel unit edge cases', () => {
     closingSock.emitMessage(JSON.stringify({ type: 'write', seq: 1, data: 'ok' }))
     await vi.waitFor(() => { expect(closingAtt.writeSpy).toHaveBeenCalledOnce() })
     expect(closingSock.sent).toEqual([])
+
+    const closingBeforeInput = makeMockSocket()
+    const waitingAttachment = makeAttachment()
+    const ending = new AbortController()
+    const pendingInput = bindTerminalInputSocket(closingBeforeInput.socket, waitingAttachment.attachment, defaultLimits, ending.signal)
+    closingBeforeInput.setState('closing')
+    closingBeforeInput.emitMessage(JSON.stringify({ type: 'write', seq: 1, data: 'after closing' }))
+    ending.abort()
+    await pendingInput
+    expect(waitingAttachment.writeSpy).not.toHaveBeenCalled()
   })
 })

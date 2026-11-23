@@ -11,6 +11,9 @@ const IMMUTABLE_REVISION = /^[a-f0-9]{12}(?:[a-f0-9]{52})?$/u
 /** Runtime endpoint for retrieving a managed model credential. */
 export const RUNTIME_MODEL_CREDENTIAL_PATH = '/internal/runtime/model-credential'
 
+/** Runtime assets use an authenticated Gateway cache and must reach it on each browser request. */
+export const BROWSER_RUNTIME_ASSET_CACHE_CONTROL = 'private, no-store'
+
 /**
  * Qualify only versioned plugin modules and hashed release assets for read-only admission.
  * @param method - original HTTP method.

@@ -45,9 +45,9 @@ export const zh = {
   forwardingCounts: 'HTTP {http} · WS {ws} · 复用 {reused} / 新建 {opened}',
   forwardingLive: '活跃 {active} · 空闲 {idle} · 排队 {waiting}',
   forwardingDetail: '委托读命中 {prepHit}/{prepTotal} · 跳过同步 {syncSkip}',
-  dbCounts: '上限 {max} · 签出错误 {errors}',
-  dbLive: '活跃 {active} · 空闲 {idle} · 排队 {waiting}（峰值 {maxWait}）',
-  dbLatency: '签出 P95 {p95} · 最大 {max}',
+  dbCounts: '连接上限 {max}',
+  dbLive: '活跃 {active} · 空闲 {idle} · 等待连接 {waiting}',
+  dbAdmission: '等待取用 {pending} / {maxPending} · 累计拒绝 {rejected}',
   na: '—',
 } satisfies Record<string, string>
 
@@ -98,8 +98,8 @@ export const en = {
   forwardingCounts: 'HTTP {http} · WS {ws} · {reused} reused / {opened} opened',
   forwardingLive: '{active} active · {idle} idle · {waiting} waiting',
   forwardingDetail: 'prepared reads {prepHit}/{prepTotal} · sync skipped {syncSkip}',
-  dbCounts: 'max {max} · checkout errors {errors}',
-  dbLive: '{active} active · {idle} idle · {waiting} waiting (peak {maxWait})',
-  dbLatency: 'checkout p95 {p95} · max {max}',
+  dbCounts: 'Connection limit {max}',
+  dbLive: '{active} active · {idle} idle · {waiting} waiting for a connection',
+  dbAdmission: 'Checkout queue {pending} / {maxPending} · {rejected} rejected',
   na: '—',
 } satisfies Record<PerformanceDiagnosticsCopyKey, string>

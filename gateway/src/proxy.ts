@@ -718,7 +718,7 @@ export function createProxyHandlers(
   const forwardUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer, context: GatewayRequestContext,
     ready: { port: number; generation: number; target: RuntimeTarget }, event: boolean, token?: string, expiresAt?: number): void => {
     const input = { user: context.user, scope: context.scope, runtime: { ...ready.target, generation: ready.generation } }
-    const principal = event ? principalSigner?.issueStream(input, expiresAt) : principalSigner?.issue(input)
+    const principal = event ? principalSigner?.issueStream(input, expiresAt) : principalSigner?.issue(input, expiresAt)
     if (event && principal !== undefined && token !== undefined && streamPrincipals !== undefined) {
       const lifetime = new AbortController()
       const close = (): void => { lifetime.abort() }
@@ -826,8 +826,7 @@ export function createProxyHandlers(
       let streamLogin: Awaited<ReturnType<typeof qualifyStream>> | undefined
       if ((eventConnection || terminalInputConnection) && principalSigner !== undefined) {
         streamLogin = token === undefined ? null : await qualifyStream(token, context)
-        if (eventConnection) await deps.accessMonitor?.synchronize()
-        else await synchronizeAccess(context.forwardedAccessRevision)
+        await deps.accessMonitor?.synchronize()
         if (streamLogin === null || streamLogin.expiresAt <= Date.now() || socket.destroyed) {
           releaseWebSocketLease()
           socket.destroy()

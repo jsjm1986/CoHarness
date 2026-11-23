@@ -24,6 +24,8 @@ export class TerminalInputChannelClosedError extends Error {
 export interface TerminalInputChannel {
   /** True only while the WebSocket is open and accepting frames. */
   readonly isOpen: boolean
+  /** Aborted once input stops, including a handshake failure or idle disconnect. */
+  readonly signal?: AbortSignal
   /**
    * Send raw UTF-8 terminal input over the open WebSocket and await Host acceptance.
    * @param data - coalesced input text.
@@ -125,7 +127,7 @@ export function openWebSocketTerminalInputChannel(
   }
 
   const ackTimeoutMs = options?.ackTimeoutMs ?? DEFAULT_TERMINAL_INPUT_ACK_TIMEOUT_MS
-  let closed = false
+  const lifetime = new AbortController()
   let nextSeq = 1
   const pending = new Map<number, {
     resolve: () => void
@@ -134,14 +136,14 @@ export function openWebSocketTerminalInputChannel(
   }>()
 
   const failPending = (): void => {
-    if (closed) return
-    closed = true
+    if (lifetime.signal.aborted) return
     const error = new TerminalInputChannelClosedError()
     for (const waiter of pending.values()) {
       clearTimeout(waiter.timer)
       waiter.reject(error)
     }
     pending.clear()
+    lifetime.abort()
   }
 
   socket.addEventListener('message', (event) => {
@@ -168,7 +170,7 @@ export function openWebSocketTerminalInputChannel(
   })
 
   const send = (payload: { readonly type: 'write'; readonly data: string } | { readonly type: 'resize'; readonly cols: number; readonly rows: number }): Promise<void> => {
-    if (closed || socket.readyState !== WS.OPEN) {
+    if (lifetime.signal.aborted || socket.readyState !== WS.OPEN) {
       return Promise.reject(new TerminalInputChannelUnavailableError())
     }
     const frame: TerminalInputClientFrame = payload.type === 'write'
@@ -178,7 +180,7 @@ export function openWebSocketTerminalInputChannel(
       const timer = setTimeout(() => {
         failPending()
         if (socket.readyState === WS.OPEN || socket.readyState === WS.CONNECTING) {
-          socket.close(1001, 'ack timeout')
+          socket.close(4000, 'ack timeout')
         }
       }, ackTimeoutMs)
       pending.set(frame.seq, { resolve, reject, timer })
@@ -188,14 +190,16 @@ export function openWebSocketTerminalInputChannel(
         clearTimeout(timer)
         pending.delete(frame.seq)
         failPending()
+        socket.close()
         reject(new TerminalInputChannelUnavailableError())
       }
     })
   }
 
   return {
+    signal: lifetime.signal,
     get isOpen() {
-      return !closed && socket.readyState === WS.OPEN
+      return !lifetime.signal.aborted && socket.readyState === WS.OPEN
     },
     write(data: string) {
       return send({ type: 'write', data })

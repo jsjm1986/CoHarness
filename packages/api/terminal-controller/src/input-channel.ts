@@ -115,11 +115,6 @@ function parseClientFrame(raw: string): TerminalInputClientFrame | undefined {
   return undefined
 }
 
-function sendFrame(socket: TerminalInputSocket, frame: TerminalInputServerFrame): void {
-  if (socket.readyState !== 'open') return
-  socket.send(JSON.stringify(frame))
-}
-
 /**
  * Bind an authenticated input WebSocket to a live terminal attachment, serializing
  * write/resize operations and closing immediately when attachment authority ends.
@@ -127,8 +122,9 @@ function sendFrame(socket: TerminalInputSocket, frame: TerminalInputServerFrame)
  * @param attachment - active `follow()` attachment verified for this caller.
  * @param limits - input size and geometry validators matching the HTTP RPC contract.
  * @param controllerSignal - controller disposal signal.
+ * @returns after the input subscription ends and any accepted frame settles.
  */
-export function bindTerminalInputSocket(
+export async function bindTerminalInputSocket(
   socket: TerminalInputSocket,
   attachment: ActiveTerminalAttachment,
   limits: {
@@ -136,8 +132,8 @@ export function bindTerminalInputSocket(
     readonly validateDimensions: (cols: number, rows: number) => void
   },
   controllerSignal: AbortSignal,
-): void {
-  if (attachment.signal.aborted || controllerSignal.aborted || attachment.isClosed()) {
+): Promise<void> {
+  if (attachment.signal.aborted || controllerSignal.aborted || socket.signal.aborted || socket.readyState !== 'open' || attachment.isClosed()) {
     socket.close(1008, 'terminal unavailable')
     return
   }
@@ -146,22 +142,25 @@ export function bindTerminalInputSocket(
   }
   attachment.inputSocket = socket
   const lifetime = AbortSignal.any([attachment.signal, controllerSignal])
+  const ended = Promise.withResolvers<void>()
   const isEnded = (): boolean => lifetime.aborted || socket.signal.aborted || attachment.isClosed()
-  const closeOnAbort = (): void => { socket.close(1008, 'terminal unavailable') }
-  lifetime.addEventListener('abort', closeOnAbort, { once: true })
+    || attachment.inputSocket !== socket || socket.readyState !== 'open'
 
   let queue: Promise<void> = Promise.resolve()
   const unsubscribeMessage = socket.onMessage((raw) => {
+    if (isEnded()) return
     const frame = parseClientFrame(raw)
     if (frame === undefined) {
       socket.close(1008, 'invalid terminal input frame')
+      finish()
       return
     }
     queue = queue.then(async () => {
       if (isEnded()) {
-        socket.close(1008, 'terminal unavailable')
+        closeOnAbort()
         return
       }
+      let reply: TerminalInputServerFrame
       try {
         if (frame.type === 'write') {
           if (Buffer.byteLength(frame.data, 'utf8') > limits.maxInputBytes) {
@@ -172,36 +171,38 @@ export function bindTerminalInputSocket(
           limits.validateDimensions(frame.cols, frame.rows)
           await attachment.terminal.resize(attachment.attachmentId, frame.cols, frame.rows)
         }
-        if (isEnded()) {
-          socket.close(1008, 'terminal unavailable')
-          return
-        }
-        sendFrame(socket, { type: 'ack', seq: frame.seq })
+        reply = { type: 'ack', seq: frame.seq }
       } catch (error) {
         if (error instanceof RemoteError) {
-          sendFrame(socket, {
+          reply = {
             type: 'error',
             seq: frame.seq,
             code: String(error.code),
             message: error.message,
             details: error.details as Record<string, unknown>,
-          })
-          return
-        }
-        sendFrame(socket, {
-          type: 'error',
-          seq: frame.seq,
-          message: error instanceof Error ? error.message : String(error),
-        })
+          }
+        } else reply = { type: 'error', seq: frame.seq, message: error instanceof Error ? error.message : String(error) }
       }
+      if (isEnded()) { closeOnAbort(); return }
+      socket.send(JSON.stringify(reply))
     })
   })
 
-  socket.onClose(() => {
+  const finish = (): void => {
     unsubscribeMessage()
     lifetime.removeEventListener('abort', closeOnAbort)
     if (attachment.inputSocket === socket) delete attachment.inputSocket
-  })
+    ended.resolve()
+  }
+  const closeOnAbort = (): void => {
+    if (socket.readyState === 'open') socket.close(1008, 'terminal unavailable')
+    finish()
+  }
+  lifetime.addEventListener('abort', closeOnAbort, { once: true })
+  const unsubscribeClose = socket.onClose(finish)
+  await ended.promise
+  unsubscribeClose()
+  await queue
 }
 
 /**

@@ -124,6 +124,23 @@ it('publishes initial overview slices to child sections and falls back to legacy
   view.unmount()
 })
 
+it('displays a successful deployment section and retries the overview after a backup section 404', async () => {
+  render(<DeploymentPage />)
+  const state = { mode: 'serving', maintenanceEpoch: '1', writeEpoch: '9', reason: null,
+    enteredAt: null, updatedAt: '2026-11-16T00:00:00Z', nodes: [], writersQuiesced: true, migrations: null, operations: [] } as const
+  await act(async () => {
+    const overview = overviewOf({ ...state, nodes: [], operations: [] })
+    overview.sections.backups = { ok: false, status: 404, error: 'backups-unavailable' }
+    reads[0]!.resolve(overview)
+  })
+  expect(screen.getByText('写纪元 9')).toBeTruthy()
+  expect(screen.getByRole('alert')).toBeTruthy()
+  expect(api.getDeployment).not.toHaveBeenCalled()
+  expect(api.listBackups).not.toHaveBeenCalled()
+  await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+  expect(api.getDeploymentOverview).toHaveBeenCalledTimes(2)
+})
+
 it('releases sections to independent reads when the aggregated snapshot is slow', async () => {
   render(<DeploymentPage />)
   expect(observedOverview?.status).toBe('loading')

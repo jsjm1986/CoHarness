@@ -112,6 +112,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
   private client: PoolClient | undefined
   private cursor: bigint | undefined
   private flight: { observed: Promise<void>; applied: Promise<void> } | undefined
+  private pendingApplication = false
   private applying: { through: bigint; fenced: boolean } | undefined
   private followUpRead: Promise<boolean> | undefined
   private wakePending = false
@@ -198,7 +199,8 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
    * @returns whether the connected monitor and the admission still describe the same revision.
    */
   async synchronizeTo(revision: bigint): Promise<boolean> {
-    if (!this.available || this.cursor === undefined || this.cursor < revision) await this.synchronize()
+    const applied = this.currentRevision()
+    if (applied === undefined || applied < revision) await this.synchronize()
     return this.matchesRevision(revision)
   }
 
@@ -206,10 +208,10 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
    * @param revision - primary-approved revision.
    * @returns whether listeners have applied it and the monitor remains available.
    */
-  matchesRevision(revision: bigint): boolean { return this.available && this.cursor === revision }
+  matchesRevision(revision: bigint): boolean { return this.currentRevision() === revision }
 
   /** @returns current applied organization access revision while LISTEN is live and caught up. */
-  currentRevision(): bigint | undefined { return this.available ? this.cursor : undefined }
+  currentRevision(): bigint | undefined { return this.available && !this.pendingApplication ? this.cursor : undefined }
 
   /**
    * Skip a tunnel database query when the connected LISTEN monitor is already at or beyond `revision`.
@@ -217,9 +219,11 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
    * @returns whether the monitor is available and applied through at least `revision`.
    */
   async ensureAtLeast(revision: bigint): Promise<boolean> {
-    if (this.available && this.cursor !== undefined && this.cursor >= revision) return true
+    const applied = this.currentRevision()
+    if (applied !== undefined && applied >= revision) return true
     await this.synchronize()
-    return this.available && this.cursor !== undefined && this.cursor >= revision
+    const current = this.currentRevision()
+    return current !== undefined && current >= revision
   }
 
   private readFresh(): NonNullable<PostgresAccessMonitor['flight']> {
@@ -317,6 +321,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
 
   private disconnect(): void {
     this.caughtUp = false
+    this.pendingApplication = false
     this.nodeStatus = undefined
     const client = this.client
     this.client = undefined
@@ -389,6 +394,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
     // runtime projection. Reconnects always retain this process's own cursor.
     const initial = this.cursor ?? BigInt(organization.access_applied_revision)
     if (initial > target) throw new Error('access invalidation revision moved backwards')
+    this.pendingApplication = initial < target
     let cursor = initial
     const changes = new Map<string, AccessInvalidationSubject>()
     while (cursor < target) {
@@ -432,6 +438,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
       if (acknowledged.rowCount !== 1) throw new Error('access invalidation compute node disappeared')
     }
     this.cursor = cursor
+    this.pendingApplication = false
     this.lastDrainAt = performance.now()
     this.unavailable = false
     this.caughtUp = true

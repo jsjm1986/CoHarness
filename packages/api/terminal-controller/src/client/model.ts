@@ -274,14 +274,13 @@ export class TerminalView {
           await channel.write(input.data)
           return
         } catch (error) {
-          if (error instanceof TerminalInputChannelClosedError) {
-            this.dropInputChannel(attachmentId)
+          const sent = error instanceof TerminalInputChannelClosedError
+          if (!sent && !(error instanceof TerminalInputChannelUnavailableError)) throw error
+          if (this.inputChannel?.channel === channel) {
+            this.dropInputChannel()
             this.scheduleInputChannelReconnect(id, attachmentId)
-            return
           }
-          if (!(error instanceof TerminalInputChannelUnavailableError)) throw error
-          this.dropInputChannel(attachmentId)
-          this.scheduleInputChannelReconnect(id, attachmentId)
+          if (sent) return
         }
       }
       valueOf(await this.remote.write(this.sessionId, id, attachmentId, input.data))
@@ -312,8 +311,10 @@ export class TerminalView {
           return
         } catch (error) {
           if (error instanceof TerminalInputChannelClosedError || error instanceof TerminalInputChannelUnavailableError) {
-            this.dropInputChannel(attachmentId)
-            this.scheduleInputChannelReconnect(id, attachmentId)
+            if (this.inputChannel?.channel === channel) {
+              this.dropInputChannel()
+              this.scheduleInputChannelReconnect(id, attachmentId)
+            }
           } else {
             throw error
           }
@@ -386,11 +387,18 @@ export class TerminalView {
     if (this.inputChannel?.attachmentId === attachmentId) return
     this.dropInputChannel()
     const channel = this.openInputChannel({ sessionId: this.sessionId, terminalId, attachmentId })
-    if (channel !== undefined) this.inputChannel = { attachmentId, channel }
+    if (channel === undefined) return
+    this.inputChannel = { attachmentId, channel }
+    const disconnected = (): void => {
+      if (this.inputChannel?.channel !== channel) return
+      this.inputChannel = undefined
+      this.scheduleInputChannelReconnect(terminalId, attachmentId)
+    }
+    channel.signal?.addEventListener('abort', disconnected, { once: true })
+    if (channel.signal?.aborted === true) disconnected()
   }
 
   private scheduleInputChannelReconnect(terminalId: WebTerminalId, attachmentId: TerminalAttachmentId): void {
-    if (this.stopped() || this.attachmentId !== attachmentId) return
     this.inputReconnectTimer = setTimeout(() => {
       this.inputReconnectTimer = undefined
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable || this.stopped()) return
@@ -398,13 +406,12 @@ export class TerminalView {
     }, this.inputReconnectDelayMs)
   }
 
-  private dropInputChannel(attachmentId?: TerminalAttachmentId): void {
+  private dropInputChannel(): void {
     if (this.inputReconnectTimer !== undefined) {
       clearTimeout(this.inputReconnectTimer)
       this.inputReconnectTimer = undefined
     }
     if (this.inputChannel === undefined) return
-    if (attachmentId !== undefined && this.inputChannel.attachmentId !== attachmentId) return
     const current = this.inputChannel
     this.inputChannel = undefined
     current.channel.close()

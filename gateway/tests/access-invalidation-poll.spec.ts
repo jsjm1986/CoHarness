@@ -35,6 +35,36 @@ class FakeListenerClient extends EventEmitter {
 
 afterEach(() => { vi.useRealTimers() })
 
+it('fences cached revisions while control readiness can observe a pending revocation', async () => {
+  const client = new FakeListenerClient()
+  const pool = { connect: async () => client }
+  const monitor = new PostgresAccessMonitor(
+    { pool: pool as never, organizationId: 'org-1', organizationSlug: 'org', nodeName: 'node-1', nodeId: 'node-1' },
+    1_000,
+  )
+  let enter!: () => void, release!: () => void
+  const entered = new Promise<void>(resolve => { enter = resolve })
+  const cleanup = new Promise<void>(resolve => { release = resolve })
+  monitor.subscribe(async () => { enter(); await cleanup })
+  try {
+    await monitor.synchronize()
+    client.revision = '3'
+    const synchronize = monitor.synchronize()
+    await entered
+    await expect(monitor.checkControlReadiness()).resolves.toBeUndefined()
+    expect(monitor.currentRevision()).toBeUndefined()
+    expect(monitor.matchesRevision(1n)).toBe(false)
+    const recheck = monitor.synchronizeTo(1n)
+    release()
+    await synchronize
+    await expect(recheck).resolves.toBe(false)
+    expect(monitor.currentRevision()).toBe(3n)
+  } finally {
+    release()
+    await monitor.close()
+  }
+})
+
 it('backs off periodic polling to healthyPollMs while LISTEN is healthy and wakes immediately on NOTIFY or disconnect', async () => {
   vi.useFakeTimers()
   const clients: FakeListenerClient[] = []

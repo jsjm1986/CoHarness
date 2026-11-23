@@ -92,6 +92,8 @@ export function DeploymentPage() {
     sections: null,
   }))
   const [error, setError] = useState('')
+  const [deploymentReadError, setDeploymentReadError] = useState('')
+  const [backupReadError, setBackupReadError] = useState('')
   const [notice, setNotice] = useState('')
   const [reason, setReason] = useState('')
   const [acting, setActing] = useState(false)
@@ -126,12 +128,22 @@ export function DeploymentPage() {
       queued.current = next
       return next
     }
-    const fetchLegacy = (): Promise<void> =>
-      Promise.all([getDeployment(owner.signal), listBackups(owner.signal)]).then(([next, list]) => {
+    const accessDenied = (cause: unknown): boolean => cause instanceof AdminRequestError && (cause.status === 401 || cause.status === 403)
+    const applySection = <T,>(read: Promise<T>, publish: (value: T | null) => void, publishError: (message: string) => void) =>
+      read.then(value => {
+        if (!owner.signal.aborted) { publish(value); publishError('') }
+      }, cause => {
         if (owner.signal.aborted) return
-        lastFetchedAt.current = Date.now()
-        setState(next); setBackups(list.backups); setError('')
+        if (accessDenied(cause)) publish(null)
+        publishError(messageOf(cause))
       })
+    const applyReads = async (stateRead: Promise<DeploymentState>, backupRead: Promise<{ backups: DeploymentBackup[] }>): Promise<void> => {
+      await Promise.all([
+        applySection(stateRead, setState, setDeploymentReadError),
+        applySection(backupRead, list => setBackups(list?.backups ?? null), setBackupReadError),
+      ])
+    }
+    const fetchLegacy = (): Promise<void> => applyReads(getDeployment(owner.signal), listBackups(owner.signal))
     const sectionsToLoad: readonly DeploymentOverviewSectionKey[] = !seeded.current
       ? initialSectionsRef.current
       : ['deployment', 'backups']
@@ -145,21 +157,19 @@ export function DeploymentPage() {
     const request = (overviewSupported.current
       ? getDeploymentOverview(sectionsToLoad, owner.signal).then(response => {
         if (owner.signal.aborted) return
+        const sections = response?.sections ?? {}
         const isInitial = !seeded.current
         if (isInitial) {
           seeded.current = true
-          setOverview({ status: 'ready', requested: new Set(sectionsToLoad), sections: response.sections })
+          setOverview({ status: 'ready', requested: new Set(sectionsToLoad), sections })
         }
-        lastFetchedAt.current = Date.now()
-        const deploymentSlice = response.sections.deployment
-        const backupsSlice = response.sections.backups
-        if (deploymentSlice === undefined || backupsSlice === undefined) {
-          throw new Error('Incomplete deployment overview response')
-        }
-        const nextState = unwrapDeploymentOverviewSlice(deploymentSlice)
-        const nextBackups = unwrapDeploymentOverviewSlice(backupsSlice)
-        setState(nextState); setBackups(nextBackups.backups); setError('')
-      }).catch(cause => {
+        const deploymentSlice = sections.deployment
+        const backupsSlice = sections.backups
+        return applyReads(
+          deploymentSlice === undefined ? getDeployment(owner.signal) : Promise.resolve().then(() => unwrapDeploymentOverviewSlice(deploymentSlice)),
+          backupsSlice === undefined ? listBackups(owner.signal) : Promise.resolve().then(() => unwrapDeploymentOverviewSlice(backupsSlice)),
+        )
+      }, cause => {
         if (owner.signal.aborted) return
         if (cause instanceof AdminRequestError && cause.status === 404) {
           overviewSupported.current = false
@@ -173,12 +183,13 @@ export function DeploymentPage() {
           seeded.current = true
           setOverview({ status: 'fallback', requested: new Set(), sections: null })
         }
-        throw cause
+        if (accessDenied(cause)) { setState(null); setBackups(null) }
+        const message = messageOf(cause)
+        setDeploymentReadError(message); setBackupReadError(message)
       })
       : fetchLegacy()
-    ).catch(cause => {
-      if (!owner.signal.aborted) setError(messageOf(cause))
-    }).finally(() => {
+    ).finally(() => {
+      if (!owner.signal.aborted) lastFetchedAt.current = Date.now()
       clearTimeout(hedge)
       if (flight.current === request) flight.current = undefined
     })
@@ -237,7 +248,8 @@ export function DeploymentPage() {
       {notice === '' ? null : <p role="status">{notice}</p>}
 
       <Section title={t('clusterTitle')} meta={state === null ? undefined : t('writeEpochMeta', { value: state.writeEpoch })}>
-        {state === null || mode === null ? error === '' ? <LoadingState label={t('loadingCluster')} /> : null : (
+        <ErrorBanner message={deploymentReadError} />
+        {state === null || mode === null ? deploymentReadError === '' ? <LoadingState label={t('loadingCluster')} /> : null : (
           <div className="deploymentStatus">
             <div className="statusRow">
               <StatusBadge tone={mode.tone}>{t(mode.labelKey)}</StatusBadge>
@@ -345,7 +357,8 @@ export function DeploymentPage() {
         actions={<Button icon={DatabaseBackup} disabled={acting || state?.mode !== 'maintenance' || !state.writersQuiesced}
           onClick={() => void run(async () => { await createBackup() }, t('noticeBackupDone'))}>{t('backupNow')}</Button>}
       >
-        {backups === null ? error === '' ? <LoadingState label={t('loadingBackups')} /> : null : backups.length === 0 ? (
+        <ErrorBanner message={backupReadError} />
+        {backups === null ? backupReadError === '' ? <LoadingState label={t('loadingBackups')} /> : null : backups.length === 0 ? (
           <EmptyState title={t('backupsEmptyTitle')} detail={t('backupsEmptyDetail')} />
         ) : (
           <div className="tableWrap" role="region" aria-label={t('backupsTableAria')} tabIndex={0}>

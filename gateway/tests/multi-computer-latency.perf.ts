@@ -478,6 +478,7 @@ export async function runMultiComputerBenchmark(options: MultiComputerBenchmarkO
       id: `plugin-item-${i}`, title: 'Multi-computer plugin module payload', version: '1.0.0',
     }))) + ';\n'
     const pluginBytes = Buffer.byteLength(pluginPayload, 'utf8')
+    const pluginStartedAt = Date.now()
     let remotePluginFetches = 0
     const pluginAssets = new RuntimeAssets({
       cfg: centerConfig,
@@ -491,14 +492,14 @@ export async function runMultiComputerBenchmark(options: MultiComputerBenchmarkO
             accessRevision: '1',
             expiresAt: Date.now() + 60_000,
             placement: { local: false, resetScope: false, target: 'personal', environment },
-            snapshot: { target: { kind: 'user', id: admin.id, runtimeId: environment.id }, state: 'ready', generation: 1, port: 1, launchStamp: 's', startedAt: Date.now() },
+            snapshot: { target: { kind: 'user', id: admin.id, runtimeId: environment.id }, state: 'ready', generation: 1, port: 1, launchStamp: 's', startedAt: pluginStartedAt },
           }
         },
       },
       instances: { retainAsset: async () => null },
       monitor: { available: true, synchronize: async () => {}, synchronizeTo: async () => true, subscribe: () => () => {} },
       signer: new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'perf', 30_000),
-      forward: async (_req, res, _actor, _placement, capture) => {
+      forward: async (_req, res, _actor, _placement, _generation, capture) => {
         remotePluginFetches += 1
         if (TUNNEL_PG_RTT_MS > 0) await delay(TUNNEL_PG_RTT_MS)
         res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', etag: '"rev-012345abcdef"' })
@@ -506,6 +507,7 @@ export async function runMultiComputerBenchmark(options: MultiComputerBenchmarkO
         capture?.onComplete({
           status: 200,
           contentType: 'text/javascript; charset=utf-8',
+          freshUntil: Date.now() + 60_000,
           etag: '"rev-012345abcdef"',
           body: Buffer.from(pluginPayload, 'utf8'),
         })
