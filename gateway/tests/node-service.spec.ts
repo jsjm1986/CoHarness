@@ -204,8 +204,8 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
   const remoteDeps = makeDeps(remoteConfig, nodeId), centerDeps = makeDeps(centerConfig, localNodeId)
   if (key !== undefined) {
     const pem = key.publicKey.export({ format: 'pem', type: 'spki' }).toString()
-    const publishedKeyCandidate = (id: RuntimeNodeId) => id === localNodeId ? pem : null
-    Object.assign(remoteDeps, createGatewayForwardAuthority({ issuerKey: async id => publishedKeyCandidate(id), publishedKeyCandidate },
+    const publishedKeyCandidate = (id: string) => id === localNodeId ? pem : null
+    Object.assign(remoteDeps, createGatewayForwardAuthority({ issuerKey: async id => id === localNodeId ? key.publicKey : null, publishedKeyCandidate },
       { audienceNode: nodeId, organization: lease.organizationId }, 30_000))
   }
   const centerRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(centerDeps), { localNodeId, catalog })
