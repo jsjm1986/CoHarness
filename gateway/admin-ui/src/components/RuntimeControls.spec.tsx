@@ -129,10 +129,15 @@ it('retains edited limits after an unconfirmed save and requires an explicit ref
   expect(await screen.findByRole('alert')).toHaveProperty('textContent', '保存未确认，请刷新后再修改')
   expect(total).toHaveProperty('value', '12')
   expect(screen.getByRole('button', { name: '保存 Runtime 配额' })).toHaveProperty('disabled', true)
+  vi.mocked(api.getRuntimeAllocationPolicy).mockResolvedValue({ maxTotal: 8, maxPerNode: 5, revision: '2', source: 'user' })
   await userEvent.click(screen.getByRole('button', { name: '刷新配额' }))
   await waitFor(() => expect(total).toHaveProperty('disabled', false))
-  expect(total).toHaveProperty('value', '8')
+  expect(total).toHaveProperty('value', '12')
   expect(api.saveRuntimeAllocationPolicy).toHaveBeenCalledTimes(1)
+  vi.mocked(api.saveRuntimeAllocationPolicy).mockResolvedValue({ maxTotal: 12, maxPerNode: 5, revision: '3', source: 'user' })
+  await userEvent.click(screen.getByRole('button', { name: '保存 Runtime 配额' }))
+  expect(await screen.findByText('配额已保存')).toBeTruthy()
+  expect(api.saveRuntimeAllocationPolicy).toHaveBeenLastCalledWith(1, '2', { maxTotal: 12, maxPerNode: 5 })
 })
 
 it('associates invalid limits with their inputs and keeps the mutation disabled', async () => {

@@ -139,6 +139,19 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
       const replayOverride = join(root, 'reply.json')
       await writeFile(replayOverride, JSON.stringify([{ kind: 'chunks', chunks: syntheticReply() }]))
       const scaffold = await launchWebScaffold({ replayFixture: join(root, 'override-only.jsonl'), replayOverride, paceMs: PACE_MS, replayContextWindow: 10000000 })
+      const inputObserved = Promise.withResolvers<undefined>()
+      let completionHoldMs = 0
+      // Keep the fixture stream open until Chromium has delivered the trusted input probe.
+      const stopProbe = scaffold.ctx.on('llm/stream', async function* (_options, next) {
+        for await (const chunk of next()) {
+          if (chunk.type === 'text-delta' && chunk.text === DONE) {
+            const heldAt = performance.now()
+            await inputObserved.promise
+            completionHoldMs = performance.now() - heldAt
+          }
+          yield chunk
+        }
+      }, { global: true, prepend: true })
       try {
         const history = syntheticHistory()
         await seedSession(scaffold, history, SESSION_ID)
@@ -218,6 +231,7 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
             await expect.poll(() => composer.textContent()).toBe('next synthetic question')
           })
           const inputOverlapped = await composer.getAttribute('data-benchmark-input-overlap') === 'true'
+          inputObserved.resolve(undefined)
           const firstObservation = await firstMarker.jsonValue()
           await firstMarker.dispose()
           console.log(JSON.stringify({ benchmark: 'long-session-browser/input', sample, first, input, firstObservation, witness: await composer.getAttribute('data-benchmark-input-witness'), inputTiming: await composer.getAttribute('data-benchmark-input-timing') }))
@@ -227,14 +241,14 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
           if (!settlement.ok) throw settlement.error
           await page.waitForFunction(({ selector, expected }) => document.querySelectorAll(selector).length === expected, { selector: TAIL, expected: HISTORY_TURNS + 1 })
           await painted(page)
-          const streamWall = performance.now() - started
+          const streamWall = performance.now() - started - completionHoldMs
           const streamTask = await taskMs(cdp) - beforeTask
           await cdp.send('HeapProfiler.collectGarbage')
           const metrics = (await cdp.send('Performance.getMetrics')).metrics
           const heap = metrics.find(metric => metric.name === 'JSHeapUsedSize')
           if (heap === undefined) throw new Error('Chromium heap metric missing')
           samples.push({ startup, returnToChat, open, page: Math.max(...pages), trajectory, first, streamTask, streamWall, input, inputOverlapped, heapMb: heap.value / 1048576, nodes: await page.locator('*').count() })
-          console.log(JSON.stringify({ benchmark: 'long-session-browser/sample', sample, initialTurns, pages, ...samples.at(-1) }))
+          console.log(JSON.stringify({ benchmark: 'long-session-browser/sample', sample, initialTurns, pages, completionHoldMs, ...samples.at(-1) }))
           await watchInputOverlap(composer)
           await composer.click()
           await page.keyboard.type('!')
@@ -247,6 +261,8 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
           await browser.close().catch((error: unknown) => failures.push(error))
         }
       } catch (error) { failures.push(error) } finally {
+        inputObserved.resolve(undefined)
+        stopProbe()
         await scaffold.close().catch((error: unknown) => failures.push(error))
       }
     } catch (error) { failures.push(error) } finally {

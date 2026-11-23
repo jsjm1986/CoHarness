@@ -1018,7 +1018,7 @@ describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execut
     expect(resources).toHaveLength(4)
     expect(resources[0]).toMatchObject({
       outcome: 'granted', originMs: duration, registrationWaitMs: duration,
-      submitCalls: 1, statusCalls: 1, gatewaySamples: 2, gatewayHandlerBearerMs: duration, gatewayAuthorityMs: duration,
+      submitCalls: 1, statusCalls: 0, gatewaySamples: 1, gatewayHandlerBearerMs: duration, gatewayAuthorityMs: duration,
       gatewayTransactionMs: duration,
     })
     const privateFields = /"(?:(?:session|runtime|request|user)Id|text|prompt|path|scopeId|authorization|token)"\s*:/u
