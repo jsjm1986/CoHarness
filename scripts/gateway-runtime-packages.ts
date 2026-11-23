@@ -36,8 +36,9 @@ export const GATEWAY_RUNTIME_PACKAGES: readonly { readonly directory: string; re
  * Make the standalone Gateway's compiled ESM graph resolve the workspace
  * packages it imports at runtime. The Gateway is intentionally outside the
  * pnpm workspace, so a clean git-archive release does not get pnpm's usual
- * workspace symlink automatically. The relative link keeps the release
- * self-contained and survives copying the complete release directory.
+ * workspace link automatically. POSIX relative links survive copying the
+ * release. Create Windows junctions in the final release directory, where
+ * their absolute targets stay valid.
  * @param root - absolute release root containing the Gateway and workspace packages.
  */
 export function ensureGatewayRuntimePackages(root: string): void {
@@ -63,7 +64,8 @@ export function ensureGatewayRuntimePackages(root: string): void {
       }
       continue
     }
-    symlinkSync(relative(dirname(link), packageRoot), link, 'dir')
+    if (process.platform === 'win32') symlinkSync(expected, link, 'junction')
+    else symlinkSync(relative(dirname(link), packageRoot), link, 'dir')
   }
 }
 /**

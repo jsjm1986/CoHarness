@@ -18,6 +18,8 @@
 
 执行数据库备份或恢复的节点还需要匹配 PostgreSQL 安装的[私密连接适配器](postgres/README.zh.md#private-maintenance-connections)；启用维护命令前，应在实际执行主机上构建。普通 Gateway 和节点代理构建不要求 C 工具链。
 
+Windows 节点先把发布包放入最终目录，再从该目录运行 `pnpm exec tsx scripts/gateway-runtime-packages.ts`，为发布包内已构建的工作区包创建目录联接。在 Windows 上按锁文件安装依赖，由 pnpm 为目标平台创建原生依赖链接。记录该平台的 Runtime 指纹后，在切换前从同一目录运行 `pnpm run build:production --verify-only`。
+
 1. 复制构建完成的 `gateway/` 目录，以及 `scripts/gateway-runtime-packages.ts` 中 `GATEWAY_RUNTIME_PACKAGES` 列出的每个相邻包，并保留各自相对于仓库根目录的位置；`build:production` 会在 `gateway/lib/` 生成 Gateway 入口及其本地模块，并创建编译 ESM 图所需的相对链接 `gateway/node_modules/@deepseek-ai/*`——对应 `GATEWAY_RUNTIME_PACKAGES` 中的每个 workspace 包；缺任一条链接的编译 release 会被 `validate_release` 拒绝。使用生产 Node 在 Gateway 目录执行 `npm install && npm rebuild better-sqlite3 argon2`，然后由纯 Node 启动 `lib/index.js`。编译后的 Gateway 保留 `@deepseek-ai/dsh-llm/discovery` 包导入，因此相邻包的构建 `lib/` 与生成的链接都必须包含在 release 中；新激活不使用源码 `tsx` loader，release controller 仍允许把只有源码的旧 release 作为回滚目标。`public/admin` 已被 gitignore，因此只能在 `build:production` 生成该目录后再从 checkout 复制。同样要把 `native/system/` 复制到 `/srv/harness/native/system`：flock 绑定与 Landlock launcher 的 `bin/` 产物都被 gitignore，源码归档本身无法提供它们，宿主平台载荷缺失的编译 release 会被 `validate_release` 拒绝。
 2. 把构建完成的 `plugins/dsh-directory-guard/` 目录复制到 `/srv/harness/plugins/dsh-directory-guard`，把 `plugins/dsh-model-governance/` 复制到 `/srv/harness/plugins/dsh-model-governance`。钉死的 npm dsh 以纯 Node 运行插件 `lib/`，不使用 tsx。即使 `HGW_GUARD_PATCH=off`，模型治理仍是强制项。
 3. 把公司默认凭据写入 `/srv/harness/gateway-data/company.env`（`DEEPSEEK_API_KEY=...`，权限 600）。每次运行时启动都会把它复制到 `$DSH_HOME/.env`；用户在 Settings 里设置的个人 key 存放于 `.credentials.yaml`，优先级更高，共享项目运行时则把凭据设置暴露为只读并使用公司来源。
