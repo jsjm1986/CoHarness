@@ -323,6 +323,84 @@ interface RuntimeProviderProjection {
   models: Map<unknown, Record<string, unknown>>
 }
 
+type RuntimePolicyRow = {
+  provider: string
+  model: string
+  provider_enabled: boolean
+  model_enabled: boolean
+  allowed: boolean
+  project_owned: boolean
+  display_name: string
+  credential_ref: string | null
+  model_name: string
+} & (
+  { profile: Record<string, unknown>; protocol: ModelProviderProtocol; base_url: string }
+  | { profile: null; protocol: ModelProviderProtocol | null; base_url: string | null }
+)
+
+const runtimePolicyColumns = `provider.provider_key provider,model.model_key model,
+  (provider.status='enabled') provider_enabled,model.enabled model_enabled,
+  provider.display_name,provider.protocol,provider.base_url,provider.credential_ref,
+  CASE WHEN provider.status='enabled' AND model.enabled THEN provider.profile END profile,
+  model.display_name model_name`
+
+function runtimePolicyFromRows(version: number, rows: readonly RuntimePolicyRow[], projectId?: number): RuntimeModelPolicy {
+  const providers = new Map<string, RuntimeProviderProjection>()
+  const models: RuntimeModelPolicy['models'] = []
+  for (const row of rows) {
+    const owningProject = row.project_owned ? projectId : undefined
+    const route = owningProject === undefined ? row.provider : projectRuntimeProviderKey(owningProject, row.provider)
+    models.push({ provider: route, model: row.model, allowed: row.provider_enabled && row.model_enabled && row.allowed })
+    if (row.profile === null) continue
+
+    const key = row.project_owned ? `project:${row.provider}` : `organization:${row.provider}`
+    let projection = providers.get(key)
+    if (projection === undefined) {
+      const profile = runtimeManagedProfile(row.profile)
+      // The projected profile and the provider must carry the same canonical endpoint.
+      if (profile.baseURL !== undefined) profile.baseURL = row.base_url
+      const provider: RuntimeModelProvider = {
+        provider: route,
+        displayName: row.display_name,
+        driver: 'pi-ai',
+        protocol: row.protocol,
+        baseURL: row.base_url,
+        ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
+        profile,
+        models: [],
+        ...owningProject === undefined ? { scope: 'organization' } : { scope: 'project', projectId: owningProject },
+      }
+      projection = { provider, models: indexedProfileModels(profile) }
+      providers.set(key, projection)
+    }
+    const configured = projection.models.get(row.model)
+    const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
+    const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
+    const input = Array.isArray(configured?.input)
+      ? configured.input.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
+      : undefined
+    const reasoningEfforts = configured?.reasoningEfforts === false
+      ? false
+      : configured?.reasoningEfforts !== undefined
+        && typeof configured.reasoningEfforts === 'object' && configured.reasoningEfforts !== null
+        ? configured.reasoningEfforts as RuntimeModelProvider['models'][number]['reasoningEfforts']
+        : undefined
+    const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
+      ? configured.compat as RuntimeModelProvider['models'][number]['compat']
+      : undefined
+    projection.provider.models.push({
+      id: row.model,
+      name: row.model_name,
+      ...contextWindow === undefined ? {} : { contextWindow },
+      ...maxTokens === undefined ? {} : { maxTokens },
+      ...input === undefined ? {} : { input },
+      ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
+      ...compat === undefined ? {} : { compat },
+    })
+  }
+  return { version, defaultAllowed: false, models, providers: [...providers.values()].map(projection => projection.provider) }
+}
+
 interface UsageTotalsRow {
   input: string
   output: string
@@ -1189,15 +1267,8 @@ export class PostgresModelGovernanceService {
         WHERE u.organization_id=$1 AND u.public_id=$2 AND u.status='active' AND u.deleted_at IS NULL
           AND m.status='active' AND o.status='active' FOR SHARE OF u,m`, [this.context.organizationId, user.id])).rows[0]
       if (account === undefined) throw new CollaborationDeniedError('forbidden')
-      const result = await client.query<{
-        provider: string
-        model: string
-        provider_enabled: boolean
-        model_enabled: boolean
-        allowed: boolean
-      }>(`SELECT model.provider_key provider,model.model_key model,
-        (provider.status='enabled') provider_enabled,model.enabled model_enabled,
-        COALESCE(access.allowed,role_access.allowed,$3='admin') allowed
+      const { rows } = await client.query<RuntimePolicyRow>(`SELECT ${runtimePolicyColumns},
+        COALESCE(access.allowed,role_access.allowed,$3='admin') allowed,false project_owned
         FROM harness.model_catalog model
         JOIN harness.model_providers provider ON provider.id=model.provider_id
           AND provider.organization_id=model.organization_id
@@ -1208,16 +1279,7 @@ export class PostgresModelGovernanceService {
         WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
         ORDER BY model.provider_key,model.model_key`,
       [this.context.organizationId, account.id, account.role])
-      return {
-        version,
-        defaultAllowed: false,
-        models: result.rows.map(row => ({
-          provider: row.provider,
-          model: row.model,
-          allowed: row.provider_enabled && row.model_enabled && row.allowed,
-        })),
-        providers: await this.runtimeProviders(client),
-      }
+      return runtimePolicyFromRows(version, rows)
     })
   }
 
@@ -1226,15 +1288,8 @@ export class PostgresModelGovernanceService {
       const project = await internalProjectId(client, this.context.organizationId, projectId)
       if (project === null) throw new Error(`unknown project ${String(projectId)}`)
       const version = await this.lockConfigurationRevision(client)
-      const result = await client.query<{
-        provider: string
-        model: string
-        provider_enabled: boolean
-        model_enabled: boolean
-        allowed: boolean
-      }>(`SELECT model.provider_key provider,model.model_key model,
-        (provider.status='enabled') provider_enabled,model.enabled model_enabled,
-        COALESCE(access.allowed,project.model_access_default_allowed) allowed
+      const { rows } = await client.query<RuntimePolicyRow>(`SELECT ${runtimePolicyColumns},
+        COALESCE(access.allowed,project.model_access_default_allowed) allowed,false project_owned
         FROM harness.model_catalog model
         JOIN harness.model_providers provider ON provider.id=model.provider_id
           AND provider.organization_id=model.organization_id
@@ -1242,42 +1297,15 @@ export class PostgresModelGovernanceService {
         LEFT JOIN harness.model_project_access access ON access.organization_id=model.organization_id
           AND access.model_id=model.id AND access.project_id=$2
         WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
-        ORDER BY model.provider_key,model.model_key`,
-      [this.context.organizationId, project])
-      const projectModels = await client.query<{
-        provider: string
-        model: string
-        provider_enabled: boolean
-        model_enabled: boolean
-      }>(`SELECT model.provider_key provider,model.model_key model,
-        (provider.status='enabled') provider_enabled,model.enabled model_enabled
+        UNION ALL
+        SELECT ${runtimePolicyColumns},true allowed,true project_owned
         FROM harness.project_model_catalog model
         JOIN harness.project_model_providers provider ON provider.id=model.provider_id
           AND provider.project_id=model.project_id
         WHERE model.organization_id=$1 AND model.project_id=$2
           AND provider.status <> 'archived'
-        ORDER BY model.provider_key,model.model_key`, [this.context.organizationId, project])
-      const projectRoutes = projectModels.rows.map(row => ({
-        provider: projectRuntimeProviderKey(projectId, row.provider),
-        model: row.model,
-        allowed: row.provider_enabled && row.model_enabled,
-      }))
-      return {
-        version,
-        defaultAllowed: false,
-        models: [
-          ...result.rows.map(row => ({
-          provider: row.provider,
-          model: row.model,
-          allowed: row.provider_enabled && row.model_enabled && row.allowed,
-          })),
-          ...projectRoutes,
-        ],
-        providers: [
-          ...await this.runtimeProviders(client),
-          ...await this.runtimeProjectProviders(client, project, projectId),
-        ],
-      }
+        ORDER BY project_owned,provider,model`, [this.context.organizationId, project])
+      return runtimePolicyFromRows(version, rows, projectId)
     })
   }
 
@@ -2845,145 +2873,5 @@ export class PostgresModelGovernanceService {
     const revision = result.rows[0]?.revision
     if (revision === undefined) throw new Error('organization model configuration revision is unavailable')
     return safeCount(revision, 'organization model configuration revision')
-  }
-
-  private async runtimeProviders(queryable: Queryable): Promise<RuntimeModelProvider[]> {
-    const result = await queryable.query<{
-      provider: string
-      display_name: string
-      protocol: ModelProviderProtocol
-      base_url: string
-      credential_ref: string | null
-      profile: Record<string, unknown>
-      model_id: string
-      model_name: string
-    }>(`SELECT provider.provider_key provider,provider.display_name,provider.protocol,
-      provider.base_url,provider.credential_ref,provider.profile,model.model_key model_id,model.display_name model_name
-      FROM harness.model_providers provider
-      JOIN harness.model_catalog model ON model.organization_id=provider.organization_id
-        AND model.provider_id=provider.id
-        AND model.enabled
-      WHERE provider.organization_id=$1 AND provider.source='managed' AND provider.status='enabled'
-      ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId])
-    const providers = new Map<string, RuntimeProviderProjection>()
-    for (const row of result.rows) {
-      let projection = providers.get(row.provider)
-      if (projection === undefined) {
-        const profile = runtimeManagedProfile(row.profile)
-        // Runtime validation requires an embedded profile URL to equal the
-        // canonical Provider URL; older settings may retain a trailing slash.
-        if (profile.baseURL !== undefined) profile.baseURL = row.base_url
-        const provider: RuntimeModelProvider = {
-          provider: row.provider,
-          displayName: row.display_name,
-          driver: 'pi-ai',
-          protocol: row.protocol,
-          baseURL: row.base_url,
-          ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
-          profile,
-          models: [],
-          scope: 'organization',
-        }
-        projection = { provider, models: indexedProfileModels(profile) }
-        providers.set(row.provider, projection)
-      }
-      const configured = projection.models.get(row.model_id)
-      const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
-      const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
-      const input = Array.isArray(configured?.input)
-        ? configured.input.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
-        : undefined
-      const reasoningEfforts = configured?.reasoningEfforts === false
-        ? false
-        : configured?.reasoningEfforts !== undefined
-          && typeof configured.reasoningEfforts === 'object' && configured.reasoningEfforts !== null
-          ? configured.reasoningEfforts as RuntimeModelProvider['models'][number]['reasoningEfforts']
-          : undefined
-      const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
-        ? configured.compat as RuntimeModelProvider['models'][number]['compat']
-        : undefined
-      projection.provider.models.push({
-        id: row.model_id,
-        name: row.model_name,
-        ...contextWindow === undefined ? {} : { contextWindow },
-        ...maxTokens === undefined ? {} : { maxTokens },
-        ...input === undefined ? {} : { input },
-        ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
-        ...compat === undefined ? {} : { compat },
-      })
-    }
-    return [...providers.values()].map(projection => projection.provider)
-  }
-
-  /** Project-owned Provider projection, with runtime-prefixed route ids. */
-  private async runtimeProjectProviders(
-    queryable: Queryable,
-    projectInternalId: string,
-    projectId: number,
-  ): Promise<RuntimeModelProvider[]> {
-    const result = await queryable.query<{
-      provider: string
-      display_name: string
-      protocol: ModelProviderProtocol
-      base_url: string
-      credential_ref: string | null
-      profile: Record<string, unknown>
-      model_id: string
-      model_name: string
-    }>(`SELECT provider.provider_key provider,provider.display_name,provider.protocol,
-      provider.base_url,provider.credential_ref,provider.profile,model.model_key model_id,model.display_name model_name
-      FROM harness.project_model_providers provider
-      JOIN harness.project_model_catalog model ON model.organization_id=provider.organization_id
-        AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
-      WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.status='enabled'
-      ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId, projectInternalId])
-    const providers = new Map<string, RuntimeProviderProjection>()
-    for (const row of result.rows) {
-      const runtimeProvider = projectRuntimeProviderKey(projectId, row.provider)
-      let projection = providers.get(runtimeProvider)
-      if (projection === undefined) {
-        const profile = runtimeManagedProfile(row.profile)
-        if (profile.baseURL !== undefined) profile.baseURL = row.base_url
-        const provider: RuntimeModelProvider = {
-          provider: runtimeProvider,
-          displayName: row.display_name,
-          driver: 'pi-ai',
-          protocol: row.protocol,
-          baseURL: row.base_url,
-          ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
-          profile,
-          models: [],
-          scope: 'project',
-          projectId,
-        }
-        projection = { provider, models: indexedProfileModels(profile) }
-        providers.set(runtimeProvider, projection)
-      }
-      const configured = projection.models.get(row.model_id)
-      const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
-      const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
-      const input = Array.isArray(configured?.input)
-        ? configured.input.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
-        : undefined
-      const reasoningEfforts = configured?.reasoningEfforts === false
-        ? false
-        : configured?.reasoningEfforts !== undefined
-          && typeof configured.reasoningEfforts === 'object' && configured.reasoningEfforts !== null
-          ? configured.reasoningEfforts as RuntimeModelProvider['models'][number]['reasoningEfforts']
-          : undefined
-      const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
-        ? configured.compat as RuntimeModelProvider['models'][number]['compat']
-        : undefined
-      projection.provider.models.push({
-        id: row.model_id,
-        name: row.model_name,
-        ...contextWindow === undefined ? {} : { contextWindow },
-        ...maxTokens === undefined ? {} : { maxTokens },
-        ...input === undefined ? {} : { input },
-        ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
-        ...compat === undefined ? {} : { compat },
-      })
-    }
-    return [...providers.values()].map(projection => projection.provider)
   }
 }

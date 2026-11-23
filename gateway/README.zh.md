@@ -554,6 +554,8 @@ Gateway 通过启动检查并绑定 HTTP 监听器后，在后台校准模型策
 
 仅管理员可访问的 `GET /admin/api/performance` 提供服务节点的 `modelPolicyProjection`、`databasePool`、`nodeForwarding` 与 `runtimeAssets`，`GET /admin/api/deployment/overview` 在一次压缩读取中聚合部署页初始分区。`modelPolicyProjection.status` 包括 `idle`（空闲）、`in-progress`（执行中）、`complete`（已完成）、`paused`（暂停）和 `stopped`（已停止）。一轮尝试结束后，`issueCount` 表示该轮问题总数，`issues` 最多列出 32 条，包含目录、所有者或 Runtime 标识及已识别的错误码。`complete` 表示扫描和重试都已结束，仍可能含有 `failed` 条目。接口直接读取内存快照。
 
+PostgreSQL 取得目录版本锁后，在同一条语句中读取模型准入结果和已启用的供应商配置。个人 Runtime 同时持有当前账户权限。组织和项目路由保留各自的作用域与凭据，冷启动和策略对账使用同一套投影。
+
 Runtime 准备及请求转发仍要求取得目标 Runtime 的当前策略。个人策略在准入后读取当前账号及成员权限。主动与惰性刷新同时比较有效内容和目录版本，因为账号角色变化不会推进该版本。凭据存储故障会保留现有策略和 intake Bearer。参见[模型策略权限指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-policy-authority/guide.zh.md)。
 
 查看停用账号时显示无有效模型访问权，同时保留已配置的覆盖项。策略刷新跳过停用账号；角色与状态组合变更会停止其个人 Runtime，不再尝试重启。重新启用后遵循当前启动授权。
