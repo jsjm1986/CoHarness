@@ -598,6 +598,8 @@ macOS 的 `release-control.sh activate <candidate> --rollback-target <directory>
 
 升级与恢复是受控操作，而不是只依赖启动迁移或 `deploy/postgres` 的 shell 脚本。`harness.cluster_control` 每个组织一行：模式（`serving`/`maintenance`/`restoring`）、节点必须确认的维护纪元、围栏陈旧写者的写纪元、以及操作员备注。`harness.deployment_operations` 是操作台账；`harness.backup_records` 登记每个转储及其受管文件清单、验证状态和取材时的写纪元。每个计算节点在 `maintenance_applied_epoch` 上报已应用的维护纪元；心跳新鲜但未确认当前纪元的节点计为活跃写者。普通离线节点继续心跳时会回到 `active`，灾难隔离节点不能重新激活。
 
+备份列表返回展示所需的元数据及是否存在带版本的清单。验证和恢复由 Gateway 读取所选记录的完整清单。
+
 维护窗口开启时，Gateway 以 503（`maintenance`）拒绝变更类 HTTP 与 runtime 调用；恢复后推进的写纪元会拒绝所有在恢复前启动的进程（`stale-epoch`）。管理端 Deployment 页与 `pnpm pg:deploy backup` 通过同一服务创建并验证备份；恢复请求由独立的 `pnpm pg:deploy restore` 应用器执行。`HGW_PGDUMP_COMMAND` 和 `HGW_PGRESTORE_COMMAND` 配置 PostgreSQL 命令封装，`HGW_PSQL_COMMAND` 可选择配套的 SQL 执行器，`HGW_BACKUP_DIR` 选择私有备份存储。
 
 PostgreSQL 命令子进程使用 Gateway 清理后的工具环境。无关的 Gateway、Runtime 和凭据类变量不会继承；标准的 `PGPASSWORD`、`PGPASSFILE` 和 `PGSSLKEY` 输入在已配置时仍然可用。自定义封装接收私密数据库输入与 PostgreSQL 设置，不依赖其他 Harness 配置。

@@ -158,7 +158,9 @@ describe('deployment admin API', () => {
     const previewNodeConfiguration = vi.fn(async (id: string) => ({ backupId: id, configFile: null,
       appliedRevision: null, values: null, incompatibleFields: [] }))
     deps.backupWork = { create, verify, previewNodeConfiguration }
-    deps.backups = { list: vi.fn(async () => [recorded]), get: vi.fn(async () => recorded), record: vi.fn(), setVerified: vi.fn() }
+    const { managedSnapshot, ...metadata } = recorded
+    const summary = { ...metadata, hasManagedSnapshot: managedSnapshot !== null }
+    deps.backups = { list: vi.fn(async () => [summary]), get: vi.fn(async () => recorded), record: vi.fn(), setVerified: vi.fn() }
     expect((await post('/admin/api/backups', {})).status).toBe(200)
     expect(create).toHaveBeenCalledExactlyOnceWith(expect.any(Number))
     expect((await post('/admin/api/backups/verify', { id: 'not-a-uuid' })).status).toBe(400)

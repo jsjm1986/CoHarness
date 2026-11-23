@@ -24,7 +24,7 @@ import {
   requestDeploymentRestore, setDeploymentNodeStatus, setMaintenance, verifyBackup,
   inspectBackupNodeConfiguration, getNodeConfiguration,
   type BackupNodeConfigurationPreview, type DeploymentOverviewSectionKey,
-  type NodeConfigurationView, type DeploymentBackup, type DeploymentNode, type DeploymentState,
+  type NodeConfigurationView, type DeploymentBackupEntry, type DeploymentNode, type DeploymentState,
 } from '../api.ts'
 import {
   Button, ConfirmDialog, Dialog, EmptyState, ErrorBanner, Field, IconButton, LoadingState,
@@ -49,7 +49,7 @@ const NODE_STATUS_LABEL: Record<DeploymentNode['status'], { labelKey: Deployment
   offline: { labelKey: 'nodeOffline', tone: 'neutral' },
 }
 
-const BACKUP_STATUS_LABEL: Record<DeploymentBackup['status'], { labelKey: DeploymentCopyKey; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
+const BACKUP_STATUS_LABEL: Record<DeploymentBackupEntry['status'], { labelKey: DeploymentCopyKey; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
   recording: { labelKey: 'backupRecording', tone: 'info' },
   verified: { labelKey: 'backupVerified', tone: 'success' },
   failed: { labelKey: 'backupFailed', tone: 'danger' },
@@ -85,7 +85,7 @@ export function DeploymentPage() {
   const initialSections = useMemo<readonly DeploymentOverviewSectionKey[]>(() => [...expectedSections], [expectedSections])
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
   const [state, setState] = useState<DeploymentState | null>(null)
-  const [backups, setBackups] = useState<DeploymentBackup[] | null>(null)
+  const [backups, setBackups] = useState<DeploymentBackupEntry[] | null>(null)
   const [overview, setOverview] = useState<DeploymentOverviewState>(() => ({
     status: 'loading',
     requested: expectedSections,
@@ -97,7 +97,7 @@ export function DeploymentPage() {
   const [notice, setNotice] = useState('')
   const [reason, setReason] = useState('')
   const [acting, setActing] = useState(false)
-  const [restoring, setRestoring] = useState<DeploymentBackup | null>(null)
+  const [restoring, setRestoring] = useState<DeploymentBackupEntry | null>(null)
   const [exiting, setExiting] = useState(false)
   const [configurationPreview, setConfigurationPreview] = useState<{ backup: BackupNodeConfigurationPreview; current: NodeConfigurationView } | null>(null)
   const lifetime = useRef<AbortController | undefined>(undefined)
@@ -137,7 +137,7 @@ export function DeploymentPage() {
         if (accessDenied(cause)) publish(null)
         publishError(messageOf(cause))
       })
-    const applyReads = async (stateRead: Promise<DeploymentState>, backupRead: Promise<{ backups: DeploymentBackup[] }>): Promise<void> => {
+    const applyReads = async (stateRead: Promise<DeploymentState>, backupRead: Promise<{ backups: DeploymentBackupEntry[] }>): Promise<void> => {
       await Promise.all([
         applySection(stateRead, setState, setDeploymentReadError),
         applySection(backupRead, list => setBackups(list?.backups ?? null), setBackupReadError),
@@ -382,7 +382,8 @@ export function DeploymentPage() {
                       }}>{t('viewBackupConfig')}</Button>
                       <IconButton label={t('verify')} icon={ShieldCheck} disabled={acting}
                         onClick={() => void run(() => verifyBackup(backup.id), t('noticeVerified'))} />
-                      {(backup.status === 'verified' || backup.status === 'restored') && backup.managedSnapshot !== null ? (
+                      {(backup.status === 'verified' || backup.status === 'restored')
+                        && ('hasManagedSnapshot' in backup ? backup.hasManagedSnapshot : backup.managedSnapshot !== null) ? (
                         <Button variant="ghost" icon={HardDriveDownload} disabled={acting || state?.mode === 'restoring'}
                           onClick={() => { setRestoring(backup) }}>{t('requestRestore')}</Button>
                       ) : null}

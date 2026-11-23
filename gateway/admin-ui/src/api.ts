@@ -1582,6 +1582,12 @@ export interface DeploymentBackup {
   error: string | null
 }
 
+/** Backup list metadata with the manifest-presence flag used by the restore action. */
+export type DeploymentBackupSummary = Omit<DeploymentBackup, 'managedSnapshot'> & { hasManagedSnapshot: boolean }
+
+/** Backup entries returned by current and older deployment endpoints. */
+export type DeploymentBackupEntry = DeploymentBackupSummary | DeploymentBackup
+
 export type DeploymentOverviewSectionKey =
   | 'deployment'
   | 'backups'
@@ -1597,7 +1603,7 @@ export type DeploymentOverviewSlice<T> =
 
 export interface DeploymentOverviewSections {
   deployment?: DeploymentOverviewSlice<DeploymentState>
-  backups?: DeploymentOverviewSlice<{ backups: DeploymentBackup[] }>
+  backups?: DeploymentOverviewSlice<{ backups: DeploymentBackupEntry[] }>
   tunnel?: DeploymentOverviewSlice<TunnelAccessView>
   nodeConfiguration?: DeploymentOverviewSlice<import('../../src/node-config-fields.ts').NodeConfigurationView>
   nodeConnection?: DeploymentOverviewSlice<NodeConnectionView>
@@ -1703,7 +1709,7 @@ export async function revokeNodeAccess(node: import('../../src/node-access.ts').
 export function requestDeploymentRestore(backupId: string): Promise<DeploymentOperation> {
   return request('/admin/api/deployment/restore', { method: 'POST', body: JSON.stringify({ backupId }) })
 }
-export function listBackups(signal?: AbortSignal): Promise<{ backups: DeploymentBackup[] }> {
+export function listBackups(signal?: AbortSignal): Promise<{ backups: DeploymentBackupEntry[] }> {
   return request('/admin/api/backups', signal === undefined ? {} : { signal })
 }
 export function createBackup(): Promise<DeploymentBackup> {

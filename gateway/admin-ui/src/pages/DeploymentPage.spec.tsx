@@ -36,7 +36,7 @@ const policy = deploymentContextSchema.parse({ mode: 'single', revision: '0',
   entry: { nodeId: '10000000-0000-4000-8000-000000000001', name: 'A' }, primary: null,
   scope: 'local', role: 'standalone', refreshAfterMs: 30000, legacyMigrationRequired: false })
 
-function overviewOf(state: api.DeploymentState, backups: api.DeploymentBackup[] = []): api.DeploymentOverviewResponse {
+function overviewOf(state: api.DeploymentState, backups: api.DeploymentBackupEntry[] = []): api.DeploymentOverviewResponse {
   return {
     sections: {
       deployment: { ok: true, value: state },
@@ -122,6 +122,23 @@ it('publishes initial overview slices to child sections and falls back to legacy
   expect(api.listBackups).toHaveBeenCalledTimes(1)
   expect(observedOverview?.status).toBe('fallback')
   view.unmount()
+})
+
+it('offers restore for verified backups with a versioned manifest in either list format', async () => {
+  const metadata = {
+    format: 'pg-dump-custom', migrationVersion: 148, writeEpoch: '1', sizeBytes: 100, sha256: null,
+    status: 'verified', createdBy: null, createdAt: '2026-11-16T00:00:00Z', verifiedAt: null, restoredAt: null, error: null,
+  } as const
+  render(<DeploymentPage />)
+  await act(async () => {
+    reads[0]!.resolve(overviewOf(await api.getDeployment(), [
+      { ...metadata, id: 'current', path: '/backups/current.dump', hasManagedSnapshot: true },
+      { ...metadata, id: 'legacy', path: '/backups/legacy.dump',
+        managedSnapshot: { version: 1, roots: [], files: [], directories: [], absent: [] } },
+      { ...metadata, id: 'shallow', path: '/backups/shallow.dump', hasManagedSnapshot: false },
+    ]))
+  })
+  expect(screen.getAllByRole('button', { name: /^请求恢复$/u })).toHaveLength(2)
 })
 
 it('displays a successful deployment section and retries the overview after a backup section 404', async () => {
