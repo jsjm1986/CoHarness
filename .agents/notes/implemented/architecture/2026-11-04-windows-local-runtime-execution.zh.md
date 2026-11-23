@@ -18,6 +18,8 @@ Windows 上的内核租约改用命名管道 `\\.\pipe\dsh-owner-<sha256(lockPat
 
 `config.ts` 的路径校验从硬编码 `posix.*` 改为平台别名（`isAbsolute`、`relative`、分隔符检查），使 `C:\harness-state` 这类根目录在 Windows 上通过校验，同时 `..` 逃逸检查继续生效。generation 提交改调 `syncStateDirectory`，它在 Windows 上空操作（NTFS 自身记录重命名；目录 `fsync` 返回 EPERM）——即 `node-private-file` 已在用的同一辅助函数。
 
+[所有权记录发布器](../../../../gateway/src/local-runtime-owner.ts) 在写入凭据或检查点之前先保护空临时文件。文件 DACL 关闭继承，仅向实际所有者、LocalSystem 和 Administrators 授予完全控制权限。每次发布在进程内调用 `SetNamedSecurityInfoW` 设置 DACL。原生绑定不可用时，既有 PowerShell 实现应用相同规则。若权限设置失败，原代次记录继续可见。
+
 ## 备选方案
 
 **保留 fd-4 描述符继承。** Node 在 Windows 上不会把任意 HANDLE 继承为 fd 槽位——实测探针报 `EBADF`——而 `stdio` 管道（fd 0-3 和 `ipc`）可以跨越，与凭证 fd3 通道的既有工作方式一致。
@@ -33,3 +35,5 @@ Windows 上的内核租约改用命名管道 `\\.\pipe\dsh-owner-<sha256(lockPat
 ## 验证
 
 在生产中心（release `coharness-full-real-20261104-r49-winexec`）对 Windows Server 2025 手工端到端验证：连接上报 `executionReady:true` 并持久化 `execution_ready=t`；转发的 admin 调用返回 `x-dsh-target-node`；`POST /admin/api/users/1/runtimes?dshNode=` 完成 Runtime 分配，`start` 到达 `ready`（确认 supervisor → `bin.js web` 进程树），`stop` 杀掉了进程树，`start` 产生 generation 21，陈旧 generation 的 stop 返回 `INSTANCE_GENERATION_CHANGED`。Gateway `tsc` 干净；原生测试车道负责持续覆盖。
+
+[原生 ACL 验证脚本](../../../../gateway/tests/run-windows-runtime-owner-acl.mjs) 的第一、第二个参数分别是候选版本和前一版本编译后的 Gateway 库目录。脚本在临时 NTFS 文件中交替运行五组对照，测量预留、启动中和运行中三次发布的耗时，并验证每个模拟启动的最终所有权记录。

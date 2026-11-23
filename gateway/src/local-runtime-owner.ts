@@ -7,9 +7,9 @@ import { isAbsolute, join } from 'node:path'
 import { tryLockExclusive } from '@deepseek-ai/node-addon-system/flock'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import { z } from 'zod'
-import { privateDirectoryState, privateFileState, probeWindowsAclPrivate, syncStateDirectory, tightenPrivateFileAcl,
+import { privateDirectoryState, privateFileState, probeWindowsAclPrivate, syncStateDirectory,
   type PrivateFileState, type WindowsAclProbe } from './node-private-file.ts'
-import { probeNativeWindowsOwnerAcl } from './local-runtime-owner-win32-acl.ts'
+import { probeNativeWindowsOwnerAcl, protectRuntimeOwnerFile } from './local-runtime-owner-win32-acl.ts'
 import type { RuntimeCheckpointOutcome } from './runtime-shutdown.ts'
 
 const OWNER_RECORD_BYTES = 65_536
@@ -487,10 +487,13 @@ export class LocalRuntimeOwnerLease {
     const path = join(this.store.directory, `.${randomUUID()}.tmp`)
     const handle = await open(path, 'wx', 0o600)
     try {
-      try { await handle.writeFile(text); await handle.sync() } finally { await handle.close() }
+      try {
+        await protectRuntimeOwnerFile(path)
+        await handle.writeFile(text)
+        await handle.sync()
+      } finally { await handle.close() }
       await this.verify()
       await rename(path, destination)
-      await tightenPrivateFileAcl(destination)
       await syncStateDirectory(this.store.directory)
     } finally { await rm(path, { force: true }) }
   }

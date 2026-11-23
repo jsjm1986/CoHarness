@@ -18,6 +18,8 @@ Process control: `detached` spawn still works and `process.kill(pid, 0)` is the 
 
 Path validation in `config.ts` switched from hardcoded `posix.*` to a platform alias (`isAbsolute`, `relative`, separator checks), so `C:\harness-state` roots validate on Windows while `..` escape checks keep working. The generation commit now calls `syncStateDirectory`, which no-ops on Windows (NTFS journals the rename; directory `fsync` returns EPERM) — the same helper `node-private-file` already used.
 
+The [ownership publisher](../../../../gateway/src/local-runtime-owner.ts) protects the empty temporary file before writing a capability or checkpoint. Its file DACL grants full control to the actual owner, LocalSystem and Administrators, with inheritance disabled. `SetNamedSecurityInfoW` installs the DACL in-process for each publication. When native bindings are unavailable, the existing PowerShell setter applies the same rules. A failed ACL operation leaves the previous generation record visible.
+
 ## Alternatives considered
 
 **Keep fd-4 descriptor inheritance.** Node does not inherit arbitrary HANDLEs as fd slots on Windows — `EBADF` in empirical probes — while `stdio` pipes (fd 0-3 and `ipc`) do cross over, matching how the credential fd3 channel already works.
@@ -33,3 +35,5 @@ A Windows node with `HGW_NODE_LOCAL_GATEWAY_URL` reports `executionReady: true`,
 ## Verification
 
 Manual end-to-end on Windows Server 2025 against the deployed center (release `coharness-full-real-20261104-r49-winexec`): connect advertises `executionReady:true` and persists `execution_ready=t`; forwarded admin calls return `x-dsh-target-node`; `POST /admin/api/users/1/runtimes?dshNode=` allocated a Runtime, `start` reached `ready` (supervisor → `bin.js web` process tree confirmed), `stop` killed the tree, `start` produced generation 21, and a stale-generation stop returned `INSTANCE_GENERATION_CHANGED`. Gateway `tsc` is clean; the native test lane remains the owner of repeat coverage.
+
+The [native ACL proof](../../../../gateway/tests/run-windows-runtime-owner-acl.mjs) accepts the candidate and previous compiled Gateway library directories as its first and second arguments. It times the reservation, starting and running publications in five alternating pairs on temporary NTFS files and verifies the final owner record of each launch.

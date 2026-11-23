@@ -1,4 +1,4 @@
-/** Compiled Windows Runtime-owner ACL acceptance and uncached probe comparison. */
+/** Compiled Windows Runtime-owner ACL acceptance, uncached reads and optional publication comparison. */
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -24,6 +24,21 @@ async function samples(count, operation) {
     p95Ms: Number(elapsed[Math.ceil(count * 0.95) - 1].toFixed(3)) }
 }
 
+async function startupPublications(Store, directory, generation) {
+  const store = new Store(directory, { node: 'acl-fixture', runtimeKey: 'user-1', kind: 'user',
+    ownerId: 1, generation, credentialHash: 'a'.repeat(64) })
+  const lease = await store.acquire()
+  try {
+    const started = performance.now()
+    const reserved = await lease.create('b5fbc474-5e65-4c06-8c46-8683ac34fce0')
+    const starting = await lease.publish({ ...reserved, phase: 'starting', url: 'http://127.0.0.1:1/', groupPid: process.pid })
+    const running = await lease.publish({ ...starting, phase: 'running' })
+    const elapsed = performance.now() - started
+    assert.deepEqual(await store.read(), running)
+    return Number(elapsed.toFixed(3))
+  } finally { await lease.close() }
+}
+
 const root = await mkdtemp(join(tmpdir(), 'harness-native-owner-acl-'))
 let lease
 try {
@@ -46,6 +61,22 @@ try {
   for (const [kind, path] of [['directory', directory], ['record', store.recordPath]]) {
     timings[kind] = { powershell: await samples(5, () => probeWindowsAclPrivate(path)),
       native: await samples(30, () => probeNativeWindowsOwnerAcl(path)) }
+  }
+
+  if (process.argv[3] !== undefined) {
+    const previous = pathToFileURL(`${process.argv[3]}/`)
+    const { LocalRuntimeOwnerStore: PreviousStore } = await import(new URL('local-runtime-owner.js', previous))
+    const publications = []
+    const stores = { baseline: PreviousStore, candidate: LocalRuntimeOwnerStore }
+    let generation = 3
+    for (let round = 0; round < 5; round++) {
+      const row = {}
+      for (const side of (round % 2 === 0 ? ['baseline', 'candidate'] : ['candidate', 'baseline'])) {
+        row[side] = await startupPublications(stores[side], directory, generation++)
+      }
+      publications.push(row)
+    }
+    timings.startupPublicationsMs = publications
   }
 
   const junction = join(root, 'junction')
