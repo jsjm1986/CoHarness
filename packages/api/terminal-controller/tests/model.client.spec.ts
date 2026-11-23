@@ -169,6 +169,33 @@ it('keeps resize requests between coalesced input batches', async () => {
   ])
 })
 
+it('sends the final pending terminal size on either side of a keystroke', async () => {
+  const { model, remote } = fixture()
+  await connected(model)
+  const first = Promise.withResolvers<RemoteResult<void>>()
+  cleanups.push(() => { first.resolve(success(undefined)) })
+  const operations: (string | [number, number])[] = []
+  vi.mocked(remote.resize).mockImplementation(async (_session, _id, _attachment, cols, rows) => {
+    operations.push([cols, rows])
+    return operations.length === 1 ? first.promise : success(undefined)
+  })
+  vi.mocked(remote.write).mockImplementation(async (_session, _id, _attachment, data) => {
+    operations.push(data)
+    return success(undefined)
+  })
+  model.resize(90, 24)
+  await expect.poll(() => operations).toEqual([[90, 24]])
+  for (let cols = 91; cols <= 114; cols++) model.resize(cols, 24)
+  model.resize(info.cols, info.rows)
+  model.write('a')
+  model.resize(120, 30)
+  model.resize(121, 31)
+  model.write('b')
+  first.resolve(success(undefined))
+  await expect.poll(() => operations.at(-1)).toBe('b')
+  expect(operations).toEqual([[90, 24], [80, 24], 'a', [121, 31], 'b'])
+})
+
 it('serializes input and resizes, clamps geometry, and suppresses unchanged sizes', async () => {
   const { model, remote } = fixture()
   await connected(model)

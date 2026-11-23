@@ -124,12 +124,14 @@ export class TerminalController extends TypertRemoteService {
     ctx.on('agent/idle-release-check', ({ agent }) => this.pendingCreations.has(agent.id)
       || [...this.owners.values()].some(owner => owner.sessionId === agent.id
         && (owner.terminals.size > 0 || owner.pending.size > 0 || owner.allocations.size > 0)) ? 'busy' : undefined, { global: true })
-    ctx.inject(['connection'], (connCtx) => {
+    const lookupAttachments = (key: string): ActiveTerminalAttachment[] =>
+      [...this.activeAttachments.values()].filter(attachment => attachment.key === key)
+    const wsScope = ctx.inject(['connection'], (connCtx) => {
       const connection = connCtx.get('connection') as TerminalInputConnectionService | undefined
       connection?.ws?.handle(TERMINAL_INPUT_PATH, (socket, request) => {
         const attachment = resolveAuthorizedTerminalAttachment(
           request,
-          key => this.activeAttachments.get(key),
+          lookupAttachments,
           creator => this.access.verifyUpgrade(creator),
         )
         if (attachment === undefined) {
@@ -149,7 +151,7 @@ export class TerminalController extends TypertRemoteService {
         maxMessageBytes: Math.max(64 * 1024, this.config.maxInputBytes * 2 + 4096),
         authorize: request => resolveAuthorizedTerminalAttachment(
           request,
-          key => this.activeAttachments.get(key),
+          lookupAttachments,
           creator => this.access.verifyUpgrade(creator),
         ) !== undefined,
       })
@@ -160,6 +162,7 @@ export class TerminalController extends TypertRemoteService {
       }
       this.activeAttachments.clear()
       this.lifetime.abort(new Error('Terminal controller disposed'))
+      await wsScope.dispose()
       await Promise.allSettled([...this.inputWork])
       const results = await Promise.allSettled([...this.owners].map(([id, owner]) => this.disposeOwner(id, owner)))
       await Promise.allSettled(this.cleanupTasks)
@@ -324,16 +327,17 @@ export class TerminalController extends TypertRemoteService {
       signal: combined,
       isClosed: () => owner.lifetime.signal.aborted || owner.closedIds.has(id),
     }
-    const previous = this.activeAttachments.get(key)
+    const ownerAttachmentKey = `${key}:${authority.creator}`
+    const previous = this.activeAttachments.get(ownerAttachmentKey)
     previous?.inputSocket?.close(1000, 'replaced')
-    this.activeAttachments.set(key, active)
+    this.activeAttachments.set(ownerAttachmentKey, active)
     try {
       for await (const frame of terminal.follow(attachmentId, combined)) {
         combined.throwIfAborted()
         yield frame
       }
     } finally {
-      if (this.activeAttachments.get(key) === active) this.activeAttachments.delete(key)
+      if (this.activeAttachments.get(ownerAttachmentKey) === active) this.activeAttachments.delete(ownerAttachmentKey)
       active.inputSocket?.close(1000, 'attachment ended')
       delete active.inputSocket
     }

@@ -26,3 +26,5 @@ Tool surface for the reserved **steward** maintenance runtime: one audited SQL c
 `tests/query.spec.ts` covers statement classification and the approval-prompt preview; `tests/composition.spec.ts` covers registration, disposal, and actual dry-run tool execution with and without truncation. The executor contract is covered by Gateway tests beside `steward-query.ts`.
 
 The keyless [steward-query-truncation snapshot](../../snapshots/session/steward-query-truncation/snapshot.yml) loads the source plugin through the shipped headless profile and records the truncated plan as a model-visible tool result. Replay from the repository root with `DSH_EXAMPLE_MODE=src DSH_SNAPSHOT=replay pnpm exec vitest run --config vitest.snapshot.config.ts snapshots/session/headless.snapshot.ts -t steward-query-truncation`.
+
+With `DSH_EXAMPLE_MODE=lib`, the source plugin resolves the built Gateway statement classifier through the root workspace development dependency.

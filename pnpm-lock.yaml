@@ -87,6 +87,9 @@ importers:
       '@deepseek-ai/dsh-experimental-worktree':
         specifier: workspace:*
         version: link:packages/experimental/worktree
+      '@deepseek-ai/dsh-gateway-runtime':
+        specifier: workspace:*
+        version: link:packages/context/gateway-runtime
       '@deepseek-ai/dsh-llm':
         specifier: workspace:*
         version: link:packages/llm/llm

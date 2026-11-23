@@ -4,7 +4,7 @@ import type { IncomingHttpHeaders } from 'node:http'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-attachment'
 // Activates the webServer Context merge used below.
-import type { IndexInjection, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
+import type { IndexInjection, WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
   DEFAULT_HISTORY_PAGE_TARGET_BYTES,
   toFetchHandler,
@@ -371,22 +371,35 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   ctx.inject(['apiProxy', 'webServer'], (apiCtx) => {
     assertImageBodyCapacity(apiCtx, maxRequestBodyBytes)
     const downlinks = new WebSocketDownlinks(apiCtx.apiProxy, websocketHeartbeatIntervalMs)
-    const registerDownlink = (
-      path: string,
-      handle: WebUpgradeRoute['handler'],
-    ): void => {
-      apiCtx.effect(() => apiCtx.webServer.registerUpgrade({
-        path,
+    apiCtx.effect(() => {
+      const unregisterMux = apiCtx.webServer.registerUpgrade({
+        path: MUX_EVENTS_PATH,
         handler: createUpgradeRouteHandler({
           owner: apiCtx,
           isRejected: req => connection.requestRejection(req, 'upgrade') !== undefined,
-          onAccepted: async (req, socket, head) => { await handle(req, socket, head) },
+          onAccepted: (req, socket, head) => {
+            downlinks.handleMux(req, socket, head)
+            return Promise.resolve()
+          },
         }),
-      }), `client-connection: ${path} WebSocket`)
-    }
-    apiCtx.effect(() => () => downlinks.close(), 'client-connection: WebSocket downlinks')
-    registerDownlink(MUX_EVENTS_PATH, (req, socket, head) => { downlinks.handleMux(req, socket, head) })
-    registerDownlink(HOST_EVENTS_PATH, (req, socket, head) => { downlinks.handleHost(req, socket, head) })
+      })
+      const unregisterHost = apiCtx.webServer.registerUpgrade({
+        path: HOST_EVENTS_PATH,
+        handler: createUpgradeRouteHandler({
+          owner: apiCtx,
+          isRejected: req => connection.requestRejection(req, 'upgrade') !== undefined,
+          onAccepted: (req, socket, head) => {
+            downlinks.handleHost(req, socket, head)
+            return Promise.resolve()
+          },
+        }),
+      })
+      return async () => {
+        unregisterMux()
+        unregisterHost()
+        await downlinks.close()
+      }
+    }, 'client-connection: WebSocket downlinks')
   })
   ctx.inject(['attachments'], (attachmentCtx) => {
     assertImageBodyCapacity(attachmentCtx, maxRequestBodyBytes)

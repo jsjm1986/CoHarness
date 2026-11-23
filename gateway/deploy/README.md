@@ -73,7 +73,7 @@ server {
   http2 on;
   server_name harness.maycran.com;
   gzip on;
-  gzip_types application/json application/javascript text/css image/svg+xml text/plain;
+  gzip_types application/json application/javascript text/javascript text/css image/svg+xml text/plain;
   location / {
     proxy_pass http://harness_gateway;
     proxy_http_version 1.1;

@@ -46,6 +46,7 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_DOCUMENT_OVERVIEW_DEADLINE_MS` | `1200` | JSON 文档概览的远端来源截止时间，单位为毫秒。浏览器渐进读取会先显示就绪的行，并以 `HGW_UPSTREAM_TIMEOUT_MS` 限制远端补齐时间。 |
 | `HGW_PEER_BACKUP_CONFIG_FILE` | 未设置 | 密文备份仓库及后台任务的节点私有配置文件。 |
 | `HGW_DATABASE_MAX_CONNECTIONS` | 10 | 业务池连接数上限 |
+| `HGW_DATABASE_MIN_CONNECTIONS` | `0` | 业务池维持的最小预热空闲连接数（不超过 `HGW_DATABASE_MAX_CONNECTIONS`） |
 | `HGW_DATABASE_MAX_CHECKOUT_QUEUE` | 256 | query、callback 与 promise 调用共享的业务池未完成连接获取上限 |
 | `HGW_DATABASE_CONTROL_MAX_CONNECTIONS` | 2 | 就绪检查、租约控制及写入代次检查的保留池连接数上限 |
 | `HGW_DATABASE_CONTROL_MAX_CHECKOUT_QUEUE` | 32 | 保留控制池的未完成连接获取上限 |
@@ -72,6 +73,8 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_STREAM_PRINCIPAL_RENEWAL_TIMEOUT_MS` | `5000` | 私有合批请求期限，同时不超过最早的签名到期时间 |
 | `HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH` | `64` | 每批连接 ID 上限；不超过 1,024 的正整数 |
 | `HGW_ACCESS_INVALIDATION_POLL_MS` | 1 秒 | 持久授权变更的兜底读取及重连间隔；通知与请求准入也会触发读取 |
+| `HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS` | 15 秒 | PostgreSQL `LISTEN` 连通且游标追平时的低频对账间隔（不小于 `HGW_ACCESS_INVALIDATION_POLL_MS`） |
+| `HGW_NODE_SERVICE_IDENTITY_CACHE_MS` | 5 秒 | 远端桥接节点身份校验与从节点拓扑读取的失效联动短缓存窗口（`0`–`30000` 毫秒） |
 | `HGW_EXECUTION_WATCH_HEARTBEAT_MS` | 15 秒 | 运行时执行监视流的存活帧间隔；必须为正数且不超过 2,147,483,647 毫秒 |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | 用于加密组织和项目 Provider API Key 的仅所有者可读 AES-GCM 密钥 |
@@ -103,6 +106,8 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_RUNTIME_MAX_RESIDENT` | 0 | 常驻与启动中 Runtime 预约的可选应急上限；`0` 禁用此上限 |
 | `HGW_RUNTIME_MAX_QUEUED` | 32 | 等待冷启动准入的 Runtime 数 |
 | `HGW_RUNTIME_QUEUE_WAIT_MS` | 30 秒 | 冷启动准入最长等待时间 |
+| `HGW_RUNTIME_PREPARE_WAIT_MS` | `1500` | 冷启动 `/api/prepare/v1/*` 请求的服务端有界短等待上限，单位为毫秒（`0`–`5000`） |
+| `HGW_RUNTIME_ASSET_CACHE_MAX_BYTES` | 32 MiB | 主入口内存中已鉴权远端不可变 `/plugins/*` 与带哈希 `/assets/*` 响应体的缓存字节上限（`0` 禁用缓存） |
 | `HGW_PERFORMANCE_ENABLED` | `true` | 启用有界累计请求／进程诊断和受管 Runtime 的一元响应耗时；仅接受 `true` 或 `false` |
 | `HGW_PERFORMANCE_OPERATION_SAMPLES` | 256 | 每个 Gateway 在内存中保留的对话和资源准入计时数量，最多 4096 条。管理员可用响应中的操作 ID 查询 `GET /admin/api/performance/operations?id=<uuid>`。 |
 | `HGW_PERFORMANCE_EVENT_LOOP_RESOLUTION_MS` | 20 毫秒 | 原生事件循环延迟采样间隔 |
@@ -204,7 +209,7 @@ Gateway 有界保留运行或控制鉴权时验证的 Runtime 身份坐标。个
 
 已识别的个人或项目 Runtime 通过本机关停检查后，用一条语句读取托管模型凭据。语句在同一快照中核验当前令牌、Runtime 代次、服务写入代次和凭据权限。项目自有凭据仅供所属项目读取。`modelCredential` 诊断记录耗时与 SQL 次数，凭据内容不进入样本。
 
-连接额度支持并发传输时，页面启动与对话准备请求为每台电脑保留一条可复用的 HTTP 连接。后台请求共享其余连接。精确代次的 HTTP 和 WebSocket 引用在活动写入期间阻止空闲回收，并释放生命周期队列供其他对话请求使用。
+连接额度支持并发传输时，页面启动与对话准备请求为每台电脑保留一条可复用的 HTTP 连接。后台请求共享其余连接。远端 WebSocket 握手可在复核节点租约后复用一条空闲 HTTP 连接。握手成功后，WebSocket 独占这条连接直至关闭。精确代次的 HTTP 和 WebSocket 引用在活动写入期间阻止空闲回收，并释放生命周期队列供其他对话请求使用。
 
 节点传输观测将 `nodeQueue`、`nodeLeaseCheck` 和 `nodeServiceOpen` 从完整的 `nodeConnection` 耗时中拆出。可用连接交给本节点最早符合条件的等待请求。正在关闭的传输计入连接上限，直到其持有方确认关闭。Windows Runtime 监督使用原生安全描述符查询常规的所有者文件 ACL。遇到不支持的描述符或原生读取不可用时，沿用 PowerShell 核验。
 
@@ -299,7 +304,7 @@ Gateway 子进程继承过滤后的宿主工具设置。调用方通过环境注
 
 在主入口的部署页使用[移除电脑](docs/deployment-topology/README.zh.md#transitions-and-recovery)，核验并移除不再使用的电脑登记。
 
-管理端外壳包含默认的用户管理页。用户列表渲染后，浏览器可在后台预加载组织模型目录的资源。实际模型数据在打开模型治理时读取。组织模型目录就绪并获得首次绘制机会后，后台任务可预加载「权限与计价」与「个人登记」共用的资源。打开页签即请求对应数据，脚本尚在加载时两者并行。其余页面在打开时下载各自的资源。页面资源加载失败时，可以重新加载当前地址。常规管理端导航仍可使用。
+管理端外壳包含默认的用户管理页。所属电脑拒绝读取项目元数据时，项目列表清除受影响项目的缓存名称和路径。点击「重试读取」可重新请求。用户列表渲染后，浏览器可在后台预加载组织模型目录的资源。实际模型数据在打开模型治理时读取。组织模型目录就绪并获得首次绘制机会后，后台任务可预加载「权限与计价」与「个人登记」共用的资源。打开页签即请求对应数据，脚本尚在加载时两者并行。其余页面在打开时下载各自的资源。页面资源加载失败时，可以重新加载当前地址。常规管理端导航仍可使用。
 
 管理端生产构建为体积较大的 JavaScript 和 CSS 生成更小的 gzip 版本。客户端接受 gzip 时，Gateway 在原有资产地址提供对应版本。旧构建或要求原始编码的客户端使用原文件。私有缓存按编码区分响应。
 
@@ -477,7 +482,7 @@ Gateway 使用认证账户当前有效的企业和成员资格注册、删除 An
 未指定目标的普通登录直接进入原有 Harness 工作台。个人分配不唯一时，浏览器入口按入口电脑、保留的原个人存储、分配时间和 UUID 选择有权限的默认个人环境，不根据连接状态选择，也不启动其他 Runtime。显式 Runtime／所有者链接仍严格解析，每个标签页保留已捕获的目标。
 
 `POST /account/runtime/start` 失败时返回本地化、禁止缓存的 HTML。可重试的失败通过手动重试表单保留原 Runtime／项目；无效或被拒绝的目标提供环境选择。JSON scope API 保持机器可读。两种失败路径均不改写 scope Cookie，也不切换到其他环境。
-账户上下文响应复用当前 HTTP 请求已经验证的作用域。PostgreSQL 解析可访问项目后，批量读取其 owner、来源和主题元数据，不加载或计数成员名单。项目权限读取同时返回管理权限和主题元数据；代理准入和事件流续租分别重新检查当前权限。成员关系和管理标记遵循[上下文读取规则](../.agents/notes/implemented/bug-fix/2026-08-26-project-scope-switch-performance.zh.md)。
+账户上下文响应复用当前 HTTP 请求已经验证的作用域。PostgreSQL 用一次目录查询读取项目成员关系、管理权限、所有者、来源和主题。节点私有的项目名称和路径从所属电脑读取。项目权限读取同时返回管理权限和主题元数据；代理准入和事件流续租分别重新检查当前权限。成员关系和管理标记遵循[上下文读取规则](../.agents/notes/implemented/bug-fix/2026-08-26-project-scope-switch-performance.zh.md)。
 
 活动的 `/api/events.mux` 与 `/api/events.host` socket 将原登录会话、nonce、身份/权限快照、scope 和 Runtime generation 保留在 Gateway 所有的登记表中。携带私有运行时 bearer 的请求只有在同步访问监控并只读检查登录资格及成员身份后，才能续租这些仍活动的登记。续租不更新登录活动，也不延长任何登录期限；权限变化、监控中断、socket 关闭或 generation 替换都会终止连接。每份替代签名的有效期仍不超过 30 秒。普通 HTTP 断言保持固定到期。续租暂时不可用时，Runtime 可在最近一次验证的期限内重试。该到期计时器保持生效，直到收到有效的替代签名。设置通过下一次私有启动凭据交付给 Runtime。见[事件 principal 决策](../.agents/notes/implemented/architecture/2026-10-23-event-stream-principal-renewal.zh.md)。
 
@@ -539,7 +544,7 @@ Gateway 还负责 `/api/documents/transfer/uploads` 下的目标作用域可续�
 
 Gateway 通过启动检查并绑定 HTTP 监听器后，在后台校准模型策略。任务以有限并发处理目录查询返回的活跃用户和项目。单个 Runtime 的投影失败时，会单独重查其存储和当前策略，其他投影可以独立完成。重试耗尽后，日志记录受影响的所有者或 Runtime 及错误码。新的触发会合并为一轮后续扫描。维护期间暂停新的投影写入，恢复写入后启动一轮新扫描。关闭时取消待执行的重试，等待正在运行的校准完成。
 
-仅管理员可访问的 `GET /admin/api/performance` 提供服务节点的 `modelPolicyProjection`。状态 `status` 包括 `idle`（空闲）、`in-progress`（执行中）、`complete`（已完成）、`paused`（暂停）和 `stopped`（已停止）。一轮尝试结束后，`issueCount` 表示该轮问题总数，`issues` 最多列出 32 条，包含目录、所有者或 Runtime 标识及已识别的错误码。`complete` 表示扫描和重试都已结束，仍可能含有 `failed` 条目。接口直接读取内存快照。
+仅管理员可访问的 `GET /admin/api/performance` 提供服务节点的 `modelPolicyProjection`、`databasePool`、`nodeForwarding` 与 `runtimeAssets`，`GET /admin/api/deployment/overview` 在一次压缩读取中聚合部署页初始分区。`modelPolicyProjection.status` 包括 `idle`（空闲）、`in-progress`（执行中）、`complete`（已完成）、`paused`（暂停）和 `stopped`（已停止）。一轮尝试结束后，`issueCount` 表示该轮问题总数，`issues` 最多列出 32 条，包含目录、所有者或 Runtime 标识及已识别的错误码。`complete` 表示扫描和重试都已结束，仍可能含有 `failed` 条目。接口直接读取内存快照。
 
 Runtime 准备及请求转发仍要求取得目标 Runtime 的当前策略。个人策略在准入后读取当前账号及成员权限。主动与惰性刷新同时比较有效内容和目录版本，因为账号角色变化不会推进该版本。凭据存储故障会保留现有策略和 intake Bearer。参见[模型策略权限指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/model-policy-authority/guide.zh.md)。
 

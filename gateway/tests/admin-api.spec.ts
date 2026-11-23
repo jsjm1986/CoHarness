@@ -26,6 +26,7 @@ import { ProjectService } from '../src/projects.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
 import type { GatewayPrincipalClaims } from '../src/principal.ts'
+import type { DeploymentContext } from '../src/deployment-protocol.ts'
 import type { ConversationArchiveDetail, ConversationArchiveRow } from '../src/postgres/conversation-archive-service.ts'
 
 let closer: (() => Promise<void>) | undefined
@@ -124,6 +125,19 @@ async function setup(
 }
 
 describe('admin JSON API', () => {
+  it('reports the current computer and forwarding scope from one authorized deployment revision', async () => {
+    const { deps, base, cookie } = await setup()
+    const entry = { nodeId: '10000000-0000-4000-8000-000000000001' as DeploymentContext['entry']['nodeId'], name: deps.cfg.computeNodeName }
+    const policy: DeploymentContext = { mode: 'multi', revision: '7', entry, primary: { ...entry, origin: base },
+      scope: 'organization', role: 'primary', refreshAfterMs: 30000, legacyMigrationRequired: false }
+    const adminRead = vi.fn(async () => policy)
+    deps.nodeServiceIdentity = { nodeId: entry.nodeId, organizationId: 'test', authorize: vi.fn() }
+    deps.topology = { adminRead, read: vi.fn(), save: vi.fn(), preflight: vi.fn(), candidates: vi.fn(), assertNode: vi.fn() }
+    const response = await fetch(`${base}/admin/api/deployment/current-node`, { headers: { cookie } })
+    expect(await response.json()).toEqual({ ...entry, forwardingEnabled: true, deployment: policy })
+    expect(adminRead).toHaveBeenCalledTimes(1)
+  })
+
   it('applies accepted numeric quota subjects to the same account used by quota reads', async () => {
     const { base, cookie, member } = await setup()
     const response = await fetch(`${base}/admin/api/quotas`, { method: 'PUT',

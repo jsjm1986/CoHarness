@@ -1,7 +1,7 @@
 import { forwardingMarks, operationPhase, recordNodeTransport, timeOperation } from './operation-timing.ts'
 import { createHash } from 'node:crypto'
 /** Forward existing authenticated Gateway operations to their owning computer. */
-import { Agent, request, STATUS_CODES, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
+import { request, STATUS_CODES, type Agent, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { BROWSER_RUNTIME_ASSET_CACHE_CONTROL, isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isReadyRuntimeInteractive, pinRuntimeRequestPath } from './runtime-request-path.ts'
@@ -158,7 +158,7 @@ export class GatewayNodeServiceProxy {
    * @param monitor - existing durable permission-change monitor, when present.
    */
   constructor(private readonly directory: NodeServiceProxyDirectory,
-    private readonly services: Pick<GatewayNodeServices, 'open' | 'revalidate' | 'released' | 'capacity'>,
+    services: Pick<GatewayNodeServices, 'open' | 'revalidate' | 'released' | 'capacity'>,
     private readonly timeoutMs: number,
     config: NodeServiceConfig,
     private readonly monitor?: GatewayAccessMonitor,
@@ -271,9 +271,7 @@ export class GatewayNodeServiceProxy {
     return operation
   }
 
-  private outgoing(req: IncomingMessage, target: Target, stream: Duplex | Agent, upgrade: boolean, body?: string, assertion?: string) {
-    const agent = stream instanceof Agent ? stream : new Agent({ keepAlive: false, maxSockets: 1 })
-    if (!(stream instanceof Agent)) agent.createConnection = () => stream
+  private outgoing(req: IncomingMessage, target: Target, agent: Agent, upgrade: boolean, body?: string, assertion?: string) {
     const forwarded = headers(req.headers, upgrade)
     forwarded[NODE_SERVICE_TARGET_HEADER] = target.nodeId
     delete forwarded[NODE_SERVICE_ASSET_GENERATION_HEADER]
@@ -282,12 +280,8 @@ export class GatewayNodeServiceProxy {
     if (assertion !== undefined) forwarded[FORWARDED_PRINCIPAL_HEADER] = assertion
     const path = target.runtimeId === undefined ? req.url ?? '/' : pinRuntimeRequestPath(req.url ?? '/', target.runtimeId)
     if (body !== undefined) forwarded['content-length'] = Buffer.byteLength(body)
-    const outgoing = request({ hostname: 'node.gateway.invalid', port: 80, method: req.method,
+    return request({ hostname: 'node.gateway.invalid', port: 80, method: req.method,
       path, headers: forwarded, agent })
-    return { outgoing, dispose: () => {
-      outgoing.destroy()
-      if (!(stream instanceof Agent)) { agent.destroy(); stream.destroy() }
-    } }
   }
 
   /**
@@ -413,12 +407,12 @@ export class GatewayNodeServiceProxy {
       const assertion = typeof actor === 'number' || this.forwardIssuer === undefined
         ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req), personalRead)
       mark('assertionReady')
-      const operation = this.outgoing(req, target, lease.agent, false, body, assertion)
+      signal.throwIfAborted()
+      const outgoing = this.outgoing(req, target, lease.agent, false, body, assertion)
       dispose = () => {
         if (complete) lease.release()
-        else { operation.dispose(); lease.destroy() }
+        else { outgoing.destroy(); lease.destroy() }
       }
-      const { outgoing } = operation
       outgoing.once('socket', () => { mark('socketAssigned') })
       outgoing.once('finish', () => { mark('requestWritten') })
       const cancel = () => { outgoing.destroy(new NodeServiceError(409, 'node-service/cancelled')) }
@@ -487,10 +481,10 @@ export class GatewayNodeServiceProxy {
                 ? preferredCompression(req.headers['accept-encoding'])
                 : undefined
               if (streamCoding !== undefined) {
-                await pipeCompressedResponse(response, res, status, forwardedHeaders, streamCoding, declaredLength)
+                await pipeCompressedResponse(response, res, status, forwardedHeaders, streamCoding, declaredLength, signal)
               } else {
                 res.writeHead(status, forwardedHeaders)
-                await pipeline(response, res)
+                await pipeline(response, res, { signal })
               }
               if (capturedChunks !== undefined && freshUntil !== undefined && !signal.aborted) {
                 const etag = typeof response.headers.etag === 'string' ? response.headers.etag : undefined
@@ -567,14 +561,15 @@ export class GatewayNodeServiceProxy {
     let dispose = () => {}
     try {
       signal.throwIfAborted()
-      const stream = await this.services.open(target.nodeId, signal)
-      dispose = () => { stream.destroy() }
+      const lease = await this.httpPool.acquire(target.nodeId, signal, true)
+      dispose = lease.destroy
+      lease.upgrade()
       signal.throwIfAborted()
-      const operation = this.outgoing(req, target, stream, true, undefined,
-        this.forwardIssuer === undefined ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req)))
-      dispose = operation.dispose
-      const { outgoing } = operation
-      const cancel = () => { outgoing.destroy(new NodeServiceError(409, 'node-service/cancelled')) }
+      const assertion = this.forwardIssuer === undefined ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req))
+      signal.throwIfAborted()
+      const outgoing = this.outgoing(req, target, lease.agent, true, undefined, assertion)
+      dispose = () => { outgoing.destroy(); lease.destroy() }
+      const cancel = () => { outgoing.destroy(new NodeServiceError(409, 'node-service/cancelled')); lease.destroy() }
       signal.addEventListener('abort', cancel, { once: true })
       let upgraded = false
       try {
@@ -601,7 +596,7 @@ export class GatewayNodeServiceProxy {
               socket.write(rawResponse(101, response.headers, true, target.resetCookie))
               if (prefix.length > 0) socket.write(prefix)
               if (head.length > 0) upstream.write(head)
-              void Promise.all([pipeline(socket, upstream), pipeline(upstream, socket)]).then(() => { resolve() }, reject)
+              void pipeline(socket, upstream, socket).then(resolve, reject)
             } catch (error) { upstream.destroy(); reject(error) }
           })
           outgoing.end()

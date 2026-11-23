@@ -14,7 +14,7 @@ import {
   AccountPreferencesUnavailableError,
   normalizeAccountPreferenceMutation,
 } from './account-preferences.ts'
-import { CollaborationDeniedError, type ProjectReadAuthorityView } from './collaboration.ts'
+import { CollaborationDeniedError, type ProjectReadAuthorityView, type ProjectScopeView } from './collaboration.ts'
 import type { GatewayConfig } from './config.ts'
 import type { WriteGateVerdict } from './postgres/maintenance-service.ts'
 import { RuntimeStartBlockedError, type ProjectRuntime, type RuntimeSubject } from './instances.ts'
@@ -632,6 +632,32 @@ class ReadPublicationUnavailableError extends Error {
   constructor(kind: 'project' | 'invitation' | 'usage', cause: unknown) { super(`${kind}-read-authority-unavailable`, { cause }) }
 }
 
+/** Read the browser account's project directory, including current ownership and theme policy. */
+async function accountContextProjects(deps: GatewayDeps, user: UserRow): Promise<ProjectScopeView[]> {
+  const scopes = await deps.collaboration?.projectsForUser(user.id, 'account-context') ?? []
+  const ids = scopes.filter(scope => scope.owner === undefined || scope.origin === undefined || scope.uiThemePolicy === undefined)
+    .map(scope => scope.projectId)
+  const details = ids.length === 0 ? [] : deps.projects.getScopeMetadataByIds !== undefined
+    ? await deps.projects.getScopeMetadataByIds(ids)
+    : deps.projects.getByIds === undefined
+      ? await deps.projects.list()
+      : await deps.projects.getByIds(ids)
+  const byId = new Map(details.map(project => [project.id, project]))
+  return Promise.all(scopes.map(async ({ canManage: granted, ...scope }) => {
+    const detail = byId.get(scope.projectId)
+    const owner = detail?.owner !== undefined ? detail.owner
+      : scope.owner !== undefined ? scope.owner : (await deps.projects.getById(scope.projectId))?.owner
+    const canManage = granted ?? (user.role === 'admin' || owner?.id === user.id)
+    return {
+      ...scope,
+      ...(canManage ? { canManage: true } : {}),
+      ...(detail?.origin === undefined ? {} : { origin: detail.origin }),
+      ...(detail?.owner === undefined ? {} : { owner: detail.owner }),
+      ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
+    }
+  }))
+}
+
 /** Authority lookup failures withhold prepared records and database diagnostics. */
 async function readPublicationAuthority<T>(kind: 'project' | 'invitation' | 'usage', read: () => Awaitable<T>): Promise<T> {
   try { return await read() }
@@ -968,6 +994,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
     }
     if (token === undefined) return null
+    const requestPath = new URL(req.url ?? '/', 'http://gateway').pathname
+    if (req.method === 'GET' && requestPath === '/account/api/node-document-overview') {
+      const qualified = await timeOperation('authorize', async () => auth.qualifyForStream(token))
+      return qualified === null ? null : { token, user: qualified.user }
+    }
     const user = await timeOperation('authorize',async()=>auth.validate(token))
     return user === null ? null : { token, user }
   }
@@ -1142,10 +1173,36 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   server.headersTimeout = cfg.keepAliveTimeoutMs + 5_000
   const nodeIdentityCache = new Map<string, { lease: import('./node-access.ts').NodeLease; expiresAtMs: number }>()
   const nodeIdentityInFlight = new Map<string, { epoch: number; promise: Promise<import('./node-access.ts').NodeLease> }>()
+  let nodeTopologyCache: { value: Awaited<ReturnType<NonNullable<GatewayDeps['topology']>['read']>>; expiresAtMs: number } | undefined
+  let nodeTopologyInFlight: { epoch: number; promise: Promise<Awaited<ReturnType<NonNullable<GatewayDeps['topology']>['read']>>> } | undefined
   let nodeIdentityCacheEpoch = 0
+  const monitorCaughtUp = (): boolean => deps.accessMonitor !== undefined
+    && (deps.accessMonitor.currentRevision !== undefined ? deps.accessMonitor.currentRevision() !== undefined : deps.accessMonitor.available)
   const clearNodeIdentityCache = (): void => {
     nodeIdentityCacheEpoch += 1
     nodeIdentityCache.clear()
+    nodeTopologyCache = undefined
+  }
+  const readCachedNodeTopology = async (): Promise<Awaited<ReturnType<NonNullable<GatewayDeps['topology']>['read']>> | undefined> => {
+    if (deps.topology === undefined) return undefined
+    const canCache = monitorCaughtUp() && cfg.nodeServiceIdentityCacheMs > 0
+    const now = Date.now()
+    if (canCache && nodeTopologyCache !== undefined && nodeTopologyCache.expiresAtMs > now) return nodeTopologyCache.value
+    if (canCache && nodeTopologyInFlight !== undefined && nodeTopologyInFlight.epoch === nodeIdentityCacheEpoch) {
+      return nodeTopologyInFlight.promise
+    }
+    const flightEpoch = nodeIdentityCacheEpoch
+    const promise = deps.topology.read()
+    if (canCache) nodeTopologyInFlight = { epoch: flightEpoch, promise }
+    try {
+      const value = await promise
+      if (canCache && flightEpoch === nodeIdentityCacheEpoch && monitorCaughtUp()) {
+        nodeTopologyCache = { value, expiresAtMs: Date.now() + cfg.nodeServiceIdentityCacheMs }
+      }
+      return value
+    } finally {
+      if (nodeTopologyInFlight?.promise === promise) nodeTopologyInFlight = undefined
+    }
   }
   const unsubscribeNodeIdentityCache = deps.accessMonitor?.subscribe(subject => {
     if (subject.userId === undefined && subject.projectId === undefined
@@ -1259,7 +1316,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const token = bearer.slice(7)
         const connectionHeader = req.headers['x-dsh-node-connection']
         const epochHeader = req.headers['x-dsh-node-epoch']
-        const canCache = deps.accessMonitor?.available === true && cfg.nodeServiceIdentityCacheMs > 0
+        const canCache = monitorCaughtUp() && cfg.nodeServiceIdentityCacheMs > 0
           && typeof connectionHeader === 'string' && typeof epochHeader === 'string'
         const cacheKey = canCache
           ? `${createHash('sha256').update(token).digest('hex')}:${connectionHeader}:${epochHeader}`
@@ -1267,7 +1324,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const now = Date.now()
         let lease: import('./node-access.ts').NodeLease
         const cached = cacheKey === undefined ? undefined : nodeIdentityCache.get(cacheKey)
-        if (cached !== undefined && cached.expiresAtMs > now && deps.accessMonitor?.available === true) {
+        if (cached !== undefined && cached.expiresAtMs > now && monitorCaughtUp()) {
           lease = cached.lease
         } else {
           if (cacheKey !== undefined) nodeIdentityCache.delete(cacheKey)
@@ -1287,7 +1344,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
                 nodeIdentityInFlight.delete(cacheKey)
               }
             }
-            if (cacheKey !== undefined && flightEpoch === nodeIdentityCacheEpoch && deps.accessMonitor?.available === true) {
+            if (cacheKey !== undefined && flightEpoch === nodeIdentityCacheEpoch && monitorCaughtUp()) {
               const leaseExpiresMs = Date.parse(lease.expiresAt)
               const expiresAtMs = Math.min(
                 Date.now() + cfg.nodeServiceIdentityCacheMs,
@@ -1308,7 +1365,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         }
         await checkReadiness()
         if (coordinate !== undefined && bridge !== undefined) {
-          const topology = await deps.topology?.read()
+          const topology = await readCachedNodeTopology()
           if (topology?.role === 'computer' && topology.primary !== null && !bridge.socket.destroyed
             && unclaimedLoopback.get(coordinate) === bridge) {
             bridge.forget()
@@ -1629,6 +1686,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             ? await deps.topology.candidates(user, new URL(req.url!, 'http://gateway').searchParams.get('cursor') ?? undefined) : await deps.topology.adminRead(user)), 'application/json')
         else if (req.method === 'PUT' && pathname === '/admin/api/deployment/topology') {
           const result = await deps.topology.save(user, jsonObject(await readBody(req)), clientIp(req))
+          clearNodeIdentityCache()
           send(res, 200, JSON.stringify(result), 'application/json')
         } else send(res, 405, '{"error":"method-not-allowed"}', 'application/json')
       }
@@ -1864,6 +1922,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
     const explicitScope = isExplicitScopeRequest(req.method, selectedUrl)
     const selectedNode = selection.get('dshNode')
+    let localNodeDirectlyAdmitted = false
     if (selectedNode !== null) {
       const nodeProjectCreation = pathname === '/account/api/projects' && req.method === 'POST'
       const nodeMetadata = (pathname === '/account/api/project-metadata' || pathname === '/account/api/node-document-overview') && req.method === 'GET'
@@ -1876,10 +1935,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if ((pathname.startsWith('/api/documents') || nodeProjectCreation || nodeMetadata) && selectedNode === deps.nodeServiceIdentity?.nodeId) {
         await deps.computerAccess?.authorize(user.id)
       }
+      if (selectedNode === deps.nodeServiceIdentity?.nodeId && !selection.has('dshRuntime')
+        && (pathname.startsWith('/api/documents') || nodeProjectCreation || nodeMetadata
+          || (pathname.startsWith('/admin/api/') && !/^\/admin\/api\/runtimes\/[^/]+\/(?:start|stop|restart|retire|personal-directory\/promote)$/u.test(pathname)))) {
+        localNodeDirectlyAdmitted = true
+      }
     }
     let admittedPlacement:RuntimePlacement|undefined
     const remember = explicitSession ? (placement:RuntimePlacement)=>{admittedPlacement=placement} : undefined
-    if (!(pathname === '/account/runtime/start' && req.method === 'POST') && !recoveryRestricted && deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.http(req, res, user,undefined,remember)) return
+    if (!localNodeDirectlyAdmitted && !(pathname === '/account/runtime/start' && req.method === 'POST') && !recoveryRestricted && deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.http(req, res, user,undefined,remember)) return
     if (deps.nodeServiceProxy === undefined && selection.has('dshRuntime') && !pathname.startsWith('/admin/api/')) {
       const placement = await runtimeRouter.placement(user, { runtimeId: selection.get('dshRuntime'), target: selection.get('dshTarget'),
         scopeCookie: parseCookies(req.headers.cookie).get(SCOPE_COOKIE) })
@@ -2434,31 +2498,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (pathname === '/account/api/context' && req.method === 'GET') {
       res.setHeader('cache-control', 'no-store')
       const resolved = await selectedContext()
-      const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
-      // Membership resolution supplies the authorized ids for owner and theme metadata.
-      const scopedIds = scopes.map(scope => scope.projectId)
-      const scopedDetails = deps.projects.getScopeMetadataByIds !== undefined
-        ? await deps.projects.getScopeMetadataByIds(scopedIds)
-        : deps.projects.getByIds === undefined
-          ? (scopedIds.length === 0 ? [] : await deps.projects.list())
-          : await deps.projects.getByIds(scopedIds)
-      const details = new Map(scopedDetails.map(project => [project.id, project]))
-      const projects = await Promise.all(scopes.map(async (scope) => {
-        const detail = details.get(scope.projectId)
-        // Project directories carry remote owner metadata. Legacy catalogs
-        // can resolve an omitted owner from their node-local detail provider.
-        const owner = detail?.owner !== undefined
-          ? detail.owner
-          : scope.owner !== undefined ? scope.owner : (await deps.projects.getById(scope.projectId))?.owner
-        const canManage = scope.canManage === true || user.role === 'admin' || owner?.id === user.id
-        return {
-          ...scope,
-          ...(canManage ? { canManage: true } : {}),
-          ...(detail?.origin === undefined ? {} : { origin: detail.origin }),
-          ...(detail?.owner === undefined ? {} : { owner: detail.owner }),
-          ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
-        }
-      }))
+      const projects = await accountContextProjects(deps, user)
       const activeProjectId = resolved.context.scope.kind === 'project'
         ? resolved.context.scope.projectId
         : undefined
@@ -2473,7 +2513,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           ...(activeProject.kind === 'steward' ? { steward: true } : {}),
           ...(activeProject.uiThemePolicy === undefined ? {} : { uiThemePolicy: activeProject.uiThemePolicy }),
         }
-      send(res, 200, JSON.stringify({
+      await sendCompressed(req, res, 200, JSON.stringify({
         user: {
           id: user.id,
           username: user.username,
@@ -2567,6 +2607,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
       res.setHeader('cache-control', 'no-store')
       const abort = requestAbort(req, res)
+      const catalogAbort = new AbortController()
+      const catalogSignal = AbortSignal.any([abort.signal, catalogAbort.signal])
       let scopes: Awaited<ReturnType<NonNullable<typeof deps.collaboration>['projectsForUser']>>
       let catalog: Awaited<ReturnType<GatewayWorkbenchCatalogHandler>>
       try {
@@ -2574,10 +2616,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           deps.collaboration.projectsForUser(user.id),
           handlers.workbenchCatalog === undefined
             ? Promise.resolve(deps.collaboration.listAccountConversations(user.id)).then(items => ({ items, personalComplete: false }))
-            : handlers.workbenchCatalog(user, abort.signal, { kind: activeRuntime.kind,
+            : handlers.workbenchCatalog(user, catalogSignal, { kind: activeRuntime.kind,
               ...(environment === undefined ? {} : { runtimeId: environment.id }) }),
         ])
       } finally {
+        catalogAbort.abort()
         abort.dispose()
       }
       await sendCompressed(req, res, 200, JSON.stringify({

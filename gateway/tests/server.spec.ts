@@ -5,6 +5,7 @@ import { RESOURCE_INGRESS_TIMING_HEADER } from '@deepseek-ai/dsh-resource-budget
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
+import { Pool } from 'pg'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { AuditService } from '../src/audit.ts'
@@ -23,6 +24,8 @@ import { GatewayPerformanceObserver } from '../src/performance-observer.ts'
 import { RuntimeCapacityError } from '../src/runtime-capacity.ts'
 import { RuntimeAccountError } from '../src/launcher.ts'
 import { PostgresCheckoutQueueFullError } from '../src/postgres/database.ts'
+import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
+import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import { MAX_PASSWORD_LENGTH } from '../src/password.ts'
 import type { AccessInvalidationSubject } from '../src/access-invalidation.ts'
 import { GatewayRuntimeRouter, LocalRuntimeAdapter } from '../src/runtime-router.ts'
@@ -1648,7 +1651,47 @@ describe('gateway server', () => {
     expect(proxy).toHaveBeenCalledOnce()
   })
 
-  it('uses authorized remote project owner metadata without reading details on the entry computer', async () => {
+  it('reads account context for remote projects in one current directory query', async () => {
+    const { deps, base } = await setup()
+    const node = randomUUID() as RuntimeNodeId
+    const projects = Array.from({ length: 8 }, (_, index) => ({
+      public_id: String(index + 1), name: 'private project', path: '/private/project',
+      content: { projectId: String(index + 1) }, access_mode: 'ro', administrator: false,
+      can_manage: false, ui_theme_policy: 'dark', kind: 'standard', node_id: randomUUID(),
+      node_name: `computer-${index + 1}`, origin: 'user', owner: { id: '2', username: 'owner', displayName: 'Owner' },
+    }))
+    let visible = projects
+    const query = vi.fn(async (sql: string) => ({
+      rows: sql.includes('FROM harness.users actor') ? visible : [],
+    }))
+    const pool = Object.assign(new Pool(), { query })
+    const context = { pool, organizationId: randomUUID(), organizationSlug: 'org', nodeId: node, nodeName: 'entry' }
+    deps.collaboration = new PostgresCollaborationService(context, node)
+    deps.projects = new PostgresProjectService(context, deps.cfg)
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const read = async () => {
+      const response = await fetch(`${base}/account/api/context`, { headers: { cookie, 'accept-encoding': 'br' } })
+      expect(response.status).toBe(200)
+      expect(response.headers.get('cache-control')).toBe('no-store')
+      if (visible.length > 0) expect(response.headers.get('content-encoding')).toBe('br')
+      return (await response.json() as { projects: unknown[] }).projects
+    }
+    try {
+      const scopes = await read()
+      expect(query).toHaveBeenCalledTimes(1)
+      expect(scopes).toHaveLength(8)
+      expect(scopes[0]).toEqual({
+        projectId: 1, name: '#1', path: '', metadataOnNode: true, mode: 'ro',
+        nodeId: projects[0]!.node_id, nodeName: 'computer-1', kind: 'standard', origin: 'user',
+        owner: { id: 2, username: 'owner', displayName: 'Owner' }, uiThemePolicy: 'dark',
+      })
+      visible = []
+      await expect(read()).resolves.toEqual([])
+      expect(query).toHaveBeenCalledTimes(2)
+    } finally { await pool.end() }
+  })
+
+  it('uses authorized remote project owner metadata from a legacy scope directory', async () => {
     const { deps, base } = await setup()
     installProjectCollaboration(deps)
     deps.collaboration!.projectsForUser = async () => [{ projectId: 991, name: 'Remote project', path: '/remote/project', mode: 'rw',

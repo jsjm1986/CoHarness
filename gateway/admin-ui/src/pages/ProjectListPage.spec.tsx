@@ -5,7 +5,8 @@ import { MemoryRouter } from 'react-router-dom'
 import * as api from '../api.ts'
 import { ProjectListPage } from './ProjectListPage.tsx'
 
-vi.mock('../api.ts', () => ({
+vi.mock('../api.ts', async original => ({
+  AdminRequestError: (await original<typeof api>()).AdminRequestError,
   listProjects: vi.fn(),
   getOwnerProjectDisplays: vi.fn(),
   listProjectDirectories: vi.fn(),
@@ -27,6 +28,24 @@ describe('ProjectListPage', () => {
     vi.mocked(api.getOwnerProjectDisplays).mockReset()
     vi.mocked(api.listProjectDirectories).mockReset()
     vi.mocked(api.createProject).mockReset()
+  })
+
+  it.each([401, 403])('clears denied project labels and waits for Retry after HTTP %i', async status => {
+    const project: api.Project = { id: 7, name: 'Cached label', path: '/cached', memberCount: 1, metadataOnNode: true }
+    vi.mocked(api.listProjects).mockResolvedValue([project])
+    vi.mocked(api.getOwnerProjectDisplays)
+      .mockRejectedValueOnce(new api.AdminRequestError(status, 'denied'))
+      .mockResolvedValue(new Map([[project.id, { name: 'Verified label', path: '/verified' }]]))
+    const user = userEvent.setup()
+    render(<MemoryRouter><ProjectListPage /></MemoryRouter>)
+    const retry = await screen.findByRole('button', { name: '重试读取' })
+    expect(api.getOwnerProjectDisplays).toHaveBeenCalledTimes(1)
+    expect(screen.queryAllByText('Cached label')).toHaveLength(0)
+    expect(screen.queryAllByText('/cached')).toHaveLength(0)
+    expect(screen.getAllByText('#7').length).toBeGreaterThan(0)
+    await user.click(retry)
+    expect((await screen.findAllByText('Verified label')).length).toBeGreaterThan(0)
+    expect(api.getOwnerProjectDisplays).toHaveBeenCalledTimes(2)
   })
 
   it('reads 32 visible project displays on this Admin computer and requests the rest only after More', async () => {

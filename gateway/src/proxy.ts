@@ -818,22 +818,38 @@ export function createProxyHandlers(
       return
     }
     try {
-      if (!await revalidate(token, context) || socket.destroyed) {
-        releaseWebSocketLease()
-        socket.destroy()
-        return
-      }
       let streamLogin: Awaited<ReturnType<typeof qualifyStream>> | undefined
       if ((eventConnection || terminalInputConnection) && principalSigner !== undefined) {
-        streamLogin = token === undefined ? null : await qualifyStream(token, context)
+        if (token === undefined) {
+          releaseWebSocketLease()
+          socket.destroy()
+          return
+        }
+        const computerCheck = deps.computerAccess === undefined
+          ? Promise.resolve(true)
+          : deps.computerAccess.authorize(context.user.id).then(() => true, (error: unknown) => {
+            if (error instanceof ComputerAccessError) return false
+            throw error
+          })
+        const [qualified, computerAllowed] = await Promise.all([
+          qualifyStream(token, context),
+          computerCheck,
+        ])
+        streamLogin = qualified
         await deps.accessMonitor?.synchronize()
-        if (streamLogin === null || streamLogin.expiresAt <= Date.now() || socket.destroyed) {
+        if (!computerAllowed || streamLogin === null || streamLogin.expiresAt <= Date.now()
+          || (context.scope.kind === 'personal' && streamLogin.user.role !== context.user.role)
+          || socket.destroyed) {
           releaseWebSocketLease()
           socket.destroy()
           return
         }
         context.user = streamLogin.user
         context.scope = streamLogin.scope
+      } else if (!await revalidate(token, context) || socket.destroyed) {
+        releaseWebSocketLease()
+        socket.destroy()
+        return
       }
       if (terminalInputConnection && streamLogin !== undefined && streamLogin !== null) {
         const expiry = setTimeout(() => { socket.destroy() }, Math.min(2_147_483_647, Math.max(0, streamLogin.expiresAt - Date.now())))

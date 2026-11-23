@@ -876,6 +876,30 @@ it('forwards the existing browser WebSocket upgrade and byte stream to the selec
   expect(f.counters().localCalls).toBe(0)
 })
 
+it('opens the browser event stream after a completed HTTP request fills the node service limit', async () => {
+  const f = await fixture({ HGW_NODE_SERVICE_MAX_CONNECTIONS: '1', HGW_NODE_SERVICE_MAX_PER_NODE: '1' })
+  const open = vi.spyOn(f.services, 'open'), revalidate = vi.spyOn(f.services, 'revalidate')
+  const response = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })
+  expect(response.status).toBe(200); await response.arrayBuffer()
+  await expect.poll(() => f.proxy.diagnostics().pool.idle).toBe(1)
+  const ws = new WebSocket(`${f.base.replace('http:', 'ws:')}/api/events?dshRuntime=${f.environment.id}`,
+    { headers: { cookie: f.cookie, origin: f.base } })
+  const closed = new Promise<void>(resolve => { ws.once('close', () => { resolve() }) })
+  releases.push(async () => { ws.terminate(); await closed })
+  await new Promise<void>((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject) })
+  const reply = new Promise<string>((resolve, reject) => {
+    ws.once('message', value => { resolve(value.toString()) })
+    ws.once('error', reject)
+  })
+  ws.send('watch-session')
+  expect(await reply).toBe('watch-session')
+  expect(open).toHaveBeenCalledTimes(1)
+  expect(revalidate).toHaveBeenCalledTimes(1)
+  f.proxy.invalidate({ userId: f.admin.id })
+  await closed
+  await expect.poll(() => f.services.capacity(f.nodeId)).toBe('available')
+})
+
 it('keeps a live browser WebSocket when its computer has no spare service capacity', async () => {
   const f = await fixture({ HGW_NODE_SERVICE_MAX_CONNECTIONS: '1', HGW_NODE_SERVICE_MAX_PER_NODE: '1' })
   const ws = new WebSocket(`${f.base.replace('http:', 'ws:')}/api/events?dshRuntime=${f.environment.id}`,
@@ -1162,6 +1186,19 @@ it('cancels a waiting borrower without destroying the active HTTP owner', async 
   const successor = await f.pool.acquire(node, new AbortController().signal)
   expect(successor.agent).toBe(active.agent)
   successor.release()
+})
+
+it('refuses queued HTTP when its only possible returning connection becomes a WebSocket', async () => {
+  const node = randomUUID() as RuntimeNodeId, f = capacityPoolFixture(1, 1)
+  const signal = new AbortController().signal
+  const owner = await f.pool.acquire(node, signal)
+  const waiting = f.pool.acquire(node, signal).catch(error => error)
+  expect(f.pool.diagnostics().waiting).toBe(1)
+  owner.upgrade()
+  expect(await waiting).toMatchObject({ code: 'node-service/busy' })
+  expect(f.streams[0]!.destroyed).toBe(false)
+  owner.release()
+  expect(f.streams[0]!.destroyed).toBe(true)
 })
 
 it('bounds waiting HTTP requests and expires their original queue deadline', async () => {

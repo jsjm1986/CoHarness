@@ -9,11 +9,12 @@ import { fixtureQueryPool } from './postgres-query-fixture.ts'
 function createMonitor() {
   let available = true
   let revision = 10n
+  let application: Promise<void> | undefined
   const listeners = new Set<(subject: AccessInvalidationSubject) => void | Promise<void>>()
   const monitor: GatewayAccessMonitor = {
     get available() { return available },
-    synchronize: async () => {},
-    currentRevision: () => (available ? revision : undefined),
+    synchronize: async () => { await application },
+    currentRevision: () => (available && application === undefined ? revision : undefined),
     subscribe: listener => {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
@@ -23,6 +24,9 @@ function createMonitor() {
     monitor,
     setAvailable: (next: boolean) => { available = next },
     setRevision: (next: bigint) => { revision = next },
+    trackApplication: (work: Promise<void>) => {
+      application = work.then(() => { application = undefined })
+    },
     listenerCount: () => listeners.size,
     emit: async (subject: AccessInvalidationSubject) => {
       for (const listener of listeners) await listener(subject)
@@ -136,8 +140,58 @@ it('deduplicates concurrent assertNode checks, caches positive results while LIS
     allowed = true
     await topology.assertNode(remoteNodeId)
     expect(queryCount).toBe(10)
+
+    // An unrelated user/project revision advance mid-flight resolves without 409 and skips stale caching.
+    const midFlight = deferred()
+    gate = midFlight
+    ctl.setRevision(12n)
+    const pendingUnrelated = topology.assertNode(remoteNodeId)
+    ctl.setRevision(13n)
+    await ctl.emit({ userId: 99 })
+    midFlight.resolve()
+    await pendingUnrelated
+    expect(queryCount).toBe(11)
+    gate = undefined
+    await topology.assertNode(remoteNodeId)
+    expect(queryCount).toBe(12)
   } finally {
     topology.dispose()
     expect(ctl.listenerCount()).toBe(0)
+  }
+})
+
+it.each(['applied', 'pending'] as const)('retains a valid earlier check when an unrelated revision is %s', async (state) => {
+  const localNodeId = randomUUID() as RuntimeNodeId
+  const remoteNodeId = randomUUID() as RuntimeNodeId
+  const ctl = createMonitor()
+  const firstQuery = deferred()
+  const application = deferred()
+  let queryCount = 0
+  const topology = new PostgresDeploymentTopology({
+    organizationId: randomUUID(), organizationSlug: 'fixture', nodeId: localNodeId, nodeName: 'center',
+    pool: fixtureQueryPool(async () => {
+      queryCount += 1
+      if (queryCount === 1) await firstQuery.promise
+      return [{ allowed: true }]
+    }),
+  }, {
+    legacyForwarding: true, refreshAfterMs: 30_000, pageSize: 50, maxBytes: 65_536,
+    allowedOrigins: ['https://center.test'], monitor: ctl.monitor,
+  })
+
+  try {
+    const earlier = expect(topology.assertNode(remoteNodeId)).resolves.toBeUndefined()
+    if (state === 'pending') ctl.trackApplication(application.promise)
+    ctl.setRevision(11n)
+    const later = expect(topology.assertNode(remoteNodeId)).resolves.toBeUndefined()
+    expect(queryCount).toBe(2)
+    firstQuery.resolve()
+    await ctl.emit({ userId: 42 })
+    application.resolve()
+    await Promise.all([earlier, later])
+  } finally {
+    firstQuery.resolve()
+    application.resolve()
+    topology.dispose()
   }
 })

@@ -431,5 +431,18 @@ describe('Host input-channel unit edge cases', () => {
     ending.abort()
     await pendingInput
     expect(waitingAttachment.writeSpy).not.toHaveBeenCalled()
+
+    // Exceeding MAX_PENDING_INPUT_FRAMES closes the socket with 1008.
+    const floodSock = makeMockSocket()
+    const floodAtt = makeAttachment()
+    const floodGate = Promise.withResolvers<undefined>()
+    floodAtt.writeSpy.mockImplementationOnce(async () => { await floodGate.promise })
+    const floodWork = bindTerminalInputSocket(floodSock.socket, floodAtt.attachment, defaultLimits, controller.signal)
+    for (let i = 1; i <= 65; i++) {
+      floodSock.emitMessage(JSON.stringify({ type: 'write', seq: i, data: 'x' }))
+    }
+    expect(floodSock.closes.at(-1)).toEqual({ code: 1008, reason: 'terminal input queue full' })
+    floodGate.resolve(undefined)
+    await floodWork
   })
 })

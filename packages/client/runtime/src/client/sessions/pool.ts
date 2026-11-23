@@ -469,7 +469,7 @@ export class SessionRuntimePool implements ISessions {
           ? [{ target: owner.target, state: owner.manager.getSnapshot() }] : []))
       }
       const stopWorkspace = manager.subscribe(publishWorkspaces)
-      fiber.ctx.effect(() => () => { stopWorkspace(); this.workspaceManagers.delete(key); publishWorkspaces() }, 'sessions: target Workspace projection')
+      fiber.ctx.effect(() => () => { stopWorkspace(); manager.handleDisconnected(); this.workspaceManagers.delete(key); publishWorkspaces() }, 'sessions: target Workspace projection')
       runtime.setPresentationKey(id => clientSessionKey(target, id), target)
       this.entries.set(key, entry)
       try {
@@ -535,19 +535,18 @@ export class SessionRuntimePool implements ISessions {
           // Fetch Session and Workspace baselines concurrently so computer switches avoid a serial remote round trip.
           const connectArchive = { generation, settled: false, ok: false }
           establishedEntry.connectArchive = connectArchive
-          const workspacesReady = manager.refresh()
+          const workspacesReady = manager.handleConnected()
           void runtime.refresh().then(() => {
             if (this.entries.get(establishedEntry.key) !== establishedEntry || establishedEntry.generation !== generation) return
             if (runtime.list.getSnapshot().phase === 'ready') resolveReady()
             else rejectReady(new Error('target runtime session list unavailable'))
           })
-          void workspacesReady.then(() => {
-            const ready = manager.getSnapshot().phase === 'ready'
+          void workspacesReady.then((snapshot) => {
+            const ready = snapshot !== undefined
             if (ready
               && this.entries.get(establishedEntry.key) === establishedEntry
               && establishedEntry.generation === generation) {
-              this.archivedByTarget.set(establishedEntry.key, new Set(manager.getSnapshot().archivedSessionIds))
-              this.rebuild()
+              this.installArchive(establishedEntry, snapshot)
             }
             connectArchive.ok = ready
             connectArchive.settled = true
@@ -561,6 +560,7 @@ export class SessionRuntimePool implements ISessions {
           establishedEntry.generation = (establishedEntry.generation ?? 0) + 1
           this.cancelArchiveRead(establishedEntry, new Error('Target runtime disconnected'))
           this.rootCtx.get('workspaceResources')?.disconnect(establishedEntry.target)
+          manager.handleDisconnected()
           runtime.handleDisconnected()
         },
       })

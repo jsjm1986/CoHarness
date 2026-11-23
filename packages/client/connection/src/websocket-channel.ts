@@ -156,6 +156,7 @@ export class ConnectionWebSocketChannel {
   private readonly lifetime = new AbortController()
   private readonly pending = new Set<Promise<void>>()
   private closing = false
+  private closePromise: Promise<void> | undefined
 
   /**
    * @param heartbeatIntervalMs - interval between server Ping control frames.
@@ -194,10 +195,19 @@ export class ConnectionWebSocketChannel {
       return Promise.resolve()
     }
     return new Promise<void>((resolve) => {
+      const settle = (): void => {
+        socket.removeListener('close', settle)
+        socket.removeListener('error', settle)
+        socketSignal.removeEventListener('abort', settle)
+        resolve()
+      }
+      socket.once('close', settle)
+      socket.once('error', settle)
+      socketSignal.addEventListener('abort', settle, { once: true })
       this.server.handleUpgrade(req, socket, head, (ws) => {
         if (this.closing || this.lifetime.signal.aborted) {
           ws.terminate()
-          resolve()
+          settle()
           return
         }
         this.heartbeat.track(ws)
@@ -219,7 +229,7 @@ export class ConnectionWebSocketChannel {
         }
         this.pending.add(work)
         void work.finally(() => { this.pending.delete(work) })
-        resolve()
+        settle()
       })
     })
   }
@@ -228,17 +238,24 @@ export class ConnectionWebSocketChannel {
    * Stop accepting upgrades, terminate active sockets, and await handler teardown.
    * @returns after the heartbeat timer, acceptor, and active callbacks settle.
    */
-  async close(): Promise<void> {
+  close(): Promise<void> {
+    if (this.closePromise !== undefined) return this.closePromise
     this.closing = true
     this.lifetime.abort()
     this.heartbeat.stop()
     for (const ws of this.server.clients) ws.terminate()
-    await new Promise<void>((resolve, reject) => {
-      this.server.close((error) => {
-        if (error === undefined) resolve()
-        else reject(error)
-      })
-    })
-    await Promise.allSettled([...this.pending])
+    this.closePromise = (async () => {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          this.server.close((error) => {
+            if (error === undefined) resolve()
+            else reject(error)
+          })
+        })
+      } finally {
+        await Promise.allSettled([...this.pending])
+      }
+    })()
+    return this.closePromise
   }
 }

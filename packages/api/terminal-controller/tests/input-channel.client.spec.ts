@@ -455,5 +455,20 @@ describe('TerminalView input channel integration and HTTP fallback', () => {
     vi.mocked(failingRemote.shells).mockRejectedValueOnce(new Error('shells offline'))
     await failing.refresh()
     expect(failing.state.getSnapshot()).toMatchObject({ phase: 'failed', error: 'shells offline' })
+
+    // Stops reconnecting after MAX_INPUT_RECONNECT_ATTEMPTS consecutive unopened failures.
+    let deadAttempts = 0
+    const deadFactory = vi.fn((): TerminalInputChannel => {
+      deadAttempts += 1
+      const dead = new AbortController()
+      dead.abort()
+      return { signal: dead.signal, isOpen: false, write: async () => {}, resize: async () => {}, close: () => {} }
+    })
+    const { model: mDead } = clientFixture(deadFactory)
+    mDead['inputReconnectDelayMs' as never] = 1 as never
+    mDead.mount()
+    await expect.poll(() => deadAttempts).toBe(6)
+    await new Promise((resolve) => { setTimeout(resolve, 40) })
+    expect(deadAttempts).toBe(6)
   })
 })

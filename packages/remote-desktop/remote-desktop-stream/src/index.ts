@@ -79,6 +79,8 @@ export function apply(ctx: Context, config: ResolvedConfig): void {
           wss.handleUpgrade(req, socket, head, (ws) => {
             if (closing) { ws.terminate(); return }
             const duplex = new WebSocketDuplex(ws)
+            sockets.add(duplex)
+            duplex.once('close', () => { sockets.delete(duplex) })
             const cancelled = new AbortController()
             const signal = AbortSignal.any([lifetime.signal, cancelled.signal])
             const failed = (error?: Error) => { cancelled.abort(error) }

@@ -33,7 +33,8 @@ function resolveStorage(): Storage | undefined {
     const candidate = (globalThis as { sessionStorage?: unknown }).sessionStorage
     if (candidate !== null && typeof candidate === 'object'
       && typeof (candidate as Storage).getItem === 'function'
-      && typeof (candidate as Storage).setItem === 'function') {
+      && typeof (candidate as Storage).setItem === 'function'
+      && typeof (candidate as Storage).removeItem === 'function') {
       return candidate as Storage
     }
   } catch {
@@ -93,7 +94,7 @@ export class VerifiedProjectDisplayCache {
     }
   }
 
-  private persist(origin: string): void {
+  private persist(origin: string, removeOnFailure = false): void {
     const store = resolveStorage()
     if (store === undefined) return
     try {
@@ -104,6 +105,9 @@ export class VerifiedProjectDisplayCache {
       if (rows.length === 0) store.removeItem(STORAGE_KEY)
       else store.setItem(STORAGE_KEY, JSON.stringify(rows))
     } catch {
+      if (removeOnFailure) {
+        try { store.removeItem(STORAGE_KEY) } catch { /* Storage unavailable; in-memory eviction already applied. */ }
+      }
       // Quota or private-mode errors leave the in-memory cache intact.
     }
   }
@@ -170,12 +174,24 @@ export class VerifiedProjectDisplayCache {
     account: number,
     nodeId: string | undefined,
     projectId: number,
-    runtimeId: string | undefined,
+    runtimeId?: string,
   ): void {
-    if (nodeId === undefined || runtimeId === undefined) return
+    if (nodeId === undefined) return
     const origin = currentOrigin()
     this.hydrate(origin)
-    if (this.memory.delete(keyOf(origin, account, nodeId, projectId, runtimeId))) this.persist(origin)
+    if (runtimeId !== undefined) {
+      if (this.memory.delete(keyOf(origin, account, nodeId, projectId, runtimeId))) this.persist(origin, true)
+      return
+    }
+    let removed = false
+    for (const [key, entry] of [...this.memory]) {
+      if (entry.account === account && entry.nodeId === nodeId && entry.projectId === projectId
+        && key.startsWith(`[${JSON.stringify(origin)},`)) {
+        this.memory.delete(key)
+        removed = true
+      }
+    }
+    if (removed) this.persist(origin, true)
   }
 
   /**
@@ -198,6 +214,6 @@ export class VerifiedProjectDisplayCache {
         removed = true
       }
     }
-    if (removed) this.persist(origin)
+    if (removed) this.persist(origin, true)
   }
 }

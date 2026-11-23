@@ -33,6 +33,7 @@ export interface TerminalInputConnectionService {
 }
 
 const ID_PATTERN = /^[\w-]{1,128}$/u
+const MAX_PENDING_INPUT_FRAMES = 64
 
 /** Live output-stream attachment eligible to bind a low-latency input WebSocket. */
 export interface ActiveTerminalAttachment {
@@ -147,6 +148,7 @@ export async function bindTerminalInputSocket(
     || attachment.inputSocket !== socket || socket.readyState !== 'open'
 
   let queue: Promise<void> = Promise.resolve()
+  let pendingFrames = 0
   const unsubscribeMessage = socket.onMessage((raw) => {
     if (isEnded()) return
     const frame = parseClientFrame(raw)
@@ -155,7 +157,14 @@ export async function bindTerminalInputSocket(
       finish()
       return
     }
+    if (pendingFrames >= MAX_PENDING_INPUT_FRAMES) {
+      socket.close(1008, 'terminal input queue full')
+      finish()
+      return
+    }
+    pendingFrames += 1
     queue = queue.then(async () => {
+      pendingFrames -= 1
       if (isEnded()) {
         closeOnAbort()
         return
@@ -214,13 +223,17 @@ export async function bindTerminalInputSocket(
  */
 export function resolveAuthorizedTerminalAttachment(
   request: IncomingMessage,
-  lookup: (key: string) => ActiveTerminalAttachment | undefined,
+  lookup: (key: string) => ActiveTerminalAttachment | Iterable<ActiveTerminalAttachment> | undefined,
   verifyCreator: (creator: TerminalCreatorId) => boolean,
 ): ActiveTerminalAttachment | undefined {
   const query = parseTerminalInputQuery(request.url)
   if (query === undefined) return undefined
-  const attachment = lookup(terminalAttachmentKey(query.sessionId, query.terminalId, query.attachmentId))
-  if (attachment === undefined || attachment.signal.aborted || attachment.isClosed()) return undefined
-  if (!verifyCreator(attachment.creator)) return undefined
-  return attachment
+  const found = lookup(terminalAttachmentKey(query.sessionId, query.terminalId, query.attachmentId))
+  if (found === undefined) return undefined
+  const candidates = Symbol.iterator in found ? found : [found]
+  for (const attachment of candidates) {
+    if (attachment.signal.aborted || attachment.isClosed()) continue
+    if (verifyCreator(attachment.creator)) return attachment
+  }
+  return undefined
 }

@@ -27,7 +27,7 @@ kind: "package-reference"
 
 与 `ctx.remoteDesktop` Provider（`dsh-remote-desktop-vnc`）和 `ctx.webServer` 一起加载。插件使用 `ctx.inject(['webServer', 'remoteDesktop'])`，仅在两者存在时激活；Provider 的 `streamPath` 配置必须与本插件一致，`attach` 才会通告到已挂载的路径。
 
-卸载时先拒绝并移除新的升级请求，再取消已接收的 Provider 调用并终止其 WebSocket。销毁会等待这些调用、socket 和 WebSocket server 全部结束。每次调用接收的取消信号同时覆盖挂载关闭和客户端断开；Provider 失败会关闭对应连接，除非关闭已由取消触发，否则会报告错误。
+卸载时拒绝并移除新的升级请求，取消已接收的 Provider 调用，销毁相应的 Duplex 适配器和 WebSocket 连接。销毁会等待这些调用、socket 和 WebSocket server 全部结束。每次调用接收的取消信号涵盖挂载关闭和客户端断开。Provider 失败会关闭对应连接，并在调用仍有效时报告错误。
 
 **运行时不变量：** 未发布配套入口。本挂载只持有逐连接的 WebSocket 管线；token 与附件的真相留在 `ctx.remoteDesktop`。
 

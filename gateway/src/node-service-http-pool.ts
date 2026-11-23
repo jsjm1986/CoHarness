@@ -43,6 +43,7 @@ interface Entry {
   owner: AbortController
   busy: boolean
   interactive: boolean
+  upgraded?: boolean
   stream?: Duplex
   agent?: Agent
   idle?: ReturnType<typeof setTimeout>
@@ -65,6 +66,8 @@ export interface NodeServiceHttpLease {
   agent: Agent
   /** This request borrowed an existing idle transport. */
   reused: boolean
+  /** Dedicate this connection to one WebSocket handshake and stream until its owner destroys it. */
+  upgrade(): void
   /** Return a completely consumed response connection to its bounded idle owner. */
   release(): void
   /** Close this request's connection after cancellation, refusal or incomplete response. */
@@ -165,10 +168,7 @@ export class NodeServiceHttpPool {
   }
 
   private waitForGrant(nodeId: RuntimeNodeId, signal: AbortSignal, interactive: boolean, deadline: number, busyRevision?: number): Promise<Acquisition> {
-    const pressure = this.services.capacity(nodeId)
-    const releasable = [...this.entries, ...this.transports.keys()].some(entry =>
-      pressure === 'global' || entry.nodeId === nodeId && (interactive || !entry.interactive) && (entry.busy || entry.owner.signal.aborted))
-    if (!releasable) return Promise.reject(new NodeServiceError(503, 'node-service/busy'))
+    if (!this.canWait(nodeId, interactive)) return Promise.reject(new NodeServiceError(503, 'node-service/busy'))
     const waitingOnNode = this.waitingByNode.get(nodeId) ?? 0
     if (this.waiters.size >= this.config.httpMaxPendingRequests || waitingOnNode >= this.config.httpMaxPendingPerNode) {
       return Promise.reject(new NodeServiceError(503, 'node-service/busy'))
@@ -208,11 +208,18 @@ export class NodeServiceHttpPool {
     })
   }
 
+  private canWait(nodeId: RuntimeNodeId, interactive: boolean): boolean {
+    const pressure = this.services.capacity(nodeId)
+    return [...this.entries, ...this.transports.keys()].some(entry =>
+      (pressure === 'global' || entry.nodeId === nodeId) && (entry.owner.signal.aborted ||
+        !entry.upgraded && (pressure === 'global' || entry.busy && (interactive || !entry.interactive))))
+  }
+
   private tryAcquire(nodeId: RuntimeNodeId, signal: AbortSignal, interactive: boolean): Acquisition | undefined {
     const revision = this.revision
     let reserved: Entry | undefined, ordinary: Entry | undefined
     for (const entry of this.entries) {
-      if (entry.nodeId !== nodeId) continue
+      if (entry.nodeId !== nodeId || entry.upgraded) continue
       if (!entry.busy && (entry.stream?.destroyed || entry.stream?.writableEnded)) { this.destroy(entry); continue }
       if (entry.interactive) { reserved = entry; continue }
       if (!entry.busy && ordinary === undefined) ordinary = entry
@@ -279,15 +286,33 @@ export class NodeServiceHttpPool {
     if (reused) this.metrics.reused += 1
     else this.metrics.opened += 1
     let released = false
-    return { agent, reused, destroy: () => { if (released) return; released = true; this.destroy(entry) }, release: () => {
-      if (released) return
-      released = true; entry.busy = false
-      if (this.closed || entry.stream?.destroyed || entry.stream?.writableEnded) { this.destroy(entry); return }
-      entry.idle = setTimeout(() => { this.destroy(entry) }, this.config.httpIdleTimeoutMs)
-      entry.idle.unref()
-      this.changed()
-      this.trimIdle(entry.nodeId)
-    } }
+    return {
+      agent, reused,
+      upgrade: () => {
+        if (released) throw new NodeServiceError(409, 'node-service/cancelled')
+        entry.upgraded = true
+        this.changed()
+        // A waiter can outlive all eligible HTTP borrowers if the last one becomes a WebSocket.
+        for (const waiter of this.waiters) {
+          if (!this.canWait(waiter.nodeId, waiter.interactive)) waiter.reject(new NodeServiceError(503, 'node-service/busy'))
+        }
+      },
+      destroy: () => {
+        if (released) return
+        released = true
+        this.destroy(entry)
+      },
+      release: () => {
+        if (released) return
+        released = true
+        entry.busy = false
+        if (this.closed || entry.upgraded || entry.stream?.destroyed || entry.stream?.writableEnded) { this.destroy(entry); return }
+        entry.idle = setTimeout(() => { this.destroy(entry) }, this.config.httpIdleTimeoutMs)
+        entry.idle.unref()
+        this.changed()
+        this.trimIdle(entry.nodeId)
+      },
+    }
   }
 
   private trimIdle(nodeId: RuntimeNodeId): void {
@@ -314,6 +339,7 @@ export class NodeServiceHttpPool {
     let active = 0
     let idle = 0
     for (const entry of this.entries) {
+      if (entry.upgraded) continue
       if (entry.busy) active += 1
       else idle += 1
     }

@@ -86,7 +86,9 @@ export function NodeConnectionSection() {
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false)
   const owner = useRef<AbortController | undefined>(undefined)
   const overview = useDeploymentOverview()
-  const hydratedOverview = useRef<{ overview: typeof overview; revision: string | undefined } | null>(null)
+  const waitingForOverview = overview?.status === 'loading' && overview.requested.has('nodeConnection')
+  const overviewConnection = overview?.status === 'ready' ? overview.sections?.nodeConnection : undefined
+  const hydratedOverview = useRef<{ slice: typeof overviewConnection; revision: string | undefined } | null>(null)
   useEffect(() => { const current = new AbortController(); owner.current = current; return () => { current.abort() } }, [])
   const selected = adminComputerTarget() ?? deployment?.entry.nodeId
   const available = deployment?.mode === 'multi' && selected !== deployment.primary?.nodeId
@@ -94,26 +96,27 @@ export function NodeConnectionSection() {
   useEffect(() => {
     if (!available) return
     const revision = deployment?.revision
-    if (overview !== null && overview.requested.has('nodeConnection')) {
-      if (hydratedOverview.current === null && overview.status === 'loading') return
-      if (overview.status === 'ready' && overview.sections?.nodeConnection !== undefined
-        && (hydratedOverview.current === null || (hydratedOverview.current.overview === overview && hydratedOverview.current.revision === revision))) {
-        if (hydratedOverview.current === null) {
-          hydratedOverview.current = { overview, revision }
-          try {
-            const next = nodeConnectionViewSchema.parse(unwrapDeploymentOverviewSlice(overview.sections.nodeConnection))
-            setView(next)
-            setCenter(current => current === '' ? next.centerUrl ?? deployment?.primary?.origin ?? '' : current)
-          } catch { setError(t('readFailed')) }
-        }
-        return
+    if (hydratedOverview.current === null && waitingForOverview) return
+    if (overviewConnection !== undefined
+      && (hydratedOverview.current === null || (hydratedOverview.current.slice === overviewConnection && hydratedOverview.current.revision === revision))) {
+      if (hydratedOverview.current === null) {
+        hydratedOverview.current = { slice: overviewConnection, revision }
+        try {
+          const next = nodeConnectionViewSchema.parse(unwrapDeploymentOverviewSlice(overviewConnection))
+          setView(next); setError('')
+          setCenter(current => current === '' ? next.centerUrl ?? deployment?.primary?.origin ?? '' : current)
+        } catch { setError(t('readFailed')) }
       }
+      return
     }
     const controller = new AbortController()
-    void getNodeConnection(controller.signal).then(next => { if (controller.signal.aborted) return; setView(next); setCenter(current => current === '' ? next.centerUrl ?? deployment?.primary?.origin ?? '' : current) })
-      .catch(() => { if (!controller.signal.aborted) setError(t('readFailed')) })
+    void getNodeConnection(controller.signal).then(next => {
+      if (controller.signal.aborted) return
+      setView(next); setError('')
+      setCenter(current => current === '' ? next.centerUrl ?? deployment?.primary?.origin ?? '' : current)
+    }).catch(() => { if (!controller.signal.aborted) setError(t('readFailed')) })
     return () => { controller.abort() }
-  }, [available, deployment?.primary?.origin, deployment?.revision, overview, t])
+  }, [available, deployment?.primary?.origin, deployment?.revision, overviewConnection, waitingForOverview, t])
   if (!available && view === null) return null
   const run = async (start: boolean): Promise<void> => {
     if (view === null || busy || !available) return
@@ -133,7 +136,7 @@ export function NodeConnectionSection() {
   }
   return <Section title={t('connectionTitle')}>
     <p className="fieldHint">{t('connectionHint')}</p>{!available && <p role="alert">{t('connectionUnavailable')}</p>}<ErrorBanner message={error} />
-    {view === null ? <LoadingState label={t('loading')} /> : <>
+    {view === null ? error === '' ? <LoadingState label={t('loading')} /> : null : <>
       <p className="fieldHint">{t(view.configured ? 'configured' : 'unconfigured')} · {t(view.connectionState === 'connected' ? 'connectedState' : view.connectionState)}</p>
       <Field label={t('center')}><input className="input" type="url" aria-label={t('center')} value={center} disabled={busy || !available} onChange={event => { setCenter(event.target.value) }} /></Field>
       <Field label={t('code')}><input className="input" type="password" aria-label={t('code')} autoComplete="off" value={code} disabled={busy || !available} onChange={event => { setCode(event.target.value) }} /></Field>

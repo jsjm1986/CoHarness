@@ -70,11 +70,15 @@ export interface TerminalViewState {
   readonly issue?: TerminalViewIssue | undefined
 }
 
+const MAX_INPUT_RECONNECT_ATTEMPTS = 5
+const MAX_INPUT_RECONNECT_DELAY_MS = 30_000
+
 /** A view survives DOM unmount; its process only ends on explicit close. */
 export class TerminalView {
   /** Observable controls, process metadata and the next screen update awaiting acknowledgement. */
   readonly state: SnapshotStore<TerminalViewState> = createSnapshotStore<TerminalViewState>({ phase: 'idle', writable: false })
   private readonly lifetime = new AbortController()
+  private readonly encoder = new TextEncoder()
   private stream: RemoteStream<TerminalFrame> | undefined
   private mounted = false
   private attachmentId: TerminalAttachmentId | undefined
@@ -86,8 +90,10 @@ export class TerminalView {
   private writes: Promise<void> = Promise.resolve()
   private queuedInput = 0
   private pendingInput: { attachmentId: TerminalAttachmentId; data: string; bytes: number } | undefined
+  private latestResize: { attachmentId: TerminalAttachmentId; cols: number; rows: number; replaceable: boolean } | undefined
   private inputChannel: { attachmentId: TerminalAttachmentId; channel: TerminalInputChannel } | undefined
   private inputReconnectTimer: ReturnType<typeof setTimeout> | undefined
+  private inputReconnectAttempts = 0
   private readonly detaching = new Set<Promise<void>>()
 
   /**
@@ -153,33 +159,34 @@ export class TerminalView {
           result => ({ ok: true as const, result }),
           (error: unknown) => ({ ok: false as const, error }),
         )
-      const [environment, available] = await Promise.all([
-        this.remote.environment(this.sessionId, this.lifetime.signal), this.remote.list(this.sessionId),
-      ])
-      if (this.stopped()) {
-        shellDiscovery?.abort()
-        return
-      }
-      this.patch({ environment: valueOf(environment) })
-      const info = valueOf(available).find(item => item.id === this.id)
-      if (info !== undefined) {
-        shellDiscovery?.abort()
-        this.adopt(info)
-      } else if (this.createWhenMissing) {
-        let path = this.shellPath
-        if (path === undefined && speculativeShells !== undefined) {
-          const settled = await speculativeShells
-          if (!settled.ok) throw settled.error
-          const shells = valueOf(settled.result)
-          const previous = preferredShell(this.preferenceKey)
-          path = shells.find(shell => shell.path === previous)?.path ?? shells[0]?.path
-        }
+      try {
+        const [environment, available] = await Promise.all([
+          this.remote.environment(this.sessionId, this.lifetime.signal), this.remote.list(this.sessionId),
+        ])
         if (this.stopped()) return
-        if (path !== undefined) rememberShell(this.preferenceKey, path)
-        await this.create(valueOf(environment), path)
+        this.patch({ environment: valueOf(environment) })
+        const info = valueOf(available).find(item => item.id === this.id)
+        if (info !== undefined) {
+          shellDiscovery?.abort()
+          this.adopt(info)
+        } else if (this.createWhenMissing) {
+          let path = this.shellPath
+          if (path === undefined && speculativeShells !== undefined) {
+            const settled = await speculativeShells
+            if (!settled.ok) throw settled.error
+            const shells = valueOf(settled.result)
+            const previous = preferredShell(this.preferenceKey)
+            path = shells.find(shell => shell.path === previous)?.path ?? shells[0]?.path
+          }
+          if (this.stopped()) return
+          if (path !== undefined) rememberShell(this.preferenceKey, path)
+          await this.create(valueOf(environment), path)
+        }
+        else throw new TerminalViewError('missingTerminal')
+      } finally {
+        shellDiscovery?.abort()
       }
-      else throw new TerminalViewError('missingTerminal')
-    })().catch((error: unknown) => { this.fail(error) }).finally(() => { this.loading = undefined })
+    })().catch((error: unknown) => { if (!this.stopped()) this.fail(error) }).finally(() => { this.loading = undefined })
     return this.loading
   }
 
@@ -254,8 +261,9 @@ export class TerminalView {
     const state = this.state.getSnapshot()
     const attachmentId = this.attachmentId
     if (!state.writable || state.info === undefined || attachmentId === undefined) return
-    const bytes = new TextEncoder().encode(data).byteLength
+    const bytes = this.encoder.encode(data).byteLength
     if (this.queuedInput + bytes > (state.environment?.maxInputBytes ?? 0)) { this.fail(new TerminalViewError('inputFull')); return }
+    if (this.latestResize !== undefined) this.latestResize.replaceable = false
     this.queuedInput += bytes
     if (this.pendingInput?.attachmentId === attachmentId) {
       this.pendingInput.data += data
@@ -272,6 +280,7 @@ export class TerminalView {
       if (channel?.isOpen) {
         try {
           await channel.write(input.data)
+          this.inputReconnectAttempts = 0
           return
         } catch (error) {
           const sent = error instanceof TerminalInputChannelClosedError
@@ -289,7 +298,7 @@ export class TerminalView {
   }
 
   /**
-   * Resize only from the currently writable view.
+   * Adjacent unsent resizes share the latest dimensions. Input and in-flight resizes retain their order.
    * @param cols - measured column count.
    * @param rows - measured row count.
    */
@@ -297,17 +306,28 @@ export class TerminalView {
     const state = this.state.getSnapshot()
     const attachmentId = this.attachmentId
     if (!state.writable || state.info === undefined || attachmentId === undefined) return
-    if (state.info.cols === cols && state.info.rows === rows) return
-    const id = state.info.id
     cols = Math.min(cols, state.environment?.maxCols ?? cols)
     rows = Math.min(rows, state.environment?.maxRows ?? rows)
+    const previous = this.latestResize?.attachmentId === attachmentId ? this.latestResize : undefined
+    const size = previous ?? state.info
+    if (size.cols === cols && size.rows === rows) return
     this.pendingInput = undefined
+    if (previous?.replaceable) {
+      previous.cols = cols
+      previous.rows = rows
+      return
+    }
+    const resize = { attachmentId, cols, rows, replaceable: true }
+    this.latestResize = resize
+    const id = state.info.id
     this.writes = this.writes.then(async () => {
+      resize.replaceable = false
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable) return
       const channel = this.inputChannel?.attachmentId === attachmentId ? this.inputChannel.channel : undefined
       if (channel?.isOpen) {
         try {
-          await channel.resize(cols, rows)
+          await channel.resize(resize.cols, resize.rows)
+          this.inputReconnectAttempts = 0
           return
         } catch (error) {
           if (error instanceof TerminalInputChannelClosedError || error instanceof TerminalInputChannelUnavailableError) {
@@ -320,7 +340,7 @@ export class TerminalView {
           }
         }
       }
-      valueOf(await this.remote.resize(this.sessionId, id, attachmentId, cols, rows))
+      valueOf(await this.remote.resize(this.sessionId, id, attachmentId, resize.cols, resize.rows))
     }).catch((error: unknown) => { if (this.attachmentId === attachmentId) this.fail(error) })
   }
 
@@ -373,6 +393,8 @@ export class TerminalView {
     this.stream = undefined
     this.attachmentId = undefined
     this.pendingInput = undefined
+    this.latestResize = undefined
+    this.inputReconnectAttempts = 0
     this.dropInputChannel()
     this.pendingRender?.resolve()
     this.pendingRender = undefined
@@ -383,7 +405,7 @@ export class TerminalView {
   }
 
   private ensureInputChannel(terminalId: WebTerminalId, attachmentId: TerminalAttachmentId): void {
-    if (this.openInputChannel === undefined || this.lifetime.signal.aborted) return
+    if (this.openInputChannel === undefined || this.stopped()) return
     if (this.inputChannel?.attachmentId === attachmentId) return
     this.dropInputChannel()
     const channel = this.openInputChannel({ sessionId: this.sessionId, terminalId, attachmentId })
@@ -399,11 +421,14 @@ export class TerminalView {
   }
 
   private scheduleInputChannelReconnect(terminalId: WebTerminalId, attachmentId: TerminalAttachmentId): void {
+    if (this.inputReconnectAttempts >= MAX_INPUT_RECONNECT_ATTEMPTS) return
+    const attempt = this.inputReconnectAttempts++
+    const delayMs = Math.min(MAX_INPUT_RECONNECT_DELAY_MS, this.inputReconnectDelayMs * (2 ** attempt))
     this.inputReconnectTimer = setTimeout(() => {
       this.inputReconnectTimer = undefined
       if (this.attachmentId !== attachmentId || !this.state.getSnapshot().writable || this.stopped()) return
       this.ensureInputChannel(terminalId, attachmentId)
-    }, this.inputReconnectDelayMs)
+    }, delayMs)
   }
 
   private dropInputChannel(): void {
@@ -465,6 +490,7 @@ export class TerminalView {
   }
 
   private fail(error: unknown): void {
+    this.dropInputChannel()
     const failure = remoteErrorOf(error)
     if (failure?.code === 'terminal/control-unavailable') {
       this.patch({ writable: false, error: undefined, issue: undefined })

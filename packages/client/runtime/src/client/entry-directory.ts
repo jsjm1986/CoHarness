@@ -359,7 +359,7 @@ export class EntryDirectory {
    * @param evictDisplays - when true (default), also purge cached verified project labels for this account.
    */
   clear(evictDisplays = true): void {
-    if (evictDisplays && this.personal !== undefined) this.displayCache.clear(this.personal.id)
+    if (evictDisplays) this.displayCache.clear(this.personal?.id)
     this.epoch++
     this.entries.clear()
     this.retained.clear()

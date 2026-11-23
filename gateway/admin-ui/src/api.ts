@@ -1799,8 +1799,8 @@ export type TunnelAccessView = {
   updatedAt: string
 }
 
-export function getTunnelAccess(): Promise<TunnelAccessView> {
-  return request('/admin/api/tunnel')
+export function getTunnelAccess(signal?: AbortSignal): Promise<TunnelAccessView> {
+  return request('/admin/api/tunnel', signal === undefined ? undefined : { signal })
 }
 export function installTunnelBinary(): Promise<TunnelAccessView> {
   return request('/admin/api/tunnel/install', { method: 'POST', body: '{}' })

@@ -93,7 +93,7 @@ export class RuntimeAssets {
       if (subject.nodeId !== undefined && subject.nodeId !== entry.nodeId) continue
       if (subject.userId !== undefined && subject.userId !== entry.userId) continue
       if (subject.projectId !== undefined && subject.projectId !== entry.projectId) continue
-      this.remoteCacheBytes -= entry.bytes
+      this.remoteCacheBytes = Math.max(0, this.remoteCacheBytes - entry.bytes)
       this.remoteCache.delete(key)
     }
     for (const operation of this.active) {
@@ -162,7 +162,7 @@ export class RuntimeAssets {
     if (entry === undefined) return false
     this.remoteCache.delete(key)
     if (entry.freshUntil <= Date.now()) {
-      this.remoteCacheBytes -= entry.bytes
+      this.remoteCacheBytes = Math.max(0, this.remoteCacheBytes - entry.bytes)
       return false
     }
     this.remoteCache.set(key, entry)
@@ -339,7 +339,7 @@ export class RuntimeAssets {
         const cacheOwner: RemoteAssetOwner = { nodeId: placement.environment.node.id, userId: admission.user.id,
           ...(admission.scope.kind === 'project' ? { projectId: admission.scope.projectId } : {}) }
         const cacheKey = JSON.stringify([cacheOwner.nodeId, runtimeId, snapshot.generation, snapshot.launchStamp,
-          snapshot.startedAt, cacheOwner.userId, cacheOwner.projectId ?? null, admission.accessRevision, runtimeRequestPath(req.url ?? '/')])
+          snapshot.startedAt, cacheOwner.userId, cacheOwner.projectId ?? null, runtimeRequestPath(req.url ?? '/')])
         if (await this.serveCachedRemote(req, res, cacheKey, owner.signal)) return true
         if (this.options.forward === undefined) {
           throw new RuntimeAssetUnavailableError(503, 'runtime-asset/unavailable')

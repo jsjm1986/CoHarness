@@ -1324,10 +1324,13 @@ export class PostgresModelGovernanceService {
           CASE WHEN COALESCE(control.write_epoch,1)<>$8 THEN 'stale-epoch'
             WHEN COALESCE(control.mode,'serving')<>'serving' THEN 'maintenance' ELSE 'open' END AS verdict
         FROM harness.instances i
+        JOIN harness.organizations o ON o.id=i.organization_id AND o.status='active'
         JOIN harness.projects owner ON (owner.organization_id,owner.id)=(i.organization_id,i.project_id)
           AND owner.public_id=$3 AND owner.status='active'
+        LEFT JOIN harness.project_content_placement cp ON cp.organization_id=i.organization_id AND cp.project_id=i.project_id
         LEFT JOIN harness.cluster_control control ON control.organization_id=i.organization_id
         WHERE i.organization_id=$1 AND i.assigned_node_id=$4 AND i.runtime_id=$5 AND i.generation=$6 AND i.runtime_token_hash=$7
+          AND (cp.project_id IS NULL OR (cp.node_id=i.assigned_node_id AND cp.runtime_id=i.runtime_id))
           AND i.provisioning_state='ready' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
           AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
       ) SELECT authority.verdict,credential.* FROM authority
@@ -1398,22 +1401,29 @@ export class PostgresModelGovernanceService {
       LIMIT 1`
     const coordinates = [this.context.organizationId, ref, subject.id]
     const ownerCheck = subject.kind === 'user'
-      ? `JOIN harness.users owner ON (owner.organization_id,owner.id)=(i.organization_id,i.user_id) AND owner.public_id=$3`
-      : `JOIN harness.projects owner ON (owner.organization_id,owner.id)=(i.organization_id,i.project_id) AND owner.public_id=$3 AND owner.status='active'`
-    const userComputerCheck = subject.kind === 'user'
-      ? `AND harness.computer_use_allowed(i.organization_id,i.user_id,i.assigned_node_id)` : ''
+      ? `JOIN harness.users owner ON (owner.organization_id,owner.id)=(i.organization_id,i.user_id)
+          AND owner.public_id=$3 AND owner.status='active' AND owner.deleted_at IS NULL
+        JOIN harness.memberships owner_membership ON owner_membership.organization_id=owner.organization_id
+          AND owner_membership.user_id=owner.id AND owner_membership.status='active'`
+      : `JOIN harness.projects owner ON (owner.organization_id,owner.id)=(i.organization_id,i.project_id)
+          AND owner.public_id=$3 AND owner.status='active'
+        LEFT JOIN harness.project_content_placement cp ON cp.organization_id=i.organization_id AND cp.project_id=i.project_id`
+    const placementCheck = subject.kind === 'user'
+      ? `AND harness.computer_use_allowed(i.organization_id,i.user_id,i.assigned_node_id)`
+      : `AND (cp.project_id IS NULL OR (cp.node_id=i.assigned_node_id AND cp.runtime_id=i.runtime_id))`
     const result = runtime === undefined
       ? await this.context.pool.query<OrganizationCredentialLookup>(`SELECT 'open' verdict,credential.* FROM (${credential}) credential`, coordinates)
       : await this.context.pool.query<OrganizationCredentialLookup>(`WITH authority AS MATERIALIZED (
           SELECT CASE WHEN COALESCE(control.write_epoch,1)<>$8 THEN 'stale-epoch'
             WHEN COALESCE(control.mode,'serving')<>'serving' THEN 'maintenance' ELSE 'open' END AS verdict
           FROM harness.instances i
+          JOIN harness.organizations o ON o.id=i.organization_id AND o.status='active'
           ${ownerCheck}
           LEFT JOIN harness.cluster_control control ON control.organization_id=i.organization_id
           WHERE i.organization_id=$1 AND i.assigned_node_id=$4 AND i.runtime_id=$5 AND i.generation=$6 AND i.runtime_token_hash=$7
             AND i.provisioning_state='ready' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
             AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
-            ${userComputerCheck}
+            ${placementCheck}
         ) SELECT authority.verdict,credential.* FROM authority
           LEFT JOIN LATERAL (${credential}) credential ON authority.verdict='open'`,
         [...coordinates, this.context.nodeId, runtime.runtimeId, runtime.generation, runtime.bearerHash, String(runtime.epoch)])

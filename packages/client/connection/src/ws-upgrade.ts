@@ -28,10 +28,9 @@ export interface WebSocketHeartbeat {
 export function createWebSocketHeartbeat(server: WebSocketServer, intervalMs: number): WebSocketHeartbeat {
   const missedHeartbeats = new Map<WebSocket, number>()
   let timer: NodeJS.Timeout | undefined
-  let stopped = false
 
   const start = (): void => {
-    if (timer !== undefined || stopped) return
+    if (timer !== undefined) return
     timer = setInterval(() => {
       for (const [socket, missed] of missedHeartbeats) {
         if (socket.readyState !== WebSocket.OPEN) {
@@ -41,8 +40,7 @@ export function createWebSocketHeartbeat(server: WebSocketServer, intervalMs: nu
         if (missed >= MAX_MISSED_HEARTBEATS) {
           // Give a pong already queued by the event loop one turn to arrive before terminating.
           setImmediate(() => {
-            const current = missedHeartbeats.get(socket)
-            if (current !== undefined && current >= MAX_MISSED_HEARTBEATS) socket.terminate()
+            if (missedHeartbeats.get(socket) === missed) socket.terminate()
           })
           continue
         }
@@ -59,13 +57,16 @@ export function createWebSocketHeartbeat(server: WebSocketServer, intervalMs: nu
       void server
       start()
       missedHeartbeats.set(socket, 0)
-      socket.on('pong', () => { missedHeartbeats.set(socket, 0) })
-      const untrack = (): void => { missedHeartbeats.delete(socket) }
+      const onPong = (): void => { missedHeartbeats.set(socket, 0) }
+      const untrack = (): void => {
+        missedHeartbeats.delete(socket)
+        socket.removeListener('pong', onPong)
+      }
+      socket.on('pong', onPong)
       socket.once('close', untrack)
       socket.once('error', untrack)
     },
     stop(): void {
-      stopped = true
       missedHeartbeats.clear()
       if (timer !== undefined) {
         clearInterval(timer)
@@ -123,16 +124,19 @@ export function createUpgradeRouteHandler(options: {
     socket.once('close', close)
     socket.once('error', close)
     if (socket.destroyed) close()
+    let handedOff = false
     return options.owner.waterfall(
       'connection/request',
       buildConnectionRequestBoundary('upgrade', req, lifetime.signal),
       async () => {
         await options.onAccepted(req, socket, head, lifetime.signal)
+        handedOff = true
       },
     ).catch((error: unknown) => {
       close()
       if (options.rejectOnError === true && !socket.destroyed && !socket.writableEnded) {
-        rejectWebSocketUpgrade(socket)
+        if (handedOff) socket.destroy()
+        else rejectWebSocketUpgrade(socket)
       }
       throw error
     })

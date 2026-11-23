@@ -192,14 +192,16 @@ describe('ConnectionWebSocketChannel', () => {
     await raceChannel.upgrade({} as IncomingMessage, new PassThrough(), Buffer.alloc(0), new AbortController().signal, () => {})
     expect(terminate).toHaveBeenCalledOnce()
 
-    // Propagate server.close error.
+    // Propagate server.close error and return cached closePromise on repeated close().
     const errChannel = new ConnectionWebSocketChannel(60_000, 1024)
     const errServer = errChannel['server'] as WebSocketServer
     vi.spyOn(errServer, 'close').mockImplementation((cb) => {
       cb?.(new Error('close failure'))
       return errServer
     })
-    await expect(errChannel.close()).rejects.toThrow('close failure')
+    const firstClose = errChannel.close()
+    expect(errChannel.close()).toBe(firstClose)
+    await expect(firstClose).rejects.toThrow('close failure')
   })
 
   it('terminates unresponsive sockets after missed heartbeats and handles ws-upgrade helpers', async () => {
@@ -256,5 +258,26 @@ describe('ConnectionWebSocketChannel', () => {
     sDestroyed.destroy()
     await expect(handler({ url: '/err', headers: {} } as IncomingMessage, sDestroyed, Buffer.alloc(0)))
       .rejects.toThrow('upgrade failed')
+
+    // Post-handoff waterfall error destroys the upgraded socket without writing raw HTTP 403 bytes.
+    const postCtx = new Context()
+    cleanups.push(() => postCtx.fiber.dispose())
+    postCtx.on('connection/request', async (_boundary, next) => {
+      await next()
+      throw new Error('post-handoff failure')
+    })
+    const postHandler = createUpgradeRouteHandler({
+      owner: postCtx,
+      isRejected: () => false,
+      rejectOnError: true,
+      onAccepted: async () => {},
+    })
+    const sHandedOff = new PassThrough()
+    const handedOffChunks: Buffer[] = []
+    sHandedOff.on('data', (c: Buffer | string) => { handedOffChunks.push(Buffer.from(c)) })
+    await expect(postHandler({ url: '/ok', headers: {} } as IncomingMessage, sHandedOff, Buffer.alloc(0)))
+      .rejects.toThrow('post-handoff failure')
+    expect(sHandedOff.destroyed).toBe(true)
+    expect(handedOffChunks).toEqual([])
   })
 })

@@ -37,11 +37,17 @@ function origin(value: string): string {
 
 /** Default bounded TTL for positive `entry_node_visible` caching while LISTEN is connected. */
 const DEFAULT_ASSERT_NODE_CACHE_MS = 5_000
+const MAX_VISIBLE_NODES = 256
+
+interface VisibilityChecks {
+  pending: number
+  current?: { revision: bigint; check: Promise<void> }
+}
 
 /** Durable organization settings; all resource traffic still uses existing computer and Runtime authorization. */
 export class PostgresDeploymentTopology {
   private readonly visibleNodes = new Map<string, { revision: bigint; validUntil: number }>()
-  private readonly visibleInflight = new Map<string, { revision: bigint; check: Promise<void> }>()
+  private readonly visibleInflight = new Map<string, VisibilityChecks>()
   private readonly unsubscribe?: () => void
   private readonly assertNodeCacheMs: number
 
@@ -212,28 +218,40 @@ export class PostgresDeploymentTopology {
     if (nodeId === this.context.nodeId) return
     const monitor = this.options.monitor
     const revision = this.assertNodeCacheMs > 0 && monitor?.available === true ? monitor.currentRevision?.() : undefined
+    const active = this.visibleInflight.get(nodeId)
     if (revision === undefined) {
-      if (this.visibleNodes.size > 0 || this.visibleInflight.size > 0) this.invalidateVisibility()
+      this.visibleNodes.clear()
     } else {
       const cached = this.visibleNodes.get(nodeId)
       if (cached !== undefined && cached.revision === revision && performance.now() < cached.validUntil) return
-      const pending = this.visibleInflight.get(nodeId)
-      if (pending?.revision === revision) return pending.check
+      if (active?.current?.revision === revision) return active.current.check
     }
-    const query = this.context.pool.query<{ allowed: boolean }>('SELECT harness.entry_node_visible($1,$2,$3) allowed',
-      [this.context.organizationId, this.context.nodeId, nodeId]).then(result => {
+    const group: VisibilityChecks = active ?? { pending: 0 }
+    this.visibleInflight.set(nodeId, group)
+    group.pending += 1
+    const check = (async () => {
+      const result = await this.context.pool.query<{ allowed: boolean }>('SELECT harness.entry_node_visible($1,$2,$3) allowed',
+        [this.context.organizationId, this.context.nodeId, nodeId])
       if (result.rows[0]?.allowed !== true) throw new DeploymentTopologyError(409, 'deployment/remote-target-unavailable')
-    })
-    if (revision === undefined) return query
-    const check = query.then(() => {
-      if (this.visibleInflight.get(nodeId)?.check !== check || monitor?.available !== true || monitor.currentRevision?.() !== revision) {
+      if (revision !== undefined && monitor?.available === true && monitor.currentRevision?.() === undefined) {
+        await monitor.synchronize()
+      }
+      if (this.visibleInflight.get(nodeId) !== group || (revision !== undefined && !monitor?.available)) {
         throw new DeploymentTopologyError(409, 'deployment/remote-target-unavailable')
       }
-      this.visibleNodes.set(nodeId, { revision, validUntil: performance.now() + this.assertNodeCacheMs })
-    }).finally(() => {
-      if (this.visibleInflight.get(nodeId)?.check === check) this.visibleInflight.delete(nodeId)
+      if (revision !== undefined && monitor?.currentRevision?.() === revision) {
+        if (this.visibleNodes.size >= MAX_VISIBLE_NODES && !this.visibleNodes.has(nodeId)) {
+          const oldest = this.visibleNodes.keys().next().value
+          if (oldest !== undefined) this.visibleNodes.delete(oldest)
+        }
+        this.visibleNodes.set(nodeId, { revision, validUntil: performance.now() + this.assertNodeCacheMs })
+      }
+    })().finally(() => {
+      group.pending -= 1
+      if (group.current?.check === check) delete group.current
+      if (group.pending === 0 && this.visibleInflight.get(nodeId) === group) this.visibleInflight.delete(nodeId)
     })
-    this.visibleInflight.set(nodeId, { revision, check })
+    if (revision !== undefined) group.current = { revision, check }
     return check
   }
 }

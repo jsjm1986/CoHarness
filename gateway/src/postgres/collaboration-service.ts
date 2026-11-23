@@ -159,11 +159,14 @@ export class PostgresCollaborationService {
     }))
   }
 
-  async projectsForUser(userId: number): Promise<ProjectScopeView[]> {
+  async projectsForUser(userId: number, view?: 'account-context'): Promise<ProjectScopeView[]> {
     const nodeScoped = this.catalogEntryNodeId !== undefined
-    return (await this.projectAuthorities(userId, undefined, true)).map(
-      ({ administrator: _, canManage: _c, uiThemePolicy: _t, origin: _o, owner: _w, nodeId, nodeName, ...project }) =>
-        nodeScoped ? { ...project, nodeId, nodeName } : project,
+    return (await this.projectAuthorities(userId, undefined, true, view === 'account-context')).map(
+      ({ administrator: _, canManage, uiThemePolicy, origin, owner, nodeId, nodeName, ...project }) => ({
+        ...project,
+        ...(nodeScoped ? { nodeId, nodeName } : {}),
+        ...(view === 'account-context' ? { canManage, uiThemePolicy, origin, owner } : {}),
+      }),
     )
   }
 

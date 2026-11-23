@@ -208,7 +208,12 @@ export interface GatewayProjectService {
 
 /** Project membership and shared-conversation authorization operations. */
 export interface GatewayCollaborationService {
-  projectsForUser(userId: number): Awaitable<ProjectScopeView[]>
+  /**
+   * @param userId - authenticated account.
+   * @param view - the browser account context requests current owner, management and theme fields. Omit for the compact roster.
+   * @returns authorized project scopes.
+   */
+  projectsForUser(userId: number, view?: 'account-context'): Awaitable<ProjectScopeView[]>
   /**
    * Admit prepared browser project metadata using one current account and project authority read without node I/O.
    * @param userId - server-authenticated account identifier.

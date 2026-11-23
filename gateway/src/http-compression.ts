@@ -139,6 +139,7 @@ export function appendVary(res: ServerResponse, token: string): void {
  * @param forwardedHeaders - mutable copy of upstream headers to publish on `res`.
  * @param coding - negotiated compression coding (`'br'` or `'gzip'`).
  * @param declaredLength - parsed upstream `content-length`, or `undefined` for chunked responses.
+ * @param signal - optional cancellation signal that tears down upstream, compressor, and destination promptly.
  */
 export async function pipeCompressedResponse(
   upstream: Readable,
@@ -147,15 +148,21 @@ export async function pipeCompressedResponse(
   forwardedHeaders: OutgoingHttpHeaders,
   coding: ContentCoding,
   declaredLength: number | undefined,
+  signal?: AbortSignal,
 ): Promise<void> {
   delete forwardedHeaders['content-length']
+  delete forwardedHeaders['accept-ranges']
   forwardedHeaders['content-encoding'] = coding
   forwardedHeaders.vary = mergeVaryValue(forwardedHeaders.vary, 'accept-encoding')
   if (typeof forwardedHeaders.etag === 'string' && !forwardedHeaders.etag.startsWith('W/')) {
     forwardedHeaders.etag = `W/${forwardedHeaders.etag}`
   }
   res.writeHead(status, forwardedHeaders)
-  await pipeline(upstream, createStreamCompressor(coding, declaredLength === undefined), res)
+  if (signal === undefined) {
+    await pipeline(upstream, createStreamCompressor(coding, declaredLength === undefined), res)
+  } else {
+    await pipeline(upstream, createStreamCompressor(coding, declaredLength === undefined), res, { signal })
+  }
 }
 
 /**
@@ -214,6 +221,19 @@ export async function sendCompressed(
         encoding = coding
       }
     }
+  }
+  if (res.headersSent || res.destroyed || res.writableEnded) return
+  if (encoding !== undefined) {
+    delete normalizedExtra['accept-ranges']
+    if (typeof normalizedExtra.etag === 'string' && !normalizedExtra.etag.startsWith('W/')) {
+      normalizedExtra.etag = `W/${normalizedExtra.etag}`
+    } else {
+      const stagedEtag = res.getHeader('etag')
+      if (typeof stagedEtag === 'string' && !stagedEtag.startsWith('W/')) {
+        res.setHeader('etag', `W/${stagedEtag}`)
+      }
+    }
+    res.removeHeader('accept-ranges')
   }
   const headers: OutgoingHttpHeaders = {
     ...normalizedExtra,

@@ -46,7 +46,9 @@ export function TunnelAccessSection() {
   const ownership = useRef({ mounted: false, action: 0, query: 0, feedback: 0, pending: null as Action | null })
   const draftInitialized = useRef(false)
   const overview = useDeploymentOverview()
-  const hydratedOverview = useRef<typeof overview>(null)
+  const waitingForOverview = overview?.status === 'loading' && overview.requested.has('tunnel')
+  const overviewTunnel = overview?.status === 'ready' ? overview.sections?.tunnel : undefined
+  const hydratedOverview = useRef<typeof overviewTunnel>(undefined)
   const lastFetchedAt = useRef(0)
 
   const publish = useCallback((next: TunnelAccessView) => {
@@ -58,13 +60,13 @@ export function TunnelAccessSection() {
     }
   }, [])
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     const owner = ownership.current
     const query = ++owner.query
     const actionId = owner.action
-    const current = () => owner.mounted && owner.query === query && owner.action === actionId
+    const current = () => owner.mounted && owner.query === query && owner.action === actionId && signal?.aborted !== true
     try {
-      const next = await getTunnelAccess()
+      const next = await getTunnelAccess(signal)
       if (!current()) return
       lastFetchedAt.current = Date.now()
       publish(next)
@@ -75,29 +77,35 @@ export function TunnelAccessSection() {
   }, [publish])
 
   useEffect(() => {
-    if (hydratedOverview.current === null && overview !== null && overview.requested.has('tunnel') && overview.status === 'loading') return
     const owner = ownership.current
     owner.mounted = true
+    return () => {
+      owner.mounted = false
+      owner.action++; owner.query++; owner.feedback++
+    }
+  }, [])
+
+  useEffect(() => {
+    if (hydratedOverview.current === undefined && waitingForOverview) return
     let skipInitial = false
-    if (overview?.status === 'ready' && overview.sections?.tunnel !== undefined) {
+    if (overviewTunnel !== undefined && hydratedOverview.current !== overviewTunnel) {
       skipInitial = true
-      if (hydratedOverview.current !== overview) {
-        hydratedOverview.current = overview
-        lastFetchedAt.current = Date.now()
-        try {
-          publish(unwrapDeploymentOverviewSlice(overview.sections.tunnel))
-          setReadError('')
-        } catch (cause) {
-          setReadError(messageOf(cause))
-        }
+      hydratedOverview.current = overviewTunnel
+      lastFetchedAt.current = Date.now()
+      try {
+        publish(unwrapDeploymentOverviewSlice(overviewTunnel))
+        setReadError('')
+      } catch (cause) {
+        setReadError(messageOf(cause))
       }
     }
+    const controller = new AbortController()
     let polling = false
     const poll = (force = false) => {
-      if (polling) return
+      if (polling || controller.signal.aborted) return
       if (!force && document.visibilityState === 'hidden') return
       polling = true
-      void refresh().finally(() => { polling = false })
+      void refresh(controller.signal).finally(() => { polling = false })
     }
     if (!skipInitial) poll(true)
     const timer = setInterval(() => { poll() }, 10_000)
@@ -108,12 +116,11 @@ export function TunnelAccessSection() {
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
+      controller.abort()
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisibility)
-      owner.mounted = false
-      owner.action++; owner.query++; owner.feedback++
     }
-  }, [overview, publish, refresh])
+  }, [overviewTunnel, waitingForOverview, publish, refresh])
 
   const run = async (kind: Action, work: () => Promise<TunnelAccessView>, ok: string, saved?: () => void) => {
     const owner = ownership.current
@@ -219,7 +226,7 @@ export function TunnelAccessSection() {
             </div>
           ) : null}
 
-          {view.lastError === null ? null : <p className="errorText">{t('lastErrorLabel')}：{view.lastError}</p>}
+          {view.lastError === null ? null : <p className="errorText">{t('lastErrorLine', { error: view.lastError })}</p>}
 
           {view.binary !== null && editable ? (
             <div className="tunnelChoices">

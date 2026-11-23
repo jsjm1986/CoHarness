@@ -40,8 +40,8 @@ async function reloadRetainedTerminal(page: Page, tripwire: ReturnType<typeof wa
   }))
 }
 
-/** Hold the first real input acknowledgement while the remaining command is typed. */
-async function typeBehindPendingInput(page: Page, input: Locator, outputPath: string): Promise<number> {
+/** Hold the first input acknowledgement while the viewport changes and the remaining command is typed. */
+async function typeBehindPendingInput(page: Page, input: Locator, cwd: string): Promise<{ inputRequests: number; resizeRequests: number }> {
   const accepted = Promise.withResolvers<undefined>()
   const firstReply = accepted.promise.then(() => ({ ok: true as const }), (error: unknown) => ({ ok: false as const, error }))
   const release = Promise.withResolvers<undefined>()
@@ -49,6 +49,14 @@ async function typeBehindPendingInput(page: Page, input: Locator, outputPath: st
   const errors: unknown[] = []
   const origin = new URL(page.url()).origin
   const inputRequest = (url: URL): boolean => url.origin === origin && url.pathname === '/api/terminal/write'
+  const viewport = page.viewportSize()
+  if (viewport === null) throw new Error('Terminal resize proof needs an explicit viewport')
+  const screenRows = page.locator('[data-sidebar-terminal] .xterm-rows > div')
+  let resizeRequests = 0
+  const trackResize = (request: Request): void => {
+    const url = new URL(request.url())
+    if (url.origin === origin && url.pathname === '/api/terminal/resize') resizeRequests++
+  }
   let requests = 0
   const handler = (route: Route): Promise<void> => {
     const first = requests++ === 0
@@ -72,22 +80,32 @@ async function typeBehindPendingInput(page: Page, input: Locator, outputPath: st
   await page.route(inputRequest, handler)
   try {
     await expect.poll(() => input.isEditable()).toBe(true)
-    await input.press('e')
+    await input.press('s')
     await expect.poll(() => requests).toBe(1)
     const first = await firstReply
     if (!first.ok) throw first.error
-    await input.pressSequentially('cho terminal-browser-proof > terminal-proof.txt')
+    page.on('request', trackResize)
+    for (const decrease of [48, 96, 144, 192]) {
+      const previousRows = await screenRows.count()
+      await page.setViewportSize({ width: viewport.width, height: viewport.height - decrease })
+      await expect.poll(() => screenRows.count()).toBeLessThan(previousRows)
+    }
+    const finalRows = await screenRows.count()
+    await input.pressSequentially('tty size > terminal-grid.txt && echo terminal-browser-proof > terminal-proof.txt')
     await input.press('Enter')
     expect(requests).toBe(1)
     release.resolve(undefined)
-    await expect.poll(() => readFile(outputPath, 'utf8').catch(() => ''))
+    await expect.poll(() => readFile(join(cwd, 'terminal-proof.txt'), 'utf8').catch(() => ''))
       .toBe('terminal-browser-proof\n')
+    expect(Number((await readFile(join(cwd, 'terminal-grid.txt'), 'utf8')).trim().split(/\s+/u)[0])).toBe(finalRows)
     await expect.poll(() => operations.size).toBe(0)
-    return requests
+    return { inputRequests: requests, resizeRequests }
   } finally {
+    page.off('request', trackResize)
     release.resolve(undefined)
     await page.unroute(inputRequest, handler)
     await Promise.allSettled([...operations])
+    await page.setViewportSize(viewport)
     if (errors.length > 0) throw new AggregateError(errors, 'Terminal input fixture failed')
   }
 }
@@ -243,10 +261,10 @@ describe('web e2e: private user terminal lifecycle', () => {
     const input = page.getByRole('textbox', { name: 'Terminal', exact: true })
     await input.waitFor()
     const panel = page.locator('[data-sidebar-right-panel]')
-    const inputRequests = await typeBehindPendingInput(page, input, join(world.workspaceCwd, 'terminal-proof.txt'))
-    console.info('[terminal-input]', JSON.stringify({ inputRequests }))
+    const counts = await typeBehindPendingInput(page, input, world.workspaceCwd)
+    console.info('[terminal-input]', JSON.stringify(counts))
     await compareWorkflowGolden(join(DIRECTORY, 'input.expected.md'), JSON.stringify({
-      inputRequests,
+      ...counts,
       deliveredCommandOutput: await readFile(join(world.workspaceCwd, 'terminal-proof.txt'), 'utf8'),
     }, null, 2), webSnapshotMode())
     const inventory = await world.ctx.terminalController.list(SESSION)

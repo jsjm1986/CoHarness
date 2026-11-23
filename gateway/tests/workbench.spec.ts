@@ -88,7 +88,17 @@ describe('workbench account catalog', () => {
       id: 1, username: 'me', displayName: 'Me', role: 'user', status: 'active',
       homePath: '/home/me', mustChangePassword: false, autoReviewEligible: false,
     }
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('legacy session list failed', { status: 500 })))
+    const archiveRequest = new AbortController()
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith('/session.list')) return Promise.resolve(new Response('legacy session list failed', { status: 500 }))
+      const signal = init!.signal!
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          archiveRequest.abort()
+          reject(signal.reason)
+        }, { once: true })
+      })
+    }))
     const handler = createGatewayWorkbenchCatalogHandler({
       instances, collaboration,
       principals: new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'test', 30_000),
@@ -96,6 +106,7 @@ describe('workbench account catalog', () => {
     })
 
     await expect(handler(user, new AbortController().signal)).resolves.toEqual({ items: projectRows, personalComplete: false })
+    expect(archiveRequest.signal.aborted).toBe(true)
   })
 
   it.each(['unavailable', 'empty', 'invalid-archive', 'cancelled'] as const)('distinguishes %s personal metadata from verified deletion', async (state) => {

@@ -421,9 +421,10 @@ async function dispatch(
   if (pathname === '/admin/api/deployment/current-node' && method === 'GET') {
     res.setHeader('cache-control', 'no-store')
     if (deps.nodeServiceIdentity === undefined) { await reply.error(503, 'node-service/unavailable'); return true }
+    const deployment = await deps.topology?.adminRead(admin)
     await reply.json(200, { nodeId: deps.nodeServiceIdentity.nodeId, name: deps.cfg.computeNodeName,
-      forwardingEnabled: deps.topology === undefined ? deps.cfg.nodeService.forwarding : (await deps.topology.adminRead(admin)).scope === 'organization',
-      ...(deps.topology === undefined ? {} : { deployment: await deps.topology.adminRead(admin) }) })
+      forwardingEnabled: deployment === undefined ? deps.cfg.nodeService.forwarding : deployment.scope === 'organization',
+      ...(deployment === undefined ? {} : { deployment }) })
     return true
   }
   if (pathname === '/admin/api/deployment/node-connection') {

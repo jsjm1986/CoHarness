@@ -146,7 +146,7 @@ it('captures file-tool edits without a Git process until an ancestor becomes a r
   expect((await changes(ctx, session)).at(-1)?.files.map(file => file.path)).toEqual(['shell.txt'])
   expect(budget.requests.length).toBeGreaterThan(0)
   expect(budget.requests.every(request => request.origin === 'infrastructure')).toBe(true)
-  expect(budget.active).toBe(0)
+  await vi.waitFor(() => { expect(budget.active).toBe(0) })
 })
 
 it('records the first turn before input admission without admitting an ordinary process', async () => {

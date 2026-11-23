@@ -134,7 +134,7 @@ Workspace 和 Session 列表各自具有单调的 `pending` → `ready` 基线�
 
 `SessionListState.state` 和 `error` 直接投影 manager 的基线活动与最近失败，独立于 `phase`。池化汇总列表报告已鉴权基础 Runtime 的活动；`currentScopeList` 排除额外工作台目标。`sessions.refresh()` 与 `workspaces.refresh()` 复用各自所有者尚未完成的基线读取，通过既有列表状态发布失败，不因 wire 或传输失败拒绝 Promise。账户授权撤回后的显式 Session 刷新不执行读取。
 
-每一代引导连接在 Workspace 所有者与 Session 池的归档分区之间共用一次 `workspace.list` 基线。共享结果包含 Workspace 帧回放与版本合并后的归档事实；读取失败或取消时不发布结果。断线与销毁会使待完成基线失效，迟到结果不能更新新一代连接或其他目标。并发刷新调用方加入同一项待完成操作，已完成结果不跨连接代次缓存。其他运行时保留各自的基线所有者。
+每一代引导连接在 Workspace 所有者与 Session 池的归档分区之间共用一次 `workspace.list` 基线。池化目标运行时也在连接建立时将 `workspace.list` 与 `session.list` 并行发起，并通过版本单调合并安装归档快照。共享结果包含 Workspace 帧回放与版本合并后的归档事实；读取失败或取消时不发布结果。断线与销毁会使待完成基线失效，迟到结果不能更新新一代连接或其他目标。并发刷新调用方加入同一项待完成操作，已完成结果不跨连接代次缓存。其他运行时保留各自的基线所有者。实例持有的 `VerifiedProjectDisplayCache` 在 `sessionStorage` 中按 `(origin, account, nodeId, projectId, runtimeId)` 缓存已核验的项目名称与根路径以消除 `#id` 闪烁，同时仍要求实时元数据复核并在 401/403 或账号清理时驱逐。
 
 Session 刷新保留已有身份的相对顺序，并将新行放在 Host 基线中紧随其后的最近已知身份之前。索引化的锚点以线性工作量合并替换目录；首次成功基线直接采用 Host 顺序。
 

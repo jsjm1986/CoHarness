@@ -240,6 +240,7 @@
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native": "workspace:*",
     "@deepseek-ai/dsh-experimental-tool-worktree": "workspace:*",
     "@deepseek-ai/dsh-experimental-worktree": "workspace:*",
+    "@deepseek-ai/dsh-gateway-runtime": "workspace:*",
     "@deepseek-ai/dsh-llm-replay": "workspace:*",
     "@deepseek-ai/dsh-skill-office": "workspace:*",
     "@deepseek-ai/dsh-ssh-helper-runtime": "workspace:*",

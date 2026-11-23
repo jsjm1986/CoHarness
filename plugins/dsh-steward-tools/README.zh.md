@@ -26,3 +26,5 @@
 `tests/query.spec.ts` 覆盖语句分类与审批提示预览；`tests/composition.spec.ts` 覆盖注册、注销，以及有截断和无截断情况下的真实 dry-run 工具执行。执行器契约由 `steward-query.ts` 旁的 Gateway 测试覆盖。
 
 无密钥的 [steward-query-truncation 快照](../../snapshots/session/steward-query-truncation/snapshot.yml)通过随产品提供的 headless profile 加载插件源码，并将截断计划记录为模型可见的工具结果。从仓库根目录运行 `DSH_EXAMPLE_MODE=src DSH_SNAPSHOT=replay pnpm exec vitest run --config vitest.snapshot.config.ts snapshots/session/headless.snapshot.ts -t steward-query-truncation` 回放。
+
+使用 `DSH_EXAMPLE_MODE=lib` 时，插件源码通过根工作区的开发依赖解析已构建的 Gateway 语句分类器。

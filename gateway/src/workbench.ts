@@ -86,35 +86,27 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
         'content-type': 'application/json',
         [PRINCIPAL_HEADER]: principal,
       }
-      const rpcSignal = AbortSignal.any([signal, AbortSignal.timeout(deps.upstreamTimeoutMs)])
-      const [response, archiveResponse] = await Promise.all([
-        fetch(`http://${authority}/api/session.list`, {
+      const rpcAbort = new AbortController()
+      const rpcSignal = AbortSignal.any([signal, rpcAbort.signal, AbortSignal.timeout(deps.upstreamTimeoutMs)])
+      const readCatalog = async (method: 'session.list' | 'workspace.list'): Promise<unknown> => {
+        const response = await fetch(`http://${authority}/api/${method}`, {
           method: 'POST',
           headers: rpcHeaders,
-          body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: 'session.list', payload: {} }),
+          body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method, payload: {} }),
           signal: rpcSignal,
-        }),
-        fetch(`http://${authority}/api/workspace.list`, {
-          method: 'POST',
-          headers: rpcHeaders,
-          body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: 'workspace.list', payload: {} }),
-          signal: rpcSignal,
-        }),
-      ])
-      if (!response.ok) {
-        await response.body?.cancel().catch(() => { /* discard unread response body on status failure */ })
-        await archiveResponse.body?.cancel().catch(() => { /* discard unread archive body on status failure */ })
-        throw new Error(`personal workbench catalog returned HTTP ${String(response.status)}`)
-      }
-      if (!archiveResponse.ok) {
-        await response.body?.cancel().catch(() => { /* discard unread response body on archive failure */ })
-        await archiveResponse.body?.cancel().catch(() => { /* discard unread archive body on status failure */ })
-        throw new Error(`personal workbench archive list returned HTTP ${String(archiveResponse.status)}`)
+        })
+        if (!response.ok) {
+          throw new Error(`personal workbench ${method} returned HTTP ${String(response.status)}`)
+        }
+        return readResponseJson(response, deps.maxResponseBytes)
       }
       const [rawEnvelope, rawArchiveEnvelope] = await Promise.all([
-        readResponseJson(response, deps.maxResponseBytes),
-        readResponseJson(archiveResponse, deps.maxResponseBytes),
-      ])
+        readCatalog('session.list'),
+        readCatalog('workspace.list'),
+      ]).catch((error: unknown) => {
+        rpcAbort.abort()
+        throw error
+      })
       const envelope = object(rawEnvelope)
       const result = object(envelope?.result)
       const value = object(result?.value)
