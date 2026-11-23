@@ -670,8 +670,8 @@ describe('CI workflow', () => {
       expect(manifest.scripts.test).toContain(`--exclude tests/${suite}.spec.ts`)
     }
     expect(gatewaySteps[postgresIndex]?.env).toMatchObject({
-      HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_dump"]',
-      HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_restore"]',
+      HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","/usr/lib/postgresql/17/bin/pg_dump"]',
+      HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","/usr/lib/postgresql/17/bin/pg_restore"]',
     })
   })
 
