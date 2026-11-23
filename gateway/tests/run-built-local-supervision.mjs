@@ -49,7 +49,8 @@ try {
   assert.deepEqual(ready.deploymentEnvironment, { HGW_DATABASE_URL: false, DATABASE_URL: false, CLOUD_CREDENTIALS: false })
   transcript.push('Gateway database and credential variables stay outside the Runtime environment.')
   const context = { organizationId: 'fixture', nodeId: 'fixture', pool: { query: async sql => ({
-    rows: sql.includes('count(*)::text FROM harness.organizations') ? [{ organizations: '1', nodes: '1' }] : [],
+    rows: sql.includes('count(*)::text FROM harness.organizations') ? [{ organizations: '1', nodes: '1' }]
+      : sql.includes('to_regclass(') ? [{ present: false }] : [],
   }) } }
   await assert.rejects(collectDeploymentData(context, { ...cfg, runtimeCredentialDir: cfg.stateRoot }), /managed-data-root-overlaps-runtime-control/u)
   transcript.push('Application backups refuse roots that overlap node execution control.')
