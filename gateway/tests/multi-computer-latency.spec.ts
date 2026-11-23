@@ -116,7 +116,7 @@ describe('multi-computer forwarding counter invariants', () => {
         { id: 1, username: 'u', displayName: 'u', role: 'user', status: 'active', homePath: '/', mustChangePassword: false, autoReviewEligible: false },
         { target: 'personal', local: false, resetScope: false, environment },
         1,
-        { maxBytes: 1024 * 1024, onComplete },
+        { capture: { maxBytes: 1024 * 1024, onComplete } },
       ).catch((error: unknown) => res.writeHead(error instanceof NodeServiceError ? error.status : 500).end())
     })
     await new Promise<void>(resolve => { front.listen(0, '127.0.0.1', resolve) })

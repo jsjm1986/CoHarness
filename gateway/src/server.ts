@@ -77,7 +77,7 @@ import { isCentralRuntimeManagementRequest } from './runtime-management-api.ts'
 import { GatewayRuntimeRouter, InvalidRuntimeTargetError, LocalRuntimeAdapter, type RuntimePlacement } from './runtime-router.ts'
 import { NodeAccessError, nodeUuidSchema } from './node-access.ts'
 import { NODE_CHANNEL_PATH, NodeChannelError } from './node-channel-protocol.ts'
-import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_LOCAL_PORT_HEADER, NODE_SERVICE_PROTOCOL_VERSION, NODE_SERVICE_STREAM_PATH, NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
+import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_LOCAL_PORT_HEADER, NODE_SERVICE_PROTOCOL_VERSION, NODE_SERVICE_STREAM_PATH, NODE_SERVICE_TARGET_HEADER, NodeServiceError, RELEASE_COMBO_DIGEST_HEADER } from './node-service-stream.ts'
 import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
 import { PostgresCheckoutQueueFullError, type PostgresPoolAdmissionSnapshot } from './postgres/database.ts'
 import { forwardedClientAddress, trustedProxyList } from './login-source.ts'
@@ -1581,6 +1581,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
     }
     const { token, user, forward } = session
+    if (forward === undefined) delete req.headers[RELEASE_COMBO_DIGEST_HEADER]
     if (!skipOrdinaryReadySession && readySession !== undefined && (!(runtimeRead || readyInteractive) || !user.mustChangePassword)
       && (forward === undefined || forwardedSessionMatches(forward, readySession))
       && await handlers.readySession?.(req, res, { ...readySession, actor: user, sessionToken: token,

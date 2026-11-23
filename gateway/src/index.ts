@@ -140,6 +140,7 @@ import { PostgresDocumentLocations } from './postgres/document-locations.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, scopeCookie, type GatewayAccessInvalidation, type GatewayDeps } from './server.ts'
 import { ReleaseAssets } from './release-assets.ts'
+import { releaseComboReader } from './release-combos.ts'
 import { GatewayPerformanceObserver } from './performance-observer.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
 import { removeBootstrapAdminPassword, writeBootstrapAdminPassword } from './bootstrap-admin.ts'
@@ -650,7 +651,8 @@ const proxyHandlers = createProxyHandlers(deps, principalKeys.signer, runtimeAdm
 const runtimeAssets = new RuntimeAssets({
   cfg, localNodeId: context.nodeId as RuntimeNodeId, admission: runtimeAdmission,
   instances, monitor: accessMonitor, signer: principalKeys.signer,
-  forward: (req, res, actor, placement, generation, capture) => nodeServiceProxy.asset(req, res, actor, placement, generation, capture),
+  releaseCombo: cfg.runtimeAssetCacheMaxBytes === 0 ? undefined : releaseComboReader(cfg.releaseRoot),
+  forward: (req, res, actor, placement, generation, delivery) => nodeServiceProxy.asset(req, res, actor, placement, generation, delivery),
 })
 await accessMonitor.synchronize()
 // Browser document operations run against each scope's filesystem root so a

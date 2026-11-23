@@ -3,16 +3,17 @@ import { createHash } from 'node:crypto'
 /** Forward existing authenticated Gateway operations to their owning computer. */
 import { request, STATUS_CODES, type Agent, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
+import { finished, pipeline } from 'node:stream/promises'
 import { BROWSER_RUNTIME_ASSET_CACHE_CONTROL, isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isReadyRuntimeInteractive, pinRuntimeRequestPath } from './runtime-request-path.ts'
 import type { UserRow } from './auth.ts'
+import { RuntimeAssetUnavailableError } from './runtime-asset-admission.ts'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
 import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import type { RuntimePlacement, RuntimeSelection } from './runtime-router.ts'
 import { parseCookies, SCOPE_COOKIE, SESSION_COOKIE } from './server.ts'
 import { RuntimeCatalogError } from './runtime-catalog.ts'
 import { nodeUuidSchema } from './node-access.ts'
-import { NODE_SERVICE_ASSET_GENERATION_HEADER, NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
+import { NODE_SERVICE_ASSET_GENERATION_HEADER, NODE_SERVICE_TARGET_HEADER, NodeServiceError, RELEASE_COMBO_DIGEST_HEADER } from './node-service-stream.ts'
 import { FORWARDED_PRINCIPAL_HEADER, type PersonalReadAdmission } from './forwarded-principal.ts'
 import type { GatewayNodeServices } from './node-service.ts'
 import type { NodeServiceConfig } from './node-service.ts'
@@ -78,6 +79,7 @@ function headers(input: IncomingHttpHeaders, upgrade = false): OutgoingHttpHeade
 function responseHeaders(input: IncomingHttpHeaders, resetCookie?: string): OutgoingHttpHeaders {
   const result = headers(input)
   delete result[NODE_SERVICE_ASSET_GENERATION_HEADER]
+  delete result[RELEASE_COMBO_DIGEST_HEADER]
   if (resetCookie !== undefined) result['set-cookie'] = [...(input['set-cookie'] ?? []), resetCookie]
   if (typeof result.location === 'string') {
     const location = new URL(result.location, 'http://gateway.invalid')
@@ -134,6 +136,19 @@ export interface RemoteAssetCapture {
     readonly contentEncoding?: string
     readonly body: Buffer
   }): void
+}
+
+/** One immutable response's optional local replacement and bounded capture. */
+export interface RemoteAssetDelivery {
+  readonly capture?: RemoteAssetCapture
+  readonly release?: {
+    readonly sha256: string
+    /**
+     * Recheck admission and deliver the bytes after the destination confirms the digest.
+     * @param signal - cancelled when the forwarded operation loses authority or ends.
+     */
+    serve(signal: AbortSignal): Promise<void>
+  }
 }
 
 /** One center proxy owner, with independent cancellation for each selected computer/runtime. */
@@ -271,10 +286,13 @@ export class GatewayNodeServiceProxy {
     return operation
   }
 
-  private outgoing(req: IncomingMessage, target: Target, agent: Agent, upgrade: boolean, body?: string, assertion?: string) {
+  private outgoing(req: IncomingMessage, target: Target, agent: Agent, upgrade: boolean, body?: string, assertion?: string,
+    releaseDigest?: string) {
     const forwarded = headers(req.headers, upgrade)
     forwarded[NODE_SERVICE_TARGET_HEADER] = target.nodeId
     delete forwarded[NODE_SERVICE_ASSET_GENERATION_HEADER]
+    delete forwarded[RELEASE_COMBO_DIGEST_HEADER]
+    if (releaseDigest !== undefined) forwarded[RELEASE_COMBO_DIGEST_HEADER] = releaseDigest
     delete forwarded['x-dsh-gateway-principal']
     delete forwarded[FORWARDED_PRINCIPAL_HEADER]
     if (assertion !== undefined) forwarded[FORWARDED_PRINCIPAL_HEADER] = assertion
@@ -305,12 +323,12 @@ export class GatewayNodeServiceProxy {
    * @param actor - current account returned by the asset admission query.
    * @param placement - exact Runtime and computer from the same admission; no cross-request reuse is permitted.
    * @param generation - ready Runtime generation authorized by this request.
-   * @param capture - optional bounded capture of the destination's matching generation.
+   * @param delivery - optional capture and release candidate for this immutable response.
    * @returns true after remote delivery, or false for this computer.
    */
   asset(req: IncomingMessage, res: ServerResponse, actor: UserRow,
     placement: RuntimePlacement & { environment: NonNullable<RuntimePlacement['environment']> },
-    generation: number, capture?: RemoteAssetCapture): Promise<boolean> {
+    generation: number, delivery?: RemoteAssetDelivery): Promise<boolean> {
     if (!isImmutableRuntimeAssetRequest(req.method, req.url ?? '/')) throw new NodeServiceError(400, 'node-service/invalid-target')
     const url = new URL(req.url ?? '/', 'http://gateway'), environment = placement.environment
     if (url.searchParams.getAll('dshRuntime').length !== 1 || url.searchParams.get('dshRuntime') !== environment.id
@@ -323,7 +341,7 @@ export class GatewayNodeServiceProxy {
     return this.track(this.forwardSelectedHttp(req, res, {
       nodeId: environment.node.id, runtimeId: environment.id, environment, resolvedTarget: placement.target,
       ...(environment.owner.kind === 'project' ? { projectId: environment.owner.id } : {}),
-    }, actor, undefined, { generation, capture }))
+    }, actor, undefined, { generation, ...delivery }))
   }
 
   /**
@@ -355,7 +373,7 @@ export class GatewayNodeServiceProxy {
   }
 
   private async forwardSelectedHttp(req: IncomingMessage, res: ServerResponse, target: Target, actor: UserRow | number,
-    body?: string, asset?: { generation: number; capture?: RemoteAssetCapture }): Promise<boolean> {
+    body?: string, asset?: { generation: number } & RemoteAssetDelivery): Promise<boolean> {
     const capture = asset?.capture
     const expectedAssetGeneration = asset === undefined ? undefined : String(asset.generation)
     if (this.closed) throw new NodeServiceError(503, 'node-service/closed')
@@ -408,7 +426,8 @@ export class GatewayNodeServiceProxy {
         ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req), personalRead)
       mark('assertionReady')
       signal.throwIfAborted()
-      const outgoing = this.outgoing(req, target, lease.agent, false, body, assertion)
+      const release = assertion === undefined ? undefined : asset?.release
+      const outgoing = this.outgoing(req, target, lease.agent, false, body, assertion, release?.sha256)
       dispose = () => {
         if (complete) lease.release()
         else { outgoing.destroy(); lease.destroy() }
@@ -445,6 +464,18 @@ export class GatewayNodeServiceProxy {
               const assetGeneration = response.headers[NODE_SERVICE_ASSET_GENERATION_HEADER]
               if (expectedAssetGeneration !== undefined && assetGeneration !== undefined && assetGeneration !== expectedAssetGeneration) {
                 throw new NodeServiceError(409, 'node-service/mismatch')
+              }
+              const matchedDigest = response.headers[RELEASE_COMBO_DIGEST_HEADER]
+              if (asset !== undefined && matchedDigest !== undefined) {
+                if (release === undefined || status !== 204 || matchedDigest !== release.sha256
+                  || assetGeneration !== expectedAssetGeneration || response.headers['set-cookie'] !== undefined) {
+                  throw new NodeServiceError(409, 'node-service/mismatch')
+                }
+                response.resume()
+                await finished(response, { cleanup: true, signal })
+                signal.throwIfAborted()
+                await release.serve(signal)
+                return
               }
               const forwardedHeaders = responseHeaders(response.headers, target.resetCookie)
               if (asset !== undefined) forwardedHeaders['cache-control'] = BROWSER_RUNTIME_ASSET_CACHE_CONTROL
@@ -509,6 +540,7 @@ export class GatewayNodeServiceProxy {
       complete = true
       return true
     } catch (error) {
+      if (error instanceof RuntimeAssetUnavailableError) throw error
       const failure = error instanceof NodeServiceError ? error
         : new NodeServiceError(signal.aborted ? 409 : 503, signal.aborted ? 'node-service/cancelled' : 'node-service/unavailable', error)
       if (submitted && !receivedResponse && (failure.code === 'node-service/timeout' || failure.code === 'node-service/unavailable')) {

@@ -38,6 +38,11 @@ import { precompressBody, selectVariant } from '@deepseek-ai/dsh-host-webserver'
 import type { IndexInjection, PrecompressedBody } from '@deepseek-ai/dsh-host-webserver'
 import { exactPackageSpecifier, parseDshClient, requiredBootIds, stripClientSuffix } from './client/manifest.ts'
 import type { WebBootBatch, WebBootBatchPhase, WebBootEntry, WebBootGraph, WebBootRelease } from './client/manifest.ts'
+import { comboRevision, framedHash, renderComboScript } from './combo-script.ts'
+import { RELEASE_COMBO_DIGEST_HEADER } from './release-combos.ts'
+
+export { openReleaseComboReader, RELEASE_COMBO_DIGEST_HEADER } from './release-combos.ts'
+export type { ReleaseComboCandidate } from './release-combos.ts'
 
 export { stripClientSuffix } from './client/manifest.ts'
 export type {
@@ -170,6 +175,8 @@ interface ComboResource {
 interface LazyResponse {
   contentType: string
   body: PrecompressedBody
+  scriptBody?: () => Promise<Buffer>
+  sha256?: string
 }
 
 /** Fields shared by every generated combo plan. */
@@ -214,13 +221,6 @@ function clientExportOf(pkgName: string, exportsField: unknown): string | undefi
 /** sha1 metadata hash shortened to 12 hex chars. */
 function shortHash(input: string): string {
   return createHash('sha1').update(input).digest('hex').slice(0, HASH_REVISION_LENGTH)
-}
-
-/** Hash several response fields without allowing bytes to move across field boundaries. */
-function framedHash(domain: string, parts: readonly (string | Buffer)[]): string {
-  const hash = createHash('sha1').update(domain).update('\0')
-  for (const part of parts) hash.update(`${String(Buffer.byteLength(part))}:`).update(part)
-  return hash.digest('hex').slice(0, HASH_REVISION_LENGTH)
 }
 
 /** Marked compiler output uses content identity; unmarked packages retain filesystem revisions. */
@@ -359,11 +359,6 @@ function prepareSource(resource: ComboResource): PreparedSource {
   return { source, fallbackSource }
 }
 
-/** Stamp a combo script's absolute indexed-map URL onto its executable bytes. */
-function comboScript(input: string, sourceMapUrl?: string): Buffer {
-  return Buffer.from(sourceMapUrl === undefined ? input : `${input}//# sourceMappingURL=${sourceMapUrl}\n`)
-}
-
 /** Read and parse an optional source map when its combo-map endpoint is requested. */
 function readSourceMap(clientPath: string): Record<string, unknown> | undefined {
   let body: Buffer
@@ -435,19 +430,9 @@ function lazyBody(produce: () => Buffer): () => Promise<Buffer> {
   }
 }
 
-/** Derive one combo revision from the ordered immutable row revisions. */
-function comboRevision(resources: readonly ComboResource[]): string {
-  return framedHash('combo', resources.flatMap(resource => [
-    resource.id,
-    resource.rev,
-  ]))
-}
-
 /** Concatenate one or more factory registrations without reading or composing source maps. */
 function buildComboScript(resources: readonly ComboResource[], sourceMapUrl: string): Buffer {
-  let source = ''
-  for (const resource of resources) source += `${prepareSource(resource).source};\n`
-  return comboScript(source, sourceMapUrl)
+  return renderComboScript(resources.map(resource => resource.bundle), sourceMapUrl)
 }
 
 /** Compose one indexed map from source-map files read only for this request. */
@@ -864,6 +849,7 @@ export class ClientModuleRegistry extends Service {
     for (const artifact of artifacts) {
       batchResponses.set(`/${artifact.descriptor.url}`, this.responses.get(`/${artifact.descriptor.url}`) ?? {
         body: precompressBody(artifact.scriptBody, this.precompressError),
+        scriptBody: artifact.scriptBody,
         contentType: 'text/javascript; charset=utf-8',
       })
       batchResponses.set(artifact.sourceMapUrl, this.responses.get(artifact.sourceMapUrl) ?? {
@@ -876,6 +862,7 @@ export class ClientModuleRegistry extends Service {
       const artifact = buildCombo([record], this.readSourceMap, record.entry.rev)
       responses.set(`/${artifact.url}`, responses.get(`/${artifact.url}`) ?? this.responses.get(`/${artifact.url}`) ?? {
         body: precompressBody(artifact.scriptBody, this.precompressError),
+        scriptBody: artifact.scriptBody,
         contentType: 'text/javascript; charset=utf-8',
       })
       responses.set(artifact.sourceMapUrl, responses.get(artifact.sourceMapUrl) ?? this.responses.get(artifact.sourceMapUrl) ?? {
@@ -1242,6 +1229,7 @@ export class ClientModuleRegistry extends Service {
 
   private async bundleResource(
     method: string | undefined, url: string, acceptEncoding: string | string[] | undefined,
+    releaseDigest?: string | string[],
   ): Promise<{
     status: number
     headers?: Record<string, string>
@@ -1254,6 +1242,11 @@ export class ClientModuleRegistry extends Service {
       ?? this.previousBatchResponses.get(resourceUrl)
       ?? this.chunkResponse(requestUrl)
     if (response !== undefined) {
+      if (method === 'GET' && response.scriptBody !== undefined && typeof releaseDigest === 'string' && /^[0-9a-f]{64}$/u.test(releaseDigest)) {
+        const bytes = await response.scriptBody()
+        response.sha256 ??= createHash('sha256').update(bytes).digest('hex')
+        if (response.sha256 === releaseDigest) return { status: 204, headers: { [RELEASE_COMBO_DIGEST_HEADER]: releaseDigest } }
+      }
       const variant = selectVariant(response.body, acceptEncoding)
       return {
         status: 200,
@@ -1273,7 +1266,8 @@ export class ClientModuleRegistry extends Service {
 
   private readonly serveBundle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server requests. */
-    const response = await this.bundleResource(req.method, req.url ?? '/', req.headers['accept-encoding'])
+    const challenge = typeof req.headers['x-dsh-gateway-principal'] === 'string' ? req.headers[RELEASE_COMBO_DIGEST_HEADER] : undefined
+    const response = await this.bundleResource(req.method, req.url ?? '/', req.headers['accept-encoding'], challenge)
     res.writeHead(response.status, response.headers)
     res.end(response.body)
   }

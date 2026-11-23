@@ -26,6 +26,8 @@ The personal workbench reads placement and the authorized predecessor page in on
 
 PostgreSQL projects backup metadata for the deployment overview and standalone list. The browser uses manifest presence to show the restore action. Verification and restore read the selected record's full manifest. The number of files recorded in a backup does not increase the overview size.
 
+The primary reconstructs an executable combo only from its immutable release directory. The same package owns byte assembly for both the release copy and the Runtime. An ordinary authorized node request asks the Runtime to confirm the full SHA-256 of the advertised resource. The primary accepts an empty acknowledgement for the matching ready generation, rechecks current permission, and sends its local copy. Cold opens can avoid bulk transport even when the node has never sent this script before. A release name and a short URL revision serve as lookup inputs. The complete digest confirmed by the owning Runtime permits substitution.
+
 ## Alternatives considered
 
 **Route delegated reads with only the access revision.** Lease and Runtime generation can change independently of that revision. The primary checks current authority at response release.

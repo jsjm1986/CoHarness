@@ -1,6 +1,6 @@
 /** Node-half composition diagnostics for package metadata and built client bundles. */
 
-import { Hash } from 'node:crypto'
+import { createHash, Hash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SourceMap } from 'node:module'
@@ -13,7 +13,7 @@ import { Context, FiberState, type Fiber } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderIndexInjections, type WebServer, type WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import * as modulesClient from '../src/client/index.ts'
-import { ClientModuleRegistry, bootInjections, orderByModuleGraph, type Config } from '../src/index.ts'
+import { ClientModuleRegistry, bootInjections, openReleaseComboReader, orderByModuleGraph, RELEASE_COMBO_DIGEST_HEADER, type Config } from '../src/index.ts'
 import { clientChunkRevision, stampClientArtifact } from '../src/artifact-revision.ts'
 import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '../src/client/index.ts'
 
@@ -167,7 +167,8 @@ function construct(packageNames: string[]): ClientModuleRegistry {
 }
 
 /** Invoke the registered plugin route and capture status, headers, and bytes. */
-async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET', acceptEncoding?: string): Promise<{
+async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET', acceptEncoding?: string,
+  extraHeaders?: Record<string, string>): Promise<{
   status: number
   headers: Record<string, string> | undefined
   body: Buffer
@@ -190,7 +191,7 @@ async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET
   const request = {
     method,
     url: `${resolved.pathname}${resolved.search}`,
-    headers: acceptEncoding === undefined ? {} : { 'accept-encoding': acceptEncoding },
+    headers: { ...(acceptEncoding === undefined ? {} : { 'accept-encoding': acceptEncoding }), ...extraHeaders },
   } as IncomingMessage
   await (await route).handler(request, response)
   return { status, headers, body }
@@ -930,6 +931,39 @@ describe('client bundle activation', () => {
 
     expect(service.rebuilt(packageName)).not.toBe(first.entries[0]!.rev)
     expect(construct([packageName]).graph()).toEqual(service.graph())
+  })
+
+  it('confirms a release combo only when its published executable bytes match', async () => {
+    const ids = ['@deepseek-ai/dsh-release-fixture-a', '@deepseek-ai/dsh-release-fixture-b']
+    for (const [i, id] of ids.entries()) {
+      const client = writeBuiltPackage(id)
+      const source = stampClientArtifact(`module.exports = ${String(i)}\n`, [])
+      writeFileSync(client, source)
+      const releasePath = join(root!, 'packages', 'client', `fixture-${String(i)}`)
+      mkdirSync(join(releasePath, 'lib'), { recursive: true })
+      writeFileSync(join(releasePath, 'package.json'), JSON.stringify({ name: id, exports: { './client': './lib/client.js' } }))
+      writeFileSync(join(releasePath, 'lib', 'client.js'), source)
+    }
+    const { service, route } = constructWithRoute(ids)
+    const url = service.graph().batches[0]!.url
+    const readRelease = openReleaseComboReader(root!)
+    const local = (await readRelease(`/${url}`))!
+    const proof = { 'x-dsh-gateway-principal': 'fixture', [RELEASE_COMBO_DIGEST_HEADER]: local.sha256 }
+    const confirmed = await routeRequest(route, url, 'GET', 'br', proof)
+    expect(confirmed).toMatchObject({ status: 204, headers: { [RELEASE_COMBO_DIGEST_HEADER]: local.sha256 }, body: Buffer.alloc(0) })
+    const publicResult = await routeRequest(route, url, 'GET', 'identity', { [RELEASE_COMBO_DIGEST_HEADER]: local.sha256 })
+    expect(publicResult.status).toBe(200)
+    expect(publicResult.body).toEqual(local.body)
+    const mismatched = await routeRequest(route, url, 'GET', 'identity', {
+      ...proof, [RELEASE_COMBO_DIGEST_HEADER]: createHash('sha256').update('other bytes').digest('hex'),
+    })
+    expect(mismatched.status).toBe(200)
+    expect(mismatched.headers?.[RELEASE_COMBO_DIGEST_HEADER]).toBeUndefined()
+    expect(mismatched.body).toEqual(local.body)
+    const unpublished = url.replace(/rev=[0-9a-f]+$/u, 'rev=000000000000')
+    expect((await routeRequest(route, unpublished, 'GET', 'identity', proof)).status).toBe(404)
+    expect(await readRelease(`/${unpublished}`)).toBeUndefined()
+    expect(await readRelease(`/${mapUrl(url)}`)).toBeUndefined()
   })
 
   it('reuses shared application responses when an optional transport group is present', async () => {

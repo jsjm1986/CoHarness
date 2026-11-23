@@ -499,12 +499,12 @@ export async function runMultiComputerBenchmark(options: MultiComputerBenchmarkO
       instances: { retainAsset: async () => null },
       monitor: { available: true, synchronize: async () => {}, synchronizeTo: async () => true, subscribe: () => () => {} },
       signer: new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'perf', 30_000),
-      forward: async (_req, res, _actor, _placement, _generation, capture) => {
+      forward: async (_req, res, _actor, _placement, _generation, delivery) => {
         remotePluginFetches += 1
         if (TUNNEL_PG_RTT_MS > 0) await delay(TUNNEL_PG_RTT_MS)
         res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', etag: '"rev-012345abcdef"' })
         res.end(pluginPayload)
-        capture?.onComplete({
+        delivery?.capture?.onComplete({
           status: 200,
           contentType: 'text/javascript; charset=utf-8',
           freshUntil: Date.now() + 60_000,

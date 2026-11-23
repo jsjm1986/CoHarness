@@ -181,6 +181,8 @@ Runtime 分发器在认证运行时令牌后，将文档流式操作交给 Gatew
 
 Gateway 将浏览器请求、事件流建立、就绪期限与服务端计时选项一同写入每个受管 Connection 插件。指定 Runtime 的页面使用所属电脑的配置。版本化对话诊断在保留就绪代次时，将 `runtimeQueue` 和 `runtimeLiveness` 记入 `admit`。在两端 Gateway 使用 `GET /admin/api/performance/operations?id=<uuid>` 对照所属端排队、本机进程监督、治理 SQL 和节点传输，按同一个操作 ID 匹配记录。各阶段耗时可能重叠。模型生成和浏览器绘制单独计时。
 
+对于不可变发布包内带修订号的插件组合，主入口可以用本地安装的客户端包重建 JavaScript。所属 Runtime 按当前浏览器授权和确切运行代次确认完整 SHA-256 后，主入口再次校验授权，随后交付本地字节。浏览器响应仍用 `private, no-store`。旧节点、私有插件及无法匹配的资源沿用所属节点传输。将 `HGW_RUNTIME_ASSET_CACHE_MAX_BYTES` 设为 `0` 也会停用本地副本。
+
 开启性能诊断时，带修订号的 `GET /plugins/combo.js` 请求可附带有效的 `x-dsh-operation-id` 来记录 `pluginCombo`。用同一个 UUID 对照两端 Gateway 的响应头时间和响应中断标记。
 
 所属 Gateway 在两个诊断接口的 `readySession` 字段中统计就绪代次的对话转发尝试。`forwarded` 统计携带本机节点服务断言且目标明确的请求，`ordinary` 统计通过账号路由进入的准入。`ready` 和 `delegated` 表示已准入 Runtime 代理。`fallbackCandidate` 统计不满足签名就绪准入条件的断言，`fallbackDelegation` 统计无可用委托的结构化读取。其他计数分别记录服务不可用、无法持有当前代次、启动读取继续走维护路由、拒绝、客户端断开和处理异常。同一请求回退后可能计入两组。

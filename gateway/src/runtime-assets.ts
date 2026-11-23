@@ -1,5 +1,6 @@
 /** Read-only delivery of revisioned Runtime resources under current browser and generation authority. */
 import { request, type IncomingMessage, type ServerResponse } from 'node:http'
+import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
 import type { UserRow } from './auth.ts'
@@ -8,13 +9,14 @@ import type { GatewayPrincipalSigner } from './principal.ts'
 import { RuntimeAssetUnavailableError, type RuntimeAssetAdmission, type RuntimeAssetRequest } from './runtime-asset-admission.ts'
 import { BROWSER_RUNTIME_ASSET_CACHE_CONTROL, isImmutableRuntimeAssetRequest, pinRuntimeRequestPath, runtimeRequestPath } from './runtime-request-path.ts'
 import { nodeUuidSchema } from './node-access.ts'
-import { NODE_SERVICE_ASSET_GENERATION_HEADER, NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
+import { NODE_SERVICE_ASSET_GENERATION_HEADER, NODE_SERVICE_TARGET_HEADER, RELEASE_COMBO_DIGEST_HEADER } from './node-service-stream.ts'
 import { parseCookies, SESSION_COOKIE } from './server.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import type { RuntimePlacement } from './runtime-router.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
 import { compressBuffer, isCompressibleContentType, MIN_COMPRESS_BYTES, preferredCompression, type ContentCoding } from './http-compression.ts'
-import type { RemoteAssetCapture } from './node-service-proxy.ts'
+import type { RemoteAssetCapture, RemoteAssetDelivery } from './node-service-proxy.ts'
+import type { ReleaseComboReader } from './release-combos.ts'
 
 const DEFAULT_REMOTE_CACHE_MAX_BYTES = 32 * 1024 * 1024
 const REMOTE_CACHE_MAX_ENTRY_BYTES = 4 * 1024 * 1024
@@ -36,10 +38,12 @@ export interface RuntimeAssetsOptions {
   instances: Pick<InstanceManager, 'retainAsset'>
   monitor: GatewayAccessMonitor
   signer: GatewayPrincipalSigner
+  /** Optional immutable installation reader. A read here supplies bytes, never authority. */
+  releaseCombo?: ReleaseComboReader
   /** Existing bounded node transport; omitted on an independent computer. */
   forward?: (request: IncomingMessage, response: ServerResponse, actor: UserRow,
     placement: RuntimePlacement & { environment: NonNullable<RuntimePlacement['environment']> },
-    generation: number, capture?: RemoteAssetCapture) => Promise<boolean>
+    generation: number, delivery?: RemoteAssetDelivery) => Promise<boolean>
 }
 
 interface ActiveAsset { nodeId?: RuntimeNodeId; userId: number; projectId?: number; qualified: boolean; cancel(): void }
@@ -287,7 +291,9 @@ export class RuntimeAssets {
     const runtimeId = ids[0]! as RuntimeId
     const sessionToken = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     if (sessionToken === undefined) { this.refuse(res, 403, 'runtime-asset/forbidden'); return true }
-    if (this.closed || !this.options.monitor.available || this.options.monitor.synchronizeTo === undefined) {
+    const monitor = this.options.monitor
+    const synchronizeTo = monitor.synchronizeTo?.bind(monitor)
+    if (this.closed || !monitor.available || synchronizeTo === undefined) {
       this.refuse(res, 503, 'runtime-asset/authority-unavailable'); return true
     }
     const owner = new AbortController()
@@ -324,7 +330,7 @@ export class RuntimeAssets {
       active.nodeId = placement.environment.node.id
       if (admission.scope.kind === 'project') active.projectId = admission.scope.projectId
       active.qualified = true
-      if (admission.expiresAt <= Date.now() || !await this.options.monitor.synchronizeTo(BigInt(admission.accessRevision))) {
+      if (admission.expiresAt <= Date.now() || !await synchronizeTo(BigInt(admission.accessRevision))) {
         throw new RuntimeAssetUnavailableError(503, 'runtime-asset/authority-changed')
       }
       owner.signal.throwIfAborted()
@@ -353,7 +359,43 @@ export class RuntimeAssets {
             },
           }
           : undefined
-        if (!await this.options.forward(req, res, admission.user, placement, snapshot.generation, capture)) {
+        const candidate = req.method === 'GET' && req.headers.range === undefined && req.headers['if-none-match'] === undefined
+          && req.headers['if-modified-since'] === undefined && req.headers['if-match'] === undefined
+          && req.headers['if-unmodified-since'] === undefined
+          ? await this.options.releaseCombo?.(runtimeRequestPath(req.url ?? '/')) : undefined
+        owner.signal.throwIfAborted()
+        const release: RemoteAssetDelivery['release'] = candidate === undefined ? undefined : {
+          sha256: candidate.sha256,
+          serve: async forwardSignal => {
+            const deliverySignal = AbortSignal.any([owner.signal, forwardSignal])
+            deliverySignal.throwIfAborted()
+            const coding = preferredCompression(req.headers['accept-encoding'])
+            const compressed = coding === undefined ? undefined : await compressBuffer(candidate.body, coding)
+            const useEncoded = compressed !== undefined && compressed.byteLength < candidate.body.byteLength
+            const body = useEncoded ? compressed : candidate.body
+            deliverySignal.throwIfAborted()
+            const current = await qualify()
+            const expiresAt = Math.min(current.expiresAt, admission.expiresAt)
+            if (current.user.id !== admission.user.id || current.placement.target !== placement.target || current.placement.local
+              || current.placement.environment.node.id !== placement.environment.node.id
+              || current.snapshot.generation !== snapshot.generation || current.snapshot.launchStamp !== snapshot.launchStamp
+              || current.snapshot.startedAt !== snapshot.startedAt || current.snapshot.port !== snapshot.port
+              || current.accessRevision !== admission.accessRevision || expiresAt <= Date.now()
+              || !await synchronizeTo(BigInt(current.accessRevision))) {
+              throw new RuntimeAssetUnavailableError(409, 'runtime-asset/authority-changed')
+            }
+            deliverySignal.throwIfAborted()
+            if (expiresAt <= Date.now()) {
+              throw new RuntimeAssetUnavailableError(409, 'runtime-asset/authority-changed')
+            }
+            res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'content-length': body.byteLength,
+              'cache-control': BROWSER_RUNTIME_ASSET_CACHE_CONTROL, vary: 'accept-encoding',
+              [NODE_SERVICE_TARGET_HEADER]: placement.environment.node.id,
+              ...(useEncoded ? { 'content-encoding': coding } : {}) })
+            await pipeline(Readable.from([body]), res, { signal: deliverySignal })
+          },
+        }
+        if (!await this.options.forward(req, res, admission.user, placement, snapshot.generation, { capture, release })) {
           throw new RuntimeAssetUnavailableError(503, 'runtime-asset/unavailable')
         }
         return true
@@ -393,6 +435,9 @@ export class RuntimeAssets {
       const value = req.headers[name]
       if (typeof value === 'string') headers[name] = value
     }
+    const challenge = req.headers[RELEASE_COMBO_DIGEST_HEADER]
+    if (forwardedGeneration !== undefined && req.method === 'GET' && path.startsWith('/plugins/combo.js??')
+      && typeof challenge === 'string' && /^[0-9a-f]{64}$/u.test(challenge)) headers[RELEASE_COMBO_DIGEST_HEADER] = challenge
     const upstream = request({ hostname: '127.0.0.1', port, path, method: req.method, headers, signal })
     const closed = new Promise<void>(resolve => { upstream.once('close', resolve) })
     const timer = setTimeout(() => { upstream.destroy(new Error('Runtime resource headers timed out')) }, this.options.cfg.upstreamTimeoutMs)
@@ -410,6 +455,7 @@ export class RuntimeAssets {
       delete response.headers[NODE_SERVICE_TARGET_HEADER]
       for (const name of httpConnectionFields(response.headers.connection)) delete response.headers[name]
       delete response.headers[NODE_SERVICE_ASSET_GENERATION_HEADER]
+      if (!Object.hasOwn(headers, RELEASE_COMBO_DIGEST_HEADER)) delete response.headers[RELEASE_COMBO_DIGEST_HEADER]
       if (forwardedGeneration === undefined) response.headers['cache-control'] = BROWSER_RUNTIME_ASSET_CACHE_CONTROL
       else response.headers[NODE_SERVICE_ASSET_GENERATION_HEADER] = String(forwardedGeneration)
       signal.throwIfAborted()

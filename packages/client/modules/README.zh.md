@@ -83,6 +83,8 @@ Node 半侧逐包增量扫描——没有全量重扫路径。每次发出 `inte
 
 Node 半侧会在发布前快照每个 `client.js` 入口，并在不构建响应 body 的情况下创建 combo descriptor。图行与批次描述符携带文档相对的 `plugins/combo.js??...&rev=...` 引用——被挂载到前缀下的 shell 会相对文档解析它们——而响应表与路由仍按绝对的 `/plugins/combo.js??...` 键匹配；`combo.js` 文件名让该路径落入 CDN 静态扩展名缓存，每个阶段都在绝对 map 形式 URL 超过 3 KiB 前分区。脚本 body 在首次 `GET` 时只组合一次，并以相对脚本自身 `/plugins/` 目录解析的 `/plugins/combo.js??...&rev=...` source-map 尾注结尾；map 文件则在首次 map `GET` 时单独读取、校验并组合，`HEAD` 不会物化任一 body。
 
+对于受管 Gateway 发起的请求，已发布的脚本组合可返回无响应体的确认，匹配的是未压缩字节的完整 SHA-256。摘要不匹配时返回原始脚本，调试映射与按需分块沿用正常资源传输。
+
 编译器在所有输出完成后，向现有 `dsh-client-artifact=v1` 尾注前写入版本化 chunk revision 表。Host 从入口快照读取该表，不扫描或预加载兄弟文件。精确的 `/plugins/<package>/client.<name>.js?rev=<rev>` 请求会读取并缓存脚本；首次 `GET` 会核对可执行字节与已发布 chunk revision。带表的 row 使用各 chunk 的可执行 revision 生成 URL 和文件名相对的 `client.<name>.js.map?rev=<rev>` 尾注，因此仅修改入口时可保留未变的预览资源。路由也接受当前 owner revision，兼容旧 Client。没有表的 Host 或产物继续使用 owner revision 的 chunk URL。未发布的 chunk、过时 revision 和额外查询参数返回 404；磁盘可执行字节不匹配时会明确失败，不发布该内容。chunk body 失败时只移除自己的响应计划，让后续显式请求重新核对已恢复的字节，不自动重试；成功的 body 仍会缓存。map 仍等到自己的 URL 被请求后才计算；每个 combo 或 chunk map 都是 Indexed Source Map v3，可用时使用作者提供的 section，否则生成 identity section。
 
 首次发布与 HMR 从捕获的入口字节及尾注派生带标记产物的 revision，因此仅入口代码或仅 chunk 代码变化都会推进所属插件 revision。相同可执行输出跨复制、重建和 Host 重启保持 revision。未带标记的第三方产物保留 mtime、ctime 和大小策略；保留标记或表格式错误会导致激活失败。HMR 对未变元数据跳过内容读取，带标记字节相同时只刷新基线、不发布变化。调试 map 字节不参与可执行内容身份，独立 chunk revision 也排除生成的独立调试尾注行。识别的 URL 不含空白、引号、反引号、反斜杠或星号；其它尾部保持原字节，保留类似指令的字符串与可执行代码行分隔符。combo revision 从有序 row revision 派生。已公告的 combo 响应与已请求的 chunk 响应会跨无关图重组保持不可变。

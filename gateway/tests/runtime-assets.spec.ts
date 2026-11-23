@@ -1,5 +1,5 @@
 /** Real resource HTTP streams retain exact authority without entering execution admission. */
-import { generateKeyPairSync, randomUUID } from 'node:crypto'
+import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -9,6 +9,7 @@ import type { InstanceManager, RuntimeInstanceSnapshot } from '../src/instances.
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import type { RuntimeAssetAdmission, RuntimeAssetRequest } from '../src/runtime-asset-admission.ts'
 import { RuntimeAssets, type RuntimeAssetsOptions } from '../src/runtime-assets.ts'
+import { RELEASE_COMBO_DIGEST_HEADER } from '../src/node-service-stream.ts'
 import type { RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { barrier } from './barrier.ts'
 
@@ -27,7 +28,7 @@ async function listen(server: Server): Promise<string> {
   return `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`
 }
 
-async function fixture(options: { streaming?: boolean; remote?: boolean } = {}) {
+async function fixture(options: { streaming?: boolean; remote?: boolean; releaseCombo?: RuntimeAssetsOptions['releaseCombo']; entryNodeId?: RuntimeNodeId } = {}) {
   const runtimeId = randomUUID() as RuntimeId, nodeId = randomUUID() as RuntimeNodeId
   const actor: UserRow = { id: 7, username: 'fixture', displayName: 'Fixture', role: 'user', status: 'active',
     homePath: '/fixture', mustChangePassword: false, autoReviewEligible: false }
@@ -87,11 +88,11 @@ async function fixture(options: { streaming?: boolean; remote?: boolean } = {}) 
   const forward = vi.fn<NonNullable<RuntimeAssetsOptions['forward']>>(async (_req, res) => { res.end('remote-resource'); return true })
   const cfg = { publicOrigins: [] as string[], upstreamTimeoutMs: 10_000 }
   const assets = new RuntimeAssets({ cfg, localNodeId: options.remote ? randomUUID() as RuntimeNodeId : nodeId,
-    admission: { admit }, instances: retain, monitor, signer, ...(options.remote ? { forward } : {}) })
+    admission: { admit }, instances: retain, monitor, signer, releaseCombo: options.releaseCombo, ...(options.remote ? { forward } : {}) })
   cleanups.push(() => assets.close())
   const dispatches: Promise<unknown>[] = []
   const server = createServer((req, res) => {
-    const work = assets.handle(req, res, actor).then(handled => {
+    const work = assets.handle(req, res, actor, options.entryNodeId).then(handled => {
       if (!handled) res.writeHead(404).end('ordinary-route')
     }, () => { if (!res.headersSent) res.writeHead(500).end(); else res.destroy() })
     dispatches.push(work)
@@ -222,17 +223,67 @@ it('reuses the exact fresh placement for remote delivery without invoking a loca
   expect(f.observed).toHaveLength(0)
 })
 
+it('qualifies the same account, authority and Runtime generation again after an owning-node byte match', async () => {
+  const body = Buffer.from('window.releasePlugin = true;\n'.repeat(100))
+  const sha256 = createHash('sha256').update(body).digest('hex')
+  const releaseCombo = vi.fn(async (_path: string) => ({ body, sha256 }))
+  const f = await fixture({ remote: true, releaseCombo })
+  f.forward.mockImplementation(async (_req, res, _actor, _placement, _generation, delivery) => {
+    if (delivery?.release === undefined) { res.end('node resource'); return true }
+    expect(delivery.release.sha256).toBe(sha256)
+    await delivery.release.serve(new AbortController().signal)
+    return true
+  })
+  const matched = await fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': 'br' } })
+  expect(matched.status).toBe(200)
+  expect(Buffer.from(await matched.arrayBuffer())).toEqual(body)
+  expect(matched.headers.get('content-encoding')).toBe('br')
+  expect(matched.headers.get('cache-control')).toBe('private, no-store')
+  expect(matched.headers.get(RELEASE_COMBO_DIGEST_HEADER)).toBeNull()
+  expect(releaseCombo).toHaveBeenCalledExactlyOnceWith(f.resource)
+  expect(f.admit).toHaveBeenCalledTimes(2)
+
+  const conditional = await fetch(f.origin + f.path, { headers: { ...f.headers, 'if-none-match': '\"old\"' } })
+  expect(await conditional.text()).toBe('node resource')
+  expect(releaseCombo).toHaveBeenCalledTimes(1)
+
+  f.admit.mockResolvedValueOnce(f.admission).mockResolvedValueOnce({ ...f.admission, accessRevision: '5' })
+  const revoked = await fetch(f.origin + f.path, { headers: f.headers })
+  expect(revoked.status).toBe(409)
+  expect(await revoked.json()).toEqual({ error: 'runtime-asset/authority-changed' })
+  f.admit.mockResolvedValueOnce(f.admission).mockResolvedValueOnce({ ...f.admission, snapshot: { ...f.admission.snapshot, generation: 8 } })
+  const replaced = await fetch(f.origin + f.path, { headers: f.headers })
+  expect(replaced.status).toBe(409)
+  await replaced.arrayBuffer()
+})
+
+it('limits release digest challenges to an already authenticated managed forward', async () => {
+  const digest = 'a'.repeat(64)
+  const forwarded = await fixture({ entryNodeId: randomUUID() as RuntimeNodeId })
+  const headers = { ...forwarded.headers, [RELEASE_COMBO_DIGEST_HEADER]: digest }
+  const direct = await fetch(forwarded.origin + forwarded.path, { headers })
+  expect(direct.status).toBe(200)
+  await direct.arrayBuffer()
+  expect(forwarded.observed[0]?.headers[RELEASE_COMBO_DIGEST_HEADER]).toBeUndefined()
+  const response = await fetch(forwarded.origin + forwarded.path, { headers: {
+    ...headers, 'x-dsh-target-node': forwarded.admission.placement.environment.node.id,
+  } })
+  expect(response.status).toBe(200)
+  await response.arrayBuffer()
+  expect(forwarded.observed[1]?.headers[RELEASE_COMBO_DIGEST_HEADER]).toBe(digest)
+})
+
 it('caches immutable assets for one authorized Runtime, generation and account', async () => {
   const f = await fixture({ remote: true })
   const payload = 'export const plugin = ' + JSON.stringify('x'.repeat(2048)) + '\n'
-  f.forward.mockImplementation(async (_req, res, _actor, _placement, _generation, capture) => {
+  f.forward.mockImplementation(async (_req, res, _actor, _placement, _generation, delivery) => {
     res.writeHead(200, {
       'content-type': 'text/javascript; charset=utf-8',
       etag: '"remote-v1"',
       'cache-control': 'private, no-store',
     })
     res.end(payload)
-    capture?.onComplete({
+    delivery?.capture?.onComplete({
       status: 200,
       contentType: 'text/javascript; charset=utf-8',
       freshUntil: Date.now() + 60_000,

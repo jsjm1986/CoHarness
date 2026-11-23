@@ -1,6 +1,6 @@
 /** Existing Gateway authentication and APIs over real outbound HTTP/WebSocket node connections. */
 import { fork } from 'node:child_process'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
 import { Socket } from 'node:net'
@@ -19,7 +19,8 @@ import { ProjectService } from '../src/projects.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { createGatewayServer, scopeCookie, type GatewayDeps, type GatewayHandlers } from '../src/server.ts'
-import type { GatewayForwardClaims } from '../src/forwarded-principal.ts'
+import { createGatewayForwardAuthority, type GatewayForwardClaims } from '../src/forwarded-principal.ts'
+import { GatewayPrincipalSigner } from '../src/principal.ts'
 import { createAdminApiHandler } from '../src/admin-api.ts'
 import { GatewayRuntimeRouter, LocalRuntimeAdapter, type RuntimePlacement } from '../src/runtime-router.ts'
 import { RuntimeCatalogError, type RuntimeCatalogEntry, type RuntimeId, type RuntimeNodeId } from '../src/runtime-catalog.ts'
@@ -31,7 +32,7 @@ import { loadNodeChannelClientLimits, NODE_CHANNEL_PROTOCOL, type NodeProbeId } 
 import { GatewayNodeServices, loadNodeServiceConfig } from '../src/node-service.ts'
 import { GatewayNodeServiceProxy, type NodeServiceProxyDirectory } from '../src/node-service-proxy.ts'
 import { NodeServiceHttpPool } from '../src/node-service-http-pool.ts'
-import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_PROTOCOL_VERSION, NODE_SERVICE_TARGET_HEADER, nodeServiceLocalOrigin, NodeServiceError, runNodeServiceBridge } from '../src/node-service-stream.ts'
+import { NODE_SERVICE_ASSET_GENERATION_HEADER, NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_PROTOCOL_VERSION, NODE_SERVICE_TARGET_HEADER, nodeServiceLocalOrigin, NodeServiceError, RELEASE_COMBO_DIGEST_HEADER, runNodeServiceBridge } from '../src/node-service-stream.ts'
 import { testConfig } from './test-config.ts'
 
 const releases: Array<() => Promise<void>> = []
@@ -115,7 +116,7 @@ function isolatedAgent(
 
 async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false, failedDial?: 'control' | 'service',
   mixedReleaseAgent?: 'compatible' | 'future-wire', approvePersonalRead?: NodeServiceProxyDirectory['approvePersonalRead'],
-  monitor?: import('../src/access-invalidation.ts').GatewayAccessMonitor) {
+  monitor?: import('../src/access-invalidation.ts').GatewayAccessMonitor, remoteCombo?: GatewayHandlers['proxy']) {
   const root = await mkdtemp(join(tmpdir(), 'hgw-node-service-'))
   releases.push(() => rm(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'accounts.sqlite'))
@@ -174,6 +175,8 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     pageForAdministrator: async () => ({ items: [environment], nextCursor: null }) }
   const channels = new GatewayNodeChannels({ authorizeChannel, authorizeAdministratorNode }, centerConfig.nodeChannel)
   const services = new GatewayNodeServices({ authorizeChannel }, channels, centerConfig.nodeService)
+  const key = remoteCombo === undefined ? undefined : generateKeyPairSync('ed25519')
+  const signer = key === undefined ? undefined : new GatewayPrincipalSigner(key.privateKey, lease.organizationId, 30_000)
   const proxy = new GatewayNodeServiceProxy({ localNodeId, resolveForAccount, resolveForAdministrator, authorizeAdministratorNode,
     authorizeAccountNode: async (actor, selected) => {
       if (actor.id !== admin.id || selected !== nodeId || users.getById(actor.id)?.status !== 'active') {
@@ -183,7 +186,12 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     ...(resolveOwners ? { resolvePlacement: (actor, selection) => centerRouter.placement(actor, selection), resetScopeCookie: () => scopeCookie('personal', centerConfig) } : {}),
     ...(approvePersonalRead === undefined ? {} : { approvePersonalRead }),
   }, services, 5000, centerConfig.nodeService, monitor,
-  approvePersonalRead === undefined ? undefined : async () => 'fixture-forwarding-assertion')
+  signer === undefined ? (approvePersonalRead === undefined ? undefined : async () => 'fixture-forwarding-assertion')
+    : async (target, user, request) => signer.issueForward({ issuerNode: localNodeId, audienceNode: target.nodeId,
+      user: users.getById(user.id)!, request,
+      selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
+      context: { environment: { id: environment.id, nodeId } },
+    }))
   let attestationCalls = 0
   const makeDeps = (cfg: typeof centerConfig, id: RuntimeNodeId): GatewayDeps => ({
     cfg, auth: new AuthService(db, cfg), users, projects: new ProjectService(db, cfg), audit: new AuditService(db),
@@ -194,6 +202,12 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     } },
   })
   const remoteDeps = makeDeps(remoteConfig, nodeId), centerDeps = makeDeps(centerConfig, localNodeId)
+  if (key !== undefined) {
+    const pem = key.publicKey.export({ format: 'pem', type: 'spki' }).toString()
+    const publishedKeyCandidate = (id: RuntimeNodeId) => id === localNodeId ? pem : null
+    Object.assign(remoteDeps, createGatewayForwardAuthority({ issuerKey: async id => publishedKeyCandidate(id), publishedKeyCandidate },
+      { audienceNode: nodeId, organization: lease.organizationId }, 30_000))
+  }
   const centerRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(centerDeps), { localNodeId, catalog })
   if (resolveOwners) centerDeps.runtimeRouter = centerRouter
   remoteDeps.runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(remoteDeps), { localNodeId: nodeId, catalog })
@@ -216,6 +230,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
         remoteHttpSockets.add(req.socket)
         req.socket.once('close', () => { remoteHttpSockets.delete(req.socket) })
       }
+      if (remoteCombo !== undefined && req.url?.startsWith('/plugins/combo.js??')) return remoteCombo(req, res, context)
       if (req.url?.startsWith('/api/final-buffer')) {
         res.writeHead(200, { 'content-type': 'text/plain', connection: 'close' })
         res.end('buffered-response'.repeat(128))
@@ -756,6 +771,67 @@ it('delivers a fresh resource placement over the node channel without another in
   const refused = await fetch(origin + path, { headers: { cookie: f.cookie } })
   expect(refused.status).toBe(503); await refused.arrayBuffer()
   expect(f.counters().remoteCalls).toBe(2)
+})
+
+it('uses local script bytes only on a matching bodyless response from the exact owning generation', async () => {
+  const bytes = Buffer.from('release asset '.repeat(64 * 1024))
+  const sha256 = createHash('sha256').update(bytes).digest('hex')
+  const challenges: Array<string | string[] | undefined> = []
+  let failure: 'digest' | 'generation' | 'missing-generation' | 'denied' | 'old-node' | undefined
+  let remoteBodyBytes = 0
+  const f = await fixture({}, true, false, undefined, undefined, undefined, undefined, async (req, res) => {
+    const proof = req.headers[RELEASE_COMBO_DIGEST_HEADER]
+    challenges.push(proof)
+    if (failure === 'denied') { res.writeHead(403).end(); return }
+    if (failure === 'old-node' || proof !== sha256) {
+      remoteBodyBytes += bytes.byteLength
+      res.writeHead(200, { 'content-type': 'application/octet-stream' }).end(bytes)
+      return
+    }
+    res.writeHead(204, {
+      [RELEASE_COMBO_DIGEST_HEADER]: failure === 'digest' ? '0'.repeat(64) : sha256,
+      ...(failure === 'missing-generation' ? {} : { [NODE_SERVICE_ASSET_GENERATION_HEADER]: failure === 'generation' ? '2' : '1' }),
+    }).end()
+  })
+  const placement: RuntimePlacement & { environment: RuntimeCatalogEntry } = {
+    target: 'personal', local: false, resetScope: false, environment: f.environment,
+  }
+  let localWrites = 0
+  const selected = createServer((req, res) => {
+    const release = req.headers['if-none-match'] === undefined ? { sha256, serve: async () => { localWrites++; res.end(bytes) } } : undefined
+    void f.proxy.asset(req, res, f.admin, placement, 1, { release }).catch(error => {
+      if (res.headersSent) res.destroy()
+      else res.writeHead(error instanceof NodeServiceError ? error.status : 500).end()
+    })
+  })
+  releases.push(() => close(selected))
+  const origin = await listen(selected)
+  const path = `/plugins/combo.js??@deepseek-ai/dsh-client-modules/client.js&rev=abcdef123456&dshRuntime=${f.environment.id}`
+  const head = await fetch(origin + path, { headers: { cookie: f.cookie } })
+  expect(head.status, head.ok ? '' : await head.clone().text()).toBe(200)
+  expect(Buffer.from(await head.arrayBuffer())).toEqual(bytes)
+  expect(localWrites).toBe(1)
+  expect(remoteBodyBytes).toBe(0)
+  expect(challenges).toEqual([sha256])
+  for (const [mode, status] of [['digest', 409], ['generation', 409], ['missing-generation', 409], ['denied', 403]] as const) {
+    failure = mode
+    const answer = await fetch(origin + path, { headers: { cookie: f.cookie } })
+    expect(answer.status).toBe(status)
+    expect((await answer.arrayBuffer()).byteLength).toBe(0)
+  }
+  failure = 'old-node'
+  const ordinary = await fetch(origin + path, { headers: { cookie: f.cookie } })
+  expect(ordinary.status).toBe(200)
+  expect(Buffer.from(await ordinary.arrayBuffer())).toEqual(bytes)
+  expect(localWrites).toBe(1)
+  expect(remoteBodyBytes).toBe(bytes.byteLength)
+
+  failure = undefined
+  const injected = await fetch(origin + path, { headers: { cookie: f.cookie, 'if-none-match': '\"browser\"', [RELEASE_COMBO_DIGEST_HEADER]: sha256 } })
+  expect(injected.status).toBe(200)
+  await injected.arrayBuffer()
+  expect(challenges.at(-1)).toBeUndefined()
+  expect(localWrites).toBe(1)
 })
 
 it('keeps pinning runtime-specific and unrevisioned browser resource URLs', async () => {
