@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/resource-budget/README.md
 document:
-  en: 2c8c3081f709e4828c12e65dab7abb0453d1d2fd
-  zh: 2aded84b4850d5bc953058b00764497023edbc52
+  en: 8c5efa3089eba108326b24ce78455f192256fe1b
+  zh: 753cc1cd443fbf8e6012da3b6d3095daae8cc14a
 /:
   en: 7c0e9906b97c762d
   zh: ebd42c9ff4da819d
@@ -21,8 +21,8 @@ document:
   en: 70d5bc2f30b587b5
   zh: ad4049f274a6230a
 /deepseek-ai-dsh-resource-budget/remote-coordination:
-  en: a67b67ad31f39c2f
-  zh: d1bf00717728b1f3
+  en: f0b71d72d30c7b13
+  zh: 8f640ba83ce59c7b
 /deepseek-ai-dsh-resource-budget/model-experience:
   en: bda5b07d2bf8c5e8
   zh: 2e2413a1f852bd08

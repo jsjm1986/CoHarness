@@ -108,6 +108,18 @@ interface RuntimeStartAdmission {
 const NODE = 'organization_id=$1 AND node_id=$2'
 const OWNER = `${NODE} AND runtime_kind=$3 AND runtime_public_id=$4 AND generation=$5`
 const REQUEST = `${OWNER} AND sequence=$6`
+const completionReceiptSql = `SELECT last_sequence, EXISTS (
+    SELECT FROM harness.node_resource_requests WHERE ${REQUEST} AND operation_id::text IS DISTINCT FROM $7::text
+  ) AS owner_mismatch FROM harness.node_resource_runtimes WHERE ${OWNER}`
+// Read the registration in a fresh statement after waiting for the node lock. An issued sequence can
+// already be closed, while a legacy reservation with a null operation ID still occupies capacity.
+const completeResourceSql = `WITH receipt AS MATERIALIZED (${completionReceiptSql}), removed AS (
+    DELETE FROM harness.node_resource_requests WHERE ${REQUEST}
+      AND EXISTS (SELECT FROM receipt WHERE last_sequence>=0 AND last_sequence>=$6 AND NOT owner_mismatch)
+    RETURNING 1
+  ), counted AS (
+    UPDATE harness.node_resource_state SET completed=completed+1 WHERE ${NODE} AND EXISTS (SELECT FROM removed)
+  ) SELECT last_sequence,owner_mismatch FROM receipt`
 const resourceRequestSql = (allocation: '$6' | 'authorized.allocation') =>
   `harness.request_node_resource($1,$2,$3,$4,$5,${allocation},$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`
 // Wait for the node before locking the actor. The scope and generation locks then cover the reservation through commit.
@@ -502,22 +514,24 @@ export class NodeResourceBudget {
    * @param subject - authenticated Runtime owning this operation.
    * @param operation - exact operation, including a cancelled registration in flight.
    * @param outcome - caller-proven completion or uncertainty that retains occupation.
-   * @returns confirmation after accounting and any next grants commit.
+   * @returns confirmation after accounting and any next grants commit under the current owner.
    */
   async finish(subject: ResourceOwner, operation: Pick<NodeResourceRequest, 'sequence' | 'requestId'>, outcome: 'quiescent' | 'not-started' | 'uncertain'): Promise<void> {
     await this.lock(async client => {
       const { sequence, requestId } = operation
       const owner = this.owner(subject), key = [...owner, sequence]
-      const counter = await client.query<{ last_sequence: string }>(`SELECT last_sequence::text FROM harness.node_resource_runtimes WHERE ${OWNER}`, owner)
-      const last = Number(counter.rows[0]?.last_sequence ?? -1)
+      const receipt = await client.query<{ last_sequence: string; owner_mismatch: boolean }>(
+        outcome === 'quiescent' ? completeResourceSql : completionReceiptSql, [...key, requestId],
+      )
+      const last = Number(receipt.rows[0]?.last_sequence ?? -1)
       if (last < 0 || sequence > last + 1 || (sequence === last + 1 && outcome !== 'not-started')) throw new NodeResourceBudgetError(409, 'unknown-operation', 'unknown resource completion sequence')
-      await this.read(client, key, requestId)
+      if (receipt.rows[0]?.owner_mismatch) throw new NodeResourceBudgetError(409, 'owner-mismatch', 'resource operation does not own this sequence')
       if (sequence === last + 1) await client.query(`UPDATE harness.node_resource_runtimes SET last_sequence=$6 WHERE ${OWNER}`, key)
       if (outcome === 'uncertain') {
         await client.query(`UPDATE harness.node_resource_requests SET state='uncertain' WHERE ${REQUEST} AND state='active'`, key)
-      } else {
+      } else if (outcome === 'not-started') {
         const removed = await client.query(`DELETE FROM harness.node_resource_requests WHERE ${REQUEST} RETURNING state`, key)
-        if (removed.rowCount !== 0) await client.query(`UPDATE harness.node_resource_state SET ${outcome === 'not-started' ? 'cancelled=cancelled+1' : 'completed=completed+1'} WHERE ${NODE}`, [this.organizationId, this.nodeId])
+        if (removed.rowCount !== 0) await client.query(`UPDATE harness.node_resource_state SET cancelled=cancelled+1 WHERE ${NODE}`, [this.organizationId, this.nodeId])
       }
       await this.schedule(client)
       // Keep the ownership row locked only through commit. Browser admission also needs this row.
@@ -639,13 +653,6 @@ export class NodeResourceBudget {
     }
     if (!isDatabaseContentionError(error)) throw error
     throw new NodeResourceBudgetError(503, 'database-busy', 'Resource accounting is busy. Retry after the current operation settles.', { cause: error })
-  }
-
-  private async read(client: PoolClient, key: readonly unknown[], requestId: ResourceOperationId): Promise<NodeResourceStatus> {
-    const result = await client.query<Pick<AdmissionRow, 'state' | 'operation_id'>>(`SELECT state,operation_id::text FROM harness.node_resource_requests WHERE ${REQUEST}`, [...key])
-    const row = result.rows[0]
-    if (row !== undefined && row.operation_id !== requestId) throw new NodeResourceBudgetError(409, 'owner-mismatch', 'resource operation does not own this sequence')
-    return { state: row?.state ?? 'closed' }
   }
 
   private async unregistered(database: Pick<Pool, 'query'> | PoolClient): Promise<number> {

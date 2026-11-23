@@ -48,7 +48,7 @@ Status: implemented
 
 [个人模型预留](../../../../gateway/src/node-resource-budget.ts)在锁定的节点策略与 Gateway 已校验的策略一致时使用 PostgreSQL 隐式事务。策略相等保证记账开始前额度有效。策略不一致时，记账沿用显式事务，由 Gateway 在提交前校验持久策略。现有函数继续校验账号、代次与调度规则。 立即获准的操作在同一事务内于预留后复核执行范围。只有该操作获得确认时才能省去独立的状态查询。排队检查和实际派发仍按当前权限校验。
 
-资源完成操作通过节点记账行串行化。最终的所有权语句紧接提交前锁定精确 Runtime 行。协调器等待前面的记账往返时，已就绪的浏览器准入可以锁定活动行。如果在最终语句前更换代次，记账和排队授权均会回滚。私有 HTTP 入口向完成操作传递已验证的所有者，bearer 查询暂时失败返回 HTTP 503。确认模型静止后，[Runtime 提供方](../../../../packages/context/gateway-runtime/README.zh.md#resource-admission)使用原序号和操作 ID 重试提交。[模型服务](../../../../packages/llm/llm/README.zh.md#understand-the-implementation)在适配器关闭超时后保留原许可，同一迭代器稍后确认终止时释放。
+资源完成操作通过节点记账行串行化。一条语句核对已完成操作的登记序号与 ID，删除对应预留，并对实际删除的行计数。等待该节点锁的事务在获得锁后读取新的快照。最终的所有权语句紧接提交前锁定精确 Runtime 行。协调器等待前面的记账往返时，已就绪的浏览器准入可以锁定活动行。如果在最终语句前更换代次，记账和排队授权均会回滚。私有 HTTP 入口向完成操作传递已验证的所有者，bearer 查询暂时失败返回 HTTP 503。确认模型静止后，[Runtime 提供方](../../../../packages/context/gateway-runtime/README.zh.md#resource-admission)使用原序号和操作 ID 重试提交。[模型服务](../../../../packages/llm/llm/README.zh.md#understand-the-implementation)在适配器关闭超时后保留原许可，同一迭代器稍后确认终止时释放。
 
 ## 备选方案
 
@@ -65,6 +65,8 @@ Status: implemented
 **无失效通道的更长 token TTL。** 否决：撤销必须以通知速度而非 TTL 速度传播，故缓存订阅既有 access-invalidation 通道而非延长陈旧窗口。
 
 ## 影响
+
+[完成回执夹具](../../../../gateway/tests/node-resource-budget-postgres.spec.ts)核对下一项授权的提交、并发重复回执，以及确切 Runtime 身份变更时的回滚。一个模型处于活动状态、另一名用户正在等待时，协调器发送七条 PostgreSQL 命令，其中包括事务设置和提交。每条命令引入 150 毫秒响应延迟时，本地三次测量的完成耗时中位数为 1.09 秒，十条命令时为 1.54 秒。
 
 [资源 HTTP 验收夹具](../../../../gateway/tests/runtime-resource-api.spec.ts)观察到符合条件的预留及其重试各使用一条治理命令。显式事务使用三条命令。夹具还检查持久策略不同时的回退、策略无效时的回滚，以及租约或权限变化后的拒绝。[执行 HTTP 验收夹具](../../../../gateway/tests/execution-runtime-isolation-postgres.spec.ts)比较确切个人执行授权的四条与一条语句，并核验并发输入进入时复用同一范围和修订号。[双 Gateway 验收夹具](../../../../gateway/tests/fixtures/versioned-node-service.mjs)观察到预备创建只有一条所属端查询，首条消息前无执行根，重试后各有一条执行根与收件箱记录。
 

@@ -544,7 +544,7 @@ describePg('durable node resource budget', () => {
   it('rolls back a Runtime decision whose deadline expires before dispatch', async () => {
     const f = await fixture(), subject = await prepareStart(f, 0)
     await f.grant(1)
-    let clock = performance.now()
+    let clock = 0
     const now = vi.spyOn(performance, 'now').mockImplementation(() => clock)
     try {
       const delayed = await startPool(async (sql, execute) => {
@@ -563,7 +563,7 @@ describePg('durable node resource budget', () => {
   it('retains an acknowledged allocation when the caller deadline expires during commit', async () => {
     const f = await fixture(), subject = await prepareStart(f, 0)
     await f.grant(1)
-    let clock = performance.now()
+    let clock = 0
     const now = vi.spyOn(performance, 'now').mockImplementation(() => clock)
     try {
       const delayed = await startPool(async (sql, execute) => {
@@ -1132,6 +1132,58 @@ describePg('durable node resource budget', () => {
     expect(await f.budget.status(f.subjects[2]!, f.request(2, 2))).toEqual({ state: 'queued' })
   })
 
+  it('commits a granted model completion and its next grant within seven database round trips', async () => {
+    const f = await fixture(), subject = f.subjects[0]!, operation = f.request(0, 1)
+    const successor = f.request(1, 1)
+    await f.grant(1)
+    expect(await f.budget.request(subject, operation)).toEqual({ state: 'active' })
+    expect(await f.budget.request(f.subjects[1]!, successor)).toEqual({ state: 'queued' })
+    await f.grant(1)
+    let commands = 0
+    const observed = await startPool((_sql, execute) => { commands += 1; return execute() })
+    const budget = new NodeResourceBudget(observed, f.context.organizationId, f.context.nodeId, f.config)
+    await budget.finish(subject, operation, 'quiescent')
+    expect(commands).toBeLessThanOrEqual(7)
+    expect((await pool.query('SELECT operation_id,state FROM harness.node_resource_requests WHERE organization_id=$1',
+      [f.context.organizationId])).rows).toEqual([{ operation_id: successor.requestId, state: 'active' }])
+    expect((await f.budget.snapshot()).outcomes.completed).toBe(1)
+  })
+
+  it('rolls back the completion and next grant when the final Runtime identity check fails', async () => {
+    const f = await fixture(), subject = f.subjects[0]!, operation = f.request(0, 1)
+    const successor = f.request(1, 1)
+    await f.grant(1)
+    expect(await f.budget.request(subject, operation)).toEqual({ state: 'active' })
+    expect(await f.budget.request(f.subjects[1]!, successor)).toEqual({ state: 'queued' })
+    await f.grant(1)
+    const otherRuntime = await f.repository.resolveTarget(f.subjects[1]!.target)
+    const cursor = f.budget.changeCursor
+    await expect(f.budget.finish({ ...subject, target: { ...subject.target, runtimeId: otherRuntime.runtimeId } },
+      operation, 'quiescent')).rejects.toMatchObject({ reason: 'stale-generation' })
+    expect(f.budget.changeCursor).toBe(cursor)
+    expect((await pool.query('SELECT operation_id,state FROM harness.node_resource_requests WHERE organization_id=$1 ORDER BY state',
+      [f.context.organizationId])).rows).toEqual([
+      { operation_id: operation.requestId, state: 'active' }, { operation_id: successor.requestId, state: 'queued' },
+    ])
+    expect((await f.budget.snapshot()).outcomes.completed).toBe(0)
+  })
+
+  it('counts concurrent completions once after waiting for the registration transaction', async () => {
+    const f = await fixture(), held = await heldRequest(f)
+    const subject = f.subjects[0]!
+    const joined = Promise.allSettled([f.budget.finish(subject, held.operation, 'quiescent'),
+      f.budget.finish(subject, held.operation, 'quiescent')])
+    cleanups.push(async () => { held.release(); await joined })
+    await expect.poll(async () => (await pool.query('SELECT FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid))',
+      [held.pid])).rowCount).toBeGreaterThan(0)
+    held.release()
+    await expect(held.request).resolves.toEqual({ state: 'active' })
+    expect((await joined).map(result => result.status)).toEqual(['fulfilled', 'fulfilled'])
+    const snapshot = await f.budget.snapshot()
+    expect(snapshot.kinds.process.active).toBe(0)
+    expect(snapshot.outcomes.completed).toBe(1)
+  })
+
   it('fences delayed registrations after cancellation without retaining completed rows', async () => {
     const f = await fixture()
     await f.budget.finish(f.subjects[0]!, f.request(0, 1), 'not-started')
@@ -1170,6 +1222,7 @@ describePg('durable node resource budget', () => {
     await expect(f.budget.status(subject, second)).rejects.toMatchObject({ status: 409 })
     await expect(f.budget.statuses(subject, [first, second])).rejects.toMatchObject({ status: 409 })
     await expect(f.budget.finish(subject, second, 'not-started')).rejects.toMatchObject({ status: 409 })
+    await expect(f.budget.finish(subject, second, 'quiescent')).rejects.toMatchObject({ reason: 'owner-mismatch' })
     await expect(f.budget.finish(subject, second, 'uncertain')).rejects.toMatchObject({ status: 409 })
     expect(await f.budget.request(subject, first)).toEqual({ state: 'active' })
     expect((await f.budget.snapshot()).kinds.model.active).toBe(1)

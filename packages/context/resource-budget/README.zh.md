@@ -37,7 +37,7 @@ kind: "package-reference"
 
 `RESOURCE_ACTIVE_MODEL_CHECK_HEADER` 指定精确模型状态查询的可选提示。`RESOURCE_QUALIFIED_GRANT_HEADER` 标记在预留事务内复核通过的即时个人许可。`RESOURCE_CHANGE_CURSOR_HEADER` 在排队的状态请求之间传递协调器的不透明变更游标。已保存的操作和当前权限决定是否许可。`RESOURCE_GRANT_AGE_HEADER` 报告获得额度时的排队耗时。
 
-Gateway 在 `/internal/runtime/resources/` 下实现已鉴权的注册、请求、批量状态与完成接口。注册返回已提交的策略，不清除既有任务。账户权限撤销或 Runtime 停止期间，只有精确的完成接口接受当前 bearer；其他接口仍使用普通 Runtime 认证。supervisor 确认进程范围停止后，只回收句柄捕获代次的资源，即使实例行已推进至更新代次。状态读取在排队派发前，按已保存的来源重新检查当前权限；带执行范围的 Session 不能省略该范围。[Gateway 提供方](../gateway-runtime/README.zh.md#resource-admission)负责 Runtime 注册与传输。
+Gateway 在 `/internal/runtime/resources/` 下实现已鉴权的注册、请求、批量状态与完成接口。注册返回已提交的策略，不清除既有任务。重复提交同一操作的精确完成回执时，释放的预留只计数一次。该释放及其触发的授权在当前所有者校验通过后一起提交。账户权限撤销或 Runtime 停止期间，只有精确的完成接口接受当前 bearer；其他接口仍使用普通 Runtime 认证。supervisor 确认进程范围停止后，只回收句柄捕获代次的资源，即使实例行已推进至更新代次。状态读取在排队派发前，按已保存的来源重新检查当前权限；带执行范围的 Session 不能省略该范围。[Gateway 提供方](../gateway-runtime/README.zh.md#resource-admission)负责 Runtime 注册与传输。
 
 <a id="model-experience"></a>
 ## 模型体验
