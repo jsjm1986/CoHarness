@@ -231,6 +231,12 @@ it('recovers a remote bootstrap script failure and transfers each draft to its o
   const browserErrors: string[] = []
   const switchAccount = completionBarrier()
   const bootstrapStatuses: number[] = []
+  const fullDocuments: string[] = []
+  tabs.on('request', (request) => {
+    if (request.isNavigationRequest() && new URL(request.url()).searchParams.get('dshBootstrap') === 'full') {
+      fullDocuments.push(request.url())
+    }
+  })
   let speculativeBeforeBootstrap = 0
   let rejectBootstrapOnce = true
   const isBootstrapScript = (url: URL): boolean => url.pathname === '/plugins/combo.js'
@@ -318,12 +324,25 @@ it('recovers a remote bootstrap script failure and transfers each draft to its o
     ])
     const oldAccountDraft = withdrawn.locator('[data-dsh-startup-draft]')
     await oldAccountDraft.getByRole('textbox').fill('Unsent on the previous account')
+    const fullIndex = oldAccountDraft.getByRole('link', { name: 'Open full workspace in a new tab' })
+    const expectedUrl = new URL('/', entry)
+    expectedUrl.search = new URLSearchParams({
+      dshRuntime: target.runtimeId, dshNode: target.nodeId, dshTarget: 'personal', dshBootstrap: 'full', dshPrincipal: '7',
+    }).toString()
+    expect(await fullIndex.getAttribute('href')).toBe(expectedUrl.href)
+    expect(fullDocuments).toEqual([])
+    const [nativePage] = await Promise.all([tabs.waitForEvent('page'), fullIndex.click()])
+    await nativePage.waitForURL(expectedUrl.href, { waitUntil: 'commit' })
+    expect(await nativePage.evaluate(() => window.opener === null)).toBe(true)
+    expect(fullDocuments).toEqual([expectedUrl.href])
+    await nativePage.close()
+    expect(await oldAccountDraft.getByRole('textbox').inputValue()).toBe('Unsent on the previous account')
     switchAccount.resolve()
     await withdrawn.getByText('The account changed while opening this Runtime').waitFor()
     await oldAccountDraft.waitFor({ state: 'hidden' })
     expect(await withdrawn.locator('[data-composer-seat]').count()).toBe(0)
     await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/deferred-entry.expected.md', import.meta.url)),
-      `Tab 1: editable while rendering assets are pending\n${evidence.join('\n')}\nBootstrap transport: 503 then 200, before speculative plugin requests\nPrepared history requests: 2\nSubmitted messages: 0\nAccount switch during rendering asset failure: startup input withdrawn`, webSnapshotMode())
+      `Tab 1: editable while rendering assets are pending\n${evidence.join('\n')}\nBootstrap transport: 503 then 200, before speculative plugin requests\nPrepared history requests: 2\nSubmitted messages: 0\nFull workspace: opened on demand in a separate tab, original draft retained\nAccount switch during rendering asset failure: startup input withdrawn`, webSnapshotMode())
   } finally {
     holdVendor.resolve()
     for (const block of held) block.resolve()

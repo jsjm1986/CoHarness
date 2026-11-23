@@ -6,9 +6,9 @@ import css from './boot-page.module.css'
 
 const text = {
   en: { label: 'Unsent draft', waiting: 'Opening your workspace. You can write a draft now.', retained: 'Unsent draft retained',
-    failed: 'The workspace did not open. You can keep or copy your draft.', full: 'Open full workspace' },
+    failed: 'The workspace did not open. You can keep or copy your draft.', full: 'Open full workspace in a new tab' },
   zh: { label: '未发送的草稿', waiting: '正在打开工作区。可以先写草稿。', retained: '草稿已保留',
-    failed: '工作区暂未打开。可以保留或复制草稿。', full: '打开完整工作区' },
+    failed: '工作区暂未打开。可以保留或复制草稿。', full: '在新标签页打开完整工作区' },
 } as const
 
 function restoredSelection(entry: RemoteEntrySelection): string | undefined {
@@ -33,6 +33,7 @@ export class StartupDraftView implements StartupDraft {
   private readonly root = document.createElement('section')
   private readonly input = document.createElement('textarea')
   private readonly status = document.createElement('p')
+  private readonly fullIndex = document.createElement('a')
   private readonly words: (typeof text)[keyof typeof text]
   private readonly listeners = new Set<() => void>()
   private retained: HTMLDetailsElement | undefined
@@ -58,7 +59,11 @@ export class StartupDraftView implements StartupDraft {
     this.input.autocomplete = 'off'
     this.input.setAttribute('aria-label', `${this.words.label} · ${entry.nodeName}`)
     this.input.addEventListener('input', this.changed)
-    this.root.append(this.status, label)
+    this.fullIndex.href = remoteEntryUrl(entry, 'full').href
+    this.fullIndex.target = '_blank'
+    this.fullIndex.rel = 'noopener'
+    this.fullIndex.textContent = this.words.full
+    this.root.append(this.status, label, this.fullIndex)
   }
 
   /**
@@ -99,6 +104,7 @@ export class StartupDraftView implements StartupDraft {
   retainAtMount(): void {
     if (this.done || this.input.value === '') { this.dispose(); return }
     this.status.textContent = this.words.retained
+    this.fullIndex.hidden = true
     const focused = document.activeElement === this.input
     const details = document.createElement('details')
     const summary = document.createElement('summary')
@@ -111,16 +117,11 @@ export class StartupDraftView implements StartupDraft {
     if (focused) this.input.focus()
   }
 
-  /** Offer the native index when deferred boot is unavailable, with input left in this tab. */
-  showNativeIndexLink(): void {
+  /** Keep the full index available if startup or the renderer handoff fails. */
+  showUnavailable(): void {
     if (this.done) return
     this.status.textContent = this.words.failed
-    const open = document.createElement('a')
-    open.href = remoteEntryUrl(this.entry, 'full').href
-    open.target = '_blank'
-    open.rel = 'noopener'
-    open.textContent = this.words.full
-    this.root.append(open)
+    this.fullIndex.hidden = false
   }
 
   /** Withdraw input when its owning document is disposed or the account changes. */

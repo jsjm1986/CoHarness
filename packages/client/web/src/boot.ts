@@ -118,7 +118,7 @@ export class AppWebEntry {
         if (reason instanceof RemoteEntryAccountChanged) this.startupDraft.dispose()
         else {
           this.page.attachDraft(this.startupDraft)
-          this.startupDraft.showNativeIndexLink()
+          this.startupDraft.showUnavailable()
         }
       }
     }
@@ -141,7 +141,7 @@ export class AppWebEntry {
     const boot = await loadRemoteEntry(remote, this.lifetime.signal)
     if (boot === 'injections') return true
     if (draft.read() === '') location.replace(remoteEntryUrl(remote, 'full'))
-    else draft.showNativeIndexLink()
+    else draft.showUnavailable()
     return false
   }
 
