@@ -85,7 +85,7 @@ describe('ConnectionWebSocketChannel', () => {
     expect(String((await reply)[0])).toBe('pong')
 
     // Exercise rawDataToUtf8 string, Buffer[], ArrayBuffer branches directly on accepted ws.
-    const server = channel['server'] as WebSocketServer
+    const server: WebSocketServer = channel['server']
     const accepted = [...server.clients][0]!
     accepted.emit('message', 'plain-str', false)
     accepted.emit('message', [Buffer.from('buf-'), Buffer.from('arr')], false)
@@ -184,7 +184,7 @@ describe('ConnectionWebSocketChannel', () => {
     const terminate = vi.fn()
     const fakeWs: Pick<WebSocket, 'terminate' | 'readyState'> =
       Object.assign(new EventEmitter(), { terminate, readyState: WebSocket.OPEN })
-    const raceServer = raceChannel['server'] as WebSocketServer
+    const raceServer: WebSocketServer = raceChannel['server']
     vi.spyOn(raceServer, 'handleUpgrade').mockImplementation((_req, _sock, _head, cb) => {
       void raceChannel.close()
       cb(fakeWs as WebSocket, {} as IncomingMessage)
@@ -194,7 +194,7 @@ describe('ConnectionWebSocketChannel', () => {
 
     // Propagate server.close error and return cached closePromise on repeated close().
     const errChannel = new ConnectionWebSocketChannel(60_000, 1024)
-    const errServer = errChannel['server'] as WebSocketServer
+    const errServer: WebSocketServer = errChannel['server']
     vi.spyOn(errServer, 'close').mockImplementation((cb) => {
       cb?.(new Error('close failure'))
       return errServer
@@ -219,7 +219,7 @@ describe('ConnectionWebSocketChannel', () => {
     const host2 = await startChannelServer(channel2, () => {})
     const client2 = new WebSocket(host2.url)
     await once(client2, 'open')
-    const server2 = channel2['server'] as WebSocketServer
+    const server2: WebSocketServer = channel2['server']
     const accepted2 = [...server2.clients][0]!
     Object.defineProperty(accepted2, 'readyState', { value: WebSocket.CLOSING, configurable: true })
     await new Promise((resolve) => { setTimeout(resolve, 40) })

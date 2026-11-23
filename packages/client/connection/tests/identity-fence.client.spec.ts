@@ -19,7 +19,7 @@ it('leaves HTTP/1 capacity for a turn and new conversation while advisory reads 
   const reads = [post('/api/skill.list'), post('/api/subagents/list'), post('/api/session.models', { signal: signal.signal })]
   try {
     const canceled = reads[2]!.catch((reason: unknown) => reason)
-    await vi.waitFor(() => expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(2))
+    await vi.waitFor(() => { expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(2) })
     await Promise.all([post('/api/admit/v1/session.prompt'), post('/api/prepare/v1/session.create')])
     expect(fetcher.mock.calls.map(([url, init]) => [requestedUrl(url).pathname, init?.priority])).toEqual([
       ['/api/skill.list', 'low'], ['/api/subagents/list', 'low'],
@@ -62,7 +62,7 @@ it('shares HTTP/1 admission across startup catalogs and directory reads while dr
   const reads = [request('/api/permissionPresets/catalog'), request('/api/session.historyIndex'),
     request('/api/settings.describe'), request('/api/session.list'), request(rows, 'GET', '&kind=workspaces&include=conversations')]
   try {
-    await vi.waitFor(() => expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(2))
+    await vi.waitFor(() => { expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(2) })
     expect(foreground()).toEqual([
       ['/api/permissionPresets/catalog', 'POST', 'low'], ['/api/session.historyIndex', 'POST', 'low'],
     ])
@@ -107,7 +107,7 @@ it('reserves capacity when activation, plugin synchronization and draft saving o
   const pending = [request(synchronization), request(listing), request(activation),
     request(rows, 'GET', '&kind=workspaces&include=conversations')]
   try {
-    await vi.waitFor(() => expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(3))
+    await vi.waitFor(() => { expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(3) })
     const issued = () => fetcher.mock.calls.map(([input, init]) => [requestedUrl(input).pathname, init?.priority])
     expect(issued()).toEqual([[synchronization, undefined], [listing, 'low'], [activation, undefined]])
     const draft = '/account/api/drafts/20000000-0000-4000-8000-000000000001'

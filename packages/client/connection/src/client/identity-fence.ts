@@ -102,7 +102,7 @@ export interface BrowserIdentityFence {
  * @returns one fence shared by every pooled runtime connection.
  */
 export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string, reload: () => void, search = ''): BrowserIdentityFence {
-  const navigation = globalThis.performance?.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+  const navigation = globalThis.performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
   const protocol = navigation?.nextHopProtocol
   const admitBackground = protocol === 'h2' || protocol?.startsWith('h3') ? undefined : http1BackgroundAdmission()
   let principal: number | undefined

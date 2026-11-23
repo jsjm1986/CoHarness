@@ -240,7 +240,9 @@ export class GatewayExecution extends ExecutionAuthority {
       const caller = ctx.gatewayRuntime.interactive()?.claims
       if (caller?.personalDraft === 'prepare' && caller.expiresAt > Date.now()
         && source === 'startup' && header.draft === true && !header.isSeeded && header.parentSession === undefined
-        && header.origin === undefined && this.mirror(session).inheritance === null && !session.events.some(materializesSession)) {
+        && header.origin === undefined && this.mirror(session).inheritance === null
+        // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+        && !session.events.some(materializesSession)) {
         this.unregisteredDrafts.add(session)
         return
       }

@@ -357,15 +357,15 @@ describe('Host input-channel unit edge cases', () => {
     // Already closed on entry.
     const closedEntry = makeMockSocket()
     const closedAtt = makeAttachment({ isClosed: () => true })
-    bindTerminalInputSocket(closedEntry.socket, closedAtt.attachment, defaultLimits, controller.signal)
+    await bindTerminalInputSocket(closedEntry.socket, closedAtt.attachment, defaultLimits, controller.signal)
     expect(closedEntry.closes).toEqual([{ code: 1008, reason: 'terminal unavailable' }])
 
     // Replace existing inputSocket with a new one.
     const first = makeMockSocket()
     const second = makeMockSocket()
     const live = makeAttachment()
-    bindTerminalInputSocket(first.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
-    bindTerminalInputSocket(second.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    await bindTerminalInputSocket(first.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    await bindTerminalInputSocket(second.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
     expect(first.closes).toEqual([{ code: 1000, reason: 'replaced' }])
     expect(live.attachment.inputSocket).toBe(second.socket)
 
@@ -382,17 +382,17 @@ describe('Host input-channel unit edge cases', () => {
 
     // Invalid frames close with 1008.
     const badJson = makeMockSocket()
-    bindTerminalInputSocket(badJson.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    await bindTerminalInputSocket(badJson.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
     badJson.emitMessage('{not-json')
     expect(badJson.closes.at(-1)).toEqual({ code: 1008, reason: 'invalid terminal input frame' })
 
     const badSeq = makeMockSocket()
-    bindTerminalInputSocket(badSeq.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    await bindTerminalInputSocket(badSeq.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
     badSeq.emitMessage(JSON.stringify({ type: 'write', seq: 0, data: 'x' }))
     expect(badSeq.closes.at(-1)).toEqual({ code: 1008, reason: 'invalid terminal input frame' })
 
     const badType = makeMockSocket()
-    bindTerminalInputSocket(badType.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
+    await bindTerminalInputSocket(badType.socket, live.attachment, { maxInputBytes: 64, validateDimensions: () => {} }, controller.signal)
     badType.emitMessage(JSON.stringify({ type: 'unknown', seq: 1 }))
     expect(badType.closes.at(-1)).toEqual({ code: 1008, reason: 'invalid terminal input frame' })
 
@@ -417,7 +417,7 @@ describe('Host input-channel unit edge cases', () => {
     const closingSock = makeMockSocket()
     const closingAtt = makeAttachment()
     closingAtt.writeSpy.mockImplementationOnce(async () => { closingSock.setState('closing') })
-    bindTerminalInputSocket(closingSock.socket, closingAtt.attachment, defaultLimits, controller.signal)
+    await bindTerminalInputSocket(closingSock.socket, closingAtt.attachment, defaultLimits, controller.signal)
     closingSock.emitMessage(JSON.stringify({ type: 'write', seq: 1, data: 'ok' }))
     await vi.waitFor(() => { expect(closingAtt.writeSpy).toHaveBeenCalledOnce() })
     expect(closingSock.sent).toEqual([])

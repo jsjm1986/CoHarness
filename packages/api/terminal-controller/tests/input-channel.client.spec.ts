@@ -248,7 +248,7 @@ describe('TerminalView input channel integration and HTTP fallback', () => {
       const write = vi.fn<TerminalInputChannel['write']>(async () => {})
       const resize = vi.fn<TerminalInputChannel['resize']>(async () => {})
       opened.push({ lifetime, write, resize })
-      return { signal: lifetime.signal, isOpen: true, write, resize, close: () => lifetime.abort() }
+      return { signal: lifetime.signal, isOpen: true, write, resize, close: () => { lifetime.abort() } }
     })
     const { model, remote } = clientFixture(factory)
     model.mount()

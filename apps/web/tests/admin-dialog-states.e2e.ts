@@ -910,7 +910,7 @@ it('shows the responding Gateway release alongside the database migration versio
     const state = await (await page.request.get(fixture.base + '/admin/api/deployment')).json() as DeploymentState
     let reads = 0, individualReads = 0
     replies.set('GET /admin/api/deployment/overview', async (request) => {
-      const original = await (await page.request.get(request.url())).json()
+      const original = await (await page.request.get(request.url())).json() as { sections: Record<string, unknown> }
       reads++
       return { body: { sections: { ...original.sections, deployment: { ok: true, value: {
         ...state, releaseId, migrations: { current: 148, applied: [148], pending: [], drifted: [] },
