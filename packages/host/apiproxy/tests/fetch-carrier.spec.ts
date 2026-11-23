@@ -583,8 +583,8 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
       const timing = response.headers.get('x-dsh-host-prepare-ms')
       if (trace) {
         if (timing === null) throw new Error('Missing prepared response timing')
-        expect(JSON.parse(timing)).toEqual({
-          bodyMs: expect.any(Number), sessionMs: expect.any(Number), initialHistoryMs: expect.any(Number),
+        expect(JSON.parse(timing) as { bodyMs: number; sessionMs: number; initialHistoryMs: number }).toEqual({
+          bodyMs: expect.any(Number) as number, sessionMs: expect.any(Number) as number, initialHistoryMs: expect.any(Number) as number,
         })
       } else expect(timing).toBeNull()
       const envelope = await response.json() as { result: {

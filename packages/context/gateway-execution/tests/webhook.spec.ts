@@ -250,7 +250,7 @@ it('rejects invalid JSON and schema violations', async () => {
 it('rejects oversized bodies while preserving the response channel', async () => {
   const f = fixture()
   const server = createServer(f.handler)
-  disposers.push(() => new Promise<void>((resolve) => { server.close(() => resolve()) }))
+  disposers.push(() => new Promise<void>((resolve) => { server.close(() => { resolve() }) }))
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
     server.listen(0, '127.0.0.1', resolve)

@@ -91,7 +91,7 @@ it('checks both paths of a move before committing any operation in the patch', a
   const result = await call(t, patch(add('first'), move('source', 'restricted')))
   expect(checks).toEqual(['first', 'source', 'restricted'].map(name => resolve(t.workspace, name)))
   expect(result.isError).toBe(true)
-  expect(result.content).toEqual(expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining('Write permission required') })]))
+  expect(result.content).toEqual(expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining('Write permission required') as string })]))
   expect(await t.bytes('source')).toBe('old\n')
   await expect(t.bytes('first')).rejects.toMatchObject({ code: 'ENOENT' })
   await expect(t.bytes('restricted')).rejects.toMatchObject({ code: 'ENOENT' })

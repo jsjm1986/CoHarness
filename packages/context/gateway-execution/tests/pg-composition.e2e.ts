@@ -1012,7 +1012,7 @@ describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execut
     expect(inputs[0]).toMatchObject({
       inboxWaitMs: duration, claimToEnterMs: duration, inheritanceMs: duration,
       enterRpcMs: duration, requestAuthorizationMs: duration, afterAuthorizationToStreamMs: duration,
-      preStepPlugins: expect.arrayContaining([expect.objectContaining({ elapsedMs: duration })]),
+      preStepPlugins: expect.arrayContaining([expect.objectContaining({ elapsedMs: duration })]) as unknown[],
     })
     const resources = measurements('model-resource-timing')
     expect(resources).toHaveLength(4)
