@@ -22,7 +22,7 @@ Python client 默认启动 `dsh --profile sdk`。其 `profile` 选择其他组�
 
 ### 已安装包闭包与外部资源
 
-CLI 的 [profile loader](../../../../packages/boot/app-boot/README.zh.md)根据安装树和有序 bundle 依赖图计算运行时包解析。安装树对它提供的包名拥有优先级；相对的插入插件以 patch 文件为基准解析。两种 SDK carrier 都使用 runtime 解析，可执行打包产物强制使用该模式。不保证任意外部插件依赖的兼容性；相对导入本身不能建立共享 Cordis 身份。
+CLI 的 [profile loader](../../../../packages/boot/app-boot/README.zh.md)根据安装树和有序 bundle 依赖图计算运行时包解析。安装树对它提供的包名拥有优先级；相对的插入插件以 patch 文件为基准解析。两种 SDK carrier 都使用 runtime 解析，可执行打包产物强制使用该模式。组合包 patch 通过 carrier 的模块文件解析器定位，并拒绝指向包外的相对路径或软链接目标。不保证任意外部插件依赖的兼容性；相对导入本身不能建立共享 Cordis 身份。
 
 [`python/sdk-runtime/package.json`](../../../../python/sdk-runtime/package.json)是独立、私有的部署清单。应用 bin 声明其运行时导入；carrier 声明所分发的插件闭包。[闭包校验](../../../../scripts/verify-runtime-closure.ts)按平台矩阵检查所分发预设，并遍历必需 workspace peer。校验时，无法解释的平台表达式仍视为激活，避免隐藏缺失依赖。
 

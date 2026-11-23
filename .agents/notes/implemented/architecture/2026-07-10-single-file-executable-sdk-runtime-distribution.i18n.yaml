@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md
 document:
-  en: e9043973fdef597b65e47a709af3caee88eab235
-  zh: 6ca91372e749556966e68b1c018fd375d6a65914
+  en: 95d472dbb86849fe72fa8f06ed99e1578461903a
+  zh: 62809f0751942653de780bd5634aaa364961753c
 /agent-note-executable-sdk-runtime-distribution:
   en: 5ca54419078ba51a
   zh: 30e0c9a6a195d75d
@@ -18,8 +18,8 @@ document:
   en: 08c9e5488613af87
   zh: f71f3fcbcd7f5b9d
 /agent-note-executable-sdk-runtime-distribution/decision/installed-package-closure-and-external-resources:
-  en: 9c6cea23e41ae47b
-  zh: b49ae337f9af3026
+  en: 10015c40286092c0
+  zh: e2af55a782964640
 /agent-note-executable-sdk-runtime-distribution/decision/carriers-platforms-and-isolated-execution:
   en: 97daddf996693df3
   zh: 151b4c8d40885928

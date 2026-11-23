@@ -8,8 +8,15 @@ import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 const database = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 
 it.skipIf(!database)('refuses to revive a retired placed Runtime or change its unique writer during control restore', async () => {
-  const pool = createPostgresPool(database!, { max: 1 })
+  const admin = createPostgresPool(database!, { max: 1 })
+  const fixture = `hgw_content_restore_${randomUUID().replaceAll('-', '')}_test`
+  let created = false, pool: ReturnType<typeof createPostgresPool> | undefined
   try {
+    await admin.query(`CREATE DATABASE "${fixture}"`)
+    created = true
+    const url = new URL(database!)
+    url.pathname = `/${fixture}`
+    pool = createPostgresPool(url.href, { max: 1 })
     await runMigrations(pool,fileURLToPath(new URL('../deploy/postgres/migrations',import.meta.url)))
     const tx = await pool.connect()
     try {
@@ -42,5 +49,9 @@ it.skipIf(!database)('refuses to revive a retired placed Runtime or change its u
       await tx.query(NODE_CONTENT_RESTORE_SUFFIX)
       expect((await tx.query('SELECT retired_at IS NOT NULL retired FROM harness.runtime_environments WHERE id=$1',[runtime])).rows[0]?.retired).toBe(true)
     } finally { await tx.query('ROLLBACK'); tx.release() }
-  } finally { await pool.end() }
+  } finally {
+    try { await pool?.end() } finally {
+      try { if (created) await admin.query(`DROP DATABASE "${fixture}"`) } finally { await admin.end() }
+    }
+  }
 })

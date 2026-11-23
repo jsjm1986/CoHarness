@@ -239,7 +239,8 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     await ready(f.root)
     const record = (await f.store.read())!
     const group = record.groupPid!
-    await writeFile(f.store.recordPath, JSON.stringify({ ...record, url: 'http://127.0.0.1:0/' }))
+    // Denial here exercises process-group recovery without an independent Linux slice stop.
+    await writeFile(f.store.recordPath, JSON.stringify({ ...record, nativeRange: undefined, url: 'http://127.0.0.1:0/' }))
     const nativeKill = process.kill
     let denied = 0
     const signal = vi.spyOn(process, 'kill').mockImplementation((pid, op) => {

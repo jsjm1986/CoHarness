@@ -48,6 +48,7 @@ import {
   isPackagedExecutable,
   PROFILE_MODULE_FALLBACK_DIR,
   realModuleDirectory,
+  realModuleFile,
   symlinkPointsTo,
 } from './profile-resolution/legacy-links.ts'
 
@@ -97,7 +98,7 @@ export function bundlePatchPaths(packageDir: string, bundle: DshBundleManifest):
   return bundlePatchFiles(bundle).map((file) => {
     const path = resolve(root, file)
     if (isAbsolute(file) || outside(path)) throw new Error(`bundle patch must be inside its package: ${file}`)
-    const target = realpathSync(path)
+    const target = realModuleFile(path)
     if (outside(target)) throw new Error(`bundle patch must be inside its package: ${file}`)
     return target
   })
