@@ -465,9 +465,11 @@ describePg('PostgreSQL outbound node access', () => {
     const foreign = new PostgresNodeAccessService({ ...f.context, nodeId: other.nodeId }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
     await expect(foreign.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch }))
       .rejects.toMatchObject({ status: 409, code: 'node-access/mode-disabled' })
+    await expect(foreign.authorizeServiceIdentity(secret, { connectionId: lease.connectionId, epoch: lease.epoch }))
+      .rejects.toMatchObject({ status: 409, code: 'node-access/mode-disabled' })
   })
 
-  it('authorizes one current channel with one database round trip', async () => {
+  it('authorizes both a current channel and a local service with one database round trip each', async () => {
     const f = await fixture(), ticket = await f.issue(), secret = credential()
     await f.nodes.enroll(ticket.token, enrollment(secret))
     const lease = await f.nodes.connect(secret, { connectionId: randomUUID() })
@@ -478,10 +480,23 @@ describePg('PostgreSQL outbound node access', () => {
     })
     try {
       const nodes = new PostgresNodeAccessService({ ...f.context, pool: reader }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
-      await expect(nodes.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch })).resolves.toEqual(lease)
-      const statements = queries.flatMap(query => query.mock.calls.map(([statement]) => statement))
-      expect(statements).toHaveLength(1)
-      expect(statements[0]).toContain('harness.node_channel_lease')
+      const input = { connectionId: lease.connectionId, epoch: lease.epoch }
+      const statements = () => queries.flatMap(query => query.mock.calls.map(([statement]) => statement))
+      await expect(nodes.authorizeChannel(secret, input)).resolves.toEqual(lease)
+      expect(statements()).toEqual([expect.stringContaining('harness.node_channel_lease')])
+      for (const query of queries) query.mockClear()
+
+      const local = new PostgresNodeAccessService({ ...f.context, nodeId: ticket.nodeId, pool: reader }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
+      const revision = await pool.query<{ access_revision: string }>(
+        'SELECT access_revision::text FROM harness.organizations WHERE id=$1', [f.organizationId])
+      await expect(local.authorizeServiceIdentity(secret, input)).resolves.toEqual({
+        ...lease, managedPrimary: { nodeId: f.context.nodeId, accessRevision: BigInt(revision.rows[0]!.access_revision) },
+      })
+      expect(statements()).toEqual([expect.stringContaining('harness.node_channel_lease')])
+      expect(statements()[0]).toContain('harness.deployment_topology')
+      await expect(nodes.authorizeServiceIdentity(secret, input)).resolves.toEqual(lease)
+      await expect(local.authorizeServiceIdentity(secret, { ...input, epoch: String(BigInt(lease.epoch) + 1n) }))
+        .rejects.toMatchObject({ status: 409, code: 'node-access/lease-lost' })
     } finally {
       await reader.end()
       for (const query of queries) query.mockRestore()

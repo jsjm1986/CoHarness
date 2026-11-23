@@ -558,7 +558,8 @@ const deps: GatewayDeps = {
   nodeServiceProxy,
   nodeServiceIdentity: {
     nodeId: context.nodeId as RuntimeNodeId, organizationId: context.organizationId,
-    authorize: (token, input) => nodeAccess.authorizeChannel(token, input),
+    authorize: (token, input) => cfg.nodeService.preparedReadDelegation
+      ? nodeAccess.authorizeServiceIdentity(token, input) : nodeAccess.authorizeChannel(token, input),
   },
   ...forwardAuthority,
   runtimeRouter,

@@ -68,3 +68,46 @@ it('preserves callback and promise results and bounds the operation ring without
     await closing
   }
 })
+
+it('correlates an explicitly sampled revisioned plugin batch through a body interruption', async () => {
+  const ring = new OperationTimings(2)
+  const id = randomUUID()
+  const resource = '/plugins/combo.js??@fixture/module/client.js&rev=0123456789ab'
+  const server = createServer((req, res) => {
+    void ring.run(req, res, async () => {
+      if (req.url === resource && req.headers['x-dsh-operation-id'] === id) {
+        res.writeHead(200, { 'content-type': 'text/javascript' })
+        res.write('partial script bytes')
+      } else res.end()
+    })
+  })
+  server.listen(0, '127.0.0.1')
+  try {
+    await once(server, 'listening')
+    const base = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}`
+    const unversioned = await fetch(base + '/plugins/combo.js??@fixture/module/client.js', { headers: { 'x-dsh-operation-id': id } })
+    expect(unversioned.headers.has('x-dsh-operation-id')).toBe(false)
+    await unversioned.arrayBuffer()
+    const unsampled = await fetch(base + resource)
+    expect(unsampled.headers.has('x-dsh-operation-id')).toBe(false)
+    await unsampled.arrayBuffer()
+    const client = new AbortController()
+    try {
+      const response = await fetch(base + resource, { headers: { 'x-dsh-operation-id': id }, signal: client.signal })
+      expect(response.headers.get('x-dsh-operation-id')).toBe(id)
+      client.abort()
+      await expect(response.arrayBuffer()).rejects.toMatchObject({ name: 'AbortError' })
+      await expect.poll(() => ring.samples()).toMatchObject([
+        { id, operation: 'pluginCombo', status: 200, aborted: true, responseHeadersMs: expect.any(Number) },
+      ])
+      const metadata = JSON.stringify(ring.samples())
+      expect(metadata).not.toContain('partial script bytes')
+      expect(metadata).not.toContain('0123456789ab')
+    } finally { client.abort() }
+  } finally {
+    const closing = once(server, 'close')
+    server.close()
+    server.closeAllConnections()
+    await closing
+  }
+})

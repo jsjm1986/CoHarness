@@ -82,6 +82,11 @@ export const nodeLeaseSchema = nodeIdentitySchema.extend({
 /** Lease response consumed by the outbound node process. */
 export type NodeLease = z.infer<typeof nodeLeaseSchema>
 
+/** Private node service attestation with the primary observed alongside a managed node's lease. */
+export interface NodeServiceIdentityLease extends NodeLease {
+  readonly managedPrimary?: { readonly nodeId: RuntimeNodeId; readonly accessRevision: bigint }
+}
+
 /** One-time ticket response; replaying issuance never returns its secret again. */
 export interface NodeEnrollment {
   nodeId: RuntimeNodeId

@@ -7,7 +7,7 @@ import type { UserRow } from '../auth.ts'
 import {
   NodeAccessError, nodeCredentialSchema, nodeEnrollmentTokenSchema, nodeUuidSchema,
   type NodeAccessConfig, type NodeAccessEntry, type NodeAccessPage, type NodeControlOperation,
-  type NodeEnrollment, type NodeEnrollmentId, type NodeEnrollmentToken, type NodeIdentity, type NodeLease,
+  type NodeEnrollment, type NodeEnrollmentId, type NodeEnrollmentToken, type NodeIdentity, type NodeLease, type NodeServiceIdentityLease,
   type NodeRemovalBlocker, type NodeRemovalCheck, type NodeRemovalReceipt,
 } from '../node-access.ts'
 import type { RuntimeCatalogLimits, RuntimeNodeId } from '../runtime-catalog.ts'
@@ -544,16 +544,41 @@ export class PostgresNodeAccessService {
    * @returns the authenticated lease; this read changes neither connectivity nor writer acknowledgements.
    */
   async authorizeChannel(token: string, input: unknown): Promise<NodeLease> {
+    return this.readChannelLease(token, input, false)
+  }
+
+  /**
+   * Attest the node service with the managed primary and access revision from the lease statement's snapshot.
+   * @param token - node bearer credential.
+   * @param input - exact connection UUID and epoch.
+   * @returns current lease and the optional primary that can use prepared reads on this computer.
+   */
+  async authorizeServiceIdentity(token: string, input: unknown): Promise<NodeServiceIdentityLease> {
+    return this.readChannelLease(token, input, true)
+  }
+
+  private async readChannelLease(token: string, input: unknown, includePrimary: boolean): Promise<NodeServiceIdentityLease> {
     const request = parse(leaseRequestSchema, input)
     const credential = nodeCredentialSchema.safeParse(token)
     if (!credential.success) throw new NodeAccessError(401, 'node-access/unauthorized')
-    const result = await this.controlPool.query<{ lease: unknown }>(
-      `SELECT harness.node_channel_lease($1,$2,$3,$4,$5) lease
+    const primaryProjection = includePrimary ? `, (
+      SELECT jsonb_build_object('nodeId', topology.primary_node_id, 'accessRevision', organization.access_revision::text)
+      FROM harness.deployment_topology topology
+      JOIN harness.organizations organization ON organization.id=topology.organization_id
+      JOIN harness.node_agents agent ON agent.organization_id=topology.organization_id AND agent.node_id=$5
+      WHERE topology.organization_id=$1 AND topology.enabled AND topology.primary_node_id<>$5
+        AND agent.attachment_state='managed'
+    ) managed_primary` : ''
+    const result = await this.controlPool.query<{ lease: unknown; managed_primary?: { nodeId: RuntimeNodeId; accessRevision: string } | null }>(
+      `SELECT harness.node_channel_lease($1,$2,$3,$4,$5) lease${primaryProjection}
        WHERE $6::bigint IS NULL OR COALESCE((SELECT write_epoch FROM harness.cluster_control WHERE organization_id=$1),1)=$6`,
       [this.context.organizationId, digest(credential.data), request.connectionId, request.epoch,
         this.context.nodeId, this.baselineWriteEpoch?.toString() ?? null])
     if (this.baselineWriteEpoch !== undefined && result.rowCount !== 1) throw new NodeAccessError(503, 'node-access/unavailable')
-    return this.acceptedLease(result.rows[0]?.lease)
+    const row = result.rows[0]
+    const lease = this.acceptedLease(row?.lease)
+    const primary = row?.managed_primary
+    return primary == null ? lease : { ...lease, managedPrimary: { nodeId: primary.nodeId, accessRevision: BigInt(primary.accessRevision) } }
   }
 
   /** Map the lease function's validated payload back onto the service's typed error contract. */

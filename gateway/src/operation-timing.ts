@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { PoolClient } from 'pg'
 import type { ReadySessionOutcome, ReadySessionRoute } from './performance-observer.ts'
-import { isReadyRuntimeRead } from './runtime-request-path.ts'
+import { isImmutableRuntimeAssetRequest, isReadyRuntimeRead } from './runtime-request-path.ts'
 
 const method = new Map([
   ['/api/prepare/v1/session.create','create'],['/api/prepare/v1/session.history','history'],['/api/session.history','history'],
@@ -27,7 +27,7 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 export type OperationPhase='authorize'|'prepare'|'admit'|'accessSync'|'runtimeQueue'|'runtimeLiveness'|'nodeConnection'|'nodeQueue'|'nodeLeaseCheck'|'nodeServiceOpen'|'upstream'
   |'entryReadApproval'|'entryReadRelease'|'nodePreparedRead'
   | 'governanceCheckout' | 'contentCheckout' | 'resourceWriteAdmission' | 'resourceChangeWait' | 'executionInputServer'
-type Method='bootstrap'|'hostDescription'|'workspaceList'|'sessionList'|'create'|'history'|'send'|'status'
+type Method='bootstrap'|'pluginCombo'|'hostDescription'|'workspaceList'|'sessionList'|'create'|'history'|'send'|'status'
   |'terminalWrite'|'terminalFollow'|'runtimePrepare'|'workbenchRows'|'workbenchContext'|'documentsOverview'|'nodeDocumentOverview'
   |'executionInput'|'executionRegister'
   |'executionEnter'|'executionAuthorize'|'resourceRequest'|'resourceStatuses'|'modelCredential'
@@ -246,11 +246,13 @@ export class OperationTimings {
     if (!this.capacity) return work()
     const suppliedId=req.headers['x-dsh-operation-id']
     if (suppliedId !== undefined && (typeof suppliedId!=='string' || !uuid.test(suppliedId))) return work()
-    const path=(req.url??'').split('?',1)[0]!
+    const requestPath=req.url??''
+    const path=requestPath.split('?',1)[0]!
     const action = req.method==='POST' ? (method as ReadonlyMap<string,Method>).get(path)
       : req.method==='GET'
         ? ((getMethod as ReadonlyMap<string,Method>).get(path)
-          ?? (path==='/' && isReadyRuntimeRead(req.method, new URL(req.url??'/', 'http://gateway')) ? 'bootstrap' : undefined))
+          ?? (path==='/' && isReadyRuntimeRead(req.method, new URL(requestPath, 'http://gateway')) ? 'bootstrap' : undefined)
+          ?? (suppliedId !== undefined && path === '/plugins/combo.js' && isImmutableRuntimeAssetRequest(req.method, requestPath) ? 'pluginCombo' : undefined))
         : undefined
     if (action === undefined) return work()
     const requestId=suppliedId ?? (action==='executionEnter' || action==='executionAuthorize' || action==='resourceRequest'

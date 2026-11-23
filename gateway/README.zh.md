@@ -74,7 +74,7 @@ API 请求可通过 `dshRuntime=<环境 UUID>` 选择获授权的环境。显式
 | `HGW_STREAM_PRINCIPAL_RENEWAL_MAX_BATCH` | `64` | 每批连接 ID 上限；不超过 1,024 的正整数 |
 | `HGW_ACCESS_INVALIDATION_POLL_MS` | 1 秒 | 持久授权变更的兜底读取及重连间隔；通知与请求准入也会触发读取 |
 | `HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS` | 15 秒 | PostgreSQL `LISTEN` 连通且游标追平时的低频对账间隔（不小于 `HGW_ACCESS_INVALIDATION_POLL_MS`） |
-| `HGW_NODE_SERVICE_IDENTITY_CACHE_MS` | 5 秒 | 远端桥接节点身份校验与从节点拓扑读取的失效联动短缓存窗口（`0`–`30000` 毫秒） |
+| `HGW_NODE_SERVICE_IDENTITY_CACHE_MS` | 5 秒 | 节点服务身份校验的失效联动缓存，包含同一次租约查询给出的受管主入口（`0`–`30000` 毫秒） |
 | `HGW_EXECUTION_WATCH_HEARTBEAT_MS` | 15 秒 | 运行时执行监视流的存活帧间隔；必须为正数且不超过 2,147,483,647 毫秒 |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | 用于加密组织和项目 Provider API Key 的仅所有者可读 AES-GCM 密钥 |
@@ -178,6 +178,8 @@ Runtime 分发器在认证运行时令牌后，将文档流式操作交给 Gatew
 业务池支持单连接。访问撤销使用一个独立连接接收 PostgreSQL 通知并读取持久 outbox。就绪检查、写者心跳、节点租约和已建立 Runtime 流的续期使用有界控制池。Runtime 和投影尚在清理时，就绪检查验证监听器能否观察已提交的变化并发出取消通知。随后通过控制池的一条查询检查节点资格和启动写入代次。清理完成后才确认持久版本。如果清理等待期间提交了新的撤权，监听器先阻断已准入流量，清理结束后再追赶持久版本。续期重新检查目标 Runtime 的精确凭据、当前写入代次、账号和电脑权限。项目流还检查活跃项目范围。性能快照在业务池计数之外提供 `databasePool.control` 和 `databasePool.accessListener`。每个 Gateway 分别计入这些连接预算。参见[控制池决策](../.agents/notes/implemented/architecture/2026-11-20-gateway-postgres-control-pools.zh.md)。
 
 Gateway 将浏览器请求、事件流建立、就绪期限与服务端计时选项一同写入每个受管 Connection 插件。指定 Runtime 的页面使用所属电脑的配置。版本化对话诊断在保留就绪代次时，将 `runtimeQueue` 和 `runtimeLiveness` 记入 `admit`。在两端 Gateway 使用 `GET /admin/api/performance/operations?id=<uuid>` 对照所属端排队、本机进程监督、治理 SQL 和节点传输，按同一个操作 ID 匹配记录。各阶段耗时可能重叠。模型生成和浏览器绘制单独计时。
+
+开启性能诊断时，带修订号的 `GET /plugins/combo.js` 请求可附带有效的 `x-dsh-operation-id` 来记录 `pluginCombo`。用同一个 UUID 对照两端 Gateway 的响应头时间和响应中断标记。
 
 所属 Gateway 在两个诊断接口的 `readySession` 字段中统计就绪代次的对话转发尝试。`forwarded` 统计携带本机节点服务断言且目标明确的请求，`ordinary` 统计通过账号路由进入的准入。`ready` 和 `delegated` 表示已准入 Runtime 代理。`fallbackCandidate` 统计不满足签名就绪准入条件的断言，`fallbackDelegation` 统计无可用委托的结构化读取。其他计数分别记录服务不可用、无法持有当前代次、启动读取继续走维护路由、拒绝、客户端断开和处理异常。同一请求回退后可能计入两组。
 

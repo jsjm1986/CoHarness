@@ -18,7 +18,8 @@ import { UserService } from '../src/users.ts'
 import { ProjectService } from '../src/projects.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
-import { createGatewayServer, scopeCookie, type GatewayDeps } from '../src/server.ts'
+import { createGatewayServer, scopeCookie, type GatewayDeps, type GatewayHandlers } from '../src/server.ts'
+import type { GatewayForwardClaims } from '../src/forwarded-principal.ts'
 import { createAdminApiHandler } from '../src/admin-api.ts'
 import { GatewayRuntimeRouter, LocalRuntimeAdapter, type RuntimePlacement } from '../src/runtime-router.ts'
 import { RuntimeCatalogError, type RuntimeCatalogEntry, type RuntimeId, type RuntimeNodeId } from '../src/runtime-catalog.ts'
@@ -120,7 +121,9 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
   const db = openDb(join(root, 'accounts.sqlite'))
   releases.push(async () => { db.close() })
   const centerConfig = testConfig(join(root, 'center'), { HGW_NODE_SERVICE_FORWARDING: 'on', ...overrides })
-  const remoteConfig = testConfig(join(root, 'remote'))
+  const remoteConfig = testConfig(join(root, 'remote'), {
+    HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: overrides.HGW_NODE_SERVICE_PREPARED_READ_DELEGATION,
+  })
   if (mixedReleaseAgent !== undefined) {
     centerConfig.releaseId = 'center-release-2'
     remoteConfig.releaseId = 'node-release-1'
@@ -205,7 +208,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
   const slow = deferred<void>(), slowResponse = deferred<void>()
   let localCalls = 0, remoteCalls = 0
   const remoteHttpSockets = new Set<import('node:net').Socket>()
-  const remote = createGatewayServer(remoteDeps, {
+  const remoteHandlers: GatewayHandlers = {
     admin: createAdminApiHandler(remoteDeps),
     proxy: async (req, res, context) => {
       remoteCalls++
@@ -242,7 +245,8 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
         bytes: Buffer.concat(parts).toString('base64'), path: req.url }))
     },
     upgrade: async (req, socket, head) => { events.handleUpgrade(req, socket, head, ws => { ws.on('message', bytes => { ws.send(bytes) }) }) },
-  })
+  }
+  const remote = createGatewayServer(remoteDeps, remoteHandlers)
   const center = createGatewayServer(centerDeps, {
     admin: createAdminApiHandler(centerDeps),
     proxy: async (_req, res) => { localCalls++; res.end('center') },
@@ -304,7 +308,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     return response.headers.get('set-cookie')!.split(';')[0]!
   }
   const cookie = await login('owner')
-  return { base, remoteBase, nodeId, localNodeId, environment, cookie, login, admin, users, channels, services, proxy, lease, credential, centerDeps,
+  return { base, remoteBase, nodeId, localNodeId, environment, cookie, login, admin, users, channels, services, proxy, lease, credential, centerDeps, remoteDeps, remoteHandlers,
     remoteStarts, localStarts, dialEvents, serviceDialEvents,
     slow, slowResponse, counters: () => ({ localCalls, remoteCalls }), remoteHttpConnections: () => remoteHttpSockets.size,
     attestationCalls: () => attestationCalls,
@@ -347,6 +351,53 @@ it('forwards between different Gateway release identities over the v1 node proto
   await other.arrayBuffer()
   expect(f.attestationCalls()).toBe(1)
   expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
+})
+
+it('opens a new node service connection when the ordinary topology reader is unavailable', async () => {
+  const f = await fixture({ HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: 'on' })
+  const unavailable = vi.fn(async () => { throw new Error('Ordinary database checkout unavailable') })
+  f.remoteDeps.topology = {
+    read: unavailable, adminRead: unavailable, save: unavailable, preflight: unavailable, candidates: unavailable,
+    assertNode: async () => {},
+  }
+  const response = await fetch(`${f.base}/api/echo?dshRuntime=${f.environment.id}`, { headers: { cookie: f.cookie } })
+  const body = await response.json()
+  expect(response.status, JSON.stringify(body)).toBe(200)
+  expect(body).toMatchObject({ node: f.nodeId, runtime: f.environment.id })
+  expect(unavailable).not.toHaveBeenCalled()
+  expect(f.attestationCalls()).toBe(1)
+})
+
+it.each([false, true])('uses the managed bridge proof only through its applied revision (changed: %s)', async changed => {
+  const approval = { accessRevision: '4', generation: 1, port: 40000, startedAt: 1, launchStamp: 'stamp-1', expiresAt: Date.now() + 60_000 }
+  const f = await fixture({ HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: 'on' }, false, false, undefined, undefined, async () => approval)
+  let appliedRevision = 4n
+  f.remoteDeps.accessMonitor = { available: true, currentRevision: () => appliedRevision,
+    synchronize: async () => {}, subscribe: () => () => {} }
+  f.remoteDeps.readiness = () => { if (changed) appliedRevision += 1n }
+  const identity = f.remoteDeps.nodeServiceIdentity!
+  const authorize = identity.authorize
+  identity.authorize = async (token, input) => ({
+    ...await authorize(token, input), managedPrimary: { nodeId: f.localNodeId, accessRevision: 4n },
+  })
+  const claims: GatewayForwardClaims = {
+    version: 1, issuer: 'harness-gateway', audience: 'dsh-node', organization: f.lease.organizationId,
+    issuerNode: f.localNodeId, audienceNode: f.nodeId, user: f.users.getById(f.admin.id)!, nonce: randomUUID(),
+    selection: { runtimeId: f.environment.id, target: 'personal' },
+    context: { environment: { id: f.environment.id, nodeId: f.nodeId }, personalRead: approval },
+    request: { method: 'GET', path: '/', sessionHash: createHash('sha256').update(f.cookie.split('=')[1]!).digest('hex') },
+    issuedAt: Date.now(), expiresAt: approval.expiresAt,
+  }
+  f.remoteDeps.forwardedSessionPrincipal = () => ({ claims, issuerPublicKey: 'fixture-key', consume: () => true })
+  f.remoteHandlers.readySession = async (_request, response, selection) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+      .end(JSON.stringify({ delegated: selection.managedPersonalRead === true, runtime: selection.runtimeId }))
+    return true
+  }
+  const response = await fetch(`${f.base}/?dshRuntime=${f.environment.id}&dshNode=${f.nodeId}&dshTarget=personal&dshBootstrap=1`,
+    { headers: { cookie: f.cookie, accept: 'application/json', 'x-dsh-expected-principal-id': String(f.admin.id) } })
+  expect(response.status).toBe(200)
+  expect(await response.json()).toEqual({ delegated: !changed, runtime: f.environment.id })
 })
 
 it.each(['future-wire', 'wrong-node', 'wrong-organization', 'stale-lease'] as const)(

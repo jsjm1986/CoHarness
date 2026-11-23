@@ -151,7 +151,7 @@ export interface GatewayDeps {
   nodeServiceIdentity?: {
     nodeId: import('./runtime-catalog.ts').RuntimeNodeId
     organizationId: string
-    authorize(token: string, input: unknown): Promise<import('./node-access.ts').NodeLease>
+    authorize(token: string, input: unknown): Promise<import('./node-access.ts').NodeServiceIdentityLease>
   }
   /** Authenticated forwarding to another computer's existing Gateway, when explicitly enabled. */
   nodeServiceProxy?: Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'http' | 'upgrade'> & Partial<Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'webhook' | 'closeIdle' | 'diagnostics'>>
@@ -1171,38 +1171,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   // headersTimeout to exceed keepAliveTimeout.
   server.keepAliveTimeout = cfg.keepAliveTimeoutMs
   server.headersTimeout = cfg.keepAliveTimeoutMs + 5_000
-  const nodeIdentityCache = new Map<string, { lease: import('./node-access.ts').NodeLease; expiresAtMs: number }>()
-  const nodeIdentityInFlight = new Map<string, { epoch: number; promise: Promise<import('./node-access.ts').NodeLease> }>()
-  let nodeTopologyCache: { value: Awaited<ReturnType<NonNullable<GatewayDeps['topology']>['read']>>; expiresAtMs: number } | undefined
-  let nodeTopologyInFlight: { epoch: number; promise: Promise<Awaited<ReturnType<NonNullable<GatewayDeps['topology']>['read']>>> } | undefined
+  const nodeIdentityCache = new Map<string, { lease: import('./node-access.ts').NodeServiceIdentityLease; expiresAtMs: number }>()
+  const nodeIdentityInFlight = new Map<string, { epoch: number; promise: Promise<import('./node-access.ts').NodeServiceIdentityLease> }>()
   let nodeIdentityCacheEpoch = 0
   const monitorCaughtUp = (): boolean => deps.accessMonitor !== undefined
     && (deps.accessMonitor.currentRevision !== undefined ? deps.accessMonitor.currentRevision() !== undefined : deps.accessMonitor.available)
   const clearNodeIdentityCache = (): void => {
     nodeIdentityCacheEpoch += 1
     nodeIdentityCache.clear()
-    nodeTopologyCache = undefined
-  }
-  const readCachedNodeTopology = async (): Promise<Awaited<ReturnType<NonNullable<GatewayDeps['topology']>['read']>> | undefined> => {
-    if (deps.topology === undefined) return undefined
-    const canCache = monitorCaughtUp() && cfg.nodeServiceIdentityCacheMs > 0
-    const now = Date.now()
-    if (canCache && nodeTopologyCache !== undefined && nodeTopologyCache.expiresAtMs > now) return nodeTopologyCache.value
-    if (canCache && nodeTopologyInFlight !== undefined && nodeTopologyInFlight.epoch === nodeIdentityCacheEpoch) {
-      return nodeTopologyInFlight.promise
-    }
-    const flightEpoch = nodeIdentityCacheEpoch
-    const promise = deps.topology.read()
-    if (canCache) nodeTopologyInFlight = { epoch: flightEpoch, promise }
-    try {
-      const value = await promise
-      if (canCache && flightEpoch === nodeIdentityCacheEpoch && monitorCaughtUp()) {
-        nodeTopologyCache = { value, expiresAtMs: Date.now() + cfg.nodeServiceIdentityCacheMs }
-      }
-      return value
-    } finally {
-      if (nodeTopologyInFlight?.promise === promise) nodeTopologyInFlight = undefined
-    }
   }
   const unsubscribeNodeIdentityCache = deps.accessMonitor?.subscribe(subject => {
     if (subject.userId === undefined && subject.projectId === undefined
@@ -1322,7 +1298,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           ? `${createHash('sha256').update(token).digest('hex')}:${connectionHeader}:${epochHeader}`
           : undefined
         const now = Date.now()
-        let lease: import('./node-access.ts').NodeLease
+        let lease: import('./node-access.ts').NodeServiceIdentityLease
         const cached = cacheKey === undefined ? undefined : nodeIdentityCache.get(cacheKey)
         if (cached !== undefined && cached.expiresAtMs > now && monitorCaughtUp()) {
           lease = cached.lease
@@ -1364,13 +1340,12 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           throw new NodeServiceError(409, 'node-service/mismatch')
         }
         await checkReadiness()
-        if (coordinate !== undefined && bridge !== undefined) {
-          const topology = await readCachedNodeTopology()
-          if (topology?.role === 'computer' && topology.primary !== null && !bridge.socket.destroyed
-            && unclaimedLoopback.get(coordinate) === bridge) {
-            bridge.forget()
-            nodeReadBridges.set(bridge.socket, topology.primary.nodeId)
-          }
+        const primary = lease.managedPrimary
+        if (coordinate !== undefined && bridge !== undefined && primary !== undefined
+          && deps.accessMonitor?.currentRevision?.() === primary.accessRevision
+          && !bridge.socket.destroyed && unclaimedLoopback.get(coordinate) === bridge) {
+          bridge.forget()
+          nodeReadBridges.set(bridge.socket, primary.nodeId)
         }
         send(res, 200, JSON.stringify({ protocolVersion: NODE_SERVICE_PROTOCOL_VERSION, organizationId: lease.organizationId,
           nodeId: lease.nodeId, release: cfg.releaseId ?? null }), 'application/json')
