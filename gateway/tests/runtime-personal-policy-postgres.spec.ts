@@ -162,17 +162,18 @@ describePg('PostgreSQL personal Runtime policy', () => {
         ...f.cfg.resourceBudget, sampleMs: 10, staleMs: 10_000, maxWaitMs,
       })
       await budget.configure()
-      const launching = Promise.withResolvers<void>()
+      let resolveLaunching!: () => void
+      const launching = new Promise<void>((resolve) => { resolveLaunching = resolve })
       let allocations = 0
       manager = new InstanceManager(f.repository, f.cfg, {
         instancesOutliveGateway: false, start: async runtime => {
-          launching.resolve()
+          resolveLaunching()
           await runtime.beforeAllocation?.(); allocations += 1
           throw new Error('Revoked administration cannot allocate a Runtime')
         },
       }, { principalPublicKey: '' }, budget)
       pending = manager.ensureRunning(f.waiting.user, 'explicit', f.holder.user.id).catch((error: unknown) => error)
-      await Promise.race([launching.promise, pending.then(cause => {
+      await Promise.race([launching, pending.then(cause => {
         throw new Error('Runtime start ended before entering the allocation wait', { cause })
       })])
       await expect.poll(async () => (await pool.query<{ allocation_state: string }>(
