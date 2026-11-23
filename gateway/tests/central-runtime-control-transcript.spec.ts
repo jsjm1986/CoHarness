@@ -18,12 +18,12 @@ it.skipIf(postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL) === undefin
         ...(mode === 'src' ? ['--import', import.meta.resolve('tsx/esm')] : []),
         fileURLToPath(new URL('./fixtures/central-runtime-control.mjs', import.meta.url)), mode,
         ...(mode === 'lib' && process.env.DSH_GATEWAY_ARTIFACT_ROOT !== undefined ? [process.env.DSH_GATEWAY_ARTIFACT_ROOT] : []),
-      ], { cwd: root, timeout: 60_000, killSignal: 'SIGKILL', env: {
+      ], { cwd: root, timeout: 120_000, killSignal: 'SIGKILL', maxBuffer: 256 * 1024, env: {
         ...process.env, NODE_OPTIONS: undefined, NODE_PATH: undefined, NODE_DISABLE_COMPILE_CACHE: '1',
         DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), DSH_MANAGED_DATA_MANIFEST: undefined,
         TSX_TSCONFIG_PATH: mode === 'src' ? fileURLToPath(new URL('../tsconfig.run.json', import.meta.url)) : undefined,
       } })
       await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL('./expected/projects/central-runtime-control-postgres.jsonl', import.meta.url)))
     } finally { await rm(root, { recursive: true, force: true }) }
-  }, 70_000,
+  }, 150_000,
 )

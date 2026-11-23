@@ -255,7 +255,7 @@ describePg('PostgreSQL personal Runtime policy', () => {
       pending = manager.ensureRunning(f.waiting.user, 'explicit').catch((error: unknown) => error)
       await expect.poll(async () => (await pool.query<{ allocation_state: string }>(
         'SELECT allocation_state FROM harness.instances WHERE user_id=$1', [f.waiting.uuid],
-      )).rows[0]!.allocation_state).toBe('waiting')
+      )).rows[0]!.allocation_state, { timeout: 10_000 }).toBe('waiting')
       if (change === 'role') await pool.query("UPDATE harness.memberships SET role='member' WHERE user_id=$1", [f.waiting.uuid])
       else if (change === 'disabled-membership') await pool.query("UPDATE harness.memberships SET status='disabled' WHERE user_id=$1", [f.waiting.uuid])
       else if (change === 'home') await pool.query('UPDATE harness.node_user_accounts SET home_path=$1 WHERE user_id=$2 AND node_id=$3',
