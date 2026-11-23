@@ -392,8 +392,10 @@ export class GatewayNodeServiceProxy {
     try {
       signal.throwIfAborted()
       const url = new URL(req.url ?? '/', 'http://gateway')
+      const releaseCandidate = this.forwardIssuer === undefined ? undefined : asset?.release
       const interactive = target.runtimeId !== undefined && (isExplicitSessionRequest(req.method, url.pathname)
         || isReadyRuntimeInteractive(req.method, url.pathname)
+        || releaseCandidate !== undefined
         || req.method === 'POST' && (url.pathname === '/api/session.history' || url.pathname === '/api/host.describe')
         || req.method === 'GET' && url.pathname === '/' && url.searchParams.get('dshBootstrap') === '1')
       const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
@@ -422,11 +424,12 @@ export class GatewayNodeServiceProxy {
       dispose = () => { lease.destroy() }
       signal.throwIfAborted()
       let complete = false
+      let upstreamReleased = false
       const assertion = typeof actor === 'number' || this.forwardIssuer === undefined
         ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req), personalRead)
       mark('assertionReady')
       signal.throwIfAborted()
-      const release = assertion === undefined ? undefined : asset?.release
+      const release = assertion === undefined ? undefined : releaseCandidate
       const outgoing = this.outgoing(req, target, lease.agent, false, body, assertion, release?.sha256)
       dispose = () => {
         if (complete) lease.release()
@@ -440,7 +443,7 @@ export class GatewayNodeServiceProxy {
         await this.track(new Promise<void>((resolve, reject) => {
           const timer = setTimeout(() => { outgoing.destroy(new NodeServiceError(504, 'node-service/timeout')) }, this.timeoutMs)
           timer.unref()
-          outgoing.on('error', error => { clearTimeout(timer); reject(error) })
+          outgoing.on('error', error => { clearTimeout(timer); if (!upstreamReleased) reject(error) })
           outgoing.once('response', response => {
             receivedResponse = true
             clearTimeout(timer)
@@ -474,6 +477,12 @@ export class GatewayNodeServiceProxy {
                 response.resume()
                 await finished(response, { cleanup: true, signal })
                 signal.throwIfAborted()
+                // The node attestation is complete while the browser still owns local delivery.
+                signal.removeEventListener('abort', cancel)
+                response.removeListener('error', reject)
+                upstreamReleased = true
+                dispose = () => {}
+                lease.release()
                 await release.serve(signal)
                 return
               }
@@ -530,7 +539,10 @@ export class GatewayNodeServiceProxy {
                   body: Buffer.concat(capturedChunks, capturedBytes),
                 })
               }
-            })().then(resolve, (error: unknown) => { response.destroy(); reject(error) })
+            })().then(resolve, (error: unknown) => {
+              if (!upstreamReleased) response.destroy()
+              reject(error)
+            })
           })
           submitted = true
           if (body === undefined) void pipeline(req, outgoing).catch(reject)

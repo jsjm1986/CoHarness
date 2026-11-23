@@ -115,7 +115,7 @@ export class NodeServiceHttpPool {
    * Borrow a matching idle connection or open one without replaying an HTTP request.
    * @param nodeId - currently authorized exact computer.
    * @param signal - request cancellation; it owns only its borrowed or opening connection.
-   * @param interactive - retain one eligible transport for prepared conversation operations on this node.
+   * @param interactive - reserve a reusable transport for browser entry and prepared conversation requests.
    * @returns an exclusive request lease.
    */
   acquire(nodeId: RuntimeNodeId, signal: AbortSignal, interactive = false): Promise<NodeServiceHttpLease> {

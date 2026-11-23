@@ -834,6 +834,58 @@ it('uses local script bytes only on a matching bodyless response from the exact 
   expect(localWrites).toBe(1)
 })
 
+it('uses the entry connection for verified scripts and returns it while local script delivery waits', async () => {
+  const body = Buffer.from('boot script')
+  const sha256 = createHash('sha256').update(body).digest('hex')
+  const localDelivery = deferred<void>()
+  const localStarted = deferred<void>()
+  const f = await fixture({
+    HGW_NODE_SERVICE_MAX_CONNECTIONS: '2', HGW_NODE_SERVICE_MAX_PER_NODE: '2',
+  }, true, false, undefined, undefined, undefined, undefined, async (req, res) => {
+    expect(req.headers[RELEASE_COMBO_DIGEST_HEADER]).toBe(sha256)
+    res.writeHead(204, {
+      [RELEASE_COMBO_DIGEST_HEADER]: sha256,
+      [NODE_SERVICE_TARGET_HEADER]: f.nodeId,
+      [NODE_SERVICE_ASSET_GENERATION_HEADER]: '1',
+    }).end()
+  })
+  const placement: RuntimePlacement & { environment: RuntimeCatalogEntry } = {
+    target: 'personal', local: false, resetScope: false, environment: f.environment,
+  }
+  const selected = createServer((req, res) => {
+    void f.proxy.asset(req, res, f.admin, placement, 1, { release: {
+      sha256, serve: async signal => {
+        localStarted.resolve()
+        await localDelivery.promise
+        signal.throwIfAborted()
+        res.end(body)
+      },
+    } }).catch(() => res.destroy())
+  })
+  releases.push(() => close(selected))
+  const origin = await listen(selected)
+  const boot = f.base + '/?dshBootstrap=1&dshRuntime=' + f.environment.id
+  const headers = { cookie: f.cookie }
+  await (await fetch(boot, { headers })).arrayBuffer()
+  const bulk = await fetch(f.base + '/api/slow?dshRuntime=' + f.environment.id, { headers })
+  const combo = fetch(origin + '/plugins/combo.js??@deepseek-ai/dsh-client-modules/client.js&rev=abcdef123456&dshRuntime=' + f.environment.id,
+    { headers, signal: AbortSignal.timeout(2_000) })
+  void combo.catch(() => {})
+  try {
+    await Promise.race([localStarted.promise, combo.then(() => { throw new Error('Release script did not enter local delivery') })])
+    const another = await fetch(boot, { headers, signal: AbortSignal.timeout(2_000) })
+    expect(another.status).toBe(200)
+    await another.arrayBuffer()
+    expect(f.proxy.diagnostics().pool.opened).toBe(2)
+    localDelivery.resolve()
+    expect(Buffer.from(await (await combo).arrayBuffer())).toEqual(body)
+  } finally {
+    localDelivery.resolve()
+    f.slow.resolve()
+    await Promise.allSettled([bulk.arrayBuffer(), combo])
+  }
+})
+
 it('keeps pinning runtime-specific and unrevisioned browser resource URLs', async () => {
   const f = await fixture({}, true)
   const referer = `${f.base}/?dshRuntime=${f.environment.id}`

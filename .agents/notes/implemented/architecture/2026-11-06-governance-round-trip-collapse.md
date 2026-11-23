@@ -38,6 +38,8 @@ A queued personal model can wait on the owning Gateway for a committed pressure 
 
 **Foreground requests during page startup.** Background requests can consume all free streams immediately after a conversation is created. The HTTP pool reserves one of its existing reusable connections for the browser bootstrap and prepared conversation operations when the configured limits permit concurrent connections. Other streams keep their own owners and time limits. The Runtime accounts for exact HTTP and WebSocket activity while governance admission or completion writes are pending, without holding the lifecycle queue across those calls.
 
+Verified release-script requests can use the same reserved connection as structured bootstrap. The primary returns that connection after consuming the exact owning generation’s digest attestation. Browser delivery continues under the primary’s authorization and cancellation while the node transport can serve the next interactive request.
+
 **Windows supervisor ownership.** The owner store reads ordinary DACLs through the native security descriptor. It checks exactly the owner, SYSTEM and Administrators and keeps the existing reparse-point and process generation checks. Unfamiliar descriptors use the existing PowerShell verdict and its bounds. The native read owns the descriptor through cancellation and frees the allocation before returning.
 
 **Managed browser deadlines.** The Runtime policy emits a single `connection` configuration row. Cordis replaces the whole config of a patched row, so browser RPC and recovery deadlines must share that row with server timing. The dual Gateway fixture checks both computers' effective HTML bootstrap with different settings.
