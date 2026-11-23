@@ -602,7 +602,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-client-modules`
 
 - `inject`: `loader`
-- `source`: [`packages/client/modules/src/index.ts:48`](../packages/client/modules/src/index.ts)
+- `source`: [`packages/client/modules/src/index.ts:53`](../packages/client/modules/src/index.ts)
 
 ```ts config-catalog
 /** Startup transport grouping; module application keeps the declared graph order. */
