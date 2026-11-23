@@ -297,7 +297,9 @@ describe('default product isolation', () => {
 
   it('rejects an Include.initial tree that includes its own generated file', () => {
     const root = fixture()
-    const path = pathToFileURL(join(root, 'included.yml')).href
+    const alias = join(root, 'checkout-alias')
+    symlinkSync(root, alias, 'junction')
+    const path = pathToFileURL(join(alias, 'included.yml')).href
     write(root, patch, [{ insert: [{ name: 'cordis:include', config: {
       path, initial: [{ name: 'cordis:include', config: { path } }],
     } }] }])

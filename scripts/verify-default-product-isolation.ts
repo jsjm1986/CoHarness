@@ -64,6 +64,8 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
   const packages = new Map<string, Package>()
   const directories = new Map<string, Package>()
   const display = (path: string): string => relative(root, path).replaceAll('\\', '/')
+  const canonicalize = (target: string): string => existsSync(target) ? realpathSync(target)
+    : existsSync(dirname(target)) ? resolve(realpathSync(dirname(target)), basename(target)) : target
   for (const path of globSync([
     'apps/*/package.json', 'packages/*/*/package.json', 'vendor/*/package.json',
     'native/system/packages/*/package.json', 'python/sdk-runtime/package.json',
@@ -130,8 +132,8 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
   }
   const reference = (name: string, origin: string, owner?: Package): void => {
     if (name.startsWith('.') || name.startsWith('/') || /^(?:file|link):/.test(name)) {
-      const target = name.startsWith('file://') ? fileURLToPath(name)
-        : resolve(owner?.directory ?? root, name.replace(/^(?:file|link):/, ''))
+      const target = canonicalize(name.startsWith('file://') ? fileURLToPath(name)
+        : resolve(owner?.directory ?? root, name.replace(/^(?:file|link):/, '')))
       const pkg = directories.get(target) ?? ownerOf(target)
       if (pkg !== undefined) add(pkg, origin)
       return
@@ -203,7 +205,7 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
         if (!composedWeb && Array.isArray(entry.config.patches)) entry.config.patches.forEach(visit)
         const included = entry.config.path
         if (typeof included !== 'string') return
-        const filename = included.startsWith('file:') ? fileURLToPath(included) : resolve(dirname(path), included)
+        const filename = canonicalize(included.startsWith('file:') ? fileURLToPath(included) : resolve(dirname(path), included))
         if (includeStack.has(filename)) {
           failures.push(`${display(path)}: cyclic Include path ${display(filename)}`)
           return
