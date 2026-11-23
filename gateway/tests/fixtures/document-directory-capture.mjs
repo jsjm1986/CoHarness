@@ -16,7 +16,7 @@ const { GatewayPrincipalSigner } = await import(new URL(`../../${entry}/principa
 const { DocumentTransferError, DOCUMENT_TRANSFER_UPLOADS_PATH } = await import(new URL(`../../${entry}/document-transfer.${extension}`, import.meta.url))
 const { DocumentCatalogError } = await import(new URL(`../../${entry}/document-catalog.${extension}`, import.meta.url))
 const root = process.cwd(), project = join(root, 'projects', 'shared'), documents = join(project, 'documents')
-const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'),
+const cfg = loadConfig({ HGW_PERFORMANCE_ENABLED: 'false', HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'),
   HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),
   HGW_STATE_ROOT: join(root, 'state'), HGW_SYSTEMD_UNIT_DIR: join(root, 'units'), HGW_DEFAULT_ENV_FILE: '',
   HGW_PROJECT_RUNTIME_USER: 'nobody' })

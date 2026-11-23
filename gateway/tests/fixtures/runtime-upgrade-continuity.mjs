@@ -33,7 +33,9 @@ try {
   await pool.query("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'local')", [organizationId])
   const context = await resolvePostgresRuntimeContext(pool, slug, 'local')
   const marker = join(root, 'runtime.json')
-  const cfg = testConfig(root, { HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE: 'local', HGW_GUARD_PATCH: 'off', HGW_DSH_REPO_ROOT: resolve(import.meta.dirname, '../../..'), HGW_READINESS_TIMEOUT_MS: '30000' })
+  const cfg = testConfig(root, { HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE: 'local', HGW_GUARD_PATCH: 'off', HGW_DSH_REPO_ROOT: resolve(import.meta.dirname, '../../..'),
+    HGW_PERFORMANCE_ENABLED: 'false', // This fixture reserves stdout for its transcript.
+    HGW_READINESS_TIMEOUT_MS: '30000' })
   cfg.dshCommand = [process.execPath, '--import', import.meta.resolve('tsx/esm'), fileURLToPath(new URL('./readiness-runtime.mjs', import.meta.url)),
     new URL('../../src/runtime-readiness.ts', import.meta.url).href, marker, 'retained-work', join(root, 'probe.json')]
   const users = new PostgresUserService(context, cfg), projects = new PostgresProjectService(context, cfg)

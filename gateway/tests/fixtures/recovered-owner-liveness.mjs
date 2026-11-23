@@ -32,7 +32,7 @@ try {
   const organizationId = (await pool.query("INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Recovered owner') RETURNING id", [slug])).rows[0].id
   await pool.query('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2)', [organizationId, name])
   const context = await resolvePostgresRuntimeContext(pool, slug, name)
-  const cfg = loadConfig({ HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE: name,
+  const cfg = loadConfig({ HGW_PERFORMANCE_ENABLED: 'false', HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE: name,
     HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state'), HGW_PROJECTS_ROOT: join(root, 'projects'),
     HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'), HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'),
     HGW_SYSTEMD_UNIT_DIR: join(root, 'units'), HGW_DEFAULT_ENV_FILE: '', HGW_DSH_REPO_ROOT: fileURLToPath(new URL('../../../', import.meta.url)) })

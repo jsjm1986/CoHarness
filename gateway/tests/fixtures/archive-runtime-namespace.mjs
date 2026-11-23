@@ -55,7 +55,7 @@ try {
     const target = await instances.resolveTarget({ kind: 'user', id: actorId }), token = randomUUID()
     const generation = await instances.beginStart(target, Date.now(), createHash('sha256').update(token).digest()); await instances.markReady(target, generation)
     logicalRuntimes.push({ instances, target, generation })
-    const cfg = loadConfig({ HGW_ORGANIZATION_SLUG: slug, HGW_USERS_ROOT: join(root, name, 'users'), HGW_STATE_ROOT: join(root, name, 'state'),
+    const cfg = loadConfig({ HGW_PERFORMANCE_ENABLED: 'false', HGW_ORGANIZATION_SLUG: slug, HGW_USERS_ROOT: join(root, name, 'users'), HGW_STATE_ROOT: join(root, name, 'state'),
       HGW_PROJECTS_ROOT: join(root, name, 'projects'), HGW_USER_PROJECTS_ROOT: join(root, name, 'user-projects'), HGW_PROJECT_RUNTIMES_ROOT: join(root, name, 'runtimes'),
       HGW_SYSTEMD_UNIT_DIR: join(root, name, 'units'), HGW_DEFAULT_ENV_FILE: '', HGW_DSH_REPO_ROOT: fileURLToPath(new URL('../../../', import.meta.url)) })
     cfg.computeNodeName = name; cfg.nodeService.forwarding = true

@@ -46,7 +46,7 @@ async function scenario(hold, verify) {
       HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),
       HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'), HGW_SYSTEMD_UNIT_DIR: join(root, 'units'), HGW_DEFAULT_ENV_FILE: '',
       HGW_SYSTEMD_COMMAND_TIMEOUT_MS: '5000', HGW_READINESS_TIMEOUT_MS: '100', HGW_UPSTREAM_RESPONSE_LIMIT_BYTES: '512' }
-    const cfg = loadConfig(environment), db = openDb(join(root, 'gateway.sqlite'))
+    const cfg = loadConfig({ HGW_PERFORMANCE_ENABLED: 'false', ...environment }), db = openDb(join(root, 'gateway.sqlite'))
     cleanups.push(async () => { db.close() })
     const context = { pool, organizationId: randomUUID(), organizationSlug: 'fixture', nodeId: randomUUID(), nodeName: 'own-node' }
     const authority = { authorize: (_actor, action) => action(), run: (_actor, action) => action(lifetime.signal, async () => '1') }
