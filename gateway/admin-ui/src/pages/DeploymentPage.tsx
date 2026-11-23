@@ -258,6 +258,7 @@ export function DeploymentPage() {
               </StatusBadge>
               <span className="sectionMeta">{t('maintenanceEpochMeta', { value: state.maintenanceEpoch })}</span>
             </div>
+            <p>{t('gatewayRelease')} <code className="codeText">{state.releaseId ?? t('releaseUnreported')}</code></p>
             {state.reason === null ? null : <p>{t('maintenanceReasonLine', { reason: state.reason })}</p>}
             {state.mode === 'serving' ? (
               <>

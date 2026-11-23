@@ -20,7 +20,11 @@ const matrix = process.env.DSH_FEATURE_MATRIX === '1'
 const timeout = matrix ? 600_000 : 60_000
 let fixture: Awaited<ReturnType<typeof startAdminResponsiveFixture>>
 let browser: Browser
-beforeAll(async () => { fixture = await startAdminResponsiveFixture(); browser = await responsiveBrowser.launch() })
+beforeAll(async () => {
+  fixture = await startAdminResponsiveFixture()
+  browser = await responsiveBrowser.launch(process.env.DSH_TEST_BROWSER_EXECUTABLE
+    ? { executablePath: process.env.DSH_TEST_BROWSER_EXECUTABLE } : undefined)
+})
 afterAll(async () => { await browser?.close(); await fixture?.close() })
 
 async function visit(path: string, operation: (page: Page, replies: Map<string, ReplySource>) => Promise<void>,
@@ -899,6 +903,31 @@ it('keeps the Webhook delivery list and redispatch failure visible within its di
     await state(page, 'webhook-redispatch-refused', dialog)
   })
 }, timeout)
+
+it('shows the responding Gateway release alongside the database migration version in one deployment read', async () => {
+  await visit('/deployment', async (page, replies) => {
+    const releaseId = 'coharness-browser-fixture'
+    const state = await (await page.request.get(fixture.base + '/admin/api/deployment')).json() as DeploymentState
+    let reads = 0, individualReads = 0
+    replies.set('GET /admin/api/deployment/overview', async (request) => {
+      const original = await (await page.request.get(request.url())).json()
+      reads++
+      return { body: { sections: { ...original.sections, deployment: { ok: true, value: {
+        ...state, releaseId, migrations: { current: 148, applied: [148], pending: [], drifted: [] },
+      } } } } }
+    })
+    replies.set('GET /admin/api/deployment', () => { individualReads++; return { body: state } })
+    await page.reload()
+    const release = page.getByText('提供部署状态的 Gateway 版本')
+    const migrations = page.getByText('数据库迁移版本 148，已应用 1 个迁移。', { exact: true })
+    await migrations.waitFor()
+    expect(await release.innerText()).toContain(releaseId)
+    expect(reads).toBe(1)
+    expect(individualReads).toBe(0)
+    await compareOrRefreshGolden(join(dirname(fileURLToPath(import.meta.url)), 'snapshots/admin-dialog-states/deployment-release.expected.md'),
+      [await release.innerText(), await migrations.innerText()].join('\n'), webSnapshotMode())
+  })
+})
 
 it('reviews deployment-mode blockers and the independent disable confirmation', async () => {
   await visit('/deployment', async (page, replies) => {

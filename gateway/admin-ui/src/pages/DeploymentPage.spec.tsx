@@ -141,6 +141,18 @@ it('offers restore for verified backups with a versioned manifest in either list
   expect(screen.getAllByRole('button', { name: /^请求恢复$/u })).toHaveLength(2)
 })
 
+it.each([undefined, 'coharness-fixture-release'])('distinguishes Gateway release %s from its database migration version', async releaseId => {
+  render(<DeploymentPage />)
+  const state: api.DeploymentState = { mode: 'serving', maintenanceEpoch: '1', writeEpoch: '9', reason: null,
+    enteredAt: null, updatedAt: '2026-11-16T00:00:00Z', nodes: [], writersQuiesced: true, operations: [], releaseId,
+    migrations: { applied: [148], pending: [], drifted: [], current: 148 } }
+  await act(async () => reads[0]!.resolve(overviewOf(state)))
+  expect(screen.getByText('提供部署状态的 Gateway 版本')).toHaveProperty('textContent', `提供部署状态的 Gateway 版本 ${releaseId ?? '未上报'}`)
+  expect(screen.getByText('数据库迁移版本 148，已应用 1 个迁移。')).toBeTruthy()
+  expect(api.getDeploymentOverview).toHaveBeenCalledTimes(1)
+  expect(api.getDeployment).not.toHaveBeenCalled()
+})
+
 it('displays a successful deployment section and retries the overview after a backup section 404', async () => {
   render(<DeploymentPage />)
   const state = { mode: 'serving', maintenanceEpoch: '1', writeEpoch: '9', reason: null,

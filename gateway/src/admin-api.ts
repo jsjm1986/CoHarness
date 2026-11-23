@@ -540,7 +540,7 @@ async function dispatch(
             deps.maintenance!.administration(admin.id),
             deps.migrationPlan?.() ?? Promise.resolve(undefined),
           ])
-          return { ...state, migrations: plan ?? null }
+          return { ...state, releaseId: deps.cfg.releaseId, migrations: plan ?? null }
         })
       },
       backups: async () => deps.backups === undefined
@@ -577,7 +577,7 @@ async function dispatch(
       deps.maintenance.administration(admin.id),
       deps.migrationPlan?.() ?? Promise.resolve(undefined),
     ])
-    await reply.json(200, { ...state, migrations: plan ?? null })
+    await reply.json(200, { ...state, releaseId: deps.cfg.releaseId, migrations: plan ?? null })
     return true
   }
   if (pathname === '/admin/api/tunnel' && method === 'GET') {

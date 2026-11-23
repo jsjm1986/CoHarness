@@ -1558,6 +1558,8 @@ export interface ClusterState {
 }
 
 export interface DeploymentState extends ClusterState {
+  /** Release of the Gateway that served this deployment state, when configured. */
+  releaseId?: string
   migrations: { applied: number[]; pending: Array<{ version: number; name: string }>; drifted: number[]; current: number } | null
   operations: DeploymentOperation[]
 }

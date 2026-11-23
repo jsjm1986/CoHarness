@@ -1372,6 +1372,7 @@ it.each(['verify', 'node-configuration'])('refuses malformed %s backup selection
 
 it('aggregates requested deployment sections in one /admin/api/deployment/overview read with per-slice error isolation', async () => {
   const { deps, base, cookie } = await setup()
+  deps.cfg.releaseId = 'coharness-fixture-release'
   deps.maintenance = {
     administration: async () => ({
       mode: 'serving', maintenanceEpoch: '1', writeEpoch: '2', reason: null,
@@ -1413,7 +1414,12 @@ it('aggregates requested deployment sections in one /admin/api/deployment/overvi
   })
   expect(response.status).toBe(200)
   const payload = await response.json() as { sections: Record<string, { ok: boolean; status?: number; error?: string; value?: unknown }> }
-  expect(payload.sections.deployment).toMatchObject({ ok: true, value: { mode: 'serving', migrations: null } })
+  expect(payload.sections.deployment).toMatchObject({ ok: true, value: { mode: 'serving', releaseId: 'coharness-fixture-release', migrations: null } })
+  const individual = await fetch(`${base}/admin/api/deployment`, { headers: { cookie } })
+  expect(await individual.json()).toEqual(payload.sections.deployment!.value)
+  delete deps.cfg.releaseId
+  const unconfigured = await fetch(`${base}/admin/api/deployment`, { headers: { cookie } })
+  expect(await unconfigured.json()).not.toHaveProperty('releaseId')
   expect(payload.sections.backups).toEqual({ ok: true, value: { backups: [] } })
   expect(payload.sections.tunnel).toMatchObject({ ok: true, value: { mode: 'off', revision: 1 } })
   expect(payload.sections.nodeConfiguration).toEqual({ ok: false, status: 503, error: 'node-configuration-unavailable' })
