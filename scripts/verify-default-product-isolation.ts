@@ -4,7 +4,7 @@
  * switch on, selected by no shipped template, its own dependency graph outside the default product's.
  */
 
-import { existsSync, globSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, globSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, extname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
@@ -55,10 +55,11 @@ export interface ProductIsolationResult {
 /**
  * Check default app installations and their authored runtime/configuration inputs.
  * Experimental opt-in packages and separate Web preview entries are outside these roots.
- * @param root - repository root; no build outputs or installed workspace links are read.
+ * @param root - repository directory or its filesystem alias; the check reads authored workspace files.
  * @returns violations and the sizes of the checked package, source, and configuration sets.
  */
 export function verifyDefaultProductIsolation(root: string): ProductIsolationResult {
+  root = realpathSync(root)
   const failures: string[] = []
   const packages = new Map<string, Package>()
   const directories = new Map<string, Package>()

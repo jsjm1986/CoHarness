@@ -187,6 +187,7 @@ it('reviews each literal MCP server and hook command independently of its host p
 it('enumerates MCP servers saved only in the Settings-owned profile patch without starting them', async () => {
   const f = fixture(), profileDir = join(f.temp, 'profiles', 'web')
   const repo = fileURLToPath(new URL('../../../../', import.meta.url))
+  f.plugin('@deepseek-ai/dsh-mcp-manager')
   initProfile(profileDir, ['@deepseek-ai/dsh-web-app'])
   const server = { transport: 'stdio' as const, command: 'never-start-during-recovery-inspection', args: ['private-argument'] }
   writeFileSync(join(profileDir, 'cordis.patch.yml'), JSON.stringify([{ id: 'mcp-manager', config: { servers: { 'saved-only-in-settings': server } } }]))
@@ -197,6 +198,7 @@ it('enumerates MCP servers saved only in the Settings-owned profile patch withou
   expect(item).toMatchObject({ status: 'eligible', reason: 'execution-review-required' })
   expect(item?.name).not.toContain('saved-only-in-settings')
   expect(inspection.composition.connections ?? []).toEqual([])
+  expect(f.output()).toBe('')
 })
 
 it('checks the file digest, composition digest, exact bigint epoch, and required admission provider', () => {

@@ -1,6 +1,6 @@
 /** Source, installation, and composition regressions for default-product isolation. */
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -390,8 +390,10 @@ describe('default product isolation', () => {
     const root = fixture()
     write(root, patch, [{ insert: [{ name: '../../experimental/prototype/src/index.ts' }] }])
     write(root, 'packages/experimental/prototype/src/index.ts', 'export {}\n')
+    const alias = join(root, 'checkout-alias')
+    symlinkSync(root, alias, 'junction')
 
-    expect(verifyDefaultProductIsolation(root).failures.join('\n')).toContain(`${profile} -> ${experimental}`)
+    expect(verifyDefaultProductIsolation(alias).failures.join('\n')).toContain(`${profile} -> ${experimental}`)
   })
 
   it('checks installation-owned profile tuples as well as new-profile defaults', () => {
