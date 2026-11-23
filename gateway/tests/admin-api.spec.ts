@@ -26,6 +26,7 @@ import { ProjectService } from '../src/projects.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
 import type { GatewayPrincipalClaims } from '../src/principal.ts'
+import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
 import type { DeploymentContext } from '../src/deployment-protocol.ts'
 import type { ConversationArchiveDetail, ConversationArchiveRow } from '../src/postgres/conversation-archive-service.ts'
 
@@ -125,6 +126,36 @@ async function setup(
 }
 
 describe('admin JSON API', () => {
+  it('identifies a project generation from its exact catalog row and starts only that project allocation', async () => {
+    const { deps, base, cookie, admin } = await setup()
+    const project = await deps.projects.create({ name: 'Reviewed', createdBy: admin.id })
+    const node = '10000000-0000-4000-8000-000000000001' as RuntimeNodeId
+    const id = '10000000-0000-4000-8000-000000000002' as RuntimeId
+    const row: RuntimeCatalogEntry = { id, owner: { kind: 'project', id: project.id, name: project.name },
+      node: { id: node, name: 'Computer', status: 'active', lastHeartbeatAt: null },
+      generation: 4, observedState: 'stopped', routing: 'local' }
+    deps.nodeServiceIdentity = { nodeId: node, organizationId: 'test', authorize: vi.fn() }
+    deps.instances.resolveTarget = vi.fn(async () => ({ kind: 'project' as const, id: project.id, runtimeId: id }))
+    const resolveForAdministrator = vi.fn(async () => row)
+    deps.runtimeCatalog = { pageForAdministrator: vi.fn(), pageForAccount: vi.fn(), resolveForAccount: vi.fn(), resolveForAdministrator }
+    const start = vi.spyOn(deps.instances, 'ensureRunning').mockResolvedValue({ port: 17171, generation: 5, runtimeId: id })
+    const detail = await fetch(`${base}/admin/api/projects/${project.id}?display=directory`, { headers: { cookie } })
+    expect(detail.status).toBe(200)
+    expect(await detail.json()).toMatchObject({ configurationSummary: { runtimeId: id, nodeId: node,
+      runtimeGeneration: 4, runtimeState: 'stopped' } })
+    const post = () => fetch(`${base}/admin/api/projects/${project.id}/instance/start?dshNode=${node}&dshRuntime=${id}`,
+      { method: 'POST', headers: { cookie, origin: base } })
+    const authorized = await post()
+    expect(authorized.status).toBe(204)
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ kind: 'project', id: project.id, runtimeId: id }), 'explicit', admin.id)
+    resolveForAdministrator.mockResolvedValueOnce({ ...row, owner: { kind: 'personal', id: project.id, name: 'Another owner' } })
+    expect((await post()).status).toBe(400)
+    resolveForAdministrator.mockResolvedValueOnce({ ...row, node: { ...row.node, id: '10000000-0000-4000-8000-000000000003' as RuntimeNodeId } })
+    expect((await post()).status).toBe(503)
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(await deps.audit.query({ action: 'admin.project-instances.start' })).toHaveLength(1)
+  })
+
   it('reports the current computer and forwarding scope from one authorized deployment revision', async () => {
     const { deps, base, cookie } = await setup()
     const entry = { nodeId: '10000000-0000-4000-8000-000000000001' as DeploymentContext['entry']['nodeId'], name: deps.cfg.computeNodeName }

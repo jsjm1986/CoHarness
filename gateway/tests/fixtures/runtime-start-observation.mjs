@@ -9,7 +9,8 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 
-const [mode, artifactRoot = '-'] = process.argv.slice(2)
+const [mode, artifactRoot = '-', scenario = 'account'] = process.argv.slice(2)
+const adminBrowser = scenario === 'admin-browser'
 assert.ok(mode === 'src' || mode === 'lib')
 const base = artifactRoot === '-' ? new URL(`../../${mode}/`, import.meta.url) : pathToFileURL(`${resolve(artifactRoot)}/`)
 const load = name => import(new URL(`${name}.${mode === 'src' ? 'ts' : 'js'}`, base))
@@ -114,11 +115,16 @@ try {
   const centerDeps = { ...common, cfg: centerConfig, projects: new ProjectService(accounts, centerConfig), instances: centerManager,
     runtimeCatalog: { pageForAccount: async (user, query) => ({ items: [await resolveForAccount(user, query.ids)], nextCursor: null }) },
     topology: { assertNode: async id => { if (!topologyAllowed || id !== nodeId) throw new DeploymentTopologyError(403, 'deployment-topology/remote-disabled') } } }
+  const browser = adminBrowser ? await import('../../../apps/web/tests/admin-runtime-start-browser.mjs') : undefined
+  const resolveForAdministrator = await browser?.installAdminStartFixture({ users, remoteUsers, center: centerDeps, remote: remoteDeps,
+    localNodeId, remoteManager, environment, actor, runtimeId, hasStarted: () => remoteStarts > 0 })
+  const admin = browser === undefined ? undefined : (await load('admin-api')).createAdminApiHandler
+  const adminHandlers = deps => admin === undefined ? undefined : { admin: admin(deps), adminRoot: process.env.DSH_ADMIN_ASSET_ROOT }
   remoteDeps.runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(remoteDeps), { localNodeId: nodeId, catalog })
   centerDeps.runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(centerDeps), { localNodeId, catalog })
-  const remote = createGatewayServer(remoteDeps)
+  const remote = createGatewayServer(remoteDeps, adminHandlers(remoteDeps))
   const remoteOrigin = await listen(remote)
-  forwarding = new GatewayNodeServiceProxy({ localNodeId, resolveForAccount,
+  forwarding = new GatewayNodeServiceProxy({ localNodeId, resolveForAccount, resolveForAdministrator,
     resolvePlacement: (user, selection) => centerDeps.runtimeRouter.placement(user, selection),
     resetScopeCookie: () => scopeCookie('personal', centerConfig), assertNode: id => centerDeps.topology.assertNode(id),
     authorizeAdministratorNode: async () => { throw new Error('No administrator operation') } }, {
@@ -132,61 +138,76 @@ try {
     },
   }, 20_000, centerConfig.nodeService)
   centerDeps.nodeServiceProxy = forwarding
-  const center = createGatewayServer(centerDeps), origin = await listen(center)
+  const center = createGatewayServer(centerDeps, adminHandlers(centerDeps)), origin = await listen(center)
   centerConfig.publicOrigins.push(origin); remoteConfig.publicOrigins.push(origin, remoteOrigin)
   const login = async username => {
     const result = await fetch(origin + '/login', { method: 'POST', redirect: 'manual', headers: { origin },
       body: new URLSearchParams({ username, password: 'fixture-password-12345' }) })
     assert.equal(result.status, 302); await result.arrayBuffer(); return result.headers.get('set-cookie').split(';')[0]
   }
-  const cookie = await login('observer'), secondCookie = await login('other')
-  const request = (path, selectedCookie = cookie) => fetch(origin + path, { redirect: 'manual', headers: { cookie: selectedCookie } })
-  pendingStart = fetch(origin + '/account/runtime/start?dshRuntime=' + runtimeId, { method: 'POST', redirect: 'manual',
-    headers: { origin, cookie: cookie + '; hgw_scope=project:999', 'content-type': 'application/x-www-form-urlencoded' }, body: 'kind=personal' })
-  await bounded(admitted.promise)
-  assert.equal(transports.size, 1)
-  for (const socket of transports) socket.destroy()
-  const response = await bounded(pendingStart); await response.arrayBuffer()
-  assert.equal(response.status, 303); assert.equal(response.headers.get('set-cookie'), null)
-  const waitPath = response.headers.get('location')
-  assert.ok(waitPath.startsWith('/account/runtime/wait?observation='))
-  transcript.push('A submitted start with a lost response redirects to a read-only observation; it is not sent again.')
-  for (let tab = 0; tab < 2; tab++) {
-    const waiting = await request(waitPath)
-    assert.equal(waiting.status, 200); assert.equal(waiting.headers.get('set-cookie'), null)
-    const html = await waiting.text(); assert.match(html, /正在确认工作台状态/); assert.doesNotMatch(html, /<form/)
+  if (browser !== undefined) {
+    await browser.observeAdminStart({ origin, runtimeId, nodeId, userId: actor.id, transcript,
+      dropReply: async () => {
+        await bounded(admitted.promise)
+        assert.equal(transports.size, 1)
+        for (const socket of transports) socket.destroy()
+      },
+      allowReadiness: () => proceed.resolve(),
+    })
+    await bounded(ready.promise)
+    assert.equal(await processOwner.isAlive(), true)
+    assert.equal(JSON.parse(await readFile(probeMarker, 'utf8')).authenticated, true)
+    assert.equal(remoteStarts, 1); assert.equal(localStarts, 0)
+  } else {
+    const cookie = await login('observer'), secondCookie = await login('other')
+    const request = (path, selectedCookie = cookie) => fetch(origin + path, { redirect: 'manual', headers: { cookie: selectedCookie } })
+    pendingStart = fetch(origin + '/account/runtime/start?dshRuntime=' + runtimeId, { method: 'POST', redirect: 'manual',
+      headers: { origin, cookie: cookie + '; hgw_scope=project:999', 'content-type': 'application/x-www-form-urlencoded' }, body: 'kind=personal' })
+    await bounded(admitted.promise)
+    assert.equal(transports.size, 1)
+    for (const socket of transports) socket.destroy()
+    const response = await bounded(pendingStart); await response.arrayBuffer()
+    assert.equal(response.status, 303); assert.equal(response.headers.get('set-cookie'), null)
+    const waitPath = response.headers.get('location')
+    assert.ok(waitPath.startsWith('/account/runtime/wait?observation='))
+    transcript.push('A submitted start with a lost response redirects to a read-only observation; it is not sent again.')
+    for (let tab = 0; tab < 2; tab++) {
+      const waiting = await request(waitPath)
+      assert.equal(waiting.status, 200); assert.equal(waiting.headers.get('set-cookie'), null)
+      const html = await waiting.text(); assert.match(html, /正在确认工作台状态/); assert.doesNotMatch(html, /<form/)
+    }
+    assert.equal(remoteStarts, 1); assert.equal(localStarts, 0)
+    transcript.push('Two browser tabs observe the same original computer without changing scope cookies or starting another Runtime.')
+    const foreign = await request(waitPath, secondCookie); assert.equal(foreign.status, 400); await foreign.arrayBuffer()
+    const altered = await request(waitPath + '&dshNode=' + localNodeId); assert.equal(altered.status, 400); await altered.arrayBuffer()
+    allowed = false
+    const denied = await request(waitPath); assert.equal(denied.status, 403); assert.doesNotMatch(await denied.text(), /http-equiv="refresh"/)
+    allowed = true; topologyAllowed = false
+    const disabled = await request(waitPath); assert.equal(disabled.status, 403); await disabled.arrayBuffer()
+    topologyAllowed = true
+    transcript.push('Foreign accounts, altered selectors, revoked use permission and disabled aggregation cannot continue the observation.')
+    const originalNode = environment.node.id
+    environment.node = { ...environment.node, id: localNodeId }
+    const moved = await request(waitPath); assert.equal(moved.status, 409); await moved.arrayBuffer()
+    environment.node = { ...environment.node, id: originalNode }
+    Date.now = () => clockNow() + centerConfig.readinessTimeoutMs + centerConfig.runtimeCapacity.maxQueueWaitMs + 1
+    const expired = await request(waitPath); assert.equal(expired.status, 504)
+    const expiredHtml = await expired.text(); assert.match(expiredHtml, /后台启动可能仍在继续/); assert.doesNotMatch(expiredHtml, /http-equiv="refresh"|<form/)
+    Date.now = clockNow
+    transcript.push('A changed computer or elapsed configured observation budget ends polling without fallback or POST replay.')
+    proceed.resolve(); await bounded(ready.promise)
+    const opened = await request(waitPath); assert.equal(opened.status, 302); await opened.arrayBuffer()
+    assert.deepEqual(Object.fromEntries(new URL(opened.headers.get('location'), origin).searchParams), { dshRuntime: runtimeId, dshNode: nodeId, dshTarget: 'personal' })
+    assert.equal(opened.headers.get('set-cookie'), null)
+    assert.equal(await processOwner.isAlive(), true); assert.equal(remoteStarts, 1); assert.equal(localStarts, 0)
+    assert.equal(JSON.parse(await readFile(probeMarker, 'utf8')).authenticated, true)
+    transcript.push('The original real Runtime completes authenticated readiness after the lost response; the browser opens only its exact target.')
+    await remoteManager.stop({ kind: 'user', id: actor.id, runtimeId })
+    const stopped = await request(waitPath); assert.equal(stopped.status, 409)
+    assert.doesNotMatch(await stopped.text(), /http-equiv="refresh"|<form/)
+    assert.equal(await processOwner.isAlive(), false); assert.equal(remoteStarts, 1)
+    transcript.push('A subsequent explicit stop remains stopped; reopening the observation never wakes it.')
   }
-  assert.equal(remoteStarts, 1); assert.equal(localStarts, 0)
-  transcript.push('Two browser tabs observe the same original computer without changing scope cookies or starting another Runtime.')
-  const foreign = await request(waitPath, secondCookie); assert.equal(foreign.status, 400); await foreign.arrayBuffer()
-  const altered = await request(waitPath + '&dshNode=' + localNodeId); assert.equal(altered.status, 400); await altered.arrayBuffer()
-  allowed = false
-  const denied = await request(waitPath); assert.equal(denied.status, 403); assert.doesNotMatch(await denied.text(), /http-equiv="refresh"/)
-  allowed = true; topologyAllowed = false
-  const disabled = await request(waitPath); assert.equal(disabled.status, 403); await disabled.arrayBuffer()
-  topologyAllowed = true
-  transcript.push('Foreign accounts, altered selectors, revoked use permission and disabled aggregation cannot continue the observation.')
-  const originalNode = environment.node.id
-  environment.node = { ...environment.node, id: localNodeId }
-  const moved = await request(waitPath); assert.equal(moved.status, 409); await moved.arrayBuffer()
-  environment.node = { ...environment.node, id: originalNode }
-  Date.now = () => clockNow() + centerConfig.readinessTimeoutMs + centerConfig.runtimeCapacity.maxQueueWaitMs + 1
-  const expired = await request(waitPath); assert.equal(expired.status, 504)
-  const expiredHtml = await expired.text(); assert.match(expiredHtml, /后台启动可能仍在继续/); assert.doesNotMatch(expiredHtml, /http-equiv="refresh"|<form/)
-  Date.now = clockNow
-  transcript.push('A changed computer or elapsed configured observation budget ends polling without fallback or POST replay.')
-  proceed.resolve(); await bounded(ready.promise)
-  const opened = await request(waitPath); assert.equal(opened.status, 302); await opened.arrayBuffer()
-  assert.deepEqual(Object.fromEntries(new URL(opened.headers.get('location'), origin).searchParams), { dshRuntime: runtimeId, dshNode: nodeId, dshTarget: 'personal' })
-  assert.equal(opened.headers.get('set-cookie'), null)
-  assert.equal(await processOwner.isAlive(), true); assert.equal(remoteStarts, 1); assert.equal(localStarts, 0)
-  assert.equal(JSON.parse(await readFile(probeMarker, 'utf8')).authenticated, true)
-  transcript.push('The original real Runtime completes authenticated readiness after the lost response; the browser opens only its exact target.')
-  await remoteManager.stop({ kind: 'user', id: actor.id, runtimeId })
-  const stopped = await request(waitPath); assert.equal(stopped.status, 409)
-  assert.doesNotMatch(await stopped.text(), /http-equiv="refresh"|<form/)
-  assert.equal(await processOwner.isAlive(), false); assert.equal(remoteStarts, 1)
-  transcript.push('A subsequent explicit stop remains stopped; reopening the observation never wakes it.')
 } catch (error) { primaryFailure = error; throw error }
 finally {
   Date.now = clockNow; proceed.resolve()

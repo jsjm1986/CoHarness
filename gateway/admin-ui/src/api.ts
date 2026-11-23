@@ -69,6 +69,8 @@ export type ProjectDetail = Project & {
     managementSurface: 'user-frontend'
     runtimeState: string
     runtimeGeneration: number
+    runtimeId?: RuntimeId
+    nodeId?: RuntimeNodeId
     filesystemManagedIn: '/admin'
     projectModels?: { providerCount: number; revision: number }
   }
@@ -398,8 +400,9 @@ export function controlInstance(id: number, op: 'start' | 'stop' | 'restart'): P
 }
 
 /** Operate this node's project runtime without changing project membership or ownership. */
-export function controlProjectInstance(id: number, op: 'start' | 'stop' | 'restart'): Promise<void> {
-  return request(`/admin/api/projects/${id}/instance/${op}`, { method: 'POST' })
+export function controlProjectInstance(id: number, op: 'start' | 'stop' | 'restart', target?: { id: RuntimeId; node: { id: RuntimeNodeId } }): Promise<void> {
+  const selected = target === undefined ? '' : `?dshNode=${encodeURIComponent(target.node.id)}&dshRuntime=${encodeURIComponent(target.id)}`
+  return request(`/admin/api/projects/${id}/instance/${op}${selected}`, { method: 'POST' })
 }
 
 export type { NodeConfigurationView, NodeSettingValues } from '../../src/node-config-fields.ts'

@@ -112,6 +112,7 @@ function UserComputerProfile({ userId, reload }: { userId: number; reload: numbe
 }
 
 function UserDetail({ userId }: { userId: number }) {
+  const { nodeId } = useParams()
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const navigate = useNavigate()
   const adminPath = useAdminPath()
@@ -236,7 +237,7 @@ function UserDetail({ userId }: { userId: number }) {
           </Section>
 
           <UserComputerPermissions userId={user.id} />
-          <UserRuntimePanel userId={user.id} onChanged={() => setProfileRevision(value => value + 1)} />
+          <UserRuntimePanel key={nodeId} userId={user.id} onChanged={() => setProfileRevision(value => value + 1)} />
           <Section title={t('sectionQualifications')} className="responsiveSection">
               <p className="muted">{t('qualificationsHint')}</p>
               <div className="qualificationGrid">

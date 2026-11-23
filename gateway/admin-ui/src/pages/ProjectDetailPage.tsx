@@ -29,6 +29,8 @@ import {
   type UsageSummary,
   type UsageContributorReport,
 } from '../api.ts'
+import { startAdminRuntime, type AdminStartTarget } from '../runtime-start-followup.ts'
+import { zh as runtimeZh, en as runtimeEn } from '../runtime.copy.ts'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { formatCostInput, parseCostInput } from '../money.ts'
 import {
@@ -53,7 +55,7 @@ type ProjectQuotaSource = 'inherit' | 'independent'
 type ProjectLimitMode = 'unlimited' | 'custom'
 
 export function ProjectDetailPage() {
-  const { id } = useParams()
+  const { id, nodeId } = useParams()
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
   const projectId = Number(id)
   if (!Number.isSafeInteger(projectId) || projectId <= 0) {
@@ -65,7 +67,7 @@ export function ProjectDetailPage() {
       </div>
     )
   }
-  return <ProjectDetail key={id} projectId={projectId} />
+  return <ProjectDetail key={`${nodeId ?? ''}:${id}`} projectId={projectId} />
 }
 
 function ProjectDetail({ projectId }: { projectId: number }) {
@@ -104,7 +106,13 @@ function ProjectDetail({ projectId }: { projectId: number }) {
   const [modelsError, setModelsError] = useState('')
   const [modelPending, setModelPending] = useState('')
   const [runtimeAction, setRuntimeAction] = useState<'start' | 'stop' | 'restart' | null>(null)
+  const runtimeTarget = useRef<AdminStartTarget | undefined>(undefined)
+  const runtimeLifetime = useRef<AbortController | null>(null)
+  const [checkingStart, setCheckingStart] = useState(false)
+  const [runtimeNeedsRefresh, setRuntimeNeedsRefresh] = useState(false)
+  const [runtimeNotice, setRuntimeNotice] = useState('')
   const [runtimeError, setRuntimeError] = useState('')
+  const runtimeCopy = useMemo(() => translateCopy(adminLanguage(), { zh: runtimeZh, en: runtimeEn }), [])
   usePendingEdits(pending !== '' || quotaOpen || quotaSaving || renameOpen && projectName !== renameInitial.current)
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
 
@@ -118,6 +126,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
       const [nextProject, nextUsers] = await Promise.all([getProject(projectId, 'members', controller.signal), listUsers()])
       if (controller.signal.aborted) return
       setProject(nextProject)
+      setRuntimeNeedsRefresh(false)
       setUsers(nextUsers)
       setError('')
       setLoading(false)
@@ -150,7 +159,9 @@ function ProjectDetail({ projectId }: { projectId: number }) {
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
-    return () => { alive.current = false }
+    const controller = new AbortController()
+    runtimeLifetime.current = controller
+    return () => { alive.current = false; controller.abort() }
   }, [])
 
   const reloadUsage = useCallback(async (showLoading = false) => {
@@ -372,6 +383,33 @@ function ProjectDetail({ projectId }: { projectId: number }) {
     }
   }
 
+  async function confirmRuntime(): Promise<void> {
+    const scope = runtimeLifetime.current
+    if (runtimeAction === null || scope === null || pending !== '') return
+    const action = runtimeAction, target = runtimeTarget.current
+    setPending('runtime')
+    setRuntimeError('')
+    try {
+      if (action === 'start') {
+        const address = target ?? (project?.runtimeId !== undefined && project.nodeId !== undefined
+          ? { id: project.runtimeId, node: { id: project.nodeId } } : undefined)
+        const result = await startAdminRuntime(target, () => controlProjectInstance(projectId, action, address),
+          scope.signal, () => setCheckingStart(true))
+        if (!scope.signal.aborted && result === 'observed') setRuntimeNotice(runtimeCopy('startObserved'))
+      } else {
+        await controlProjectInstance(projectId, action)
+      }
+      if (!scope.signal.aborted) { setRuntimeAction(null); await reload() }
+    } catch (cause) {
+      if (!scope.signal.aborted) {
+        setRuntimeError(messageFrom(cause))
+        if (action === 'start') setRuntimeNeedsRefresh(true)
+      }
+    } finally {
+      if (!scope.signal.aborted) { setPending(''); setCheckingStart(false) }
+    }
+  }
+
   return (
     <div className="page projectDetailPage">
       <AdminLink className="breadcrumb" to="/projects"><ArrowLeft aria-hidden="true" />{t('backToProjects')}</AdminLink>
@@ -417,11 +455,20 @@ function ProjectDetail({ projectId }: { projectId: number }) {
                   : `${project.configurationSummary.runtimeState} · generation ${String(project.configurationSummary.runtimeGeneration)}`}</span>
                 <div className="formActions" aria-label={t('runtimeActionsAria')}>
                   {(['start', 'stop', 'restart'] as const).map(action => (
-                    <Button key={action} disabled={pending !== ''} onClick={() => { setRuntimeError(''); setRuntimeAction(action) }}>
+                    <Button key={action} disabled={pending !== '' || action === 'start' && runtimeNeedsRefresh} onClick={() => {
+                      const summary = project.configurationSummary
+                      runtimeTarget.current = summary?.runtimeId === undefined || summary.nodeId === undefined ? undefined : {
+                        id: summary.runtimeId, node: { id: summary.nodeId }, owner: { kind: 'project', id: projectId },
+                        generation: summary.runtimeGeneration, observedState: summary.runtimeState,
+                      }
+                      setRuntimeError(''); setRuntimeNotice(''); setRuntimeAction(action)
+                    }}>
                       {action === 'start' ? t('instanceStart') : action === 'stop' ? t('instanceStop') : t('instanceRestart')}
                     </Button>
                   ))}
                 </div>
+                {runtimeNeedsRefresh && <Button disabled={pending !== ''} onClick={() => void reload(true)}>{runtimeCopy('refresh')}</Button>}
+                {runtimeNotice && <p role="status">{runtimeNotice}</p>}
               </div>
               <div>
                 <span className="definitionLabel">{t('providerLabel')}</span>
@@ -716,16 +763,14 @@ function ProjectDetail({ projectId }: { projectId: number }) {
         onClose={() => { if (pending !== 'runtime') setRuntimeAction(null) }}
         footer={<>
           <Button disabled={pending === 'runtime'} onClick={() => { setRuntimeAction(null) }}>{t('cancel')}</Button>
-          <Button variant="primary" loading={pending === 'runtime'} onClick={() => {
-            const action = runtimeAction
-            if (action === null) return
-            setPending('runtime'); setRuntimeError('')
-            void controlProjectInstance(projectId, action).then(async () => { setRuntimeAction(null); await reload() })
-              .catch((cause: unknown) => { setRuntimeError(messageFrom(cause)) })
-              .finally(() => { setPending('') })
-          }}>{t('confirmExecute')}</Button>
+          {runtimeAction === 'start' && runtimeError !== '' ? (
+            <Button variant="primary" onClick={() => { setRuntimeAction(null); void reload(true) }}>{runtimeCopy('refresh')}</Button>
+          ) : <Button variant="primary" loading={pending === 'runtime'} onClick={() => void confirmRuntime()}>{t('confirmExecute')}</Button>}
         </>}
-      ><ErrorBanner message={runtimeError} /></Dialog>
+      >
+        {checkingStart && <p role="status">{runtimeCopy('startChecking')}</p>}
+        <ErrorBanner message={runtimeError} />
+      </Dialog>
 
       <ConfirmDialog
         open={removeTarget !== null}

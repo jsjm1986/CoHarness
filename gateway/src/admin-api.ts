@@ -12,7 +12,7 @@ import { RuntimeStartBlockedError, RuntimeStopError, RuntimeGenerationConflictEr
 import { RuntimeManagementError } from './runtime-management.ts'
 import { runtimeManagementApi } from './runtime-management-api.ts'
 import { RUNTIME_SHUTDOWN_OUTCOME_HEADER } from './runtime-shutdown.ts'
-import { RuntimeCatalogError } from './runtime-catalog.ts'
+import { RuntimeCatalogError, type RuntimeId, type RuntimeNodeId } from './runtime-catalog.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { RuntimeAccountError } from './launcher.ts'
 import { NodeResourceBudgetError } from './node-resource-budget.ts'
@@ -2041,7 +2041,10 @@ async function dispatch(
     if (project === null) { await reply.error(404, 'project not found'); return true }
     const target = { kind: 'project' as const, id: projectId }
     const stopped = op === 'start' ? undefined : await deps.instances.stop(target, 'manual', admin.id)
-    if (op !== 'stop') await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit', admin.id)
+    if (op !== 'stop') {
+      const selected = op === 'start' ? await selectedAdminRuntime(deps, admin, req, target) : target
+      await deps.instances.ensureRunning({ ...selected, kind: 'project', name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit', admin.id)
+    }
     await write(`admin.project-instances.${op}`, { projectId, ...stopped })
     if (stopped !== undefined) res.setHeader(RUNTIME_SHUTDOWN_OUTCOME_HEADER, stopped.shutdownOutcome)
     sendNoContent(res)
@@ -2058,9 +2061,24 @@ async function dispatch(
       const target = { kind: 'project' as const, id: projectId }
       let runtimeState = 'unavailable'
       let runtimeGeneration = 0
+      let assignment: { runtimeId: RuntimeId; nodeId: RuntimeNodeId } | undefined
       try {
-        runtimeState = await deps.instances.stateOf(target)
-        runtimeGeneration = await deps.instances.generationOf(target)
+        const catalog = deps.runtimeCatalog
+        const id = catalog?.resolveForAdministrator === undefined ? undefined
+          : project.runtimeId ?? (await deps.instances.resolveTarget?.(target))?.runtimeId
+        if (id !== undefined && catalog?.resolveForAdministrator !== undefined) {
+          const row = await catalog.resolveForAdministrator(admin, id)
+          if (row.id !== id || row.owner.kind !== 'project' || row.owner.id !== projectId
+            || (project.nodeId ?? deps.nodeServiceIdentity?.nodeId) !== row.node.id) {
+            throw new RuntimeCatalogError(400, 'runtime-catalog/target-mismatch')
+          }
+          runtimeState = row.observedState
+          runtimeGeneration = row.generation
+          assignment = { runtimeId: row.id, nodeId: row.node.id }
+        } else {
+          runtimeState = await deps.instances.stateOf(target)
+          runtimeGeneration = await deps.instances.generationOf(target)
+        }
       } catch {
         // A project can lack an instance row on this node; configuration
         // summaries remain useful without inventing lifecycle data.
@@ -2089,6 +2107,7 @@ async function dispatch(
           managementSurface: 'user-frontend',
           runtimeState,
           runtimeGeneration,
+          ...assignment,
           filesystemManagedIn: '/admin',
           ...(projectModelSummary === undefined ? {} : { projectModels: projectModelSummary }),
         },

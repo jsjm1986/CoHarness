@@ -9,7 +9,8 @@ import { UserRuntimePanel } from './UserRuntimePanel.tsx'
 import { runtimeFixture, runtimePageFixture } from './runtime-fixture.ts'
 import { deploymentContextSchema } from '../../../src/deployment-protocol.ts'
 
-vi.mock('../api.ts', () => ({
+vi.mock('../api.ts', async importOriginal => ({
+  ...await importOriginal<typeof api>(), adminRequest: vi.fn(),
   getRuntimeAllocationPolicy: vi.fn(), saveRuntimeAllocationPolicy: vi.fn(),
   listUserComputerPermissions: vi.fn(), saveUserComputerPermission: vi.fn(),
   getAdminComputerContext: vi.fn(), listUserRuntimes: vi.fn(), allocateUserRuntime: vi.fn(), operateRuntime: vi.fn(),
@@ -33,6 +34,24 @@ beforeEach(() => {
   vi.mocked(api.listUserRuntimes).mockResolvedValue(runtimePageFixture('user', 1))
   vi.mocked(api.getRuntimeAllocationPolicy).mockResolvedValue({ maxTotal: 8, maxPerNode: 4, revision: '1', source: 'user' })
   vi.mocked(api.listUserComputerPermissions).mockResolvedValue({ items: [computer], nextCursor: null })
+})
+
+it('keeps a personal start pending until the captured allocation reports its next generation ready', async () => {
+  const stopped = { ...runtime, observedState: 'stopped' }
+  const read = Promise.withResolvers<typeof runtime>()
+  vi.mocked(api.listUserRuntimes).mockResolvedValue({ items: [stopped], nextCursor: null })
+  vi.mocked(api.operateRuntime).mockRejectedValueOnce(new api.AdminRequestError(503, 'offline', 'node-service/unavailable'))
+  vi.mocked(api.adminRequest).mockReturnValue(read.promise)
+  render(<UserRuntimePanel userId={1} />)
+  const row = await screen.findByRole('row', { name: new RegExp(runtime.id) })
+  await userEvent.click(within(row).getByRole('button', { name: '启动' }))
+  const dialog = within(screen.getByRole('dialog'))
+  await userEvent.click(dialog.getByRole('button', { name: '启动' }))
+  expect(await dialog.findByRole('status')).toHaveProperty('textContent', '启动请求的回复中断，正在核实所选 Runtime 的状态')
+  expect(dialog.getByRole('button', { name: '启动' })).toHaveProperty('disabled', true)
+  await act(async () => read.resolve({ ...runtime, generation: stopped.generation + 1 }))
+  expect(await screen.findByText('所选 Runtime 已就绪')).toBeTruthy()
+  expect(api.operateRuntime).toHaveBeenCalledTimes(1)
 })
 
 it('keeps local Runtime controls and grants available without computer labels in single mode', async () => {

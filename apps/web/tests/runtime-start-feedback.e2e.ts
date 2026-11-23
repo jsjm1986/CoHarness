@@ -122,3 +122,14 @@ it.each(cases)('retains the $kind target through startup failure and keyboard re
     if (failures.length > 0) throw new AggregateError(failures, 'Runtime startup browser fixture cleanup failed')
   }
 })
+
+it.skipIf(process.platform === 'win32')('observes a signed remote Runtime after the real Admin start reply is lost', async () => {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const module = fileURLToPath(new URL('../../../gateway/tests/fixtures/runtime-start-observation.mjs', import.meta.url))
+  const { stdout } = await promisify(execFile)(process.execPath, ['--import', import.meta.resolve('tsx/esm'), module, 'src', '-', 'admin-browser'], {
+    timeout: 70_000, maxBuffer: 128 * 1024,
+    env: { ...process.env, NODE_OPTIONS: undefined, NODE_PATH: undefined, TSX_TSCONFIG_PATH: fileURLToPath(new URL('../../../gateway/tsconfig.run.json', import.meta.url)) },
+  })
+  await compareOrRefreshGolden(join(EXPECTED, 'admin-lost-reply.expected.md'), stdout.trimEnd(), webSnapshotMode())
+}, 75_000)

@@ -349,6 +349,7 @@ export function ConfirmDialog({
   confirmLabel,
   pending = false,
   error = '',
+  status,
   confirmDisabled = false,
   onConfirm,
   onClose,
@@ -359,6 +360,7 @@ export function ConfirmDialog({
   confirmLabel: string
   pending?: boolean
   error?: string
+  status?: string
   confirmDisabled?: boolean
   onConfirm: () => void
   onClose: () => void
@@ -378,6 +380,7 @@ export function ConfirmDialog({
         </>
       )}
     >
+      {status && <p role="status">{status}</p>}
       {error === '' ? undefined : <ErrorBanner message={error} />}
     </Dialog>
   )

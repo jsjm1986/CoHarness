@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-read-only-runtime-start-observation.md
 document:
-  en: 82f49b58548cab4c240d4828e0742a8ffcdeaf66
-  zh: 21a189b1a31a915072bfbc32f25ed02abf8597b8
+  en: 3bf1b94545ba988f3f3b4f8e5d3818ad2dcb839e
+  zh: 314b54491c1b03c00b7eb41d5588452f4ea37bf1
 /agent-note-read-only-observation-after-a-lost-runtime-start-response:
   en: 1041e96ed7e619cb
   zh: 17d66ad46c7932c9
@@ -12,8 +12,8 @@ document:
   en: 9e0d3cff05f94981
   zh: 7d3e4c2de171532d
 /agent-note-read-only-observation-after-a-lost-runtime-start-response/decision:
-  en: 03f3caf75f29caec
-  zh: e7b3a07b219dd897
+  en: 01d4c40ea86938f6
+  zh: 90906eee39ad523d
 /agent-note-read-only-observation-after-a-lost-runtime-start-response/alternatives-considered:
   en: 7c75d43f6393b0da
   zh: b505000cfa92736c

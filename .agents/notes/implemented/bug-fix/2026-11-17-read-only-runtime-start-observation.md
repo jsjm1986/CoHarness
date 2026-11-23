@@ -10,7 +10,9 @@ A remote start can be accepted while its HTTP response is lost. Treating that ou
 
 ## Decision
 
-Only a submitted forward with no response headers enters a read-only continuation. The Gateway signs the authenticated account, resolved computer, Runtime, space and fixed deadline with a process-owned key. It pins those selectors before forwarding. Each continuation GET resolves current placement and topology without starting a process; ready state redirects to that exact target. The queue and readiness configuration bounds additional observation. Expiry, Gateway restart, stopped state, changed placement or revoked permission ends polling without stopping accepted work or choosing another computer.
+The account form enters a read-only continuation when a submitted forward loses its response headers. The Gateway signs the authenticated account, resolved computer, Runtime, space and fixed deadline with a process-owned key. It pins those selectors before forwarding. Each continuation GET resolves current placement and topology without starting a process; ready state redirects to that exact target. The queue and readiness configuration bounds additional observation. Expiry, Gateway restart, stopped state, changed placement or revoked permission ends polling without stopping accepted work or choosing another computer.
+
+Admin lifecycle controls capture the displayed owner, computer, allocation and generation before sending a start. The center already authorizes an exact catalog read for administrators. After a transport failure, the page uses that read until the expected generation becomes ready on an active computer. A cold start expects the successor generation. A start for an already starting or ready process expects the displayed generation. A different allocation or generation ends observation. A missing selection or expired observation leaves the outcome unknown.
 
 This extends the exact-target rules in [browser Runtime identity](../architecture/2026-10-29-browser-runtime-and-document-location.md); their document, Session and configuration ownership decisions remain independent.
 
