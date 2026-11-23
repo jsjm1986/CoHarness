@@ -47,6 +47,7 @@ function config(name) {
     HGW_PROJECTS_ROOT: join(home, 'projects'), HGW_PROJECT_RUNTIMES_ROOT: join(home, 'runtimes'),
     HGW_USER_PROJECTS_ROOT: join(home, 'user-projects'), HGW_SYSTEMD_UNIT_DIR: join(home, 'units'),
     HGW_DEFAULT_ENV_FILE: '', HGW_GUARD_PATCH: 'off', HGW_READINESS_TIMEOUT_MS: '30000',
+    HGW_PERFORMANCE_ENABLED: 'false', // This fixture reserves stdout for its transcript.
     HGW_NODE_SERVICE_FORWARDING: 'on', HGW_DSH_REPO_ROOT: fileURLToPath(new URL('../../../', import.meta.url)) })
 }
 function track(socket) {
