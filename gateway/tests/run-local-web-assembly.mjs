@@ -265,7 +265,7 @@ try {
           const reply = await fetch(asset, { method, headers: { cookie, referer: runtimeUrl('/').href } })
           const body = await reply.text()
           assert.equal(reply.status, 200, body.slice(0, 300))
-          assert.match(reply.headers.get('cache-control'), /immutable/u)
+          assert.equal(reply.headers.get('cache-control'), 'private, no-store')
           if (method === 'GET') assert.ok(body.length > 0)
           else assert.equal(body, '')
         }
