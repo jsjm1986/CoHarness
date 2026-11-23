@@ -70,7 +70,9 @@ export class StartupDraftView implements StartupDraft {
    * Move the same draft view into the startup surface, preserving its input.
    * @param location - parent of the startup surface before the renderer mounts.
    */
-  attach(location: HTMLElement): void { location.append(this.root) }
+  attach(location: HTMLElement): void {
+    if (this.root.parentElement !== location) location.append(this.root)
+  }
 
   private readonly beforeUnload = (event: BeforeUnloadEvent): void => {
     if (this.input.value !== '') event.preventDefault()

@@ -230,6 +230,7 @@ it('recovers a remote bootstrap script failure and transfers each draft to its o
   const evidence: string[] = []
   const browserErrors: string[] = []
   const switchAccount = completionBarrier()
+  const releaseRequiredPlugin = completionBarrier()
   const bootstrapStatuses: number[] = []
   const fullDocuments: string[] = []
   tabs.on('request', (request) => {
@@ -341,10 +342,28 @@ it('recovers a remote bootstrap script failure and transfers each draft to its o
     await withdrawn.getByText('The account changed while opening this Runtime').waitFor()
     await oldAccountDraft.waitFor({ state: 'hidden' })
     expect(await withdrawn.locator('[data-composer-seat]').count()).toBe(0)
+
+    const failed = await tabs.newPage()
+    const requiredScript = '@deepseek-ai/dsh-client-ui-agent-preset/client.js'
+    await failed.route(url => url.pathname.startsWith('/plugins/') && url.href.includes(requiredScript), async (route) => {
+      await releaseRequiredPlugin.promise
+      await route.abort('failed')
+    })
+    await failed.goto(entry.href, { waitUntil: 'commit' })
+    const failedDraft = failed.getByRole('textbox', { name: 'Unsent draft · Compute computer' })
+    await failedDraft.fill('Keep this unsent draft')
+    releaseRequiredPlugin.resolve()
+    await failed.getByText('The workspace did not open. You can keep or copy your draft.').waitFor()
+    expect(await failedDraft.evaluate(input => input === document.activeElement)).toBe(true)
+    await failed.keyboard.type(' here')
+    expect(await failedDraft.inputValue()).toBe('Keep this unsent draft here')
+    expect(await failed.getByRole('link', { name: 'Open full workspace in a new tab' }).getAttribute('href')).toBe(expectedUrl.href)
+    expect(fixture.receipts.filter(row => row.path === '/api/admit/v1/session.prompt')).toHaveLength(0)
     await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/deferred-entry.expected.md', import.meta.url)),
-      `Tab 1: editable while rendering assets are pending\n${evidence.join('\n')}\nBootstrap transport: 503 then 200, before speculative plugin requests\nPrepared history requests: 2\nSubmitted messages: 0\nFull workspace: opened on demand in a separate tab, original draft retained\nAccount switch during rendering asset failure: startup input withdrawn`, webSnapshotMode())
+      `Tab 1: editable while rendering assets are pending\n${evidence.join('\n')}\nBootstrap transport: 503 then 200, before speculative plugin requests\nPrepared history requests: 2\nSubmitted messages: 0\nFull workspace: opened on demand in a separate tab, original draft retained\nAccount switch during rendering asset failure: startup input withdrawn\nRequired plugin failure: kept typing in the focused draft, full workspace link available`, webSnapshotMode())
   } finally {
     holdVendor.resolve()
+    releaseRequiredPlugin.resolve()
     for (const block of held) block.resolve()
     switchAccount.resolve()
     await tabs.close()

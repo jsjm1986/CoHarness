@@ -12,7 +12,7 @@ Direct navigation from the primary Gateway to a remote Runtime waits for that Ru
 
 The primary serves its release shell after a fresh account catalog check for the exact allocation. The selected computer supplies the index injection rows through the existing authenticated index gate. The browser verifies the returned account and Runtime before applying those rows. Raw HTML taps use the same native index as direct entry.
 
-The boot page accepts text owned by one document. Its full-workspace link is available during startup. Following it opens a separate document bound to the same account, computer and allocation. Only the original saved Session can adopt that text after the account, Runtime and computer are verified and the Session's draft writer is ready. An unavailable saved Session leaves the text available in the original document. Prepared history for the exact saved Session shares the initial Session window. The ordinary catalog still decides whether that Session can become current.
+The boot page accepts text owned by one document. Loader updates and required plugin failures preserve the focused input and its full-workspace link. Following it opens a separate document bound to the same account, computer and allocation. Only the original saved Session can adopt that text after the account, Runtime and computer are verified and the Session's draft writer is ready. An unavailable saved Session leaves the text available in the original document. Prepared history for the exact saved Session shares the initial Session window. The ordinary catalog still decides whether that Session can become current.
 
 ## Alternatives considered
 

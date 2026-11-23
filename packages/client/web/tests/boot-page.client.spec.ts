@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import { BootPage } from '../src/boot-page.ts'
+import { StartupDraftView } from '../src/startup-draft.ts'
 
 afterEach(() => { document.body.innerHTML = '' })
 
@@ -51,6 +52,32 @@ describe('BootPage', () => {
     page.setState('a', 'active')
     expect(el.textContent).toContain(report)
     expect(el.textContent).not.toContain('Loading plugins…')
+  })
+
+  it('keeps a focused remote draft and recovery link through late plugin status changes', () => {
+    const { el, page } = mount()
+    const draft = new StartupDraftView({
+      language: 'en', nodeName: 'Compute', nodeId: 'c06bdb76-ae4c-42db-80d8-9d5578ccf322',
+      runtimeId: '346c1bc8-a9ac-4e59-a930-4551df414a17', principalId: 3, scope: 'personal',
+    })
+    try {
+      page.attachDraft(draft)
+      const input = el.querySelector('textarea')!
+      input.value = 'Unsent text'
+      input.focus()
+      page.setState('required', 'failed')
+      page.setState('required', 'active')
+      page.fail('A required entry could not activate')
+      page.attachDraft(draft)
+      draft.showUnavailable()
+      page.setState('other', 'active')
+      expect(el.querySelector('textarea')).toBe(input)
+      expect(document.activeElement).toBe(input)
+      expect(input.value).toBe('Unsent text')
+      expect(el.querySelector('a')?.textContent).toBe('Open full workspace in a new tab')
+    } finally {
+      draft.dispose()
+    }
   })
 
   it('detaches on disposal', () => {

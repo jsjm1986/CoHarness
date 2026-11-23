@@ -48,6 +48,10 @@
   gap: 10px;
 }
 
+.progress {
+  display: contents;
+}
+
 .wordmark {
   font-size: 17px;
   line-height: 26px;

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-19-remote-entry-deferred-index.md
 document:
-  en: 425195276d5a50623ef3e997ec38e695b3764afb
-  zh: 9d1cceb7cdf5f85f38f269f75b2293dfca74d6c6
+  en: 2d6085a5b0b7cb63fbc61b0fa2534dbe5061a0c5
+  zh: 236235713397f18d8de496255a9091f0810c5da7
 /agent-note-deferred-remote-runtime-entry:
   en: e794545b4082d9e7
   zh: 1fd3181b7be60934
@@ -12,8 +12,8 @@ document:
   en: 47f65f32817feb63
   zh: 1c74910482f48793
 /agent-note-deferred-remote-runtime-entry/decision:
-  en: f6a9a33b344f7af5
-  zh: 4cdedd9fbab418a3
+  en: c8eaae9b0f5ba7ec
+  zh: 2d2fa53bf89c2012
 /agent-note-deferred-remote-runtime-entry/alternatives-considered:
   en: 26abab91ee5f4348
   zh: 154b0cbef00cced2
