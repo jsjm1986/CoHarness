@@ -1353,6 +1353,7 @@ describe('InstanceManager', () => {
     try {
       writeFileSync(portFile, String((squatter.address() as AddressInfo).port))
       const repository = Reflect.get(manager, 'repository') as InstanceRepository
+      const portReads = vi.spyOn(repository, 'portOf')
       const reassign = vi.spyOn(repository, 'reassignPort').mockImplementation(async () => {
         const claimed = await claimRuntimePort(dshHome)
         db.prepare(`UPDATE instances SET port=? WHERE user_id=?`).run(claimed, alice.id)
@@ -1361,6 +1362,7 @@ describe('InstanceManager', () => {
       })
       const endpoint = await manager.ensureRunning(alice)
       expect(reassign).toHaveBeenCalledTimes(1)
+      expect(portReads).toHaveBeenCalledTimes(1)
       const assigned = (db.prepare(`SELECT port FROM instances WHERE user_id=?`).get(alice.id) as { port: number }).port
       expect(endpoint.port).toBe(assigned)
       expect(await manager.stateOf(alice.id)).toBe('ready')
@@ -2120,7 +2122,10 @@ describe('InstanceManager', () => {
     await expect(manager.ensureRunning(alice)).rejects.toBeInstanceOf(RuntimeStartBlockedError)
     await expect(manager.ensureRunning(alice, 'webhook')).rejects.toBeInstanceOf(RuntimeStartBlockedError)
     expect(await manager.isLive(alice.id)).toBe(false)
+    const repository = Reflect.get(manager, 'repository') as InstanceRepository
+    const stopReasonReads = vi.spyOn(repository, 'stopReasonOf')
     await manager.ensureRunning(alice, 'explicit')
+    expect(stopReasonReads).not.toHaveBeenCalled()
     expect(await manager.isLive(alice.id)).toBe(true)
     expect(await manager.stopReasonOf(alice.id)).toBeNull()
   })

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-23-gateway-runtime-admission.md
 document:
-  en: a10d7f03ce4fc80f4a2877513fa011bf7a3485c4
-  zh: 10fcada9383aea7db943105e77292958cfabe522
+  en: 920c5a85b04789708b5fb3d35abbf1c75753ae46
+  zh: 2396d3857565cee0dc80ceff524509426eb8f52b
 /agent-note-managed-runtime-process-admission:
   en: 50b4c013f0ed4ed5
   zh: 9f1015ac85745a7b
@@ -12,8 +12,8 @@ document:
   en: 472306c8a5a15f6d
   zh: c552906f03ee4067
 /agent-note-managed-runtime-process-admission/decision:
-  en: 02aa12a50ff69d7e
-  zh: 6183a192c69979f9
+  en: 3fc9017711c64926
+  zh: 4d1154450f1fa000
 /agent-note-managed-runtime-process-admission/alternatives-considered:
   en: 5d2de89926b85e6a
   zh: 4954625808495026

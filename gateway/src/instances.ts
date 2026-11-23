@@ -1226,7 +1226,7 @@ export class InstanceManager {
       && current.storageLayout === user.storageLayout && current.dshHome === user.dshHome
   }
 
-  private async launchContext(subject: RuntimeSubject): Promise<Omit<RuntimeLaunchContext, 'generation'>> {
+  private async launchContext(subject: RuntimeSubject, selectedPort?: number): Promise<Omit<RuntimeLaunchContext, 'generation'>> {
     if ('username' in subject) {
       const target = runtimeTargetOf(subject)
       const user = await this.personalSubject(subject)
@@ -1239,7 +1239,7 @@ export class InstanceManager {
         runtimeKey: personalRuntimeLayout(this.cfg, user).runtimeKey,
         systemUser: `harness-${user.username}`,
         privileged: user.role === 'admin',
-        port: await this.portOf(target),
+        port: selectedPort ?? await this.portOf(target),
         homePath: user.homePath,
         dshHome: user.dshHome??personalRuntimeLayout(this.cfg, user).dshHome,
         ...(user.dshHome===undefined?{}:{retainedData:true as const}),
@@ -1273,7 +1273,7 @@ export class InstanceManager {
       // stay masked to their project path.
       privileged: steward,
       resident: steward,
-      port: await this.portOf(target),
+      port: selectedPort ?? await this.portOf(target),
       homePath: projectPath,
       dshHome: owner.dshHome??join(this.cfg.projectRuntimesRoot, String(subject.id), 'dsh'),
       ...(owner.dshHome===undefined?{}:{retainedData:true as const}),
@@ -1483,12 +1483,14 @@ export class InstanceManager {
       if (this.residentLeases.has(targetKey(target))) {
         throw new RuntimeStartBlockedError('unavailable', 'The runtime has an incomplete start or stop. Stop it successfully before starting it again.')
       }
-      const reason = await this.repository.stopReasonOf(target)
-      if (intent !== 'explicit' && (reason === 'manual' || intent === 'webhook' && reason !== 'idle')) {
-        const eligible = await this.repository.startEligibility(target)
-        if (eligible === null) throw new RuntimeStartBlockedError('unavailable')
-        if (eligible.stopReason === 'manual' || intent === 'webhook' && eligible.stopReason !== 'idle') {
-          throw new RuntimeStartBlockedError(eligible.stopReason)
+      if (intent !== 'explicit') {
+        const reason = await this.repository.stopReasonOf(target)
+        if (reason === 'manual' || intent === 'webhook' && reason !== 'idle') {
+          const eligible = await this.repository.startEligibility(target)
+          if (eligible === null) throw new RuntimeStartBlockedError('unavailable')
+          if (eligible.stopReason === 'manual' || intent === 'webhook' && eligible.stopReason !== 'idle') {
+            throw new RuntimeStartBlockedError(eligible.stopReason)
+          }
         }
       }
       const timing = entry === undefined ? undefined : new RuntimeLaunchTiming(entry.wall, entry.tick)
@@ -1507,9 +1509,9 @@ export class InstanceManager {
         const start = async () => {
           timing?.mark('startAdmitted')
           if (administratorUserId !== undefined) await this.repository.authorizeAdministrator(administratorUserId)
-          const descriptor = await this.launchContext(subject)
+          const descriptor = await this.launchContext(subject, port)
           timing?.mark('contextReady')
-          return this.start(descriptor, port, intent, signal, administratorUserId, recordActivity, timing)
+          return this.start(descriptor, intent, signal, administratorUserId, recordActivity, timing)
         }
         const result = await (this.startAdmission === undefined ? start() : this.startAdmission(start))
         lease.ready()
@@ -1694,7 +1696,6 @@ export class InstanceManager {
 
   private async start(
     descriptor: Omit<RuntimeLaunchContext, 'generation'>,
-    port: number,
     intent: RuntimeStartIntent,
     signal: AbortSignal,
     administratorUserId?: number,
@@ -1706,7 +1707,7 @@ export class InstanceManager {
     const runtimeTokenHash = createHash('sha256').update(runtimeToken).digest()
     const verifyPreparedStorage=await this.repository.checkProjectStorage?.(descriptor.target)
     if (this.repository.checkProjectStorage !== undefined) timing?.mark('storageChecked')
-    const claimedPort = await this.reclaimInstancePort(descriptor, port, signal)
+    const claimedPort = await this.reclaimInstancePort(descriptor.target, descriptor.port, signal)
     timing?.mark('portReady')
     // Minted before the claim so an unmintable variant fails without consuming
     // a generation. The attempt still publishes quiescence for the existing
@@ -1905,16 +1906,13 @@ export class InstanceManager {
    * reaped on the control path instead. An occupied port therefore belongs to
    * a process outside ownership evidence, and the instance moves to a freshly
    * allocated port instead of looping EADDRINUSE through the readiness deadline.
-   * @param descriptor - launch context whose `port`/`target` identify the row.
+   * @param target - Runtime assignment whose port may be reassigned.
    * @param port - assigned instance port.
    * @param signal - caller cancellation.
    * @returns the port the child must bind — unchanged or freshly allocated.
    */
-  private async reclaimInstancePort(
-    descriptor: Omit<RuntimeLaunchContext, 'generation'>, port: number, signal: AbortSignal,
-  ): Promise<number> {
+  private async reclaimInstancePort(target: RuntimeTarget, port: number, signal: AbortSignal): Promise<number> {
     if (await this.instancePortFree(port, signal)) return port
-    const target = descriptor.target
     for (let attempt = 0; attempt < PORT_REASSIGN_ATTEMPTS; attempt += 1) {
       const reassigned = await this.repository.reassignPort?.(target)
       if (reassigned === undefined) {

@@ -173,7 +173,7 @@ Runtime 分发器在认证运行时令牌后，将文档流式操作交给 Gatew
 
 `POST /api/prepare/v1/session.create` 与 `session.history` 在冷启动获准后返回 `503 INSTANCE_STARTING`，附带 `preparation: {id, waitMs}`、`Retry-After` 和确切的 `x-dsh-runtime-id`。客户端通过 `x-dsh-prepare-continuation` 续等同一操作，每次请求重新核验权限。凭据只对应一次已接受的启动及其就绪代次，停止或 Gateway 重启后失效，不能启动替代进程。等待预算使用目标的 `HGW_RUNTIME_QUEUE_WAIT_MS` 加 `HGW_READINESS_TIMEOUT_MS`，上限为浏览器计时器范围；它不保证覆盖全部配置准备和压力等待。每次 HTTP 请求的截止时间不变。取消仅结束浏览器等待，不停止已接受的 Runtime 启动。
 
-开启 `HGW_PERFORMANCE_ENABLED=true` 后，所属 Gateway 为每次进入容量准入的冷启动写一条 `[runtime-start-timing]` 日志。用所有者、Runtime ID 和代次关联启动操作。`startedAt` 是 Gateway 的 Unix 毫秒时间，`stagesMs` 记录从首次请求到容量准入、策略准备、进程启动、签名就绪探测、资源登记和就绪发布各阶段的单调时钟偏移量。相邻偏移量之差是该阶段耗时。即使 HTTP 已断开，日志仍记录最终结果及实际到达的阶段。
+开启 `HGW_PERFORMANCE_ENABLED=true` 后，所属 Gateway 为每次进入容量准入的冷启动写一条 `[runtime-start-timing]` 日志。用所有者、Runtime ID 和代次关联启动操作。`startedAt` 是 Gateway 的 Unix 毫秒时间，`stagesMs` 记录从首次请求到容量准入、策略准备、进程启动、签名就绪探测、资源登记和就绪发布各阶段的单调时钟偏移量。相邻偏移量之差是该阶段耗时。即使 HTTP 已断开，日志仍记录最终结果及实际到达的阶段。Gateway 在冷启动前探测已分配的端口，遇到其他进程占用时会分配新端口。
 
 `GET /admin/api/performance` 要求已登录管理员身份，返回不缓存的累计快照：HTTP、内部 HTTP 和 WebSocket 生命周期、错误及在途计数；固定时长分桶及近似分位数上界；Gateway 事件循环延迟／利用率和进程内存；原生数据库连接池计数；以及 Runtime 准入计数。快照包含自身读取请求的在途占用，不保留请求路径、账户名或 Session 标识。采样区间可比较计数与分桶差值；累计分位数、最大值和内存快照不能通过相减得到区间统计。WebSocket 时长衡量连接生命周期，不是逐帧投递延迟；Gateway 内存不包括 Runtime 子进程和 PostgreSQL。
 
