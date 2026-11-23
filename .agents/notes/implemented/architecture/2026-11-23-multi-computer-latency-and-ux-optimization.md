@@ -22,6 +22,8 @@ Each Admin document uses one data router for center and computer routes. The dep
 
 A forwarded WebSocket borrows a revalidated node connection from the HTTP pool. From upgrade until close the WebSocket owns it exclusively, including under a one-connection quota. Terminal input coalesces consecutive unsent resize frames within each attachment, preserving the order of user input. The account context reads project membership and display policy together so the number of directory reads is independent of the number of remote projects. The current-node response derives forwarding scope and deployment metadata from a single authorized revision. An administrator can explicitly retry a refused project-label read after the directory clears its affected cached labels.
 
+The personal workbench reads placement and the authorized predecessor page in one PostgreSQL statement per row type. A combined first page also looks up unpublished legacy conversations. These three queries can run concurrently on the owning Gateway. A node-local index read verifies placement and permission again after local I/O. The primary cannot establish current node reachability from the governance lease alone, so it continues to forward directory reads to the selected computer.
+
 PostgreSQL projects backup metadata for the deployment overview and standalone list. The browser uses manifest presence to show the restore action. Verification and restore read the selected record's full manifest. The number of files recorded in a backup does not increase the overview size.
 
 ## Alternatives considered

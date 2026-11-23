@@ -490,6 +490,8 @@ Gateway 使用认证账户当前有效的企业和成员资格注册、删除 An
 
 `GET /account/api/workbench/context` 从中心治理数据返回认证账号、已授权项目成员关系与已验证 Runtime 身份。它要求明确的 `dshRuntime` 和 `dshTarget`，检查可选的 `dshNode` 及入口允许的节点范围，不向该 Runtime 转发，也不启动它。节点所属项目内容在此响应中仍以管理标识表示。
 
+所选 Runtime 的所属 Gateway 提供 `GET /account/api/workbench/rows`。个人工作区请求可使用 `kind=workspaces&include=conversations` 同时获取首屏会话，两页合计须符合响应字节上限。个人目录迁至节点存储前，每页通过一次治理库查询核对存储位置、当前权限并读取限定数量的目录条目。迁移后，所属节点在返回本地条目前再次核对位置和权限。
+
 账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。只有个人会话目录和归档目录都读取完成，`personalComplete` 字段才为 true。个人 runtime 不可用时仍可返回经过 ACL 过滤的项目记录，但不完整的个人目录不能证明会话已删除，也不能移除已保存的个人窗格。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
 
 项目成员分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目及其全部对话（包括私密根对话）拥有隐式 `rw` 权限。管理员专用的 `danger-full-access` 预设在个人或项目 scope 中都会在验证请求身份后提供；普通用户不能通过 `/permission` 或新会话默认设置选择它。在共享项目会话中，权限事件属于整个会话，因此管理员切换预设后，所有参与者看到的应用内预设都会改变，直到下一次获得授权的选择；systemd 项目单元仍把宿主访问限制在项目路径内。对普通成员而言，根对话选择项目公开或仅创建者可见，后代继承根 ACL。Host 操作会授权读取、写入、管理、fork、stream、审批和问题；PostgreSQL 只接受每项共享审批/问题的一份响应。项目运行时通过 Gateway PostgreSQL 提供方保存 Session header 和完整事件；其写入和读取解码器会在数据进入活动 Session 前要求精确的事件 envelope 字段与 surface 元数据。持久参与者元数据使模型与 transcript 能区分贡献者。Web 插件展示 scope、可见性、创建者、参与者和贡献次数，并为 `ro` 成员替换完整 composer；浏览器不是授权边界。

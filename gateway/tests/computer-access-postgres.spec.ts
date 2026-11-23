@@ -23,7 +23,9 @@ import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.t
 import { InstanceManager } from '../src/instances.ts'
 import { ResourceAccess } from '../src/resource-access.ts'
 import { PostgresWorkspaceCatalog } from '../src/workspace-catalog.ts'
-import type { RuntimeNodeId } from '../src/runtime-catalog.ts'
+import { PersonalNodeIndex } from '../src/personal-index.ts'
+import type { RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
+import { workbenchRows } from '../src/workbench-rows.ts'
 import { testConfig } from './test-config.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { removeFixtureOrganization } from './postgres-fixture-cleanup.ts'
@@ -196,6 +198,55 @@ describePg('organization computer use', () => {
     expect(await catalog.personal(f.member)).toEqual([])
     expect((await pool.query('SELECT items FROM harness.runtime_workspace_catalog WHERE organization_id=$1', [f.organization])).rows)
       .toEqual([{ items: [entry] }])
+  })
+
+  it('pages an authorized personal directory in one governance round trip and rechecks access after a local read', async () => {
+    const f = await fixture()
+    const local = new PersonalNodeIndex(f.root)
+    releases.push(() => local.close())
+    const nodeId = f.a.nodeId as RuntimeNodeId
+    const { runtimeId, generation } = (await pool.query<{ runtimeId: RuntimeId; generation: number }>(`
+      SELECT i.runtime_id "runtimeId",i.generation::float8 generation FROM harness.instances i
+      JOIN harness.users u ON u.id=i.user_id AND u.organization_id=i.organization_id
+      WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND u.public_id=$3`, [f.organization, nodeId, f.member.id])).rows[0]!
+    const catalog = new PostgresWorkspaceCatalog(f.a, nodeId, local)
+    const read = workbenchRows(f.a, catalog, new PostgresCollaborationService(f.a, nodeId), f.cfg.runtimeCatalog)
+    const owner = { user: f.member, scope: { kind: 'personal' as const }, runtime: f.member, environment: { id: runtimeId, nodeId } }
+    const args = { dshTarget: 'personal', dshRuntime: runtimeId, limit: '2' }
+    const first = new URLSearchParams({ ...args, kind: 'workspaces', include: 'conversations' })
+    const conversations = new URLSearchParams({ ...args, kind: 'conversations' })
+    const timestamp = '2026-10-30T00:00:00.000Z'
+    const ids = ['c', 'b', 'a']
+    const items = ids.map(id => ({ workspaceId: id, title: id, path: '/' + id,
+      sessionIds: [id], createdAt: timestamp, updatedAt: timestamp }))
+    await catalog.publish({ organizationId: f.organization, target: { kind: 'user', id: f.member.id, runtimeId }, generation }, {
+      revision: 1, items, conversations: ids.map(sessionId => ({ sessionId, updatedAt: 10, title: sessionId, blank: false })),
+    })
+
+    const sql = vi.spyOn(pool, 'query')
+    try {
+      const result = await read(owner, first)
+      expect(sql).toHaveBeenCalledTimes(3)
+      expect(result).toMatchObject({ indexed: true, workspaces: [{ workspaceId: 'a', sessionIds: [] }, { workspaceId: 'b', sessionIds: [] }],
+        conversationPage: { indexed: true, items: [{ sessionId: 'a' }, { sessionId: 'b' }] } })
+      const next = new URLSearchParams(conversations)
+      next.set('cursor', result.conversationPage!.nextCursor!)
+      expect(await read(owner, next)).toMatchObject({ items: [{ sessionId: 'c' }], nextCursor: null })
+    } finally {
+      sql.mockRestore()
+    }
+    await expect(read({ ...owner, user: f.admin }, first)).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(read({ ...owner, environment: { id: runtimeId, nodeId: f.b.nodeId as RuntimeNodeId } }, first))
+      .rejects.toMatchObject({ code: 'runtime-catalog/target-mismatch' })
+    await catalog.promotePersonal(f.admin.id, runtimeId)
+    const readLocal = local.page.bind(local)
+    vi.spyOn(local, 'page').mockImplementationOnce(async (target, selection) => {
+      const result = await readLocal(target, selection)
+      await f.access.set(f.admin, f.member.id, nodeId, { enabled: false, revision: '1' })
+      return result
+    })
+    await expect(read(owner, conversations)).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(read(owner, first)).rejects.toMatchObject({ code: 'forbidden' })
   })
 
   it.each(['create', 'accept'] as const)('rechecks the recipient computer after waiting to %s an invitation', async operation => {
