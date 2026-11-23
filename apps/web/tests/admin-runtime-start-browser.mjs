@@ -36,7 +36,7 @@ export async function installAdminStartFixture({ users, remoteUsers, center, rem
 }
 
 /** Exercise a lost submitted response while the remote launcher is held behind the fixture gate. */
-export async function observeAdminStart({ origin, runtimeId, nodeId, userId, transcript, dropReply, allowReadiness }) {
+export async function observeAdminStart({ origin, runtimeId, nodeId, userId, transcript, dropReply, allowReadiness, bounded }) {
   const browser = await chromium.launch({ executablePath: process.env.DSH_TEST_BROWSER_EXECUTABLE })
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'zh-CN' })
@@ -55,10 +55,13 @@ export async function observeAdminStart({ origin, runtimeId, nodeId, userId, tra
     await row.getByRole('button', { name: '启动', exact: true }).click()
     const dialog = page.getByRole('dialog')
     const submit = dialog.getByRole('button', { name: '启动', exact: true })
-    const [response] = await Promise.all([
-      page.waitForResponse(response => new URL(response.url()).pathname === start),
-      submit.click(), dropReply(),
-    ])
+    const reply = Promise.withResolvers()
+    page.on('response', response => {
+      if (response.request().method() === 'POST' && new URL(response.url()).pathname === start) reply.resolve(response)
+    })
+    await submit.click()
+    await dropReply()
+    const response = await bounded(reply.promise)
     assert.equal(response.status(), 503)
     assert.equal((await response.json()).error, 'node-service/unavailable')
     const checking = dialog.getByRole('status')

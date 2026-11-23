@@ -146,7 +146,7 @@ try {
     assert.equal(result.status, 302); await result.arrayBuffer(); return result.headers.get('set-cookie').split(';')[0]
   }
   if (browser !== undefined) {
-    await browser.observeAdminStart({ origin, runtimeId, nodeId, userId: actor.id, transcript,
+    await browser.observeAdminStart({ origin, runtimeId, nodeId, userId: actor.id, transcript, bounded,
       dropReply: async () => {
         await bounded(admitted.promise)
         assert.equal(transports.size, 1)
