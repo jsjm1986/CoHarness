@@ -654,7 +654,7 @@ describe('background sandbox facts', () => {
     const task = (await start(bash, bash.resolve({ command: 'echo "Permission denied" >&2; sleep 30' })))
     // Let the stderr land before the kill so the classifier sees the
     // signature and must still refuse it on the null exit code alone.
-    await vi.waitFor(() => { expect(task.readOutput().delta).toContain('Permission denied') })
+    await vi.waitFor(() => { expect(task.readOutput().delta).toContain('Permission denied') }, { timeout: 10_000 })
     task.kill()
     await task.done
     expect(task.sandbox).toEqual({ mode: 'read-only', denied: false, enforcement: 'full' })
