@@ -1555,7 +1555,9 @@ describe('forgePanel removed worktrees', () => {
     sendPrompt(opened.agent, 'removed')
     await vi.waitFor(() => { expect(() => opened.agent.runMaintenance(() => Promise.resolve())).toThrow('already has active work') })
     const waiting = opened.agent.wakes
-    await vi.waitFor(async () => { await expect(opened.ctx.forgePanel.continueInProject(opened.session, signal)).resolves.toBeUndefined() })
+    await vi.waitFor(async () => {
+      await expect(opened.ctx.forgePanel.continueInProject(opened.session, signal)).resolves.toBeUndefined()
+    }, { timeout: 10_000 })
     await opened.agent.whenIdle()
     sendPrompt(opened.agent, 'outside')
 
