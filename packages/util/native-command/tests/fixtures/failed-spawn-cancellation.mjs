@@ -15,7 +15,7 @@ try {
     const path = join(root, 'ready'), ready = Promise.withResolvers()
     watcher = watch(root, () => { if (existsSync(path)) ready.resolve() })
     pending = runNativeCommand(process.execPath, ['--input-type=module', '-e',
-      "import {writeFileSync} from 'node:fs';process.on('SIGTERM',()=>{});writeFileSync(process.argv[1],String(process.pid));setInterval(()=>{},60000)", path],
+      "import {writeFileSync,renameSync} from 'node:fs';process.on('SIGTERM',()=>{});writeFileSync(process.argv[1]+'.tmp',String(process.pid));renameSync(process.argv[1]+'.tmp',process.argv[1]);setInterval(()=>{},60000)", path],
     AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]), 'hidden')
     await Promise.race([ready.promise, pending.then(() => { throw new Error('Helper exited before readiness') })])
     watcher.close(); watcher = undefined

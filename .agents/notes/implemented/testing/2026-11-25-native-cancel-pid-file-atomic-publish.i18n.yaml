@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-25-native-cancel-pid-file-atomic-publish.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-25-native-cancel-pid-file-atomic-publish.md
+document:
+  en: 6a8003cb49ad2202b1827d5505795f56bb628877
+  zh: acaa3cebc4a9ea1bacbe6aa6701f3568faa634bc
+/agent-note-publish-the-cancellation-fixture-s-pid-file-atomically:
+  en: 30caf1d719dcf4a3
+  zh: 120bc6ed5f5a885d
+/agent-note-publish-the-cancellation-fixture-s-pid-file-atomically/problem:
+  en: 2b34f91c62c1560c
+  zh: c8ef07dc0d054ea5
+/agent-note-publish-the-cancellation-fixture-s-pid-file-atomically/decision:
+  en: f51809e581004572
+  zh: 857a5d4a975aef80
+/agent-note-publish-the-cancellation-fixture-s-pid-file-atomically/alternatives-considered:
+  en: 537242b58b9e59e5
+  zh: be6388dc5726e2f9
+/agent-note-publish-the-cancellation-fixture-s-pid-file-atomically/consequences:
+  en: c96649ac91589bab
+  zh: 9ca60298a2285ad5
