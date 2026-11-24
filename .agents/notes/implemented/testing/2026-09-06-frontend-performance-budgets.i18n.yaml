@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-06-frontend-performance-budgets.md
 document:
-  en: 36b9be949276e09f5169bd46c96d2192f853b882
-  zh: acb13b84eed5074520911b39eb0720bd24ced09b
+  en: 109adc3db4ca95eb9348722d0f959dc76639b338
+  zh: 99ac69b763c87660a6a6e7f8956a1465debfda5e
 /agent-note-frontend-large-session-performance-budgets:
   en: 443578f129feecd8
   zh: fcc3b1bf7dcdb1fb
@@ -21,8 +21,8 @@ document:
   en: d4d6aebafcdb8c12
   zh: 112d3ca1a4ea8ae1
 /agent-note-frontend-large-session-performance-budgets/calibration/standard-hosted-expectations-and-input-scheduling:
-  en: ceabfc88a73b8c2e
-  zh: 8ed2c196d89c3d4e
+  en: c4da24cefce324dc
+  zh: e22d4149aff78a7c
 /agent-note-frontend-large-session-performance-budgets/alternatives-considered:
   en: 1472bd425ef0daec
   zh: a89811758d70331e
