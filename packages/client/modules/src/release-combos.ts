@@ -29,9 +29,10 @@ function inside(parent: string, target: string): boolean {
 /** Index only the release's built-in packages, without resolving any Runtime-local modules. */
 async function packagedClients(root: string): Promise<Map<string, string>> {
   const clients = new Map<string, string>()
+  const packagesRoot = await realpath(join(root, 'packages'))
   for await (const file of glob('packages/*/*/package.json', { cwd: root })) {
     const path = await realpath(join(root, file))
-    if (!inside(join(root, 'packages'), path)) continue
+    if (!inside(packagesRoot, path)) continue
     const manifest: unknown = JSON.parse(await readFile(path, 'utf8'))
     if (typeof manifest !== 'object' || manifest === null || !('name' in manifest)
       || typeof manifest.name !== 'string' || !WORKSPACE_ENTRY.test(`${manifest.name}/client.js`)) continue
@@ -56,10 +57,18 @@ export function openReleaseComboReader(releaseRoot: string): (target: string) =>
   const pending = new Map<string, Promise<ReleaseComboCandidate | undefined>>()
   let retainedBytes = 0
 
+  const loadIndex = (): Promise<Map<string, string>> => {
+    index ??= packagedClients(releaseRoot).catch((error: unknown) => {
+      index = undefined
+      throw error
+    })
+    return index
+  }
+
   const materialize = async (resources: string, rev: string): Promise<ReleaseComboCandidate | undefined> => {
     const names = resources.split(',').map(resource => WORKSPACE_ENTRY.exec(resource)?.[1])
     if (!names.every((name): name is string => name !== undefined) || new Set(names).size !== names.length) return undefined
-    const clients = await (index ??= packagedClients(releaseRoot))
+    const clients = await loadIndex()
     const rows: { id: string; rev: string; bytes: Buffer }[] = []
     let available = BYTE_BUDGET
     for (const name of names) {
@@ -70,7 +79,6 @@ export function openReleaseComboReader(releaseRoot: string): (target: string) =>
       const info = await stat(file)
       if (!info.isFile() || info.size <= 0 || info.size > available) return undefined
       const bytes = await readFile(file)
-      if (bytes.byteLength !== info.size) return undefined
       const revision = clientContentRevision(bytes)
       if (revision === undefined) return undefined
       rows.push({ id: name, rev: revision, bytes })
