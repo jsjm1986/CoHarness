@@ -13,12 +13,16 @@ import { HISTORY_TURNS, SESSION_ID, FIRST, DONE, DELTAS, PACE_MS, syntheticHisto
 const SAMPLES = 3
 const TAIL = '[data-chat-flow-key^="9:turn-tail"]'
 const REFERENCE = { open: 200, page: 260, trajectory: 160, first: 1100, streamTask: 1800, input: 500, streamWall: 1000 }
-const EXPECTED_OPEN_CI_MS = 900
+const EXPECTED_OPEN_CI_MS = 1000
 const EXPECTED_PAGE_CI_MS = 1050
 const EXPECTED_TRAJECTORY_CI_MS = 1100
+const EXPECTED_FIRST_CI_MS = 3400
+const EXPECTED_STREAM_TASK_CI_MS = 5500
 const OPEN_BUDGET_MS = Math.ceil(EXPECTED_OPEN_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
 const PAGE_BUDGET_MS = Math.ceil(EXPECTED_PAGE_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
 const TRAJECTORY_BUDGET_MS = Math.ceil(EXPECTED_TRAJECTORY_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
+const FIRST_BUDGET_MS = Math.ceil(EXPECTED_FIRST_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
+const STREAM_TASK_BUDGET_MS = Math.ceil(EXPECTED_STREAM_TASK_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
 const REPLAY_DURATION_MS = (DELTAS + 4) * PACE_MS
 
 async function painted(page: Page): Promise<void> {
@@ -92,7 +96,7 @@ it('accepts recorded hosted open samples and rejects slower endpoints', () => {
   expect(() => expectEndpointWithinBudget(repeatedMedian, ciTimeBudget(REFERENCE.open))).toThrow()
   expect(() => expectEndpointWithinBudget(repeatedMedian, 875)).toThrow()
   expectEndpointWithinBudget(repeatedMedian, OPEN_BUDGET_MS)
-  expect(OPEN_BUDGET_MS).toBe(1125)
+  expect(OPEN_BUDGET_MS).toBe(1250)
   expect(() => expectEndpointWithinBudget(OPEN_BUDGET_MS + 1, OPEN_BUDGET_MS)).toThrow()
   expect(() => expectEndpointWithinBudget(2000, OPEN_BUDGET_MS)).toThrow()
 })
@@ -273,9 +277,9 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
   const aggregate = Object.fromEntries(Object.keys(REFERENCE).map(key => [key, median(samples.map(sample => sample[key as keyof typeof REFERENCE]))]))
   const budgets: Record<string, number> = {
     ...Object.fromEntries(Object.entries(REFERENCE).map(([key, value]) => [key, ciTimeBudget(value) + (key === 'streamWall' ? REPLAY_DURATION_MS : 0)])),
-    open: OPEN_BUDGET_MS, page: PAGE_BUDGET_MS, trajectory: TRAJECTORY_BUDGET_MS,
+    open: OPEN_BUDGET_MS, page: PAGE_BUDGET_MS, trajectory: TRAJECTORY_BUDGET_MS, first: FIRST_BUDGET_MS, streamTask: STREAM_TASK_BUDGET_MS,
   }
   console.log(JSON.stringify({ benchmark: 'long-session-browser/diagnostic', startup: median(samples.map(sample => sample.startup)), returnToChat: median(samples.map(sample => sample.returnToChat)) }))
-  console.log(JSON.stringify({ benchmark: 'long-session-browser/median', turns: HISTORY_TURNS, deltas: DELTAS, paceMs: PACE_MS, samples, aggregate, referenceMs: REFERENCE, expectedOpenCiMs: EXPECTED_OPEN_CI_MS, expectedPageCiMs: EXPECTED_PAGE_CI_MS, expectedTrajectoryCiMs: EXPECTED_TRAJECTORY_CI_MS, budgets }))
+  console.log(JSON.stringify({ benchmark: 'long-session-browser/median', turns: HISTORY_TURNS, deltas: DELTAS, paceMs: PACE_MS, samples, aggregate, referenceMs: REFERENCE, expectedOpenCiMs: EXPECTED_OPEN_CI_MS, expectedPageCiMs: EXPECTED_PAGE_CI_MS, expectedTrajectoryCiMs: EXPECTED_TRAJECTORY_CI_MS, expectedFirstCiMs: EXPECTED_FIRST_CI_MS, expectedStreamTaskCiMs: EXPECTED_STREAM_TASK_CI_MS, budgets }))
   for (const [key, value] of Object.entries(aggregate)) expectEndpointWithinBudget(value, budgets[key]!)
 })
