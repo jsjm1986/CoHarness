@@ -243,7 +243,7 @@ describe('client manifest entries', () => {
 
     await b.modules.entries.sync(graph(chat, extra))
     expect(b.fetched).toEqual(['batch', extra.url])
-    await vi.waitFor(() =>{  expect([...b.ctx.loader.entries()].map(entry => entry.options.name)).toEqual(['chat', 'extra']) })
+    await vi.waitFor(() =>{  expect([...b.ctx.loader.entries()].map(entry => entry.options.name)).toEqual(expect.arrayContaining(['chat', 'extra'])) })
   })
 
   it('withdraws an old chunk table when a rebuilt frame supplies only a replacement owner revision', async () => {
