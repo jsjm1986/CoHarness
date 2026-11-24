@@ -29,7 +29,7 @@ describe('native process control deadlines', () => {
   it('bounds ordinary Windows fallback signalling', () => {
     taskkillProcessTree(77, 41)
     expect(spawnSync).toHaveBeenLastCalledWith('taskkill', ['/PID', '77', '/T', '/F'], {
-      stdio: 'ignore', windowsHide: true, timeout: 41, killSignal: 'SIGKILL',
+      stdio: 'ignore', windowsHide: true, timeout: 10_000, killSignal: 'SIGKILL',
     })
   })
 
@@ -53,7 +53,7 @@ describe('native process control deadlines', () => {
     })
     taskkillProcessTree(77, 0.5)
     expect(spawnSync).toHaveBeenLastCalledWith('taskkill', expect.any(Array), {
-      stdio: 'ignore', windowsHide: true, timeout: 1, killSignal: 'SIGKILL',
+      stdio: 'ignore', windowsHide: true, timeout: 10_000, killSignal: 'SIGKILL',
     })
     createWindowsProcessInspector(0.5).signalGroup(77, 'SIGKILL')
     expect(spawnSync).toHaveBeenLastCalledWith('taskkill', expect.any(Array), {
@@ -82,7 +82,7 @@ describe('native process control deadlines', () => {
       })
       handle.terminateForHostExit()
       expect(spawnSync).toHaveBeenLastCalledWith('taskkill', expect.any(Array), {
-        stdio: 'ignore', windowsHide: true, timeout: 47, killSignal: 'SIGKILL',
+        stdio: 'ignore', windowsHide: true, timeout: 10_000, killSignal: 'SIGKILL',
       })
       await handle.done
       await expect(handle.waitForExit()).resolves.toBe(true)
