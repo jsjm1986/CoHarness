@@ -168,10 +168,21 @@ try {
           const connections = [...sockets].map(socket => new Promise(ready => { socket.once('close', ready); socket.destroy() }))
           await Promise.all([closed, ...connections])
         })
-        const port = relay.address().port
-        if (context === undefined) db.prepare('UPDATE instances SET port=? WHERE user_id=?').run(port, placement.id)
-        else await pool.query(`UPDATE harness.instances i SET port=$1 FROM harness.${placement.kind === 'user' ? 'users' : 'projects'} u WHERE u.id=${placement.kind === 'user' ? 'i.user_id' : 'i.project_id'}
-          AND i.organization_id=$2 AND u.public_id=$3`, [port, context.organizationId, placement.id])
+        // A sibling scenario's row can already hold an ephemeral port draw;
+        // rebind the relay for a fresh port until the claim does not collide.
+        for (let attempt = 0; ; attempt++) {
+          const port = relay.address().port
+          try {
+            if (context === undefined) db.prepare('UPDATE instances SET port=? WHERE user_id=?').run(port, placement.id)
+            else await pool.query(`UPDATE harness.instances i SET port=$1 FROM harness.${placement.kind === 'user' ? 'users' : 'projects'} u WHERE u.id=${placement.kind === 'user' ? 'i.user_id' : 'i.project_id'}
+              AND i.organization_id=$2 AND u.public_id=$3`, [port, context.organizationId, placement.id])
+            break
+          } catch (error) {
+            if (attempt >= 4 || !String(error).includes('UNIQUE')) throw error
+            await new Promise((ready, reject) => relay.close(err => err ? reject(err) : ready()))
+            await listen(relay)
+          }
+        }
       }
       const governance = context === undefined ? undefined : new PostgresModelGovernanceService(context,
         new OrganizationModelCredentialCipher(Buffer.alloc(32, 1)), 'UTC')
