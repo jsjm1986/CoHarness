@@ -57,7 +57,9 @@ describe('coverage measurement selection', () => {
       'packages/client/ui-conversation/src/client/apply.ts',
       'packages/client/ui-conversation/src/client/ConversationRoot.tsx',
     ]
-    expect(selectCoverageSources(sources, resolveCoveragePolicy('linux', false))).toEqual(sources.slice(0, 2))
+    // stores.ts joined the recorded-debt roster at the stack's first
+    // instrumented run; only session-persistence.ts remains measured.
+    expect(selectCoverageSources(sources, resolveCoveragePolicy('linux', false))).toEqual(sources.slice(0, 1))
   })
   it('keeps native PowerShell measured on Windows while excluding unsupported POSIX providers', () => {
     const pwsh = 'packages/shell/pwsh-local/src/index.ts'
