@@ -113,8 +113,10 @@ describe('ConnectionWebSocketChannel', () => {
     accepted.emit('close')
     expect(closeCalls).toBe(1)
 
-    // Operations after close are no-ops / immediate callback.
-    expect(serverSocket.readyState).toBe('closed')
+    // Operations after close are no-ops / immediate callback. The underlying
+    // socket's close handshake settles asynchronously after terminate(), so
+    // readyState can still read 'closing' for a tick on a loaded host.
+    await expect.poll(() => serverSocket.readyState, { timeout: 10_000 }).toBe('closed')
     serverSocket.send('noop-after-close')
     serverSocket.close()
     const lateClose = vi.fn()

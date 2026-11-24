@@ -947,7 +947,13 @@ describe('client bundle activation', () => {
     const { service, route } = constructWithRoute(ids)
     const url = service.graph().batches[0]!.url
     const readRelease = openReleaseComboReader(root!)
-    const local = (await readRelease(`/${url}`))!
+    // The release index scans the filesystem; on a loaded Windows host a
+    // just-written fixture can be invisible to the first enumeration.
+    const local = await vi.waitFor(async () => {
+      const candidate = await readRelease(`/${url}`)
+      expect(candidate).toBeDefined()
+      return candidate!
+    }, { timeout: 10_000 })
     const proof = { 'x-dsh-gateway-principal': 'fixture', [RELEASE_COMBO_DIGEST_HEADER]: local.sha256 }
     const confirmed = await routeRequest(route, url, 'GET', 'br', proof)
     expect(confirmed).toMatchObject({ status: 204, headers: { [RELEASE_COMBO_DIGEST_HEADER]: local.sha256 }, body: Buffer.alloc(0) })
