@@ -5,17 +5,42 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
+import time
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
+
+
+def remove_tree(root: Path) -> None:
+    """Remove a tree, tolerating the lag with which Windows releases process handles.
+
+    A native Office engine executable can still hold its image file briefly after
+    the harness reports termination, so a locked-file failure retries for a bounded
+    window instead of failing cleanup; POSIX deletion is immediate and unchanged.
+    """
+    if sys.platform != "win32":
+        shutil.rmtree(root)
+        return
+    deadline = time.monotonic() + 30
+    while True:
+        try:
+            shutil.rmtree(root)
+            return
+        except (PermissionError, NotADirectoryError):
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.5)
+
 
 @contextmanager
 def workspace(artifacts: Path | None = None, *, prefix: str = "dsh-office-render-") -> Iterator[Path]:
     """Retain only Office inputs, PNG batches, and errors before cleaning the temporary root."""
     if artifacts is not None:
         artifacts.mkdir(parents=True, exist_ok=False)
-    with tempfile.TemporaryDirectory(prefix=prefix) as temporary:
+    temporary = tempfile.mkdtemp(prefix=prefix)
+    try:
         root = Path(temporary).resolve()
         try:
             yield root
@@ -39,6 +64,8 @@ def workspace(artifacts: Path | None = None, *, prefix: str = "dsh-office-render
                             for file in batch.iterdir():
                                 if file.is_file() and (file.suffix == ".png" or file.name == "manifest.json"):
                                     shutil.copy2(file, destination / file.name)
+    finally:
+        remove_tree(Path(temporary))
 
 
 def copy_documents(directory: Path) -> dict[str, Path]:
