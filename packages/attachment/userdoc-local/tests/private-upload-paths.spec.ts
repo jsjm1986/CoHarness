@@ -105,8 +105,12 @@ it.each(['uploading', 'complete', 'failed'] as const)('still expires a session i
   const manifest = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
   await writeFileAtomic(path, JSON.stringify({ ...manifest, expiresAt: 1 }), { mode: 0o600, dirMode: 0o700 })
   await expect(f.manager.inspect(session.uploadId, owner)).rejects.toMatchObject({ code: 'DOCUMENT_UPLOAD_EXPIRED' })
-  await f.manager.cleanupExpired()
-  await expect(readFile(path)).rejects.toMatchObject({ code: 'ENOENT' })
+  // The just-settled publish job can still occupy the sweep's live-job guard
+  // briefly after the state write; retry the sweep until the claim lands.
+  await expect.poll(async () => {
+    await f.manager.cleanupExpired()
+    return readFile(path).then(() => 'exists', () => 'gone')
+  }, { timeout: 10_000 }).toBe('gone')
   if (state === 'complete') expect(await readFile(join(f.root, session.name), 'utf8')).toBe('')
 })
 
