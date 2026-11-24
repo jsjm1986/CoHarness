@@ -106,16 +106,6 @@ export function killGroup(pid: number | undefined, sig: NodeJS.Signals): void {
 }
 
 /**
- * Minimum lifetime granted to the `taskkill` helper process. The owner budget
- * bounds how long teardown waits for the helper, but the helper must also be
- * created and run before it can deliver termination — on a degraded host that
- * setup alone can outlast a sub-second escalation budget. Killing the helper
- * that early leaves the target alive while liveness polls never observe an
- * exit, so the owner floor never drops below this bound.
- */
-const TASKKILL_MIN_TIMEOUT_MS = 10_000
-
-/**
  * Terminate one Windows process tree with `taskkill /T /F`. Contained like
  * POSIX group signalling — delivery races tree exit, so an absent tree, a
  * nonzero status, or a missing taskkill binary must not break idempotent
@@ -131,7 +121,7 @@ export function taskkillProcessTree(pid: number | undefined, commandTimeoutMs: n
   spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
     stdio: 'ignore',
     windowsHide: true,
-    timeout: Math.max(Math.ceil(commandTimeoutMs), TASKKILL_MIN_TIMEOUT_MS),
+    timeout: Math.ceil(commandTimeoutMs),
     killSignal: 'SIGKILL',
   })
 }
@@ -153,18 +143,6 @@ function signalTree(
   if (pid === undefined) return
   if (platform === 'win32') {
     taskkill(pid)
-    // taskkill delivery is unchecked: when the helper cannot start or cannot
-    // reach the tree, TerminateProcess on the spawned child still publishes an
-    // exit the liveness loop can observe, so teardown never waits forever on a
-    // tree the helper silently failed to kill.
-    try {
-      child.kill(sig)
-    } catch {
-      /* v8 ignore start -- kill throws only when the handle is already closed,
-         which no POSIX CI path can stage; the swallow keeps teardown idempotent. */
-      // The direct child already exited; teardown remains idempotent.
-      /* v8 ignore stop */
-    }
     return
   }
   try {

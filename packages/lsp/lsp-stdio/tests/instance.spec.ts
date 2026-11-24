@@ -16,6 +16,17 @@ import { spawnSubprocess } from '@deepseek-ai/dsh-subprocess-local/src/spawn.ts'
 
 const fixtureServer = fileURLToPath(new URL('./fixture-server.ts', import.meta.url))
 
+/**
+ * Teardown budgets sized for degraded hosted Windows runners: the synchronous taskkill helper that
+ * delivers forced termination must spawn and run inside `killGraceMs`, and ~200 ms-class budgets
+ * starve it on loaded images — leaving the tree alive while the intentionally unbounded
+ * managed-range wait polls liveness forever (180 s test timeouts on the windows-2025-vs2026
+ * 20261111.635 image; the sibling provider path uses job objects and is immune). These stays in the
+ * low seconds so healthy runs still escalate quickly.
+ */
+const SHUTDOWN_TIMEOUT_MS = 2_000
+const KILL_GRACE_MS = 2_000
+
 let root: string
 let ws: string
 let ctx: Context
@@ -54,8 +65,8 @@ async function makeInstance(
     initializationOptions: { init: true },
     maxMessageBytes: 16_000_000,
     maxStderrBytes: 100_000,
-    shutdownTimeoutMs: 200,
-    killGraceMs: 200,
+    shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS,
+    killGraceMs: KILL_GRACE_MS,
     ...overrides,
   }, spawnSubprocess, writer)
   live.push(instance)
@@ -89,8 +100,8 @@ async function scriptInstance(script: string, overrides: Partial<InstanceSpec> =
     initializationOptions: null,
     maxMessageBytes: 16_000_000,
     maxStderrBytes: 100_000,
-    shutdownTimeoutMs: 150,
-    killGraceMs: 150,
+    shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS,
+    killGraceMs: KILL_GRACE_MS,
     ...overrides,
   }, spawnSubprocess)
   live.push(instance)
@@ -174,7 +185,7 @@ describe('LspInstance query and abort', () => {
   it('terminates the instance when the server ignores $/cancelRequest past the grace', async () => {
     // The hang server never honors cancellation, so after the bounded grace the instance must be torn
     // down (its process closed) rather than left with an active request.
-    const instance = await makeInstance({ LSP_FAKE_HANG: '1' }, { killGraceMs: 100 })
+    const instance = await makeInstance({ LSP_FAKE_HANG: '1' }, { killGraceMs: KILL_GRACE_MS })
     const controller = new AbortController()
     const pending = run(instance, 'goToDefinition', controller.signal)
     await new Promise<void>(resolve => setTimeout(resolve, 300))
@@ -195,7 +206,7 @@ describe('LspInstance query and abort', () => {
       + 'else if(m.method==="shutdown")process.stdout.write(fr({id:m.id,result:null}));'
       + 'else if(m.method==="exit")process.exit(0);'
       + '}});'
-    const instance = await scriptInstance(script, { killGraceMs: 2_000 })
+    const instance = await scriptInstance(script, { killGraceMs: KILL_GRACE_MS })
     const controller = new AbortController()
     const pending = run(instance, 'goToDefinition', controller.signal)
     await new Promise<void>(resolve => setTimeout(resolve, 300))
@@ -209,7 +220,7 @@ describe('LspInstance query and abort', () => {
   it('observes abort while awaiting a slow initialize handshake', async () => {
     // A server that answers nothing (not even initialize) leaves `ready` pending; an abort must be
     // observed during that wait instead of hanging the tool-timeout signal.
-    const instance = await scriptInstance('setInterval(()=>{},1000)', { killGraceMs: 100 })
+    const instance = await scriptInstance('setInterval(()=>{},1000)', { killGraceMs: KILL_GRACE_MS })
     const controller = new AbortController()
     const pending = run(instance, 'goToDefinition', controller.signal)
     await new Promise<void>(resolve => setTimeout(resolve, 150))
@@ -227,8 +238,8 @@ describe('LspInstance query and abort', () => {
       LSP_FAKE_INITIALIZED_MARKER: marker,
       LSP_FAKE_PAUSE_STDIN_AFTER_INITIALIZED: '1',
     }, {
-      shutdownTimeoutMs: 100,
-      killGraceMs: 100,
+      shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS,
+      killGraceMs: KILL_GRACE_MS,
     })
     const controller = new AbortController()
     const pending = run(instance, 'goToDefinition', controller.signal)
@@ -242,8 +253,8 @@ describe('LspInstance query and abort', () => {
 
   it('terminates when stdin fails during the didOpen write', async () => {
     const instance = await makeInstance({}, {
-      shutdownTimeoutMs: 100,
-      killGraceMs: 100,
+      shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS,
+      killGraceMs: KILL_GRACE_MS,
     }, failingWriter('textDocument/didOpen'))
     await expect(run(instance, 'goToDefinition')).rejects.toThrow()
     expect(instance.dead).toBe(true)
@@ -251,8 +262,8 @@ describe('LspInstance query and abort', () => {
 
   it('awaits process exit before rejecting a request write failure', async () => {
     const instance = await makeInstance({}, {
-      shutdownTimeoutMs: 100,
-      killGraceMs: 100,
+      shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS,
+      killGraceMs: KILL_GRACE_MS,
     }, failingWriter('textDocument/definition'))
     await expect(run(instance, 'goToDefinition')).rejects.toThrow(/fixture textDocument\/definition failure/)
     expect(instance.dead).toBe(true)
@@ -274,7 +285,7 @@ describe('LspInstance query and abort', () => {
   it('keeps a settled result but awaits teardown when didClose cannot be written', async () => {
     const instance = await makeInstance({
       LSP_FAKE_DEF: 'null',
-    }, { shutdownTimeoutMs: 100, killGraceMs: 100 }, failingWriter('textDocument/didClose'))
+    }, { shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS, killGraceMs: KILL_GRACE_MS }, failingWriter('textDocument/didClose'))
     await expect(run(instance, 'goToDefinition')).resolves.toEqual({
       kind: 'locations',
       locations: [],
@@ -291,7 +302,7 @@ describe('LspInstance disposal', () => {
       LSP_FAKE_DEF: 'null',
       LSP_FAKE_EXIT_DELAY_MS: '75',
       LSP_FAKE_EXIT_MARKER: marker,
-    }, { shutdownTimeoutMs: 500 })
+    }, { shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS })
     await run(instance, 'goToDefinition')
     await instance.dispose()
     expect(await readFile(marker, 'utf8')).toBe('EXIT\nCLEAN\n')
@@ -321,7 +332,7 @@ describe('LspInstance disposal', () => {
   it('escalates to SIGKILL when the server ignores shutdown and SIGTERM', async () => {
     // Server answers initialize, ignores shutdown, and traps SIGTERM so only SIGKILL stops it.
     const script = RESPONDING_SERVER + 'process.on("SIGTERM",()=>{});'
-    const instance = await scriptInstance(script, { shutdownTimeoutMs: 100, killGraceMs: 100 })
+    const instance = await scriptInstance(script, { shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS, killGraceMs: KILL_GRACE_MS })
     await run(instance, 'goToDefinition')
     await expect(instance.dispose()).resolves.toBeUndefined()
   })
@@ -333,7 +344,7 @@ describe('LspInstance disposal', () => {
       + `const helper=spawn(process.execPath,["-e",${JSON.stringify(helper)}],{stdio:"ignore"});`
       + `writeFileSync(${JSON.stringify(marker)},String(helper.pid));`
       + RESPONDING_SERVER
-    const instance = await scriptInstance(script, { shutdownTimeoutMs: 100, killGraceMs: 100 })
+    const instance = await scriptInstance(script, { shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS, killGraceMs: KILL_GRACE_MS })
     await run(instance, 'goToDefinition')
     const helperPid = Number(await readFile(marker, 'utf8'))
     try {
@@ -377,7 +388,7 @@ function processAlive(pid: number): boolean {
 }
 
 /** Wait until a process can no longer execute so temporary-workspace cleanup cannot race handle release. */
-async function waitForProcessExit(pid: number, timeoutMs = 3_000): Promise<void> {
+async function waitForProcessExit(pid: number, timeoutMs = 10_000): Promise<void> {
   const started = Date.now()
   while (processAlive(pid)) {
     if (Date.now() - started > timeoutMs) throw new Error(`process ${pid} did not exit`)
@@ -397,7 +408,7 @@ function failingWriter(method: string): ConnectionWriter {
 }
 
 /** Wait until a fixture marker exists, bounded so a broken handshake cannot hang the test. */
-async function waitForFile(path: string, timeoutMs = 3000): Promise<void> {
+async function waitForFile(path: string, timeoutMs = 10_000): Promise<void> {
   const started = Date.now()
   for (;;) {
     try {
