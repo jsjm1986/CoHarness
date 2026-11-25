@@ -3,20 +3,20 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-25-web-e2e-contention-hardening.md
 document:
-  en: 8817f97a12bc589398d16931204a81ca77c98c2e
-  zh: c21ac47fff05be26614a7ccff286ee12683f4f4c
+  en: b2dda6ae1819d3a5029af73f0108ab229f97af11
+  zh: 59c1b599c717b0c63e83ef53ab654d9b089581b8
 /agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing:
   en: ca0e241401286135
   zh: c39bea09abf95f03
 /agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/problem:
-  en: c1571367d6859252
-  zh: 58dd0eb128bef7ab
+  en: 9d88dfd46bf55dca
+  zh: 5ce3f5936a45eb43
 /agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/decision:
-  en: 8e1bec3be17e2570
-  zh: 8d74a2f06d367c2b
+  en: c582c748bb94fb4a
+  zh: 5116d5c9237cdd7d
 /agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/alternatives-considered:
   en: 2b48e323d26b639e
   zh: df43e51f00acaaf9
 /agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/consequences:
-  en: e716f50d6ffeea5a
-  zh: 728de04d11254f1f
+  en: 31d51fbf6418e8a4
+  zh: a071df37c6782612

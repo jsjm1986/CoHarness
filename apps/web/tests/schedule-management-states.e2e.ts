@@ -224,7 +224,7 @@ describe.skipIf(webSnapshotMode() === 'record')('web e2e: Schedule environment a
       // The resolved Workspace list completes the deferred boot restore: the
       // app selects the seeded Session and the Task manager unmounts. Wait for
       // the session view before re-opening the manager.
-      await page.locator('textarea:enabled').first().waitFor()
+      await page.getByText('DONE', { exact: true }).waitFor({ timeout: 60_000 })
       await openManager(page)
       await manager.getByRole('button', { name: task.title, exact: true }).click()
       await expect.poll(() => linked.isEnabled()).toBe(true)
