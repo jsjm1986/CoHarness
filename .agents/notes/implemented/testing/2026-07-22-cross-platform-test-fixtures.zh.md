@@ -22,6 +22,8 @@ Status: implemented
 
 包含 wall-clock 日期的浏览器 golden 会显式固定浏览器上下文的 `timezoneId`；仅凭 locale 并不能决定渲染出的日期。预期文件随后使用这个固定时区，使处于不同时区的开发机与 CI runner 比较同一份用户可见文本，而不是把产品行为归一化成 UTC。
 
+由带沙盒的产品进程执行的 fixture 不能只放在宿主 `/tmp` 中。即使宿主根目录在 Linux bwrap 中以只读方式可见，bwrap 仍会把 `/tmp` 替换成私有 tmpfs；因此受限命令内需要的可执行辅助程序和控制文件应放在仓库作用域的 scratch 存储或可写 workspace 中。
+
 ## 曾考虑的替代方案
 
 **将所有路径和 URI 归一化为 POSIX 字符串。**这会使断言保持一致，但也会改变正确的 Windows 行为：外部路径是原生绝对路径，UNC 文件 URI 有效，而且已配置的主目录会按照宿主路径规则解析。

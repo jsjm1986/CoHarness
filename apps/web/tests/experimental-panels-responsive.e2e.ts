@@ -2,7 +2,6 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -47,7 +46,8 @@ describe('web e2e: opt-in panel interactions', () => {
   let worktreeControl: string
   let sessionId: Awaited<ReturnType<typeof seedSession>>
   beforeAll(async () => {
-    scratch = await mkdtemp(join(tmpdir(), 'dsh-experimental-panels-'))
+    await mkdir(join(REPO_ROOT, '.artifacts'), { recursive: true })
+    scratch = await mkdtemp(join(REPO_ROOT, '.artifacts', 'dsh-experimental-panels-'))
     worktreeControl = join(scratch, 'worktree-control.json')
     await writeFile(worktreeControl, '{}')
     const gitGate = join(scratch, 'worktree-git.mjs')

@@ -22,6 +22,8 @@ Tests for a genuinely POSIX-only primitive use a narrow Windows exclusion on tha
 
 Browser goldens that include wall-clock dates pin the browser context's `timezoneId`; locale alone does not determine the rendered date. The expected file then uses that pinned zone, so developer machines and CI runners in different zones compare the same user-visible text rather than normalizing the product to UTC.
 
+Fixtures executed by a sandboxed product process must not live only in the host `/tmp`. Linux bwrap replaces `/tmp` with a private tmpfs even though the host root is read-only visible, so executable helpers and control files needed inside the confined command belong in repository-scoped scratch storage or the writable workspace.
+
 ## Alternatives considered
 
 **Normalize all paths and URIs to POSIX strings.** This would make assertions uniform but would change correct Windows behavior: external paths are native absolute paths, UNC file URIs are valid, and configured homes resolve through the host path rules.
