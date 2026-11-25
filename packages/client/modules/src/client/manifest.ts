@@ -458,6 +458,8 @@ export interface ClientModuleCreateOptions {
   boot: unknown
   /** Module-table seed: platform-singleton specifier → shell instance. */
   staticModules: Record<string, unknown>
+  /** Transport results for application batches the entry document attempted before creating the module system. */
+  preloadedBundles?: ReadonlyMap<string, 'executed' | 'load-failed'>
   /** Bundle-load hook. A cancelled hook must suppress registration. Defaults to a same-origin classic script element. */
   loadBundle?: (url: string, signal?: AbortSignal) => Promise<void>
 }
@@ -560,6 +562,8 @@ export interface ClientModuleSystemOptions {
   registrationTarget: ClientModuleLoaderTarget
   /** Already-materialized modules bundle consumed while creating the system. */
   bootstrapModule: ClientBootstrapModule
+  /** Application batch results carried by the entry document alongside its pending registrations. */
+  preloadedBundles?: ClientModuleCreateOptions['preloadedBundles']
   /** Bundle-load hook. Defaults to a same-origin classic script element. */
   loadBundle?: ClientModuleCreateOptions['loadBundle']
 }

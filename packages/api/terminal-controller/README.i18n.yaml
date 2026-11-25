@@ -4,7 +4,7 @@
 #   pnpm run verify-translation-pairing --write packages/api/terminal-controller/README.md
 document:
   en: 14f8f6449bf91f1a4edcebea4123c8fe1d308a46
-  zh: cbfd60eddc68bb4e42db616eaacbe89cfda79f35
+  zh: ba675dafbde42d448f33008a723df2dbd791a9d0
 /:
   en: 6a19f6d3fdfe0db2
   zh: a361afe6b8cd3010
@@ -31,7 +31,7 @@ document:
   zh: 35a7c88f180f74a1
 /deepseek-ai-dsh-api-terminal-controller/model-experience/kv-cache-effect:
   en: 507d3b3b80596fdc
-  zh: 03058ee7f8d31911
+  zh: 4659007c4671afdc
 /deepseek-ai-dsh-api-terminal-controller/known-limitations-and-deferred-work:
   en: 6af6663b852441db
   zh: 244ed7729cae8d81

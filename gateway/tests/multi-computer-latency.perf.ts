@@ -269,7 +269,7 @@ export async function runMultiComputerBenchmark(options: MultiComputerBenchmarkO
         return true
       },
       proxy: async (_req, res, context) => {
-        // Simulates remote proxy.ts slow-path admission with Wave 3 ensureAtLeast sync skip + 2 serial PG checks.
+        // Simulates remote proxy.ts slow-path admission with ensureAtLeast sync skip + 2 serial PG checks.
         await syncRemoteAccess(context.forwardedAccessRevision)
         pgCounts.remoteTunnelProxyAdmission += 2
         if (TUNNEL_PG_RTT_MS > 0) await delay(TUNNEL_PG_RTT_MS * 2)

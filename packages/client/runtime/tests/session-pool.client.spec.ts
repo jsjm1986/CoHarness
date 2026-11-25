@@ -107,6 +107,24 @@ describe('SessionRuntimePool', () => {
     } finally { await ctx.fiber.dispose() }
   })
 
+  it('keeps directory snapshots when clearing an already empty workbench', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const id = 'empty-workbench-directory' as SessionId
+    api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    try {
+      await base.refresh()
+      const aggregate = pool.list.getSnapshot()
+      const scope = pool.currentScopeList.getSnapshot()
+      expect(aggregate.ids).toContain(pool.keyFor(id))
+      pool.setAdditionalStaged([])
+      expect(pool.list.getSnapshot()).toBe(aggregate)
+      expect(pool.currentScopeList.getSnapshot()).toBe(scope)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('keeps initial Workspace history selection through the first project identity', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

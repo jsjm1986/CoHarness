@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write scripts/existing-deployment-latency/README.md
 document:
-  en: 705b83655a21068258a878c1eb5b4fc72fb0d892
-  zh: cc812c4152a0eb11da2b3412d7b7fc87fac8b2b4
+  en: bd0a47709cf42b42015e71f4a6d4f6a3c6207677
+  zh: 73997ddbe30a944fef5f4622a7b9cde55f84bce4
 /:
   en: 9790c6db87582caa
   zh: 65d71276b9e56c6a
@@ -24,8 +24,8 @@ document:
   en: 4fbcf2a36d7d161d
   zh: fe2f0fc2b42c7b6e
 /existing-qa-deployment-latency-sampling/reading-measurements:
-  en: 6053d7bb48520f1a
-  zh: 9bf3fe941e0af46f
+  en: 3922eae78608de34
+  zh: 5dbbfbadf1486d0b
 /existing-qa-deployment-latency-sampling/dev-note:
   en: cbadaa9137a728e4
   zh: 0610f26eec27ab12

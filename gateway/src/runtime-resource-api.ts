@@ -10,7 +10,7 @@ import {
 } from '@deepseek-ai/dsh-resource-budget/wire'
 import { ExecutionIdentityError, type GatewayExecutionIdentity, type PersonalExecutionWriteFence } from './execution-identity.ts'
 import { NodeResourceBudgetError, type NodeResourceAdmission, type NodeResourceBudget } from './node-resource-budget.ts'
-import { timeOperation } from './operation-timing.ts'
+import { hasOperationTiming, recordResourceQueueDiagnostic, timeOperation } from './operation-timing.ts'
 import type { GatewayPrincipalClaims, GatewayPrincipalSigner } from './principal.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 
@@ -225,6 +225,7 @@ export async function handleRuntimeResourceApi(
             if (timing !== undefined) postAuthorizeMs = performance.now() - postStarted
           }
         }
+        if (status.state === 'queued' && hasOperationTiming()) recordResourceQueueDiagnostic(deps.budget.queueDiagnostic())
         timing?.((authorized - started) + postAuthorizeMs, reserved - authorized)
         send(200, status)
         return true
@@ -255,13 +256,21 @@ export async function handleRuntimeResourceApi(
           res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
         }
         if (changeWaitMs !== undefined) res.setHeader(RESOURCE_CHANGE_WAIT_TIMING_HEADER, changeWaitMs.toFixed(2))
+        if (statuses.some(item => item.state === 'queued') && hasOperationTiming()) {
+          recordResourceQueueDiagnostic(deps.budget.queueDiagnostic())
+        }
         timing?.(performance.now() - observed, observed - started)
         send(200, statuses)
         return true
       }
       case 'finish': {
         const request = resourceFinishSchema.parse(payload)
-        await deps.budget.finish(subject, request, request.outcome)
+        const started = timing === undefined ? 0 : performance.now()
+        try {
+          await timeOperation('resourceFinishDatabase', () => deps.budget.finish(subject, request, request.outcome))
+        } finally {
+          timing?.(0, performance.now() - started)
+        }
         send(200, {})
         return true
       }

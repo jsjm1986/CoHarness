@@ -2,6 +2,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { pipeline } from 'node:stream/promises'
 
+/** Header sent by browser shells that safely overlap application combo preloads with bootstrap scripts. */
+export const BOOTSTRAP_PRELOAD_HEADER = 'x-dsh-bootstrap-preload'
+
 const MAX_BOOTSTRAP_BYTES = 1024 * 1024
 
 function isRecord(value: unknown): value is Record<string, unknown> {

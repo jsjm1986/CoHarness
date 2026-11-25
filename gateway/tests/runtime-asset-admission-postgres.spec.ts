@@ -322,7 +322,9 @@ pg('PostgreSQL exact Runtime admission', () => {
       await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
       return `http://127.0.0.1:${(server.address() as AddressInfo).port}`
     }
+    const upstreamRequest = vi.fn()
     const upstream = createServer(async (req, res) => {
+      upstreamRequest()
       const assertion = req.headers[PRINCIPAL_HEADER]
       if (typeof assertion !== 'string') { res.writeHead(403).end(); return }
       const principal = signer.verify(assertion)
@@ -401,17 +403,20 @@ pg('PostgreSQL exact Runtime admission', () => {
     f.cfg.publicOrigins.push(baseline, forwardedBaseline, candidate)
     const admin = await f.auth.login(f.admin.username, 'pw-12345678', '127.0.0.1', 'asset-fixture')
     if (typeof admin === 'string') throw new Error(admin)
-    const request = async (entry: string, path: string, body: string, id = randomUUID(), headers?: Record<string, string>) => {
-      const response = await fetch(`${entry}${path}?dshRuntime=${f.personal.id}&dshTarget=personal&dshNode=${nodeId}`,
-        { method: 'POST', headers: { cookie: `${SESSION_COOKIE}=${f.request.sessionToken}`, origin: entry,
+    let browserToken = f.request.sessionToken
+    const sendRequest = (entry: string, path: string, body: string, id = randomUUID(), headers?: Record<string, string>) =>
+      fetch(`${entry}${path}?dshRuntime=${f.personal.id}&dshTarget=personal&dshNode=${nodeId}`,
+        { method: 'POST', headers: { cookie: `${SESSION_COOKIE}=${browserToken}`, origin: entry,
           'content-type': 'application/json', 'x-dsh-operation-id': id, ...headers }, body })
-      expect(response.status).toBe(200)
+    const request = async (...args: Parameters<typeof sendRequest>) => {
+      const response = await sendRequest(...args)
+      expect(response.status, response.ok ? args[1] : `${args[1]}: ${await response.text()}`).toBe(200)
       return response
     }
     const measure = async (entry: string, path: string, body: string, headers?: Record<string, string>) => {
       const id = randomUUID()
       const response = await request(entry, path, body, id, headers)
-      expect(response.headers.get('x-dsh-runtime-id')).toBe(f.personal.id)
+      const runtimeId = response.headers.get('x-dsh-runtime-id')
       const data = await response.json()
       const observations = await fetch(`${entry}/admin/api/performance/operations?id=${id}`, { headers: { cookie: `${SESSION_COOKIE}=${admin.token}` } })
       expect(observations.status).toBe(200)
@@ -422,7 +427,7 @@ pg('PostgreSQL exact Runtime admission', () => {
       }> }
       expect(metrics.operations).toHaveLength(1)
       const { phases, sql: { governance }, readySession: decisions } = metrics.operations[0]!
-      return { data, phases, governance, decisions }
+      return { runtimeId, data, phases, governance, decisions }
     }
     const sessionId = 'fixture-history', requestId = randomUUID()
     for (const [path, method, payload] of [
@@ -434,6 +439,7 @@ pg('PostgreSQL exact Runtime admission', () => {
       const body = JSON.stringify({ type: 'client-request', rpcId: 'fixture', method, payload })
       const before = await measure(baseline, path, body)
       const after = await measure(candidate, path, body)
+      expect([before.runtimeId, after.runtimeId]).toEqual([f.personal.id, f.personal.id])
       expect(after.data).toEqual(before.data)
       expect(after.data).toMatchObject({ user: f.member.id, runtime: { runtimeId: f.personal.id, generation }, path, payload: body })
       expect(after.governance.count, `${method} ready Session statements`).toBe(3)
@@ -450,17 +456,18 @@ pg('PostgreSQL exact Runtime admission', () => {
     expect(readySession).toHaveBeenCalledTimes(4)
     const path = '/api/admit/v1/session.prompt'
     const payload = JSON.stringify({ type: 'client-request', rpcId: 'fixture', method: 'session.prompt', payload: { sessionId, requestId, prompt: 'fixture-input' } })
-    const forwardedHeaders = (requestPath = path): Record<string, string> => ({
+    const forwardedHeaders = (requestPath = path, user = f.member, accessRevision?: string): Record<string, string> => ({
       [NODE_SERVICE_TARGET_HEADER]: nodeId,
-      'x-dsh-gateway-forward': signer.issueForward({ issuerNode: nodeId, audienceNode: nodeId, user: f.member,
+      'x-dsh-gateway-forward': signer.issueForward({ issuerNode: nodeId, audienceNode: nodeId, user, accessRevision,
         selection: { runtimeId: f.personal.id, target: 'personal' },
         context: { environment: { id: f.personal.id, nodeId } },
-        request: { method: 'POST', path: requestPath, sessionHash: createHash('sha256').update(f.request.sessionToken).digest('hex') },
+        request: { method: 'POST', path: requestPath, sessionHash: createHash('sha256').update(browserToken).digest('hex') },
       }),
     })
     const forwarded = forwardedHeaders()
     const before = await measure(forwardedBaseline, path, payload, forwardedHeaders())
     const after = await measure(candidate, path, payload, forwarded)
+    expect([before.runtimeId, after.runtimeId]).toEqual([f.personal.id, f.personal.id])
     expect(after.data).toEqual(before.data)
     expect(before.governance.count - after.governance.count).toBe(1)
     expect(before.decisions).toEqual({ forwarded: { fallbackCandidate: 1 }, ordinary: { ready: 1 } })
@@ -527,6 +534,27 @@ pg('PostgreSQL exact Runtime admission', () => {
       expect(readySession).toHaveBeenLastCalledWith(expect.anything(), expect.anything(),
         expect.objectContaining({ runtimeId: f.personal.id, nodeId, target: 'personal', forwarded: expect.anything() }))
     }
+    const filesPath = '/api/workspaceFiles.list'
+    const filesBody = JSON.stringify({ type: 'client-request', rpcId: 'files', method: 'workspaceFiles.list', payload: { sessionId, path: '.' } })
+    const appliedRevision = monitor.currentRevision()?.toString()
+    expect(appliedRevision).toBeDefined()
+    const listHeaders = () => ({ ...principal, ...forwardedHeaders(filesPath, login.user, appliedRevision) })
+    const ordinaryFiles = await measure(baseline, filesPath, filesBody, listHeaders())
+    const readyFiles = await measure(candidate, filesPath, filesBody, listHeaders())
+    expect(readyFiles.data).toEqual(ordinaryFiles.data)
+    expect(readyFiles.data).toMatchObject({ user: f.member.id, scope: { kind: 'personal' },
+      path: filesPath, payload: filesBody, runtime: { runtimeId: f.personal.id, generation } })
+    expect(readyFiles.decisions).toEqual({ forwarded: { ready: 1 } })
+    expect(readyFiles.runtimeId).toBe(f.personal.id)
+    expect(ordinaryFiles.decisions).toBeUndefined()
+    expect(readyFiles.governance.count, 'forwarded file list governance statements before response').toBe(1)
+    expect(ordinaryFiles.governance.count - readyFiles.governance.count, 'file list statements removed').toBeGreaterThanOrEqual(5)
+    expect(readySession).toHaveBeenLastCalledWith(expect.anything(), expect.anything(),
+      expect.not.objectContaining({ managedPersonalRead: true }))
+    const unboundFiles = await measure(candidate, filesPath, filesBody, forwardedHeaders(filesPath, login.user, appliedRevision))
+    expect(unboundFiles.data).toEqual(ordinaryFiles.data)
+    expect(unboundFiles.decisions).toBeUndefined()
+
     const boot = (entry: string, requestPrincipal: string, session = f.request.sessionToken) =>
       fetch(`${entry}/${coordinates}&dshBootstrap=1`, { headers: {
         cookie: `${SESSION_COOKIE}=${session}`, accept: 'application/json', 'x-dsh-expected-principal-id': requestPrincipal,
@@ -553,14 +581,39 @@ pg('PostgreSQL exact Runtime admission', () => {
     }, body })
     expect(refusedRead.status).toBe(503)
     await refusedRead.body?.cancel()
+    const dispatchedBeforeMaintenanceList = upstreamRequest.mock.calls.length
+    const maintenanceFiles = await sendRequest(candidate, filesPath, filesBody, randomUUID(), listHeaders())
+    expect(maintenanceFiles.status).toBe(503)
+    expect(await maintenanceFiles.json()).toEqual({ error: 'maintenance' })
+    expect(upstreamRequest).toHaveBeenCalledTimes(dispatchedBeforeMaintenanceList)
     const maintenanceBoot = await boot(candidate, String(f.member.id))
     expect(maintenanceBoot.status).toBe(200)
     expect(await maintenanceBoot.json()).toEqual(await (await boot(baseline, String(f.member.id))).json())
     const performance = await fetch(`${candidate}/admin/api/performance`, { headers: { cookie: `${SESSION_COOKIE}=${admin.token}` } })
     expect(performance.status).toBe(200)
     expect(await performance.json()).toMatchObject({
-      readySession: { ordinary: { ready: 5, refused: 2, fallbackMaintenance: 1 }, forwarded: { ready: 5, refused: 1 } },
+      readySession: { ordinary: { ready: 5, refused: 2, fallbackMaintenance: 1 }, forwarded: { ready: 6, refused: 2 } },
     })
+
+    await pool.query("UPDATE harness.cluster_control SET mode='serving' WHERE organization_id=$1", [f.organizationId])
+    const dispatchedBeforeRevocation = upstreamRequest.mock.calls.length
+    await f.auth.revoke(browserToken)
+    await monitor.synchronize()
+    const revokedFiles = await sendRequest(candidate, filesPath, filesBody, randomUUID(), listHeaders())
+    expect(revokedFiles.status).toBe(403)
+    expect(await revokedFiles.json()).toEqual({ error: 'access-revoked' })
+    expect(upstreamRequest).toHaveBeenCalledTimes(dispatchedBeforeRevocation)
+
+    const renewedLogin = await f.auth.login(f.member.username, 'pw-12345678', '127.0.0.1', 'asset-fixture')
+    if (typeof renewedLogin === 'string') throw new Error(renewedLogin)
+    browserToken = renewedLogin.token
+    await pool.query("UPDATE harness.instances SET generation=generation+1,observed_state='stopped',desired_state='stopped',stop_reason='manual' WHERE runtime_id=$1",
+      [f.personal.id])
+    const staleFiles = await sendRequest(candidate, filesPath, filesBody, randomUUID(), listHeaders())
+    expect(staleFiles.status).toBe(409)
+    expect(await staleFiles.json()).toMatchObject({ error: { code: 'INSTANCE_STOPPED' } })
+    expect(upstreamRequest).toHaveBeenCalledTimes(dispatchedBeforeRevocation)
+    expect(start).not.toHaveBeenCalled()
   })
 
   it('refuses revoked sessions, foreign owners, duplicate-owner guesses and mismatched explicit scope or computer', async () => {

@@ -373,23 +373,16 @@ export class HostConnectionService extends Service implements HostConnectionHand
           path,
           handler: createUpgradeRouteHandler({
             owner: webCtx,
-            isRejected: req => routeLifetime.signal.aborted || this.rejectionFor(req, options.authority, 'upgrade') !== undefined,
+            isRejected: req => this.rejectionFor(req, options.authority, 'upgrade') !== undefined,
             rejectOnError: true,
-            onAccepted: (req, socket, head, signal) => {
-              const combined = AbortSignal.any([signal, routeLifetime.signal])
-              const task = (async () => {
-                if (combined.aborted) {
-                  rejectWebSocketUpgrade(socket)
-                  return
-                }
-                if (options.authorize !== undefined && !await options.authorize(req, combined)) {
-                  rejectWebSocketUpgrade(socket)
-                  return
-                }
-                await channel.upgrade(req, socket, head, combined, handler)
-              })()
-              inFlight.add(task)
-              return task.finally(() => { inFlight.delete(task) })
+            routeSignal: routeLifetime.signal,
+            inFlight,
+            onAccepted: async (req, socket, head, signal) => {
+              if (options.authorize !== undefined && !await options.authorize(req, signal)) {
+                rejectWebSocketUpgrade(socket)
+                return
+              }
+              await channel.upgrade(req, socket, head, signal, handler)
             },
           }),
         })

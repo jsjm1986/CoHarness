@@ -23,6 +23,7 @@ it('retains the shipped schema-135 inventory and excludes transient recovery app
   expect(governanceRebuildInventory(145)).toEqual(governanceRebuildInventory(146))
   expect(governanceRebuildInventory(146)).toEqual(governanceRebuildInventory(147))
   expect(governanceRebuildInventory(148)?.digest).toBe('f60c1eff534df5d72f06e224cba4c2d121a083ef81efa3a63b9e50f5dfe46d02')
+  expect(governanceRebuildInventory(149)).toEqual(governanceRebuildInventory(148))
   expect(governanceRebuildInventory(148)?.tables.conversation_draft_reservations).toContainEqual({name:'model_selection',disposition:'node-owned'})
   expect(governanceRebuildInventory(147)?.tables.conversation_draft_reservations).not.toContainEqual({name:'model_selection',disposition:'node-owned'})
   for(const version of [134,GOVERNANCE_REBUILD_SCHEMA_VERSION+1])expect(governanceRebuildInventory(version)).toBeUndefined()

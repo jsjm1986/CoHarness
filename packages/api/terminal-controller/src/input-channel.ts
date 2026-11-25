@@ -7,7 +7,7 @@ import type { TerminalInputClientFrame, TerminalInputServerFrame } from './input
 import type { BrowserTerminal } from './terminal.ts'
 import type { TerminalAttachmentId, WebTerminalId } from './types.ts'
 
-/** Minimal text WebSocket contract consumed from `ctx.connection.ws` without circular host references. */
+/** Minimal text WebSocket interface consumed from `ctx.connection.ws` without circular host references. */
 export type TerminalInputSocket = {
   readonly signal: AbortSignal
   readonly readyState: 'open' | 'closing' | 'closed'
@@ -121,7 +121,7 @@ function parseClientFrame(raw: string): TerminalInputClientFrame | undefined {
  * write/resize operations and closing immediately when attachment authority ends.
  * @param socket - upgraded Connection WebSocket.
  * @param attachment - active `follow()` attachment verified for this caller.
- * @param limits - input size and geometry validators matching the HTTP RPC contract.
+ * @param limits - input size and geometry validators matching the HTTP RPC limits.
  * @param controllerSignal - controller disposal signal.
  * @returns after the input subscription ends and any accepted frame settles.
  */

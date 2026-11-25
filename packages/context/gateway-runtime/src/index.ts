@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/cordis-plugin-loader'
 import Schema from '@deepseek-ai/schemastery'
 import { publishWorkspaceCatalog } from './workspace-catalog.ts'
 import { launchAuthorityOf } from './launch-authority.ts'
+import { attachModelResourceFinishRecorder, installModelTurnTailObserver } from './model-tail-timing.ts'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type {
   ConnectionAuthenticationRequest,
@@ -151,9 +152,22 @@ export class GatewayResponseTooLargeError extends Error {
   }
 }
 
+/** Process-uptime offsets recorded by the managed CLI launcher during cold boot. */
+export interface RuntimeStartupMarks {
+  readonly entryUptimeMs: number
+  readonly proxyInstalledMs?: number
+  readonly profileComposedMs?: number
+  readonly patchesReadMs?: number
+  readonly hostPreparedMs?: number
+  readonly bootSettledMs?: number
+  /** Callback registered if authenticated readiness answers before `boot()` settles. */
+  notifySettled?: () => void
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     gatewayRuntime: GatewayRuntime
+    runtimeStartupMarks?: RuntimeStartupMarks
   }
 }
 
@@ -564,23 +578,34 @@ export class GatewayRuntime extends Service {
   private readonly readinessPlugins: readonly string[]
   private readonly streamPrincipals: StreamPrincipalLeasePool | undefined
   private executionSettings: () => RuntimeExecutionSettings = () => ({ mode: 'resident' })
+  private readonly credentialReadStartUptimeMs: number
+  private readonly credentialReadMs: number
+  private readonly gatewayRuntimeReadyUptimeMs: number
+  private readiness503ResourceBudget = 0
+  private readiness503RequiredPlugins = 0
+  private firstReadinessLogged = false
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'gatewayRuntime')
     this.readinessPlugins = [...new Set(config.requiredPlugins ?? [])]
     this.modelTimings = config.modelTimings === true
-    if (this.modelTimings) ctx.on('llm/model-attempt-timing', (sample) => {
-      const round = (ms: number) => Math.round(ms * 100) / 100
-      console.info(`[model-attempt-timing] ${JSON.stringify({
-        outcome: sample.outcome, startedAt: sample.startedAt, elapsedMs: round(sample.elapsedMs),
-        adapterPreparationMs: round(sample.adapterPreparationMs), resourceWaitMs: round(sample.resourceWaitMs),
-        ...(sample.resourceOperationId === undefined ? {} : { resourceOperationId: sample.resourceOperationId }),
-        initialAuthorizationMs: round(sample.initialAuthorizationMs),
-        adapterDispatchPreparationMs: round(sample.adapterDispatchPreparationMs),
-        dispatchAuthorizationMs: round(sample.dispatchAuthorizationMs), adapterCallbacks: sample.adapterCallbacks,
-        afterLastAuthorizationMs: round(sample.afterLastAuthorizationMs),
-      })}`)
-    })
+    if (this.modelTimings) {
+      ctx.on('llm/model-attempt-timing', (sample) => {
+        try {
+          const round = (ms: number) => Math.round(ms * 100) / 100
+          console.info(`[model-attempt-timing] ${JSON.stringify({
+            outcome: sample.outcome, startedAt: sample.startedAt, elapsedMs: round(sample.elapsedMs),
+            adapterPreparationMs: round(sample.adapterPreparationMs), resourceWaitMs: round(sample.resourceWaitMs),
+            ...(sample.resourceOperationId === undefined ? {} : { resourceOperationId: sample.resourceOperationId }),
+            initialAuthorizationMs: round(sample.initialAuthorizationMs),
+            adapterDispatchPreparationMs: round(sample.adapterDispatchPreparationMs),
+            dispatchAuthorizationMs: round(sample.dispatchAuthorizationMs), adapterCallbacks: sample.adapterCallbacks,
+            afterLastAuthorizationMs: round(sample.afterLastAuthorizationMs),
+          })}`)
+        } catch { /* Diagnostic output cannot interrupt model attempts. */ }
+      })
+      attachModelResourceFinishRecorder(this, installModelTurnTailObserver(ctx))
+    }
     installSettingsSection(ctx, runtimeExecutionNamespace, runtimeExecutionSchema, { mode: 'resident' }, {
       label: { en: 'Runtime execution', zh: '运行时策略' },
       owner: 'project',
@@ -588,10 +613,15 @@ export class GatewayRuntime extends Service {
       setSource: (source) => { this.executionSettings = source },
       onChange: () => {},
     })
+    const round = (ms: number) => Math.round(Math.max(0, ms) * 100) / 100
+    this.credentialReadStartUptimeMs = round(process.uptime() * 1000)
+    const credentialReadStarted = performance.now()
     const authority = launchAuthorityOf(ctx, () => {
       const credential = readGatewayRuntimeCredential()
       return { credential, publicKey: createPublicKey(credential.principalPublicKey) }
     })
+    this.credentialReadMs = round(performance.now() - credentialReadStarted)
+    this.gatewayRuntimeReadyUptimeMs = round(process.uptime() * 1000)
     this.credential = authority.credential
     this.identity = { ...this.credential.runtime }
     this.nodeId = this.credential.nodeId
@@ -809,6 +839,7 @@ export class GatewayRuntime extends Service {
       return
     }
     if (this.ctx.get('resourceBudget') === undefined) {
+      this.readiness503ResourceBudget += 1
       response.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' })
       response.end(JSON.stringify({ error: 'resource-admission-unavailable' }))
       return
@@ -819,10 +850,15 @@ export class GatewayRuntime extends Service {
         const matching = entries.filter(entry => entry.options.id === id)
         return matching.length !== 1 || matching[0]?.fiber?.state !== FiberState.ACTIVE
       })) {
+        this.readiness503RequiredPlugins += 1
         response.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         response.end(JSON.stringify({ error: 'required-plugins-unavailable' }))
         return
       }
+    }
+    if (this.modelTimings && !this.firstReadinessLogged) {
+      this.firstReadinessLogged = true
+      this.reportBootTiming()
     }
     response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
     const policy = this.executionSettings().mode
@@ -838,6 +874,68 @@ export class GatewayRuntime extends Service {
       proof: readinessProof('response', this.credential.token, nonce, this.identity),
       idle: { policy, canStop, proof: createHmac('sha256', this.credential.token).update(idleMaterial).digest('base64url') },
     }))
+  }
+
+  private reportBootTiming(): void {
+    try {
+      const round = (ms: number): number => Math.round(Math.max(0, ms) * 100) / 100
+      const uptimeMs = process.uptime() * 1000
+      const marks = this.ctx.root.get('runtimeStartupMarks')
+      if (marks !== undefined && marks.bootSettledMs === undefined && this.ctx.fiber.state === FiberState.ACTIVE) {
+        const onSettled = (): void => {
+          if (marks.notifySettled === onSettled) delete marks.notifySettled
+          this.reportBootSettled(marks)
+        }
+        this.ctx.effect(() => {
+          marks.notifySettled = onSettled
+          return () => {
+            if (marks.notifySettled === onSettled) delete marks.notifySettled
+          }
+        }, 'gateway-runtime: boot settled timing')
+      }
+      const profileBoot = marks === undefined ? undefined : {
+        entryUptimeMs: round(marks.entryUptimeMs),
+        ...(marks.proxyInstalledMs === undefined ? {} : { proxyInstalledMs: round(marks.proxyInstalledMs) }),
+        ...(marks.profileComposedMs === undefined ? {} : { profileComposedMs: round(marks.profileComposedMs) }),
+        ...(marks.patchesReadMs === undefined ? {} : { patchesReadMs: round(marks.patchesReadMs) }),
+        ...(marks.hostPreparedMs === undefined ? {} : { hostPreparedMs: round(marks.hostPreparedMs) }),
+        ...(marks.bootSettledMs === undefined ? {} : { bootSettledMs: round(marks.bootSettledMs) }),
+      }
+      const loader = this.ctx.get('loader')
+      const pluginCount = loader === undefined ? undefined : [...loader.entries()].length
+      console.info(`[runtime-boot-timing] ${JSON.stringify({
+        runtimeId: this.identity.runtimeId,
+        kind: this.identity.kind,
+        ownerId: this.identity.id,
+        generation: this.identity.generation,
+        startedAt: Date.now() - Math.round(uptimeMs),
+        firstReadinessUptimeMs: round(uptimeMs),
+        credentialReadStartUptimeMs: this.credentialReadStartUptimeMs,
+        credentialReadMs: this.credentialReadMs,
+        gatewayRuntimeReadyUptimeMs: this.gatewayRuntimeReadyUptimeMs,
+        readiness503ResourceBudget: this.readiness503ResourceBudget,
+        readiness503RequiredPlugins: this.readiness503RequiredPlugins,
+        ...(pluginCount === undefined ? {} : { pluginCount }),
+        ...(profileBoot === undefined ? {} : { profileBoot }),
+      })}`)
+    } catch { /* Diagnostic output cannot interrupt authenticated readiness. */ }
+  }
+
+  private reportBootSettled(marks: RuntimeStartupMarks): void {
+    try {
+      const round = (ms: number): number => Math.round(Math.max(0, ms) * 100) / 100
+      const loader = this.ctx.get('loader')
+      const pluginCount = loader === undefined ? undefined : [...loader.entries()].length
+      console.info(`[runtime-boot-settled] ${JSON.stringify({
+        runtimeId: this.identity.runtimeId,
+        kind: this.identity.kind,
+        ownerId: this.identity.id,
+        generation: this.identity.generation,
+        bootSettledUptimeMs: round(process.uptime() * 1000),
+        ...(marks.bootSettledMs === undefined ? {} : { bootSettledMs: round(marks.bootSettledMs) }),
+        ...(pluginCount === undefined ? {} : { pluginCount }),
+      })}`)
+    } catch { /* Diagnostic output cannot interrupt profile startup settlement. */ }
   }
 
   private canReleaseRuntime(): boolean {

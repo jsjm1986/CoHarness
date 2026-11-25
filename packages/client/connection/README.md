@@ -23,7 +23,7 @@ Authenticated Gateway HTML supplies a versioned account ID and Runtime target to
 
 `ConnectionHandle.documentIdentity` exposes the validated account and initial Runtime for namespacing browser state. It is absent for standalone pages, fixtures and explicit transports. Derived target handles share the originating document identity; it grants no target access.
 
-An HTTP/1 document, or a document with an unknown protocol, admits up to three background requests across its Runtime targets until response headers arrive. At most two can be reads. Session activation and plugin manifest synchronization take precedence over queued navigation reads and catalogs. HTTP/2 and HTTP/3 issue these operations concurrently. Explicit high-priority requests, conversation creation and send, draft operations, workbench search and workbench pagination bypass the queue. Cancellation withdraws pending requests before they contact the Gateway. The [scheduling decision](../../../.agents/notes/implemented/architecture/2026-11-22-browser-advisory-read-scheduling.md) explains the connection measurements.
+An HTTP/1 document, or a document with an unknown protocol, admits up to three background requests across its Runtime targets until response headers arrive. At most two can be reads, including passive desktop status checks. Session activation and plugin manifest synchronization take precedence over queued navigation reads and catalogs. HTTP/2 and HTTP/3 issue these operations concurrently. Explicit high-priority requests, desktop status refreshes, conversation creation and send, draft operations, workbench search and workbench pagination bypass the queue. Cancellation withdraws pending requests before they contact the Gateway. The [scheduling decision](../../../.agents/notes/implemented/architecture/2026-11-22-browser-advisory-read-scheduling.md) explains the connection measurements.
 
 The fetch wrapper identifies a native request rejection as `ApiTransportError` with status `0` and code `request-unavailable`; it preserves the cause and makes no retry. This identifies failure to receive an HTTP response, not an offline diagnosis or a known server outcome. An aborted request keeps its signal reason; identity failures and response-decoding defects are not classified as network failures. See the [fetch carrier](../../host/apiproxy/README.md) for HTTP and RPC failure semantics.
 
@@ -93,6 +93,8 @@ None, as the wire consumer layer moves already-composed messages between browser
 None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **History availability follows the Host** — this carrier only transports the bounded `session.history` response; whether a deployment can read a cold log without resuming an Agent belongs to the Host persistence provider.
 - **A plain-HTTP listener exposes the bearer cookie in transit** — such a deployment cannot mark the browser cookie `Secure`, so serving the same authority over a network can leak the session cookie; configuring TLS on the Web carrier ([`dsh-host-webserver`](../../host/webserver/README.md)) marks the cookie `Secure` and confines it to TLS.

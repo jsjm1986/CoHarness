@@ -194,6 +194,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   agentPreStepTiming: 'Managed pre-step timing callback documented in packages/core/agent/README.md#step-admission',
   resourceBudgetRequired: 'managed-deployment marker is owned by packages/context/gateway-runtime/README.md#resource-admission',
   gatewayWorkspaceCatalogRevision: 'not a service: root-owned Workspace publication sequence — packages/context/gateway-runtime/README.md owns publication ordering',
+  runtimeStartupMarks: 'not a service: launcher startup milestones — packages/context/gateway-runtime/README.md owns boot timing',
   modelAccessRequired: 'managed-deployment marker is owned by packages/llm/model-access/README.md',
   appExit: 'not a service: launcher-provided bounded process-exit callback — packages/boot/cmdline/README.md owns the launcher contract',
   appReady: 'not a service: launcher-provided successful-startup signal — packages/boot/cmdline/README.md owns the launcher contract',

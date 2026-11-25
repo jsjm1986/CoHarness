@@ -8,7 +8,7 @@ import { auditAdminState, auditAdminTouchTargets } from './admin-responsive-stat
 import { responsiveBrowser, responsiveMobileEmulation } from './responsive-browser.ts'
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
 import type {
-  AdminDocumentDetail, AdminUser, DeploymentState, ModelRegistrationReport, NodeConfigurationView,
+  AdminDocumentDetail, AdminUser, DeploymentOverviewResponse, DeploymentState, ModelRegistrationReport, NodeConfigurationView,
   OrganizationModelSettingsView, ProjectDetail, TunnelAccessView, UsageOverview,
 } from '../../../gateway/admin-ui/src/api.ts'
 import type { GovernanceRebuildStatus } from '../../../gateway/src/governance-rebuild-review.ts'
@@ -16,6 +16,15 @@ import type { DeploymentContext, NodeConnectionView } from '../../../gateway/src
 
 interface Reply { status?: number; body: unknown }
 type ReplySource = Reply | ((request: Request) => Reply | Promise<Reply>)
+const overviewReads = {
+  deployment: '/admin/api/deployment',
+  backups: '/admin/api/backups',
+  tunnel: '/admin/api/tunnel',
+  nodeConfiguration: '/admin/api/deployment/configuration',
+  nodeConnection: '/admin/api/deployment/node-connection',
+  runtimeAllocationPolicy: '/admin/api/runtime-allocation-policy',
+  nodeAccess: '/admin/api/deployment/nodes/access',
+} as const
 const matrix = process.env.DSH_FEATURE_MATRIX === '1'
 const timeout = matrix ? 600_000 : 60_000
 let fixture: Awaited<ReturnType<typeof startAdminResponsiveFixture>>
@@ -38,9 +47,30 @@ async function visit(path: string, operation: (page: Page, replies: Map<string, 
   const replies = new Map<string, ReplySource>()
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
+  const readLegacy = async (request: Request, path: string): Promise<Reply> => {
+    const source = replies.get(`GET ${path}`)
+    if (source !== undefined) return typeof source === 'function' ? source(request) : source
+    const response = await page.request.get(new URL(path, request.url()).toString())
+    return { status: response.status(), body: await response.json().catch(() => ({})) }
+  }
+  const overviewReply = async (request: Request): Promise<Reply> => {
+    const selected = new URL(request.url()).searchParams.get('sections')?.split(',').filter(part => part !== '')
+      ?? Object.keys(overviewReads)
+    const sections: Record<string, unknown> = {}
+    await Promise.all(selected.map(async (key) => {
+      if (!(key in overviewReads)) return
+      const reply = await readLegacy(request, overviewReads[key as keyof typeof overviewReads])
+      const status = reply.status ?? 200
+      const error = typeof reply.body === 'object' && reply.body !== null && 'error' in reply.body && typeof reply.body.error === 'string'
+        ? reply.body.error : `HTTP ${status}`
+      sections[key] = status >= 400 ? { ok: false, status, error } : { ok: true, value: reply.body }
+    }))
+    return { body: { sections } as DeploymentOverviewResponse }
+  }
   const intercept = async (route: Parameters<Parameters<Page['route']>[1]>[0]): Promise<void> => {
     const request = route.request()
-    const source = replies.get(`${request.method()} ${new URL(request.url()).pathname}`)
+    const key = `${request.method()} ${new URL(request.url()).pathname}`
+    const source = replies.get(key) ?? (key === 'GET /admin/api/deployment/overview' ? overviewReply : undefined)
     if (source === undefined) { await route.fallback(); return }
     const reply = typeof source === 'function' ? await source(request) : source
     await route.fulfill({ status: reply.status ?? 200, json: reply.body })
@@ -96,7 +126,7 @@ const catalogReads = [
   ['models', '/models', '/models'], ['audit', '/audit', '/audit'],
   ['usage', '/usage', '/usage/overview'], ['documents', '/documents', '/documents'],
   ['archives', '/archives', '/archives/records'], ['ssh', '/ssh', '/ssh-targets'],
-  ['deployment', '/deployment', '/deployment'], ['steward', '/steward', '/steward'],
+  ['deployment', '/deployment', '/deployment/overview'], ['steward', '/steward', '/steward'],
   ['webhooks', '/webhooks', '/webhook-endpoints'], ['desktops', '/desktops', '/desktops'],
   ['remote-desktops', '/remote-desktops', '/remote-desktop/endpoints'],
   ['governance-recovery', '/governance-recovery', '/governance-recovery'],
@@ -1748,6 +1778,15 @@ it.each(['organization', 'user'] as const)('reviews %s Runtime allocation limits
     const path = `/admin/api/${kind === 'user' ? `users/${fixture.adminId}/` : ''}runtime-allocation-policy`
     const inherited = { revision: '1', maxTotal: 8, maxPerNode: 2, source: 'organization' }
     replies.set(`GET ${path}`, { body: inherited })
+    if (kind === 'organization') {
+      replies.set('GET /admin/api/deployment/overview', async (request) => {
+        const response = await page.request.get(request.url())
+        expect(response.ok()).toBe(true)
+        const overview = await response.json() as DeploymentOverviewResponse
+        if (overview.sections.runtimeAllocationPolicy === undefined) return { body: overview }
+        return { body: { sections: { ...overview.sections, runtimeAllocationPolicy: { ok: true, value: inherited } } } }
+      })
+    }
     await page.reload()
     if (kind === 'user') await page.locator('summary').filter({ hasText: 'Runtime 配额' }).tap()
     const form = page.locator('.runtimePolicy')
@@ -1770,7 +1809,9 @@ it.each(['organization', 'user'] as const)('reviews %s Runtime allocation limits
     replies.set(`GET ${path}`, { body: { ...inherited, revision: '2', maxTotal: 10, maxPerNode: 3,
       source: kind === 'user' ? 'user' : 'organization' } })
     await form.getByRole('button', { name: '刷新配额', exact: true }).tap()
-    await expect.poll(() => total.inputValue()).toBe('10')
+    await expect.poll(() => total.isEnabled()).toBe(true)
+    expect(await total.inputValue()).toBe('12')
+    expect(await perNode.inputValue()).toBe('4')
     await state(page, `runtime-policy-${kind}-refreshed`, form)
     if (kind === 'user') {
       await pendingReply(replies, `PUT ${path}`, refusal,

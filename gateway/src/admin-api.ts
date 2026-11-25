@@ -2040,12 +2040,12 @@ async function dispatch(
     const project = await deps.projects.getById(projectId)
     if (project === null) { await reply.error(404, 'project not found'); return true }
     const target = { kind: 'project' as const, id: projectId }
-    const stopped = op === 'start' ? undefined : await deps.instances.stop(target, 'manual', admin.id)
+    const selected = await selectedAdminRuntime(deps, admin, req, target)
+    const stopped = op === 'start' ? undefined : await deps.instances.stop(selected, 'manual', admin.id)
     if (op !== 'stop') {
-      const selected = op === 'start' ? await selectedAdminRuntime(deps, admin, req, target) : target
       await deps.instances.ensureRunning({ ...selected, kind: 'project', name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit', admin.id)
     }
-    await write(`admin.project-instances.${op}`, { projectId, ...stopped })
+    await write(`admin.project-instances.${op}`, { projectId, ...(selected.runtimeId === undefined ? {} : { runtimeId: selected.runtimeId }), ...stopped })
     if (stopped !== undefined) res.setHeader(RUNTIME_SHUTDOWN_OUTCOME_HEADER, stopped.shutdownOutcome)
     sendNoContent(res)
     return true

@@ -976,15 +976,23 @@ describe('InstanceManager', () => {
       await manager.ensureRunning(alice)
       const lines = info.mock.calls.map(([line]) => String(line)).filter(line => line.startsWith('[runtime-start-timing] '))
       expect(lines).toHaveLength(1)
-      const timing = JSON.parse(lines[0]!.slice('[runtime-start-timing] '.length)) as { stagesMs: Record<string, number>; elapsedMs: number; readinessProbes: number }
+      const timing = JSON.parse(lines[0]!.slice('[runtime-start-timing] '.length)) as {
+        stagesMs: Record<string, number>
+        localSupervisorStagesMs?: Record<string, number>
+        elapsedMs: number
+        readinessProbes: number
+      }
       expect(timing).toMatchObject({ ownerId: alice.id, kind: 'user', intent: 'passive', generation: endpoint.generation, outcome: 'ready' })
       const stages = ['targetResolved', 'lifecycleAcquired', 'capacityRequested', 'capacityGranted', 'startAdmitted', 'contextReady',
-        'portReady', 'stampReady', 'generationClaimed', 'profileReady', 'allocationRequested', 'allocationAuthorized', 'launcherReturned',
+        'portReady', 'stampReady', 'generationClaimed', 'profileReady', 'localBootIdStarted', 'localBootIdReady',
+        'localLeaseAcquired', 'localReservationWritten', 'allocationRequested', 'allocationAuthorized',
+        'localSupervisorSpawnStarted', 'localSupervisorSpawned', 'localSupervisorReady', 'launcherReturned',
         'readinessAuthenticated', 'readyPublished']
       expect(timing.readinessProbes).toBeGreaterThanOrEqual(1)
       expect(Object.keys(timing.stagesMs)).toEqual(stages)
       const offsets = [0, ...stages.map(stage => timing.stagesMs[stage]!), timing.elapsedMs]
       expect(offsets.every((ms, index) => Number.isFinite(ms) && (index === 0 || ms >= offsets[index - 1]!))).toBe(true)
+      expect(timing.localSupervisorStagesMs).toMatchObject({ ownerLeaseAdopted: expect.any(Number), ready: expect.any(Number) })
     } finally { info.mockRestore() }
   })
 

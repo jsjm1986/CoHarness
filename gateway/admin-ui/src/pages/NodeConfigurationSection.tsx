@@ -1,6 +1,6 @@
 /** Desired and effective deployment settings for the server-confirmed current node. */
 import { usePendingEdits } from '../pending-edits.tsx'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import { getNodeConfiguration, mutateNodeConfiguration, type NodeConfigurationView, type NodeSettingValues } from '../api.ts'
 import { unwrapDeploymentOverviewSlice, useDeploymentOverview } from '../deployment-overview.tsx'
@@ -36,19 +36,27 @@ export function NodeConfigurationSection() {
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
   const [busy, setBusy] = useState(false)
+  const [reading, setReading] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [filter, setFilter] = useState('')
+  const rereadRequest = useRef<AbortController | undefined>(undefined)
   const applying = view?.operation?.status === 'pending' || view?.operation?.status === 'applying'
+  const cancelReread = useCallback(() => {
+    if (rereadRequest.current === undefined) return
+    rereadRequest.current.abort(); rereadRequest.current = undefined; setReading(false)
+  }, [])
+  useEffect(() => () => { rereadRequest.current?.abort() }, [])
   useEffect(() => {
     const appendOrigin = (event: Event): void => {
       if (!(event instanceof CustomEvent) || view === null || draft === null || busy || applying || event.detail?.nodeId !== view.nodeId || typeof event.detail?.origin !== 'string') return
       event.preventDefault()
+      cancelReread()
       const origin = event.detail.origin as string
       setDraft(current => current === null ? null : { ...current, HGW_PUBLIC_ORIGINS: [...new Set([...current.HGW_PUBLIC_ORIGINS.split(',').map(value => value.trim()), origin])].join(',') })
     }
     window.addEventListener('hgw-node-connection-origin', appendOrigin)
     return () => { window.removeEventListener('hgw-node-connection-origin', appendOrigin) }
-  }, [view?.nodeId, draft === null, busy, applying])
+  }, [view?.nodeId, draft === null, busy, applying, cancelReread])
   const overview = useDeploymentOverview()
   const settled = useRef(false)
   const dirty = draft !== null && view !== null && NODE_CONFIG_FIELDS.some(field => draft[field.key] !== view.desired[field.key])
@@ -71,7 +79,7 @@ export function NodeConfigurationSection() {
     const lifetime = new AbortController()
     void getNodeConfiguration(lifetime.signal).then(value => {
       if (lifetime.signal.aborted) return
-      settled.current = true; setView(value); setDraft(value.desired)
+      settled.current = true; setView(value); setDraft(value.desired); setError('')
     }).catch((cause: unknown) => {
       if (lifetime.signal.aborted) return
       settled.current = true; setError(configurationMessage(cause))
@@ -83,16 +91,38 @@ export function NodeConfigurationSection() {
     const lifetime = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
     const read = async () => {
-      try { setView(await getNodeConfiguration(lifetime.signal)); setError('') }
-      catch (cause) { if (!lifetime.signal.aborted) setError(configurationMessage(cause)) }
+      try {
+        const next = await getNodeConfiguration(lifetime.signal)
+        if (!lifetime.signal.aborted) { setView(next); setError('') }
+      } catch (cause) { if (!lifetime.signal.aborted) setError(configurationMessage(cause)) }
       finally { if (!lifetime.signal.aborted) timer = setTimeout(() => { void read() }, 5000) }
     }
     timer = setTimeout(() => { void read() }, 1000)
     return () => { lifetime.abort(); clearTimeout(timer) }
   }, [applying])
 
+  async function reread(): Promise<void> {
+    if (busy || applying || confirm) return
+    rereadRequest.current?.abort()
+    const controller = new AbortController()
+    rereadRequest.current = controller
+    setReading(true)
+    if (view === null) setError('')
+    try {
+      const next = await getNodeConfiguration(controller.signal)
+      if (controller.signal.aborted) return
+      setView(next); setDraft(next.desired); setError(''); setSaved('')
+    } catch (cause) { if (!controller.signal.aborted) setError(configurationMessage(cause)) }
+    finally {
+      if (rereadRequest.current === controller && !controller.signal.aborted) {
+        rereadRequest.current = undefined; setReading(false)
+      }
+    }
+  }
+
   async function mutate(action: 'save' | 'apply') {
-    if (view === null || draft === null) return
+    if (view === null || draft === null || busy || applying) return
+    cancelReread()
     setBusy(true); setError(''); setSaved('')
     try {
       const next = await mutateNodeConfiguration({ action, organizationId: view.organizationId, nodeId: view.nodeId,
@@ -103,9 +133,12 @@ export function NodeConfigurationSection() {
     finally { setBusy(false) }
   }
 
-  return <Section title={t('sectionTitle')} meta={view === null ? t('metaLoading') : t('metaNode', { node: view.nodeId, revision: String(view.revision), running: String(view.runningRevision) })}>
+  return <Section title={t('sectionTitle')} meta={view === null ? (error === '' ? t('metaLoading') : undefined) : t('metaNode', { node: view.nodeId, revision: String(view.revision), running: String(view.runningRevision) })}>
     <DesktopEnvironmentNotice />
-    {view === null || draft === null ? <><ErrorBanner message={error} />{error === '' ? <LoadingState label={t('loading')} /> : null}</> : <>
+    {view === null || draft === null ? <>
+      <ErrorBanner message={error} />
+      {error === '' ? <LoadingState label={t('loading')} /> : <Button onClick={() => { void reread() }}>{t('rereadButton')}</Button>}
+    </> : <>
       <p>{t('intro')}</p>
       <StatusBadge tone={applying ? 'warning' : view.operation?.status === 'failed' ? 'danger' : 'neutral'}>
         {view.operation === null || view.operation.revision !== view.revision ? (view.revision === view.runningRevision ? t('stateEffective') : t('stateDesired')) : status[view.operation.status]}
@@ -123,7 +156,11 @@ export function NodeConfigurationSection() {
           {fields.map(field => <Field key={field.key} label={`${field.label}${field.unit === '' ? '' : `（${field.unit}）`}`}>{controlProps => <>
             <input {...controlProps} className="input" value={draft[field.key]} inputMode={field.kind === 'integer' ? 'numeric' : 'text'}
               aria-label={`${field.label}${field.unit === '' ? '' : `（${field.unit}）`}`} aria-describedby={`node-setting-help-${field.key} node-setting-current-${field.key}`}
-              onChange={event => { setDraft(current => current === null ? null : { ...current, [field.key]: event.target.value }); setSaved('') }} />
+              onChange={event => {
+                cancelReread()
+                const value = event.target.value
+                setDraft(current => current === null ? null : { ...current, [field.key]: value }); setSaved('')
+              }} />
             <p id={`node-setting-help-${field.key}`}>{field.help}</p>
             <small id={`node-setting-current-${field.key}`}>{t('currentLine', { value: view.effective[field.key] === '' ? t('notSet') : view.effective[field.key], source: view.runningRevision === 0 ? t('sourceBoot') : t('sourceManaged', { revision: String(view.runningRevision) }) })}</small>
           </>}</Field>)}
@@ -132,12 +169,10 @@ export function NodeConfigurationSection() {
       })}
       <div className="formActions nodeConfigurationActions">
         <Button variant="primary" disabled={!dirty || applying} loading={busy} onClick={() => { void mutate('save') }}>{t('saveButton')}</Button>
-        <Button disabled={busy || dirty || applying || view.revision === view.runningRevision} onClick={() => { setError(''); setConfirm(true) }}>{t('applyButton')}</Button>
-        <Button disabled={busy || applying} onClick={() => {
-          setBusy(true)
-          void getNodeConfiguration().then(next => { setView(next); setDraft(next.desired); setError(''); setSaved('') })
-            .catch((cause: unknown) => { setError(configurationMessage(cause)) }).finally(() => { setBusy(false) })
-        }}>{t('rereadButton')}</Button>
+        <Button disabled={busy || dirty || applying || view.revision === view.runningRevision} onClick={() => {
+          cancelReread(); setError(''); setConfirm(true)
+        }}>{t('applyButton')}</Button>
+        <Button disabled={busy || applying} loading={reading} onClick={() => { void reread() }}>{t('rereadButton')}</Button>
       </div>
       <p className="nodeConfigurationHelp">{t('configFileLead')}<code>{view.configFile}</code>{t('configFileCli')}<code>node gateway/lib/node-config-cli.js status</code>{t('configFileStatus')}<code>recover</code>{t('configFileRecover')}</p>
       <Dialog open={confirm} title={t('applyDialogTitle')} description={t('applyDialogDescription')}

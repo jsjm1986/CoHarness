@@ -4,18 +4,21 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { PoolClient } from 'pg'
 import type { ReadySessionOutcome, ReadySessionRoute } from './performance-observer.ts'
+import { observeLaunchSql } from './runtime-launch-timing.ts'
 import { isImmutableRuntimeAssetRequest, isReadyRuntimeRead } from './runtime-request-path.ts'
 
 const method = new Map([
   ['/api/prepare/v1/session.create','create'],['/api/prepare/v1/session.history','history'],['/api/session.history','history'],
   ['/api/host.describe','hostDescription'],['/api/workspace.list','workspaceList'],['/api/session.list','sessionList'],
+  ['/api/workspaceFiles.list','workspaceFilesList'],['/api/workspaceFiles.stat','workspaceFilesStat'],
+  ['/api/workspaceFiles.read','workspaceFilesRead'],['/api/workspaceFiles.readBytes','workspaceFilesReadBytes'],
   ['/api/admit/v1/session.prompt','send'],['/api/admit/v1/session.status','status'],
   ['/api/terminal/write','terminalWrite'],['/api/terminal/follow','terminalFollow'],
   ['/account/api/runtime/prepare/v1','runtimePrepare'],
   ['/internal/runtime/execution/input','executionInput'],['/internal/runtime/execution/register-session','executionRegister'],
   ['/internal/runtime/execution/enter','executionEnter'],['/internal/runtime/execution/authorize','executionAuthorize'],
   ['/internal/runtime/resources/request','resourceRequest'],['/internal/runtime/resources/statuses','resourceStatuses'],
-  ['/internal/runtime/model-credential','modelCredential'],
+  ['/internal/runtime/resources/finish','resourceFinish'],['/internal/runtime/model-credential','modelCredential'],
 ] as const)
 const getMethod = new Map([
   ['/account/api/workbench/rows', 'workbenchRows'],
@@ -26,11 +29,17 @@ const getMethod = new Map([
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 export type OperationPhase='authorize'|'prepare'|'admit'|'accessSync'|'runtimeQueue'|'runtimeLiveness'|'nodeConnection'|'nodeQueue'|'nodeLeaseCheck'|'nodeServiceOpen'|'upstream'
   |'entryReadApproval'|'entryReadRelease'|'nodePreparedRead'
-  | 'governanceCheckout' | 'contentCheckout' | 'resourceWriteAdmission' | 'resourceChangeWait' | 'executionInputServer'
-type Method='bootstrap'|'pluginCombo'|'hostDescription'|'workspaceList'|'sessionList'|'create'|'history'|'send'|'status'
+  | 'governanceCheckout' | 'contentCheckout' | 'resourceWriteAdmission' | 'resourceChangeWait' | 'resourceFinishDatabase' | 'executionInputServer'
+type Method='bootstrap'|'pluginCombo'|'hostDescription'|'workspaceList'|'sessionList'
+  |'workspaceFilesList'|'workspaceFilesStat'|'workspaceFilesRead'|'workspaceFilesReadBytes'
+  |'create'|'history'|'send'|'status'
   |'terminalWrite'|'terminalFollow'|'runtimePrepare'|'workbenchRows'|'workbenchContext'|'documentsOverview'|'nodeDocumentOverview'
   |'executionInput'|'executionRegister'
-  |'executionEnter'|'executionAuthorize'|'resourceRequest'|'resourceStatuses'|'modelCredential'
+  |'executionEnter'|'executionAuthorize'|'resourceRequest'|'resourceStatuses'|'resourceFinish'|'modelCredential'
+const automaticId = new Set<Method>([
+  'bootstrap', 'pluginCombo', 'workspaceFilesList', 'workspaceFilesStat', 'workspaceFilesRead', 'workspaceFilesReadBytes',
+  'executionEnter', 'executionAuthorize', 'resourceRequest', 'resourceStatuses', 'modelCredential',
+])
 type SqlRole='governance'|'content'
 /** Result of acquiring one exclusive PostgreSQL client. */
 export type ConnectionCheckout = { kind: 'opened'; setupMs: number } | { kind: 'reused' | 'handoff' | 'failed' }
@@ -44,6 +53,19 @@ const admissionPhases=['sessionAuthority','agentReadiness','admissionWait','exec
 type HostAdmission=Partial<Record<typeof admissionPhases[number],number>>
 const preparationPhases = ['bodyMs', 'sessionMs', 'initialHistoryMs'] as const
 type HostPreparation = Partial<Record<typeof preparationPhases[number], number>>
+/** Identifier-free host pressure summary recorded when resource admission remains queued. */
+export interface ResourceQueueDiagnostic {
+  readonly reason: 'no-local-observation' | 'observation-failed' | 'observation-stale' | 'pressure-memory' | 'pressure-cpu'
+    | 'pressure-event-loop' | 'observation-unapplied' | 'credits-or-unregistered'
+  readonly observationAgeMs?: number
+  readonly lastErrorAgeMs?: number
+  readonly cpu?: number
+  readonly memory?: 'normal' | 'warning' | 'critical'
+  readonly memoryAvailableRatio?: number
+  readonly eventLoopMs?: number
+  readonly sampleCredits?: number
+  readonly sampleApplied?: boolean
+}
 interface Sample {
   id:string; operation:Method; startedAtMs:number; durationMs:number; responseHeadersMs?:number
   status:number; aborted:boolean; sentBytes:number|null; receivedBytes:number|null
@@ -51,6 +73,7 @@ interface Sample {
   readySession?:Partial<Record<ReadySessionRoute,Partial<Record<ReadySessionOutcome,number>>>>
   databaseCheckout?:Partial<Record<SqlRole,CheckoutSpans>>
   resourceBearerDatabase?:{poolWaitMs:number;connectionSetupMs:number;failedCheckoutMs:number;queryMs:number;queries:number}
+  resourceQueue?:ResourceQueueDiagnostic
   phases:Partial<Record<OperationPhase,number>>; sql:Record<SqlRole,{count:number;elapsedMs:number}>
   hostMs?:number; hostAdmission?:HostAdmission; hostPreparation?:HostPreparation; nodeTransport?:NodeTransport
 }
@@ -153,6 +176,17 @@ export function recordReadySession(route: ReadySessionRoute, outcome: ReadySessi
 }
 
 /**
+ * Record host-local pressure attribution when a resource admission response remains queued.
+ * @param diagnostic - identifier-free summary from the coordinator's latest host observation.
+ */
+export function recordResourceQueueDiagnostic(diagnostic: ResourceQueueDiagnostic): void {
+  const flight = current.getStore()
+  if ((flight?.sample.operation === 'resourceRequest' || flight?.sample.operation === 'resourceStatuses') && !flight.closed) {
+    flight.sample.resourceQueue = diagnostic
+  }
+}
+
+/**
  * Record the database server's elapsed execution input statement time.
  * @param milliseconds - time measured on PostgreSQL, including any server-side waits.
  */
@@ -214,15 +248,20 @@ export function observeOperationCheckout(role: SqlRole): (result: ConnectionChec
 export function observeOperationSql(db:PoolClient,role:SqlRole):void{
   db.query=new Proxy(db.query,{apply(target,receiver,args:unknown[]){
     const flight=current.getStore()
-    if(!flight || flight.closed) return Reflect.apply(target,receiver,args)
-    const start=performance.now(),measure=flight.sample.sql[role]
+    const trackFlight = flight !== undefined && !flight.closed
+    const recordLaunchSql = observeLaunchSql()
+    if(!trackFlight && recordLaunchSql === undefined) return Reflect.apply(target,receiver,args)
+    const start=performance.now()
+    const measure=trackFlight ? flight.sample.sql[role] : undefined
     let settled=false
     const finish=()=>{
-      if(settled || flight.closed)return
+      if(settled)return
       settled=true
-      measure.elapsedMs=rounded(measure.elapsedMs+performance.now()-start)
+      const elapsed = performance.now()-start
+      if(measure!==undefined && !flight!.closed) measure.elapsedMs=rounded(measure.elapsedMs+elapsed)
+      recordLaunchSql?.(elapsed)
     }
-    measure.count++
+    if(measure!==undefined) measure.count++
     const cb=args.at(-1)
     const hasCallback=typeof cb==='function'
     if(hasCallback) args[args.length-1]=new Proxy(cb,{apply(callback,owner,parameters){finish();return Reflect.apply(callback,owner,parameters)}})
@@ -252,12 +291,12 @@ export class OperationTimings {
       : req.method==='GET'
         ? ((getMethod as ReadonlyMap<string,Method>).get(path)
           ?? (path==='/' && isReadyRuntimeRead(req.method, new URL(requestPath, 'http://gateway')) ? 'bootstrap' : undefined)
-          ?? (suppliedId !== undefined && path === '/plugins/combo.js' && isImmutableRuntimeAssetRequest(req.method, requestPath) ? 'pluginCombo' : undefined))
+          ?? (path === '/plugins/combo.js' && isImmutableRuntimeAssetRequest(req.method, requestPath) ? 'pluginCombo' : undefined))
         : undefined
     if (action === undefined) return work()
-    const requestId=suppliedId ?? (action==='executionEnter' || action==='executionAuthorize' || action==='resourceRequest'
-      || action==='resourceStatuses' || action==='modelCredential' ? randomUUID() : undefined)
+    const requestId = suppliedId ?? (automaticId.has(action) ? randomUUID() : undefined)
     if (requestId === undefined) return work()
+    if (suppliedId === undefined) req.headers['x-dsh-operation-id'] = requestId
     const sample:Sample={id:requestId,operation:action,startedAtMs:Date.now(),status:0,durationMs:0,aborted:false,
       receivedBytes:action==='modelCredential' ? null : length(req.headers['content-length']),
       sentBytes:null,phases:{},sql:{governance:{count:0,elapsedMs:0},content:{count:0,elapsedMs:0}}}
@@ -291,7 +330,7 @@ export class OperationTimings {
     res.once('finish',finish);res.once('close',finish)
     return current.run(scope,work)
   }
-  /** @param id - optional exact browser intent. @returns completed observations oldest first. */
+  /** @param id - optional exact correlation UUID. @returns completed observations oldest first. */
   samples(id?:string):readonly Sample[]{
     return [...this.history.slice(this.position),...this.history.slice(0,this.position)].filter(row=>id===undefined || row.id===id)
   }

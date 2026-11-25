@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/web/README.md
 document:
-  en: 472838755bf7d3ec860f8540b1602da0dd4616bf
-  zh: 165e872d5c14a9b6020c8ade33297eb2cc1277fd
+  en: 3bce4846b82b5f53c5d01eaccc2ac2b1369d0de7
+  zh: 5ad3b71b01e7f8f9ffca335a62242e0e58bf7a2f
 /:
   en: a702bbb711d8d2fb
   zh: 0a51af1cad6486b4
 /deepseek-ai-dsh-client-web:
-  en: 806dc2f62c762072
-  zh: f5faaa3ea5cd71ce
+  en: 185744633414865f
+  zh: 1e7bb6daa2a2c8a4
 /deepseek-ai-dsh-client-web/summary:
   en: 42c461bf5f4db9ac
   zh: 41dbd8cccb2d642c
@@ -22,10 +22,10 @@ document:
   zh: bc8bc6e25ecbf9e8
 /deepseek-ai-dsh-client-web/model-experience/kv-cache-effect:
   en: ca75c51c89c2c9b0
-  zh: 2026c1566df4f78c
+  zh: de54f3467ef3b9be
 /deepseek-ai-dsh-client-web/known-limitations-and-deferred-work:
-  en: b4d18174d3cd4acd
-  zh: 5ea6249611c9df85
+  en: cf4af3db1a0a2723
+  zh: b9d205b61ae9092c
 /deepseek-ai-dsh-client-web/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

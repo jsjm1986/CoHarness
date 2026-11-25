@@ -1588,7 +1588,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-gateway-runtime`
 
 - `inject`: `connection`
-- `source`: [`packages/context/gateway-runtime/src/index.ts:531`](../packages/context/gateway-runtime/src/index.ts)
+- `source`: [`packages/context/gateway-runtime/src/index.ts:545`](../packages/context/gateway-runtime/src/index.ts)
 
 ```ts config-catalog
 /** Managed readiness and Workspace metadata publication settings. */

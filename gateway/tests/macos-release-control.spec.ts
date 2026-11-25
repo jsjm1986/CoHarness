@@ -731,12 +731,17 @@ printf '%s\n' "$*" > "$CAPTURE"
     else expect(readFileSync(capture, 'utf8')).toBe(`${realpathSync(candidate)}/gateway/lib/index.js\n`)
   })
 
-  it('rejects a release missing the supervisor listed by the production manifest before process inspection', () => {
+  it.each([
+    'gateway/lib/local-runtime-supervisor.js',
+    'gateway/deploy/postgres/migrations/149_quiescent_node_resource_completion.sql',
+  ])('rejects a release missing %s before process inspection', required => {
+    const manifest = readFileSync(new URL('../deploy/required-release-files.txt', import.meta.url), 'utf8')
+    expect(manifest.trimEnd().split('\n')).toContain(required)
     const f = activationFixture()
-    writeFileSync(join(f.candidate, 'gateway/deploy/required-release-files.txt'), 'gateway/lib/local-runtime-supervisor.js\n')
+    writeFileSync(join(f.candidate, 'gateway/deploy/required-release-files.txt'), `${required}\n`)
     const result = f.activate([f.candidate])
     expect(result.status).toBe(1)
-    expect(result.stderr).toContain('gateway/lib/local-runtime-supervisor.js')
+    expect(result.stderr).toContain(required)
     f.expectUnchanged()
   })
 

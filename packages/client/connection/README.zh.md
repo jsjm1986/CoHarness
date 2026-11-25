@@ -23,7 +23,7 @@ kind: "package-reference"
 
 `ConnectionHandle.documentIdentity` 提供已校验的账号与初始 Runtime，用于划分浏览器状态的存储命名空间。独立页面、fixture 与显式载体不提供该值。派生目标 handle 共享原始页面的身份，该值不授予目标访问权限。
 
-HTTP/1 或协议未知的页面跨各 Runtime 最多允许三条后台请求同时等待响应头，其中读取最多两条。会话激活和插件清单同步优先于排队中的导航读取和辅助目录。HTTP/2 和 HTTP/3 可并发执行这些操作。显式高优先级请求、新建对话、发送、草稿操作、工作台搜索和翻页直接发出。取消排队中的操作会在到达 Gateway 前撤销请求。连接测量见[调度决策](../../../.agents/notes/implemented/architecture/2026-11-22-browser-advisory-read-scheduling.zh.md)。
+HTTP/1 或协议未知的页面跨各 Runtime 最多允许三条后台请求同时等待响应头，其中读取最多两条，包括被动桌面状态查询。会话激活和插件清单同步优先于排队中的导航读取和辅助目录。HTTP/2 和 HTTP/3 可并发执行这些操作。显式高优先级请求、主动刷新桌面状态、新建对话、发送、草稿操作、工作台搜索和翻页直接发出。取消排队中的操作会在到达 Gateway 前撤销请求。连接测量见[调度决策](../../../.agents/notes/implemented/architecture/2026-11-22-browser-advisory-read-scheduling.zh.md)。
 
 fetch 包装把原生请求拒绝标识为 `ApiTransportError`，状态为 `0`、代码为 `request-unavailable`；它保留原因且不重试。这只标识未收到 HTTP 响应，不表示已诊断为断网或已知服务端结果。已取消的请求保留 signal 的原因；身份失败和响应解码缺陷不归类为网络失败。HTTP 与 RPC 失败语义见 [fetch 传输器](../../host/apiproxy/README.zh.md)。
 
@@ -92,8 +92,9 @@ Host 配置项 `serverTiming: true` 为 ApiProxy 回退 POST 响应添加固定�
 
 无；该包既不组装也不发送提供方请求。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **History 可用性由 Host 决定**：该 carrier 只传输有界的 `session.history` 响应；部署能否在不恢复 Agent 的情况下读取冷日志，属于 Host 持久化提供方的职责。
 - **明文 HTTP 监听器会在传输中暴露载体 Cookie**：此类部署无法给浏览器 Cookie 标记 `Secure`，因此在网络上提供同一权威可能泄露会话 Cookie；在 Web 载体（[`dsh-host-webserver`](../../host/webserver/README.zh.md)）上配置 TLS 会给 Cookie 标记 `Secure` 并将其限定在 TLS 内。

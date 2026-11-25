@@ -90,7 +90,6 @@ Client 在分配前，将每个 Session/content 到终端的关联写入自己�
 
 无；终端输出只在浏览器与 Host 之间传输。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

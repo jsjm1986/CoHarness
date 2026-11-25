@@ -21,9 +21,10 @@ import { runGatewayChildCommand } from './child-command.ts'
 import { LocalRuntimeControl } from './local-runtime-control.ts'
 import { LocalRuntimeOwnerStore,localRuntimeOwnerStores } from './local-runtime-owner.ts'
 import { probeLocalLinuxScope } from './local-runtime-linux.ts'
-import { LOCAL_BOOTSTRAP_BYTES, localBootstrapSchema, localKernelBootId } from './local-runtime-protocol.ts'
+import { localBootstrapMessage, localKernelBootId, localSupervisorStagesSchema } from './local-runtime-protocol.ts'
 import { nodeControlPaths } from './node-control-paths.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
+import type { RuntimeLaunchTiming } from './runtime-launch-timing.ts'
 import { readSystemdShutdownReceipt, systemdRuntimeShutdownReceipt, type RuntimeShutdownOutcome } from './runtime-shutdown.ts'
 import { renderUserUnit, unitName, type GrantEntry, type SystemdOptions } from './systemd.ts'
 
@@ -150,24 +151,34 @@ export class LocalLauncher implements Launcher {
     }), this.cfg.readinessTimeoutMs)
   }
 
-  async start(runtime: LaunchRuntime): Promise<InstanceProc> {
+  /**
+   * @param runtime - exact generation and private bootstrap inputs.
+   * @param timing - collect milestones and request supervisor diagnostics when supplied; otherwise leave timing off.
+   * @returns the generation's control handle after the supervisor acknowledges startup.
+   */
+  async start(runtime: LaunchRuntime, timing?: RuntimeLaunchTiming): Promise<InstanceProc> {
     if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
     const previous = this.homes.get(runtime.dshHome)
     if (previous !== undefined) { await previous.terminate(0); this.homes.delete(runtime.dshHome) }
+    timing?.mark('localBootIdStarted')
     const bootId = await localKernelBootId(runtime.signal).catch((error: unknown) => {
       if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
       throw error
     })
+    timing?.mark('localBootIdReady')
     const control = this.control(runtime)
     const lease = await control.store.acquire()
     let allocationAttempted = false
     let supervisor: ChildProcess | undefined
     try {
+      timing?.mark('localLeaseAcquired')
       const linuxScopeMode = await probeLocalLinuxScope(this.cfg.upstreamTimeoutMs, runtime.signal)
       const record = await lease.create(bootId, linuxScopeMode === undefined ? undefined : 'linux-slice')
-      const spec = localBootstrapSchema.parse({
+      timing?.mark('localReservationWritten')
+      const spec = localBootstrapMessage({
         kind: 'start', directory: control.store.directory, identity: control.store.identity, record,
         ...linuxScopeMode === undefined ? {} : { linuxScopeMode },
+        ...timing === undefined ? {} : { reportTiming: true },
         command: this.cfg.dshCommand.map(a => a.replaceAll('{port}', String(runtime.port))),
         cwd: runtime.homePath, dshHome: runtime.dshHome, credential: runtime.gatewayCredential,
         logCapBytes: this.cfg.runtimeLogCapBytes, controlTimeoutMs: this.cfg.upstreamTimeoutMs,
@@ -186,7 +197,6 @@ export class LocalLauncher implements Launcher {
           }),
         },
       })
-      if (Buffer.byteLength(JSON.stringify(spec)) > LOCAL_BOOTSTRAP_BYTES) throw new Error('Local runtime bootstrap exceeds its byte limit')
       const source = import.meta.url.endsWith('.ts')
       const entry = fileURLToPath(new URL(`./local-runtime-supervisor.${source ? 'ts' : 'js'}`, import.meta.url))
       await runtime.beforeAllocation?.()
@@ -197,6 +207,7 @@ export class LocalLauncher implements Launcher {
       // releases its pipe as soon as the bootstrap is delivered.
       const stdio: ('ignore' | 'ipc' | number)[] = ['ignore', 'ignore', 'ignore', 'ipc']
       if (process.platform !== 'win32') stdio.push(lease.fd)
+      timing?.mark('localSupervisorSpawnStarted')
       const child = supervisor = spawn(process.execPath, [...(source ? ['--import', import.meta.resolve('tsx/esm')] : []), entry, String(this.cfg.readinessTimeoutMs)], {
         cwd: this.cfg.dshRepoRoot, detached: true, stdio,
         env: {
@@ -205,8 +216,9 @@ export class LocalLauncher implements Launcher {
           TSX_TSCONFIG_PATH: fileURLToPath(new URL('../tsconfig.run.json', import.meta.url)),
         },
       })
+      if (timing !== undefined && child.pid !== undefined) timing.mark('localSupervisorSpawned')
       const exited = new Promise<void>(resolve => child.once('exit', () => resolve()))
-      await new Promise<void>((resolve, reject) => {
+      const diagnostic = await new Promise<{ stages: unknown } | undefined>((resolve, reject) => {
         const aborted = () => failed(new RuntimeCapacityError('cancelled'))
         const settled = () => { clearTimeout(timer); runtime.signal?.removeEventListener('abort', aborted) }
         const failed = (error: unknown) => { settled(); reject(error) }
@@ -215,7 +227,10 @@ export class LocalLauncher implements Launcher {
         child.once('exit', () => failed(new Error('Local runtime supervisor exited during startup')))
         child.on('message', (message: unknown) => {
           if (typeof message === 'object' && message !== null && 'kind' in message && message.kind === 'ready'
-            && 'nonce' in message && message.nonce === record.nonce) { settled(); resolve() }
+            && 'nonce' in message && message.nonce === record.nonce) {
+            settled()
+            resolve(spec.reportTiming === true && 'localSupervisorStagesMs' in message ? { stages: message.localSupervisorStagesMs } : undefined)
+          }
         })
         runtime.signal?.addEventListener('abort', aborted, { once: true })
         if (runtime.signal?.aborted) aborted()
@@ -224,6 +239,13 @@ export class LocalLauncher implements Launcher {
           else if (process.platform === 'win32') void lease.close()
         })
       })
+      if (timing !== undefined) {
+        timing.mark('localSupervisorReady')
+        if (diagnostic !== undefined) {
+          const parsed = localSupervisorStagesSchema.safeParse(diagnostic.stages)
+          if (parsed.success) timing.localSupervisorStagesMs = parsed.data
+        }
+      }
       if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
       child.unref()
       await lease.close()

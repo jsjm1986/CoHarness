@@ -10,6 +10,10 @@ import { Button, ErrorBanner, Field, LoadingState } from './ui.tsx'
 
 type LimitsDraft = { revision: string; total?: string; perNode?: string }
 
+function changedLimit(value: string | undefined, baseline: number): string | undefined {
+  return value === undefined || Number(value) === baseline ? undefined : value
+}
+
 /** @param props - optional account override; omission edits the organization's defaults. @returns existing form primitives with optimistic conflict handling. */
 export function RuntimeAllocationPolicyEditor({ userId }: { userId?: number }) {
   const showComputer = useDeploymentContext().value?.mode === 'multi'
@@ -27,6 +31,7 @@ export function RuntimeAllocationPolicyEditor({ userId }: { userId?: number }) {
   const waitingForOverview = includedInOverview && overview?.status === 'loading'
   const overviewPolicy = includedInOverview && overview?.status === 'ready' ? overview.sections?.runtimeAllocationPolicy : undefined
   const validationId = useId()
+  useEffect(() => { setDraft(undefined) }, [userId])
   useEffect(() => {
     setLoading(true)
     if (waitingForOverview) return
@@ -36,7 +41,15 @@ export function RuntimeAllocationPolicyEditor({ userId }: { userId?: number }) {
     void read.then(value => {
       if (controller.signal.aborted) return
       setPolicy(value); setError(''); setNeedsRefresh(false)
-      if (refresh > 0) setDraft(current => current === undefined ? undefined : { ...current, revision: value.revision })
+      if (refresh > 0) setDraft(current => {
+        if (current === undefined) return undefined
+        const next = {
+          revision: value.revision,
+          total: changedLimit(current.total, value.maxTotal),
+          perNode: changedLimit(current.perNode, value.maxPerNode),
+        }
+        return next.total === undefined && next.perNode === undefined ? undefined : next
+      })
     }).catch((cause: unknown) => { if (!controller.signal.aborted) { setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : t('limitsReadFailed')); setNeedsRefresh(true) } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => { controller.abort() }
@@ -48,9 +61,9 @@ export function RuntimeAllocationPolicyEditor({ userId }: { userId?: number }) {
   const valid = Number.isSafeInteger(limits.maxTotal) && Number.isSafeInteger(limits.maxPerNode) && limits.maxTotal > 0 && limits.maxPerNode > 0 && limits.maxPerNode <= limits.maxTotal
   function edit(field: 'total' | 'perNode', value: string): void {
     if (policy === undefined) return
-    const baseline = String(field === 'total' ? policy.maxTotal : policy.maxPerNode)
+    const baseline = field === 'total' ? policy.maxTotal : policy.maxPerNode
     setDraft(current => {
-      const next = { revision: policy.revision, ...current, [field]: value === baseline ? undefined : value }
+      const next = { revision: policy.revision, ...current, [field]: changedLimit(value, baseline) }
       return next.total === undefined && next.perNode === undefined ? undefined : next
     })
     setNotice('')

@@ -12,13 +12,19 @@ import type {
 import { bootClient } from './boot-client.ts'
 import { BootPage } from './boot-page.ts'
 import { mountClient } from './mount.ts'
-import { loadRemoteEntry, remoteEntrySelection, RemoteEntryAccountChanged, remoteEntryUrl, type RemoteEntrySelection } from './remote-entry.ts'
+import { loadRemoteEntry, remoteEntrySelection, RemoteEntryAccountChanged, remoteEntryUrl, type RemoteEntrySelection, type RemoteIndex } from './remote-entry.ts'
 import { StartupDraftView } from './startup-draft.ts'
 import './abort-signal.ts'
 import './base.css'
 
 /** Module transport hook replaced by jsdom tests. */
 export type BootSeams = Pick<ClientModuleCreateOptions, 'loadBundle'>
+
+function markBootStage(stage: string): void {
+  try {
+    performance.mark(`dsh:boot:${stage}`)
+  } catch { /* Boot telemetry cannot fail application startup in restricted runtimes. */ }
+}
 
 /** Browser boot entry that renders native input before loading the renderer's shared modules. */
 export class AppWebEntry {
@@ -50,13 +56,16 @@ export class AppWebEntry {
    */
   async run(onFailure?: (reason: unknown) => void): Promise<void> {
     try {
+      markBootStage('run-start')
       const remote = remoteEntrySelection()
       const remoteBoot = remote === undefined ? undefined : this.bootRemoteIndex(remote)
       const platform = import('./seed.ts')
       void platform.catch((_error: unknown) => {
         // The remote account check takes precedence over reporting a renderer asset failure.
       })
-      if (remoteBoot !== undefined && !await remoteBoot) return
+      const remoteIndex = remoteBoot === undefined ? undefined : await remoteBoot
+      if (remoteIndex?.kind === 'full-index') return
+      if (remoteIndex !== undefined) markBootStage('remote-entry-ready')
       // Boot-readiness gate: whichever bootstrap applies the injection table
       // settles this deferred once every row has taken effect — the served
       // index resolves it in the rendered tail, so the await returns on the
@@ -79,9 +88,11 @@ export class AppWebEntry {
       }).__DSH_TRANSPORT__
       const { getStaticModules } = await platform
       if (this.lifetime.signal.aborted) return
+      markBootStage('seed-ready')
       this.modules = moduleLoader.create({
         boot: win.__DSH_BOOT__,
         staticModules: getStaticModules(),
+        ...remoteIndex === undefined ? {} : { preloadedBundles: remoteIndex.preloadedBundles },
         ...transport?.loadBundle === undefined ? {} : { loadBundle: transport.loadBundle },
         ...this.seams,
       })
@@ -99,6 +110,7 @@ export class AppWebEntry {
       }
       this.page.setTotal(this.manifest.plugins.filter(row => row.optional !== true).length)
       await prefetching
+      markBootStage('prefetch-ready')
       await bootClient({
         ctx,
         modules: this.modules,
@@ -107,8 +119,14 @@ export class AppWebEntry {
           if (onFailure === undefined || state !== 'failed') this.page.setState(name, state)
         },
       })
-      draft?.retainAtMount()
+      markBootStage('plugins-active')
+      if (draft !== undefined && draft.read() !== '') draft.retainAtMount()
       await mountClient(ctx, this.container)
+      markBootStage('mounted')
+      if (draft !== undefined) {
+        if (draft.read() === '') draft.dispose()
+        else draft.retainAtMount()
+      }
     } catch (reason) {
       if (this.lifetime.signal.aborted) return
       console.error(reason)
@@ -134,15 +152,23 @@ export class AppWebEntry {
     this.page.dispose()
   }
 
-  private async bootRemoteIndex(remote: RemoteEntrySelection): Promise<boolean> {
+  private async bootRemoteIndex(remote: RemoteEntrySelection): Promise<RemoteIndex> {
     const draft = new StartupDraftView(remote)
     this.startupDraft = draft
     this.page.attachDraft(draft)
+    markBootStage('draft-attached')
     const boot = await loadRemoteEntry(remote, this.lifetime.signal)
-    if (boot === 'injections') return true
-    if (draft.read() === '') location.replace(remoteEntryUrl(remote, 'full'))
-    else draft.showUnavailable()
-    return false
+    this.lifetime.signal.throwIfAborted()
+    if (boot.kind === 'full-index') {
+      this.page.stopProgress()
+      if (draft.read() === '') {
+        draft.dispose()
+        location.replace(remoteEntryUrl(remote, 'full'))
+      } else {
+        draft.showFullIndex()
+      }
+    }
+    return boot
   }
 
   /** Prefetch stage-one bundles and their dynamic requests before concurrent plugin imports. */

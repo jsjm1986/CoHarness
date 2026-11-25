@@ -11,7 +11,8 @@ import type { PersonalExecutionWriteFence } from './execution-identity.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 import type { RuntimeTarget } from './instances.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
-import { type NodePressureConfig, type NodePressureObservation } from './node-resource-pressure.ts'
+import { pressureCredits, type NodePressureConfig, type NodePressureObservation, type NodePressureSample } from './node-resource-pressure.ts'
+import type { ResourceQueueDiagnostic } from './operation-timing.ts'
 import { isDatabaseContentionError, transaction } from './postgres/database.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 
@@ -159,7 +160,7 @@ const qualifiedPersonalModelSql = `WITH reservation AS MATERIALIZED (
 const admissionErrors = new Map<string, NodeResourceBudgetError['reason']>([
   ['P4201', 'stale-generation'], ['P4202', 'request-conflict'], ['P4203', 'unregistered'],
   ['P4204', 'sequence-gap'], ['P4205', 'operation-conflict'],
-  ['P4206', 'owner-mismatch'],
+  ['P4206', 'owner-mismatch'], ['P4207', 'unknown-operation'],
 ])
 
 /** PostgreSQL owns reservations; no Gateway-local timer or lease expiry can release running work. */
@@ -167,6 +168,13 @@ export class NodeResourceBudget {
   private readonly changeEpoch = randomUUID()
   private changeRevision = 0
   private readonly changeWaiters = new Set<() => void>()
+  private lastObservation: {
+    readonly capturedAt: number
+    readonly applied: boolean
+    readonly sample: NodePressureSample
+    readonly credits: number
+  } | undefined
+  private lastObservationErrorAt: number | undefined
 
   constructor(
     private readonly pool: Pool,
@@ -183,6 +191,50 @@ export class NodeResourceBudget {
   private signalChange(): void {
     this.changeRevision += 1
     for (const wake of this.changeWaiters) wake()
+  }
+
+  /**
+   * Summarize the coordinator's latest local pressure observation for a queued admission response.
+   * @returns identifier-free queue attribution computed without an additional database query.
+   */
+  queueDiagnostic(): ResourceQueueDiagnostic {
+    const now = performance.now()
+    const round = (ms: number): number => Math.round(Math.max(0, ms) * 100) / 100
+    const last = this.lastObservation
+    const failedAt = this.lastObservationErrorAt
+    if (last === undefined) {
+      return failedAt === undefined
+        ? { reason: 'no-local-observation' }
+        : { reason: 'observation-failed', lastErrorAgeMs: round(now - failedAt) }
+    }
+    const observationAgeMs = round(now - last.capturedAt)
+    const failedAfterLast = failedAt !== undefined && failedAt > last.capturedAt
+    const { sample, credits, applied } = last
+    const reason: ResourceQueueDiagnostic['reason'] = observationAgeMs >= this.config.staleMs
+      ? (failedAfterLast ? 'observation-failed' : 'observation-stale')
+      : sample.memory !== 'normal'
+          || (sample.memoryAvailableRatio !== undefined && sample.memoryAvailableRatio <= this.config.linuxMemoryReserveRatio)
+        ? 'pressure-memory'
+        : sample.cpu >= this.config.cpuTarget
+          ? 'pressure-cpu'
+          : sample.eventLoopMs >= this.config.eventLoopTargetMs
+            ? 'pressure-event-loop'
+            : !applied
+              ? 'observation-unapplied'
+              : 'credits-or-unregistered'
+    return {
+      reason,
+      observationAgeMs,
+      ...(failedAfterLast ? { lastErrorAgeMs: round(now - failedAt) } : {}),
+      cpu: Math.round(sample.cpu * 10_000) / 10_000,
+      memory: sample.memory,
+      ...(sample.memoryAvailableRatio === undefined ? {} : {
+        memoryAvailableRatio: Math.round(sample.memoryAvailableRatio * 10_000) / 10_000,
+      }),
+      eventLoopMs: Math.round(sample.eventLoopMs * 100) / 100,
+      sampleCredits: credits,
+      sampleApplied: applied,
+    }
   }
 
   /**
@@ -222,6 +274,8 @@ export class NodeResourceBudget {
         [this.organizationId, this.nodeId, JSON.stringify(this.config)])
       await this.schedule(client)
     })
+    this.lastObservation = undefined
+    this.lastObservationErrorAt = undefined
   }
 
   /**
@@ -243,8 +297,17 @@ export class NodeResourceBudget {
           WHERE organization.id=$1 AND COALESCE(control.mode,'serving')='serving'
             AND COALESCE(control.write_epoch,1)=$6`,
         [this.organizationId, this.nodeId, JSON.stringify(sample), elapsed, JSON.stringify(this.config), String(writeEpoch)])
-      if (round?.observed.applied === true) this.signalChange()
+      const applied = round?.observed.applied === true
+      this.lastObservation = {
+        capturedAt,
+        applied,
+        sample,
+        credits: pressureCredits(sample, this.config),
+      }
+      this.lastObservationErrorAt = undefined
+      if (applied) this.signalChange()
     } catch (error) {
+      this.lastObservationErrorAt = performance.now()
       if (!isDatabaseContentionError(error)) throw error
       throw new NodeResourceBudgetError(503, 'database-busy', 'Resource accounting is busy. Retry after the current operation settles.', { cause: error })
     }
@@ -517,6 +580,17 @@ export class NodeResourceBudget {
    * @returns confirmation after accounting and any next grants commit under the current owner.
    */
   async finish(subject: ResourceOwner, operation: Pick<NodeResourceRequest, 'sequence' | 'requestId'>, outcome: 'quiescent' | 'not-started' | 'uncertain'): Promise<void> {
+    if (outcome === 'quiescent') {
+      let applied: boolean
+      try {
+        const { rows: [row] } = await this.pool.query<{ applied: boolean }>(
+          'SELECT harness.complete_quiescent_node_resource($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) AS applied',
+          [...this.owner(subject), ...this.exactOwner(subject), operation.sequence, operation.requestId, JSON.stringify(this.config)],
+        )
+        applied = row!.applied
+      } catch (error) { this.admissionError(error) }
+      if (applied) { this.signalChange(); return }
+    }
     await this.lock(async client => {
       const { sequence, requestId } = operation
       const owner = this.owner(subject), key = [...owner, sequence]

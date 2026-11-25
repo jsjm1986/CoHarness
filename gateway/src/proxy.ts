@@ -23,7 +23,7 @@ import { StreamPrincipalLeases } from './stream-principal-leases.ts'
 import { NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
 import type { ReadySessionOutcome } from './performance-observer.ts'
 import { ComputerAccessError } from './computer-access.ts'
-import { sendDeferredRuntimeBootstrap } from './deferred-runtime-bootstrap.ts'
+import { BOOTSTRAP_PRELOAD_HEADER, sendDeferredRuntimeBootstrap } from './deferred-runtime-bootstrap.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
 import { RuntimeAssetUnavailableError, type PostgresRuntimeAssetAdmission } from './runtime-asset-admission.ts'
 import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayHandlers, type GatewayRequestContext, type ReadyEventHandler, type ReadySessionHandler, type ProxyHandler, type UpgradeHandler } from './server.ts'
@@ -141,7 +141,11 @@ export function createProxyHandlers(
   const active = new Set<{ userId: number; projectId?: number; cancel(): void }>()
   const qualifyStream = async (token: string, context: GatewayRequestContext, renewal = false): Promise<(StreamSessionQualification & { scope: PrincipalScope }) | null> => {
     const authority = renewal ? deps.streamPrincipalAuthority : undefined
-    const current = await (authority ?? deps.auth).qualifyForStream(token)
+    const current = authority !== undefined
+      ? await authority.qualifyForStream(token)
+      : deps.qualifyStreamOnComputer !== undefined
+        ? await deps.qualifyStreamOnComputer(token)
+        : await deps.auth.qualifyForStream(token)
     if (current === null || current.user.id !== context.user.id || current.user.mustChangePassword
       || current.user.homePath !== context.user.homePath) return null
     if (context.scope.kind === 'personal') return { ...current, scope: { kind: 'personal' } }
@@ -220,8 +224,9 @@ export function createProxyHandlers(
   }
   server.on('proxyRes', (proxyResponse, req, res) => {
     for (const name of httpConnectionFields(proxyResponse.headers.connection)) delete proxyResponse.headers[name]
-    // Runtime plugins cannot replace the Gateway's authenticated response identity.
+    // Runtime plugins cannot replace the Gateway's response identity or timing ID.
     delete proxyResponse.headers['x-dsh-runtime-id']
+    delete proxyResponse.headers['x-dsh-operation-id']
     const location = proxyResponse.headers.location
     if (typeof location === 'string') {
       const rewritten = publicLocation(location)
@@ -252,19 +257,30 @@ export function createProxyHandlers(
     const { governance, pluginState } = deps
     const { dshHome, user, project } = runtime
     const retained = runtime.retainedData ? { existingHome: true as const } : undefined
-    const preparePolicy = async (): Promise<void> => {
+    const prepareGrants = async (): Promise<void> => {
       if (user !== undefined) {
         writeRuntimeGrantsFile(dshHome, await runtimeDirectoryGrants(user, projects), cfg.usersRoot, retained)
-        if (governance !== undefined) await writeModelGovernanceFile(cfg, governance, { ...user, dshHome }, retained)
       } else {
         if (project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
         writeRuntimeGrantsFile(dshHome, projectRuntimeGrants(cfg, project), cfg.projectRuntimesRoot, retained)
-        if (governance !== undefined) await writeProjectModelGovernanceFile(cfg, governance, project, dshHome, retained)
       }
     }
-    // Launch ownership covers pending policy writes even when the plugin read fails.
-    const [policy, projection] = await Promise.allSettled([preparePolicy(), pluginState?.projection(runtime.target)])
-    if (policy.status === 'rejected') throw policy.reason
+    const prepareGovernance = async (): Promise<void> => {
+      if (governance === undefined) return
+      if (user !== undefined) await writeModelGovernanceFile(cfg, governance, { ...user, dshHome }, retained)
+      else {
+        if (project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
+        await writeProjectModelGovernanceFile(cfg, governance, project, dshHome, retained)
+      }
+    }
+    // Launch ownership covers pending policy writes even when another preparation branch fails.
+    const [grants, modelPolicy, projection] = await Promise.allSettled([
+      prepareGrants(),
+      prepareGovernance(),
+      pluginState?.projection(runtime.target),
+    ])
+    if (grants.status === 'rejected') throw grants.reason
+    if (modelPolicy.status === 'rejected') throw modelPolicy.reason
     if (projection.status === 'rejected') throw projection.reason
     const pending = projection.value
     if (pluginState === undefined || pending === undefined || pending === null || pending === 'current') return
@@ -536,6 +552,7 @@ export function createProxyHandlers(
     const { pathname } = url
     const structuredBootstrap = req.method === 'GET' && pathname === '/' && req.headers.accept === 'application/json'
       && url.searchParams.getAll('dshBootstrap').length === 1 && url.searchParams.get('dshBootstrap') === '1'
+    const stripBootstrapPreloads = structuredBootstrap && req.headers[BOOTSTRAP_PRELOAD_HEADER] !== '1'
     if (pathname.startsWith('/api/') && !isDocumentUploadDataPath(req.method, pathname)) {
       res.once('finish', () => {
         // Successful RPC traffic is transport noise; only failures are audit-worthy.
@@ -552,7 +569,7 @@ export function createProxyHandlers(
         })).catch(error => { console.error('[gateway] API audit write failed:', error) })
       })
     }
-    req.url = runtimeRequestPath(req.url ?? '/')
+    req.url = runtimeRequestPath(req.url ?? '/', req.method)
     await new Promise<void>((resolve) => {
       let settled = false
       const finish = (): void => {
@@ -581,8 +598,8 @@ export function createProxyHandlers(
       })
       try {
         const options = targetOptions(ready.port, principal)
-        if (structuredBootstrap) deferredBootstrap.add(res)
-        const upstream = structuredBootstrap
+        if (stripBootstrapPreloads) deferredBootstrap.add(res)
+        const upstream = stripBootstrapPreloads
           ? { ...options, selfHandleResponse: true, headers: { ...options.headers, 'accept-encoding': 'identity' } }
           : options
         server.web(req, res, upstream, () => {
@@ -825,16 +842,27 @@ export function createProxyHandlers(
           socket.destroy()
           return
         }
-        const computerCheck = deps.computerAccess === undefined
-          ? Promise.resolve(true)
-          : deps.computerAccess.authorize(context.user.id).then(() => true, (error: unknown) => {
-            if (error instanceof ComputerAccessError) return false
-            throw error
-          })
-        const [qualified, computerAllowed] = await Promise.all([
-          qualifyStream(token, context),
-          computerCheck,
-        ])
+        let qualified: Awaited<ReturnType<typeof qualifyStream>>
+        let computerAllowed: boolean
+        if (deps.qualifyStreamOnComputer !== undefined) {
+          qualified = await qualifyStream(token, context)
+          computerAllowed = qualified !== null
+        } else {
+          const computerCheck = deps.computerAccess !== undefined
+            ? deps.computerAccess.authorize(context.user.id).then(() => true, (error: unknown) => {
+              if (error instanceof ComputerAccessError) return false
+              throw error
+            })
+            : deps.revalidateOnComputer !== undefined
+              ? deps.revalidateOnComputer(token).then(user => user !== null && user.id === context.user.id
+                && !user.mustChangePassword && user.homePath === context.user.homePath
+                && (context.scope.kind !== 'personal' || user.role === context.user.role))
+              : Promise.resolve(true)
+          ;[qualified, computerAllowed] = await Promise.all([
+            qualifyStream(token, context),
+            computerCheck,
+          ])
+        }
         streamLogin = qualified
         await deps.accessMonitor?.synchronize()
         if (!computerAllowed || streamLogin === null || streamLogin.expiresAt <= Date.now()

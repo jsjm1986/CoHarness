@@ -16,6 +16,8 @@ export const MIN_COMPRESS_BYTES = 1024
 
 const BROTLI_QUALITY = 4
 const GZIP_LEVEL = 4
+const IMMUTABLE_BROTLI_QUALITY = 9
+const IMMUTABLE_GZIP_LEVEL = 6
 
 const COMPRESSIBLE_MEDIA_TYPES = new Set([
   'application/json',
@@ -85,6 +87,19 @@ export function compressBuffer(raw: Buffer, coding: ContentCoding): Promise<Buff
   return coding === 'br'
     ? brotli(raw, { params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY } })
     : deflate(raw, { level: GZIP_LEVEL })
+}
+
+/**
+ * Compress immutable release bytes with higher-density settings intended for cached reuse.
+ * Brotli quality 9 matches the Host runtime's precompressed bundle output.
+ * @param raw - complete immutable uncompressed bytes.
+ * @param coding - negotiated content coding.
+ * @returns compressed buffer.
+ */
+export function compressImmutableBuffer(raw: Buffer, coding: ContentCoding): Promise<Buffer> {
+  return coding === 'br'
+    ? brotli(raw, { params: { [constants.BROTLI_PARAM_QUALITY]: IMMUTABLE_BROTLI_QUALITY } })
+    : deflate(raw, { level: IMMUTABLE_GZIP_LEVEL })
 }
 
 /**

@@ -75,6 +75,7 @@ export function PerformanceDiagnosticsSection() {
   useEffect(() => {
     if (!expanded) {
       activeRequest.current?.abort()
+      setLoading(false)
       return
     }
     void refresh()

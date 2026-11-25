@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import type { ProjectNameKeyring } from './project-name-keyring.ts'
 
-export const GOVERNANCE_REBUILD_SCHEMA_VERSION = 148
+export const GOVERNANCE_REBUILD_SCHEMA_VERSION = 149
 const dispositions = {safe:'restore-safe',reset:'reset-and-review',node:'node-owned',ephemeral:'ephemeral'} as const
 export type GovernanceColumnDisposition = typeof dispositions[keyof typeof dispositions]
 export interface GovernanceRebuildColumn {name:string;disposition:GovernanceColumnDisposition}
@@ -195,10 +195,12 @@ const schema144Tables = {
     "ephemeral": "organization_id,session_id,event_seq,device_id,status,attempts,last_error,created_at,sent_at,updated_at,runtime_id,runtime_namespace,provider_msg_id,delivered_at,opened_at",
   }),
 } as const
-export const governanceRebuildTables = {
+const schema148Tables = {
   ...schema144Tables,
   conversation_draft_reservations: columns({"node":"organization_id,scope_key,draft_id,session_id,user_id,project_id,cwd,visibility,agent_preset,created_at,updated_at,lease_expires_at,ssh_target_id,runtime_id,runtime_namespace,model_selection"}),
 } as const
+// Schema 149 adds a function; its rebuilding table and column inventory is unchanged.
+export const governanceRebuildTables = schema148Tables
 export type GovernanceRebuildTable = keyof typeof governanceRebuildTables
 type GovernanceInventoryTables = Partial<Record<GovernanceRebuildTable,readonly GovernanceRebuildColumn[]>>
 function inventory(tables:GovernanceInventoryTables){
@@ -210,7 +212,8 @@ const schema136Inventory=inventory(schema136Tables)
 const schema139Inventory=inventory(schema139Tables)
 const schema143Inventory=inventory(schema143Tables)
 const schema144Inventory=inventory(schema144Tables)
-const currentInventory=inventory(governanceRebuildTables)
+const schema148Inventory=inventory(schema148Tables)
+const currentInventory=schema148Inventory
 /** Resolve only reviewed immutable payload inventories; no newer-schema fallback is permitted.
  * @param version - final migration version sealed into the source package.
  * @returns its literal inventory, or undefined for an unsupported package.
@@ -221,6 +224,7 @@ export function governanceRebuildInventory(version:number){
     :version===139||version===140||version===141||version===142?schema139Inventory
     :version===143?schema143Inventory
     :version===144||version===145||version===146||version===147?schema144Inventory
+    :version===148?schema148Inventory
     :version===GOVERNANCE_REBUILD_SCHEMA_VERSION?currentInventory:undefined
 }
 /** Stable per-column decisions also accompany the encrypted package for administrator review. */

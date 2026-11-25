@@ -75,9 +75,20 @@ describe('BootPage', () => {
       expect(document.activeElement).toBe(input)
       expect(input.value).toBe('Unsent text')
       expect(el.querySelector('a')?.textContent).toBe('Open full workspace in a new tab')
+
+      // Retaining for mount and re-attaching on mount failure removes the retained wrapper and keeps focus.
+      draft.retainAtMount()
+      expect(document.body.querySelector('details')).not.toBeNull()
+      page.attachDraft(draft)
+      expect(document.body.querySelector('details')).toBeNull()
+      expect(el.querySelector('textarea')).toBe(input)
+      expect(document.activeElement).toBe(input)
     } finally {
       draft.dispose()
     }
+    // Re-attaching a disposed draft does not resurrect dead DOM.
+    page.attachDraft(draft)
+    expect(el.querySelector('[data-dsh-startup-draft]')).toBeNull()
   })
 
   it('detaches on disposal', () => {

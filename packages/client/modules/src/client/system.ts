@@ -100,6 +100,7 @@ export class ClientModuleSystem implements ClientModuleLoader {
   private readonly failedBundleUrls = new Map<string, readonly string[]>()
   /** Every URL whose script has executed once; a batch among them is never requested again. */
   private readonly executedBundleUrls = new Set<string>()
+  private readonly earlyTransportFailures = new Set<string>()
 
   /**
    * Build the module system over the parsed boot rows.
@@ -123,6 +124,10 @@ export class ClientModuleSystem implements ClientModuleLoader {
 
     for (const row of options.manifest.modules) {
       this.graphRows.set(row.id, row)
+    }
+    for (const [url, outcome] of options.preloadedBundles ?? []) {
+      if (outcome === 'executed') this.executedBundleUrls.add(url)
+      else this.earlyTransportFailures.add(url)
     }
 
     const bootstrapId = stripClientSuffix(options.bootstrapModule.id)
@@ -257,8 +262,10 @@ export class ClientModuleSystem implements ClientModuleLoader {
       outcome = 'not-registered'
       this.failedBundleUrls.set(preferred, [...failures])
     } else {
+      const failedDuringBoot = this.earlyTransportFailures.has(preferred)
+      if (failedDuringBoot) failures.push(`${preferred}: application preload failed to load`)
       outcome = await attempt(preferred)
-      if (outcome === 'transport-failed') outcome = await attempt(preferred)
+      if (outcome === 'transport-failed' && !failedDuringBoot) outcome = await attempt(preferred)
       // Only a batch URL is remembered: a one-resource URL has no fallback and
       // stays retryable on the next import, as before.
       if (outcome !== 'registered' && fallback !== undefined) this.failedBundleUrls.set(preferred, [...failures])

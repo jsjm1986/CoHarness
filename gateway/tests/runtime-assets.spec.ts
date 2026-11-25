@@ -1,5 +1,6 @@
 /** Real resource HTTP streams retain exact authority without entering execution admission. */
 import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto'
+import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -9,6 +10,7 @@ import type { InstanceManager, RuntimeInstanceSnapshot } from '../src/instances.
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import type { RuntimeAssetAdmission, RuntimeAssetRequest } from '../src/runtime-asset-admission.ts'
 import { RuntimeAssets, type RuntimeAssetsOptions } from '../src/runtime-assets.ts'
+import * as httpCompression from '../src/http-compression.ts'
 import { RELEASE_COMBO_DIGEST_HEADER } from '../src/node-service-stream.ts'
 import type { RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { barrier } from './barrier.ts'
@@ -354,4 +356,210 @@ it('caches immutable assets for one authorized Runtime, generation and account',
   expect(f.forward).toHaveBeenCalledTimes(4)
   await f.invalidate({ nodeId: f.admission.placement.environment.node.id })
   expect(f.assets.diagnostics().remoteCacheEntries).toBe(0)
+})
+
+it('caches deterministic Brotli-9 and gzip-6 bytes by release sha256 without caching authority', async () => {
+  const snippet = Array.from({ length: 400 }, (_, i) => `export function fn_${String(i)}(value){return value+"-${String(i).padStart(4, '0')}-payload";}\n`).join('')
+  const body = Buffer.from(snippet, 'utf8')
+  const sha256 = createHash('sha256').update(body).digest('hex')
+  const releaseCombo = vi.fn(async (_path: string) => ({ body, sha256 }))
+  const f = await fixture({ remote: true, releaseCombo })
+  const expectedBr = brotliCompressSync(body, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 9 } })
+  const br4 = brotliCompressSync(body, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 } })
+  expect(expectedBr.byteLength).toBeLessThan(br4.byteLength)
+
+  let forwardCalls = 0
+  f.forward.mockImplementation(async (_req, _res, _actor, _placement, _generation, delivery) => {
+    forwardCalls += 1
+    expect(delivery?.release?.sha256).toBe(sha256)
+    await delivery!.release!.serve(new AbortController().signal)
+    return true
+  })
+
+  // First br request warms and caches Brotli-9 bytes.
+  const first = await fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': 'br' } })
+  expect(first.status).toBe(200)
+  expect(first.headers.get('content-encoding')).toBe('br')
+  expect(first.headers.get('cache-control')).toBe('private, no-store')
+  expect(Number(first.headers.get('content-length'))).toBe(expectedBr.byteLength)
+  expect(Buffer.from(await first.arrayBuffer())).toEqual(body)
+  expect(f.assets.diagnostics()).toMatchObject({
+    releaseEncodedHits: 0,
+    releaseEncodedMisses: 1,
+    releaseEncodedEntries: 1,
+    releaseEncodedBytes: expectedBr.byteLength,
+  })
+
+  // Second br request reuses cached compressed bytes while still re-running full admission and owning-node attestation.
+  const second = await fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': 'br' } })
+  expect(second.status).toBe(200)
+  expect(second.headers.get('content-encoding')).toBe('br')
+  expect(Number(second.headers.get('content-length'))).toBe(expectedBr.byteLength)
+  expect(Buffer.from(await second.arrayBuffer())).toEqual(body)
+  expect(forwardCalls).toBe(2)
+  expect(f.admit).toHaveBeenCalledTimes(4)
+  expect(f.assets.diagnostics()).toMatchObject({
+    releaseEncodedHits: 1,
+    releaseEncodedMisses: 1,
+    releaseEncodedEntries: 1,
+  })
+
+  // Gzip coding caches independently under the same sha256.
+  const gz = await fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': 'gzip' } })
+  expect(gz.status).toBe(200)
+  expect(gz.headers.get('content-encoding')).toBe('gzip')
+  expect(Buffer.from(await gz.arrayBuffer())).toEqual(body)
+  expect(f.assets.diagnostics()).toMatchObject({
+    releaseEncodedHits: 1,
+    releaseEncodedMisses: 2,
+    releaseEncodedEntries: 2,
+  })
+
+  // Revocation still refuses delivery even though compressed release bytes stay warm.
+  await f.invalidate({ userId: f.actor.id })
+  f.admit.mockResolvedValueOnce(f.admission).mockResolvedValueOnce({ ...f.admission, accessRevision: '9' })
+  const refused = await fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': 'br' } })
+  expect(refused.status).toBe(409)
+  expect(await refused.json()).toEqual({ error: 'runtime-asset/authority-changed' })
+
+  await f.assets.close()
+  expect(f.assets.diagnostics()).toMatchObject({ releaseEncodedEntries: 0, releaseEncodedBytes: 0 })
+})
+
+it.each([
+  ['job count', 2, 16 * 1024],
+  ['raw byte budget', 1, 5 * 1024 * 1024],
+] as const)('serves authorized identity bytes when release compression reaches its %s', async (_limit, heldCount, bodyBytes) => {
+  const releaseCompression = barrier()
+  const candidates = Array.from({ length: heldCount + 1 }, (_value, index) => {
+    const body = Buffer.alloc(bodyBytes, 32 + index)
+    const sha256 = createHash('sha256').update(body).digest('hex')
+    const path = `/plugins/combo.js??fixture${index}/client.js&rev=012345abcdef`
+    return { body, sha256, path }
+  })
+  const available = candidates.at(-1)!
+  const f = await fixture({ remote: true, releaseCombo: async path => candidates.find(candidate => candidate.path === path) })
+  const compress = vi.spyOn(httpCompression, 'compressImmutableBuffer').mockImplementation(async raw => {
+    if (raw !== available.body) await releaseCompression.promise
+    return httpCompression.compressBuffer(raw, 'br')
+  })
+  f.forward.mockImplementation(async (_req, res, _actor, _placement, _generation, delivery) => {
+    if (delivery?.release?.sha256 === available.sha256) await delivery.release.serve(new AbortController().signal)
+    else res.end('owning Gateway copy')
+    return true
+  })
+  const fetchCombo = (path: string) => fetch(`${f.origin}${path}&dshRuntime=${f.admission.placement.environment.id}`,
+    { headers: { ...f.headers, 'accept-encoding': 'br' } })
+  try {
+    for (const candidate of candidates.slice(0, heldCount)) {
+      const res = await fetchCombo(candidate.path)
+      expect(await res.text()).toBe('owning Gateway copy')
+    }
+    const skipped = await fetchCombo(available.path)
+    expect(skipped.status).toBe(200)
+    expect(skipped.headers.get('content-encoding')).toBeNull()
+    expect(createHash('sha256').update(Buffer.from(await skipped.arrayBuffer())).digest('hex')).toBe(available.sha256)
+    expect(compress).toHaveBeenCalledTimes(heldCount)
+    expect(f.assets.diagnostics()).toMatchObject({ releaseEncodingInFlight: heldCount, releaseEncodingInFlightBytes: heldCount * bodyBytes })
+
+    releaseCompression.resolve()
+    await expect.poll(() => f.assets.diagnostics().releaseEncodingInFlight).toBe(0)
+    const resumed = await fetchCombo(available.path)
+    expect(resumed.headers.get('content-encoding')).toBe('br')
+    expect(createHash('sha256').update(Buffer.from(await resumed.arrayBuffer())).digest('hex')).toBe(available.sha256)
+    expect(compress).toHaveBeenCalledTimes(heldCount + 1)
+  } finally {
+    releaseCompression.resolve()
+    await f.assets.close()
+    compress.mockRestore()
+  }
+})
+
+it('joins detached release compression at close without caching its result or accepting new work', async () => {
+  const body = Buffer.from('window.__combo_detached = ' + JSON.stringify('abc123'.repeat(2000)))
+  const f = await fixture({ remote: true, releaseCombo: async () => ({ body, sha256: createHash('sha256').update(body).digest('hex') }) })
+  const releaseCompression = barrier()
+  const compress = vi.spyOn(httpCompression, 'compressImmutableBuffer').mockImplementation(async raw => {
+    await releaseCompression.promise
+    return httpCompression.compressBuffer(raw, 'br')
+  })
+  const fetchCombo = () => fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': 'br' } })
+  let closed = false
+  let closing: Promise<void> | undefined
+  try {
+    const response = await fetchCombo()
+    expect(await response.text()).toBe('remote-resource')
+    expect(compress).toHaveBeenCalledOnce()
+    const close = f.assets.close()
+    closing = close.then(() => { closed = true })
+    expect(f.assets.close()).toBe(close)
+    expect(f.subscribers()).toBe(0)
+    const refused = await fetchCombo()
+    expect(refused.status).toBe(503)
+    await refused.arrayBuffer()
+    expect(closed).toBe(false)
+    expect(compress).toHaveBeenCalledOnce()
+    expect(f.forward).toHaveBeenCalledOnce()
+    expect(f.assets.diagnostics()).toMatchObject({ releaseEncodingInFlight: 1, releaseEncodingInFlightBytes: body.byteLength })
+  } finally {
+    releaseCompression.resolve()
+    await (closing ?? f.assets.close())
+    compress.mockRestore()
+  }
+  expect(closed).toBe(true)
+  expect(f.assets.diagnostics()).toMatchObject({
+    releaseEncodingInFlight: 0, releaseEncodingInFlightBytes: 0, releaseEncodedEntries: 0, releaseEncodedBytes: 0,
+  })
+})
+
+it.each(['br, identity;q=0', 'gzip, *;q=0'])('uses owning-node delivery when %s forbids identity', async encoding => {
+  const body = Buffer.from('export const fixture = true')
+  const releaseCombo = vi.fn(async () => ({ body, sha256: createHash('sha256').update(body).digest('hex') }))
+  const f = await fixture({ remote: true, releaseCombo })
+  const res = await fetch(f.origin + f.path, { headers: { ...f.headers, 'accept-encoding': encoding } })
+  expect(await res.text()).toBe('remote-resource')
+  expect(f.forward.mock.lastCall?.[5]?.release).toBeUndefined()
+  expect(releaseCombo).not.toHaveBeenCalled()
+})
+
+it('shares release compression across concurrent waiters after one disconnects', async () => {
+  const body = Buffer.from('window.__combo_singleflight = ' + JSON.stringify('abc123'.repeat(2000)) + ';\n')
+  const sha256 = createHash('sha256').update(body).digest('hex')
+  const f = await fixture({ remote: true, releaseCombo: async () => ({ body, sha256 }) })
+  const firstEntered = barrier(), secondEntered = barrier(), firstLeft = barrier(), releaseCompression = barrier()
+  const compress = vi.spyOn(httpCompression, 'compressImmutableBuffer').mockImplementation(async (raw, coding) => {
+    await releaseCompression.promise
+    return httpCompression.compressBuffer(raw, coding)
+  })
+  let calls = 0
+  f.forward.mockImplementation(async (_req, _res, _actor, _placement, _generation, delivery) => {
+    const first = ++calls === 1
+    const entered = first ? firstEntered : secondEntered
+    const serving = delivery!.release!.serve(new AbortController().signal)
+    entered.resolve()
+    try { await serving; return true }
+    finally { if (first) firstLeft.resolve() }
+  })
+  const fetchCombo = (signal?: AbortSignal) => fetch(f.origin + f.path, { signal, headers: { ...f.headers, 'accept-encoding': 'br' } })
+  const client = new AbortController()
+  const interrupted = fetchCombo(client.signal).then(res => ({ status: res.status }), error => ({ error }))
+  try {
+    await firstEntered.promise
+    const healthy = fetchCombo().then(async res => ({ status: res.status, body: Buffer.from(await res.arrayBuffer()) }), error => ({ error }))
+    await secondEntered.promise
+    client.abort()
+    expect(await interrupted).toMatchObject({ error: { name: 'AbortError' } })
+    await firstLeft.promise
+    expect(compress).toHaveBeenCalledOnce()
+    expect(f.assets.diagnostics()).toMatchObject({ releaseEncodingInFlight: 1, releaseEncodingInFlightBytes: body.byteLength })
+    releaseCompression.resolve()
+    expect(await healthy).toEqual({ status: 200, body })
+    expect(compress).toHaveBeenCalledOnce()
+    expect(f.assets.diagnostics()).toMatchObject({ releaseEncodedMisses: 1, releaseEncodedEntries: 1, releaseEncodingInFlight: 0 })
+  } finally {
+    client.abort()
+    releaseCompression.resolve()
+    await f.assets.close()
+    compress.mockRestore()
+  }
 })

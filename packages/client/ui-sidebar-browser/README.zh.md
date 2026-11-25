@@ -27,7 +27,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-随附的 Web composition 已挂载本包。可以从右侧 Sidebar guide 打开 **浏览器**、输入 HTTP(S) URL，或点击 Assistant Markdown 中的 HTTP(S) 链接。不带 scheme 的主机名会补全为 HTTPS。公共目标与 loopback 目标使用相同的默认 sandbox。每次 guide 操作或消息链接操作都会创建一个新的 Browser tab。
+随附的 Web 组合将浏览器列为必需条目，因此链接打开方式设为侧边栏时，首次点击会话链接也能在侧边栏打开。可以从右侧栏引导页打开 **浏览器**、输入 HTTP(S) URL，或点击助手 Markdown 中的 HTTP(S) 链接。不带协议的主机名会补全为 HTTPS。公共目标与 loopback 目标使用相同的默认沙箱。每次从引导页或消息链接在侧边栏打开时，都会创建一个新的浏览器标签页。
 
 ### 何时选择
 

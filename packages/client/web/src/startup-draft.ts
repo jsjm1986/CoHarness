@@ -6,9 +6,11 @@ import css from './boot-page.module.css'
 
 const text = {
   en: { label: 'Unsent draft', waiting: 'Opening your workspace. You can write a draft now.', retained: 'Unsent draft retained',
-    failed: 'The workspace did not open. You can keep or copy your draft.', full: 'Open full workspace in a new tab' },
+    failed: 'The workspace did not open. You can keep or copy your draft.',
+    fallback: 'Open the full workspace to continue. Your draft stays here.', full: 'Open full workspace in a new tab' },
   zh: { label: '未发送的草稿', waiting: '正在打开工作区。可以先写草稿。', retained: '草稿已保留',
-    failed: '工作区暂未打开。可以保留或复制草稿。', full: '在新标签页打开完整工作区' },
+    failed: '工作区暂未打开。可以保留或复制草稿。',
+    fallback: '请打开完整工作区继续。草稿保留在此页', full: '在新标签页打开完整工作区' },
 } as const
 
 function restoredSelection(entry: RemoteEntrySelection): string | undefined {
@@ -71,7 +73,14 @@ export class StartupDraftView implements StartupDraft {
    * @param location - parent of the startup surface before the renderer mounts.
    */
   attach(location: HTMLElement): void {
+    if (this.done) return
+    const focused = document.activeElement === this.input
+    if (this.retained !== undefined) {
+      this.retained.remove()
+      this.retained = undefined
+    }
     if (this.root.parentElement !== location) location.append(this.root)
+    if (focused) this.input.focus()
   }
 
   private readonly beforeUnload = (event: BeforeUnloadEvent): void => {
@@ -105,6 +114,7 @@ export class StartupDraftView implements StartupDraft {
   /** Preserve input while the mounted UI completes account and Session verification. */
   retainAtMount(): void {
     if (this.done || this.input.value === '') { this.dispose(); return }
+    if (this.retained !== undefined) return
     this.status.textContent = this.words.retained
     this.fullIndex.hidden = true
     const focused = document.activeElement === this.input
@@ -117,6 +127,11 @@ export class StartupDraftView implements StartupDraft {
     this.retained = details
     document.body.append(details)
     if (focused) this.input.focus()
+  }
+
+  /** Keep the draft editable when the selected workspace requires a full document. */
+  showFullIndex(): void {
+    this.status.textContent = this.words.fallback
   }
 
   /** Keep the full index available if startup or the renderer handoff fails. */

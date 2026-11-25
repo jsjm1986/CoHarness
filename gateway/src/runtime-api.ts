@@ -10,7 +10,7 @@ import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESO
   RESOURCE_PHASE_TIMING_HEADER, isResourceAdmissionRequest } from '@deepseek-ai/dsh-resource-budget/wire'
 import { DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_UPSTREAM_TIMEOUT_MS } from './config.ts'
 import { activeModelStatusOperation, handleRuntimeResourceApi, scopedModelResourceRequest } from './runtime-resource-api.ts'
-import { timeOperation, timeResourceBearer } from './operation-timing.ts'
+import { hasOperationTiming, recordResourceQueueDiagnostic, timeOperation, timeResourceBearer } from './operation-timing.ts'
 import { NodeResourceBudgetError, type NodeResourceBudget } from './node-resource-budget.ts'
 import { sessionLogicalFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import {
@@ -840,6 +840,7 @@ export function createRuntimeApiHandler(
                 if (changeWaitMs !== undefined) res.setHeader(RESOURCE_CHANGE_WAIT_TIMING_HEADER, changeWaitMs.toFixed(2))
               }
               if (confirmed.state === 'queued' && waiting) res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
+              if (confirmed.state === 'queued' && hasOperationTiming()) recordResourceQueueDiagnostic(budget.queueDiagnostic())
               res.setHeader('cache-control', 'no-store')
               send(res, 200, [{ state: confirmed.state }])
               return true
@@ -892,11 +893,13 @@ export function createRuntimeApiHandler(
         if (!await executionWrite.admit(fencedSubject !== undefined)) return true
       }
       const streamControl = isRuntimeStreamControlRequest(pathname, req.method)
-      const bearerStarted = deps.performanceEnabled === true && isResourceAdmissionRequest(pathname, req.method)
+      const resourceCompletion = isRuntimeResourceCompletionRequest(pathname, req.method)
+      const bearerStarted = deps.performanceEnabled === true
+        && (isResourceAdmissionRequest(pathname, req.method) || resourceCompletion)
         ? performance.now() : undefined
       const draftModelWrite = pathname === '/internal/runtime/session/draft/model' && req.method === 'POST'
       const active = fencedSubject ?? resourceSubject ?? controlSubject ?? await authenticate(req,
-        isRuntimeResourceCompletionRequest(pathname, req.method), streamControl, draftModelWrite || executionWrite?.fromCandidate)
+        resourceCompletion, streamControl, draftModelWrite || executionWrite?.fromCandidate)
       const bearerMs = resourceBearerMs ?? (bearerStarted === undefined ? undefined : performance.now() - bearerStarted)
       const shutdown = active === null && token !== undefined && isRuntimeShutdownStorageRequest(pathname, req.method)
         ? await deps.instances.authenticateRuntimeShutdownToken?.(token) : undefined

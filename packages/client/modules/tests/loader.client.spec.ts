@@ -83,6 +83,7 @@ function bench(
     transportFailures?: Record<string, number>
     /** URLs whose script loads but registers only the listed ids (a runtime throw after those registrations). */
     registerOnly?: Record<string, string[]>
+    preloadedBundles?: ReadonlyMap<string, 'executed' | 'load-failed'>
     applicationBatches?: { url: string; entries: string[] }[]
   } = {},
 ): Bench {
@@ -151,6 +152,7 @@ function bench(
       batches,
     },
     staticModules: opts.seed ?? {},
+    ...(opts.preloadedBundles === undefined ? {} : { preloadedBundles: opts.preloadedBundles }),
     ...(opts.defaultTransport === true ? {} : { loadBundle }),
   })
   return { loader, target, fetched, gates }
@@ -528,6 +530,27 @@ describe('bundle arrival recovery', () => {
     expect(b.fetched).toEqual([APPLICATION_URL, single('b')])
     expect(await b.loader.import('a', '', {})).toEqual({ a: 1 })
     expect(b.fetched).toHaveLength(2)
+  })
+
+  it('loads only missing rows from a batch executed by the entry document', async () => {
+    const b = bench([row('a'), row('b')], { a: () => ({ a: 1 }), b: () => ({ b: 2 }) }, {
+      pending: [{ id: 'a', factory: () => ({ a: 1 }) }],
+      preloadedBundles: new Map([[APPLICATION_URL, 'executed']]),
+    })
+    expect(await b.loader.import('b', '', {})).toEqual({ b: 2 })
+    expect(await b.loader.import('a', '', {})).toEqual({ a: 1 })
+    expect(b.fetched).toEqual([single('b')])
+  })
+
+  it('uses the original batch URL once more after a failed speculative request', async () => {
+    const b = bench([row('a'), row('b')], { a: () => ({ a: 1 }), b: () => ({ b: 2 }) }, {
+      preloadedBundles: new Map([[APPLICATION_URL, 'load-failed']]),
+      transportFailures: { [APPLICATION_URL]: 1 },
+    })
+    await expect(Promise.all([b.loader.import('a', '', {}), b.loader.import('b', '', {})])).resolves.toEqual([{ a: 1 }, { b: 2 }])
+    expect(b.fetched).toHaveLength(3)
+    expect(b.fetched[0]).toBe(APPLICATION_URL)
+    expect(b.fetched.slice(1).sort()).toEqual([single('a'), single('b')].sort())
   })
 
   it('never re-executes a batch that already ran, even when its first importer was one of the rows it did register', async () => {

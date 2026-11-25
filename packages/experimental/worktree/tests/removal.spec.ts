@@ -42,7 +42,7 @@ async function fixture() {
 }
 
 describe('safe worktree removal', () => {
-  it('removes a clean checkout, preserves local commits and restores the retained branch', { timeout: 60_000 }, async () => {
+  it('removes a clean checkout, preserves local commits and restores the retained branch', async () => {
     const { ctx, agent, worktree, root } = await fixture()
     await writeFile(join(worktree.path, 'local.txt'), 'not pushed\n')
     await git(worktree.path, 'add', 'local.txt')

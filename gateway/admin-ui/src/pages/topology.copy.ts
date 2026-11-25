@@ -27,6 +27,7 @@ export const zh = {
   serviceFailed: '未能启动接入服务，请检查已安装的服务和本机日志',
   identityFailed: '中心地址或接入码与这台电脑不匹配，请到主入口重新核对',
   connected: '这台电脑已有活动接入，请先退出原接入再更换配置',
+  listSeparator: '、',
 } as const
 
 export const en: Record<keyof typeof zh, string> = {
@@ -57,4 +58,5 @@ export const en: Record<keyof typeof zh, string> = {
   serviceFailed: 'Could not start the agent. Check the installed service and local logs.',
   identityFailed: 'The center address or enrollment code does not match this computer. Check it at the primary entry.',
   connected: 'This computer already has an active connection. Detach it before replacing setup.',
+  listSeparator: ', ',
 }

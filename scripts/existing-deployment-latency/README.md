@@ -62,6 +62,10 @@ The output is append-only JSONL: one plan, one raw receipt per attempted action,
 
 A durable receipt requires the versioned admission endpoint, the exact Session and application request ID, a matching RPC response ID and a positive result. The Host forces `durable: true` for this endpoint; ordinary `/api/session.prompt` acceptance, HTTP 200, UI echo and model output are insufficient. A recovery status must refer to the same original request.
 
+The runner syncs a `durable-send-accepted` checkpoint before reading browser clocks or waiting for a visible reply. If a run ends before its final sample or summary, the checkpoint still confirms that prompt's acceptance. It has no reply timing and is not a second operation sample. Use a separate output file for each target and retain the complete JSONL rows even when a target does not finish.
+
+`operationId` uses the response's valid `x-dsh-operation-id` UUID, falling back to the request UUID only if the response header is absent. It correlates Gateway timing records and never proves durable acceptance. The summary's `resourceTraces` records up to 32 observed bootstrap, versioned combo and file-read requests for the selected QA target. It records the stage, fixed category, HTTP status or network failure code, and available UUID without making extra requests or retaining resource URLs or contents. The summary also records browser `dsh:boot:*` `bootMarks` (including on initial-open failure when the page stays readable) and pathname-only `initialRpcSummary` split into `boot` and `setup` phases (at most 64 distinct `/api/*` or `/account/api/*` pathnames per phase, with counts, statuses and `maxMs`). When a measured action fails and the browser can no longer evaluate final marks, the runner preserves the earlier measurement failure instead of overwriting it.
+
 Naming is outside the measured operation. Its ordinary RPC route confirms the matching request ID, exact synthetic title and title-event sequence; only the versioned preparation/admission routes require the Runtime response header. Runtime-directory reads stop and cancel after one MiB of response bytes.
 
 | Endpoint | What it measures |

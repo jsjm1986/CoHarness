@@ -2,6 +2,7 @@
 import { request, type IncomingMessage, type ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import Negotiator from 'negotiator'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
 import type { UserRow } from './auth.ts'
 import { RuntimeLeaseUnavailableError, type InstanceManager } from './instances.ts'
@@ -14,20 +15,30 @@ import { parseCookies, SESSION_COOKIE } from './server.ts'
 import type { RuntimeId, RuntimeNodeId } from './runtime-catalog.ts'
 import type { RuntimePlacement } from './runtime-router.ts'
 import { httpConnectionFields } from './http-connection-fields.ts'
-import { compressBuffer, isCompressibleContentType, MIN_COMPRESS_BYTES, preferredCompression, type ContentCoding } from './http-compression.ts'
+import { compressBuffer, compressImmutableBuffer, isCompressibleContentType, MIN_COMPRESS_BYTES, preferredCompression, type ContentCoding } from './http-compression.ts'
 import type { RemoteAssetCapture, RemoteAssetDelivery } from './node-service-proxy.ts'
-import type { ReleaseComboReader } from './release-combos.ts'
+import type { LocalReleaseCombo, ReleaseComboReader } from './release-combos.ts'
 
 const DEFAULT_REMOTE_CACHE_MAX_BYTES = 32 * 1024 * 1024
 const REMOTE_CACHE_MAX_ENTRY_BYTES = 4 * 1024 * 1024
 const REMOTE_CACHE_MAX_ENTRIES = 128
+const RELEASE_ENCODED_CACHE_MAX_BYTES = 16 * 1024 * 1024
+const RELEASE_ENCODED_CACHE_MAX_ENTRIES = 64
+const RELEASE_ENCODING_MAX_JOBS = 2
+const RELEASE_ENCODING_MAX_INPUT_BYTES = 8 * 1024 * 1024
 
-/** Identifier-free metrics for Center-side caching of remote immutable runtime assets. */
+/** Identifier-free asset cache counters and current release compression occupancy. */
 export interface RuntimeAssetCacheDiagnostics {
   readonly remoteCacheHits: number
   readonly remoteCacheMisses: number
   readonly remoteCacheEntries: number
   readonly remoteCacheBytes: number
+  readonly releaseEncodedHits: number
+  readonly releaseEncodedMisses: number
+  readonly releaseEncodedEntries: number
+  readonly releaseEncodedBytes: number
+  readonly releaseEncodingInFlight: number
+  readonly releaseEncodingInFlightBytes: number
 }
 
 /** Existing authority, lifecycle and forwarding owners used by immutable resource dispatch. */
@@ -73,12 +84,22 @@ export class RuntimeAssets {
   private remoteCacheBytes = 0
   private remoteCacheHits = 0
   private remoteCacheMisses = 0
+  private readonly releaseEncodedCache = new Map<string, Buffer | null>()
+  private readonly releaseEncodingInFlight = new Map<string, Promise<Buffer | null>>()
+  private releaseEncodingInFlightBytes = 0
+  private readonly releaseEncodedMaxBytes: number
+  private releaseEncodedBytes = 0
+  private releaseEncodedHits = 0
+  private releaseEncodedMisses = 0
   private readonly unsubscribe: () => void
-  private closed = false
+  private closing?: Promise<void>
+
+  private get closed(): boolean { return this.closing !== undefined }
 
   /** @param options - current node authority and the existing transport/lifecycle providers. */
   constructor(private readonly options: RuntimeAssetsOptions) {
     this.remoteCacheMaxBytes = options.cfg.runtimeAssetCacheMaxBytes ?? DEFAULT_REMOTE_CACHE_MAX_BYTES
+    this.releaseEncodedMaxBytes = Math.min(RELEASE_ENCODED_CACHE_MAX_BYTES, this.remoteCacheMaxBytes)
     this.unsubscribe = options.monitor.subscribe(subject => { this.invalidate(subject) })
   }
 
@@ -89,6 +110,12 @@ export class RuntimeAssets {
       remoteCacheMisses: this.remoteCacheMisses,
       remoteCacheEntries: this.remoteCache.size,
       remoteCacheBytes: this.remoteCacheBytes,
+      releaseEncodedHits: this.releaseEncodedHits,
+      releaseEncodedMisses: this.releaseEncodedMisses,
+      releaseEncodedEntries: this.releaseEncodedCache.size,
+      releaseEncodedBytes: this.releaseEncodedBytes,
+      releaseEncodingInFlight: this.releaseEncodingInFlight.size,
+      releaseEncodingInFlightBytes: this.releaseEncodingInFlightBytes,
     }
   }
 
@@ -158,6 +185,86 @@ export class RuntimeAssets {
       this.remoteCache.delete(oldest[0])
       this.remoteCacheBytes = Math.max(0, this.remoteCacheBytes - oldest[1].bytes)
     }
+  }
+
+  private storeReleaseEncoded(key: string, encoded: Buffer | null): void {
+    const previous = this.releaseEncodedCache.get(key)
+    if (previous !== undefined) {
+      if (previous !== null) this.releaseEncodedBytes = Math.max(0, this.releaseEncodedBytes - previous.byteLength)
+      this.releaseEncodedCache.delete(key)
+    }
+    this.releaseEncodedCache.set(key, encoded)
+    if (encoded !== null) this.releaseEncodedBytes += encoded.byteLength
+    while (this.releaseEncodedCache.size > RELEASE_ENCODED_CACHE_MAX_ENTRIES || this.releaseEncodedBytes > this.releaseEncodedMaxBytes) {
+      const oldest = this.releaseEncodedCache.entries().next().value as [string, Buffer | null] | undefined
+      if (oldest === undefined) break
+      this.releaseEncodedCache.delete(oldest[0])
+      if (oldest[1] !== null) this.releaseEncodedBytes = Math.max(0, this.releaseEncodedBytes - oldest[1].byteLength)
+    }
+  }
+
+  private startReleaseEncoding(candidate: LocalReleaseCombo, coding: ContentCoding): { promise: Promise<Buffer | null>; started: boolean } | undefined {
+    if (this.closed || this.releaseEncodedMaxBytes <= 0) return undefined
+    const key = `${candidate.sha256}:${coding}`
+    const cached = this.releaseEncodedCache.get(key)
+    if (cached !== undefined) {
+      this.releaseEncodedCache.delete(key)
+      this.releaseEncodedCache.set(key, cached)
+      return { promise: Promise.resolve(cached), started: false }
+    }
+    const inFlight = this.releaseEncodingInFlight.get(key)
+    if (inFlight !== undefined) return { promise: inFlight, started: false }
+    const bytes = candidate.body.byteLength
+    if (this.releaseEncodingInFlight.size >= RELEASE_ENCODING_MAX_JOBS
+      || this.releaseEncodingInFlightBytes + bytes > RELEASE_ENCODING_MAX_INPUT_BYTES) return undefined
+    this.releaseEncodedMisses += 1
+    this.releaseEncodingInFlightBytes += bytes
+    const work = compressImmutableBuffer(candidate.body, coding).then(compressed => {
+      const stored = compressed.byteLength < bytes ? compressed : null
+      if (!this.closed && (stored === null || stored.byteLength <= this.releaseEncodedMaxBytes)) {
+        this.storeReleaseEncoded(key, stored)
+      }
+      return stored
+    }).finally(() => {
+      this.releaseEncodingInFlight.delete(key)
+      this.releaseEncodingInFlightBytes -= bytes
+    })
+    this.releaseEncodingInFlight.set(key, work)
+    return { promise: work, started: true }
+  }
+
+  private warmReleaseEncoding(candidate: LocalReleaseCombo, coding: ContentCoding): boolean {
+    if (this.closed || this.releaseEncodedMaxBytes <= 0) return false
+    const key = `${candidate.sha256}:${coding}`
+    if (this.releaseEncodedCache.has(key) || this.releaseEncodingInFlight.has(key)) return false
+    const encoding = this.startReleaseEncoding(candidate, coding)
+    if (encoding === undefined) return false
+    void encoding.promise.catch(() => { /* Compression failures surface to active waiters without creating unhandled rejections. */ })
+    return encoding.started
+  }
+
+  private async encodeReleaseCandidate(
+    candidate: LocalReleaseCombo,
+    coding: ContentCoding,
+    signal: AbortSignal,
+    prewarmed: boolean,
+  ): Promise<Buffer | undefined> {
+    signal.throwIfAborted()
+    const encoding = this.startReleaseEncoding(candidate, coding)
+    if (encoding === undefined) return undefined
+    const { promise, started } = encoding
+    if (!started && !prewarmed) this.releaseEncodedHits += 1
+    const result = await new Promise<Buffer | null>((resolve, reject) => {
+      if (signal.aborted) { reject(signal.reason); return }
+      const onAbort = (): void => { reject(signal.reason) }
+      signal.addEventListener('abort', onAbort, { once: true })
+      promise.then(
+        value => { signal.removeEventListener('abort', onAbort); resolve(value) },
+        error => { signal.removeEventListener('abort', onAbort); reject(error) },
+      )
+    })
+    signal.throwIfAborted()
+    return result ?? undefined
   }
 
   private async serveCachedRemote(req: IncomingMessage, res: ServerResponse, key: string, signal: AbortSignal): Promise<boolean> {
@@ -266,6 +373,7 @@ export class RuntimeAssets {
 
   private async serve(req: IncomingMessage, res: ServerResponse, actor: UserRow, entryNodeId?: RuntimeNodeId): Promise<boolean> {
     if (!isImmutableRuntimeAssetRequest(req.method, req.url ?? '/')) return false
+    const path = runtimeRequestPath(req.url ?? '/', req.method)
     const url = new URL(req.url ?? '/', 'http://gateway')
     if (!url.searchParams.has('dshRuntime') && req.headers.referer !== undefined) {
       let referer: URL
@@ -345,7 +453,7 @@ export class RuntimeAssets {
         const cacheOwner: RemoteAssetOwner = { nodeId: placement.environment.node.id, userId: admission.user.id,
           ...(admission.scope.kind === 'project' ? { projectId: admission.scope.projectId } : {}) }
         const cacheKey = JSON.stringify([cacheOwner.nodeId, runtimeId, snapshot.generation, snapshot.launchStamp,
-          snapshot.startedAt, cacheOwner.userId, cacheOwner.projectId ?? null, runtimeRequestPath(req.url ?? '/')])
+          snapshot.startedAt, cacheOwner.userId, cacheOwner.projectId ?? null, path])
         if (await this.serveCachedRemote(req, res, cacheKey, owner.signal)) return true
         if (this.options.forward === undefined) {
           throw new RuntimeAssetUnavailableError(503, 'runtime-asset/unavailable')
@@ -359,19 +467,24 @@ export class RuntimeAssets {
             },
           }
           : undefined
-        const candidate = req.method === 'GET' && req.headers.range === undefined && req.headers['if-none-match'] === undefined
-          && req.headers['if-modified-since'] === undefined && req.headers['if-match'] === undefined
-          && req.headers['if-unmodified-since'] === undefined
-          ? await this.options.releaseCombo?.(runtimeRequestPath(req.url ?? '/')) : undefined
+        const candidate = this.options.releaseCombo !== undefined && req.method === 'GET' && req.headers.range === undefined
+          && req.headers['if-none-match'] === undefined && req.headers['if-modified-since'] === undefined
+          && req.headers['if-match'] === undefined && req.headers['if-unmodified-since'] === undefined
+          && new Negotiator(req).encoding(['identity']) === 'identity'
+          ? await this.options.releaseCombo(path) : undefined
         owner.signal.throwIfAborted()
+        const releaseCoding = candidate === undefined ? undefined : preferredCompression(req.headers['accept-encoding'])
+        const releasePrewarmed = candidate !== undefined && releaseCoding !== undefined
+          ? this.warmReleaseEncoding(candidate, releaseCoding) : false
         const release: RemoteAssetDelivery['release'] = candidate === undefined ? undefined : {
           sha256: candidate.sha256,
           serve: async forwardSignal => {
             const deliverySignal = AbortSignal.any([owner.signal, forwardSignal])
             deliverySignal.throwIfAborted()
-            const coding = preferredCompression(req.headers['accept-encoding'])
-            const compressed = coding === undefined ? undefined : await compressBuffer(candidate.body, coding)
-            const useEncoded = compressed !== undefined && compressed.byteLength < candidate.body.byteLength
+            const coding = releaseCoding
+            const compressed = coding === undefined
+              ? undefined : await this.encodeReleaseCandidate(candidate, coding, deliverySignal, releasePrewarmed)
+            const useEncoded = compressed !== undefined
             const body = useEncoded ? compressed : candidate.body
             deliverySignal.throwIfAborted()
             const current = await qualify()
@@ -401,7 +514,6 @@ export class RuntimeAssets {
         return true
       }
       if (retained === null) throw new RuntimeAssetUnavailableError(503, 'runtime-asset/unavailable')
-      const path = runtimeRequestPath(req.url ?? '/')
       const assertion = this.options.signer.issueAsset({ user: admission.user, scope: admission.scope,
         runtime: { ...snapshot.target, generation: snapshot.generation }, method: req.method as 'GET' | 'HEAD', path }, admission.expiresAt)
       await this.forwardLocal(req, res, snapshot.port, path, assertion, owner.signal,
@@ -452,6 +564,7 @@ export class RuntimeAssets {
       clearTimeout(timer)
       delete response.headers['set-cookie']
       delete response.headers['x-dsh-runtime-id']
+      delete response.headers['x-dsh-operation-id']
       delete response.headers[NODE_SERVICE_TARGET_HEADER]
       for (const name of httpConnectionFields(response.headers.connection)) delete response.headers[name]
       delete response.headers[NODE_SERVICE_ASSET_GENERATION_HEADER]
@@ -471,13 +584,26 @@ export class RuntimeAssets {
     }
   }
 
-  /** Refuse new reads, cancel owned responses, and await their generation-reference release. */
-  async close(): Promise<void> {
-    this.closed = true
+  /**
+   * Refuse new reads and cancel owned responses.
+   * @returns shared completion of reference release and in-flight release compression.
+   */
+  close(): Promise<void> {
+    if (this.closing !== undefined) return this.closing
+    let resolve!: () => void
+    let reject!: (error: unknown) => void
+    this.closing = new Promise<void>((done, fail) => { resolve = done; reject = fail })
+    void this.finishClose().then(resolve, reject)
+    return this.closing
+  }
+
+  private async finishClose(): Promise<void> {
     this.unsubscribe()
     this.remoteCache.clear()
     this.remoteCacheBytes = 0
+    this.releaseEncodedCache.clear()
+    this.releaseEncodedBytes = 0
     for (const operation of this.active) operation.cancel()
-    await Promise.allSettled([...this.work])
+    await Promise.allSettled([...this.work, ...this.releaseEncodingInFlight.values()])
   }
 }

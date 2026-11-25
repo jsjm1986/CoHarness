@@ -173,7 +173,7 @@ Runtime 分发器在认证运行时令牌后，将文档流式操作交给 Gatew
 
 `POST /api/prepare/v1/session.create` 与 `session.history` 在冷启动获准后返回 `503 INSTANCE_STARTING`，附带 `preparation: {id, waitMs}`、`Retry-After` 和确切的 `x-dsh-runtime-id`。客户端通过 `x-dsh-prepare-continuation` 续等同一操作，每次请求重新核验权限。凭据只对应一次已接受的启动及其就绪代次，停止或 Gateway 重启后失效，不能启动替代进程。等待预算使用目标的 `HGW_RUNTIME_QUEUE_WAIT_MS` 加 `HGW_READINESS_TIMEOUT_MS`，上限为浏览器计时器范围；它不保证覆盖全部配置准备和压力等待。每次 HTTP 请求的截止时间不变。取消仅结束浏览器等待，不停止已接受的 Runtime 启动。
 
-开启 `HGW_PERFORMANCE_ENABLED=true` 后，所属 Gateway 为每次进入容量准入的冷启动写一条 `[runtime-start-timing]` 日志。用所有者、Runtime ID 和代次关联启动操作。`startedAt` 是 Gateway 的 Unix 毫秒时间，`stagesMs` 记录从首次请求到容量准入、策略准备、进程启动、签名就绪探测、资源登记和就绪发布各阶段的单调时钟偏移量。相邻偏移量之差是该阶段耗时。即使 HTTP 已断开，日志仍记录最终结果及实际到达的阶段。Gateway 在冷启动前探测已分配的端口，遇到其他进程占用时会分配新端口。
+开启 `HGW_PERFORMANCE_ENABLED=true` 后，所属 Gateway 为每次进入容量准入的冷启动写一条 `[runtime-start-timing]` 日志。用所有者、Runtime ID 和代次关联启动操作。`startedAt` 是 Gateway 的 Unix 毫秒时间，`stagesMs` 记录从首次请求到容量准入、策略准备、进程启动、签名就绪探测、资源登记和就绪发布各阶段的单调时钟偏移量。在同一时钟内用相邻偏移量之差计算阶段耗时。`sqlTotal` 与 `stageSql` 仅以元数据记录整次启动及各已完成阶段的 PostgreSQL 查询次数与耗时，不记录 SQL 文本。本地启动的 `localSupervisorStagesMs` 是可选字段，按监督进程自己的单调时钟，从接受引导信息起记录租约接管、启动身份核验、进程启动、凭据交付及就绪确认的偏移量。不要将这组偏移量与 `stagesMs` 相减。计时请求与其他启动进程间通信字段共用既有的 1 MiB UTF-8 负载上限；加入计时请求会超限时，启动器会省略它。诊断信息缺失或无效不影响就绪确认。即使 HTTP 已断开，日志仍记录最终结果及实际到达的阶段。Gateway 在冷启动前探测已分配的端口，遇到其他进程占用时会分配新端口。
 
 `GET /admin/api/performance` 要求已登录管理员身份，返回不缓存的累计快照：HTTP、内部 HTTP 和 WebSocket 生命周期、错误及在途计数；固定时长分桶及近似分位数上界；Gateway 事件循环延迟／利用率和进程内存；原生数据库连接池计数；以及 Runtime 准入计数。快照包含自身读取请求的在途占用，不保留请求路径、账户名或 Session 标识。采样区间可比较计数与分桶差值；累计分位数、最大值和内存快照不能通过相减得到区间统计。WebSocket 时长衡量连接生命周期，不是逐帧投递延迟；Gateway 内存不包括 Runtime 子进程和 PostgreSQL。
 
@@ -181,11 +181,13 @@ Runtime 分发器在认证运行时令牌后，将文档流式操作交给 Gatew
 
 Gateway 将浏览器请求、事件流建立、就绪期限与服务端计时选项一同写入每个受管 Connection 插件。指定 Runtime 的页面使用所属电脑的配置。版本化对话诊断在保留就绪代次时，将 `runtimeQueue` 和 `runtimeLiveness` 记入 `admit`。在两端 Gateway 使用 `GET /admin/api/performance/operations?id=<uuid>` 对照所属端排队、本机进程监督、治理 SQL 和节点传输，按同一个操作 ID 匹配记录。各阶段耗时可能重叠。模型生成和浏览器绘制单独计时。
 
-对于不可变发布包内带修订号的插件组合，主入口可以用本地安装的客户端包重建 JavaScript。所属 Runtime 按当前浏览器授权和确切运行代次确认完整 SHA-256 后，主入口再次校验授权，随后交付本地字节。浏览器响应仍用 `private, no-store`。旧节点、私有插件及无法匹配的资源沿用所属节点传输。将 `HGW_RUNTIME_ASSET_CACHE_MAX_BYTES` 设为 `0` 也会停用本地副本。
+对于不可变发布包内带修订号的插件组合，主入口可以用本地安装的客户端包重建 JavaScript。只有所属 Runtime 按浏览器当前授权和确切代次确认完整 SHA-256 后，主入口才可替换响应字节。交付前主入口再次校验准入，浏览器响应仍用 `private, no-store`。旧节点、私有插件及无法匹配的资源沿用所属节点传输。将 `HGW_RUNTIME_ASSET_CACHE_MAX_BYTES` 设为 `0` 也会停用本地副本。
 
-通过认证的发布脚本校验使用为 Web 入口保留的连接。所属 Gateway 确认摘要并结束空响应后，中心先归还节点连接，再向浏览器发送本地脚本。较旧的所属节点仍使用借出的连接发送自己的响应。
+主入口可在校验摘要期间准备 Brotli 质量 9 和 gzip 级别 6 的发布字节。有界缓存按完整 SHA-256 与编码保存结果，不缓存授权。每个 Gateway 最多运行 2 个压缩任务，未压缩输入合计不超过 8 MiB。任务数或输入字节达到上限时，验证通过的响应可发送未压缩字节。不接受 identity 编码的请求不会使用本地发布副本。关闭时等待已提交的发布压缩任务，但不保留其结果。
 
-开启性能诊断时，带修订号的 `GET /plugins/combo.js` 请求可附带有效的 `x-dsh-operation-id` 来记录 `pluginCombo`。用同一个 UUID 对照两端 Gateway 的响应头时间和响应中断标记。
+通过认证的脚本校验可使用为 Web 入口保留的连接。带 `dshAssetPreload=1` 的带修订号多脚本 GET 使用普通节点连接，Gateway 在转发和查缓存前移除该提示。所属 Gateway 确认摘要并结束空响应后，主入口先归还节点连接，再向浏览器发送本地字节。较旧的所属节点仍使用借出的连接发送自己的响应。
+
+启用操作采样时，结构化启动 GET、不可变 `GET /plugins/combo.js` 或 `/api/workspaceFiles.{list,stat,read,readBytes}` POST 若未提供 `x-dsh-operation-id`，Gateway 会生成 UUID。Gateway 保留有效的传入 UUID，把该值写入响应，并在转发时传给所属 Gateway。分别查询两端的记录，以对照响应头计时和中断状态。只有携带有效 UUID 的 `POST /internal/runtime/resources/finish` 才记为 `resourceFinish`，并拆分 `authorize`、`resourceWriteAdmission` 与 `resourceFinishDatabase`。仍处于排队状态的 `resourceRequest` 和 `resourceStatuses` 响应会直接根据协调器内存中最新一次主机压力采样附加 `resourceQueue`，不增加额外数据库查询。参见 [Runtime 资源诊断](../packages/context/gateway-runtime/README.zh.md#resource-admission) 与模型尝试关联。
 
 所属 Gateway 在两个诊断接口的 `readySession` 字段中统计就绪代次的对话转发尝试。`forwarded` 统计携带本机节点服务断言且目标明确的请求，`ordinary` 统计通过账号路由进入的准入。`ready` 和 `delegated` 表示已准入 Runtime 代理。`fallbackCandidate` 统计不满足签名就绪准入条件的断言，`fallbackDelegation` 统计无可用委托的结构化读取。其他计数分别记录服务不可用、无法持有当前代次、启动读取继续走维护路由、拒绝、客户端断开和处理异常。同一请求回退后可能计入两组。
 
@@ -193,9 +195,11 @@ Gateway 将浏览器请求、事件流建立、就绪期限与服务端计时选
 
 浏览器声明预期账号和确切 Runtime 时，结构化启动读取、Host 描述、工作区列表、会话列表与历史 RPC 可对就绪代次复用上述准入。客户端沿用原路径、游标和归档读取规则。当前代次未就绪时，读取按普通路由及启动规则处理。恢复已保存的个人对话时，浏览器附加 `dshRestore=1`，只使用现有的就绪代次，不启动 Runtime。
 
-对于使用已验证节点内容卷的就绪项目，历史准备请求以及绑定账号的 Host 描述、工作区列表、会话列表和历史读取会持有当前代次。这也适用于选择器一致、入口节点获准的普通签名节点服务转发。首次治理查询验证账号权限，并返回[迁移 147](deploy/postgres/migrations/147_ready_project_content_admission.sql) 提供的存储标识。所属 Gateway 从该卷读取当前项目名，转发前再次验证权限和相同的存储归属。这类项目的写请求使用普通写入准入。
+绑定账号和确切 Runtime 的 `POST /api/workspaceFiles.list` 可以使用就绪准入，不使用主入口委托。所属 Gateway 实时从 PostgreSQL 核验权限和维护状态，并应用与准入结果精确匹配的权限修订。Host 仍检查原请求中的会话和工作区相对路径。文件 `stat`、`read` 和 `readBytes` 使用普通准入。
 
-`HGW_NODE_SERVICE_PREPARED_READ_DELEGATION=on` 允许主入口核准个人历史准备请求，以及绑定账号的结构化启动、Host 描述、工作区列表、会话列表和历史读取。请在主入口和所属 Gateway 同时启用，并使用配套 Node Agent。主入口在转发前和返回结果前都复核当前权限。所属端在已认证的本机 Node Agent 连接上核验签名请求和会话，检查已应用的权限修订号，并保留获准的代次。符合条件时，所属端在响应前无需查询治理库。其余请求沿用普通准入。委托读取记录完成活动和启动审计事件。参见[个人 Runtime 读取决策](../.agents/notes/implemented/architecture/2026-11-21-personal-history-restore-admission.zh.md)。
+对于使用已验证节点内容卷的就绪项目，历史准备请求以及上述绑定账号的 POST 读取会持有当前代次。这也适用于选择器一致、入口节点获准的普通签名节点服务转发。首次治理查询验证账号权限，并返回[迁移 147](deploy/postgres/migrations/147_ready_project_content_admission.sql) 提供的存储标识。所属 Gateway 从该卷读取当前项目名，转发前再次验证权限和相同的存储归属。这类项目的写请求使用普通写入准入。
+
+`HGW_NODE_SERVICE_PREPARED_READ_DELEGATION=on` 允许主入口核准个人历史准备请求，以及绑定账号的结构化启动、Host 描述、工作区列表、会话列表和历史读取。请在主入口和所属 Gateway 同时启用，并使用配套 Node Agent。主入口在转发前和返回结果前都复核当前权限。所属端在已认证的本机 Node Agent 连接上核验签名请求和会话，检查已应用的权限修订号，并保留获准的代次。符合条件时，所属端在响应前无需查询治理库。没有可用委托时，这些读取由所属 Gateway 准入。委托读取记录完成活动和启动审计事件。参见[个人 Runtime 读取决策](../.agents/notes/implemented/architecture/2026-11-21-personal-history-restore-admission.zh.md)。
 
 `accessSync` 衡量 SQL 准入后所属 Gateway 的撤权复核。`hostPreparation` 记录 Host 解码请求正文、处理对话以及按需读取初始历史的耗时。对话处理包含执行登记。用同一个操作 ID 的 `executionRegister` 将执行登记 SQL 与其余 Host 处理分开。
 
@@ -207,13 +211,9 @@ Gateway 有界保留运行或控制鉴权时验证的 Runtime 身份坐标。个
 
 已识别 Runtime 的个人根会话原始输入先检查本机关停状态，再通过一条数据库语句进入执行。语句锁定会话，核验当前令牌、代次、租约、电脑权限和写入代次，然后消耗回执并记录不可变范围。已有执行范围、委派、编辑或会话修订变化时，重新检查共享维护状态和 Runtime 鉴权，使用常规事务。`executionEnter` 样本记录 SQL 次数和耗时。每次实际调用模型仍核验当前执行权限。
 
-预备新的空白个人草稿时，Gateway 记录在途写入，并对确切就绪代次核验当前浏览器权限。草稿可以直接进入编辑。首条预备消息到达时，所属 Gateway 在同一条语句中登记根会话和输入回执。如果首次操作需要会话谱系，或者请求未携带已签名的预备发送标记，Runtime 通过常规路径登记。过期租约或写入代次拒绝受理，重试复用原回执。
-
 [迁移 142](deploy/postgres/migrations/142_execution_hot_path.sql) 将模型或进程的预留登记和状态读取分别收为事务内的一条语句。Gateway 在提交前校验持久策略，并在释放节点行锁后重新核验已记录的执行权限。完成操作紧接提交前锁定并核验精确 Runtime 代次，浏览器在前面的记账语句执行期间仍可更新活动时间。每次普通个人执行检查用一条语句核验当前令牌、代次、节点租约、服务写入代次、电脑权限及不可变范围。共享项目批量读取同一 Runtime 的凭据，沿用项目和会话权限检查。
 
 带执行范围的个人模型请求可以在一次数据库往返内锁定节点策略、核验当前会话权限并提交预留。持久策略在锁定时必须与 Gateway 已校验的策略一致。策略缺失或不同时使用显式事务，在提交前校验策略。额度立即获准时，语句在锁仍有效时复核执行范围，响应可携带该精确许可的确认。排队的预留和缺少确认的响应沿用常规核验。Runtime 在实际调用模型前再次核验执行权限。
-
-压力采样每次发布后等待配置的周期，再开始下一次采集。观测语句校验当前服务模式和写入纪元。启动额度由资源压力和公平调度决定。
 
 已识别的个人或项目 Runtime 通过本机关停检查后，用一条语句读取托管模型凭据。语句在同一快照中核验当前令牌、Runtime 代次、服务写入代次和凭据权限。项目自有凭据仅供所属项目读取。`modelCredential` 诊断记录耗时与 SQL 次数，凭据内容不进入样本。
 
@@ -238,8 +238,6 @@ Gateway 有界保留运行或控制鉴权时验证的 Runtime 身份坐标。个
 迁移137将冷启动的归属、租约、队列和压力检查及可能分配记录合并为一条数据库语句。Gateway 保留事务至结果处理与提交结束，检查和消耗新鲜额度之间不会持有节点锁等待网络往返。提交确认丢失时保留可能分配状态，由已有启动器清理，不重放启动。
 
 [迁移 138](deploy/postgres/migrations/138_runtime_resource_registration.sql) 通过 `BEGIN` 与 `COMMIT` 之间的一条 PostgreSQL 语句登记 Runtime。该语句在当前代次和节点租约检查、保留身份的登记及序号读取期间持续持有节点锁与实例锁。Gateway 在提交前校验节点中已持久化的策略；无效策略、已撤销代次和写入失败会回滚整个登记。重复登记保留活动预留和下一序号。Runtime 请求期限仍由 `HGW_RUNTIME_REQUEST_TIMEOUT_MS` 配置。
-
-带执行范围的个人模型请求可以在一次数据库往返内锁定节点策略、核验当前会话权限并提交预留。持久策略在锁定时必须与 Gateway 已校验的策略一致。策略缺失或不同时使用显式事务，在提交前校验策略。额度立即获准时，语句在锁仍有效时复核执行范围，响应可携带该精确许可的确认。排队的预留和缺少确认的响应沿用常规核验。Runtime 在实际调用模型前再次核验执行权限。
 
 压力采样每次发布后等待配置的周期，再开始下一次采集。观测语句校验当前服务模式和写入纪元。启动额度由资源压力和公平调度决定。
 
@@ -284,6 +282,8 @@ PostgreSQL 连接池统一限制原生查询、直接取连接和事务辅助函
 构建 Gateway 后，在仓库根目录运行 `npm exec -- tsx gateway/tests/runtime-provider-projection.perf.ts`，可针对构建后的投影执行离线诊断。它报告两种作用域下 16、64 和 256 个合成模型的 profile 克隆调用次数及被克隆模型条目数。诊断不包含数据库解码、认证、网络、Runtime 就绪和浏览器渲染；这些计数不证明端到端延迟或容量。
 Gateway 在 `/internal/runtime/resources/` 下协调持久化的节点准入。[Runtime 提供方](../packages/context/gateway-runtime/README.zh.md#resource-admission)在就绪前注册；实际 LLM 派发和子进程分配等待许可。排队许可重新检查捕获的权限。停止期间或账户权限撤销后，只有完成接口接受当前 Runtime bearer；确认进程范围终止后按其捕获的代次回收资源。绕过这些消费方直接分配 worker 的入口仍需接入；Runtime 常驻限制仍是独立控制项。
 
+静止资源完成记账要求数据库已应用[迁移 149](deploy/postgres/migrations/149_quiescent_node_resource_completion.sql)。已存资源策略不满足条件时，Gateway 走普通记账；SQL 函数缺失不触发回退。发布清单将此迁移列为必需文件，macOS 激活前会拒绝缺件的发布包。
+
 只有已停止的实例记录可以领取新代次。停止状态变更与凭据清除必须匹配捕获的代次。凭据指纹区分备份恢复后重复出现的代次编号。Linux 使用 `harness-<runtime-key>@<generation>-<credential-hash>.service`；终止会先把该代次的单元原子替换为空的屏蔽文件，再等待 `systemctl stop`。保留这些屏蔽文件，以阻止迟到的启动命令重新激活已经确认停止的代次。终止同时屏蔽并停止旧式按用户命名的单元。停止、启动和升级通过实例管理执行，让凭据、记账和监督状态一起推进。
 
 Linux Runtime 单元使用 `Type=exec`，并保留其所有者私有的凭据源文件，直到精确的已屏蔽代次确认停止。这保证启动、自动重启及 Gateway 替换时 systemd 仍可加载凭据。停止未能确认时，凭据源文件继续保留。
@@ -321,6 +321,8 @@ Gateway 子进程继承过滤后的宿主工具设置。调用方通过环境注
 Admin JSON 读取会在发送数据及专用响应头前复核当前账号资格。撤权返回403；查询不可用返回503 `admin-authorization-unavailable`。已提交变更结果保留所属服务的准入。自定义账号适配器和 Runtime 管理组装遵循[读取发送指南](../docs/upgrade-guide/v0.2.1-rc.1.coharness.1/administrator-read-publication/guide.zh.md)。
 
 Admin 表单在自己的浏览器页面中登记待保存编辑。切换电脑、跟随导航链接或使用浏览器前进后退时，可在新标签页打开目标，原表单保持挂载；刷新和关闭使用浏览器的未保存提示。模型页视图切换也会在 Provider、计价或辅助模型仍处于编辑状态时使用同一保护。表单值和凭证不会复制到浏览器共享存储。字段恢复到已保存值或编辑器卸载时，该编辑器的保护随之移除。
+
+手动重新读取部署拓扑或节点配置，不会将无编辑的表单标记为未保存。较新的编辑、拓扑预检、保存或应用操作会取代同一表单尚未完成的重读；较早的响应不能覆盖草稿或较新操作的结果。重新加载 Runtime 分配配额时，只清除数值与服务端返回的已校验配额一致的字段编辑。其他编辑仍保留，供管理员复核。
 
 `/admin` 托管从 `gateway/admin-ui` 构建到 `gateway/public/admin` 的 Vite SPA；外壳 `index.html` 携带 `cache-control: no-store`，使版本切换不会让被钉住的外壳继续引用已删除的哈希分块，`assets/*` 按内容哈希命名并携带 `private, max-age=31536000, immutable`。`/admin/api/*` 是网关 JSON API（非 `admin` 角色 403）。管理员发起项目有两种创建模式：**默认目录**只提交名称，并以 `0770` 权限创建或复用 `<HGW_PROJECTS_ROOT>/<name>`；**现有目录**提交名称以及从 Gateway 宿主机选择的目录。用户发起项目仍只提交名称，并在 `HGW_USER_PROJECTS_ROOT` 下分配目录。两种来源使用同一套工作空间、共享运行时、成员和对话模型。用户创建的项目把创建者设为 `rw` 所有者，并提供邀请生命周期操作；管理员可以在同一列表中查看两种来源并按来源筛选。
 
@@ -504,13 +506,13 @@ Gateway 使用认证账户当前有效的企业和成员资格注册、删除 An
 
 Auto 审查资格是每个用户独立的管理员授权（`autoReviewEligible`），普通用户与管理员的初始值均为 false。用户列表和编辑对话框在桌面与手机布局中展示该资格。只有管理员可以通过 `/admin/api/users/:id` PATCH 修改它，且要求严格的布尔值、审计记录和跨 Gateway 访问失效通知。授予资格不会启用 Auto，不会改变当前 Session，也不会改变新会话的默认权限；项目访问继续使用既有成员权限与对话 ACL。详见[管理员所有的资格记录](../.agents/notes/implemented/bug-fix/2026-09-22-admin-auto-review-eligibility.zh.md)。
 
-记忆写入资格同样独立于 Auto 和模型权限。按用户的授权在用户详情页编辑；项目授权经 `/admin/api/memory/permissions` 在项目详情页编辑，保存携带版本并经访问失效 outbox 发布。执行侧 `memory` 能力要求每位已核验参与者具备资格且项目已授权并持有可写成员身份，仅适用于项目运行时，在私有对话中始终拒绝。
-
 桌面资格独立于 Auto 和模型权限。桌面协调页通过 `/admin/api/desktops/permissions` 编辑项目授权；按用户的授权在用户详情页编辑，未配置时默认拒绝。保存携带版本并拒绝并发覆盖。执行侧 `desktop` 能力要求每位已核验参与者具备资格；项目中还要求项目授权及可写成员身份，管理员也不能绕过。修改通过访问失效 outbox 发布。运行时仅当节点通过 `HGW_DESKTOP_ID` 声明交互桌面时才携带桌面驱动：启动组合随之挂载 computer-use 服务与已配置的 Cua Driver MCP 提供者，已配置的[执行提供者](../packages/context/gateway-execution/README.zh.md) 发布负责驱动准入的托管策略。资格本身既不提供根会话确认，也不提供桌面租约。
 
 每个受管 Runtime 还加载[桌面可用性观察器](../packages/context/gateway-execution/README.zh.md)。未配置驱动的电脑在 Host 摘要和桌面状态中报告已知限制；观察此状态不会启动驱动，也不会修改用户资格。
 
 Admin 的 `GET /admin/api/desktop-environment` 读取当前所选 Gateway 电脑的桌面会话信息，不启动 Runtime。部署配置、桌面权限与远程桌面配置会说明 GUI 缺失或尚未核验的情况。新主机未检测到图形会话时，不预建本机 VNC 端点；已明确配置的外部端点保持不变。桌面服务与系统权限仍需分别准备。
+
+记忆写入资格同样独立于 Auto 和模型权限。按用户的授权在用户详情页编辑；项目授权经 `/admin/api/memory/permissions` 在项目详情页编辑，保存携带版本并经访问失效 outbox 发布。执行侧 `memory` 能力要求每位已核验参与者具备资格且项目已授权并持有可写成员身份，仅适用于项目运行时，在私有对话中始终拒绝。
 
 桌面确认按实际活动根会话单独记录，并绑定已认证用户、当前节点、运行时代次及精确桌面。迁移 033 将其绑定到当前用户和项目资格版本。撤销确认会发布访问失效通知；撤销资格后重新授予仍需再次确认。私有执行 API 拒绝调用者提供参与者和节点。桌面租约归属绑定已认证运行时代次和实际活动根；经过验证的子会话共享该根，其他根不能续租、释放或确认其租约已停止。协调端从服务器取得节点和参与者，不复用浏览器断言。撤权后精确持有者仍可清理；获取、状态查询及续租则要求当前资格和确认。
 
@@ -546,7 +548,7 @@ Gateway 还负责 `/api/documents/transfer/uploads` 下的目标作用域可续�
 
 按 Runtime 签发的模型上报凭据，会把所提交的执行输入凭据绑定到 Session 所属的精确持久 Runtime；同一账号在一台或多台电脑拥有多个运行时时也不例外。账务仍按账号/项目汇总。撤销资格不会抹除该 Runtime 的有效延迟费用；其他 Runtime 不能借用这些输入凭据，也不能在事件正文中替换其上报身份。
 
-管理 SPA 提供”模型”和”用量”页面。模型以精确 `(provider, model)` 路由标识。治理目录是每个角色的唯一授权来源——管理员不再有 `defaultAllowed` 旁路。按路由角色默认（`admin` / `member`）、按用户 `允许` / `拒绝` / `继承` 例外和全局启用开关共同决定目录内路由的有效策略。新建项目使用项目级默认规则，自动授权当前全部可用的组织模型；新增目录模型会继续跟随该规则，直到管理员关闭项目默认授权或写入单模型拒绝。既有项目保留数据库中的默认规则。目录外的路由对所有角色拒绝；在个人运行时中，用户在设置 user 层声明的路由（BYOK，自带密钥）同时获得授权，用量归个人成本、目录无价则按 0 记，项目共享运行时不开 BYOK。策略投影还会把第一条获授权且已启用的组织路由写入运行时 home patch 作为组合默认值；user 层的 `agent-default-model` 选择仍然拥有更高优先级。策略变化会原子重写 `$DSH_HOME/model-governance.json`（权限 `0600`）；运行中的实例会监视该文件，验证通过后无需重启即可应用策略，无效的运行中文档会对新的模型请求 fail-closed。实例插件提供 `ctx.modelAccess`；`apiproxy` 过滤目录并拒绝选择/发送 RPC，而 `llm/stream` 中间件是聊天、标题、压缩和直接调用进入适配器前的最终强制点。
+管理 SPA 提供”模型”和”用量”页面。模型以精确 `(provider, model)` 路由标识。治理目录是包括管理员在内的每个角色的唯一授权来源。按路由角色默认（`admin` / `member`）、按用户 `允许` / `拒绝` / `继承` 例外和全局启用开关共同决定目录内路由的有效策略。新建项目使用项目级默认规则，自动授权当前全部可用的组织模型；新增目录模型会继续跟随该规则，直到管理员关闭项目默认授权或写入单模型拒绝。既有项目保留数据库中的默认规则。目录外的路由对所有角色拒绝；在个人运行时中，用户在设置 user 层声明的路由（BYOK，自带密钥）同时获得授权，用量归个人成本、目录无价则按 0 记，项目共享运行时不开 BYOK。策略投影还会把第一条获授权且已启用的组织路由写入运行时 home patch 作为组合默认值；user 层的 `agent-default-model` 选择仍然拥有更高优先级。策略变化会原子重写 `$DSH_HOME/model-governance.json`（权限 `0600`）；运行中的实例会监视该文件，验证通过后无需重启即可应用策略，无效的运行中文档会对新的模型请求 fail-closed。实例插件提供 `ctx.modelAccess`；`apiproxy` 过滤目录并拒绝选择/发送 RPC，而 `llm/stream` 中间件是聊天、标题、压缩和直接调用进入适配器前的最终强制点。
 
 用户详情页展示的有效模型访问来自目标账号的服务端策略，包含其角色、Provider/模型启用状态和按用户的覆盖项。角色默认与用户覆盖只描述配置来源，均不能替代有效授权结果。
 

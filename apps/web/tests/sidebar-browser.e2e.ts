@@ -2,6 +2,7 @@
 import { responsiveBrowser, responsiveBrowserName, responsiveMobileEmulation, responsiveViewports, expectViewportFit } from './responsive-browser.ts'
 import { createServer, type Server } from 'node:http'
 import type {} from '@deepseek-ai/dsh-workspace'
+import type { WebBootGraph } from '@deepseek-ai/dsh-client-modules'
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -40,7 +41,8 @@ describe('web e2e: Session-owned Browser', () => {
     const history = await seedSession(scaffold, source, 'sidebar-browser-history')
     const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
     await workspace.attachSession(history)
-    browser = await responsiveBrowser.launch()
+    const executablePath = process.env.DSH_TEST_BROWSER_EXECUTABLE
+    browser = await responsiveBrowser.launch(executablePath === undefined ? undefined : { executablePath })
   }, 120_000)
 
   afterAll(async () => {
@@ -55,6 +57,23 @@ describe('web e2e: Session-owned Browser', () => {
         }
       }
     }
+  })
+
+  it('opens the first conversation link in Browser without opening a new tab', async () => {
+    if (scaffold === undefined) throw new Error('Web scaffold is unavailable')
+    const page = await browser!.newPage({ locale: 'en-US', viewport: { width: 1440, height: 1000 } })
+    try {
+      await page.goto(scaffold.authenticatedUrl, { waitUntil: 'domcontentloaded' })
+      const row = await page.evaluate(() => {
+        const graph = (window as Window & { __DSH_BOOT__?: WebBootGraph }).__DSH_BOOT__
+        return graph?.entries.find(entry => entry.id === '@deepseek-ai/dsh-client-ui-sidebar-browser')
+      })
+      expect(row).toBeDefined()
+      expect(row?.optional).not.toBe(true)
+      await page.getByRole('link', { name: 'Local preview', exact: true }).click()
+      await page.frameLocator('[data-sidebar-browser-frame]').getByRole('heading', { name: 'First local page' }).waitFor()
+      expect(page.context().pages()).toEqual([page])
+    } finally { await page.context().close() }
   })
 
   it.each(responsiveViewports)('$name opens a message link, reports unobservable navigation, and restores sandbox after reload', async ({ name, width, height }) => {

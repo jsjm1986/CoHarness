@@ -1,4 +1,4 @@
-/** Deterministic tests for Wave 4 model first-token fast paths on project and node_content Runtimes. */
+/** Deterministic tests for model first-token fast paths on project and node_content Runtimes. */
 import { randomBytes, randomUUID } from 'node:crypto'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
@@ -65,7 +65,7 @@ function fakeResponse() {
   }
 }
 
-describe('Wave 4: single-statement project model credential resolution', () => {
+describe('single-statement project model credential resolution', () => {
   it('resolves both organization-managed and project-owned credentials in 1 SQL query with epoch/serving fencing', async () => {
     const cipher = new OrganizationModelCredentialCipher(randomBytes(32))
     const encryptedOrg = cipher.encrypt(ORG_ID, 'prov-org', 'sk-org-secret')
@@ -111,7 +111,7 @@ describe('Wave 4: single-statement project model credential resolution', () => {
   })
 })
 
-describe('Wave 4: immediate qualified project model grants and cursor wakeups', () => {
+describe('immediate qualified project model grants and cursor wakeups', () => {
   it('qualifies immediate active scoped project model grants inline and refuses when post-grant authority fails', async () => {
     const authorize = vi.fn(async () => ({
       scopeId: SCOPE_ID, revision: '1', inputs: [INPUT_ID], actors: [{ userId: 7 }],
@@ -207,8 +207,8 @@ describe('Wave 4: immediate qualified project model grants and cursor wakeups', 
   })
 })
 
-describe('Wave 4: combined scope+actor and project/steward/members/placement SQL in GatewayExecutionIdentity.authorize', () => {
-  it('uses only 2 governance SQL statements for node_content project authorize (down from 4+)', async () => {
+describe('combined scope+actor and project/steward/members/placement SQL in GatewayExecutionIdentity.authorize', () => {
+  it('uses 2 governance SQL statements for node_content project authorize', async () => {
     const governanceQueries: string[] = []
     const localQueries: string[] = []
     const client = fixtureQueryClient(sql => {

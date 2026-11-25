@@ -96,8 +96,10 @@ describe('WorkspaceManager', () => {
     const manager = new WorkspaceManager(api)
     const oldResult = manager.handleConnected()
     const oldSignal = list.mock.calls[0]?.[1]
+    expect(manager.getSnapshot().state).toBe('loading')
     manager.handleDisconnected()
     expect(oldSignal?.aborted).toBe(true)
+    expect(manager.getSnapshot().state).toBe('idle')
     api.onWorkspaceList = () => next.promise
     const nextResult = manager.handleConnected()
     next.resolve(ok({ items: [workspace('next')], archivedSessionIds: [], archiveRevision: 2 }))

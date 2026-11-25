@@ -1,5 +1,6 @@
 /** Real process, socket and kernel-lease evidence for the recoverable local launcher. */
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -10,7 +11,10 @@ import { loadConfig } from '../src/config.ts'
 import { LocalLauncher, RuntimeLaunchCleanupError, type InstanceProc } from '../src/launcher.ts'
 import { LocalRuntimeOwnerLease, LocalRuntimeOwnerStore } from '../src/local-runtime-owner.ts'
 import { LocalRuntimeControl } from '../src/local-runtime-control.ts'
+import * as bootstrap from '../src/local-runtime-protocol.ts'
+import { RuntimeLaunchTiming } from '../src/runtime-launch-timing.ts'
 
+const { LOCAL_BOOTSTRAP_BYTES, localBootstrapSchema, localSupervisorStagesSchema } = bootstrap
 const roots: string[] = [], handles: InstanceProc[] = []
 afterEach(async () => {
   try { for (const handle of handles.splice(0)) await handle.terminate(0) }
@@ -31,9 +35,9 @@ async function fixture(mode = 'normal') {
   })
   return { root, cfg, runtime, store, launcher: new LocalLauncher(cfg) }
 }
-async function start(f: Awaited<ReturnType<typeof fixture>>) {
+async function start(f: Awaited<ReturnType<typeof fixture>>, timing?: RuntimeLaunchTiming) {
   try {
-    const handle = await f.launcher.start({ ...f.runtime, gatewayCredential: '{"fixture":true}' })
+    const handle = await f.launcher.start({ ...f.runtime, gatewayCredential: '{"fixture":true}' }, timing)
     handles.push(handle); return handle
   } catch (error) { if (error instanceof RuntimeLaunchCleanupError) handles.push(error.process); throw error }
 }
@@ -116,6 +120,94 @@ describe.skipIf(process.platform === 'win32')('recoverable LocalLauncher', () =>
     expect(await readFile(join(f.root, 'logs/runtime.log'), 'utf8')).toBe('runtime-ready\n')
     await expect(f.launcher.start({ ...f.runtime, gatewayCredential: '{}' })).rejects.toThrow('fenced')
     expect(await handle.isAlive?.()).toBe(false)
+  })
+
+  it('receives supervisor-relative stages on the existing ready acknowledgement when timing is requested', async () => {
+    const f = await fixture()
+    const timing = new RuntimeLaunchTiming(Date.now(), performance.now())
+    await start(f, timing)
+    const stages = timing.localSupervisorStagesMs!
+    expect(stages).toMatchObject({ ownerLeaseAdopted: expect.any(Number), ready: expect.any(Number) })
+    const ordered = [stages.ownerLeaseAdopted, stages.bootIdStarted, stages.bootIdVerified, stages.controlListening,
+      stages.startingRecordWritten, stages.runtimeSpawnStarted, stages.runtimeSpawned, stages.runningRecordWriteStarted,
+      stages.runningRecordWritten, stages.ready]
+    expect(ordered).toEqual([...ordered].sort((a, b) => a - b))
+    expect(stages.credentialDeliveryStarted).toBeGreaterThanOrEqual(stages.runtimeSpawnStarted)
+    expect(stages.credentialDelivered).toBeGreaterThanOrEqual(stages.credentialDeliveryStarted)
+    expect(stages.runningRecordWriteStarted).toBeGreaterThanOrEqual(stages.credentialDelivered)
+    expect(stages).not.toHaveProperty('jobAssignmentFinished')
+  })
+
+  it('rejects malformed supervisor stage diagnostics', () => {
+    const valid = {
+      ownerLeaseAdopted: 1, bootIdStarted: 2, bootIdVerified: 3, controlListening: 4,
+      startingRecordWritten: 5, runtimeSpawnStarted: 6, runtimeSpawned: 7,
+      credentialDeliveryStarted: 8, credentialDelivered: 9,
+      runningRecordWriteStarted: 10, runningRecordWritten: 11, ready: 12,
+    }
+    expect(localSupervisorStagesSchema.safeParse(valid).success).toBe(true)
+    expect(localSupervisorStagesSchema.safeParse({ ...valid, extra: 1 }).success).toBe(false)
+    expect(localSupervisorStagesSchema.safeParse({ ...valid, ready: -1 }).success).toBe(false)
+    expect(localSupervisorStagesSchema.safeParse({ ...valid, ready: Number.NaN }).success).toBe(false)
+    expect(localSupervisorStagesSchema.safeParse({ ...valid, ready: Number.POSITIVE_INFINITY }).success).toBe(false)
+    expect(localSupervisorStagesSchema.safeParse({ ...valid, ready: '12' }).success).toBe(false)
+    const missingReady: Record<string, unknown> = { ...valid }
+    delete missingReady.ready
+    expect(localSupervisorStagesSchema.safeParse(missingReady).success).toBe(false)
+  })
+
+  it.each(['included', 'removed', 'too large'] as const)('uses the exact UTF-8 bootstrap ceiling with timing %s', async outcome => {
+    const f = await fixture()
+    const timing = new RuntimeLaunchTiming(Date.now(), performance.now())
+    const prepare = bootstrap.localBootstrapMessage
+    const bytes = (value: unknown): number => Buffer.byteLength(JSON.stringify(value), 'utf8')
+    let credentialDigest: string | undefined
+    const sizeBootstrap = vi.spyOn(bootstrap, 'localBootstrapMessage').mockImplementationOnce(input => {
+      const base = localBootstrapSchema.parse({ ...input, credential: JSON.stringify({ fixture: true, padding: '中文"\\' }) })
+      expect(base.reportTiming).toBe(true)
+      const minimum = { ...base }
+      delete minimum.reportTiming
+      const ceiling = outcome === 'too large' ? LOCAL_BOOTSTRAP_BYTES + 1 : LOCAL_BOOTSTRAP_BYTES
+      const target = outcome === 'included' ? base : minimum
+      const credential = JSON.parse(base.credential) as { fixture: true; padding: string }
+      credential.padding += 'x'.repeat(ceiling - bytes(target))
+      base.credential = minimum.credential = JSON.stringify(credential)
+      expect(bytes(target)).toBe(ceiling)
+      credentialDigest = createHash('sha256').update(base.credential).digest('hex')
+      const prepared = prepare(base)
+      expect(bytes(prepared)).toBe(LOCAL_BOOTSTRAP_BYTES)
+      expect(prepared.reportTiming).toBe(outcome === 'included' ? true : undefined)
+      return prepared
+    })
+    try {
+      if (outcome === 'too large') {
+        await expect(start(f, timing)).rejects.toThrow('Local runtime bootstrap exceeds its byte limit')
+        await expect(readFile(join(f.root, 'ready.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+        expect(timing.localSupervisorStagesMs).toBeUndefined()
+      } else {
+        const handle = await start(f, timing), runtime = await ready(f.root)
+        expect(createHash('sha256').update(JSON.stringify(runtime.credential)).digest('hex')).toBe(credentialDigest)
+        expect(await handle.isAlive?.()).toBe(true)
+        expect(await (await fetch(`http://127.0.0.1:${runtime.port}`)).text()).toBe('owned-runtime')
+        if (outcome === 'included') expect(timing.localSupervisorStagesMs?.ready).toEqual(expect.any(Number))
+        else expect(timing.localSupervisorStagesMs).toBeUndefined()
+      }
+      expect(sizeBootstrap).toHaveBeenCalledOnce()
+    } finally { sizeBootstrap.mockRestore() }
+  })
+
+  it('keeps the Runtime alive when a matching ready acknowledgement carries malformed timing', async () => {
+    const f = await fixture()
+    const hook = new URL('./fixtures/local-runtime-drop-ack.mjs', import.meta.url)
+    const timing = new RuntimeLaunchTiming(Date.now(), performance.now())
+    vi.stubEnv('NODE_OPTIONS', [process.env.NODE_OPTIONS, `--import=${hook.href}`].filter(Boolean).join(' '))
+    vi.stubEnv('LOCAL_RUNTIME_FIXTURE_DROP', 'malformed-timing')
+    try {
+      const handle = await start(f, timing), runtime = await ready(f.root)
+      expect(timing.localSupervisorStagesMs).toBeUndefined()
+      expect(await handle.isAlive?.()).toBe(true)
+      expect(await (await fetch(`http://127.0.0.1:${runtime.port}`)).text()).toBe('owned-runtime')
+    } finally { vi.unstubAllEnvs() }
   })
 
   it.each(['ready', 'ack-dropped', 'spec-held'])('recovers exact ownership after Gateway SIGKILL at %s', async stage => {

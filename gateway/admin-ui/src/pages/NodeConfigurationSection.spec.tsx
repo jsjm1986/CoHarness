@@ -1,8 +1,9 @@
 /** Admin configuration keeps edits, actual values and explicit restart requests distinct. */
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import * as api from '../api.ts'
+import { PendingEditsProvider } from '../pending-edits.tsx'
 import { NodeConfigurationSection } from './NodeConfigurationSection.tsx'
 
 vi.mock('../api.ts', () => ({ getNodeConfiguration: vi.fn(), mutateNodeConfiguration: vi.fn(), getDesktopEnvironment: vi.fn() }))
@@ -52,4 +53,40 @@ it('retains a conflicted draft until the administrator explicitly reloads', asyn
   vi.mocked(api.getNodeConfiguration).mockResolvedValue({ ...initial, revision: 2, desired: { ...values, HGW_PORT: '9402' } })
   fireEvent.click(screen.getByRole('button', { name: '重新读取' }))
   await waitFor(() => expect((port as HTMLInputElement).value).toBe('9402'))
+})
+
+it.each(['initial failure', 'loaded configuration'])('allows unloading during a configuration reload from %s', async source => {
+  if (source === 'initial failure') vi.mocked(api.getNodeConfiguration).mockRejectedValueOnce(new Error('读取失败'))
+  const reload = Promise.withResolvers<api.NodeConfigurationView>()
+  render(<PendingEditsProvider><NodeConfigurationSection /></PendingEditsProvider>)
+  const button = await screen.findByRole('button', { name: '重新读取' })
+  vi.mocked(api.getNodeConfiguration).mockReturnValueOnce(reload.promise)
+  fireEvent.click(button)
+  expect(api.getNodeConfiguration).toHaveBeenCalledTimes(2)
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(true)
+
+  await act(async () => { reload.resolve({ ...initial, revision: 2, desired: { ...values, HGW_PORT: '9402' } }) })
+  expect(screen.getByLabelText('Gateway 端口（1–65535）')).toHaveProperty('value', '9402')
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(api.mutateNodeConfiguration).not.toHaveBeenCalled()
+})
+
+it('keeps the newer edit, reviewed revision, and save error when an older configuration reload resolves', async () => {
+  const reload = Promise.withResolvers<api.NodeConfigurationView>()
+  vi.mocked(api.mutateNodeConfiguration).mockRejectedValue(new Error('配置版本已变化'))
+  render(<NodeConfigurationSection />)
+  const port = await screen.findByLabelText<HTMLInputElement>('Gateway 端口（1–65535）')
+  vi.mocked(api.getNodeConfiguration).mockReturnValueOnce(reload.promise)
+  fireEvent.click(screen.getByRole('button', { name: '重新读取' }))
+  expect(api.getNodeConfiguration).toHaveBeenCalledTimes(2)
+
+  fireEvent.change(port, { target: { value: '9401' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存待应用配置' }))
+  expect(api.mutateNodeConfiguration).toHaveBeenCalledExactlyOnceWith({ action: 'save', organizationId: 'org', nodeId: 'node', revision: 0, values: { ...values, HGW_PORT: '9401' } })
+  await screen.findByText('配置版本已变化')
+  await act(async () => { reload.resolve({ ...initial, revision: 2, desired: { ...values, HGW_PORT: '9402' } }) })
+
+  expect(port.value).toBe('9401')
+  expect(screen.getByRole('alert').textContent).toContain('配置版本已变化')
+  expect(vi.mocked(api.getNodeConfiguration).mock.calls[1]?.[0]?.aborted).toBe(true)
 })

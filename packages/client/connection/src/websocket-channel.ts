@@ -10,7 +10,7 @@ import { createWebSocketHeartbeat, type WebSocketHeartbeat } from './ws-upgrade.
 /** Default maximum incoming WebSocket text frame payload size in bytes. */
 const DEFAULT_MAX_MESSAGE_BYTES = 256 * 1024
 
-/** Minimal text-oriented WebSocket surface handed to an accepted Connection upgrade handler. */
+/** Minimal text-oriented WebSocket interface handed to an accepted Connection upgrade handler. */
 export interface ConnectionWebSocket {
   /** Aborted when the socket closes, errors, or the owning route is disposed. */
   readonly signal: AbortSignal
@@ -115,9 +115,8 @@ function adaptWebSocket(ws: WebSocket, signal: AbortSignal): ConnectionWebSocket
   return {
     signal,
     get readyState() {
-      if (ws.readyState === WebSocket.OPEN) return 'open'
-      if (ws.readyState === WebSocket.CLOSING) return 'closing'
-      return 'closed'
+      if (closed) return 'closed'
+      return ws.readyState === WebSocket.OPEN ? 'open' : 'closing'
     },
     send(data: string) {
       if (ws.readyState !== WebSocket.OPEN) return

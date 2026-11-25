@@ -10,7 +10,7 @@ import { clientSessionKey } from '../../packages/host/apiproxy/src/api/client-se
 import type { ClientRuntimeId } from '../../packages/host/apiproxy/src/api/client-session.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { authenticationCookie, MeasurementError, object, privateText, measurementPlan, type ExistingLatencyConfig } from './config.ts'
-import { assertDurableReceiptRequest, assertReadyRuntime, assertRenameReceipt, assertRequestTarget, correlatedRpcValue, failure, summarize, type LatencySample } from './report.ts'
+import { assertDurableReceiptRequest, assertReadyRuntime, assertRenameReceipt, assertRequestTarget, correlatedRpcValue, failure, operationId, resourceOperation, summarize, type LatencySample } from './report.ts'
 import { boundedJson } from './read.ts'
 
 function sessionKey(config: Pick<ExistingLatencyConfig, 'runtimeId'>, id: string): string {
@@ -87,6 +87,144 @@ async function privateParent(file: string): Promise<void> {
     || await realpath(parent) !== parent) throw new MeasurementError('canonical-private-output-parent-required')
 }
 async function append(handle: FileHandle, value: unknown): Promise<void> { await handle.appendFile(JSON.stringify(value) + '\n'); await handle.sync() }
+
+/** Preserve a validated durable prompt receipt before observing later browser endpoints.
+ * @param receipts - this run's private append-only output.
+ * @param sample - action metadata after exact receipt validation.
+ * @param observe - read the browser clock and wait for visible settlement; failure still stops the run.
+ */
+export async function observeAcceptedPrompt(receipts: FileHandle, sample: LatencySample, observe: () => Promise<void>): Promise<void> {
+  const { index, sessionId, requestId, receipt, operationId, httpStatus } = sample
+  await append(receipts, { kind: 'checkpoint', checkpoint: 'durable-send-accepted', operation: 'durable-send',
+    index, sessionId, requestId, receipt, operationId, httpStatus })
+  await observe()
+}
+
+/** Collect the final browser marks whether or not the measured action succeeds.
+ * Preserves an earlier measurement error when the browser can no longer evaluate final marks.
+ * @param measure - operation whose result is being measured.
+ * @param collect - remove observers and read any marks still available.
+ * @returns the measured result.
+ */
+export async function withFinalBrowserClock<T>(measure: () => Promise<T>, collect: () => Promise<void>): Promise<T> {
+  let failed = false
+  try {
+    return await measure()
+  } catch (error) {
+    failed = true
+    throw error
+  } finally {
+    if (failed) {
+      try { await collect() } catch { /* Preserve the earlier measurement failure when final browser marks cannot be read. */ }
+    } else {
+      await collect()
+    }
+  }
+}
+
+/** Narrow event-source interface shared by Playwright Page and unit-test harnesses. */
+export interface ResourceTraceTarget {
+  on(event: 'request' | 'requestfailed', listener: (request: BrowserRequest) => void): unknown
+  on(event: 'response', listener: (response: BrowserResponse) => void): unknown
+}
+
+/** Per-pathname count, HTTP status breakdown, and maximum duration for initial-open API traffic. */
+export interface InitialRpcBucket {
+  count: number
+  statuses: Record<string, number>
+  maxMs?: number
+}
+
+/** Pathname-only API telemetry split between cold page boot and history-row setup. */
+export interface InitialRpcSummary {
+  boot: Record<string, InitialRpcBucket>
+  setup: Record<string, InitialRpcBucket>
+}
+
+const BOOT_RPC_STAGES = new Set(['initial-navigation', 'initial-computer-directory'])
+const SETUP_RPC_STAGES = new Set(['initial-workspace-selection', 'initial-history-row', 'initial-history-click', 'initial-history-content'])
+
+/**
+ * Observe bounded, content-free resource traces and initial API pathname telemetry on a browser page.
+ * @param page - Playwright page or test double emitting request lifecycle events.
+ * @param config - exact target coordinates used to classify bootstrap, script and Workspace file calls.
+ * @param currentStage - returns the runner's current stage label when each request starts.
+ * @param tracedRequests - shared per-request map so response and failure events update the same trace record.
+ * @param requestTrace - fallback resolver for `/api/prepare/v1/*` and `/api/admit/v1/*` failure records.
+ * @returns bounded `resourceTraces` list (at most 32) and pathname-only `initialRpcSummary` (at most 64 paths per phase).
+ */
+export function attachResourceTraceObservers(
+  page: ResourceTraceTarget,
+  config: Pick<ExistingLatencyConfig, 'origin' | 'runtimeId' | 'nodeId'>,
+  currentStage: () => string,
+  tracedRequests: WeakMap<BrowserRequest, Record<string, unknown>> = new WeakMap(),
+  requestTrace: (request: BrowserRequest) => Record<string, unknown> | undefined = request => tracedRequests.get(request),
+): { resourceTraces: Array<Record<string, unknown>>; initialRpcSummary: InitialRpcSummary } {
+  const resourceTraces: Array<Record<string, unknown>> = []
+  const initialRpcSummary: InitialRpcSummary = { boot: {}, setup: {} }
+  const rpcStarts = new WeakMap<BrowserRequest, { bucket: InitialRpcBucket; started: number }>()
+  page.on('request', (request) => {
+    const stage = currentStage()
+    const phase = BOOT_RPC_STAGES.has(stage) ? 'boot' : SETUP_RPC_STAGES.has(stage) ? 'setup' : undefined
+    if (phase !== undefined) {
+      try {
+        const url = new URL(request.url())
+        if (url.origin === config.origin && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/account/api/'))) {
+          const table = initialRpcSummary[phase]
+          const path = url.pathname
+          if (Object.hasOwn(table, path) || Object.keys(table).length < 64) {
+            const bucket = table[path] ?? (table[path] = { count: 0, statuses: {} })
+            bucket.count += 1
+            rpcStarts.set(request, { bucket, started: performance.now() })
+          }
+        }
+      } catch { /* Malformed request URLs are ignored by pathname counters. */ }
+    }
+    if (resourceTraces.length >= 32) return
+    let operation: ReturnType<typeof resourceOperation>
+    try {
+      operation = resourceOperation(request.method(), request.url(), request.headers().referer, config)
+    } catch {
+      /* Malformed request URLs are ignored by resource traces. */
+      return
+    }
+    if (operation === undefined) return
+    const trace: Record<string, unknown> = { stage, operation }
+    resourceTraces.push(trace)
+    tracedRequests.set(request, trace)
+  })
+  page.on('response', (response) => {
+    const request = response.request()
+    const rpc = rpcStarts.get(request)
+    if (rpc !== undefined) {
+      const code = String(response.status())
+      rpc.bucket.statuses[code] = (rpc.bucket.statuses[code] ?? 0) + 1
+      const elapsed = Math.round(Math.max(0, performance.now() - rpc.started) * 100) / 100
+      rpc.bucket.maxMs = rpc.bucket.maxMs === undefined ? elapsed : Math.max(rpc.bucket.maxMs, elapsed)
+    }
+    const trace = tracedRequests.get(request)
+    if (trace === undefined) return
+    trace.status = response.status()
+    const id = operationId(response.headers()['x-dsh-operation-id'], request.headers()['x-dsh-operation-id'])
+    if (id !== undefined) trace.operationId = id
+  })
+  page.on('requestfailed', (request) => {
+    const rpc = rpcStarts.get(request)
+    if (rpc !== undefined) rpc.bucket.statuses.failed = (rpc.bucket.statuses.failed ?? 0) + 1
+    const trace = requestTrace(request)
+    if (!trace) return
+    const errorText = request.failure()?.errorText
+    trace.failure = errorText && /^net::ERR_[A-Z0-9_]+$/u.test(errorText) ? errorText : 'browser-request-failed'
+  })
+  return { resourceTraces, initialRpcSummary }
+}
+
+async function readBootMarks(page: Page): Promise<Array<{ name: string; startTime: number }>> {
+  return page.evaluate(() => performance.getEntriesByType('mark')
+    .filter(entry => entry.name.startsWith('dsh:boot:'))
+    .map(entry => ({ name: entry.name, startTime: Math.round(entry.startTime * 100) / 100 })))
+}
+
 async function ready(config: ExistingLatencyConfig, cookie: { name: string; value: string }): Promise<void> {
   const url = new URL('/account/api/runtimes', config.origin)
   url.searchParams.set('ids', config.runtimeId)
@@ -99,11 +237,13 @@ async function ready(config: ExistingLatencyConfig, cookie: { name: string; valu
 async function accepted(response: BrowserResponse, config: ExistingLatencyConfig, sample: LatencySample): Promise<Record<string, unknown>> {
   assertRequestTarget(response.url(), response.request().headers()['x-dsh-expected-principal-id'], config)
   sample.httpStatus = response.status()
-  const operation = response.request().headers()['x-dsh-operation-id']
-  if (operation) sample.operationId = id(operation)
+  const headers = response.headers()
+  const operation = operationId(headers['x-dsh-operation-id'], response.request().headers()['x-dsh-operation-id'])
+  if (operation === undefined) delete sample.operationId
+  else sample.operationId = operation
   if (!response.ok()) throw new MeasurementError(`http-${response.status()}`)
-  if (response.headers()['x-dsh-runtime-id'] !== config.runtimeId) throw new MeasurementError('response-runtime-mismatch')
-  const duration = response.headers()['x-dsh-host-duration-ms']
+  if (headers['x-dsh-runtime-id'] !== config.runtimeId) throw new MeasurementError('response-runtime-mismatch')
+  const duration = headers['x-dsh-host-duration-ms']
   if (duration !== undefined && Number.isFinite(Number(duration)) && Number(duration) >= 0) sample.hostDurationMs = Number(duration)
   return correlatedRpcValue(await response.json(), response.request().postDataJSON())
 }
@@ -118,12 +258,12 @@ async function preparation(page: Page, config: ExistingLatencyConfig, click: Loc
     sample.requests = (sample.requests ?? 0) + 1
     const body = object(object(request.postDataJSON()).payload)
     if (typeof body.sessionId === 'string' && /^[A-Za-z0-9_-]{1,160}$/u.test(body.sessionId)) sample.sessionId = body.sessionId
-    const operation = request.headers()['x-dsh-operation-id']
-    if (operation && /^[A-Za-z0-9_-]{1,160}$/u.test(operation)) sample.operationId = operation
+    const operation = operationId(undefined, request.headers()['x-dsh-operation-id'])
+    if (operation !== undefined && sample.operationId === undefined) sample.operationId = operation
   }
   page.on('request', observe)
   const driver = performance.now()
-  try {
+  return await withFinalBrowserClock(async () => {
     await click.click()
     const response = await responsePromise
     const attemptedSession = payload(response).sessionId
@@ -158,7 +298,7 @@ async function preparation(page: Page, config: ExistingLatencyConfig, click: Loc
     sample.transportMs = timing.row.end - timing.row.start
     sample.afterResponseMs = Math.max(0, timing.mark.ready - timing.row.end)
     return original
-  } finally {
+  }, async () => {
     page.off('request', observe)
     sample.driverMs = performance.now() - driver
     const mark = await page.evaluate(() => {
@@ -167,7 +307,7 @@ async function preparation(page: Page, config: ExistingLatencyConfig, click: Loc
       return state.__dshLatency
     })
     if (mark?.input !== undefined) sample.editableMs = mark.input - mark.start
-  }
+  })
 }
 
 interface RenameSessionRequest {
@@ -212,7 +352,8 @@ export async function renameTestSession(
   assertRenameReceipt(response.body, rpcId, title)
 }
 
-async function send(page: Page, config: ExistingLatencyConfig, sample: LatencySample, sessionId: string, text: string): Promise<void> {
+async function send(page: Page, config: ExistingLatencyConfig, receipts: FileHandle,
+  sample: LatencySample, sessionId: string, text: string): Promise<void> {
   const chat = page.locator(attribute('data-conversation-session', sessionKey(config, sessionId)))
   const selected = await chat.locator('[data-model-trigger]').innerText()
   if (!selected.includes(config.testModelLabel)) throw new MeasurementError('controlled-test-model-not-selected')
@@ -255,11 +396,12 @@ async function send(page: Page, config: ExistingLatencyConfig, sample: LatencySa
   const sent = (request: BrowserRequest) => {
     const path = new URL(request.url()).pathname
     if (path !== '/api/admit/v1/session.prompt' && path !== '/api/admit/v1/session.status') return
-    sample.requests = (sample.requests ?? 0) + 1
     const body = object(object(request.postDataJSON()).payload)
+    if (body.sessionId !== sessionId || (sample.requestId !== undefined && sample.requestId !== body.requestId)) return
+    sample.requests = (sample.requests ?? 0) + 1
     if (typeof body.requestId === 'string' && /^[A-Za-z0-9_-]{1,160}$/u.test(body.requestId)) sample.requestId = body.requestId
-    const operation = request.headers()['x-dsh-operation-id']
-    if (operation && /^[A-Za-z0-9_-]{1,160}$/u.test(operation)) sample.operationId = operation
+    const operation = operationId(undefined, request.headers()['x-dsh-operation-id'])
+    if (operation !== undefined && sample.operationId === undefined) sample.operationId = operation
   }
   const observed = (response: BrowserResponse) => {
     if (['/api/admit/v1/session.prompt', '/api/admit/v1/session.status'].includes(new URL(response.url()).pathname)) {
@@ -271,7 +413,7 @@ async function send(page: Page, config: ExistingLatencyConfig, sample: LatencySa
   const prompt = page.waitForResponse(response => new URL(response.url()).pathname === '/api/admit/v1/session.prompt', { timeout: config.timeoutMs })
   void prompt.catch(() => { /* The failed attempt is retained without resubmission. */ })
   const driver = performance.now()
-  try {
+  await withFinalBrowserClock(async () => {
     await editor.press('Enter')
     const response = await prompt
     const request = payload(response)
@@ -299,38 +441,46 @@ async function send(page: Page, config: ExistingLatencyConfig, sample: LatencySa
       receipt = confirmation
       sample.receipt = 'status'
     }
-    await receipt.finished()
-    const timing = await page.evaluate(({ receiptPath, runtime }) => {
-      const mark = (window as Window & { __qaSend?: { start: number } }).__qaSend
-      const all = (performance.getEntriesByType('resource') as PerformanceResourceTiming[]).filter(row => mark !== undefined
-        && row.startTime >= mark.start && new URL(row.name).searchParams.get('dshRuntime') === runtime)
-      const first = all.find(row => new URL(row.name).pathname === '/api/admit/v1/session.prompt')
-      const last = all.findLast(row => new URL(row.name).pathname === receiptPath)
-      return { start: mark?.start, first: first?.startTime, end: last?.responseEnd }
-    }, { receiptPath: new URL(receipt.url()).pathname, runtime: config.runtimeId })
-    if (timing.start === undefined || timing.first === undefined || timing.end === undefined) throw new MeasurementError('missing-browser-receipt-clock')
-    sample.durableReceiptMs = timing.end - timing.start
-    sample.beforeRequestMs = timing.first - timing.start
-    sample.transportMs = timing.end - timing.first
-    sample.driverMs = performance.now() - driver
-    sample.outcome = 'ok'
-    try {
-      await page.waitForFunction(() => (window as Window & { __qaSend?: { complete?: number } }).__qaSend?.complete !== undefined,
-        undefined, { timeout: config.settleTimeoutMs })
-      sample.completion = 'complete'
-    } catch (error) { sample.completion = failure(error).outcome; throw new MeasurementError('accepted-turn-not-settled') }
-  } finally {
+    const submissionDriverMs = performance.now() - driver
+    sample.driverMs = submissionDriverMs
+    await observeAcceptedPrompt(receipts, sample, async () => {
+      const clockReadStarted = performance.now()
+      await receipt.finished()
+      const timing = await page.evaluate(({ receiptPath, runtime }) => {
+        const mark = (window as Window & { __qaSend?: { start: number } }).__qaSend
+        const all = (performance.getEntriesByType('resource') as PerformanceResourceTiming[]).filter(row => mark !== undefined
+          && row.startTime >= mark.start && new URL(row.name).searchParams.get('dshRuntime') === runtime)
+        const first = all.find(row => new URL(row.name).pathname === '/api/admit/v1/session.prompt')
+        const last = all.findLast(row => new URL(row.name).pathname === receiptPath)
+        return { start: mark?.start, first: first?.startTime, end: last?.responseEnd }
+      }, { receiptPath: new URL(receipt.url()).pathname, runtime: config.runtimeId })
+      if (timing.start === undefined || timing.first === undefined || timing.end === undefined) throw new MeasurementError('missing-browser-receipt-clock')
+      sample.durableReceiptMs = timing.end - timing.start
+      sample.beforeRequestMs = timing.first - timing.start
+      sample.transportMs = timing.end - timing.first
+      sample.driverMs = submissionDriverMs + performance.now() - clockReadStarted
+      sample.outcome = 'ok'
+      try {
+        await page.waitForFunction(() => (window as Window & { __qaSend?: { complete?: number } }).__qaSend?.complete !== undefined,
+          undefined, { timeout: config.settleTimeoutMs })
+        sample.completion = 'complete'
+      } catch (error) { sample.completion = failure(error).outcome; throw new MeasurementError('accepted-turn-not-settled') }
+    })
+  }, async () => {
     page.off('request', sent)
     page.off('response', observed)
-    const mark = await page.evaluate(() => {
-      const state = window as Window & { __qaSend?: { start: number; first?: number; complete?: number }; __qaSendStop?: () => void }
-      state.__qaSendStop?.()
-      return state.__qaSend
-    })
-    if (mark?.first !== undefined) sample.firstVisibleAnswerMs = mark.first - mark.start
-    if (mark?.complete !== undefined) sample.completionMs = mark.complete - mark.start
-    sample.driverMs ??= performance.now() - driver
-  }
+    try {
+      const mark = await page.evaluate(() => {
+        const state = window as Window & { __qaSend?: { start: number; first?: number; complete?: number }; __qaSendStop?: () => void }
+        state.__qaSendStop?.()
+        return state.__qaSend
+      })
+      if (mark?.first !== undefined) sample.firstVisibleAnswerMs = mark.first - mark.start
+      if (mark?.complete !== undefined) sample.completionMs = mark.complete - mark.start
+    } finally {
+      sample.driverMs ??= performance.now() - driver
+    }
+  })
 }
 
 /** Execute only against an explicitly configured ready QA allocation. Each failure stops subsequent mutations.
@@ -350,13 +500,17 @@ export async function measureDeployment(config: ExistingLatencyConfig): Promise<
   let stopped: ReturnType<typeof failure> | undefined, violation: string | undefined, promptSession: string | undefined
   let stage = 'private-receipt-setup'
   let diagnostics: unknown
+  let bootMarks: Array<{ name: string; startTime: number }> | undefined
   const requestTraces: Array<Record<string, unknown>> = []
+  let resourceTraces: Array<Record<string, unknown>> = []
+  let initialRpcSummary: InitialRpcSummary = { boot: {}, setup: {} }
   const tracedRequests = new WeakMap<BrowserRequest, Record<string, unknown>>()
   const requestTrace = (request: BrowserRequest): Record<string, unknown> | undefined => {
-    const url = new URL(request.url())
-    if (!url.pathname.startsWith('/api/prepare/v1/') && !url.pathname.startsWith('/api/admit/v1/')) return
     const prior = tracedRequests.get(request)
     if (prior) return prior
+    if (requestTraces.length >= 32) return
+    const url = new URL(request.url())
+    if (!url.pathname.startsWith('/api/prepare/v1/') && !url.pathname.startsWith('/api/admit/v1/')) return
     const coordinate = (key: string): string | null => {
       const value = url.searchParams.get(key)
       return value === null || /^[A-Za-z0-9:_-]{1,160}$/u.test(value) ? value : 'invalid-coordinate'
@@ -371,7 +525,7 @@ export async function measureDeployment(config: ExistingLatencyConfig): Promise<
     const trace: Record<string, unknown> = { stage, pathname: url.pathname, dshRuntime: coordinate('dshRuntime'),
       dshNode: coordinate('dshNode'), dshTarget: coordinate('dshTarget'),
       expectedPrincipalId: principal === undefined ? null : /^\d+$/u.test(principal) ? principal : 'invalid-principal', payloadFields, route: 'pending' }
-    if (requestTraces.length < 32) requestTraces.push(trace)
+    requestTraces.push(trace)
     tracedRequests.set(request, trace)
     return trace
   }
@@ -394,12 +548,9 @@ export async function measureDeployment(config: ExistingLatencyConfig): Promise<
     const page = await context.newPage()
     observedPage = page
     page.setDefaultTimeout(config.timeoutMs)
-    page.on('requestfailed', (request) => {
-      const trace = requestTrace(request)
-      if (!trace) return
-      const errorText = request.failure()?.errorText
-      trace.failure = errorText && /^net::ERR_[A-Z0-9_]+$/u.test(errorText) ? errorText : 'browser-request-failed'
-    })
+    const observedResources = attachResourceTraceObservers(page, config, () => stage, tracedRequests, requestTrace)
+    resourceTraces = observedResources.resourceTraces
+    initialRpcSummary = observedResources.initialRpcSummary
     const closeOnInterrupt = () => {
       stopped = { error: 'operator-interrupted', outcome: 'failed' }
       void context?.close().catch(() => { /* The outer finally records cleanup failure and joins the owned connection. */ })
@@ -460,6 +611,7 @@ export async function measureDeployment(config: ExistingLatencyConfig): Promise<
         throw new MeasurementError('test-history-running')
       }
       if (violation) throw new MeasurementError(violation)
+      bootMarks = await readBootMarks(page)
       await page.evaluate(() =>{  performance.setResourceTimingBufferSize(10000) })
       const attempt = async (sample: LatencySample, action: () => Promise<void>) => {
         try {
@@ -495,8 +647,9 @@ export async function measureDeployment(config: ExistingLatencyConfig): Promise<
         const prompt: LatencySample = { index, operation: 'durable-send', outcome: 'failed', sessionId }
         stage = 'durable-send'
         promptSession = sessionId
-        try { await attempt(prompt, () => send(page, config, prompt, sessionId, `${title}: Reply only CANDIDATE_QA_ACCEPTED. Do not use tools.`)) }
-        finally { promptSession = undefined }
+        try {
+          await attempt(prompt, () => send(page, config, receipts, prompt, sessionId, `${title}: Reply only CANDIDATE_QA_ACCEPTED. Do not use tools.`))
+        } finally { promptSession = undefined }
         await delay(config.intervalMs)
         const opened: LatencySample = { index, operation: 'hot-open', outcome: 'failed', sessionId: config.historySessionId }
         stage = 'history-row-setup'
@@ -514,6 +667,10 @@ export async function measureDeployment(config: ExistingLatencyConfig): Promise<
     if (violation) stopped = failure(new MeasurementError(violation))
     else stopped ??= failure(error)
     if (observedPage && !observedPage.isClosed()) {
+      if (bootMarks === undefined) {
+        try { bootMarks = await readBootMarks(observedPage) }
+        catch { /* A closed or unavailable page contributes no boot marks; the operation failure remains recorded. */ }
+      }
       try {
         diagnostics = await observedPage.evaluate(({ workspaceId, historyKey }) => {
           const rows = [...document.querySelectorAll<HTMLElement>('[data-row-key]')]
@@ -536,7 +693,8 @@ export async function measureDeployment(config: ExistingLatencyConfig): Promise<
     try {
       if (output) await append(output, {
         kind: 'summary', runId, finishedAt: new Date().toISOString(), stopped: stopped ? { ...stopped, stage } : null,
-        violation: violation ?? null, requestTraces, diagnostics, confirmedCreatedSessionIds: [...created],
+        violation: violation ?? null, requestTraces, resourceTraces, bootMarks: bootMarks ?? null, initialRpcSummary,
+        diagnostics, confirmedCreatedSessionIds: [...created],
         result: summarize(samples, config.samples),
       })
     } finally {

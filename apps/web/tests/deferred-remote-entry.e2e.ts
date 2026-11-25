@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type { WebBootGraph } from '@deepseek-ai/dsh-client-modules'
 import type { Request, Response } from 'playwright'
 import { computerBrowser } from './computer-browser.ts'
 import { launchPersonalComputersFixture, personalTargets } from './personal-computers-fixture.ts'
@@ -210,6 +211,147 @@ it.each([true, false])('loads one authorized history tail and one post-subscript
   }
 }, 120_000)
 
+it('loads only the missing factories after early application script execution or failure', async () => {
+  const target = personalTargets[1]!
+  const fixture = await launchPersonalComputersFixture({ deferredEntry: true })
+  fixture.worlds[1]!.ctx.on('webserver/index-inject', (rows) => {
+    rows.push({ kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: {
+      version: 1, principalId: 7, runtimeTarget: { kind: 'personal', runtimeId: target.runtimeId },
+    } })
+  })
+  const entry = new URL(fixture.url)
+  entry.searchParams.set('dshRuntime', target.runtimeId)
+  const hint = '&dshAssetPreload=1'
+  const isMarkedBatch = (url: URL): boolean => url.pathname === '/plugins/combo.js' && url.search.endsWith(hint)
+  try {
+    const browser = await computerBrowser()
+    try {
+      for (const failedDownload of [false, true]) {
+        const page = await browser.newPage({ locale: 'en-US' })
+        try {
+          const requests: string[] = []
+          page.on('request', (req) => { if (req.resourceType() === 'script') requests.push(req.url()) })
+          if (failedDownload) {
+            let original: string | undefined
+            await page.route(url => isMarkedBatch(url) || url.href === original, (route) => {
+              const url = new URL(route.request().url())
+              if (isMarkedBatch(url)) original = url.href.slice(0, -hint.length)
+              return route.fulfill({ status: 503, headers: { 'cache-control': 'no-store' }, body: 'Fixture application script unavailable' })
+            })
+          } else {
+            // Drop a single registration from the executed release script without replacing its other factories.
+            await page.addInitScript(() => {
+              type Queue = { load(registration: { id: string }): void }
+              let queue: Queue
+              Object.defineProperty(window, '__ModuleLoader__', { configurable: true, get: () => queue, set(value: Queue) {
+                const load = value.load.bind(value)
+                value.load = (registration) => {
+                  const script = document.currentScript
+                  const root = document.documentElement
+                  if (script instanceof HTMLScriptElement && new URL(script.src).searchParams.get('dshAssetPreload') === '1'
+                    && root.dataset.fixtureDroppedFactory === undefined) {
+                    root.dataset.fixtureDroppedFactory = registration.id
+                    return
+                  }
+                  load(registration)
+                }
+                queue = value
+              } })
+            })
+          }
+          await page.goto(entry.href, { waitUntil: 'commit' })
+          await page.locator('[data-composer-seat] textarea:enabled').first().waitFor()
+          const early = requests.filter(url => isMarkedBatch(new URL(url)))
+          expect(early).toHaveLength(1)
+          const original = early[0]!.slice(0, -hint.length)
+          const { dropped, singles } = await page.evaluate((url) => {
+            const graph = (window as Window & { __DSH_BOOT__?: WebBootGraph }).__DSH_BOOT__
+            const group = graph?.batches.find(batch => new URL(batch.url, location.href).href === url)
+            return { dropped: document.documentElement.dataset.fixtureDroppedFactory,
+              singles: graph?.entries.filter(row => group?.entries.includes(row.id))
+                .map(row => ({ id: row.id, url: new URL(row.url, location.href).href })) ?? [] }
+          }, original)
+          expect(singles.length).toBeGreaterThan(1)
+          if (!failedDownload) expect(singles.map(row => row.id)).toContain(dropped)
+          expect(requests.filter(url => url === original)).toHaveLength(failedDownload ? 1 : 0)
+          for (const row of singles) {
+            const expected = failedDownload || row.id === dropped ? 1 : 0
+            expect(requests.filter(url => url === row.url)).toHaveLength(expected)
+          }
+        } finally { await page.context().close() }
+      }
+    } finally { await browser.close() }
+  } finally { await fixture.close() }
+}, 120_000)
+
+it('opens the full document required by a Host index transform without losing a draft', async () => {
+  const target = personalTargets[1]!
+  const fixture = await launchPersonalComputersFixture({ deferredEntry: true })
+  const world = fixture.worlds[1]!
+  world.ctx.effect(() => world.ctx.webServer.tapIndex(html => html.replace('</head>', '<meta name="fixture-full-document"></head>')))
+  const entry = new URL(fixture.url)
+  entry.searchParams.set('dshRuntime', target.runtimeId)
+  const full = new URL('/', entry)
+  full.search = new URLSearchParams({
+    dshRuntime: target.runtimeId, dshNode: target.nodeId, dshTarget: 'personal', dshBootstrap: 'full', dshPrincipal: '7',
+  }).toString()
+  const isBootstrap = (url: URL): boolean => url.pathname === '/' && url.searchParams.get('dshBootstrap') === '1'
+  const evidence: string[] = []
+  try {
+    const browser = await computerBrowser()
+    try {
+      for (const { locale, draft, notice, action } of [
+        { locale: 'en-US', draft: 'Keep editing', notice: 'Open the full workspace to continue. Your draft stays here.', action: 'Open full workspace in a new tab' },
+        { locale: 'zh-CN', draft: '继续写草稿', notice: '请打开完整工作区继续。草稿保留在此页', action: '在新标签页打开完整工作区' },
+      ]) {
+        const release = completionBarrier()
+        const tabs = await browser.newContext({ locale })
+        try {
+          const page = await tabs.newPage()
+          await page.route(isBootstrap, async (route) => { await release.promise; await route.continue() })
+          await page.goto(entry.href, { waitUntil: 'commit' })
+          const input = page.locator('[data-dsh-startup-draft]').getByRole('textbox')
+          await input.fill(draft)
+          const response = page.waitForResponse(reply => isBootstrap(new URL(reply.url())))
+          release.resolve()
+          expect(await (await response).json()).toEqual({ version: 1, kind: 'full-index' })
+          const status = page.getByRole('status').filter({ hasText: notice })
+          await status.waitFor()
+          expect(await page.locator('[data-dsh-boot-spinner]').count()).toBe(0)
+          expect(await page.getByText('Failed to load plugins').count()).toBe(0)
+          expect(await input.evaluate(element => element === document.activeElement)).toBe(true)
+          expect(await input.inputValue()).toBe(draft)
+          expect(page.url()).toBe(entry.href)
+          const link = page.getByRole('link', { name: action })
+          expect(await link.getAttribute('href')).toBe(full.href)
+          const [opened] = await Promise.all([tabs.waitForEvent('page'), link.click()])
+          await opened.waitForURL(full.href, { waitUntil: 'domcontentloaded' })
+          await opened.locator('meta[name="fixture-full-document"]').waitFor({ state: 'attached' })
+          expect(await opened.evaluate(() => window.opener === null)).toBe(true)
+          await opened.close()
+          expect(await input.inputValue()).toBe(draft)
+          evidence.push(`${locale}: ${await status.textContent()} — ${await input.inputValue()}`)
+
+          if (locale === 'en-US') {
+            const empty = await tabs.newPage()
+            await empty.goto(entry.href, { waitUntil: 'commit' })
+            await empty.waitForURL(full.href, { waitUntil: 'domcontentloaded' })
+            await empty.locator('meta[name="fixture-full-document"]').waitFor({ state: 'attached' })
+            expect(await empty.locator('[data-dsh-startup-draft]').count()).toBe(0)
+            evidence.push('Empty draft: opened the full workspace in the same tab')
+          }
+        } finally {
+          release.resolve()
+          await tabs.close()
+        }
+      }
+    } finally { await browser.close() }
+    expect(fixture.receipts.filter(row => row.path === '/api/admit/v1/session.prompt')).toHaveLength(0)
+    await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/full-index-fallback.expected.md', import.meta.url)),
+      evidence.join('\n'), webSnapshotMode())
+  } finally { await fixture.close() }
+}, 120_000)
+
 it('recovers a remote bootstrap script failure and transfers each draft to its original Session', async () => {
   const target = personalTargets[1]!
   const savedSessionId = 'startup-remote-restored'
@@ -238,10 +380,13 @@ it('recovers a remote bootstrap script failure and transfers each draft to its o
       fullDocuments.push(request.url())
     }
   })
-  let speculativeBeforeBootstrap = 0
+  let overlappedApplicationBatches = 0
+  let totalApplicationBatches = 0
   let rejectBootstrapOnce = true
   const isBootstrapScript = (url: URL): boolean => url.pathname === '/plugins/combo.js'
     && url.search.startsWith('??@deepseek-ai/dsh-client-modules/client.js')
+  const isApplicationBatchScript = (url: URL): boolean => url.pathname === '/plugins/combo.js'
+    && !isBootstrapScript(url) && url.search.includes(',')
   try {
     const pages = await Promise.all([tabs.newPage(), tabs.newPage()])
     for (const [i, page] of pages.entries()) {
@@ -258,8 +403,9 @@ it('recovers a remote bootstrap script failure and transfers each draft to its o
       if (i === 0) {
         page.on('request', (request) => {
           const url = new URL(request.url())
-          if (url.pathname === '/plugins/combo.js' && !isBootstrapScript(url) && !bootstrapStatuses.includes(200)) {
-            speculativeBeforeBootstrap++
+          if (isApplicationBatchScript(url)) {
+            totalApplicationBatches++
+            if (!bootstrapStatuses.includes(200)) overlappedApplicationBatches++
           }
         })
         page.on('response', (response) => {
@@ -310,7 +456,8 @@ it('recovers a remote bootstrap script failure and transfers each draft to its o
     await expect.poll(() => fixture.receipts.filter(row => row.path === '/api/prepare/v1/session.history'
       && row.runtimeId === target.runtimeId && row.status === 200).length).toBe(2)
     expect(bootstrapStatuses).toEqual([503, 200])
-    expect(speculativeBeforeBootstrap).toBe(0)
+    expect(overlappedApplicationBatches).toBe(1)
+    expect(totalApplicationBatches).toBe(1)
     expect(fixture.receipts.filter(row => row.path === '/api/admit/v1/session.prompt')).toHaveLength(0)
     const withdrawn = await tabs.newPage()
     await withdrawn.route(vendorAsset, route => route.abort())
@@ -360,7 +507,7 @@ it('recovers a remote bootstrap script failure and transfers each draft to its o
     expect(await failed.getByRole('link', { name: 'Open full workspace in a new tab' }).getAttribute('href')).toBe(expectedUrl.href)
     expect(fixture.receipts.filter(row => row.path === '/api/admit/v1/session.prompt')).toHaveLength(0)
     await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/deferred-entry.expected.md', import.meta.url)),
-      `Tab 1: editable while rendering assets are pending\n${evidence.join('\n')}\nBootstrap transport: 503 then 200, before speculative plugin requests\nPrepared history requests: 2\nSubmitted messages: 0\nFull workspace: opened on demand in a separate tab, original draft retained\nAccount switch during rendering asset failure: startup input withdrawn\nRequired plugin failure: kept typing in the focused draft, full workspace link available`, webSnapshotMode())
+      `Tab 1: editable while rendering assets are pending\n${evidence.join('\n')}\nBootstrap transport: 503 then 200, overlapped with one application batch\nPrepared history requests: 2\nSubmitted messages: 0\nFull workspace: opened on demand in a separate tab, original draft retained\nAccount switch during rendering asset failure: startup input withdrawn\nRequired plugin failure: kept typing in the focused draft, full workspace link available`, webSnapshotMode())
   } finally {
     holdVendor.resolve()
     releaseRequiredPlugin.resolve()

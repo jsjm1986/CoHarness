@@ -62,6 +62,10 @@ node --import tsx/esm scripts/measure-existing-deployment.ts --config /private/q
 
 持久受理确认要求版本化准入端点、准确的 Session 和应用请求 ID、匹配的 RPC 响应 ID，以及肯定的结果。Host 为此端点强制设置 `durable: true`；普通 `/api/session.prompt` 受理、HTTP 200、界面回显和模型输出都不能作为证明。恢复状态必须对应同一原始请求。
 
+采样器先把 `durable-send-accepted` 检查点同步到磁盘，再读取浏览器时钟或等待可见回复。如果最终样本或汇总尚未写入，检查点仍能确认该次提示已受理。它没有回复耗时，也不另计为一条操作样本。每个目标使用独立的输出文件，即使目标未测完也保留完整的 JSONL 行。
+
+`operationId` 使用响应头 `x-dsh-operation-id` 的有效 UUID；仅在该响应头缺失时使用请求 UUID。该标识用来关联 Gateway 计时记录，不能证明持久受理。汇总的 `resourceTraces` 最多保存 32 条所选 QA 目标的结构化启动、带修订号组合脚本和文件读取观测，只记录阶段、固定类别、HTTP 状态或网络失败码及可用的 UUID，不增加请求，不保留资源 URL 或内容。汇总同时记录浏览器的 `dsh:boot:*` `bootMarks`（首次打开失败但页面可读时也保留）以及分为 `boot` 与 `setup` 两阶段、仅含路径名的 `initialRpcSummary`（每阶段最多统计 64 个不同的 `/api/*` 或 `/account/api/*` 路径，含次数、状态分布与 `maxMs`）。被测操作失败且浏览器已无法读取收尾标记时，采样器保留原始失败原因，不将其覆盖。
+
 命名不计入测量操作。其普通 RPC 路由确认匹配的请求 ID、准确的合成标题及标题事件序号；只有版本化准备／准入路由要求 Runtime 响应头。Runtime 目录读取在响应字节超过一 MiB 时停止并取消。
 
 | 终点 | 测量含义 |

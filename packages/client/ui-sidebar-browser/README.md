@@ -27,7 +27,7 @@ Browse HTTP(S) pages, including loopback services, inside independent right-Side
 <a id="use-this-package"></a>
 ## Use this package
 
-The shipped Web composition mounts this package. Open **Browser** from the right-Sidebar guide, enter an HTTP(S) URL, or select an HTTP(S) link in Assistant Markdown. A host name without a scheme becomes HTTPS. Public and loopback targets use the same default sandbox. Each guide action or message-link activation creates another Browser tab.
+The shipped Web composition includes Browser among its required entries so it can handle the first conversation link when the link-opening preference is set to the sidebar. Open **Browser** from the right-Sidebar guide, enter an HTTP(S) URL, or select an HTTP(S) link in assistant Markdown. A host name without a scheme becomes HTTPS. Public and loopback targets use the same default sandbox. Each guide action or sidebar message-link activation creates another Browser tab.
 
 ### When to choose it
 

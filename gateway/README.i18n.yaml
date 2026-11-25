@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/README.md
 document:
-  en: c57f61135c7f4872c463e07ba9568148d5d56c12
-  zh: 6531165ab583c7eef3952b96e8177b8bb9a2be73
+  en: 68f832692040aa44e3b5d030bb3535900485cef7
+  zh: 08ba9c1635ae9047aa1313b734505f0ad5dec544
 /harness-gateway:
   en: d06b73ef2a831bb8
   zh: 8a3e3f0d5c13677e
@@ -15,14 +15,14 @@ document:
   en: e4de134e8251fabd
   zh: 87f7cab9763c0647
 /harness-gateway/performance-and-runtime-admission:
-  en: a189c5de8e017823
-  zh: 17001146fec360a7
+  en: bd338aab9ae98183
+  zh: f9cdd716bea025d2
 /harness-gateway/public-access-tunnel:
   en: cb899eb32564dc68
   zh: c6d16f6215cb0aa8
 /harness-gateway/admin-console-and-project-grants:
-  en: 7602cdc10f122a01
-  zh: 129d86db7b7805bf
+  en: a4af096b26a55cf3
+  zh: 21403185e4deb92b
 /harness-gateway/admin-console-and-project-grants/project-progress:
   en: 09520b8586900c8e
   zh: baafc6283b217c78
@@ -40,10 +40,10 @@ document:
   zh: 4d39a9e54e9a3f3c
 /harness-gateway/project-collaborative-conversations:
   en: 4812bca4886145b6
-  zh: 527eb615243ed791
+  zh: 56d928e50828c434
 /harness-gateway/model-governance-and-usage-accounting:
-  en: 75084c3cf81164c6
-  zh: 39dd58ca99549891
+  en: 08548b49f980dc48
+  zh: 32e023645062c27f
 /harness-gateway/postgresql-control-plane:
   en: c27f5b4776762617
   zh: fbaeb983a8ff22b4

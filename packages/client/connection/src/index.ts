@@ -372,11 +372,15 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     assertImageBodyCapacity(apiCtx, maxRequestBodyBytes)
     const downlinks = new WebSocketDownlinks(apiCtx.apiProxy, websocketHeartbeatIntervalMs)
     apiCtx.effect(() => {
+      const routeLifetime = new AbortController()
+      const inFlight = new Set<Promise<void>>()
       const unregisterMux = apiCtx.webServer.registerUpgrade({
         path: MUX_EVENTS_PATH,
         handler: createUpgradeRouteHandler({
           owner: apiCtx,
           isRejected: req => connection.requestRejection(req, 'upgrade') !== undefined,
+          routeSignal: routeLifetime.signal,
+          inFlight,
           onAccepted: (req, socket, head) => {
             downlinks.handleMux(req, socket, head)
             return Promise.resolve()
@@ -388,6 +392,8 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
         handler: createUpgradeRouteHandler({
           owner: apiCtx,
           isRejected: req => connection.requestRejection(req, 'upgrade') !== undefined,
+          routeSignal: routeLifetime.signal,
+          inFlight,
           onAccepted: (req, socket, head) => {
             downlinks.handleHost(req, socket, head)
             return Promise.resolve()
@@ -397,6 +403,8 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
       return async () => {
         unregisterMux()
         unregisterHost()
+        routeLifetime.abort()
+        await Promise.allSettled([...inFlight])
         await downlinks.close()
       }
     }, 'client-connection: WebSocket downlinks')

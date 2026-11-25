@@ -539,6 +539,7 @@ const poolUsage = (source: typeof pool) => ({
 })
 const deps: GatewayDeps = {
   revalidateOnComputer:token=>auth.validateOnComputer(token),
+  qualifyStreamOnComputer: token => auth.qualifyForStreamOnComputer(token, pool),
   streamPrincipalAuthority: {
     qualifyForStream: token => auth.qualifyForStreamOnComputer(token, controlPool),
     projectForUser: (projectId, userId) => collaboration.projectForUser(projectId, userId, controlPool),

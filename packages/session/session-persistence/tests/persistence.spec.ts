@@ -1241,17 +1241,20 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       // Untracked, live-owned, and materialized ids are not detached pendings.
+      expect(coordinator.isMaterialized(SessionId('ghost'))).toBe(false)
       await expect(coordinator.materializeDetached(SessionId('ghost')))
         .rejects.toThrow(/no detached pending state/)
 
       const pending = SessionId('detached-pending')
       await coordinator.create(meta(pending))
       expect(coordinator.isPending(pending)).toBe(true)
+      expect(coordinator.isMaterialized(pending)).toBe(false)
       expect(coordinator.listPending().map(storage => storage.meta.id)).toEqual([pending])
       await coordinator.materializeDetached(pending)
       expect(backend.store.get(pending)?.events).toEqual([])
       // Materialized ownerless state is no longer pending.
       expect(coordinator.isPending(pending)).toBe(false)
+      expect(coordinator.isMaterialized(pending)).toBe(true)
       expect(coordinator.listPending()).toEqual([])
       await expect(coordinator.materializeDetached(pending))
         .rejects.toThrow(/no detached pending state/)

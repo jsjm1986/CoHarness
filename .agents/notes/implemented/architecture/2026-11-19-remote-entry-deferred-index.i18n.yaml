@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-19-remote-entry-deferred-index.md
 document:
-  en: 2d6085a5b0b7cb63fbc61b0fa2534dbe5061a0c5
-  zh: 236235713397f18d8de496255a9091f0810c5da7
+  en: 0b680b8c46c3e24cc45cca0aba11c53b2f8e8c00
+  zh: f8a1262e23d609f178c84167d8908c453ee55b77
 /agent-note-deferred-remote-runtime-entry:
   en: e794545b4082d9e7
   zh: 1fd3181b7be60934
@@ -12,14 +12,14 @@ document:
   en: 47f65f32817feb63
   zh: 1c74910482f48793
 /agent-note-deferred-remote-runtime-entry/decision:
-  en: c8eaae9b0f5ba7ec
-  zh: 2d2fa53bf89c2012
+  en: 42a1186dd9123da0
+  zh: ac6a897ab7e62532
 /agent-note-deferred-remote-runtime-entry/alternatives-considered:
   en: 26abab91ee5f4348
   zh: 154b0cbef00cced2
 /agent-note-deferred-remote-runtime-entry/consequences:
-  en: d8728faafa208bfc
-  zh: 8c77fec8ac8cdacb
+  en: de6c445c855f93db
+  zh: 9c4f61ef5ce1d916
 /agent-note-deferred-remote-runtime-entry/verification:
-  en: 1e08bb66747dedc2
-  zh: f2da876dcb26ccb9
+  en: 5aca198a13adac87
+  zh: b4f8c3a8502156c4

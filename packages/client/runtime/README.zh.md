@@ -1,5 +1,5 @@
 ---
-description: "English | 中文"
+description: "客户端核心服务：SlotRegistry、SessionRuntime（scope 树与对象层）"
 kind: "package-reference"
 ---
 
@@ -90,8 +90,6 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 `source(request)` 暴露原生 `getSnapshot`/`subscribe` 快照协议，消费方通过渲染器的 `keyedHooks` 机制绑定它，而不直接持有 registry。
 
 <a id="slot-declaration-injection"></a>
-
-<a id="slot-declaration-injection"></a>
 ## Slot 声明注入
 
 `ctx.slots.inject(name, callback)` 将完整的 `SlotMap` key 作为贡献项的依赖，适用于贡献方插件可独立于声明条目激活的情形。声明存在时，它会同步运行 `callback`，否则等待；声明折叠会 dispose（资源释放）回调 effect，重新声明则会再次运行回调。控制器归调用方的插件 fiber 所有，因此卸载贡献方会取消等待或移除其活跃注册项。直接调用 `slots.register()` 向未声明 slot 注册仍会抛出异常。
@@ -126,7 +124,7 @@ Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除
 
 `WorkspaceRuntime.startInitialSelection()` 在等待首次列表基线及准备好的 Session 时，通过工作区列表发布可选标记 `initialSelectionPending`。完成、被新导航取代、工作区基线读取失败、准备失败或释放都会移除标记。释放只取消本次导航等待，不影响其他历史读取者；失败后仅在权威列表输入变化时重试。
 
-未变化的 Session 行在 runtime 和账号池中保留相同的 `SessionSummary` 引用，因此选择器可用 `Object.is` 比较行。manager 行或所属 runtime 描述变化时会产生新摘要；项目标签、可见性和项目归属均参与失效判断。[投影决策](../../../.agents/notes/implemented/architecture/2026-10-23-client-list-projection-reuse.zh.md)记录了身份与缓存生命周期规则。
+未变化的 Session 行在 runtime 和账号池中保留相同的 `SessionSummary` 引用，因此选择器可用 `Object.is` 比较行。manager 行或所属 runtime 描述变化时会产生新摘要；项目标签、可见性和项目归属均参与失效判断。工作台检查发现没有闲置 Runtime 可释放时，保留两份目录快照。[投影决策](../../../.agents/notes/implemented/architecture/2026-10-23-client-list-projection-reuse.zh.md)记录了身份与缓存生命周期规则。
 
 Workspace 和 Session 列表各自具有单调的 `pending` → `ready` 基线阶段，也有各自的刷新活动／错误状态。列表请求期间到达的增量插入或更新／移除／顺序帧与一元变更回显会在其响应之上回放。每次成功的 Workspace 基线都会重新建立 Host 持久 Workspace 顺序，因此重连会接纳该客户端离线期间提交的变更。`WorkspaceRuntime.insertBefore` 会立即安装乐观顺序；只有最新一元回声可以替换它，更新的 Host 顺序帧优先于旧回声，而最新请求被拒时会恢复最近一次由 Host 确认的顺序，不会恢复更早且尚未提交的拖拽。已移除的 Workspace id 会保留进程本地删除标记，避免延迟到达的 changed 帧将其复活。Workspace 新近程度只在两条基线都 ready 后派生，且绝不改变 Workspace 列表顺序。
 
@@ -134,7 +132,11 @@ Workspace 和 Session 列表各自具有单调的 `pending` → `ready` 基线�
 
 `SessionListState.state` 和 `error` 直接投影 manager 的基线活动与最近失败，独立于 `phase`。池化汇总列表报告已鉴权基础 Runtime 的活动；`currentScopeList` 排除额外工作台目标。`sessions.refresh()` 与 `workspaces.refresh()` 复用各自所有者尚未完成的基线读取，通过既有列表状态发布失败，不因 wire 或传输失败拒绝 Promise。账户授权撤回后的显式 Session 刷新不执行读取。
 
-每一代引导连接在 Workspace 所有者与 Session 池的归档分区之间共用一次 `workspace.list` 基线。池化目标运行时也在连接建立时将 `workspace.list` 与 `session.list` 并行发起，并通过版本单调合并安装归档快照。共享结果包含 Workspace 帧回放与版本合并后的归档事实；读取失败或取消时不发布结果。断线与销毁会使待完成基线失效，迟到结果不能更新新一代连接或其他目标。并发刷新调用方加入同一项待完成操作，已完成结果不跨连接代次缓存。其他运行时保留各自的基线所有者。实例持有的 `VerifiedProjectDisplayCache` 在 `sessionStorage` 中按 `(origin, account, nodeId, projectId, runtimeId)` 缓存已核验的项目名称与根路径以消除 `#id` 闪烁，同时仍要求实时元数据复核并在 401/403 或账号清理时驱逐。
+每个连接代次持有自己的 `workspace.list` 基线。在基础连接上，Workspace 所有者与 Session 池的归档分区共享同一份基线。各个池化目标并行启动各自的 `workspace.list` 与 `session.list`。共享结果包含 Workspace 帧回放与版本单调合并后的归档信息；读取失败或取消时不发布结果。断线与销毁会使待完成的基线失效，迟到结果不能更新新一代连接或其他目标。
+
+导航需要核对归档状态时，即使 Session 列表已就绪，也会等待目标尚未完成的工作区基线。取消本次等待不会取消基线读取。基线结束后的热态导航重新读取，以确认会话是否归档。并发的热态检查共享尚未完成的重读；不再有所有者需要该结果时，可以取消重读。
+
+实例持有的 `VerifiedProjectDisplayCache` 在 `sessionStorage` 中按 `(origin, account, nodeId, projectId, runtimeId)` 缓存已核验的项目名称与根路径以消除 `#id` 闪烁，同时仍要求实时元数据复核并在 401/403 或账号清理时驱逐。
 
 Session 刷新保留已有身份的相对顺序，并将新行放在 Host 基线中紧随其后的最近已知身份之前。索引化的锚点以线性工作量合并替换目录；首次成功基线直接采用 Host 顺序。
 
@@ -169,7 +171,7 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 
 `WorkspaceRuntime.openWorkspace(workspaceId)` 从现有列表快照中选择该 Workspace 最新的、当前用户可见、非空、未归档的根 Session，不额外请求列表；没有符合条件的历史 Session 时委托 `connectWorkspace`，因此调用方仍会得到正常复用或新建的空会话。启动流程与 Hero 工作区选择器使用历史优先入口，明确的新会话操作走 `startSession` 的两个分支。
 
-`sessions/prepare-create` 是创建根会话时使用的 Client waterfall。`SessionRuntime.create()` 与 `SessionRuntime.createOrReuse()` 会在复用空会话或分发 RPC 之前，让调用方提供的 `SessionCreateOptions` 经过该事件；监听器可以增加插件自有字段或拒绝整个操作。随后，`createOrReuse()` 会把完整准备后的选项与每个空白候选项交给 `sessions/confirm-blank-reuse`。确认监听器调用 `next()`，并在插件自有创建字段与既有根会话不匹配时返回 false；只有全部监听器都接受，候选项才会被复用。每个 waterfall 监听器都必须先调用 `next()`，再应用自己的贡献，让独立插件能够组合。fork 与 subagent 均不使用这两个事件。
+`sessions/prepare-create` 是创建根会话时使用的 Client waterfall。`SessionRuntime.create()` 与 `SessionRuntime.createOrReuse()` 会在复用空会话或分发 RPC 之前，让调用方提供的 `SessionCreateOptions` 经过该事件；监听器可以增加插件自有字段或拒绝整个操作。随后，`createOrReuse()` 会把完整准备后的选项与每个空白候选项交给 `sessions/confirm-blank-reuse`。确认监听器调用 `next()`，并在插件自有创建字段与既有根会话不匹配时返回 false；只有全部监听器都接受，候选项才会被复用。每个 waterfall 监听器都必须先调用 `next()`，再应用自己的贡献，让独立插件能够组合。`SessionCreateOptions.agentPreset` 指定对话运行的组合，省略时使用 Host 默认值；复用的空会话按此次选择运行而非沿用其原记录的预设，被 Host 拒绝的候选项保持不变，响应返回新创建的 Session，并由权威列表拉取校准其陈旧行。当请求的预设已不在名单中时，自动回退到默认值并重试一次，而不是让创建失败。fork 与 subagent 均不使用这两个事件。
 
 `Session.composerPhase` 把任何可见的非命令 Chat Node 视为对话内容，因此客户端插件可以在不打开轮次的情况下投影持久用户输入，而仅包含通用命令行的窗口仍保持 Host blank 状态。列表隐藏和空白会话复用仍遵循 Host blank 位。缺少插件输入 Node 的历史窗口会恢复该空白状态，直到加载更早页面后该 Node 恢复。
 
@@ -218,8 +220,6 @@ Trajectory Definition 组装出一条按时间顺序排列、以用途为判别�
 
 `SessionManager` 独立于列表和 Session 实例到达情况，保留最近一次通过验证的 `session/title` 控制快照。seq 更高的事件会替换旧快照，标题时间戳计入列表新近程度；订阅基线会先丢弃 seq 超过其 `lastSeq` 的任何已保留标题，再接收可选的折叠标题。显式移除 Session 也会清除已保留标题。因此，面向客户端的 `SessionSummary.title` 只包含实际的持久化标题；`displayTitle` 始终存在，并依次回退到 cwd basename 和 Session id。冷态持久化会话会保持该回退值，直到打开或恢复会话，促使主机折叠并投影由日志支撑的标题。`ISession.rename` 用 unary 响应中的 `{title, seq}` 直接结算 `title` 投影格，遵循同一 seq 高者胜规则——列表行和所有 `useProjection('title')` 读者在推送帧到达前即更新；推送帧随后重放同一 seq 时为无操作。
 
-每个 Session 从自身的 `inbox` 投影存储读取冷会话待处理输入，保持 runtime 隔离。Session 释放时关闭投影订阅。
-
 <a id="model-retry-projection"></a>
 ## 模型重试投影
 
@@ -237,6 +237,8 @@ reason 为 `max-tokens` 的 `turn/end` 会在该轮位置投影出一个 `turn-m
 
 每个常驻 `Session` 都拥有一个 `modelSelection` 快照，其中包含当前模型选择、按提供方分组的目录、逐提供方失败记录，以及 `idle`／`loading`／`ready`／`selecting`／`error` 状态。历史记录会建立或刷新当前模型选择，打开选择器会刷新目录；选择失败会保留上一次模型选择和可用分组。目录与选择操作共用单调递增的代次，因此较旧响应无法覆盖较新的模型选择。重连重建会恢复 Host 报告的模型选择，同时不替换未变化的选择子结构。
 
+每个 Session 从自身的 `inbox` 投影存储读取冷会话待处理输入，保持 runtime 隔离。Session 释放时关闭投影订阅。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -246,8 +248,9 @@ reason 为 `max-tokens` 的 `turn/end` 会在该轮位置投影出一个 `turn-m
 
 更改模型选择可能改变提供方侧的缓存复用，或使其失效；该包本身不会改变提示词前缀。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **`loader.unload` 是 stub**：它会抛出 not-implemented；客户端没有从 fiber dispose 到注册与样式移除的卸载链。
 - **插件 bundle 从该包导入值时必须使用 `/client` 子路径**：裸包名不在 loader externals 表中，会内联第二个模块实例；其私有 scope-tag Symbol 永远无法匹配。

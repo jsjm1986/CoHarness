@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { request, STATUS_CODES, type Agent, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { finished, pipeline } from 'node:stream/promises'
-import { BROWSER_RUNTIME_ASSET_CACHE_CONTROL, isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isReadyRuntimeInteractive, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { BROWSER_RUNTIME_ASSET_CACHE_CONTROL, isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isReadyRuntimeInteractive, pinRuntimeRequestPath, withoutRuntimeAssetPreload } from './runtime-request-path.ts'
 import type { UserRow } from './auth.ts'
 import { RuntimeAssetUnavailableError } from './runtime-asset-admission.ts'
 import type { GatewayAccessMonitor, AccessInvalidationSubject } from './access-invalidation.ts'
@@ -287,7 +287,7 @@ export class GatewayNodeServiceProxy {
   }
 
   private outgoing(req: IncomingMessage, target: Target, agent: Agent, upgrade: boolean, body?: string, assertion?: string,
-    releaseDigest?: string) {
+    releaseDigest?: string, noBody = false) {
     const forwarded = headers(req.headers, upgrade)
     forwarded[NODE_SERVICE_TARGET_HEADER] = target.nodeId
     delete forwarded[NODE_SERVICE_ASSET_GENERATION_HEADER]
@@ -296,8 +296,14 @@ export class GatewayNodeServiceProxy {
     delete forwarded['x-dsh-gateway-principal']
     delete forwarded[FORWARDED_PRINCIPAL_HEADER]
     if (assertion !== undefined) forwarded[FORWARDED_PRINCIPAL_HEADER] = assertion
-    const path = target.runtimeId === undefined ? req.url ?? '/' : pinRuntimeRequestPath(req.url ?? '/', target.runtimeId)
-    if (body !== undefined) forwarded['content-length'] = Buffer.byteLength(body)
+    const targetPath = withoutRuntimeAssetPreload(req.method, req.url ?? '/')
+    const path = target.runtimeId === undefined ? targetPath : pinRuntimeRequestPath(targetPath, target.runtimeId)
+    if (noBody) {
+      delete forwarded['content-length']
+      delete forwarded['transfer-encoding']
+    } else if (body !== undefined) {
+      forwarded['content-length'] = Buffer.byteLength(body)
+    }
     return request({ hostname: 'node.gateway.invalid', port: 80, method: req.method,
       path, headers: forwarded, agent })
   }
@@ -391,11 +397,12 @@ export class GatewayNodeServiceProxy {
     let receivedResponse = false
     try {
       signal.throwIfAborted()
-      const url = new URL(req.url ?? '/', 'http://gateway')
+      const path = req.url ?? '/'
+      const url = new URL(path, 'http://gateway')
       const releaseCandidate = this.forwardIssuer === undefined ? undefined : asset?.release
       const interactive = target.runtimeId !== undefined && (isExplicitSessionRequest(req.method, url.pathname)
         || isReadyRuntimeInteractive(req.method, url.pathname)
-        || releaseCandidate !== undefined
+        || releaseCandidate !== undefined && withoutRuntimeAssetPreload(req.method, path) === path
         || req.method === 'POST' && (url.pathname === '/api/session.history' || url.pathname === '/api/host.describe')
         || req.method === 'GET' && url.pathname === '/' && url.searchParams.get('dshBootstrap') === '1')
       const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
@@ -424,15 +431,19 @@ export class GatewayNodeServiceProxy {
       dispose = () => { lease.destroy() }
       signal.throwIfAborted()
       let complete = false
+      let reusable = false
       let upstreamReleased = false
+      const noBody = asset !== undefined
       const assertion = typeof actor === 'number' || this.forwardIssuer === undefined
         ? undefined : await this.forwardIssuer(target, actor, forwardRequestOf(req), personalRead)
       mark('assertionReady')
       signal.throwIfAborted()
       const release = assertion === undefined ? undefined : releaseCandidate
-      const outgoing = this.outgoing(req, target, lease.agent, false, body, assertion, release?.sha256)
+      const outgoing = this.outgoing(req, target, lease.agent, false, body, assertion, release?.sha256, noBody)
+      const canReuseLease = (response: IncomingMessage): boolean =>
+        outgoing.writableFinished && response.complete
       dispose = () => {
-        if (complete) lease.release()
+        if (complete && reusable) lease.release()
         else { outgoing.destroy(); lease.destroy() }
       }
       outgoing.once('socket', () => { mark('socketAssigned') })
@@ -482,11 +493,13 @@ export class GatewayNodeServiceProxy {
                 response.removeListener('error', reject)
                 upstreamReleased = true
                 dispose = () => {}
-                lease.release()
+                if (canReuseLease(response)) lease.release()
+                else { outgoing.destroy(); lease.destroy() }
                 await release.serve(signal)
                 return
               }
               const forwardedHeaders = responseHeaders(response.headers, target.resetCookie)
+              if (res.hasHeader('x-dsh-operation-id')) delete forwardedHeaders['x-dsh-operation-id']
               if (asset !== undefined) forwardedHeaders['cache-control'] = BROWSER_RUNTIME_ASSET_CACHE_CONTROL
               const declaredLength = typeof response.headers['content-length'] === 'string'
                 ? Number(response.headers['content-length']) : undefined
@@ -539,14 +552,18 @@ export class GatewayNodeServiceProxy {
                   body: Buffer.concat(capturedChunks, capturedBytes),
                 })
               }
+              reusable = canReuseLease(response)
             })().then(resolve, (error: unknown) => {
               if (!upstreamReleased) response.destroy()
               reject(error)
             })
           })
           submitted = true
-          if (body === undefined) void pipeline(req, outgoing).catch(reject)
-          else outgoing.end(body)
+          if (body === undefined && !noBody) {
+            void pipeline(req, outgoing).catch(error => { if (!upstreamReleased) reject(error) })
+          } else {
+            outgoing.end(body)
+          }
         }))
       } finally { signal.removeEventListener('abort', cancel) }
       complete = true

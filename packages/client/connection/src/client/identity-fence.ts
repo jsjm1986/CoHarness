@@ -175,7 +175,9 @@ export function createBrowserIdentityFence(fetcher: typeof fetch, origin: string
     const scoped = url.searchParams.has('dshRuntime')
     const limited = scoped && admitBackground !== undefined
     const navigation = limited && navigationRead(url, method)
-    const catalog = method === 'POST' && (ADVISORY_READS.has(url.pathname) || limited && HTTP1_ADVISORY_READS.has(url.pathname))
+    const desktopHint = url.pathname === '/api/desktop.status' && init?.priority === 'low'
+    const catalog = method === 'POST' && (ADVISORY_READS.has(url.pathname)
+      || limited && (HTTP1_ADVISORY_READS.has(url.pathname) || desktopHint))
     const advisory = scoped && (navigation || catalog) && init?.priority !== 'high'
     const synchronization = limited && method === 'POST' && HTTP1_SYNCHRONIZATION.has(url.pathname) && init?.priority !== 'high'
     const foreground = limited && method === 'POST' && HTTP1_CONVERSATION_ACTIONS.has(url.pathname)

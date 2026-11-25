@@ -14,7 +14,7 @@ The send also competes with automatic Host synchronization. In a separate HTTP/1
 
 ## Decision
 
-The [document's Connection](../../../../packages/client/connection/README.md) admits three concurrent background requests until response headers arrive on HTTP/1 or an unknown protocol. A maximum of two can be reads. Session activation and plugin manifest synchronization take precedence, followed by the session list, history index and initial combined workbench read, then auxiliary catalogs and settings. HTTP/2 and HTTP/3 keep their concurrent request paths. Explicit high-priority requests bypass admission. HTTP/1 prepared creation, prompt admission and prompt status use high Fetch priority.
+The [document's Connection](../../../../packages/client/connection/README.md) admits three concurrent background requests until response headers arrive on HTTP/1 or an unknown protocol. A maximum of two can be reads. Session activation and plugin manifest synchronization take precedence, followed by the session list, history index and initial combined workbench read, then auxiliary catalogs, passive desktop status checks and settings. Interactive desktop refreshes stay direct. HTTP/2 and HTTP/3 keep their concurrent request paths. Explicit high-priority requests bypass admission. HTTP/1 prepared creation, prompt admission and prompt status use high Fetch priority.
 
 The queue keeps no response bodies and makes no retry. Page disposal and caller cancellation remove pending work. Each request keeps its pinned account and Runtime for Gateway authorization. Draft reads and versioned mutations use direct admission with the original revisions and receipts.
 
@@ -26,4 +26,4 @@ The queue keeps no response bodies and makes no retry. Page disposal and caller 
 
 ## Consequences
 
-Auxiliary catalogs can appear later on HTTP/1. Bounded admission protects the conversation from one tab's initial catalog burst. Browser connection pools may still be shared with other tabs. Measurements report protocol, browser queue time, connection setup and the interval from writing the request to Gateway ingress separately.
+Auxiliary catalogs and passive desktop status can appear later on HTTP/1; interactive desktop refreshes remain direct. Browser connection pools may still be shared with other tabs. In the [keyless browser fixture](../../../../apps/web/tests/personal-runtime-latency.e2e.ts) with 500 ms of added response delay, two 50-send runs measured durable acceptance P95 of 958 ms without admitting passive desktop status to the queue and 553 ms with it. Browser queue P95 fell from 422 ms to below 1 ms; all sends in both runs received the original prompt receipt. These are fixture measurements, not deployed-node latency.

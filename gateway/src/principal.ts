@@ -200,7 +200,7 @@ export class GatewayPrincipalSigner {
    * @returns an assertion unusable for API, index, upgrades, or another resource URL.
    */
   issueAsset(input: Omit<PrincipalInput, 'purpose' | 'asset'> & { method: 'GET' | 'HEAD'; path: string }, notAfter: number): string {
-    const path = runtimeRequestPath(input.path)
+    const path = runtimeRequestPath(input.path, input.method)
     if (!isImmutableRuntimeAssetRequest(input.method, path)) throw new Error('invalid Runtime asset request')
     const now = input.now ?? Date.now()
     const lifetimeMs = Math.min(this.ttlMs, Math.floor(notAfter - now))
@@ -348,7 +348,7 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
   const asset = record(claims.asset)
   if (claims.purpose === 'runtime-asset'
     ? (asset?.method !== 'GET' && asset?.method !== 'HEAD') || typeof asset.path !== 'string'
-      || !isImmutableRuntimeAssetRequest(asset.method, asset.path) || runtimeRequestPath(asset.path) !== asset.path
+      || !isImmutableRuntimeAssetRequest(asset.method, asset.path) || runtimeRequestPath(asset.path, asset.method) !== asset.path
     : claims.asset !== undefined) throw new Error('invalid principal asset assertion')
   if (claims.personalDraft !== undefined && ((claims.personalDraft !== 'prepare' && claims.personalDraft !== 'admit-input')
     || claims.purpose !== undefined || scope.kind !== 'personal' || runtime.kind !== 'user' || runtime.id !== user.id

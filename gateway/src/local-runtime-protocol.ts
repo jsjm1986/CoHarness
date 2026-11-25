@@ -7,6 +7,16 @@ import { runGatewayChildCommand } from './child-command.ts'
 
 /** Fixed maximum for the private bootstrap message, including credentials and environment. */
 export const LOCAL_BOOTSTRAP_BYTES = 1024 * 1024
+
+/**
+ * Measure the same JSON payload on both sides of the startup pipe.
+ * @param message - serializable JSON bootstrap input.
+ * @returns the UTF-8 byte count excluding IPC framing.
+ */
+export function localBootstrapByteLength(message: unknown): number {
+  return Buffer.byteLength(JSON.stringify(message), 'utf8')
+}
+
 const absolute = z.string().refine(isAbsolute, 'Expected an absolute path')
 /** Validate the independent process input before loading credentials or allocating a runtime. */
 export const localBootstrapSchema = z.object({
@@ -14,8 +24,36 @@ export const localBootstrapSchema = z.object({
   command: z.array(z.string()).min(1), cwd: absolute, dshHome: absolute,
   env: z.record(z.string(), z.string()), credential: z.string(),
   linuxScopeMode: z.enum(['literal-option', 'literal-default']).optional(),
+  reportTiming: z.literal(true).optional(),
   logCapBytes: z.number().int().positive().safe(), controlTimeoutMs: z.number().int().min(1).max(2_147_483_647),
 }).strict()
+
+/**
+ * Prepare the exact IPC message without charging optional diagnostics against the bootstrap limit.
+ * @param input - startup facts before serialization.
+ * @returns the validated message to send; rejects if the required payload alone exceeds the limit.
+ */
+export function localBootstrapMessage(input: z.input<typeof localBootstrapSchema>): z.output<typeof localBootstrapSchema> {
+  const spec = localBootstrapSchema.parse(input)
+  if (localBootstrapByteLength(spec) <= LOCAL_BOOTSTRAP_BYTES) return spec
+  if (spec.reportTiming === true) {
+    delete spec.reportTiming
+    if (localBootstrapByteLength(spec) <= LOCAL_BOOTSTRAP_BYTES) return spec
+  }
+  throw new Error('Local runtime bootstrap exceeds its byte limit')
+}
+
+const offsetMs = z.number().min(0).max(2_147_483_647)
+/** Validate the optional ready diagnostics independently of the acknowledgement. */
+export const localSupervisorStagesSchema = z.object({
+  ownerLeaseAdopted: offsetMs, bootIdStarted: offsetMs, bootIdVerified: offsetMs, controlListening: offsetMs,
+  startingRecordWritten: offsetMs, runtimeSpawnStarted: offsetMs, runtimeSpawned: offsetMs,
+  credentialDeliveryStarted: offsetMs, credentialDelivered: offsetMs, jobAssignmentFinished: offsetMs.optional(),
+  runningRecordWriteStarted: offsetMs, runningRecordWritten: offsetMs, ready: offsetMs,
+}).strict()
+
+/** Monotonic offsets from bootstrap acceptance in the supervisor, not the Gateway clock. */
+export type LocalSupervisorStages = z.infer<typeof localSupervisorStagesSchema>
 
 /**
  * Read an operating-system boot UUID without deriving identity from a wall clock.

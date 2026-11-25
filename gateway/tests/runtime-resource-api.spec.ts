@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Pool, PoolClient } from 'pg'
 import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_CHANGE_WAIT_TIMING_HEADER, RESOURCE_GRANT_AGE_HEADER,
-  RESOURCE_QUALIFIED_GRANT_HEADER } from '@deepseek-ai/dsh-resource-budget/wire'
+  RESOURCE_INGRESS_TIMING_HEADER, RESOURCE_PHASE_TIMING_HEADER, RESOURCE_QUALIFIED_GRANT_HEADER } from '@deepseek-ai/dsh-resource-budget/wire'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { NodeResourceBudgetConfig } from '../src/node-resource-budget.ts'
 import { InstanceManager } from '../src/instances.ts'
@@ -59,7 +59,7 @@ describePg('Runtime resource HTTP admission', () => {
   it('attributes one queued bearer query to its own resource exchange', async () => {
     const limited = createPostgresPool(databaseUrl!, { max: 1 })
     cleanups.push(() => limited.end())
-    const ring = new OperationTimings(2)
+    const ring = new OperationTimings(3)
     const server = createServer((req, res) => {
       void ring.run(req, res, async () => {
         await timeResourceBearer(() => limited.query('SELECT 1'))
@@ -84,13 +84,18 @@ describePg('Runtime resource HTTP admission', () => {
     const statuses = await fetch(`${url}/statuses`, { method: 'POST' })
     expect(statuses.status).toBe(200)
     await statuses.text()
-    expect(ring.samples()).toMatchObject(['resourceRequest', 'resourceStatuses'].map(operation => ({
+    const finishId = randomUUID()
+    const completed = await fetch(`${url}/finish`, { method: 'POST', headers: { 'x-dsh-operation-id': finishId } })
+    expect(completed.status).toBe(200)
+    await completed.text()
+    expect(ring.samples()).toMatchObject(['resourceRequest', 'resourceStatuses', 'resourceFinish'].map(operation => ({
       operation, resourceBearerDatabase: { queries: 1, queryMs: expect.any(Number), poolWaitMs: expect.any(Number), connectionSetupMs: 0 },
       sql: { governance: { count: 2 } }, databaseCheckout: { governance: { reused: 2, opened: 0 } },
     })))
     expect(ring.samples()[0]!.resourceBearerDatabase!.poolWaitMs).toBeGreaterThan(0)
     expect(submitted.headers.get('x-dsh-operation-id')).toBe(ring.samples()[0]!.id)
     expect(statuses.headers.get('x-dsh-operation-id')).toBe(ring.samples()[1]!.id)
+    expect(completed.headers.get('x-dsh-operation-id')).toBe(finishId)
   })
 
   it('reserves a known personal model operation once after rechecking scope, permission, lease and epoch', async () => {
@@ -221,15 +226,24 @@ describePg('Runtime resource HTTP admission', () => {
     const submission = await http('request', { ...queued, kind: 'model',
       origin: { kind: 'session', sessionId: otherSession, scopeId: otherEntry.body.scopeId } })
     expect(await submission.json()).toEqual({ state: 'queued' })
+    expect(timings.samples().at(-1)).toMatchObject({
+      operation: 'resourceRequest',
+      resourceQueue: { reason: 'no-local-observation' },
+    })
     const cursor = submission.headers.get(RESOURCE_CHANGE_CURSOR_HEADER)
     expect(submission.headers.get(RESOURCE_QUALIFIED_GRANT_HEADER)).toBeNull()
     expect(cursor).toBe(f.resourceBudget!.changeCursor)
+    await f.resourceBudget!.observe({ capturedAt: performance.now() - config.sampleMs - 10, cpu: 0.95, memory: 'normal', eventLoopMs: 2, parallelism: 4 })
     expect(await call('statuses', { operations: [queued] }, f.personal, hint)).toEqual({
       status: 200, body: [{ state: 'queued' }],
     })
+    expect(timings.samples().at(-1)).toMatchObject({
+      operation: 'resourceStatuses',
+      resourceQueue: { reason: 'pressure-cpu', cpu: 0.95, memory: 'normal', sampleCredits: 0, sampleApplied: true },
+    })
     const waitForChange = vi.spyOn(f.resourceBudget!, 'waitForChange')
     const awaiting = http('statuses', { operations: [queued] }, f.personal, {
-      ...hint, [RESOURCE_CHANGE_CURSOR_HEADER]: cursor!, 'x-dsh-operation-id': queued.requestId,
+      ...hint, [RESOURCE_CHANGE_CURSOR_HEADER]: f.resourceBudget!.changeCursor, 'x-dsh-operation-id': queued.requestId,
     })
     try {
       await expect.poll(() => waitForChange.mock.calls.length).toBe(1)
@@ -248,7 +262,24 @@ describePg('Runtime resource HTTP admission', () => {
       waitForChange.mockRestore()
       await awaiting.catch(() => { /* Ensure the bounded waiter settles under a failed assertion. */ })
     }
-    expect(await call('finish', { ...queued, outcome: 'not-started' })).toMatchObject({ status: 200 })
+    const completion = { ...queued, outcome: 'quiescent' }
+    const correlation = { 'x-dsh-operation-id': queued.requestId }
+    const mismatchedFinish = await http('finish', { ...completion, requestId: randomUUID() }, f.personal, correlation)
+    expect(mismatchedFinish.status).toBe(409)
+    expect(mismatchedFinish.headers.get(RESOURCE_PHASE_TIMING_HEADER)).toMatch(/^\[\d+(?:\.\d+)?,0,\d+(?:\.\d+)?\]$/u)
+    await mismatchedFinish.json()
+    expect(await reservations()).toEqual(['1', '2'])
+    const finished = await http('finish', completion, f.personal, correlation)
+    expect(finished.headers.get('x-dsh-operation-id')).toBe(queued.requestId)
+    expect(finished.headers.get('cache-control')).toBe('no-store')
+    expect(finished.headers.get(RESOURCE_INGRESS_TIMING_HEADER)).toMatch(/^\[\d+(?:\.\d+)?,\d+(?:\.\d+)?\]$/u)
+    expect(finished.headers.get(RESOURCE_PHASE_TIMING_HEADER)).toMatch(/^\[\d+(?:\.\d+)?,0,\d+(?:\.\d+)?\]$/u)
+    expect({ status: finished.status, body: await finished.json() }).toEqual({ status: 200, body: {} })
+    expect(await reservations()).toEqual(['1'])
+    expect(timings.samples(queued.requestId).filter(sample => sample.operation === 'resourceFinish')).toMatchObject([
+      { status: 409, durationMs: expect.any(Number), phases: { resourceFinishDatabase: expect.any(Number) } },
+      { status: 200, durationMs: expect.any(Number), phases: { resourceFinishDatabase: expect.any(Number) } },
+    ])
     await grant(false)
     expect(await call('statuses', check, f.personal, hint)).toMatchObject({ status: 401 })
     expect(await reservations()).toEqual(['1'])

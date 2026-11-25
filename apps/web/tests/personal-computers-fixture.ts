@@ -66,6 +66,10 @@ export async function launchPersonalComputersFixture(
   const { LocalNodeDrafts } = await import(/* @vite-ignore */ source.href) as {
     LocalNodeDrafts: new (directory: string) => FixtureDraftStore
   }
+  const pathSource = new URL('../../../gateway/src/runtime-request-path.ts', import.meta.url)
+  const { withoutRuntimeAssetPreload } = await import(/* @vite-ignore */ pathSource.href) as {
+    withoutRuntimeAssetPreload: (method: string | undefined, path: string) => string
+  }
   const assetsSource = new URL('../../../gateway/src/release-assets.ts', import.meta.url)
   const assets = options.deferredEntry === true
     ? new ((await import(/* @vite-ignore */ assetsSource.href)) as { ReleaseAssets: new (directory: string) => FixtureReleaseAssets })
@@ -133,13 +137,17 @@ export async function launchPersonalComputersFixture(
     const selected = (raw?: string): number => new URL(raw ?? '/', 'http://fixture').searchParams.get('dshRuntime') === personalTargets[1]!.runtimeId ? 1 : 0
     server = createServer((req, res) => {
       const serve = async (): Promise<void> => {
-        const url = new URL(req.url ?? '/', 'http://fixture'), index = selected(req.url), world = worlds[index]!, target = personalTargets[index]!
+        const url = new URL(req.url ?? '/', 'http://fixture')
+        const referer = req.headers.referer === undefined ? null : URL.parse(req.headers.referer)
+        const referrerOwnsCombo = url.pathname === '/plugins/combo.js' && !url.searchParams.has('dshRuntime')
+          && referer?.origin === `http://127.0.0.1:${req.socket.localPort}`
+        const index = selected(referrerOwnsCombo ? referer?.href : req.url), world = worlds[index]!, target = personalTargets[index]!
         const reply = (value: unknown): void => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(value)) }
         const requested = url.searchParams.get('dshRuntime')
         const boot = assets !== undefined && index === 1 && url.pathname === '/' && req.method === 'GET'
         if (boot && !url.searchParams.has('dshBootstrap') && await assets.serveDeferredIndex(res, {
           principalId: 7, runtimeId: target.runtimeId, nodeId: target.nodeId, nodeName: target.nodeName,
-          scope: 'personal', language: 'en',
+          scope: 'personal', language: req.headers['accept-language']?.toLowerCase().startsWith('zh') === true ? 'zh' : 'en',
         })) return
         if (boot && url.searchParams.get('dshBootstrap') === '1') {
           if (req.headers['x-dsh-expected-principal-id'] !== '7' || url.searchParams.get('dshNode') !== target.nodeId
@@ -237,7 +245,7 @@ export async function launchPersonalComputersFixture(
         }
         if (url.pathname.startsWith('/account/')) { res.writeHead(501, { 'content-type': 'application/json' }); res.end('{"error":"fixture-endpoint-unavailable"}'); return }
         if (url.pathname.startsWith('/api/')) calls.set(target.runtimeId, (calls.get(target.runtimeId) ?? 0) + 1)
-        const upstream = request(new URL(req.url ?? '/', world.baseUrl), { method: req.method,
+        const upstream = request(new URL(withoutRuntimeAssetPreload(req.method, req.url ?? '/'), world.baseUrl), { method: req.method,
           headers: { ...req.headers, cookie: cookies.get(world.baseUrl) ?? '', ...(url.pathname === '/api/host.describe' ? { 'accept-encoding': 'identity' } : {}) } }, (response) => {
           if (url.pathname === '/api/host.describe') {
             response.setEncoding('utf8'); let body = ''

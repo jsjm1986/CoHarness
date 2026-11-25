@@ -3,10 +3,13 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { join } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import type { Writable } from 'node:stream'
 import { runGatewayChildCommand } from './child-command.ts'
 import { LocalRuntimeOwnerLease, LocalRuntimeOwnerStore } from './local-runtime-owner.ts'
-import { LOCAL_BOOTSTRAP_BYTES, localBootstrapSchema, localKernelBootId } from './local-runtime-protocol.ts'
+import {
+  LOCAL_BOOTSTRAP_BYTES, localBootstrapByteLength, localBootstrapSchema, localKernelBootId, type LocalSupervisorStages,
+} from './local-runtime-protocol.ts'
 import { RuntimeLog } from './runtime-log.ts'
 import { localLinuxRuntimeCommand, stopLocalLinuxRuntime } from './local-runtime-linux.ts'
 import { assignRuntimeKillJob, win32CurrentProcessCreationMs, type Win32RuntimeJob } from './local-runtime-win32-job.ts'
@@ -30,16 +33,24 @@ process.once('message', (input: unknown) => {
 })
 
 async function supervise(input: unknown): Promise<void> {
-  if (Buffer.byteLength(JSON.stringify(input)) > LOCAL_BOOTSTRAP_BYTES) throw new Error('Local runtime bootstrap exceeds its byte limit')
+  if (localBootstrapByteLength(input) > LOCAL_BOOTSTRAP_BYTES) throw new Error('Local runtime bootstrap exceeds its byte limit')
   const spec = localBootstrapSchema.parse(input)
+  const timing: { start: number; stages: Partial<LocalSupervisorStages> } | undefined = spec.reportTiming === true
+    ? { start: performance.now(), stages: {} } : undefined
+  function mark(stage: keyof LocalSupervisorStages): void {
+    if (timing !== undefined) timing.stages[stage] = Math.round((performance.now() - timing.start) * 100) / 100
+  }
   const store = new LocalRuntimeOwnerStore(spec.directory, spec.identity)
   // Windows has no descriptor inheritance: the supervisor claims the
   // generation's named-pipe lease itself, waiting out the launcher's release.
   const lease = process.platform === 'win32'
     ? await LocalRuntimeOwnerLease.adopt(store, spec.record, bootstrapTimeoutMs)
     : await LocalRuntimeOwnerLease.inherit(store, 4, spec.record)
+  mark('ownerLeaseAdopted')
   let record = (await store.read())!
+  mark('bootIdStarted')
   if (record.bootId !== await localKernelBootId()) throw new Error('Local runtime reservation belongs to another kernel boot')
+  mark('bootIdVerified')
   if ((record.nativeRange === 'linux-slice') !== (spec.linuxScopeMode !== undefined)) {
     throw new Error('Local runtime native ownership does not match its reservation')
   }
@@ -168,6 +179,7 @@ async function supervise(input: unknown): Promise<void> {
       server.once('error', reject)
       server.listen(0, '127.0.0.1', () => { server.off('error', reject); resolve() })
     })
+    mark('controlListening')
     const address = server.address()
     if (address === null || typeof address === 'string') throw new Error('Local runtime owner endpoint is unavailable')
     record = await lease.publish({
@@ -178,8 +190,10 @@ async function supervise(input: unknown): Promise<void> {
         ? (() => { try { return { groupStartedAt: win32CurrentProcessCreationMs() } } catch { return {} } })()
         : {}),
     })
+    mark('startingRecordWritten')
     if (stopping || await store.cancelled()) throw new Error('Local runtime startup is cancelled')
     const command = spec.linuxScopeMode === undefined ? spec.command : localLinuxRuntimeCommand(record, spec.linuxScopeMode, spec.command)
+    mark('runtimeSpawnStarted')
     child = spawn(command[0]!, command.slice(1), {
       cwd: spec.cwd, env: spec.env, detached: false,
       stdio: process.platform === 'win32'
@@ -203,23 +217,33 @@ async function supervise(input: unknown): Promise<void> {
     const spawned = child
     const spawnReady = new Promise<void>((resolve, reject) => { spawned.once('spawn', resolve); spawned.once('error', reject) })
       .then(() => {
+        mark('runtimeSpawned')
         if (process.platform === 'win32') {
           if (spawned.pid === undefined) throw new Error('Local runtime child spawned without a process id')
           // A supervisor running inside an outer Job (Task Scheduler services
           // run under one) cannot nest the child; the Job then degrades to the
           // same taskkill /T + creation-fenced sweep that owns the tree anyway.
           try { killJob = assignRuntimeKillJob(spawned.pid) } catch { killJob = undefined }
+          mark('jobAssignmentFinished')
         }
       })
     const credential = child.stdio[3] as Writable
     const delivered = new Promise<void>((resolve, reject) => {
-      credential.once('error', reject); credential.end(spec.credential, resolve)
+      credential.once('error', reject)
+      mark('credentialDeliveryStarted')
+      credential.end(spec.credential, timing === undefined ? resolve : () => { mark('credentialDelivered'); resolve() })
     })
     await Promise.all([spawnReady, delivered])
     runtimeAlive = child.exitCode === null && child.signalCode === null
     if (stopping || await store.cancelled() || !runtimeAlive) throw new Error('Local runtime stopped during startup')
+    mark('runningRecordWriteStarted')
     record = await lease.publish({ ...record, phase: 'running' })
-    if (process.connected) process.send?.({ kind: 'ready', nonce: record.nonce })
+    mark('runningRecordWritten')
+    if (process.connected) {
+      mark('ready')
+      process.send?.({ kind: 'ready', nonce: record.nonce,
+        ...timing === undefined ? {} : { localSupervisorStagesMs: timing.stages } })
+    }
     if (process.connected) process.disconnect?.()
   } catch {
     stop(0)

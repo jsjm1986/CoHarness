@@ -21,7 +21,7 @@ const fixtureServer = fileURLToPath(new URL('./fixture-server.ts', import.meta.u
  * delivers forced termination must spawn and run inside `killGraceMs`, and ~200 ms-class budgets
  * starve it on loaded images — leaving the tree alive while the intentionally unbounded
  * managed-range wait polls liveness forever (180 s test timeouts on the windows-2025-vs2026
- * 20261111.635 image; the sibling provider path uses job objects and is immune). These stays in the
+ * 20261111.635 image; the sibling provider path uses job objects and is immune). These stay in the
  * low seconds so healthy runs still escalate quickly.
  */
 const SHUTDOWN_TIMEOUT_MS = 2_000

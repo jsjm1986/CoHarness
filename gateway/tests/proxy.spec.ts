@@ -162,11 +162,11 @@ async function setup(withPrincipal = false, env: Record<string, string> = {}, la
 }
 
 describe('proxy handlers', () => {
-  it('keeps application preloads out of the authenticated remote bootstrap response', async () => {
+  it('keeps application preloads out of legacy bootstrap responses and preserves them when negotiated', async () => {
     const { base, cookie, deps, alice } = await setup(true)
     await deps.instances.ensureRunning(alice)
-    const getBootstrap = (flags = '', principal = String(alice.id)) => fetch(`${base}/?dshBootstrap=1${flags}`, {
-      headers: { cookie, accept: 'application/json', 'accept-encoding': 'gzip', 'x-dsh-expected-principal-id': principal },
+    const getBootstrap = (flags = '', principal = String(alice.id), extraHeaders: Record<string, string> = {}) => fetch(`${base}/?dshBootstrap=1${flags}`, {
+      headers: { cookie, accept: 'application/json', 'accept-encoding': 'gzip', 'x-dsh-expected-principal-id': principal, ...extraHeaders },
     })
     const ready = await getBootstrap()
     expect(ready.status).toBe(200)
@@ -175,6 +175,14 @@ describe('proxy handlers', () => {
     expect(ready.headers.get('x-dsh-principal-id')).toBe(String(alice.id))
     expect(await ready.json()).toEqual({ version: 1, kind: 'injections', rows: [
       { kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: { principalId: 1 } },
+      { kind: 'script-src', src: 'plugins/bootstrap.js', placement: 'head' },
+    ] })
+    const overlapped = await getBootstrap('', String(alice.id), { 'x-dsh-bootstrap-preload': '1' })
+    expect(overlapped.status).toBe(200)
+    expect(overlapped.headers.get('cache-control')).toBe('no-store')
+    expect(await overlapped.json()).toEqual({ version: 1, kind: 'injections', rows: [
+      { kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: { principalId: 1 } },
+      { kind: 'script-preload', src: 'plugins/application.js' },
       { kind: 'script-src', src: 'plugins/bootstrap.js', placement: 'head' },
     ] })
     expect(await (await getBootstrap('&tap=1')).json()).toEqual({ version: 1, kind: 'full-index' })
@@ -957,6 +965,35 @@ describe('proxy handlers', () => {
     cleanup.push(() => ws.terminate())
     await once(ws, 'error', { signal: AbortSignal.timeout(5000) })
     expect(qualification).toHaveBeenCalledOnce()
+    expect(handlers.streamPrincipals?.size).toBe(0)
+  })
+
+  it('qualifies initial event upgrades via business-pool qualifyStreamOnComputer without touching control-pool streamPrincipalAuthority', async () => {
+    const { deps, base, cookie, handlers, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const controlQualify = vi.fn(async (token: string) => deps.auth.qualifyForStream(token))
+    const businessQualify = vi.fn(async (token: string) => deps.auth.qualifyForStream(token))
+    const authQualify = vi.spyOn(deps.auth, 'qualifyForStream')
+    deps.streamPrincipalAuthority = {
+      qualifyForStream: controlQualify,
+      projectForUser: async () => null,
+    }
+    deps.qualifyStreamOnComputer = businessQualify
+    cleanup.push(() => { authQualify.mockRestore() })
+
+    const ws = new WebSocket(`${base.replace('http', 'ws')}/api/events.mux`, { headers: { cookie, origin: base } })
+    cleanup.push(() => ws.terminate())
+    await once(ws, 'open', { signal: AbortSignal.timeout(5000) })
+    expect(businessQualify).toHaveBeenCalledOnce()
+    expect(controlQualify).not.toHaveBeenCalled()
+    ws.terminate()
+
+    businessQualify.mockResolvedValueOnce(null)
+    const denied = new WebSocket(`${base.replace('http', 'ws')}/api/events.host`, { headers: { cookie, origin: base } })
+    cleanup.push(() => denied.terminate())
+    await once(denied, 'error', { signal: AbortSignal.timeout(5000) })
+    expect(businessQualify).toHaveBeenCalledTimes(2)
+    expect(controlQualify).not.toHaveBeenCalled()
     expect(handlers.streamPrincipals?.size).toBe(0)
   })
 

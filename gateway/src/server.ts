@@ -75,7 +75,7 @@ import { computerAccessApi } from './computer-access-api.ts'
 import { DeploymentTopologyError } from './deployment-topology.ts'
 import { isCentralRuntimeManagementRequest } from './runtime-management-api.ts'
 import { GatewayRuntimeRouter, InvalidRuntimeTargetError, LocalRuntimeAdapter, type RuntimePlacement } from './runtime-router.ts'
-import { NodeAccessError, nodeUuidSchema } from './node-access.ts'
+import { NodeAccessError, nodeUuidSchema, type NodeServiceIdentityLease } from './node-access.ts'
 import { NODE_CHANNEL_PATH, NodeChannelError } from './node-channel-protocol.ts'
 import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_LOCAL_PORT_HEADER, NODE_SERVICE_PROTOCOL_VERSION, NODE_SERVICE_STREAM_PATH, NODE_SERVICE_TARGET_HEADER, NodeServiceError, RELEASE_COMBO_DIGEST_HEADER } from './node-service-stream.ts'
 import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
@@ -124,6 +124,8 @@ export interface GatewayDeps {
   auth: GatewayAuthService
   /** Current browser session and local computer permission after acquiring a Runtime. */
   revalidateOnComputer?(token:string): Promise<UserRow|null>
+  /** Current browser session, earliest deadline, and local computer permission on the business pool for initial WebSocket upgrades. */
+  qualifyStreamOnComputer?: GatewayAuthService['qualifyForStream']
   /** Fresh session and project authority for existing event socket renewal. */
   streamPrincipalAuthority?: Pick<GatewayAuthService, 'qualifyForStream'> & Pick<GatewayCollaborationService, 'projectForUser'>
   users: GatewayUserService
@@ -997,7 +999,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     const requestPath = new URL(req.url ?? '/', 'http://gateway').pathname
     if (req.method === 'GET' && requestPath === '/account/api/node-document-overview') {
       const qualified = await timeOperation('authorize', async () => auth.qualifyForStream(token))
-      return qualified === null ? null : { token, user: qualified.user }
+      if (qualified !== null) return { token, user: qualified.user }
     }
     const user = await timeOperation('authorize',async()=>auth.validate(token))
     return user === null ? null : { token, user }
@@ -1171,11 +1173,44 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   // headersTimeout to exceed keepAliveTimeout.
   server.keepAliveTimeout = cfg.keepAliveTimeoutMs
   server.headersTimeout = cfg.keepAliveTimeoutMs + 5_000
-  const nodeIdentityCache = new Map<string, { lease: import('./node-access.ts').NodeServiceIdentityLease; expiresAtMs: number }>()
-  const nodeIdentityInFlight = new Map<string, { epoch: number; promise: Promise<import('./node-access.ts').NodeServiceIdentityLease> }>()
+  const nodeIdentityCache = new Map<string, { lease: NodeServiceIdentityLease; expiresAtMs: number }>()
+  const nodeIdentityInFlight = new Map<string, { epoch: number; promise: Promise<NodeServiceIdentityLease> }>()
   let nodeIdentityCacheEpoch = 0
   const monitorCaughtUp = (): boolean => deps.accessMonitor !== undefined
     && (deps.accessMonitor.currentRevision !== undefined ? deps.accessMonitor.currentRevision() !== undefined : deps.accessMonitor.available)
+  const cachedNodeIdentity = (key: string | undefined, stale?: NodeServiceIdentityLease): NodeServiceIdentityLease | undefined => {
+    const cached = key === undefined ? undefined : nodeIdentityCache.get(key)
+    return cached !== undefined && cached.lease !== stale && cached.expiresAtMs > Date.now() && monitorCaughtUp() ? cached.lease : undefined
+  }
+  const authorizeNodeIdentity = async (
+    identity: NonNullable<GatewayDeps['nodeServiceIdentity']>, token: string, input: unknown, key: string | undefined,
+  ): Promise<NodeServiceIdentityLease> => {
+    if (key !== undefined) nodeIdentityCache.delete(key)
+    const epoch = nodeIdentityCacheEpoch
+    const existing = key === undefined ? undefined : nodeIdentityInFlight.get(key)
+    if (existing !== undefined && existing.epoch === epoch) return existing.promise
+    const promise = identity.authorize(token, input)
+    if (key !== undefined) nodeIdentityInFlight.set(key, { epoch, promise })
+    try {
+      const lease = await promise
+      if (key !== undefined && epoch === nodeIdentityCacheEpoch && monitorCaughtUp()
+        && deps.nodeServiceIdentity === identity && lease.nodeId === identity.nodeId && lease.organizationId === identity.organizationId) {
+        const now = Date.now(), leaseExpiry = Date.parse(lease.expiresAt)
+        const cacheExpiry = now + cfg.nodeServiceIdentityCacheMs
+        const expiresAtMs = Number.isFinite(leaseExpiry) ? Math.min(leaseExpiry, cacheExpiry) : cacheExpiry
+        if (expiresAtMs > now) {
+          if (nodeIdentityCache.size >= 64) {
+            const oldest = nodeIdentityCache.keys().next().value
+            if (oldest !== undefined) nodeIdentityCache.delete(oldest)
+          }
+          nodeIdentityCache.set(key, { lease, expiresAtMs })
+        }
+      }
+      return lease
+    } finally {
+      if (key !== undefined && nodeIdentityInFlight.get(key)?.promise === promise) nodeIdentityInFlight.delete(key)
+    }
+  }
   const clearNodeIdentityCache = (): void => {
     nodeIdentityCacheEpoch += 1
     nodeIdentityCache.clear()
@@ -1279,7 +1314,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (pathname === NODE_SERVICE_IDENTITY_PATH) {
       req.resume(); res.setHeader('cache-control', 'no-store')
       if (req.method !== 'GET') { res.setHeader('allow', 'GET'); send(res, 405, '{"error":"method-not-allowed"}', 'application/json'); return }
-      if (deps.nodeServiceIdentity === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
+      const identity = deps.nodeServiceIdentity
+      if (identity === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
       if (nodeControlsInFlight >= cfg.nodeAccess.maxInFlight) throw new NodeAccessError(503, 'node-access/busy')
       const bearer = req.headers.authorization
       if (typeof bearer !== 'string' || !bearer.startsWith('Bearer ')) throw new NodeAccessError(401, 'node-access/unauthorized')
@@ -1287,65 +1323,40 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const coordinate = cfg.nodeService.preparedReadDelegation === true && typeof port === 'string'
         && /^[1-9][0-9]{0,4}$/u.test(port) && Number(port) <= 65535 ? bridgeCoordinate(req.socket, Number(port)) : undefined
       const bridge = coordinate === undefined ? undefined : unclaimedLoopback.get(coordinate)
+      const pendingBridge = () => coordinate !== undefined && bridge !== undefined && !bridge.socket.destroyed
+        && unclaimedLoopback.get(coordinate) === bridge ? bridge : undefined
+      const { nodeId, organizationId } = identity
+      const assertIdentity = (lease: NodeServiceIdentityLease): void => {
+        if (deps.nodeServiceIdentity !== identity || identity.nodeId !== nodeId || identity.organizationId !== organizationId
+          || lease.nodeId !== nodeId || lease.organizationId !== organizationId) {
+          throw new NodeServiceError(409, 'node-service/mismatch')
+        }
+      }
       nodeControlsInFlight += 1
       try {
         const token = bearer.slice(7)
-        const connectionHeader = req.headers['x-dsh-node-connection']
-        const epochHeader = req.headers['x-dsh-node-epoch']
-        const canCache = monitorCaughtUp() && cfg.nodeServiceIdentityCacheMs > 0
-          && typeof connectionHeader === 'string' && typeof epochHeader === 'string'
-        const cacheKey = canCache
-          ? `${createHash('sha256').update(token).digest('hex')}:${connectionHeader}:${epochHeader}`
-          : undefined
-        const now = Date.now()
-        let lease: import('./node-access.ts').NodeServiceIdentityLease
-        const cached = cacheKey === undefined ? undefined : nodeIdentityCache.get(cacheKey)
-        if (cached !== undefined && cached.expiresAtMs > now && monitorCaughtUp()) {
-          lease = cached.lease
-        } else {
-          if (cacheKey !== undefined) nodeIdentityCache.delete(cacheKey)
-          const existing = cacheKey === undefined ? undefined : nodeIdentityInFlight.get(cacheKey)
-          if (existing !== undefined && existing.epoch === nodeIdentityCacheEpoch) {
-            lease = await existing.promise
-          } else {
-            const flightEpoch = nodeIdentityCacheEpoch
-            const promise = deps.nodeServiceIdentity.authorize(token, {
-              connectionId: connectionHeader, epoch: epochHeader,
-            })
-            if (cacheKey !== undefined) nodeIdentityInFlight.set(cacheKey, { epoch: flightEpoch, promise })
-            try {
-              lease = await promise
-            } finally {
-              if (cacheKey !== undefined && nodeIdentityInFlight.get(cacheKey)?.promise === promise) {
-                nodeIdentityInFlight.delete(cacheKey)
-              }
-            }
-            if (cacheKey !== undefined && flightEpoch === nodeIdentityCacheEpoch && monitorCaughtUp()) {
-              const leaseExpiresMs = Date.parse(lease.expiresAt)
-              const expiresAtMs = Math.min(
-                Date.now() + cfg.nodeServiceIdentityCacheMs,
-                Number.isFinite(leaseExpiresMs) ? leaseExpiresMs : Date.now() + cfg.nodeServiceIdentityCacheMs,
-              )
-              if (expiresAtMs > Date.now()) {
-                if (nodeIdentityCache.size >= 64) {
-                  const oldest = nodeIdentityCache.keys().next().value
-                  if (oldest !== undefined) nodeIdentityCache.delete(oldest)
-                }
-                nodeIdentityCache.set(cacheKey, { lease, expiresAtMs })
-              }
-            }
-          }
-        }
-        if (lease.nodeId !== deps.nodeServiceIdentity.nodeId || lease.organizationId !== deps.nodeServiceIdentity.organizationId) {
-          throw new NodeServiceError(409, 'node-service/mismatch')
-        }
+        const connectionId = req.headers['x-dsh-node-connection'], epoch = req.headers['x-dsh-node-epoch']
+        const cacheKey = monitorCaughtUp() && cfg.nodeServiceIdentityCacheMs > 0 && typeof connectionId === 'string' && typeof epoch === 'string'
+          ? `${createHash('sha256').update(token).digest('hex')}:${connectionId}:${epoch}` : undefined
+        const cacheEpoch = nodeIdentityCacheEpoch
+        const cached = cachedNodeIdentity(cacheKey)
+        const authorize = () => authorizeNodeIdentity(identity, token, { connectionId, epoch }, cacheKey)
+        let lease = cached ?? await authorize()
+        assertIdentity(lease)
         await checkReadiness()
         const primary = lease.managedPrimary
-        if (coordinate !== undefined && bridge !== undefined && primary !== undefined
-          && deps.accessMonitor?.currentRevision?.() === primary.accessRevision
-          && !bridge.socket.destroyed && unclaimedLoopback.get(coordinate) === bridge) {
-          bridge.forget()
-          nodeReadBridges.set(bridge.socket, primary.nodeId)
+        const appliedRevision = deps.accessMonitor?.currentRevision?.()
+        if (cached !== undefined && primary !== undefined && appliedRevision !== undefined && primary.accessRevision < appliedRevision
+          && cacheEpoch === nodeIdentityCacheEpoch && pendingBridge() !== undefined) {
+          // An unrelated access change can leave the identity cached but age out its delegation proof.
+          lease = cachedNodeIdentity(cacheKey, cached) ?? await authorize()
+        }
+        assertIdentity(lease)
+        const candidate = pendingBridge(), proof = lease.managedPrimary
+        if (candidate !== undefined && proof !== undefined && proof.nodeId === primary?.nodeId
+          && cacheEpoch === nodeIdentityCacheEpoch && deps.accessMonitor?.currentRevision?.() === proof.accessRevision) {
+          candidate.forget()
+          nodeReadBridges.set(candidate.socket, proof.nodeId)
         }
         send(res, 200, JSON.stringify({ protocolVersion: NODE_SERVICE_PROTOCOL_VERSION, organizationId: lease.organizationId,
           nodeId: lease.nodeId, release: cfg.releaseId ?? null }), 'application/json')
@@ -1417,7 +1428,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const candidate = stopGate !== undefined && isPersonalExecutionWriteRequest(pathname, req.method, activeModelCheck)
         ? findCandidate?.(req) : undefined
       const fromCandidate = candidate != null && handlers.runtime?.defersPersonalExecutionWrite?.(candidate, pathname, req.method, activeModelCheck) === true
-      const measureIngress = cfg.performanceEnabled && handlers.runtimeAuthorize !== undefined && isResourceAdmissionRequest(pathname, req.method)
+      const resourceCompletion = isRuntimeResourceCompletionRequest(pathname, req.method)
+      const measureIngress = cfg.performanceEnabled && handlers.runtimeAuthorize !== undefined
+        && (isResourceAdmissionRequest(pathname, req.method) || resourceCompletion)
       const authorizationStarted = measureIngress ? performance.now() : 0
       if (fromCandidate) authorized = candidate
       else if (handlers.runtimeAuthorize !== undefined) {
@@ -1448,7 +1461,6 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (handlers.runtime?.stream !== undefined
         && await handlers.runtime.stream(req, res, pathname, () => writeVerdict(req, res, pathname, true))) return
       const streamControl = isRuntimeStreamControlRequest(pathname, req.method)
-      const resourceCompletion = isRuntimeResourceCompletionRequest(pathname, req.method)
       const rechecksControlSubject = (streamControl && req.method === 'POST') || resourceCompletion
       const controlSubject = typeof authorized === 'object' && rechecksControlSubject ? authorized : undefined
       const gate = authorized === 'shutdown-storage' ? handlers.runtimeShutdownStorageWriteGate
@@ -1898,7 +1910,6 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
     const explicitScope = isExplicitScopeRequest(req.method, selectedUrl)
     const selectedNode = selection.get('dshNode')
-    let localNodeDirectlyAdmitted = false
     if (selectedNode !== null) {
       const nodeProjectCreation = pathname === '/account/api/projects' && req.method === 'POST'
       const nodeMetadata = (pathname === '/account/api/project-metadata' || pathname === '/account/api/node-document-overview') && req.method === 'GET'
@@ -1908,18 +1919,13 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (!selection.has('dshRuntime') && !pathname.startsWith('/api/documents') && !nodeProjectCreation && !nodeMetadata
         && (!pathname.startsWith('/admin/api/') || user.role !== 'admin')) throw new NodeServiceError(403, 'node-service/invalid-target')
       if (!explicitSession && !explicitScope && selectedNode !== deps.nodeServiceIdentity?.nodeId && deps.nodeServiceProxy === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
-      if ((pathname.startsWith('/api/documents') || nodeProjectCreation || nodeMetadata) && selectedNode === deps.nodeServiceIdentity?.nodeId) {
+      if ((pathname.startsWith('/api/documents') || nodeProjectCreation || nodeMetadata) && selectedNode === deps.nodeServiceIdentity?.nodeId && deps.nodeServiceProxy === undefined) {
         await deps.computerAccess?.authorize(user.id)
-      }
-      if (selectedNode === deps.nodeServiceIdentity?.nodeId && !selection.has('dshRuntime')
-        && (pathname.startsWith('/api/documents') || nodeProjectCreation || nodeMetadata
-          || (pathname.startsWith('/admin/api/') && !/^\/admin\/api\/runtimes\/[^/]+\/(?:start|stop|restart|retire|personal-directory\/promote)$/u.test(pathname)))) {
-        localNodeDirectlyAdmitted = true
       }
     }
     let admittedPlacement:RuntimePlacement|undefined
     const remember = explicitSession ? (placement:RuntimePlacement)=>{admittedPlacement=placement} : undefined
-    if (!localNodeDirectlyAdmitted && !(pathname === '/account/runtime/start' && req.method === 'POST') && !recoveryRestricted && deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.http(req, res, user,undefined,remember)) return
+    if (!(pathname === '/account/runtime/start' && req.method === 'POST') && !recoveryRestricted && deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.http(req, res, user,undefined,remember)) return
     if (deps.nodeServiceProxy === undefined && selection.has('dshRuntime') && !pathname.startsWith('/admin/api/')) {
       const placement = await runtimeRouter.placement(user, { runtimeId: selection.get('dshRuntime'), target: selection.get('dshTarget'),
         scopeCookie: parseCookies(req.headers.cookie).get(SCOPE_COOKIE) })

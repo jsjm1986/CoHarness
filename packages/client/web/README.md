@@ -21,7 +21,11 @@ The shell base styles apply automatic CJK/Latin spacing to ordinary content in s
 
 `ClientEntries` owns both initial Loader entry creation and subsequent page-local graph reconciliation, retries, and rebuilt-code replacement. The Host emits bootstrap and application batches; `applyIndexInjections` executes the same structured table for an explicit page-owned carrier. CoHarness retains its runtime preload, static platform modules, authentication, and AbortSignal compatibility.
 
-The primary Gateway can render the release shell for an authenticated remote Runtime before contacting that computer. The frontend's `@deepseek-ai/dsh-client-web/boot` entry shows tab-local, unsent input while it loads the renderer's shared modules and reads the Runtime's authenticated index rows. During startup and after a required plugin fails, the draft stays editable and the full-workspace link opens the same account and Runtime in a new tab. The deferred entry loads the bootstrap scripts before requesting application plugin bundles. A failed same-origin, revision-pinned bootstrap download receives one retry at the same URL. The normal renderer waits for required plugin activation. The browser transfers the text only when the exact saved Session and Gateway account qualify for a draft writer. When a saved Session cannot qualify or a native index transform requires the full document, the original document keeps the text available to copy.
+The primary Gateway can render the release shell for an authenticated remote Runtime before contacting that computer. The frontend's `@deepseek-ai/dsh-client-web/boot` entry shows tab-local, unsent input while it loads the renderer's shared modules and reads the Runtime's authenticated index rows. During startup and after a required plugin fails, the draft stays editable and the full-workspace link opens the selected account, computer, scope and Runtime in a new tab. The browser transfers the text only when the exact saved Session and Gateway account qualify for a draft writer. When a saved Session cannot qualify, the original document keeps the text available to copy.
+
+The deferred entry sends `x-dsh-bootstrap-preload: 1` to request application preload rows. With the registration queue installed, the page runs bootstrap scripts at high priority in order and retries a failed revision-pinned bootstrap download once at the same URL. It can execute one same-origin, revision-pinned application combo at low priority in parallel. The [module system](../modules/README.md) receives the actual script outcome, not an assumption that a download hint was reused. The complete renderer waits for required plugin activation.
+
+A full-index response is an ordinary continuation, not a plugin failure. With an empty draft, the browser replaces the current page with the full index for the exact selected target. With a nonempty draft, the editor retains focus and stays editable in the original page, and its full-workspace link opens that same target separately.
 
 ## Summary
 
@@ -45,6 +49,8 @@ None, as the boot kernel is a browser-side UI plugin layer that registers nothin
 None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - A failed required entry keeps the framework-free boot page visible with a per-entry report.
 

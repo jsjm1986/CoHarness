@@ -57,8 +57,9 @@ interface RuntimeEntry {
   archiveRevision?: number
   connectArchive?: {
     generation: number
-    settled: boolean
-    ok: boolean
+    lifetime: AbortController
+    ready?: boolean
+    completion: Promise<boolean>
   } | undefined
   archiveRead?: {
     controller: AbortController
@@ -465,6 +466,7 @@ export class SessionRuntimePool implements ISessions {
       const manager = new WorkspaceManager(connection.api)
       this.workspaceManagers.set(key, { target, manager })
       const publishWorkspaces = (): void => {
+        if (this.accountInvalidated) return
         this.workspaceSnapshots.set([...this.workspaceManagers.values()].flatMap(owner => owner.manager.getSnapshot().phase === 'ready'
           ? [{ target: owner.target, state: owner.manager.getSnapshot() }] : []))
       }
@@ -533,23 +535,24 @@ export class SessionRuntimePool implements ISessions {
           establishedEntry.archiveRevision = 0
           runtime.handleConnected()
           // Fetch Session and Workspace baselines concurrently so computer switches avoid a serial remote round trip.
-          const connectArchive = { generation, settled: false, ok: false }
+          const connectArchive: NonNullable<RuntimeEntry['connectArchive']> = {
+            generation,
+            lifetime: new AbortController(),
+            completion: manager.handleConnected().then((snapshot) => {
+              if (this.accountInvalidated || snapshot === undefined || connectArchive.lifetime.signal.aborted) {
+                connectArchive.ready = false
+                return false
+              }
+              this.installArchive(establishedEntry, snapshot)
+              connectArchive.ready = true
+              return true
+            }),
+          }
           establishedEntry.connectArchive = connectArchive
-          const workspacesReady = manager.handleConnected()
           void runtime.refresh().then(() => {
             if (this.entries.get(establishedEntry.key) !== establishedEntry || establishedEntry.generation !== generation) return
             if (runtime.list.getSnapshot().phase === 'ready') resolveReady()
             else rejectReady(new Error('target runtime session list unavailable'))
-          })
-          void workspacesReady.then((snapshot) => {
-            const ready = snapshot !== undefined
-            if (ready
-              && this.entries.get(establishedEntry.key) === establishedEntry
-              && establishedEntry.generation === generation) {
-              this.installArchive(establishedEntry, snapshot)
-            }
-            connectArchive.ok = ready
-            connectArchive.settled = true
           })
         },
         onFailure: (failure) => {
@@ -671,15 +674,36 @@ export class SessionRuntimePool implements ISessions {
     if (entry === undefined || entry.connection === undefined) throw new Error('target runtime unavailable for Session verification')
     const original = id
     if (!entry.runtime.list.getSnapshot().ids.includes(original)) return false
-    const settledConnectArchive = connecting
-      && entry.connectArchive !== undefined
-      && entry.connectArchive.generation === entry.generation
-      && entry.connectArchive.settled
-      && entry.connectArchive.ok
-    if (!settledConnectArchive) await this.refreshArchive(entry, active)
+    const generation = entry.generation
+    const connectArchive = entry.connectArchive
+    let archiveReady = false
+    if (connectArchive !== undefined && connectArchive.generation === generation && (connecting || connectArchive.ready === undefined)) {
+      // Session readiness does not transfer ownership of the in-flight Workspace baseline.
+      const waiting = AbortSignal.any([active, connectArchive.lifetime.signal])
+      archiveReady = connectArchive.ready ?? await this.awaitConnectArchive(connectArchive.completion, waiting)
+      waiting.throwIfAborted()
+    }
+    if (!archiveReady) await this.refreshArchive(entry, active)
     active.throwIfAborted()
     if (this.entries.get(entry.key) !== entry) throw new Error('target runtime was released during Session verification')
+    if (entry.generation !== generation) throw new Error('target runtime changed during Session verification')
     return this.archivedByTarget.get(entry.key)?.has(original) !== true
+  }
+
+  private async awaitConnectArchive(completion: Promise<boolean>, signal: AbortSignal): Promise<boolean> {
+    signal.throwIfAborted()
+    let abort: (() => void) | undefined
+    try {
+      return await new Promise<boolean>((resolve, reject) => {
+        abort = () => {
+          reject(signal.reason instanceof Error ? signal.reason : new Error('Workspace archive verification cancelled', { cause: signal.reason }))
+        }
+        signal.addEventListener('abort', abort, { once: true })
+        void completion.then(resolve, reject)
+      })
+    } finally {
+      if (abort !== undefined) signal.removeEventListener('abort', abort)
+    }
   }
 
   /** Share only an outstanding archive repull; each caller owns its cancellation. */
@@ -747,9 +771,11 @@ export class SessionRuntimePool implements ISessions {
   }
 
   private cancelArchiveRead(entry: RuntimeEntry, reason: Error): void {
-    const read = entry.archiveRead
+    const { archiveRead, connectArchive } = entry
     entry.archiveRead = undefined
-    read?.controller.abort(reason)
+    entry.connectArchive = undefined
+    archiveRead?.controller.abort(reason)
+    connectArchive?.lifetime.abort(reason)
   }
 
   private installArchive(entry: RuntimeEntry, snapshot: WorkspaceArchiveSnapshot): void {
@@ -900,8 +926,13 @@ export class SessionRuntimePool implements ISessions {
     this.notifyProvide()
     this.publishProvideRevision()
     this.beginNavigation()
-    this.lifetime.abort(new Error('Client account identity was invalidated'))
+    const invalidatedError = new Error('Client account identity was invalidated')
+    this.lifetime.abort(invalidatedError)
+    this.archivedByTarget.clear()
+    this.workspaceSnapshots.set([])
+    for (const owner of this.workspaceManagers.values()) owner.manager.handleDisconnected()
     for (const entry of this.entries.values()) {
+      this.cancelArchiveRead(entry, invalidatedError)
       entry.stopSubscriptions?.()
       entry.runtime.clear()
     }
@@ -1312,7 +1343,6 @@ export class SessionRuntimePool implements ISessions {
         || [...retained].some(id => this.ownerFor(id) === entry)) continue
       this.releaseEntry(entry)
     }
-    this.rebuild()
   }
 
   private releaseEntry(entry: RuntimeEntry, failure = new Error('target runtime was released before it became ready')): void {

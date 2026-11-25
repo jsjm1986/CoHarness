@@ -107,6 +107,7 @@ export function NodeAccessSection() {
   const waitingForOverview = overview?.status === 'loading' && overview.requested.has('nodeAccess')
   const overviewPage = overview?.status === 'ready' ? overview.sections?.nodeAccess : undefined
   const hydratedOverview = useRef<typeof overviewPage>(undefined)
+  const paged = useRef(false)
 
   useEffect(() => {
     if (cursor === undefined && refresh === 0 && hydratedOverview.current === undefined && waitingForOverview) {
@@ -137,15 +138,17 @@ export function NodeAccessSection() {
         if (!disposed) setLoading(false)
       }
     }
-    if (cursor === undefined && refresh === 0 && overviewPage !== undefined && hydratedOverview.current !== overviewPage) {
-      hydratedOverview.current = overviewPage
-      try {
-        const parsed = nodeAccessPageSchema.parse(unwrapDeploymentOverviewSlice(overviewPage))
-        setPage(parsed); setError('')
-      } catch (cause) {
-        applyError(cause)
-      } finally {
-        setLoading(false)
+    if (cursor === undefined && refresh === 0 && !paged.current && overviewPage !== undefined) {
+      if (hydratedOverview.current !== overviewPage) {
+        hydratedOverview.current = overviewPage
+        try {
+          const parsed = nodeAccessPageSchema.parse(unwrapDeploymentOverviewSlice(overviewPage))
+          setPage(parsed); setError('')
+        } catch (cause) {
+          applyError(cause)
+        } finally {
+          setLoading(false)
+        }
       }
     } else void load()
     const whenVisible = () => { if (document.visibilityState === 'visible') void load() }
@@ -155,7 +158,7 @@ export function NodeAccessSection() {
   }, [cursor, overviewPage, waitingForOverview, refresh, t])
 
   const reread = () => { setRefresh(value => value + 1) }
-  const showPage = (next: string | undefined): void => { setPage(null); setLoading(true); setCursor(next) }
+  const showPage = (next: string | undefined): void => { paged.current = true; setPage(null); setLoading(true); setCursor(next) }
   const open = (next: Action) => {
     setRemoval(null); setAction(next); setName(''); setExisting(''); setCandidateCursor(undefined); setCandidates(undefined); setCandidateError(''); setActionError(''); setUncertain(false); setNotice('')
   }

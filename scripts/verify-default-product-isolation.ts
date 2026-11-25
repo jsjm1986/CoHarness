@@ -64,8 +64,17 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
   const packages = new Map<string, Package>()
   const directories = new Map<string, Package>()
   const display = (path: string): string => relative(root, path).replaceAll('\\', '/')
-  const canonicalize = (target: string): string => existsSync(target) ? realpathSync(target)
-    : existsSync(dirname(target)) ? resolve(realpathSync(dirname(target)), basename(target)) : target
+  const canonicalize = (target: string): string => {
+    const suffix: string[] = []
+    let current = target
+    while (!existsSync(current)) {
+      const parent = dirname(current)
+      if (parent === current) return target
+      suffix.unshift(basename(current))
+      current = parent
+    }
+    return resolve(realpathSync(current), ...suffix)
+  }
   for (const path of globSync([
     'apps/*/package.json', 'packages/*/*/package.json', 'vendor/*/package.json',
     'native/system/packages/*/package.json', 'python/sdk-runtime/package.json',

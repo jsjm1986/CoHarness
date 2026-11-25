@@ -25,6 +25,7 @@ import { createAdminApiHandler } from '../src/admin-api.ts'
 import { GatewayRuntimeRouter, LocalRuntimeAdapter, type RuntimePlacement } from '../src/runtime-router.ts'
 import { RuntimeCatalogError, type RuntimeCatalogEntry, type RuntimeId, type RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { NodeAccessError, type NodeCredential, type NodeLease } from '../src/node-access.ts'
+import type { AccessInvalidationSubject, GatewayAccessMonitor } from '../src/access-invalidation.ts'
 import { GatewayNodeChannels } from '../src/node-channel.ts'
 import { runNodeChannel } from '../src/node-channel-client.ts'
 import { NodeDialer, type NodeDialReason } from '../src/node-dialer.ts'
@@ -116,7 +117,7 @@ function isolatedAgent(
 
 async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false, ambiguousPersonal = false, failedDial?: 'control' | 'service',
   mixedReleaseAgent?: 'compatible' | 'future-wire', approvePersonalRead?: NodeServiceProxyDirectory['approvePersonalRead'],
-  monitor?: import('../src/access-invalidation.ts').GatewayAccessMonitor, remoteCombo?: GatewayHandlers['proxy']) {
+  monitor?: GatewayAccessMonitor, remoteCombo?: GatewayHandlers['proxy'], remoteMonitor?: GatewayAccessMonitor) {
   const root = await mkdtemp(join(tmpdir(), 'hgw-node-service-'))
   releases.push(() => rm(root, { recursive: true, force: true }))
   const db = openDb(join(root, 'accounts.sqlite'))
@@ -202,6 +203,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}, resolveOwners = false,
     } },
   })
   const remoteDeps = makeDeps(remoteConfig, nodeId), centerDeps = makeDeps(centerConfig, localNodeId)
+  if (remoteMonitor !== undefined) remoteDeps.accessMonitor = remoteMonitor
   if (key !== undefined) {
     const pem = key.publicKey.export({ format: 'pem', type: 'spki' }).toString()
     const publishedKeyCandidate = (id: string) => id === localNodeId ? pem : null
@@ -368,6 +370,46 @@ it('forwards between different Gateway release identities over the v1 node proto
   expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
 })
 
+it('correlates browser startup and file reads across both Gateway operation rings', async () => {
+  const f = await fixture({}, true)
+  const selectors = `dshRuntime=${f.environment.id}&dshNode=${f.nodeId}&dshTarget=personal`
+  const headers = { cookie: f.cookie, 'x-dsh-expected-principal-id': String(f.admin.id) }
+  const proxy = f.remoteHandlers.proxy
+  if (proxy === undefined) throw new Error('The loopback fixture has no Runtime proxy')
+  const downstreamId = randomUUID()
+  const receivedIds: Array<string | string[] | undefined> = []
+  f.remoteHandlers.proxy = async (req, res, context) => {
+    receivedIds.push(req.headers['x-dsh-operation-id'])
+    if (req.method === 'POST') res.setHeader('x-dsh-operation-id', downstreamId)
+    return proxy(req, res, context)
+  }
+  const combo = `/plugins/combo.js??first/client.js,second/client.js&rev=abcdef123456&${selectors}`
+  for (const [path, options, operation] of [
+    [`/?dshBootstrap=1&${selectors}`, { headers: { ...headers, accept: 'application/json' } }, 'bootstrap'],
+    [`${combo}&dshAssetPreload=1`, { headers }, 'pluginCombo'],
+    [`/api/workspaceFiles.read?${selectors}`, { method: 'POST', headers: { ...headers, origin: f.base }, body: '{}' }, 'workspaceFilesRead'],
+  ] as const) {
+    const response = await fetch(f.base + path, options)
+    const forwarded = await response.json()
+    expect(response.status, JSON.stringify(forwarded)).toBe(200)
+    expect(forwarded).toMatchObject({ node: f.nodeId, runtime: f.environment.id })
+    if (operation === 'pluginCombo') expect(forwarded.path).toBe(combo)
+    const id = response.headers.get('x-dsh-operation-id')
+    expect(id).toMatch(/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u)
+    expect(id).not.toBe(downstreamId)
+    expect(receivedIds.at(-1)).toBe(id)
+    const samples = async (base: string) => {
+      const result = await fetch(`${base}/admin/api/performance/operations?id=${id}`, { headers: { cookie: f.cookie } })
+      expect(result.status).toBe(200)
+      return result.json()
+    }
+    expect(await samples(f.base)).toMatchObject({ operations: [{ id, operation, status: 200, forwarding: { responseHeaders: expect.any(Number) } }] })
+    expect(await samples(f.remoteBase)).toMatchObject({ operations: [{ id, operation, status: 200 }] })
+  }
+  expect(new Set(receivedIds).size).toBe(3)
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 3 })
+})
+
 it('opens a new node service connection when the ordinary topology reader is unavailable', async () => {
   const f = await fixture({ HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: 'on' })
   const unavailable = vi.fn(async () => { throw new Error('Ordinary database checkout unavailable') })
@@ -383,18 +425,20 @@ it('opens a new node service connection when the ordinary topology reader is una
   expect(f.attestationCalls()).toBe(1)
 })
 
-it.each([false, true])('uses the managed bridge proof only through its applied revision (changed: %s)', async changed => {
+async function preparedReadBridge() {
   const approval = { accessRevision: '4', generation: 1, port: 40000, startedAt: 1, launchStamp: 'stamp-1', expiresAt: Date.now() + 60_000 }
-  const f = await fixture({ HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: 'on' }, false, false, undefined, undefined, async () => approval)
-  let appliedRevision = 4n
-  f.remoteDeps.accessMonitor = { available: true, currentRevision: () => appliedRevision,
-    synchronize: async () => {}, subscribe: () => () => {} }
-  f.remoteDeps.readiness = () => { if (changed) appliedRevision += 1n }
+  let appliedRevision: bigint | undefined = 4n
+  const listeners = new Set<(subject: AccessInvalidationSubject) => void | Promise<void>>()
+  const monitor = {
+    get available() { return appliedRevision !== undefined },
+    currentRevision: () => appliedRevision,
+    synchronize: async () => {},
+    subscribe: listener => { listeners.add(listener); return () => { listeners.delete(listener) } },
+  } satisfies GatewayAccessMonitor
+  const f = await fixture({ HGW_NODE_SERVICE_PREPARED_READ_DELEGATION: 'on' }, false, false, undefined, undefined,
+    async () => approval, undefined, undefined, monitor)
   const identity = f.remoteDeps.nodeServiceIdentity!
   const authorize = identity.authorize
-  identity.authorize = async (token, input) => ({
-    ...await authorize(token, input), managedPrimary: { nodeId: f.localNodeId, accessRevision: 4n },
-  })
   const claims: GatewayForwardClaims = {
     version: 1, issuer: 'harness-gateway', audience: 'dsh-node', organization: f.lease.organizationId,
     issuerNode: f.localNodeId, audienceNode: f.nodeId, user: f.users.getById(f.admin.id)!, nonce: randomUUID(),
@@ -405,15 +449,117 @@ it.each([false, true])('uses the managed bridge proof only through its applied r
   }
   f.remoteDeps.forwardedSessionPrincipal = () => ({ claims, issuerPublicKey: 'fixture-key', consume: () => true })
   f.remoteHandlers.readySession = async (_request, response, selection) => {
-    response.writeHead(200, { 'content-type': 'application/json' })
+    response.writeHead(200, { 'content-type': 'application/json', connection: 'close' })
       .end(JSON.stringify({ delegated: selection.managedPersonalRead === true, runtime: selection.runtimeId }))
     return true
   }
-  const response = await fetch(`${f.base}/?dshRuntime=${f.environment.id}&dshNode=${f.nodeId}&dshTarget=personal&dshBootstrap=1`,
+  const request = () => fetch(`${f.base}/?dshRuntime=${f.environment.id}&dshNode=${f.nodeId}&dshTarget=personal&dshBootstrap=1`,
     { headers: { cookie: f.cookie, accept: 'application/json', 'x-dsh-expected-principal-id': String(f.admin.id) } })
-  expect(response.status).toBe(200)
-  expect(await response.json()).toEqual({ delegated: !changed, runtime: f.environment.id })
+  return { ...f, request, identity, authorize, monitor,
+    prove: (revision: bigint) => ({ nodeId: f.localNodeId, accessRevision: revision }),
+    async apply(revision: bigint | undefined, subject?: AccessInvalidationSubject) {
+      if (subject !== undefined) await Promise.all([...listeners].map(listener => listener(subject)))
+      appliedRevision = revision
+      if (revision !== undefined) approval.accessRevision = revision.toString()
+    },
+    async expectDelegation(expected: boolean) {
+      const response = await request()
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual({ delegated: expected, runtime: f.environment.id })
+    },
+  }
+}
+
+it.each([false, true])('uses the managed bridge proof only through its applied revision (changed: %s)', async changed => {
+  const f = await preparedReadBridge()
+  f.remoteDeps.readiness = async () => { if (changed) await f.apply(5n) }
+  f.identity.authorize = async (token, input) => ({ ...await f.authorize(token, input), managedPrimary: f.prove(4n) })
+  await f.expectDelegation(!changed)
+  expect(f.attestationCalls()).toBe(1)
 })
+
+it('refreshes a cached bridge proof after an unrelated access change and reuses the matching proof', async () => {
+  const f = await preparedReadBridge()
+  let proof = 4n
+  f.identity.authorize = async (token, input) => ({ ...await f.authorize(token, input), managedPrimary: f.prove(proof) })
+  await f.expectDelegation(true)
+  await f.expectDelegation(true)
+  expect(f.attestationCalls()).toBe(1)
+
+  await f.apply(5n, { userId: f.admin.id + 1 })
+  proof = 5n
+  await f.expectDelegation(true)
+  expect(f.attestationCalls()).toBe(2)
+  await f.expectDelegation(true)
+  expect(f.attestationCalls()).toBe(2)
+})
+
+it('shares the refreshed proof between concurrent bridge attestations', async () => {
+  const f = await preparedReadBridge()
+  f.identity.authorize = async (token, input) => ({ ...await f.authorize(token, input), managedPrimary: f.prove(4n) })
+  await f.expectDelegation(true)
+  await f.apply(5n, { userId: f.admin.id + 1 })
+  const refreshStarted = deferred<void>(), releaseRefresh = deferred<void>(), secondAtCache = deferred<void>()
+  f.identity.authorize = async (token, input) => {
+    const lease = await f.authorize(token, input)
+    refreshStarted.resolve()
+    await releaseRefresh.promise
+    return { ...lease, managedPrimary: f.prove(5n) }
+  }
+  const first = f.expectDelegation(true)
+  const requests = [first]
+  try {
+    await Promise.race([refreshStarted.promise, first.then(() => { throw new Error('Bridge did not refresh its proof') })])
+    const currentRevision = f.monitor.currentRevision
+    vi.spyOn(f.monitor, 'currentRevision').mockImplementationOnce(() => {
+      secondAtCache.resolve()
+      return currentRevision()
+    })
+    const second = f.expectDelegation(true)
+    requests.push(second)
+    await Promise.race([secondAtCache.promise, second.then(() => { throw new Error('Second bridge did not check the cached proof') })])
+    releaseRefresh.resolve()
+    await Promise.all(requests)
+    expect(f.attestationCalls()).toBe(2)
+  } finally { releaseRefresh.resolve(); await Promise.allSettled(requests) }
+})
+
+it.each(['stale', 'unapplied', 'detached', 'revoked', 'unavailable', 'invalidated'] as const)(
+  'does not register a cached bridge with a %s refreshed proof', async outcome => {
+    const f = await preparedReadBridge()
+    f.identity.authorize = async (token, input) => ({ ...await f.authorize(token, input), managedPrimary: f.prove(4n) })
+    await f.expectDelegation(true)
+    await f.apply(outcome === 'unavailable' ? undefined : 5n, { projectId: 42 })
+    const reading = deferred<void>(), finish = deferred<void>()
+    f.identity.authorize = async (token, input) => {
+      const lease = await f.authorize(token, input)
+      if (outcome === 'revoked') throw new NodeAccessError(409, 'node-access/lease-lost')
+      if (outcome === 'detached') return lease
+      if (outcome === 'invalidated') {
+        reading.resolve(); await finish.promise
+        return { ...lease, managedPrimary: f.prove(6n) }
+      }
+      return { ...lease, managedPrimary: f.prove(outcome === 'unapplied' ? 6n : 4n) }
+    }
+    if (outcome === 'revoked') {
+      const response = await f.request()
+      expect(response.status).toBe(503)
+      expect(await response.json()).toEqual({ error: 'node-service/unavailable' })
+    } else if (outcome === 'invalidated') {
+      const inFlight = f.expectDelegation(false)
+      const settled = Promise.allSettled([inFlight])
+      try {
+        await Promise.race([reading.promise, inFlight.then(() => { throw new Error('Bridge did not refresh its proof') })])
+        await f.apply(6n, { nodeId: f.nodeId })
+        finish.resolve()
+        await inFlight
+      } finally { finish.resolve(); await settled }
+    } else {
+      await f.expectDelegation(false)
+    }
+    expect(f.attestationCalls()).toBe(2)
+  },
+)
 
 it.each(['future-wire', 'wrong-node', 'wrong-organization', 'stale-lease'] as const)(
   'refuses the %s peer before forwarding an operation across releases',
@@ -705,6 +851,20 @@ it.each([
     nodeId: f.nodeId, runtimeId: f.environment.id, target: 'personal' }))
 })
 
+it('forwards an exact personal file listing without requesting primary read approval', async () => {
+  const approve = vi.fn(async () => null)
+  const f = await fixture({}, true, false, undefined, undefined, approve)
+  const response = await fetch(`${f.base}/api/workspaceFiles.list?dshRuntime=${f.environment.id}&dshTarget=personal`, {
+    method: 'POST', headers: { cookie: f.cookie, origin: f.base, 'content-type': 'application/json',
+      'x-dsh-expected-principal-id': String(f.admin.id) },
+    body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: 'workspaceFiles.list', payload: { sessionId: 'fixture', path: '.' } }),
+  })
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ node: f.nodeId, runtime: f.environment.id })
+  expect(f.counters()).toEqual({ localCalls: 0, remoteCalls: 1 })
+  expect(approve).not.toHaveBeenCalled()
+})
+
 it('pins the browser SVG icon to its referring tab when several personal Runtimes exist', async () => {
   const f = await fixture({}, true, true)
   const response = await fetch(`${f.base}/favicon.svg`, { headers: {
@@ -839,9 +999,11 @@ it('uses the entry connection for verified scripts and returns it while local sc
   const sha256 = createHash('sha256').update(body).digest('hex')
   const localDelivery = deferred<void>()
   const localStarted = deferred<void>()
+  const forwardedPaths: Array<string | undefined> = []
   const f = await fixture({
     HGW_NODE_SERVICE_MAX_CONNECTIONS: '2', HGW_NODE_SERVICE_MAX_PER_NODE: '2',
   }, true, false, undefined, undefined, undefined, undefined, async (req, res) => {
+    forwardedPaths.push(req.url)
     expect(req.headers[RELEASE_COMBO_DIGEST_HEADER]).toBe(sha256)
     res.writeHead(204, {
       [RELEASE_COMBO_DIGEST_HEADER]: sha256,
@@ -868,21 +1030,36 @@ it('uses the entry connection for verified scripts and returns it while local sc
   const headers = { cookie: f.cookie }
   await (await fetch(boot, { headers })).arrayBuffer()
   const bulk = await fetch(f.base + '/api/slow?dshRuntime=' + f.environment.id, { headers })
-  const combo = fetch(origin + '/plugins/combo.js??@deepseek-ai/dsh-client-modules/client.js&rev=abcdef123456&dshRuntime=' + f.environment.id,
-    { headers, signal: AbortSignal.timeout(2_000) })
-  void combo.catch(() => {})
+  const path = `/plugins/combo.js??@deepseek-ai/fixture/client.js,second/client.js&rev=abcdef123456&dshRuntime=${f.environment.id}`
+  const requester = new AbortController()
+  const fetchCombo = async (suffix: string): Promise<Buffer> => {
+    const response = await fetch(origin + path + suffix, { headers, signal: requester.signal })
+    expect(response.status).toBe(200)
+    return Buffer.from(await response.arrayBuffer())
+  }
+  const preload = fetchCombo('&dshAssetPreload=1')
+  void preload.catch((_error: unknown) => { /* The assertion or cleanup below joins the request. */ })
+  let combo: Promise<Buffer> | undefined
   try {
+    await expect.poll(() => f.proxy.diagnostics().pool.waiting).toBe(1)
+    expect(forwardedPaths).toEqual([])
+    combo = fetchCombo('')
     await Promise.race([localStarted.promise, combo.then(() => { throw new Error('Release script did not enter local delivery') })])
-    const another = await fetch(boot, { headers, signal: AbortSignal.timeout(2_000) })
+    const another = await fetch(boot, { headers, signal: requester.signal })
     expect(another.status).toBe(200)
     await another.arrayBuffer()
     expect(f.proxy.diagnostics().pool.opened).toBe(2)
+    expect(forwardedPaths).toEqual([path])
     localDelivery.resolve()
-    expect(Buffer.from(await (await combo).arrayBuffer())).toEqual(body)
+    expect(await combo).toEqual(body)
+    f.slow.resolve()
+    expect(await preload).toEqual(body)
+    expect(forwardedPaths).toEqual([path, path])
   } finally {
+    requester.abort()
     localDelivery.resolve()
     f.slow.resolve()
-    await Promise.allSettled([bulk.arrayBuffer(), combo])
+    await Promise.allSettled([bulk.arrayBuffer(), preload, combo])
   }
 })
 

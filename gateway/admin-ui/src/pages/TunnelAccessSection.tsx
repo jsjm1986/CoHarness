@@ -88,15 +88,17 @@ export function TunnelAccessSection() {
   useEffect(() => {
     if (hydratedOverview.current === undefined && waitingForOverview) return
     let skipInitial = false
-    if (overviewTunnel !== undefined && hydratedOverview.current !== overviewTunnel) {
+    if (overviewTunnel !== undefined) {
       skipInitial = true
-      hydratedOverview.current = overviewTunnel
-      lastFetchedAt.current = Date.now()
-      try {
-        publish(unwrapDeploymentOverviewSlice(overviewTunnel))
-        setReadError('')
-      } catch (cause) {
-        setReadError(messageOf(cause))
+      if (hydratedOverview.current !== overviewTunnel) {
+        hydratedOverview.current = overviewTunnel
+        lastFetchedAt.current = Date.now()
+        try {
+          publish(unwrapDeploymentOverviewSlice(overviewTunnel))
+          setReadError('')
+        } catch (cause) {
+          setReadError(messageOf(cause))
+        }
       }
     }
     const controller = new AbortController()

@@ -45,6 +45,7 @@ export class WebSocketDownlinks {
   private readonly server = new WebSocketServer({ noServer: true })
   private readonly heartbeat: WebSocketHeartbeat
   private readonly pumps = new Set<Promise<void>>()
+  private closing = false
 
   /**
    * @param api - host API supplying the typed event streams.
@@ -88,6 +89,7 @@ export class WebSocketDownlinks {
    * @returns A promise resolving after every socket and source iterator stops.
    */
   async close(): Promise<void> {
+    this.closing = true
     this.heartbeat.stop()
     for (const socket of this.server.clients) socket.terminate()
     await new Promise<void>((resolve, reject) => {
@@ -105,7 +107,15 @@ export class WebSocketDownlinks {
     head: Buffer,
     open: (signal: AbortSignal) => AsyncIterable<RpcRequest<F>>,
   ): void {
+    if (this.closing) {
+      rejectWebSocketUpgrade(socket)
+      return
+    }
     this.server.handleUpgrade(req, socket, head, (websocket) => {
+      if (this.closing) {
+        websocket.terminate()
+        return
+      }
       this.heartbeat.track(websocket)
       const abort = new AbortController()
       websocket.once('close', () => { abort.abort() })

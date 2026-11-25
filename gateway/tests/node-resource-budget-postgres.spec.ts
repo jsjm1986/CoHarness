@@ -246,10 +246,12 @@ describePg('durable node resource budget', () => {
     return { ...previous, generation }
   }
 
-  async function startPool(intercept: (sql: string, execute: () => Promise<QueryResult>) => Promise<QueryResult>) {
-    const owned = createPostgresPool(databaseUrl!, { max: 1 })
+  async function startPool(intercept: (sql: string, execute: () => Promise<QueryResult>) => Promise<QueryResult>, applicationName?: string) {
+    const owned = createPostgresPool(databaseUrl!, { max: 1, ...(applicationName === undefined ? {} : { application_name: applicationName }) })
     cleanups.push(() => owned.end())
     return new Proxy(owned, { get(actualPool, key) {
+      if (key === 'query') return (sql: string, values?: readonly unknown[]) =>
+        intercept(sql, () => actualPool.query(sql, values === undefined ? undefined : [...values]))
       if (key === 'connect') return async () => {
         const client = await actualPool.connect()
         return new Proxy(client, { get(actual, property) {
@@ -350,6 +352,8 @@ describePg('durable node resource budget', () => {
     await expect(repository.touch(f.subjects[0]!.target, Date.now()))
       .rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE', cause: { code: '57014' } })
     await expect(budget.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 2 }))
+      .rejects.toMatchObject({ status: 503, reason: 'database-busy', cause: { code: '57014' } })
+    await expect(budget.finish(f.subjects[0]!, held.operation, 'quiescent'))
       .rejects.toMatchObject({ status: 503, reason: 'database-busy', cause: { code: '57014' } })
     expect((await pool.query<{ at: string }>('SELECT last_activity_at::text at FROM harness.instances WHERE organization_id=$1 AND user_id=$2',
       [f.context.organizationId, f.users[0]!.uuid])).rows[0]!.at).toBe(before)
@@ -927,37 +931,54 @@ describePg('durable node resource budget', () => {
     expect(await restarted.status(f.subjects[1]!, f.request(1, 1))).toEqual({ state: 'active' })
   })
 
-  it.each([false, true])('keeps the activity row available during resource settlement with generation change=%s', async change => {
-    const f = await fixture(), subject = f.subjects[0]!, operation = f.request(0, 1)
+  async function completionFixture() {
+    const f = await fixture(), original = f.subjects[0]!
+    const subject = { ...original, target: await f.repository.resolveTarget(original.target) }
+    const operation = f.request(0, 1), successor = f.request(1, 1)
     await f.grant(1)
     expect(await f.budget.request(subject, operation)).toEqual({ state: 'active' })
-    let scheduled!: () => void, resume!: () => void
-    const scheduling = new Promise<void>(resolve => { scheduled = resolve })
-    const resuming = new Promise<void>(resolve => { resume = resolve })
-    const delayed = await startPool(async (sql, execute) => {
-      const result = await execute()
-      if (sql === 'SELECT harness.schedule_node_resources($1,$2)') {
-        scheduled()
-        await resuming
-      }
-      return result
-    })
-    const budget = new NodeResourceBudget(delayed, f.context.organizationId, f.context.nodeId, f.config)
-    const pending = budget.finish(subject, operation, 'quiescent')
-    const settled = Promise.allSettled([pending])
-    try {
-      await Promise.race([scheduling, pending])
-      await transaction(pool, async client => {
-        const args = [f.context.organizationId, f.users[0]!.uuid]
-        expect((await client.query('SELECT id FROM harness.instances WHERE organization_id=$1 AND user_id=$2 FOR UPDATE NOWAIT', args)).rowCount).toBe(1)
-        if (change) await client.query('UPDATE harness.instances SET generation=generation+1 WHERE organization_id=$1 AND user_id=$2', args)
-      })
-    } finally { resume(); await settled }
-    expect(await settled).toEqual(change
-      ? [{ status: 'rejected', reason: expect.objectContaining({ reason: 'stale-generation' }) }]
-      : [{ status: 'fulfilled', value: undefined }])
-    expect((await f.budget.snapshot()).kinds.model.active).toBe(change ? 1 : 0)
-  })
+    expect(await f.budget.request(f.subjects[1]!, successor)).toEqual({ state: 'queued' })
+    const requests = async () => (await pool.query(
+      'SELECT operation_id,state FROM harness.node_resource_requests WHERE organization_id=$1 ORDER BY state',
+      [f.context.organizationId],
+    )).rows
+    return { ...f, subject, operation, successor, requests }
+  }
+
+  it.each(['matching', 'drifted'].flatMap(policy => [false, true].map(change => ({ policy, change }))))(
+    'keeps the activity row available during $policy-policy scheduling with generation change=$change', async ({ policy, change }) => {
+      const f = await completionFixture()
+      await f.grant(1)
+      const applicationName = `resource-finish-${randomUUID()}`
+      const waitingPool = createPostgresPool(databaseUrl!, { max: 1, application_name: applicationName })
+      cleanups.push(() => waitingPool.end())
+      const config = policy === 'matching' ? f.config : { ...f.config, maxWaitMs: f.config.maxWaitMs - 1 }
+      const budget = new NodeResourceBudget(waitingPool, f.context.organizationId, f.context.nodeId, config)
+      let settled: Promise<PromiseSettledResult<void>[]> | undefined
+      try {
+        await transaction(pool, async blocker => {
+          const { rows: [held] } = await blocker.query<{ pid: number }>(`SELECT pg_backend_pid() pid FROM harness.node_resource_requests
+            WHERE organization_id=$1 AND operation_id=$2 AND state='queued' FOR UPDATE`, [f.context.organizationId, f.successor.requestId])
+          expect(held).toBeDefined()
+          settled = Promise.allSettled([budget.finish(f.subject, f.operation, 'quiescent')])
+          await expect.poll(async () => (await pool.query(`SELECT FROM pg_stat_activity
+            WHERE application_name=$1 AND $2=ANY(pg_blocking_pids(pid))`, [applicationName, held!.pid])).rowCount).toBe(1)
+          await transaction(pool, async client => {
+            const args = [f.context.organizationId, f.subject.target.runtimeId]
+            expect((await client.query('SELECT id FROM harness.instances WHERE organization_id=$1 AND runtime_id=$2 FOR UPDATE NOWAIT', args)).rowCount).toBe(1)
+            if (change) await client.query('UPDATE harness.instances SET generation=generation+1 WHERE organization_id=$1 AND runtime_id=$2', args)
+          })
+        })
+      } finally { await settled }
+      expect(await settled).toEqual(change
+        ? [{ status: 'rejected', reason: expect.objectContaining({ reason: 'stale-generation' }) }]
+        : [{ status: 'fulfilled', value: undefined }])
+      expect(await f.requests()).toEqual(change ? [
+        { operation_id: f.operation.requestId, state: 'active' }, { operation_id: f.successor.requestId, state: 'queued' },
+      ] : [{ operation_id: f.successor.requestId, state: 'active' }])
+      expect((await f.budget.snapshot()).outcomes.completed).toBe(change ? 0 : 1)
+    },
+  )
 
   it('returns the committed node policy when another coordinator changes the deployment limits', async () => {
     const f = await fixture()
@@ -1132,41 +1153,108 @@ describePg('durable node resource budget', () => {
     expect(await f.budget.status(f.subjects[2]!, f.request(2, 2))).toEqual({ state: 'queued' })
   })
 
-  it('commits a granted model completion and its next grant within seven database round trips', async () => {
-    const f = await fixture(), subject = f.subjects[0]!, operation = f.request(0, 1)
-    const successor = f.request(1, 1)
-    await f.grant(1)
-    expect(await f.budget.request(subject, operation)).toEqual({ state: 'active' })
-    expect(await f.budget.request(f.subjects[1]!, successor)).toEqual({ state: 'queued' })
+  it('commits a granted model completion and its next grant in one database round trip', async () => {
+    const f = await completionFixture()
     await f.grant(1)
     let commands = 0
     const observed = await startPool((_sql, execute) => { commands += 1; return execute() })
     const budget = new NodeResourceBudget(observed, f.context.organizationId, f.context.nodeId, f.config)
-    await budget.finish(subject, operation, 'quiescent')
-    expect(commands).toBeLessThanOrEqual(7)
-    expect((await pool.query('SELECT operation_id,state FROM harness.node_resource_requests WHERE organization_id=$1',
-      [f.context.organizationId])).rows).toEqual([{ operation_id: successor.requestId, state: 'active' }])
+    await budget.finish(f.subject, f.operation, 'quiescent')
+    expect(commands).toBe(1)
+    expect(await f.requests()).toEqual([{ operation_id: f.successor.requestId, state: 'active' }])
     expect((await f.budget.snapshot()).outcomes.completed).toBe(1)
   })
 
-  it('rolls back the completion and next grant when the final Runtime identity check fails', async () => {
-    const f = await fixture(), subject = f.subjects[0]!, operation = f.request(0, 1)
-    const successor = f.request(1, 1)
+  it.each(['valid', 'invalid'] as const)('leaves accounting untouched on %s policy drift committed while the node lock is held', async policy => {
+    const f = await completionFixture(), expired = f.request(2, 1)
+    expect(await f.budget.request(f.subjects[2]!, expired)).toEqual({ state: 'queued' })
+    await pool.query("UPDATE harness.node_resource_requests SET deadline=clock_timestamp() WHERE operation_id=$1", [expired.requestId])
     await f.grant(1)
-    expect(await f.budget.request(subject, operation)).toEqual({ state: 'active' })
-    expect(await f.budget.request(f.subjects[1]!, successor)).toEqual({ state: 'queued' })
-    await f.grant(1)
-    const otherRuntime = await f.repository.resolveTarget(f.subjects[1]!.target)
-    const cursor = f.budget.changeCursor
-    await expect(f.budget.finish({ ...subject, target: { ...subject.target, runtimeId: otherRuntime.runtimeId } },
-      operation, 'quiescent')).rejects.toMatchObject({ reason: 'stale-generation' })
-    expect(f.budget.changeCursor).toBe(cursor)
-    expect((await pool.query('SELECT operation_id,state FROM harness.node_resource_requests WHERE organization_id=$1 ORDER BY state',
-      [f.context.organizationId])).rows).toEqual([
-      { operation_id: operation.requestId, state: 'active' }, { operation_id: successor.requestId, state: 'queued' },
-    ])
-    expect((await f.budget.snapshot()).outcomes.completed).toBe(0)
+    const args = [f.context.organizationId, f.context.nodeId]
+    const counters = async () => (await pool.query(`SELECT completed::int,timed_out::int FROM harness.node_resource_state
+      WHERE organization_id=$1 AND node_id=$2`, args)).rows[0]
+    const applicationName = `resource-policy-${randomUUID()}`, commands: string[] = []
+    const observed = await startPool(async (sql, execute) => {
+      commands.push(sql)
+      const result = await execute()
+      if (commands.length === 1) {
+        expect(result.rows).toEqual([{ applied: false }])
+        expect(await counters()).toEqual({ completed: 0, timed_out: 0 })
+        expect(await f.requests()).toContainEqual({ operation_id: expired.requestId, state: 'queued' })
+      }
+      return result
+    }, applicationName)
+    const budget = new NodeResourceBudget(observed, f.context.organizationId, f.context.nodeId, f.config)
+    let settled: Promise<PromiseSettledResult<void>[]> | undefined
+    try {
+      await transaction(pool, async blocker => {
+        const limits = policy === 'valid' ? { ...f.config, maxWaitMs: f.config.maxWaitMs - 1 } : { ...f.config, sampleMs: 0 }
+        const { rows: [held] } = await blocker.query<{ pid: number }>(`UPDATE harness.node_resource_state SET limits=$3::jsonb
+          WHERE organization_id=$1 AND node_id=$2 RETURNING pg_backend_pid() pid`, [...args, JSON.stringify(limits)])
+        settled = Promise.allSettled([budget.finish(f.subject, f.operation, 'quiescent')])
+        await expect.poll(async () => (await pool.query(`SELECT FROM pg_stat_activity
+          WHERE application_name=$1 AND $2=ANY(pg_blocking_pids(pid))`, [applicationName, held!.pid])).rowCount).toBe(1)
+      })
+    } finally { await settled }
+    if (policy === 'valid') {
+      expect(await settled).toEqual([{ status: 'fulfilled', value: undefined }])
+      expect(commands.slice(1)).toHaveLength(6)
+      expect(commands.at(-1)).toBe('COMMIT')
+      expect(await counters()).toEqual({ completed: 1, timed_out: 1 })
+      expect(await f.requests()).toEqual([{ operation_id: f.successor.requestId, state: 'active' }])
+    } else {
+      expect(await settled).toEqual([{ status: 'rejected', reason: expect.objectContaining({ name: 'ZodError' }) }])
+      expect(commands.at(-1)).toBe('ROLLBACK')
+      expect(await counters()).toEqual({ completed: 0, timed_out: 0 })
+      expect(await f.requests()).toHaveLength(3)
+    }
   })
+
+  it('falls back for an absent node policy without initializing accounting on the fast-path miss', async () => {
+    const f = await fixture()
+    const { rows: [node] } = await pool.query<{ id: string }>("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'other') RETURNING id",
+      [f.context.organizationId])
+    const stateRows = async () => (await pool.query('SELECT 1 FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2',
+      [f.context.organizationId, node!.id])).rowCount
+    const commands: string[] = []
+    const observed = await startPool(async (sql, execute) => {
+      commands.push(sql)
+      const result = await execute()
+      if (commands.length === 1) {
+        expect(result.rows).toEqual([{ applied: false }])
+        expect(await stateRows()).toBe(0)
+      }
+      return result
+    })
+    const budget = new NodeResourceBudget(observed, f.context.organizationId, node!.id, f.config)
+    await expect(budget.finish(f.subjects[0]!, f.request(0, 1), 'quiescent')).rejects.toMatchObject({ reason: 'unknown-operation' })
+    expect(commands.some(sql => sql.includes('harness.lock_node_resources('))).toBe(true)
+    expect(commands.at(-1)).toBe('ROLLBACK')
+    expect(await stateRows()).toBe(0)
+  })
+
+  it.each(['stale-generation', 'unknown-operation', 'owner-mismatch'] as const)(
+    'rejects %s without retrying or publishing completion and its next grant', async reason => {
+      const f = await completionFixture()
+      await f.grant(1)
+      let commands = 0
+      const observed = await startPool((_sql, execute) => { commands += 1; return execute() })
+      const budget = new NodeResourceBudget(observed, f.context.organizationId, f.context.nodeId, f.config)
+      const other = await f.repository.resolveTarget(f.subjects[1]!.target)
+      const subject = reason === 'stale-generation'
+        ? { ...f.subject, target: { ...f.subject.target, runtimeId: other.runtimeId } } : f.subject
+      const operation = reason === 'unknown-operation' ? { ...f.operation, sequence: f.operation.sequence + 1 }
+        : reason === 'owner-mismatch' ? { ...f.operation, requestId: f.successor.requestId } : f.operation
+      const cursor = budget.changeCursor
+      await expect(budget.finish(subject, operation, 'quiescent')).rejects.toMatchObject({ status: 409, reason })
+      expect(commands).toBe(1)
+      expect(budget.changeCursor).toBe(cursor)
+      expect(await f.requests()).toEqual([
+        { operation_id: f.operation.requestId, state: 'active' }, { operation_id: f.successor.requestId, state: 'queued' },
+      ])
+      expect((await f.budget.snapshot()).outcomes.completed).toBe(0)
+    },
+  )
 
   it('counts concurrent completions once after waiting for the registration transaction', async () => {
     const f = await fixture(), held = await heldRequest(f)

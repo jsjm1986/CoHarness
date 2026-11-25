@@ -392,6 +392,10 @@ export class WorkspaceManager {
     this.inflight?.controller.abort()
     this.inflight = null
     this.refreshFrames = null
+    if (this.state === 'loading') {
+      this.state = 'idle'
+      this.notifier.markDirty()
+    }
   }
 
   /**

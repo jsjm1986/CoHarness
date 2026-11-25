@@ -1,6 +1,7 @@
 apps/cli/lib/bin.js
 apps/web/dist/index.html
 gateway/deploy/node-content/migrations/017_plugin_inventory.sql
+gateway/deploy/node-content/migrations/018_project_draft_model_selection.sql
 gateway/deploy/postgres/migrations/003_project_collaboration.sql
 gateway/deploy/postgres/migrations/004_conversation_event_json.sql
 gateway/deploy/postgres/migrations/005_user_owned_projects.sql
@@ -23,6 +24,8 @@ gateway/deploy/postgres/migrations/144_push_delivery_outcomes.sql
 gateway/deploy/postgres/migrations/145_unifiedpush_provider.sql
 gateway/deploy/postgres/migrations/146_retired_node_enrollment_receipts.sql
 gateway/deploy/postgres/migrations/147_ready_project_content_admission.sql
+gateway/deploy/postgres/migrations/148_project_draft_model_selection.sql
+gateway/deploy/postgres/migrations/149_quiescent_node_resource_completion.sql
 gateway/deploy/windows/node-agent-task.ps1
 gateway/lib/config.js
 gateway/lib/deferred-runtime-bootstrap.js

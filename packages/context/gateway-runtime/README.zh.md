@@ -69,9 +69,11 @@ kind: "package-reference"
 
 `modelAccessRequired` 同样保留在应用根上下文直到销毁。受管模型请求在准入和最终派发期间必须保有原策略所有者；卸载或替换提供方不会放行不受限调用。
 
-`modelTimings` 默认关闭。受管启动配置随 Gateway 性能诊断启用，将计时元数据写入 Runtime 日志或 systemd 单元日志。采样覆盖[输入与请求准备](../gateway-execution/README.zh.md#execution-authorization)、资源准入及模型尝试到首段文本。沿用现有日志保留策略。
+`modelTimings` 默认关闭。受管启动配置随 Gateway 性能诊断启用，将计时元数据写入 Runtime 日志或 systemd 单元日志。采样覆盖[输入与请求准备](../gateway-execution/README.zh.md#execution-authorization)、资源准入、模型尝试到首段文本、流后内存轮次收尾（`[model-turn-tail-timing]`），以及冷启动摘要（首次认证就绪 `200` 时输出 `[runtime-boot-timing]`，若 `boot()` 晚于就绪收敛则追加 `[runtime-boot-settled]`；受管启动失败时输出仅含元数据的 `[runtime-boot-failed]`）。沿用现有日志保留策略。
 
-`model-resource-timing` 记录来源绑定、本地登记、提交、状态请求和轮询间隔。`statusChangeWaitMs` 是 `statusMs` 中协调器报告的挂起等待时间，`statusChangeWaitSamples` 记录包含该测量的响应次数。核验通过的响应可以报告 `grantQueueMs`，即预留落盘到获得额度的时间。它可能与轮询间隔和状态请求耗时重叠。可用 `operationId` 在所属 Gateway 查询提交和单预留状态请求，批量轮询的最近一次请求可用 `lastStatusOperationId` 查询。
+`model-resource-timing` 记录来源绑定、本地登记、提交、状态请求和轮询间隔，并在来源绑定完成后记录 `originKind`。`statusChangeWaitMs` 是 `statusMs` 中协调器报告的挂起等待时间，`statusChangeWaitSamples` 记录包含该测量的响应次数。核验通过的响应可以报告 `grantQueueMs`，即预留落盘到获得额度的时间。它可能与轮询间隔和状态请求耗时重叠。可用 `operationId` 在所属 Gateway 查询提交和单预留状态请求，批量轮询的最近一次请求可用 `lastStatusOperationId` 查询。
+
+`model-resource-finish-timing` 用 Runtime 自己的时钟测量每次 HTTP 完成请求，包含 `startedAt`、重试时的 `retry: true` 和响应解析，不包含重试间隔。所属 Gateway 在 `finish` 响应返回阶段或入口计时头时，样本还会记录 `gatewayHandlerBearerMs`（处理器复用入口已核验的 `controlSubject` 时为 `0`）、`gatewayTransactionMs`、`gatewayIngressBearerMs` 与 `gatewayWriteAdmissionMs`。用 `operationId` 关联资源准入、模型尝试及轮次收尾样本中的 `resourceOperationId`，以及所属 Gateway 的 `resourceFinish`。`originKind` 表示归属类别，不标识具体调用者或模型用途。`acknowledged` 表示 Runtime 收到并解析了成功响应；为 false 时 Runtime 未能确认结果，但协调器仍可能已提交。`[model-turn-tail-timing]` 在同一 Runtime 时钟上另行关联非重试完成事件与已提交到内存的 `assistant/message` 或 `assistant/attempt`、`step/end`（多步轮次最多保留 16 步）及 `turn/end`，不记录提示、回复正文或异步持久化刷盘耗时。
 
 提供方在进入有界注册队列前，捕获 Session 范围、签名交互调用者或明确的基础设施归属。归属解析失败会立即拒绝。捕获调用方范围后，由 Runtime 服务负责注册、重复轮询和完成结算。尚未发送的请求被取消时，会独立于此前的 HTTP 请求释放本地排队容量。已验证且仍有效的条目串行注册；已尝试注册的请求则保留精确的完成记账，直到得到确认。
 

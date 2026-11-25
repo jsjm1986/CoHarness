@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
+import { PendingEditsProvider } from '../pending-edits.tsx'
 import { RuntimeAllocationPolicyEditor } from './RuntimeAllocationPolicyEditor.tsx'
 import { UserComputerPermissions } from './UserComputerPermissions.tsx'
 import { UserRuntimePanel } from './UserRuntimePanel.tsx'
@@ -157,6 +158,37 @@ it('retains edited limits after an unconfirmed save and requires an explicit ref
   await userEvent.click(screen.getByRole('button', { name: '保存 Runtime 配额' }))
   expect(await screen.findByText('配额已保存')).toBeTruthy()
   expect(api.saveRuntimeAllocationPolicy).toHaveBeenLastCalledWith(1, '2', { maxTotal: 12, maxPerNode: 5 })
+})
+
+it('clears a quota edit when the input returns to an equivalent number', async () => {
+  render(<PendingEditsProvider><RuntimeAllocationPolicyEditor userId={1} /></PendingEditsProvider>)
+  const total = await screen.findByRole('spinbutton', { name: '总配额' })
+  fireEvent.change(total, { target: { value: '9' } })
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(false)
+
+  fireEvent.change(total, { target: { value: '08' } })
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(true)
+  expect(total).toHaveProperty('value', '8')
+  expect(api.saveRuntimeAllocationPolicy).not.toHaveBeenCalled()
+})
+
+it('clears quota drafts that match the refreshed numbers without another write', async () => {
+  const reload = Promise.withResolvers<api.RuntimeAllocationPolicy>()
+  render(<PendingEditsProvider><RuntimeAllocationPolicyEditor userId={1} /></PendingEditsProvider>)
+  const total = await screen.findByRole('spinbutton', { name: '总配额' })
+  const perNode = screen.getByRole('spinbutton', { name: '每台电脑配额' })
+  fireEvent.change(total, { target: { value: '012' } })
+  fireEvent.change(perNode, { target: { value: '5.0' } })
+  vi.mocked(api.getRuntimeAllocationPolicy).mockReturnValueOnce(reload.promise)
+  fireEvent.click(screen.getByRole('button', { name: '刷新配额' }))
+  expect(api.getRuntimeAllocationPolicy).toHaveBeenCalledTimes(2)
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(false)
+
+  await act(async () => { reload.resolve({ maxTotal: 12, maxPerNode: 5, revision: '2', source: 'user' }) })
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(true)
+  expect(total).toHaveProperty('value', '12')
+  expect(perNode).toHaveProperty('value', '5')
+  expect(api.saveRuntimeAllocationPolicy).not.toHaveBeenCalled()
 })
 
 it('associates invalid limits with their inputs and keeps the mutation disabled', async () => {

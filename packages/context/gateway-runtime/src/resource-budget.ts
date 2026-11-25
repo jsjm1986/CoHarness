@@ -12,6 +12,8 @@ import {
   resourceStatusSchema, type ResourceOrigin, type ResourcePolicy, type ResourceStatus, type ResourceWireRequest,
 } from '@deepseek-ai/dsh-resource-budget/wire'
 import { readGatewayResponseJson, type GatewayRuntime } from './index.ts'
+import { recordModelResourceFinish } from './model-tail-timing.ts'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 
 /** Bounded coordinator transport and disposal timing, in milliseconds. */
 export interface Config {
@@ -29,6 +31,7 @@ interface Deferred<T> {
 
 interface ModelResourceTiming {
   operationId: ResourceOperationId
+  originKind?: ResourceOrigin['kind']
   startedAt: number
   started: number
   originMs: number
@@ -59,6 +62,16 @@ interface ResourceExchangeObservation {
   samples: readonly ModelResourceTiming[]
 }
 
+type CompletionOutcome = 'not-started' | 'quiescent' | 'uncertain'
+
+interface ResourceFinishObservation {
+  operationId: ResourceOperationId
+  originKind: ResourceOrigin['kind']
+  outcome: CompletionOutcome
+  retry: boolean
+  sessionId?: SessionId
+}
+
 function observeSingle(timing: ModelResourceTiming | undefined): ResourceExchangeObservation | undefined {
   return timing === undefined ? undefined : { operationId: timing.operationId, samples: [timing] }
 }
@@ -84,14 +97,15 @@ function readCoordinatorTiming(
 function reportTiming(timing: ModelResourceTiming, outcome: 'granted' | 'failed'): void {
   const round = (ms: number): number => Math.round(ms * 100) / 100
   const {
-    operationId, startedAt, started, originMs, registrationWaitMs, submitMs, submitCalls, statusMs, statusCalls,
+    operationId, originKind, startedAt, started, originMs, registrationWaitMs, submitMs, submitCalls, statusMs, statusCalls,
     lastStatusOperationId, statusChangeWaitSamples, statusChangeWaitMs,
     queuedResponses, pollWaitMs, gatewaySamples, gatewayHandlerBearerMs, gatewayAuthorityMs, gatewayTransactionMs,
     gatewayIngressSamples, gatewayIngressBearerMs, gatewayWriteAdmissionMs,
   } = timing
   try {
     console.info(`[model-resource-timing] ${JSON.stringify({
-      operationId, startedAt, outcome, elapsedMs: round(performance.now() - started), originMs: round(originMs),
+      operationId, ...(originKind === undefined ? {} : { originKind }), startedAt, outcome,
+      elapsedMs: round(performance.now() - started), originMs: round(originMs),
       registrationWaitMs: round(registrationWaitMs), submitMs: round(submitMs), submitCalls,
       statusMs: round(statusMs), statusCalls, lastStatusOperationId, queuedResponses, pollWaitMs: round(pollWaitMs),
       ...(statusChangeWaitSamples === 0 ? {} : { statusChangeWaitSamples, statusChangeWaitMs: round(statusChangeWaitMs) }),
@@ -102,6 +116,25 @@ function reportTiming(timing: ModelResourceTiming, outcome: 'granted' | 'failed'
         gatewayWriteAdmissionMs: round(gatewayWriteAdmissionMs) }),
     })}`)
   } catch { /* Diagnostic output cannot interrupt a resource lease. */ }
+}
+
+function reportFinishTiming(
+  observation: ResourceFinishObservation,
+  startedAt: number,
+  acknowledged: boolean,
+  elapsedMs: number,
+  phases?: [number, number, number],
+  ingress?: [number, number],
+): void {
+  const round = (ms: number): number => Math.round(ms * 100) / 100
+  const { operationId, originKind, outcome, retry } = observation
+  try {
+    console.info(`[model-resource-finish-timing] ${JSON.stringify({
+      operationId, originKind, outcome, startedAt, acknowledged, ...(retry ? { retry: true } : {}), elapsedMs: round(elapsedMs),
+      ...(phases === undefined ? {} : { gatewayHandlerBearerMs: round(phases[0]), gatewayTransactionMs: round(phases[2]) }),
+      ...(ingress === undefined ? {} : { gatewayIngressBearerMs: round(ingress[0]), gatewayWriteAdmissionMs: round(ingress[1]) }),
+    })}`)
+  } catch { /* A diagnostic sink failure cannot change completion acknowledgement. */ }
 }
 
 function deferred<T>(): Deferred<T> {
@@ -131,7 +164,7 @@ interface Operation {
   completed: boolean
   quiescent: boolean
   retryingCompletion: boolean
-  acknowledged?: 'uncertain' | 'quiescent' | 'not-started'
+  acknowledged?: CompletionOutcome
   completion: Promise<void>
 }
 
@@ -234,16 +267,19 @@ export class GatewayResourceBudget extends ResourceBudget {
     const controller = new AbortController()
     const result = deferred<ResourceLease>(), done = deferred<void>()
     const operationId = randomUUID() as ResourceOperationId
-    const timing = request.kind === 'model' && this.owner.runtime.modelTimings ? {
+    const timing: ModelResourceTiming | undefined = request.kind === 'model' && this.owner.runtime.modelTimings ? {
       operationId, startedAt: Date.now(), started: performance.now(), originMs: 0, registrationWaitMs: 0,
       submitMs: 0, submitCalls: 0, statusMs: 0, statusCalls: 0, queuedResponses: 0, pollWaitMs: 0,
       statusChangeWaitSamples: 0, statusChangeWaitMs: 0,
       gatewaySamples: 0, gatewayHandlerBearerMs: 0, gatewayAuthorityMs: 0, gatewayTransactionMs: 0,
       gatewayIngressSamples: 0, gatewayIngressBearerMs: 0, gatewayWriteAdmissionMs: 0,
-    } satisfies ModelResourceTiming : undefined
+    } : undefined
     // The origin read starts in the caller's scope, before joining the serial registration queue.
     const origin = this.captureOrigin(caller, request).then((value) => {
-      if (timing !== undefined) timing.originMs = performance.now() - timing.started
+      if (timing !== undefined) {
+        timing.originKind = value.kind
+        timing.originMs = performance.now() - timing.started
+      }
       if (entry.completed || entry.controller.signal.aborted) throw cancellation(entry.controller.signal)
       const size = Buffer.byteLength(JSON.stringify({ requestId: entry.id, sequence: this.nextSequence, kind: entry.kind, origin: value }))
       if (size > RESOURCE_MESSAGE_MAX_BYTES || this.bytes - entry.bytes + size > policy.maxQueuedBytes) {
@@ -525,7 +561,7 @@ export class GatewayResourceBudget extends ResourceBudget {
       for (;;) {
         await delay(this.owner.config.requestTimeoutMs, undefined, { signal, ref: false })
         try {
-          await this.complete(entry, 'quiescent', { signal, retry: false })
+          await this.complete(entry, 'quiescent', { signal, retry: false, backgroundRetry: true })
           return
         } catch (error) {
           if (error instanceof ResourceHttpError && error.status < 500) {
@@ -541,17 +577,29 @@ export class GatewayResourceBudget extends ResourceBudget {
     }
   }
 
-  private complete(entry: Operation, outcome: 'not-started' | 'quiescent' | 'uncertain',
-    { deadline, signal, retry = true }: { deadline?: number; signal?: AbortSignal; retry?: boolean } = {}): Promise<void> {
+  private complete(entry: Operation, outcome: CompletionOutcome,
+    { deadline, signal, retry = true, backgroundRetry = false }: {
+      deadline?: number
+      signal?: AbortSignal
+      retry?: boolean
+      backgroundRetry?: boolean
+    } = {}): Promise<void> {
     const completion = entry.completion.catch(() => { /* a later report retries the same exact operation */ }).then(async () => {
       if (entry.acknowledged === 'quiescent' || entry.acknowledged === 'not-started' || entry.acknowledged === outcome) return
       if (entry.request === undefined) { this.forget(entry); return }
       const until = Math.min(deadline ?? Number.POSITIVE_INFINITY, this.shutdownDeadline ?? Number.POSITIVE_INFINITY,
         Date.now() + this.owner.config.cleanupTimeoutMs)
+      let attempt = 0
       for (;;) {
         signal?.throwIfAborted()
+        const observation: ResourceFinishObservation | undefined = entry.timing === undefined ? undefined : {
+          operationId: entry.timing.operationId, originKind: entry.request.origin.kind, outcome,
+          retry: backgroundRetry || attempt > 0 || entry.acknowledged === 'uncertain',
+          ...(entry.request.origin.kind === 'session' ? { sessionId: entry.request.origin.sessionId } : {}),
+        }
+        attempt += 1
         try {
-          await this.post('finish', { sequence: entry.request.sequence, requestId: entry.id, outcome }, until, signal)
+          await this.post('finish', { sequence: entry.request.sequence, requestId: entry.id, outcome }, until, signal, observation)
           entry.acknowledged = outcome
           this.forget(entry)
           return
@@ -613,7 +661,7 @@ export class GatewayResourceBudget extends ResourceBudget {
 
   private async post(
     action: string, value: unknown, deadline?: number, upstream?: AbortSignal,
-    observation?: ResourceExchangeObservation, observed?: Operation,
+    observation?: ResourceExchangeObservation | ResourceFinishObservation, observed?: Operation,
   ): Promise<unknown> {
     const confirmingModel = action === 'confirm-active-model'
     const route = confirmingModel ? 'statuses' : action
@@ -624,9 +672,11 @@ export class GatewayResourceBudget extends ResourceBudget {
     const body = JSON.stringify(value)
     if (Buffer.byteLength(body) > RESOURCE_MESSAGE_MAX_BYTES) throw new ResourceAdmissionError('refused', 'Resource metadata exceeds the protocol byte limit.')
     const started = observation === undefined ? undefined : performance.now()
+    const startedAt = observation === undefined ? undefined : Date.now()
     const cursor = confirmingModel ? observed?.changeCursor : undefined
     if (observed !== undefined) observed.changeCursor = undefined
     let response: Response | undefined
+    let acknowledged = false
     try {
       response = await this.owner.runtime.request(`/internal/runtime/resources/${route}`, {
         method: 'POST', headers: { 'content-type': 'application/json',
@@ -647,9 +697,30 @@ export class GatewayResourceBudget extends ResourceBudget {
           && request?.kind === 'model' && request.origin.kind === 'session' && request.origin.scopeId !== undefined
           ? true : undefined
       }
+      acknowledged = true
       return payload
     } finally {
-      if (started !== undefined && observation !== undefined) {
+      if (started !== undefined && startedAt !== undefined && observation !== undefined && 'outcome' in observation) {
+        const finishedPerf = performance.now()
+        const elapsedMs = finishedPerf - started
+        const phases = readCoordinatorTiming(response, RESOURCE_PHASE_TIMING_HEADER, 3)
+        const ingress = readCoordinatorTiming(response, RESOURCE_INGRESS_TIMING_HEADER, 2)
+        reportFinishTiming(observation, startedAt, acknowledged, elapsedMs, phases, ingress)
+        if (observation.sessionId !== undefined) {
+          try {
+            recordModelResourceFinish(this.owner.runtime, {
+              sessionId: observation.sessionId,
+              operationId: observation.operationId,
+              outcome: observation.outcome,
+              acknowledged,
+              retry: observation.retry,
+              startedAt,
+              finishedPerf,
+              elapsedMs,
+            })
+          } catch { /* Diagnostic correlation cannot change completion acknowledgement. */ }
+        }
+      } else if (started !== undefined && observation !== undefined && 'samples' in observation) {
         const elapsed = performance.now() - started
         const phases = readCoordinatorTiming(response, RESOURCE_PHASE_TIMING_HEADER, 3)
         const ingress = readCoordinatorTiming(response, RESOURCE_INGRESS_TIMING_HEADER, 2)

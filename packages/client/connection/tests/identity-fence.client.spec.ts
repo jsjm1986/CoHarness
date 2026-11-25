@@ -6,8 +6,9 @@ import { ApiTransportError } from '../src/client/api.ts'
 const ORIGIN = 'https://gateway.example'
 const ADVISORY_RUNTIME = '10000000-0000-4000-8000-000000000001'
 
-it('leaves HTTP/1 capacity for a turn and new conversation while advisory reads wait', async () => {
+it('keeps a passive desktop status read queued while a turn and an explicit refresh proceed over HTTP/1', async () => {
   const catalog = Promise.withResolvers<Response>()
+  const desktop = '/api/desktop.status'
   const held = new Set(['/api/skill.list', '/api/subagents/list'])
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async input =>
     held.has(requestedUrl(input).pathname) ? catalog.promise : new Response('{}'))
@@ -16,25 +17,26 @@ it('leaves HTTP/1 capacity for a turn and new conversation while advisory reads 
   const signal = new AbortController()
   const post = (path: string, init?: RequestInit): Promise<Response> =>
     fence.fetch(`${ORIGIN}${path}?dshRuntime=${ADVISORY_RUNTIME}`, { method: 'POST', ...init })
-  const reads = [post('/api/skill.list'), post('/api/subagents/list'), post('/api/session.models', { signal: signal.signal })]
+  const reads = [post('/api/skill.list'), post('/api/subagents/list'), post(desktop, { priority: 'low', signal: signal.signal })]
   try {
     const canceled = reads[2]!.catch((reason: unknown) => reason)
     await vi.waitFor(() => { expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(2) })
-    await Promise.all([post('/api/admit/v1/session.prompt'), post('/api/prepare/v1/session.create')])
+    await Promise.all([post('/api/admit/v1/session.prompt'), post('/api/prepare/v1/session.create'), post(desktop)])
     expect(fetcher.mock.calls.map(([url, init]) => [requestedUrl(url).pathname, init?.priority])).toEqual([
       ['/api/skill.list', 'low'], ['/api/subagents/list', 'low'],
-      ['/api/admit/v1/session.prompt', 'high'], ['/api/prepare/v1/session.create', 'high'],
+      ['/api/admit/v1/session.prompt', 'high'], ['/api/prepare/v1/session.create', 'high'], [desktop, undefined],
     ])
     signal.abort('selection changed')
     expect(await canceled).toBe('selection changed')
-    const fourth = post('/api/llm.providers')
-    expect(fetcher).toHaveBeenCalledTimes(4)
-    catalog.resolve(new Response('{}'))
-    await Promise.all([reads[0], reads[1], fourth])
+    const status = post(desktop, { priority: 'low' })
     expect(fetcher).toHaveBeenCalledTimes(5)
-    expect(requestedUrl(fetcher.mock.calls[4]?.[0]).pathname).toBe('/api/llm.providers')
-    const fourthHeaders = new Headers(fetcher.mock.calls[4]?.[1]?.headers)
-    expect(fourthHeaders.get('x-dsh-expected-principal-id')).toBe('7')
+    catalog.resolve(new Response('{}'))
+    await Promise.all([reads[0], reads[1], status])
+    expect(fetcher).toHaveBeenCalledTimes(6)
+    const [url, init] = fetcher.mock.calls[5]!
+    expect(requestedUrl(url).pathname).toBe(desktop)
+    expect(init?.priority).toBe('low')
+    expect(new Headers(init?.headers).get('x-dsh-expected-principal-id')).toBe('7')
   } finally {
     signal.abort('test finished')
     fence.dispose()

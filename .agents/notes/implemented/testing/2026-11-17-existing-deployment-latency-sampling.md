@@ -12,7 +12,7 @@ Locally spawned multi-computer fixtures can reproduce transport delay without pr
 
 The [manual sampler](../../../../scripts/existing-deployment-latency/README.md) targets an existing authorized personal Runtime through explicit private coordinates. Planning performs no network, authentication or browser work. Execution requires `--execute`, an already ready allocation, an owned measurement window and synthetic test histories. It reuses browser launch and click clocks without importing application fixtures.
 
-Create, history-open and durable-send receipts remain separate. A send succeeds only through the versioned durable admission route with matching Session, application request and RPC response identities. Browser event time, driver overhead, visible answer and turn completion remain distinct. Unknown outcomes stop further mutations; no automatic resubmission, cancellation or data cleanup is performed.
+Create, history-open and durable-send receipts remain separate. A send succeeds only through the versioned durable admission route with matching Session, application request and RPC response identities. The sampler syncs acceptance before observing the reply so an interrupted browser wait cannot erase a confirmed input. Browser event time, driver overhead, visible answer and turn completion remain distinct. Unknown outcomes stop further mutations; no automatic resubmission, cancellation or data cleanup is performed.
 
 ## Alternatives considered
 

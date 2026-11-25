@@ -1,6 +1,65 @@
 /** Content-free operation receipts; periodic telemetry is not an operation sample. */
 import { MeasurementError, object, type ExistingLatencyConfig } from './config.ts'
 
+// Use the Gateway's source recognizers without adding its compiler face to the Host program.
+const pathSource = new URL('../../gateway/src/runtime-request-path.ts', import.meta.url)
+const { isImmutableRuntimeAssetRequest, isReadyRuntimeRead } = await import(/* @vite-ignore */ pathSource.href) as {
+  isImmutableRuntimeAssetRequest: (method: string, path: string) => boolean
+  isReadyRuntimeRead: (method: string, url: URL) => boolean
+}
+
+/**
+ * Use the Gateway's returned observation ID, falling back only for releases that did not return one.
+ * @param returned - response header, absent on older deployments.
+ * @param sent - request header originally supplied by the browser.
+ * @returns a valid diagnostic UUID, never a durable request ID.
+ */
+export function operationId(returned: string | undefined, sent: string | undefined): string | undefined {
+  const id = returned ?? sent
+  return id !== undefined && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu.test(id) ? id : undefined
+}
+
+type FileOperation = 'workspaceFilesList' | 'workspaceFilesStat' | 'workspaceFilesRead' | 'workspaceFilesReadBytes'
+const fileOperations = new Map<string, FileOperation>([
+  ['/api/workspaceFiles.list', 'workspaceFilesList'], ['/api/workspaceFiles.stat', 'workspaceFilesStat'],
+  ['/api/workspaceFiles.read', 'workspaceFilesRead'], ['/api/workspaceFiles.readBytes', 'workspaceFilesReadBytes'],
+])
+
+/**
+ * Classify existing startup and file requests without retaining their URLs or payloads.
+ * @param method - browser request method.
+ * @param rawUrl - actual browser resource URL.
+ * @param referer - referring document for a native script without placement selectors.
+ * @param config - selected QA origin, node and Runtime.
+ * @returns the fixed Gateway operation category, or undefined outside this QA target.
+ */
+export function resourceOperation(method: string, rawUrl: string, referer: string | undefined,
+  config: Pick<ExistingLatencyConfig, 'origin' | 'runtimeId' | 'nodeId'>): 'bootstrap' | 'pluginCombo' | FileOperation | undefined {
+  const url = new URL(rawUrl)
+  if (url.origin !== config.origin) return undefined
+  const combo = method === 'GET' && url.pathname === '/plugins/combo.js'
+    && isImmutableRuntimeAssetRequest(method, `${url.pathname}${url.search}`)
+  const operation = combo ? 'pluginCombo'
+    : method === 'POST' ? fileOperations.get(url.pathname)
+      : method === 'GET' && isReadyRuntimeRead(method, url) ? 'bootstrap' : undefined
+  if (operation === undefined) return undefined
+  const matches = (target: URL): boolean => {
+    if (target.origin !== config.origin) return false
+    const runtime = target.searchParams.getAll('dshRuntime')
+    const node = target.searchParams.getAll('dshNode'), scope = target.searchParams.getAll('dshTarget')
+    return runtime.length === 1 && runtime[0] === config.runtimeId
+      && (node.length === 0 || node.length === 1 && node[0] === config.nodeId)
+      && (scope.length === 0 || scope.length === 1 && scope[0] === 'personal')
+  }
+  if (!matches(url)) {
+    if (!combo || referer === undefined || ['dshRuntime', 'dshNode', 'dshTarget'].some(key => url.searchParams.has(key))) return undefined
+    let document: URL
+    try { document = new URL(referer) } catch { return undefined }
+    if (!matches(document)) return undefined
+  }
+  return operation
+}
+
 /** A real attempted operation, including failed and unconfirmed outcomes. */
 export interface LatencySample {
   index: number

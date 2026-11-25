@@ -340,6 +340,16 @@ export interface RunProfileOptions {
  */
 export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
   const managed = launchedByGateway(options.environment)
+  const startupStart = managed ? performance.now() : 0
+  const startupMarks: {
+    entryUptimeMs: number
+    proxyInstalledMs?: number
+    profileComposedMs?: number
+    patchesReadMs?: number
+    hostPreparedMs?: number
+    bootSettledMs?: number
+    notifySettled?: () => void
+  } | undefined = managed ? { entryUptimeMs: process.uptime() * 1000 } : undefined
   const recoveryFile = options.environment.getFrom('HGW_RECOVERY_POLICY_FILE', ['process'])?.value
   const recoveryDigest = options.environment.getFrom('HGW_RECOVERY_POLICY_SHA256', ['process'])?.value
   let recoveryPolicy: ReturnType<typeof readRecoveryPolicy> | undefined
@@ -355,6 +365,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     options.environment,
     (message) => { process.stderr.write(`${NAME}: ${message}\n`) },
   )
+  if (startupMarks !== undefined) startupMarks.proxyInstalledMs = performance.now() - startupStart
 
   const packaged = (process as NodeJS.Process & { pkg?: unknown }).pkg !== undefined
   const resolutionMode = packaged ? 'runtime' : options.resolutionMode ?? 'runtime'
@@ -404,6 +415,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     const composed = await composeProfile(
       options.profile, options.patchFiles, resolutionMode, options.fromDefaultProfile, options.resolvedProfile,
     )
+    if (startupMarks !== undefined) startupMarks.profileComposedMs = performance.now() - startupStart
     const appReady = createAppReady()
     const shutdown = createProcessShutdown(dispose)
     const interrupt = (code: number): void => {
@@ -437,8 +449,12 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       },
     }
     const patches = readProfilePatches(NAME, profileContext, composed.profile)
+    if (startupMarks !== undefined) startupMarks.patchesReadMs = performance.now() - startupStart
     const ctx = await boot(NAME, rootConfig, patches, async (hostCtx) => {
       app.current = hostCtx
+      if (startupMarks !== undefined) {
+        hostCtx.effect(() => hostCtx.reflect.provide('runtimeStartupMarks', startupMarks), 'managed launch: startup timing marks')
+      }
       if (recoveryPolicy !== undefined) {
         installRecoveryPolicy(hostCtx, recoveryPolicy, (context, ids) => {
           installAgentExecutionAdmission(context, ids.map(SessionId))
@@ -481,7 +497,12 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
         },
         ready: appReady.service,
       })
+      if (startupMarks !== undefined) startupMarks.hostPreparedMs = performance.now() - startupStart
     })
+    if (startupMarks !== undefined) {
+      startupMarks.bootSettledMs = performance.now() - startupStart
+      startupMarks.notifySettled?.()
+    }
     app.current = ctx
     if (!signalShutdown.signal.aborted
       && ctx.fiber.state === FiberState.ACTIVE
@@ -491,6 +512,20 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     managedStartup?.resolve(ctx)
     return { ctx, shutdown }
   } catch (error) {
+    if (startupMarks !== undefined) {
+      try {
+        const round = (ms: number): number => Math.round(Math.max(0, ms) * 100) / 100
+        console.info(`[runtime-boot-failed] ${JSON.stringify({
+          entryUptimeMs: round(startupMarks.entryUptimeMs),
+          ...(startupMarks.proxyInstalledMs === undefined ? {} : { proxyInstalledMs: round(startupMarks.proxyInstalledMs) }),
+          ...(startupMarks.profileComposedMs === undefined ? {} : { profileComposedMs: round(startupMarks.profileComposedMs) }),
+          ...(startupMarks.patchesReadMs === undefined ? {} : { patchesReadMs: round(startupMarks.patchesReadMs) }),
+          ...(startupMarks.hostPreparedMs === undefined ? {} : { hostPreparedMs: round(startupMarks.hostPreparedMs) }),
+          failedUptimeMs: round(process.uptime() * 1000),
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        })}`)
+      } catch { /* Startup failure diagnostics cannot replace the original error. */ }
+    }
     managedStartup?.resolve(undefined)
     try { await dispose() } catch (cleanupError) {
       throw new AggregateError([error, cleanupError], 'dsh: profile startup and cleanup failed')

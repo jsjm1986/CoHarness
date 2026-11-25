@@ -19,6 +19,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 
+function markRemoteBootStage(stage: string): void {
+  try {
+    performance.mark(`dsh:boot:${stage}`)
+  } catch { /* Boot telemetry cannot fail remote bootstrap in restricted runtimes. */ }
+}
+
 /** Decode the entry-owned marker without treating URL parameters as authority.
  * @returns the validated selection or undefined on an ordinary Host index.
  */
@@ -63,17 +69,58 @@ function matchesIdentity(value: unknown, entry: RemoteEntrySelection): boolean {
     : value.runtimeTarget.kind === 'project' && `project:${String(value.runtimeTarget.projectId)}` === entry.scope
 }
 
+const BOOTSTRAP_PRELOAD_HEADER = 'x-dsh-bootstrap-preload'
+
+/** Structured boot carries early script outcomes to the page's module system. */
+export type RemoteIndex =
+  | { readonly kind: 'full-index' }
+  | { readonly kind: 'injections'; readonly preloadedBundles: ReadonlyMap<string, 'executed' | 'load-failed'> }
+
 class BootstrapScriptLoadError extends Error {}
 
-function loadScript(src: string, signal: AbortSignal): Promise<void> {
+function isRevisionedSameOriginCombo(src: string): boolean {
+  if (!/^\/?plugins\/combo\.js\?\?[^?&#]+&rev=[a-f0-9]{12}$/u.test(src)) return false
+  const url = new URL(src, document.baseURI)
+  return url.origin === location.origin && url.pathname === '/plugins/combo.js'
+}
+
+const applicationResource = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*\/client\.js$/u
+
+function earlyApplicationBatch(rows: readonly IndexInjection[]): string | undefined {
+  const graphs = rows.filter(row => row.kind === 'global' && row.name === '__DSH_BOOT__')
+  const graph = graphs[0]
+  if (graphs.length !== 1 || graph?.kind !== 'global' || !isRecord(graph.value) || !Array.isArray(graph.value.batches)) return undefined
+  const batches: readonly unknown[] = graph.value.batches
+  for (const row of rows) {
+    if (row.kind !== 'script-preload' || !isRevisionedSameOriginCombo(row.src)) continue
+    const resources = row.src.slice(row.src.indexOf('??') + 2, row.src.indexOf('&rev=')).split(',')
+    if (resources.length > 1 && resources.every(resource => applicationResource.test(resource))
+      && batches.some(batch => isRecord(batch) && batch.phase === 'application' && batch.url === row.src
+        && Array.isArray(batch.entries) && batch.entries.length === resources.length)) return row.src
+  }
+  return undefined
+}
+
+function loadScript(
+  src: string,
+  signal: AbortSignal,
+  options: { fetchPriority: 'high' | 'low'; removeOnLoad?: boolean },
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script')
+    script.async = true
+    script.fetchPriority = options.fetchPriority
     const finish = (error?: Error): void => {
       signal.removeEventListener('abort', abort)
       script.onload = null
       script.onerror = null
-      if (error === undefined) resolve()
-      else { script.remove(); reject(error) }
+      if (error === undefined) {
+        if (options.removeOnLoad === true) script.remove()
+        resolve()
+      } else {
+        script.remove()
+        reject(error)
+      }
     }
     const abort = (): void => {
       const reason: unknown = signal.reason
@@ -90,15 +137,11 @@ function loadScript(src: string, signal: AbortSignal): Promise<void> {
 
 async function loadBootstrapScript(src: string, signal: AbortSignal): Promise<void> {
   try {
-    await loadScript(src, signal)
+    await loadScript(src, signal, { fetchPriority: 'high' })
   } catch (error) {
     signal.throwIfAborted()
-    if (!(error instanceof BootstrapScriptLoadError)
-      || !/^\/?plugins\/combo\.js\?\?/u.test(src)) throw error
-    const url = new URL(src, document.baseURI)
-    const revision = url.searchParams.get('rev')
-    if (url.origin !== location.origin || revision === null || !/^[a-f0-9]{12}$/u.test(revision)) throw error
-    await loadScript(src, signal)
+    if (!(error instanceof BootstrapScriptLoadError) || !isRevisionedSameOriginCombo(src)) throw error
+    await loadScript(src, signal, { fetchPriority: 'high' })
   }
 }
 
@@ -116,16 +159,21 @@ function isIndexInjection(value: unknown): value is IndexInjection {
   }
 }
 
-/** Apply the selected Host's authenticated index rows without speculative preloads.
- * A failed same-origin, revision-pinned plugin bootstrap download receives one retry.
+/** Apply authenticated index rows. Start sequential bootstrap scripts before one
+ * revisioned application batch, and pass the batch outcome to the module system.
+ * A failed same-origin, revision-pinned bootstrap download receives one retry.
  * @param entry - exact account, computer and scope that rendered the first shell.
  * @param signal - owning document's lifetime.
- * @returns full-index when raw index transforms or an older Host require native rendering.
+ * @returns early script outcomes, or full-index when the Host requires native rendering.
  */
-export async function loadRemoteEntry(entry: RemoteEntrySelection, signal: AbortSignal): Promise<'injections' | 'full-index'> {
+export async function loadRemoteEntry(entry: RemoteEntrySelection, signal: AbortSignal): Promise<RemoteIndex> {
   const response = await fetch(remoteEntryUrl(entry, '1'), {
     signal, cache: 'no-store', redirect: 'error',
-    headers: { accept: 'application/json', 'x-dsh-expected-principal-id': String(entry.principalId) },
+    headers: {
+      accept: 'application/json',
+      'x-dsh-expected-principal-id': String(entry.principalId),
+      [BOOTSTRAP_PRELOAD_HEADER]: '1',
+    },
   })
   const principal = response.headers.get('x-dsh-principal-id')
   if (response.status === 401 || principal !== null && principal !== String(entry.principalId)) {
@@ -137,14 +185,14 @@ export async function loadRemoteEntry(entry: RemoteEntrySelection, signal: Abort
     throw new Error(`Runtime bootstrap returned HTTP ${String(response.status)}`)
   }
   const contentType = response.headers.get('content-type')?.split(';')[0]
-  if (contentType === 'text/html') { await response.body?.cancel(); return 'full-index' }
+  if (contentType === 'text/html') { await response.body?.cancel(); return { kind: 'full-index' } }
   if (contentType !== 'application/json') {
     await response.body?.cancel()
     throw new Error('Runtime bootstrap returned an unsupported document')
   }
   const payload: unknown = await response.json()
   if (!isRecord(payload) || payload.version !== 1) throw new Error('Invalid Runtime bootstrap document')
-  if (payload.kind === 'full-index') return 'full-index'
+  if (payload.kind === 'full-index') return { kind: 'full-index' }
   if (payload.kind !== 'injections' || !Array.isArray(payload.rows) || !payload.rows.every(isIndexInjection)) {
     throw new Error('Invalid Runtime bootstrap document')
   }
@@ -155,6 +203,30 @@ export async function loadRemoteEntry(entry: RemoteEntrySelection, signal: Abort
     throw new Error('Runtime bootstrap returned a different document identity')
   }
   signal.throwIfAborted()
-  await applyIndexInjections(rows, src => loadBootstrapScript(src, signal))
-  return 'injections'
+  markRemoteBootStage('bootstrap-json-ready')
+  const preload = earlyApplicationBatch(rows)
+  const preloadController = new AbortController()
+  const preloadSignal = AbortSignal.any([signal, preloadController.signal])
+  const preloadedBundles = new Map<string, 'executed' | 'load-failed'>()
+  let preloadWork: Promise<void> | undefined
+  try {
+    await applyIndexInjections(rows, (src) => {
+      const bootstrap = loadBootstrapScript(src, signal)
+      const loader = (globalThis as { __ModuleLoader__?: { mode?: unknown } }).__ModuleLoader__
+      if (preload !== undefined && preloadWork === undefined && loader?.mode === 'queue') {
+        preloadWork = loadScript(`${preload}&dshAssetPreload=1`, preloadSignal, { fetchPriority: 'low', removeOnLoad: true }).then(
+          () => { preloadedBundles.set(preload, 'executed') },
+          () => { preloadedBundles.set(preload, 'load-failed') },
+        )
+      }
+      return bootstrap
+    })
+    if (preloadWork !== undefined) await preloadWork
+    signal.throwIfAborted()
+    markRemoteBootStage('bootstrap-scripts-ready')
+    return { kind: 'injections', preloadedBundles }
+  } catch (error) {
+    preloadController.abort(error)
+    throw error
+  }
 }

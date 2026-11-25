@@ -7,6 +7,34 @@ const PLUGIN_PACKAGE = '(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*'
 const COMBO_RESOURCE = new RegExp(`^${PLUGIN_PACKAGE}/client\\.js(\\.map)?$`, 'u')
 const PLUGIN_CHUNK = new RegExp(`^/plugins/${PLUGIN_PACKAGE}/client\\.[A-Za-z0-9][A-Za-z0-9._-]*\\.js(?:\\.map)?$`, 'u')
 const IMMUTABLE_REVISION = /^[a-f0-9]{12}(?:[a-f0-9]{52})?$/u
+const COMBO_PATH = '/plugins/combo.js'
+const COMBO_QUERY = /^\?([^&]+)&rev=([^&]+)$/u
+const ASSET_PRELOAD = 'dshAssetPreload=1'
+const WORKSPACE_FILE_LIST_PATH = '/api/workspaceFiles.list'
+
+function comboResources(query: string): string[] | undefined {
+  const match = COMBO_QUERY.exec(query)
+  if (match === null || !IMMUTABLE_REVISION.test(match[2]!)) return undefined
+  return match[1]!.split(',')
+}
+
+/**
+ * Strip the scheduling hint only from a revisioned multi-script GET combination.
+ * @param method - original HTTP method.
+ * @param path - original target, including any routing selectors.
+ * @returns the target without the hint, or the original target if it was not a valid preload.
+ */
+export function withoutRuntimeAssetPreload(method: string | undefined, path: string): string {
+  if (method !== 'GET' || !path.startsWith(`${COMBO_PATH}??`) || !path.includes(`&${ASSET_PRELOAD}`)) return path
+  const parts = path.split('&')
+  const index = parts.indexOf(ASSET_PRELOAD)
+  if (index < 1 || parts.lastIndexOf(ASSET_PRELOAD) !== index) return path
+  parts.splice(index, 1)
+  const target = parts.join('&')
+  const resources = comboResources(stripRoutingSelectors(target).slice(COMBO_PATH.length + 1))
+  return resources !== undefined && resources.length > 1
+    && resources.every(entry => entry.endsWith('/client.js') && COMBO_RESOURCE.test(entry)) ? target : path
+}
 
 /** Runtime endpoint for retrieving a managed model credential. */
 export const RUNTIME_MODEL_CREDENTIAL_PATH = '/internal/runtime/model-credential'
@@ -22,16 +50,16 @@ export const BROWSER_RUNTIME_ASSET_CACHE_CONTROL = 'private, no-store'
  */
 export function isImmutableRuntimeAssetRequest(method: string | undefined, path: string): boolean {
   if (method !== 'GET' && method !== 'HEAD') return false
-  const resource = runtimeRequestPath(path)
+  const resource = runtimeRequestPath(path, method)
   const question = resource.indexOf('?')
   const pathname = question < 0 ? resource : resource.slice(0, question)
   const query = question < 0 ? '' : resource.slice(question + 1)
   if (IMMUTABLE_ASSET.test(pathname)) return query === ''
-  if (pathname === '/plugins/combo.js') {
-    const match = /^\?([^&]+)&rev=([^&]+)$/u.exec(query)
-    if (match === null || !IMMUTABLE_REVISION.test(match[2]!)) return false
-    const resources = match[1]!.split(',').map(entry => COMBO_RESOURCE.exec(entry))
-    return resources.every(entry => entry !== null && entry[1] === resources[0]?.[1])
+  if (pathname === COMBO_PATH) {
+    const resources = comboResources(query)
+    if (resources === undefined) return false
+    const sourceMap = resources[0]!.endsWith('.map')
+    return resources.every(entry => COMBO_RESOURCE.test(entry) && entry.endsWith('.map') === sourceMap)
   }
   return PLUGIN_CHUNK.test(pathname) && query.startsWith('rev=') && IMMUTABLE_REVISION.test(query.slice(4))
 }
@@ -75,6 +103,7 @@ export function isReadyRuntimeRead(method: string | undefined, url: URL): boolea
   if (method === 'POST') {
     return url.pathname === '/api/host.describe' || url.pathname === '/api/session.list'
       || url.pathname === '/api/workspace.list' || url.pathname === '/api/session.history'
+      || url.pathname === WORKSPACE_FILE_LIST_PATH
   }
   if (method !== 'GET' || url.pathname !== '/') return false
   const bootstrap = url.searchParams.getAll('dshBootstrap')
@@ -92,7 +121,8 @@ export function isReadyRuntimeInteractive(method: string | undefined, pathname: 
 }
 
 /**
- * Select read operations that can use the primary's approval on a ready personal Runtime.
+ * Select reads that can use the primary's approval on a ready personal Runtime.
+ * Workspace file listings require current authorization at the owning Gateway.
  * @param method - original HTTP method.
  * @param url - browser request coordinates.
  * @param accountBound - whether the request declares its expected browser account.
@@ -101,7 +131,8 @@ export function isReadyRuntimeInteractive(method: string | undefined, pathname: 
  */
 export function isDelegatablePersonalRead(method: string | undefined, url: URL, accountBound: boolean, accept: string | undefined): boolean {
   if (method === 'POST' && url.pathname === '/api/prepare/v1/session.history') return true
-  return accountBound && isReadyRuntimeRead(method, url) && (method !== 'GET' || accept === 'application/json')
+  return accountBound && url.pathname !== WORKSPACE_FILE_LIST_PATH
+    && isReadyRuntimeRead(method, url) && (method !== 'GET' || accept === 'application/json')
 }
 
 /** @param method - original HTTP method. @param url - original request coordinates. @returns whether a scope change explicitly prepares an allocation. */
@@ -112,9 +143,14 @@ export function isExplicitScopeRequest(method: string | undefined, url: URL): bo
 /**
  * Remove Gateway-owned selectors without reserializing module-loader query fields.
  * @param path - authenticated request path and its original query bytes.
+ * @param method - original HTTP method; omit to remove only placement selectors.
  * @returns the Runtime's original path, preserving custom module and revision syntax.
  */
-export function runtimeRequestPath(path: string): string {
+export function runtimeRequestPath(path: string, method?: string): string {
+  return stripRoutingSelectors(withoutRuntimeAssetPreload(method, path))
+}
+
+function stripRoutingSelectors(path: string): string {
   const question = path.indexOf('?')
   if (question < 0) return path
   const parts = path.slice(question + 1).split('&').filter(part => !SELECTORS.has(new URLSearchParams(part).keys().next().value ?? ''))

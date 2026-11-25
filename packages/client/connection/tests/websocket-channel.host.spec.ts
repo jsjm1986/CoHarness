@@ -7,7 +7,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import WebSocket, { type WebSocketServer } from 'ws'
 import { ConnectionWebSocketChannel, type ConnectionWebSocket } from '../src/websocket-channel.ts'
-import { buildConnectionRequestBoundary, createUpgradeRouteHandler } from '../src/ws-upgrade.ts'
+import { buildConnectionRequestBoundary, createUpgradeRouteHandler, createWebSocketHeartbeat } from '../src/ws-upgrade.ts'
 
 const cleanups: Array<() => void | Promise<void>> = []
 afterEach(async () => {
@@ -255,11 +255,24 @@ describe('ConnectionWebSocketChannel', () => {
       .rejects.toThrow('upgrade failed')
     expect(Buffer.concat(errChunks).toString('utf8')).toContain('403 Forbidden')
 
-    // Already-destroyed socket triggers immediate abort and skips 403 write on error.
+    // Already-destroyed socket triggers immediate abort and skips onAccepted cleanly.
     const sDestroyed = new PassThrough()
     sDestroyed.destroy()
     await expect(handler({ url: '/err', headers: {} } as IncomingMessage, sDestroyed, Buffer.alloc(0)))
-      .rejects.toThrow('upgrade failed')
+      .resolves.toBeUndefined()
+
+    // Socket destroyed during onAccepted before error skips 403 write on catch.
+    const destroyThenThrow = createUpgradeRouteHandler({
+      owner: ctx,
+      isRejected: () => false,
+      rejectOnError: true,
+      onAccepted: async (_req, socket) => {
+        socket.destroy()
+        throw new Error('destroyed mid-upgrade')
+      },
+    })
+    await expect(destroyThenThrow({ url: '/err', headers: {} } as IncomingMessage, new PassThrough(), Buffer.alloc(0)))
+      .rejects.toThrow('destroyed mid-upgrade')
 
     // Post-handoff waterfall error destroys the upgraded socket without writing raw HTTP 403 bytes.
     const postCtx = new Context()
@@ -281,5 +294,77 @@ describe('ConnectionWebSocketChannel', () => {
       .rejects.toThrow('post-handoff failure')
     expect(sHandedOff.destroyed).toBe(true)
     expect(handedOffChunks).toEqual([])
+
+    // Route-signal & inFlight tracking: aborts and drains in-flight waterfall before route disposal.
+    const drainCtx = new Context()
+    cleanups.push(() => drainCtx.fiber.dispose())
+    const gate = Promise.withResolvers<undefined>()
+    drainCtx.on('connection/request', async (_boundary, next) => {
+      await gate.promise
+      await next()
+    })
+    const routeLifetime = new AbortController()
+    const inFlight = new Set<Promise<void>>()
+    const acceptedCb = vi.fn(async () => {})
+    const drainHandler = createUpgradeRouteHandler({
+      owner: drainCtx,
+      isRejected: () => false,
+      routeSignal: routeLifetime.signal,
+      inFlight,
+      onAccepted: acceptedCb,
+    })
+    const sDraining = new PassThrough()
+    const drainingChunks: Buffer[] = []
+    sDraining.on('data', (c: Buffer | string) => { drainingChunks.push(Buffer.from(c)) })
+    const inflightPromise = drainHandler({ url: '/drain', headers: {} } as IncomingMessage, sDraining, Buffer.alloc(0))
+    expect(inFlight.size).toBe(1)
+    routeLifetime.abort()
+    // New upgrades arriving after route abort are rejected synchronously.
+    const sAfterAbort = new PassThrough()
+    const afterAbortChunks: Buffer[] = []
+    sAfterAbort.on('data', (c: Buffer | string) => { afterAbortChunks.push(Buffer.from(c)) })
+    void drainHandler({ url: '/after', headers: {} } as IncomingMessage, sAfterAbort, Buffer.alloc(0))
+    expect(Buffer.concat(afterAbortChunks).toString('utf8')).toContain('403 Forbidden')
+    gate.resolve(undefined)
+    await inflightPromise
+    await Promise.allSettled([...inFlight])
+    expect(inFlight.size).toBe(0)
+    expect(acceptedCb).not.toHaveBeenCalled()
+    expect(Buffer.concat(drainingChunks).toString('utf8')).toContain('403 Forbidden')
+    // Rejecting upgrades also clear from inFlight once settled.
+    const sRejectInflight = new PassThrough()
+    await expect(createUpgradeRouteHandler({
+      owner: drainCtx,
+      isRejected: () => false,
+      inFlight,
+      onAccepted: () => Promise.reject(new Error('boom')),
+    })({ url: '/err', headers: {} } as IncomingMessage, sRejectInflight, Buffer.alloc(0))).rejects.toThrow('boom')
+    await Promise.allSettled([...inFlight])
+    expect(inFlight.size).toBe(0)
+
+    // Synchronous throws from connection/request listeners still reject via HTTP 403 and clear inFlight.
+    const syncThrowCtx = new Context()
+    cleanups.push(() => syncThrowCtx.fiber.dispose())
+    syncThrowCtx.on('connection/request', () => { throw new Error('expired principal') })
+    const sSyncThrow = new PassThrough()
+    const syncThrowChunks: Buffer[] = []
+    sSyncThrow.on('data', (c: Buffer | string) => { syncThrowChunks.push(Buffer.from(c)) })
+    await expect(createUpgradeRouteHandler({
+      owner: syncThrowCtx,
+      isRejected: () => false,
+      rejectOnError: true,
+      inFlight,
+      onAccepted: acceptedCb,
+    })({ url: '/sync-throw', headers: {} } as IncomingMessage, sSyncThrow, Buffer.alloc(0))).rejects.toThrow('expired principal')
+    await Promise.allSettled([...inFlight])
+    expect(inFlight.size).toBe(0)
+    expect(Buffer.concat(syncThrowChunks).toString('utf8')).toContain('403 Forbidden')
+
+    // Heartbeat stops its timer when the last socket closes and terminates late track() calls after stop().
+    const hb = createWebSocketHeartbeat({} as WebSocketServer, 15)
+    hb.stop()
+    const lateTerminate = vi.spyOn(client, 'terminate')
+    hb.track(client)
+    expect(lateTerminate).toHaveBeenCalledOnce()
   })
 })

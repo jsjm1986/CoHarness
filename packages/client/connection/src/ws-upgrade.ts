@@ -1,4 +1,4 @@
-/** Shared WebSocket upgrade admission, request-boundary building, and protocol heartbeat helpers. */
+/** Shared WebSocket upgrade admission, request-descriptor building, and protocol heartbeat helpers. */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingMessage } from 'node:http'
@@ -28,6 +28,14 @@ export interface WebSocketHeartbeat {
 export function createWebSocketHeartbeat(server: WebSocketServer, intervalMs: number): WebSocketHeartbeat {
   const missedHeartbeats = new Map<WebSocket, number>()
   let timer: NodeJS.Timeout | undefined
+  let stopped = false
+
+  const clearTimer = (): void => {
+    if (timer !== undefined) {
+      clearInterval(timer)
+      timer = undefined
+    }
+  }
 
   const start = (): void => {
     if (timer !== undefined) return
@@ -47,6 +55,7 @@ export function createWebSocketHeartbeat(server: WebSocketServer, intervalMs: nu
         missedHeartbeats.set(socket, missed + 1)
         socket.ping()
       }
+      if (missedHeartbeats.size === 0) clearTimer()
     }, intervalMs)
     timer.unref()
   }
@@ -55,23 +64,26 @@ export function createWebSocketHeartbeat(server: WebSocketServer, intervalMs: nu
     track(socket: WebSocket): void {
       // Keep server parameter referenced for caller symmetry while tracking active sockets explicitly.
       void server
+      if (stopped) {
+        socket.terminate()
+        return
+      }
       start()
       missedHeartbeats.set(socket, 0)
       const onPong = (): void => { missedHeartbeats.set(socket, 0) }
       const untrack = (): void => {
         missedHeartbeats.delete(socket)
         socket.removeListener('pong', onPong)
+        if (missedHeartbeats.size === 0) clearTimer()
       }
       socket.on('pong', onPong)
       socket.once('close', untrack)
       socket.once('error', untrack)
     },
     stop(): void {
+      stopped = true
       missedHeartbeats.clear()
-      if (timer !== undefined) {
-        clearInterval(timer)
-        timer = undefined
-      }
+      clearTimer()
     },
   }
 }
@@ -109,9 +121,11 @@ export function createUpgradeRouteHandler(options: {
   readonly isRejected: (req: IncomingMessage) => boolean
   readonly onAccepted: (req: IncomingMessage, socket: Duplex, head: Buffer, signal: AbortSignal) => Promise<void>
   readonly rejectOnError?: boolean
+  readonly routeSignal?: AbortSignal
+  readonly inFlight?: Set<Promise<void>>
 }): WebUpgradeRoute['handler'] {
   return (req, socket, head) => {
-    if (options.isRejected(req)) {
+    if (options.routeSignal?.aborted === true || options.isRejected(req)) {
       rejectWebSocketUpgrade(socket)
       return
     }
@@ -124,15 +138,24 @@ export function createUpgradeRouteHandler(options: {
     socket.once('close', close)
     socket.once('error', close)
     if (socket.destroyed) close()
+    const signal = options.routeSignal === undefined
+      ? lifetime.signal
+      : AbortSignal.any([lifetime.signal, options.routeSignal])
     let handedOff = false
-    return options.owner.waterfall(
-      'connection/request',
-      buildConnectionRequestBoundary('upgrade', req, lifetime.signal),
-      async () => {
-        await options.onAccepted(req, socket, head, lifetime.signal)
-        handedOff = true
-      },
-    ).catch((error: unknown) => {
+    const work = (async () => {
+      await options.owner.waterfall(
+        'connection/request',
+        buildConnectionRequestBoundary('upgrade', req, signal),
+        async () => {
+          if (signal.aborted) {
+            rejectWebSocketUpgrade(socket)
+            return
+          }
+          await options.onAccepted(req, socket, head, signal)
+          handedOff = true
+        },
+      )
+    })().catch((error: unknown) => {
       close()
       if (options.rejectOnError === true && !socket.destroyed && !socket.writableEnded) {
         if (handedOff) socket.destroy()
@@ -140,5 +163,12 @@ export function createUpgradeRouteHandler(options: {
       }
       throw error
     })
+    const { inFlight } = options
+    if (inFlight !== undefined) {
+      const tracked = work.then(() => undefined, () => undefined)
+      inFlight.add(tracked)
+      void tracked.finally(() => { inFlight.delete(tracked) })
+    }
+    return work
   }
 }

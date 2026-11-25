@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-22-browser-advisory-read-scheduling.md
 document:
-  en: a602cfb043f5f3c099af24fca9abb64497b5b3da
-  zh: 3c9b6a3c9041807656888eec755699a0ae15e516
+  en: 05f9d4e5a9c8d0ff04138dad5067989f9604c1e0
+  zh: 5f0b35afd8192e29d131be7b56a00f688e9876ee
 /agent-note-reserve-browser-connections-for-conversation-actions:
   en: 6a8a5a161d1518b8
   zh: f726f6c711994fad
@@ -12,11 +12,11 @@ document:
   en: 001b7e17b45eb5b7
   zh: 21905559f73ac250
 /agent-note-reserve-browser-connections-for-conversation-actions/decision:
-  en: 1545fc85e0ffc584
-  zh: fdb032d046802e25
+  en: 81dc7d9d333d7eb7
+  zh: 19940ed8affc008b
 /agent-note-reserve-browser-connections-for-conversation-actions/alternatives-considered:
   en: c49881205346be4f
   zh: 1b1ea03a1d515e3a
 /agent-note-reserve-browser-connections-for-conversation-actions/consequences:
-  en: 2fb3bc39df39639a
-  zh: 8c55e1965f9e4e2f
+  en: a9dda82740a27cbf
+  zh: 8e8e1f92154d8c03

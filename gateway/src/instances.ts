@@ -33,6 +33,7 @@ import { connect } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import type Database from 'better-sqlite3'
 import { RuntimeLaunchTiming } from './runtime-launch-timing.ts'
+import type { RuntimeStartIntent, RuntimeTarget } from './runtime-instance-types.ts'
 import type { UserRow } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
 import type { ProjectOrigin } from './projects.ts'
@@ -128,8 +129,7 @@ export function validateProjectRuntimePath(cfg: GatewayConfig, path: string, ori
   return canonical
 }
 
-/** Runtime ownership and optional exact identity; omitted identity requires an unambiguous local assignment. */
-export type RuntimeTarget = ({ kind: 'user'; id: number } | { kind: 'project'; id: number }) & { runtimeId?: RuntimeId }
+export type { RuntimeStartIntent, RuntimeTarget } from './runtime-instance-types.ts'
 export type RuntimeTargetInput = RuntimeTarget | number
 
 /** Personal launch facts retain account identity separately from the selected Runtime. */
@@ -231,9 +231,6 @@ export class RuntimeLeaseUnavailableError extends Error {
 export type RuntimeStopReason = 'manual' | 'idle' | 'shutdown' | 'failed' | 'access-change'
 /** Process-only administrator control or quiescence for data-changing work; destructive protection is the default. */
 export type RuntimeStopPurpose = 'control' | 'destructive' | 'content-publication'
-/** Explicit starts require an authenticated user action at the owning HTTP route. */
-export type RuntimeStartIntent = 'passive' | 'explicit' | 'webhook'
-
 /** One deduplicated start with separate bounded admission and readiness results. */
 export interface RuntimeStartRequest {
   /** Resolves after bounded queue acceptance, immediate capacity reservation or warm reuse. */
@@ -1366,12 +1363,15 @@ export class InstanceManager {
     const admission = new Promise<void>((resolve, reject) => { accept = resolve; refuse = reject })
     // ensureRunning consumers observe readiness only; keep the optional admission result contained.
     void admission.catch(() => {})
-    const entry = this.cfg.performanceEnabled ? { wall: Date.now(), tick: performance.now() } : undefined
-    const run = this.dispatch(runtimeTargetOf(subject), target => this.ensureRunningNow(
-      { ...subject, runtimeId: target.runtimeId }, intent, controller.signal, accept, administratorUserId, recordActivity, entry)).then(result => {
+    const timing = this.cfg.performanceEnabled ? new RuntimeLaunchTiming(Date.now(), performance.now()) : undefined
+    const execute = (): Promise<RuntimeEndpoint> => this.dispatch(runtimeTargetOf(subject), target => this.ensureRunningNow(
+      { ...subject, runtimeId: target.runtimeId }, intent, controller.signal, accept, administratorUserId, recordActivity, timing))
+    const run = (timing === undefined ? execute() : timing.run(execute)).then(result => {
+      timing?.close()
       accept()
       return result
     }, error => {
+      timing?.close()
       refuse(error)
       throw error
     })
@@ -1386,11 +1386,11 @@ export class InstanceManager {
   }
 
   private ensureRunningNow(subject: RuntimeSubject, intent: RuntimeStartIntent, signal: AbortSignal, accept: () => void,
-    administratorUserId: number | undefined, recordActivity: boolean, entry?: { wall: number; tick: number }): Promise<RuntimeEndpoint> {
+    administratorUserId: number | undefined, recordActivity: boolean, timing?: RuntimeLaunchTiming): Promise<RuntimeEndpoint> {
     const target = runtimeTargetOf(subject)
-    const resolved = entry === undefined ? undefined : performance.now()
+    timing?.mark('targetResolved')
     return this.serialize(target, async () => {
-      const acquired = entry === undefined ? undefined : performance.now()
+      timing?.mark('lifecycleAcquired')
       await this.initialized
       if (this.closedStartRequest !== undefined) throw new RuntimeCapacityError('cancelled')
       if (administratorUserId !== undefined) await this.repository.authorizeAdministrator(administratorUserId)
@@ -1493,9 +1493,6 @@ export class InstanceManager {
           }
         }
       }
-      const timing = entry === undefined ? undefined : new RuntimeLaunchTiming(entry.wall, entry.tick)
-      timing?.mark('targetResolved', resolved)
-      timing?.mark('lifecycleAcquired', acquired)
       timing?.mark('capacityRequested')
       let reserved = false
       try {
@@ -1766,7 +1763,7 @@ export class InstanceManager {
         ...(this.cfg.streamPrincipalRenewal.enabled ? { streamPrincipalRenewal: this.cfg.streamPrincipalRenewal } : {}),
       })
       const resources = this.resources
-      try { proc = await this.launcher.start({
+      const launch = {
         ...runtime, credentialHash: runtimeTokenHash.toString('hex'), gatewayCredential, signal,
         ...(recoveryPolicy === undefined ? {} : { recoveryPolicy }),
         beforeAllocation: async () => {
@@ -1781,7 +1778,11 @@ export class InstanceManager {
           if (signal.aborted) throw new RuntimeCapacityError('cancelled')
           timing?.mark('allocationAuthorized')
         },
-      }) } catch (launchError: unknown) {
+      }
+      try {
+        proc = await (timing !== undefined && this.launcher instanceof LocalLauncher
+          ? this.launcher.start(launch, timing) : this.launcher.start(launch))
+      } catch (launchError: unknown) {
         if (launchError instanceof RuntimeLaunchCleanupError) {
           proc = launchError.process
           this.procGenerations.set(proc, generation)

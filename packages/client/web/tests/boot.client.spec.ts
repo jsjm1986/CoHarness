@@ -19,6 +19,7 @@ const moduleFace = modulesClient as unknown as Record<string, unknown>
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   delete win.__DSH_BOOT__
   delete win.__ModuleLoader__
   delete transportGlobal.__DSH_TRANSPORT__
@@ -133,6 +134,60 @@ describe('bootstrap failure rendering', () => {
         batches: [{ phase: 'application', url: '/batch.js', rev: 'batch', entries: ['duplicate'] }],
       }
     }, 'duplicate graph entry "duplicate"')
+  })
+})
+
+describe('full workspace continuation', () => {
+  it.each([
+    { language: 'en', draft: 'Still editing', status: 'Open the full workspace to continue. Your draft stays here.' },
+    { language: 'zh', draft: '未发送的文字', status: '请打开完整工作区继续。草稿保留在此页' },
+    { language: 'en', draft: '', status: undefined },
+  ])('keeps the full-index continuation separate from plugin failure ($language: $draft)', async ({ language, draft, status }) => {
+    const nodeId = 'c06bdb76-ae4c-42db-80d8-9d5578ccf322', runtimeId = '346c1bc8-a9ac-4e59-a930-4551df414a17'
+    const container = document.createElement('div'), marker = document.createElement('script')
+    marker.id = 'dsh-runtime-bootstrap'
+    marker.type = 'application/json'
+    marker.textContent = JSON.stringify({ version: 1, principalId: 3, nodeId, runtimeId, nodeName: 'Compute', scope: 'personal', language })
+    document.body.append(marker, container)
+    const response = Promise.withResolvers<Response>()
+    const fetchRemote = vi.fn(() => response.promise)
+    const replace = vi.fn()
+    vi.stubGlobal('fetch', fetchRemote)
+    vi.stubGlobal('location', { origin: location.origin, replace })
+    const ready = new Response(JSON.stringify({ kind: 'full-index', version: 1 }), {
+      headers: { 'content-type': 'application/json', 'x-dsh-principal-id': '3' },
+    })
+    const entry = new AppWebEntry(container)
+    const failure = vi.fn()
+    const boot = entry.run(failure)
+    const href = `${location.origin}/?dshRuntime=${runtimeId}&dshNode=${nodeId}&dshTarget=personal&dshBootstrap=full&dshPrincipal=3`
+    try {
+      const input = container.querySelector('textarea')!
+      input.focus()
+      input.value = draft
+      input.dispatchEvent(new Event('input'))
+      expect(container.querySelector('[data-dsh-boot-spinner]')).not.toBeNull()
+      response.resolve(ready)
+      await boot
+      expect(failure).not.toHaveBeenCalled()
+      expect(performance.getEntriesByType('mark').map(mark => mark.name)).toContain('dsh:boot:draft-attached')
+      expect(container.textContent).not.toContain('Failed to load plugins')
+      expect(container.querySelector('[data-dsh-boot-spinner]')).toBeNull()
+      if (status === undefined) {
+        expect(replace).toHaveBeenCalledExactlyOnceWith(new URL(href))
+        expect(container.querySelector('textarea')).toBeNull()
+      } else {
+        expect(replace).not.toHaveBeenCalled()
+        expect(container.querySelector('[role="status"]')?.textContent).toBe(status)
+        expect(document.activeElement).toBe(input)
+        expect(input.value).toBe(draft)
+        expect(container.querySelector('a')?.href).toBe(href)
+      }
+    } finally {
+      response.resolve(ready)
+      await boot
+      await entry.dispose()
+    }
   })
 })
 
@@ -262,6 +317,14 @@ describe('plugin activation', () => {
     expect(target.mode).toBe('live')
     expect(events).toEqual(['consumer', 'mount'])
     expect(container.textContent).toBe('mounted')
+    const bootMarks = performance.getEntriesByType('mark').map(mark => mark.name).filter(name => name.startsWith('dsh:boot:'))
+    expect(bootMarks.slice(-5)).toEqual([
+      'dsh:boot:run-start',
+      'dsh:boot:seed-ready',
+      'dsh:boot:prefetch-ready',
+      'dsh:boot:plugins-active',
+      'dsh:boot:mounted',
+    ])
     await entry.dispose()
   })
 })
@@ -293,5 +356,38 @@ it('draws the shared boot page before Host injections and resumes without replac
     await boot
     await entry.dispose()
     vi.unstubAllGlobals()
+  }
+})
+
+it('completes boot when performance.mark throws and keeps retainAtMount idempotent', async () => {
+  const container = document.createElement('div')
+  document.body.append(container)
+  const markSpy = vi.spyOn(performance, 'mark').mockImplementation(() => { throw new Error('telemetry disabled') })
+  const { StartupDraftView } = await import('../src/startup-draft.ts')
+  const draft = new StartupDraftView({
+    principalId: 3, runtimeId: '11111111-1111-4111-8111-111111111111',
+    nodeId: '22222222-2222-4222-8222-222222222222', nodeName: 'Compute', scope: 'personal', language: 'en',
+  })
+  const entry = new AppWebEntry(container)
+  const create = vi.fn(() => { throw new Error('stop after start') })
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    draft.attach(container)
+    const input = container.querySelector('textarea')!
+    input.value = 'keep me'
+    input.dispatchEvent(new Event('input'))
+    draft.retainAtMount()
+    draft.retainAtMount()
+    expect(document.body.querySelectorAll('details')).toHaveLength(1)
+
+    installFacade(create)
+    await entry.run()
+    expect(create).toHaveBeenCalledOnce()
+    expect(container.textContent).toContain('stop after start')
+  } finally {
+    markSpy.mockRestore()
+    error.mockRestore()
+    draft.dispose()
+    await entry.dispose()
   }
 })

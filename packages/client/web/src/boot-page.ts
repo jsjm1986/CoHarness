@@ -99,6 +99,9 @@ export class BootPage {
     this.render()
   }
 
+  /** Remove the loader report when opening the full workspace instead of loading plugins here. */
+  stopProgress(): void { this.progress.remove() }
+
   /** Detach the page before or after the UI renderer takes the mount point. */
   dispose(): void {
     this.root.remove()

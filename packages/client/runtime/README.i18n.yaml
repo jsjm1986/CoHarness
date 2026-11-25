@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/runtime/README.md
 document:
-  en: 40c5d6d558dfdf6aa754bcbd4329a0468bdd1c0d
-  zh: 89e97c1c86dd7cee6fae33e40c2c924eb87a2191
+  en: 8be10b6013cdacb2869c33164810ace90a8eb218
+  zh: 7993bfca8a69111d6c3700760f0f9543c6a4a631
 /:
   en: d263c68503f0be45
-  zh: 61495d48365178df
+  zh: 30efb3c4272dfe51
 /deepseek-ai-dsh-client-runtime:
   en: ba9c3ff443ecab4a
   zh: 6fcc045bc4b51823
@@ -22,7 +22,7 @@ document:
   zh: de13327130c7a78d
 /deepseek-ai-dsh-client-runtime/workspace-file-resources:
   en: c1a85e244e91a29e
-  zh: cd830a1f37503f9a
+  zh: 071a34c57c0ecb44
 /deepseek-ai-dsh-client-runtime/slot-declaration-injection:
   en: d09f86355b89e9a4
   zh: a00a28e4d51ca12d
@@ -30,11 +30,11 @@ document:
   en: 52a58173ee3d8d5a
   zh: 7f52906304f4f7ed
 /deepseek-ai-dsh-client-runtime/workspace-and-session-lists:
-  en: ae4228b7fffd1d03
-  zh: 867791adc6484dbc
+  en: d510e57464c61bdf
+  zh: 12ea7bb00cec1f97
 /deepseek-ai-dsh-client-runtime/new-session-and-the-blank-mirror:
   en: 195af68108ecfbba
-  zh: 28cac9d77fe60fd6
+  zh: 6d39fce8584e712d
 /deepseek-ai-dsh-client-runtime/pending-queue-projection:
   en: 93d87cc376f7dd2e
   zh: 2c8c42c9dfb80571
@@ -49,7 +49,7 @@ document:
   zh: f55f099d83b5f29c
 /deepseek-ai-dsh-client-runtime/session-title-projection:
   en: 86212eead7b05fe6
-  zh: f91633b0ff856b97
+  zh: f33af8dd6c703c2d
 /deepseek-ai-dsh-client-runtime/model-retry-projection:
   en: e472dc78fced7c60
   zh: d2896b4efcbb0d61
@@ -58,16 +58,16 @@ document:
   zh: c481733cab9fb623
 /deepseek-ai-dsh-client-runtime/session-model-selection:
   en: 0a6c40b5fd403b6d
-  zh: eadde76ddfd09358
+  zh: f991b0f557544294
 /deepseek-ai-dsh-client-runtime/model-experience:
   en: bf831f42c8076152
   zh: e45befdc3c65eae7
 /deepseek-ai-dsh-client-runtime/model-experience/kv-cache-effect:
   en: 0d01056201d6e191
-  zh: 1904b410339d290a
+  zh: aa8f2c2482f0299e
 /deepseek-ai-dsh-client-runtime/known-limitations-and-deferred-work:
-  en: 603150ef8ca837d3
-  zh: af79fedbfd266873
+  en: cb6f7ec3d51e5b01
+  zh: 63cf87637c7bb576
 /deepseek-ai-dsh-client-runtime/known-limitations-and-deferred-work/dev-note:
   en: 5ef52300877194e3
   zh: 2632e724b9f1530f

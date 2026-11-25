@@ -17,7 +17,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AttachmentStore from '@deepseek-ai/dsh-attachment'
-import { collaborationCapabilities } from '@deepseek-ai/dsh-collaboration'
+import { CollaborationError, collaborationCapabilities } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import LlmRuntime, { LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import ModelAccessPolicy from '@deepseek-ai/dsh-model-access'
@@ -28,7 +28,7 @@ import type {
 } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import SessionPersistence from '@deepseek-ai/dsh-session-persistence'
+import SessionPersistence, { SessionPersistenceReadError } from '@deepseek-ai/dsh-session-persistence'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
@@ -878,4 +878,50 @@ it('verifies the exact durable inbox event while later Session events commit, an
       })
     } finally { await writeFile(path, bytes) }
   } finally { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }) }
+})
+
+it('maps transient reservedProjectDraft persistence errors to a typed RPC error in session.models', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-models-draft-read-'))
+  let ctx: Context | undefined
+  try {
+    const fixture = await harness(undefined, { persistenceRoot: root })
+    ctx = fixture.ctx
+    const missing = 'missing-draft-session' as SessionId
+    const authority: CollaborationAuthority = {
+      participant: {
+        userId: 7,
+        username: 'alice',
+        displayName: 'Alice',
+        role: 'user',
+        scope: { kind: 'project', projectId: 41, projectName: 'Compiler', mode: 'rw' },
+      },
+      expiresAt: Date.now() + 60_000,
+      signal: new AbortController().signal,
+      capabilities() { return collaborationCapabilities(this.participant) },
+      authorize: () => Promise.reject(new CollaborationError('conversation-not-found')),
+      readableSessionIds: () => Promise.resolve(new Set()),
+      claimInteraction: () => Promise.resolve(true),
+    }
+    ctx.provide('collaboration', {
+      capture: () => authority,
+      currentCreation: () => undefined,
+      withSessionCreation: (_creation: unknown, operation: () => Promise<unknown>) => operation(),
+    } as never)
+    const reservedProjectDraft = vi.spyOn(ctx.sessionPersistence, 'reservedProjectDraft')
+      .mockRejectedValueOnce(new SessionPersistenceReadError('dependency', 'gateway unavailable'))
+      .mockRejectedValueOnce(new Error('unexpected failure'))
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+    const handled = await api.sessions.models(request({ sessionId: missing }))
+    expect(handled.result).toMatchObject({
+      ok: false,
+      error: { code: 'internal', message: 'The project draft could not be recovered for model selection.' },
+    })
+    await expect(api.sessions.models(request({ sessionId: missing }))).rejects.toThrow('unexpected failure')
+    expect(reservedProjectDraft).toHaveBeenCalledTimes(2)
+  } finally {
+    try { await ctx?.fiber.dispose() } finally { await rm(root, { recursive: true, force: true }) }
+  }
 })

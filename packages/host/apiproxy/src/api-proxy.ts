@@ -4991,7 +4991,15 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const authorized = await authorizeSession(sessionId, 'read')
         if ('error' in authorized) {
           if (!missingConversation(authorized.error)) return err(request, authorized.error)
-          const draft = await ctx.get('sessionPersistence')?.reservedProjectDraft(sessionId)
+          let draft: Awaited<ReturnType<SessionPersistence['reservedProjectDraft']>>
+          try {
+            draft = await ctx.get('sessionPersistence')?.reservedProjectDraft(sessionId)
+          } catch (error: unknown) {
+            const failure = asHistoryPersistenceError(error)
+            if (failure === undefined) throw error
+            ctx.logger.warn(`session.models: ${failure.code} for ${sessionId}: ${failure.message}`)
+            return err(request, { code: 'internal', message: 'The project draft could not be recovered for model selection.', details: {} })
+          }
           if (draft === undefined) return err(request, authorized.error)
           return describeModelSelection(request, draft.modelSelection === undefined
             ? defaults.defaultModelSelection() : draftModelSelection(draft.modelSelection))
