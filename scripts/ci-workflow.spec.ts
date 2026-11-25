@@ -324,7 +324,7 @@ describe('CI workflow', () => {
     expect(webVerification.if).toBe("github.event_name == 'pull_request'")
     expect(webVerification.needs).toContain('pr-scope')
     expect(String(webVerification['runs-on'])).toContain('DSH_CI_FAILOVER_LINUX')
-    expectExternalCapacityExpression(webVerification.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '1')
+    expectExternalCapacityExpression(webVerification.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '2')
     // The Admin acceptance sweep runs its page x viewport x engine matrix
     // serially inside one file, so hosted runners narrow it to a
     // representative slice; capable runners keep the full sweep.

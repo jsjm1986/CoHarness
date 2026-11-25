@@ -3,20 +3,20 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-25-admin-matrix-hosted-budget.md
 document:
-  en: 63b45d8aa37a5e0a465a4a217398d6b2c1018669
-  zh: 3ca08963af8e4088a9c44706cae27992788f5b05
+  en: 514e8a5007cf8fecb2fef0bd5476980a3d50fe38
+  zh: 22e111cfc923e3215ed21bc216e4f6e4a612ff3b
 /agent-note-narrow-the-admin-acceptance-matrix-on-hosted-web-verification-runners:
   en: c1d1ebacaa6670c1
   zh: 9d454c0d02e9ee8c
 /agent-note-narrow-the-admin-acceptance-matrix-on-hosted-web-verification-runners/problem:
-  en: 1724c819768d34eb
-  zh: 8d88c9ee27335922
+  en: 8815441110248d17
+  zh: e7e3bfa5847b2072
 /agent-note-narrow-the-admin-acceptance-matrix-on-hosted-web-verification-runners/decision:
-  en: 635017972947d5b1
-  zh: 79b3c2c2619c5553
+  en: 1db3c2046aca14a6
+  zh: 71181bd476aa92ec
 /agent-note-narrow-the-admin-acceptance-matrix-on-hosted-web-verification-runners/alternatives-considered:
-  en: 8a503542e665084b
-  zh: 030d8f8146b3f7f6
+  en: 0b563f090fca6e50
+  zh: 94d150a144dcb484
 /agent-note-narrow-the-admin-acceptance-matrix-on-hosted-web-verification-runners/consequences:
   en: 9d980b26cd92f23c
   zh: 294df586d8ed9b31

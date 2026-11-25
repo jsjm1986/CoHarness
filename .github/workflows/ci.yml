@@ -679,7 +679,7 @@ jobs:
           && github.event.pull_request.head.repo.full_name == github.repository
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '6' || '1' }}
+          && '6' || '2' }}
       # Hosted ubuntu-latest cannot finish the Admin matrix (20 pages x 18
       # viewports x 3 engines inside serial per-file tests) within the lane
       # budget; capable runners keep the full sweep.
