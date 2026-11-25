@@ -20,6 +20,8 @@ Language-server teardown targets the whole descendant tree through a negative pr
 
 Tests for a genuinely POSIX-only primitive use a narrow Windows exclusion on that case. Adjacent cross-platform cases continue to pin non-regular file rejection, unavailable command rejection, and inaccessible working-directory rejection. Supported Windows paths remain inside the per-file coverage gate rather than being excluded with their test files.
 
+Browser goldens that include wall-clock dates pin the browser context's `timezoneId`; locale alone does not determine the rendered date. The expected file then uses that pinned zone, so developer machines and CI runners in different zones compare the same user-visible text rather than normalizing the product to UTC.
+
 ## Alternatives considered
 
 **Normalize all paths and URIs to POSIX strings.** This would make assertions uniform but would change correct Windows behavior: external paths are native absolute paths, UNC file URIs are valid, and configured homes resolve through the host path rules.

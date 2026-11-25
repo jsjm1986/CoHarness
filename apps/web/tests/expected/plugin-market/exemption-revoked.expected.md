@@ -12,7 +12,7 @@
 - definition:
   - code: {{publisher}}/registry/
 - term: Published
-- definition: November 15, 2023
+- definition: November 14, 2023
 - term: Plugin market
 - definition: Installation status acceptance
 - heading "Versions" [level=4]

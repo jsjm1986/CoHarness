@@ -208,6 +208,37 @@ export async function startAdminResponsiveFixture(host = '127.0.0.1') {
       if (req.method === 'GET' && state.mode === 'error' && suffix === state.failurePath) {
         res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'unavailable' })); return true
       }
+      if (req.method === 'GET' && suffix === '/deployment/overview') {
+        const query = new URL(req.url!, 'http://fixture').searchParams
+        const selected = query.get('sections')?.split(',').filter(part => part !== '')
+          ?? ['deployment', 'backups', 'tunnel', 'nodeConfiguration', 'nodeConnection', 'runtimeAllocationPolicy', 'nodeAccess']
+        const deploymentValue = state.scope === 'organization' ? { ...deployment, nodes: deploymentNodes } : deployment
+        const legacy: Record<string, unknown> = {
+          deployment: deploymentValue,
+          backups: data['/backups'],
+          tunnel: data['/tunnel'],
+          nodeConfiguration: await nodeConfiguration.view(admin.id),
+          nodeConnection: { nodeId: REMOTE, revision: 1, configured: true, centerUrl: 'https://fixture.invalid',
+            localGatewayUrl: 'https://node.invalid', enrollmentPending: false, originReady: true,
+            service: 'node-service', connectionState: 'disconnected' },
+          runtimeAllocationPolicy: { revision: '1', maxTotal: 8, maxPerNode: 2, source: 'organization' },
+          nodeAccess: { items: [{ nodeId: REMOTE, name: REMOTE_NAME, revision: 1, status: 'disconnected',
+            platform: 'linux', architecture: 'arm64', lastSeenAt: null, leaseExpiresAt: null, executionReady: false }], nextCursor: null },
+        }
+        const failurePath: Record<string, string> = {
+          deployment: '/deployment', backups: '/backups', tunnel: '/tunnel', nodeConfiguration: '/deployment/configuration',
+          nodeConnection: '/deployment/node-connection', runtimeAllocationPolicy: '/runtime-allocation-policy',
+          nodeAccess: '/deployment/nodes/access',
+        }
+        const sections = Object.fromEntries(selected.map((key) => {
+          const value = legacy[key]
+          const slice = state.mode === 'error' && failurePath[key] === state.failurePath || value === undefined
+            ? { ok: false, status: 503, error: 'unavailable' }
+            : { ok: true, value }
+          return [key, slice]
+        }))
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ sections })); return true
+      }
       let value = req.method === 'GET' ? (state.mode === 'empty' && suffix in emptyData ? emptyData[suffix] : data[suffix]) : undefined
       if (req.method === 'GET' && state.scope === 'organization' && suffix === '/deployment') {
         value = { ...deployment, nodes: deploymentNodes }

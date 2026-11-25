@@ -22,7 +22,7 @@
 - definition:
   - code: {{publisher}}/registry/
 - term: Published
-- definition: November 15, 2023
+- definition: November 14, 2023
 - term: Category
 - definition: Developer tools
 - term: Labels
@@ -33,8 +33,8 @@
 - list "Versions of Workspace notes with a deliberately long localized plugin title":
   - listitem: 2.0.0-beta.1 Prerelease Incompatible This version is not compatible with the running DSH 0.2.1-rc.1.coharness.1; it requires DSH >=999.0.0.
   - listitem:
-    - text: 1.0.0 Recommended Nov 15, 2023
+    - text: 1.0.0 Recommended Nov 14, 2023
     - button "Install Workspace notes with a deliberately long localized plugin title 1.0.0": Install
   - listitem:
-    - text: 0.9.0 Nov 15, 2023
+    - text: 0.9.0 Nov 14, 2023
     - button "Install Workspace notes with a deliberately long localized plugin title 0.9.0": Install

@@ -325,7 +325,7 @@ describe('web e2e: plugin market discovery', () => {
   }
 
   async function open(): Promise<{ page: Page; tripwire: ReturnType<typeof watchConsole> }> {
-    const page = await newWorkflowPage(browser)
+    const page = await newWorkflowPage(browser, 1000, 'UTC')
     const tripwire = watchConsole(page)
     page.setDefaultTimeout(15_000)
     try {
