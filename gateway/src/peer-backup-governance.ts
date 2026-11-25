@@ -608,6 +608,7 @@ export class PeerBackupGovernance {
         FROM harness.peer_backup_policies p JOIN harness.cluster_control c ON c.organization_id=p.organization_id AND c.mode='serving'
         WHERE p.organization_id=$1 AND p.source_node_id=$2 AND p.enabled AND p.capture_stopped_at IS NULL AND p.next_capture_at<=now()
           AND NOT EXISTS(SELECT FROM harness.node_recovery_quarantines q WHERE q.organization_id=p.organization_id AND q.node_id=p.source_node_id)
+        ORDER BY p.id FOR UPDATE OF p
         ON CONFLICT DO NOTHING`,
         [this.context.organizationId, this.context.nodeId],
       )

@@ -131,7 +131,7 @@ export async function actualPeerFlow(
       expect((await submit(api,'PUT',{...policy,expectedRevision:1})).status).toBe(200)
     }
     const start = await submit(api + '/' + policyId + '/capture', 'POST', {})
-    expect(start.status).toBe(202)
+    expect(start.status, await start.clone().text()).toBe(202)
     const job = (await start.json()) as { operationId: string }
     const deadline = Date.now() + 45000
     let lastState:unknown

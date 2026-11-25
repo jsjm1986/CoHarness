@@ -3,7 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { createPostgresPool, runMigrations, transaction } from '../src/postgres/database.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
@@ -302,4 +302,65 @@ describe.skipIf(!url || !/^\/hgw_peer_[0-9a-f]+_test$/u.test(new URL(url).pathna
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('serializes a manual capture with scheduler admission without a policy/work lock inversion', async () => {
+    const org = randomUUID(), source = randomUUID(), target = randomUUID(), slug = 'capture-lock-' + org
+    const root = await mkdtemp(join(tmpdir(), 'peer-capture-lock-'))
+    const manualName = ('manual-' + randomUUID().replaceAll('-', '')).slice(0, 60),
+      claimName = ('claim-' + randomUUID().replaceAll('-', '')).slice(0, 60)
+    let manualPool: Pool | undefined, claimPool: Pool | undefined, barrier: PoolClient | undefined
+    const trigger = 'fixture_pause_manual_peer_capture', barrierKey = Math.floor(Math.random() * 2 ** 30) + 1
+    try {
+      await pool.query("INSERT INTO harness.organizations(id,slug,display_name) VALUES($1,$2,'Capture lock ordering')", [org, slug])
+      await pool.query("INSERT INTO harness.compute_nodes(id,organization_id,name) VALUES($1,$2,'source'),($3,$2,'target')", [source, org, target])
+      await pool.query('UPDATE harness.deployment_topology SET enabled=true,revision=1,primary_node_id=$2,primary_origin=$3 WHERE organization_id=$1', [org, source, 'https://primary.test'])
+      await pool.query(`INSERT INTO harness.node_agents(organization_id,node_id,credential_hash,platform,architecture,connection_id,connection_epoch,lease_expires_at)
+        VALUES($1,$2,$3,'linux','x64',$4,1,clock_timestamp()+interval '5 minutes')`, [org, target, randomBytes(32), randomUUID()])
+      const admin = (await pool.query<{ public_id: string }>(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
+        VALUES($1,'admin','Administrator',$2) RETURNING public_id::text`, [org, join(root, 'admin')])).rows[0]!
+      await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) SELECT organization_id,id,'admin' FROM harness.users WHERE organization_id=$1", [org])
+      await pool.query("INSERT INTO harness.password_credentials(user_id,password_hash,must_change_password) SELECT id,'fixture-password',false FROM harness.users WHERE organization_id=$1", [org])
+      await pool.query(`DROP TRIGGER IF EXISTS ${trigger} ON harness.peer_backup_work`)
+      await pool.query(`DROP FUNCTION IF EXISTS harness.${trigger}()`)
+      barrier = await pool.connect()
+      await barrier.query('SELECT pg_advisory_lock($1::bigint)', [barrierKey])
+      await pool.query(`CREATE FUNCTION harness.${trigger}() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN IF current_setting('application_name')='${manualName}' THEN PERFORM pg_advisory_lock(${barrierKey}); PERFORM pg_advisory_unlock(${barrierKey}); END IF; RETURN NEW; END $$`)
+      await pool.query(`CREATE TRIGGER ${trigger} BEFORE INSERT ON harness.peer_backup_work FOR EACH ROW
+        WHEN (NEW.kind='capture') EXECUTE FUNCTION harness.${trigger}()`)
+      const primary = await resolvePostgresRuntimeContext(pool, slug, 'source')
+      manualPool = createPostgresPool(url!, { max: 1, application_name: manualName })
+      claimPool = createPostgresPool(url!, { max: 1, application_name: claimName })
+      const manualGovernance = new PeerBackupGovernance({ ...primary, pool: manualPool }),
+        claimGovernance = new PeerBackupGovernance({ ...primary, pool: claimPool }),
+        actor = Number(admin.public_id)
+      const input = { id: randomUUID(), expectedRevision: 0, scopeKind: 'governance' as const, scopeId: org,
+        sourceNodeId: source, targetNodeId: target, tier: 'important' as const, enabled: true,
+        quotaBytes: 1 << 20, appendFingerprint: digest('manual-append'), recoveryFingerprint: digest('manual-recover') }
+      await manualGovernance.configure(actor, input)
+      const manual = manualGovernance.enqueue(actor, input.id, 'capture')
+      await expect.poll(async () => (await pool.query(`SELECT 1 FROM pg_stat_activity
+        WHERE application_name=$1 AND starts_with(query,'INSERT INTO harness.peer_backup_work') AND wait_event_type='Lock'`, [manualName])).rowCount, { timeout: 5000 }).toBe(1)
+      const claim = claimGovernance.claim()
+      await expect.poll(async () => (await pool.query(`SELECT 1 FROM pg_stat_activity
+        WHERE application_name=$1 AND wait_event_type='Lock'`, [claimName])).rowCount, { timeout: 5000 }).toBe(1)
+      await barrier.query('SELECT pg_advisory_unlock($1::bigint)', [barrierKey])
+      const operationId = await manual
+      expect(await claim).toMatchObject({ id: operationId })
+      await pool.query(`DROP TRIGGER ${trigger} ON harness.peer_backup_work`)
+      await pool.query(`DROP FUNCTION harness.${trigger}()`)
+    } finally {
+      if (barrier) {
+        await barrier.query('SELECT pg_advisory_unlock_all()').catch(() => {})
+        barrier.release()
+      }
+      await manualPool?.end()
+      await claimPool?.end()
+      await pool.query(`DROP TRIGGER IF EXISTS ${trigger} ON harness.peer_backup_work`)
+      await pool.query(`DROP FUNCTION IF EXISTS harness.${trigger}()`)
+      await removeFixtureOrganization(pool, org)
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 15000)
+
 })
