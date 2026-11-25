@@ -680,6 +680,22 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
           && '6' || '1' }}
+      # Hosted ubuntu-latest cannot finish the Admin matrix (20 pages x 18
+      # viewports x 3 engines inside serial per-file tests) within the lane
+      # budget; capable runners keep the full sweep.
+      DSH_ADMIN_ENGINES: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && 'chromium,webkit,firefox' || 'chromium' }}
+      DSH_ADMIN_VIEWPORTS: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '320,360,375,390,412,430,540,667,844,872,767,768,769,839,840,841,1024,1280'
+          || '320,390,768,1280' }}
     steps:
       - name: Record skipped web verification
         if: needs.pr-scope.outputs.snapshot_mode == 'skip' || needs.pr-scope.outputs.snapshot_mode == 'scoped'
