@@ -40,6 +40,7 @@ describe.skipIf(webSnapshotMode() === 'record')('web e2e: Schedule environment a
       await page.addInitScript(() => { localStorage.setItem('dsh.locale', 'en') })
       await page.goto(fixture.url, { waitUntil: 'networkidle' })
       await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+      await page.getByText('DONE', { exact: true }).waitFor({ timeout: 60_000 })
       await openManager(page)
       await page.route(/\/api\/prepare\/v1\/session\.create(?:\?.*)?$/, async (route) => {
         creationTargets.push(new URL(route.request().url()).searchParams.get('dshRuntime'))

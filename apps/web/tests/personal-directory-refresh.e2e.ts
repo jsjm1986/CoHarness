@@ -16,6 +16,7 @@ it.skipIf(webSnapshotMode() === 'record')('refreshes a selected task environment
     try {
       await page.addInitScript(() => { localStorage.setItem('dsh.locale', 'en') })
       await page.goto(fixture.url, { waitUntil: 'networkidle' })
+      await page.getByText('DONE', { exact: true }).waitFor({ timeout: 60_000 })
       await page.getByRole('button', { name: 'Automation tasks', exact: true }).click()
       const manager = page.getByTestId('task-manager-page')
       await manager.waitFor()
