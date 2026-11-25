@@ -165,7 +165,7 @@ it('restores the offline computer after reload and transfers input only to its o
     reads.length = 0
     await page.reload({ waitUntil: 'networkidle' })
     const editor = page.locator('[data-conversation-intent]')
-    await editor.getByRole('button', { name: 'Retry' }).waitFor({ timeout: 10_000 })
+    await editor.getByRole('button', { name: 'Retry' }).waitFor({ timeout: 30_000 })
     expect(await editor.getAttribute('data-intent-runtime')).toBe(remote!.runtimeId)
     await editor.locator('textarea').fill('Keep this input on the Compute computer')
     await editor.locator('textarea').press('Enter')

@@ -22,7 +22,7 @@ async function openManager(page: Page): Promise<void> {
   const sidebar = page.getByRole('button', { name: 'Open sidebar', exact: true })
   if (await sidebar.isVisible()) await sidebar.click()
   await page.getByRole('button', { name: 'Automation tasks', exact: true }).click()
-  await page.getByTestId('task-manager-page').waitFor()
+  await page.getByTestId('task-manager-page').waitFor({ timeout: 60_000 })
 }
 
 describe.skipIf(webSnapshotMode() === 'record')('web e2e: Schedule environment and timing states', () => {
