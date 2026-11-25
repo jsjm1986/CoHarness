@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-25-web-e2e-contention-hardening.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-25-web-e2e-contention-hardening.md
+document:
+  en: da31b041aa22e670b8fed276e959870c9dcece8f
+  zh: f912db9652af4d13963db4cd2fd929e435b0edb4
+/agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing:
+  en: ca0e241401286135
+  zh: c39bea09abf95f03
+/agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/problem:
+  en: c1571367d6859252
+  zh: 58dd0eb128bef7ab
+/agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/decision:
+  en: 729aad5c5a9a0e98
+  zh: 5a03318d61138dd8
+/agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/alternatives-considered:
+  en: 2b48e323d26b639e
+  zh: df43e51f00acaaf9
+/agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/consequences:
+  en: e716f50d6ffeea5a
+  zh: 728de04d11254f1f

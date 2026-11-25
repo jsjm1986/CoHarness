@@ -16,7 +16,9 @@ const EXPORT = '**/api/session.export?*'
 async function requestExport(page: Page): Promise<void> {
   const mobile = page.getByRole('button', { name: 'Export Session log', exact: true })
   const desktop = page.getByRole('button', { name: 'Session log', exact: true })
-  await expect.poll(async () => await mobile.isVisible() || await desktop.isVisible()).toBe(true)
+  // The export entry mounts only after the workspace finishes loading;
+  // co-file contention on shared CI workers stretches that boot past the expect default.
+  await expect.poll(async () => await mobile.isVisible() || await desktop.isVisible(), { timeout: 30_000 }).toBe(true)
   if (await mobile.isVisible()) await mobile.click()
   else {
     await desktop.click()

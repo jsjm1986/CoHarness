@@ -55,15 +55,21 @@ export async function observeAdminStart({ origin, runtimeId, nodeId, userId, tra
     await row.getByRole('button', { name: '启动', exact: true }).click()
     const dialog = page.getByRole('dialog')
     const submit = dialog.getByRole('button', { name: '启动', exact: true })
+    // CDP never exposes error-response bodies to getResponseBody once the
+    // renderer consumes them, so proxy the start reply: route.fetch performs
+    // the genuine round trip while the test captures status and body directly.
     const reply = Promise.withResolvers()
-    page.on('response', response => {
-      if (response.request().method() === 'POST' && new URL(response.url()).pathname === start) reply.resolve(response)
+    await page.route((url) => url.pathname === start, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue()
+      const response = await route.fetch()
+      reply.resolve({ status: response.status(), body: await response.json() })
+      await route.fulfill({ response })
     })
     await submit.click()
     await dropReply()
     const response = await bounded(reply.promise)
-    assert.equal(response.status(), 503)
-    assert.equal((await response.json()).error, 'node-service/unavailable')
+    assert.equal(response.status, 503)
+    assert.equal(response.body.error, 'node-service/unavailable')
     const checking = dialog.getByRole('status')
     await checking.waitFor()
     assert.equal(await submit.isDisabled(), true)
