@@ -10,7 +10,7 @@
 
 ## 决策
 
-`session-export-responsive` 的就绪轮询现在带显式三十秒预算，与兄弟套件已声明的退化余量一致；同一预算延伸到 `workspace-review` 的交付与变更卡片轮询及 `personal-navigation-resume` 的离线电脑重试等待，而 schedule 管理页就绪等待升至六十秒，因为导航本身要排在同文件浏览器工作之后。`admin-runtime-start-browser.mjs` 通过 `page.route` 代理启动 POST：`route.fetch()` 执行到 fixture 服务器的真实往返，测试直接捕获状态码与 JSON，再 `route.fulfill({ response })` 把未动的回复交给页面——UI 观察到真实交换，测试不再依赖 CDP body 留存。
+`session-export-responsive` 的就绪轮询现在带显式三十秒预算，与兄弟套件已声明的退化余量一致；同一预算延伸到 `workspace-review` 的交付与变更卡片轮询及 `personal-navigation-resume` 的离线电脑重试等待，而 schedule 管理页就绪等待升至六十秒，因为导航本身要排在同文件浏览器工作之后。`settings-chrome` 的 boot 画布测量从加载提示走 `parentElement.parentElement`，被 boot 页 progress 包装层重构破坏；断言失败还跳过了测试自身的偏好恢复，级联出后续主题翻转测试的深色偏好污染失败。测量现在锚定 boot 根元素的稳定 `data-dsh-boot` 属性。`admin-runtime-start-browser.mjs` 通过 `page.route` 代理启动 POST：`route.fetch()` 执行到 fixture 服务器的真实往返，测试直接捕获状态码与 JSON，再 `route.fulfill({ response })` 把未动的回复交给页面——UI 观察到真实交换，测试不再依赖 CDP body 留存。
 
 ## 备选方案
 

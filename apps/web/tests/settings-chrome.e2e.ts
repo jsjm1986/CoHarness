@@ -239,8 +239,8 @@ describe('web e2e: settings modal and General preferences', () => {
       const loading = page.getByText('Loading plugins…', { exact: true })
       await loading.waitFor({ timeout: 10_000 })
       const state = await loading.evaluate((element) => {
-        const boot = element.parentElement?.parentElement
-        if (boot === undefined || boot === null) throw new Error('loading hint is detached from the boot page')
+        const boot = element.closest('[data-dsh-boot]')
+        if (boot === null) throw new Error('loading hint is detached from the boot page')
         return {
           attr: document.body.hasAttribute('data-ds-dark-theme'),
           background: getComputedStyle(boot).backgroundColor,

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-25-web-e2e-contention-hardening.md
 document:
-  en: 2e88bd8614bad69e6381d7991fe9af1bd7450dfd
-  zh: 8c1effc7f0c1efb3465665c0da9ebf6665390b5d
+  en: 8817f97a12bc589398d16931204a81ca77c98c2e
+  zh: c21ac47fff05be26614a7ccff286ee12683f4f4c
 /agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing:
   en: ca0e241401286135
   zh: c39bea09abf95f03
@@ -12,8 +12,8 @@ document:
   en: c1571367d6859252
   zh: 58dd0eb128bef7ab
 /agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/decision:
-  en: f43880938481fe81
-  zh: 159bcacf9c212ed2
+  en: 8e1bec3be17e2570
+  zh: 8d74a2f06d367c2b
 /agent-note-harden-web-e2e-readiness-waits-and-capture-start-replies-through-routing/alternatives-considered:
   en: 2b48e323d26b639e
   zh: df43e51f00acaaf9
