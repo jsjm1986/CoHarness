@@ -1405,6 +1405,78 @@ describe('pending submission echoes', () => {
     expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
     expect(chatSeqs(session.getSnapshot())).toEqual([47, 48])
   })
+
+  it('repairs a fresh tail far ahead of the window as a partial history window', async () => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    api.onHistory = () => histResponse([], false)
+    await session.open()
+    expect(session.getSnapshot().hasMore).toBe(false)
+    api.onHistory = () => histResponse([ev.turnStart(20, 1), ev.assistant(21, 1, '尾部')], true)
+    await session.resync()
+    expect(chatSeqs(session.getSnapshot())).toEqual([20, 21])
+    expect(session.getSnapshot().hasMore).toBe(true)
+  })
+
+  it('walks older pages after a reconnect until a transcript receipt retires', async () => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    api.onHistory = () => histResponse([], false)
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '断线前已接受', images: [], onRetire: retired })
+    await expect(session.prompt([{ type: 'text', text: '断线前已接受' }], 'queue', undefined, handle.requestId))
+      .resolves.toMatchObject({ ok: true })
+    const tail = [ev.turnStart(20, 1), ev.assistant(21, 1, '尾部')]
+    api.onHistory = payload => payload.beforeSeq === 20
+      ? histResponse([durableUser(19, handle.requestId)], false)
+      : histResponse(tail, true)
+    await session.resync()
+    await vi.waitFor(() => { expect(retired).toHaveBeenCalledOnce() })
+    await flushSubmissionFrame()
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(chatSeqs(session.getSnapshot())).toEqual([19, 20, 21])
+    expect(api.callsOf('session.history')).toMatchObject([{}, {}, { beforeSeq: 20 }])
+  })
+
+  it('walks older pages after first open when submission registration preceded the tail', async () => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '打开前已接受', images: [], onRetire: retired })
+    const tail = [ev.turnStart(20, 1), ev.assistant(21, 1, '尾部')]
+    api.onHistory = payload => payload.beforeSeq === 20
+      ? histResponse([durableUser(19, handle.requestId)], false)
+      : histResponse(tail, true)
+    await session.open()
+    await vi.waitFor(() => { expect(retired).toHaveBeenCalledOnce() })
+    expect(chatSeqs(session.getSnapshot())).toEqual([19, 20, 21])
+    expect(api.callsOf('session.history')).toMatchObject([{}, { beforeSeq: 20 }])
+  })
+
+  it('discards a receipt recovery walk that reaches the log head without a match', async () => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    api.onHistory = () => histResponse([], false)
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '仍待录取', images: [], onRetire: retired })
+    await expect(session.prompt([{ type: 'text', text: '仍待录取' }], 'queue', undefined, handle.requestId))
+      .resolves.toMatchObject({ ok: true })
+    const tail = [ev.turnStart(20, 1), ev.assistant(21, 1, '尾部')]
+    api.onHistory = payload => payload.beforeSeq === 20
+      ? histResponse([ev.turnStart(19, 1)], false)
+      : histResponse(tail, true)
+    await session.resync()
+    await vi.waitFor(() => {
+      expect(api.callsOf('session.history')).toMatchObject([{}, {}, { beforeSeq: 20 }])
+    })
+    expect(retired).not.toHaveBeenCalled()
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+    expect(chatSeqs(session.getSnapshot())).toEqual([20, 21])
+    expect(session.getSnapshot().hasMore).toBe(true)
+  })
 })
 
 describe('pending interactions', () => {

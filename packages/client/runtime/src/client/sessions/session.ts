@@ -44,7 +44,7 @@ import { SessionQueueMirror } from './queue-mirror.ts'
 /** Messages requested per history page. */
 export const PAGE_MESSAGES = 50
 
-/** Safety bound for one history walk driven by a reader jump or a detail fill. */
+/** Safety bound for one history walk driven by a reader jump, a receipt recovery, or a detail fill. */
 const MAX_HISTORY_EXPANSION_PAGES = 64
 
 /**
@@ -205,6 +205,8 @@ export class Session implements SessionFace {
   private stitching = false
   /** The in-flight repair, shared with callers that request one while it runs. */
   private repairPromise: Promise<void> | null = null
+  /** One bounded backward walk that restores enough history to prove a lost transcript receipt. */
+  private receiptRecoveryPromise: Promise<void> | null = null
   /** Highest sequence requested during a read. Infinity requests a fresh tail without a known watermark. */
   private repairRequestedThrough = -1
   /** subscribed.lastSeq baseline (gap detection; null when no subscribed frame arrived — degrade to the liveBuffer dedup path). */
@@ -351,6 +353,7 @@ export class Session implements SessionFace {
     else {
       this.prepareEmptyReceipt()
       this.scheduleHistoryNavigationRead()
+      this.recoverSubmissionReceipts()
     }
     if (this.running) this.beginLiveHistory()
     else this.notifier.markDirty()
@@ -1328,6 +1331,7 @@ export class Session implements SessionFace {
       this.prepareEmptyReceipt()
       this.openedFromPreparedTail = prepared !== undefined
       this.scheduleHistoryNavigationRead()
+      this.recoverSubmissionReceipts()
       if (this.stageActive && this.running) this.beginLiveHistory()
     } catch (error) {
       if (generation !== this.openGeneration) return
@@ -1970,6 +1974,7 @@ export class Session implements SessionFace {
         this.repairRequestedThrough = -1
         await this.enqueueHistoryOperation(signal => this.mergeTail(signal), false)
       } while (this.repairRequestedThrough > (this.windowTailSeq() ?? -1))
+      this.recoverSubmissionReceipts()
     } catch (error) {
       // A repair in flight when the scope disposes rejects with the lifetime
       // abort reason — teardown, not a repair failure.
@@ -1978,6 +1983,83 @@ export class Session implements SessionFace {
       this.repairRequestedThrough = -1
       this.stitching = false
       this.repairPromise = null
+    }
+  }
+
+  /** Whether any transcript echo still needs durable admission evidence. */
+  private hasUnadmittedTranscriptSubmission(): boolean {
+    for (const settlement of this.submissionSettlements.values()) {
+      if (settlement.placement === 'transcript' && settlement.admitted === undefined && !settlement.retiring) return true
+    }
+    return false
+  }
+
+  /** Whether one page carries the durable receipt of a still-pending transcript echo. */
+  private pageHasTranscriptReceipt(page: HistoryPage): boolean {
+    for (const { event } of page.entries) {
+      if (event.type !== 'user/message') continue
+      const source = event.data.source
+      if (source.kind !== 'user' || !('rpcId' in source) || typeof source.rpcId !== 'string') continue
+      const settlement = this.submissionSettlements.get(source.rpcId)
+      if (settlement?.placement === 'transcript' && settlement.admitted === undefined && !settlement.retiring) return true
+    }
+    return false
+  }
+
+  /**
+   * Recover a transcript echo whose live receipt and first repair page were both
+   * lost. The walk stays behind other history mutations, prepends only the
+   * contiguous pages needed to reach the receipt, and discards its reads when
+   * the receipt is absent (a queued or rejected input must not unbounded-grow
+   * the resident window).
+   */
+  private recoverSubmissionReceipts(): void {
+    if (this.receiptRecoveryPromise !== null || this.openState !== 'open' || this.baseSeq <= 1
+      || !this.hasUnadmittedTranscriptSubmission()) return
+    const operation = this.enqueueHistoryOperation(signal => this.walkSubmissionReceipts(signal), true)
+    this.receiptRecoveryPromise = operation
+    void operation.catch((error: unknown) => {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
+        console.error('[web-runtime] submission receipt recovery failed:', error)
+      }
+    }).finally(() => {
+      if (this.receiptRecoveryPromise === operation) this.receiptRecoveryPromise = null
+    })
+  }
+
+  /** Walk contiguous older pages until the pending transcript receipt enters the resident window. */
+  private async walkSubmissionReceipts(signal: AbortSignal): Promise<void> {
+    const generation = this.openGeneration
+    if (this.openState !== 'open') return
+    const pages: HistoryPage[] = []
+    let beforeSeq = this.baseSeq
+    let previousOldest = Number.POSITIVE_INFINITY
+    for (let guard = 0; guard < MAX_HISTORY_EXPANSION_PAGES; guard++) {
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- the queued operation may be superseded while a page awaits.
+      if (generation !== this.openGeneration || this.openState !== 'open' || signal.aborted
+        || !this.hasUnadmittedTranscriptSubmission()) return
+      const page = await this.fetchHistoryPage({ beforeSeq, maxMessages: PAGE_MESSAGES }, signal)
+      if (page === undefined) return
+      const oldest = logicalBaseSeq(page.entries.map(entry => entry.event), page.omittedSpans)
+      const pageTail = logicalTailSeq(page.entries.map(entry => entry.event), page.omittedSpans)
+      if (oldest === null || pageTail === null || pageTail + 1 !== beforeSeq
+        || oldest >= beforeSeq || oldest >= previousOldest) {
+        console.error(`[web-runtime] submission receipt recovery stopped at seq ${String(oldest)}`)
+        return
+      }
+      pages.push(page)
+      if (this.pageHasTranscriptReceipt(page)) {
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- leaveStage/resync may run during the final page merge.
+        if (generation !== this.openGeneration || this.openState !== 'open' || signal.aborted) return
+        this.applyOlderPages(pages, page.hasMore)
+        this.liveHistoryPages += pages.length
+        this.notifier.markDirty()
+        return
+      }
+      if (!page.hasMore) return
+      previousOldest = oldest
+      beforeSeq = oldest
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
     }
   }
 
@@ -2014,10 +2096,12 @@ export class Session implements SessionFace {
     const appendOnly = tailSeq !== null
       && fresh.every(entry => entry.event.seq > tailSeq)
       && page.omittedSpans.every(span => span.startSeq > tailSeq)
-    // A tail probe can prove that an existing bounded window still has an
-    // older prefix, but it cannot create one after the window was complete.
+    // A tail probe preserves an existing bounded window's older prefix. It can
+    // also create one when the resident window was empty: events admitted after
+    // that complete empty window can now sit before the recovered tail. A
+    // nonempty complete window already contains every predecessor it overlaps.
     const previousHasMore = this.hasMore
-    this.hasMore = previousHasMore && page.hasMore
+    this.hasMore = page.hasMore && (previousHasMore || tailSeq === null)
     if (page.projections !== undefined) this.projections.seed(page.projections)
     if (appendOnly) {
       // The ordinary reconnect case: everything missed lies past the tail, so
