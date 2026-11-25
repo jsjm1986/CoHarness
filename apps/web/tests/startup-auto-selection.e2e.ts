@@ -624,6 +624,8 @@ describe('web e2e: startup auto-selection', () => {
       const countHistory = (request: import('playwright').Request): void => {
         const path = new URL(request.url()).pathname
         if (path === '/api/session.history') {
+          const payload = (request.postDataJSON() as { payload: { beforeSeq?: number } }).payload
+          if (payload.beforeSeq !== undefined) return
           historyCalls++
           console.log(`[diag] history call #${String(historyCalls)} payload=${request.postData() ?? 'null'} nav=${targetPage.url()}`)
         }
