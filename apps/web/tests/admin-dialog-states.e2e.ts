@@ -65,7 +65,7 @@ async function visit(path: string, operation: (page: Page, replies: Map<string, 
         ? reply.body.error : `HTTP ${status}`
       sections[key] = status >= 400 ? { ok: false, status, error } : { ok: true, value: reply.body }
     }))
-    return { body: { sections } as DeploymentOverviewResponse }
+    return { body: { sections } }
   }
   const intercept = async (route: Parameters<Parameters<Page['route']>[1]>[0]): Promise<void> => {
     const request = route.request()
