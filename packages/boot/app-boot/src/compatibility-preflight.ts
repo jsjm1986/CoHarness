@@ -13,6 +13,7 @@ import type {} from './profile-resolution/service.ts'
 import type {} from './profile-context.ts'
 import { evaluatePluginCompatibility, pluginCompatibilityWarning } from './plugin-compatibility.ts'
 import { readProfileCompatibility } from './profile-compatibility.ts'
+import { prepareRecoveryEntries } from './recovery-policy.ts'
 
 function readManifest(filename: string): object {
   return JSON.parse(readFileSync(filename, 'utf8')) as object
@@ -89,7 +90,8 @@ type DenialReporter = (row: EntryOptions, reason: string) => void
 function preflight(
   ctx: Context, entries: readonly EntryOptions[], parentURL: string | undefined, report: DenialReporter,
 ) {
-  const rows = structuredClone(entries) as EntryOptions[]
+  if (ctx.get('recoveryPolicy') !== undefined && parentURL === undefined) throw new Error('Recovery preflight requires a resolution base')
+  const rows = parentURL === undefined ? structuredClone(entries) as EntryOptions[] : prepareRecoveryEntries(ctx, entries, parentURL)
   const profile = ctx.get('profileContext')
   if (profile === undefined) return { rows, blocked: false }
   if (parentURL === undefined) throw new Error('Profile compatibility preflight requires a resolution base')
@@ -180,7 +182,7 @@ function preflight(
 export function prepareProfilePatches(
   ctx: Context, patches: PatchOptions[], parentURL: string, binName = 'dsh',
 ): PatchOptions[] {
-  if (ctx.get('profileContext') === undefined) return patches
+  if (ctx.get('profileContext') === undefined && ctx.get('recoveryPolicy') === undefined) return patches
   const entries = applyEntryPatches([], patches, patchWarning(ctx))
   const rows = prepareProfileEntries(ctx, entries, parentURL, binName)
   return rows.length === 0 ? [] : [{ insert: rows }]

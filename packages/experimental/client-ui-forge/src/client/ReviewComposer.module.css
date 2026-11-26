@@ -7,8 +7,9 @@
 .title { margin-bottom: 12px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
 /* Fixed-size textarea layout stays local during typing; native resizing can still change its outer height. */
 .input { display: block; box-sizing: border-box; width: 100%; height: 88px; min-height: 88px; contain: strict; padding: 10px 12px; resize: vertical; border: 0.5px solid var(--dsw-alias-border-l4); border-radius: var(--dsw-radius-md); outline: none; background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-label-primary); font: inherit; }
-.input::placeholder { color: var(--dsw-alias-label-dimmed); }
+.input::placeholder { color: var(--dsw-alias-label-secondary); opacity: 1; }
 .input:focus { border-color: var(--dsw-alias-state-business-primary); }
+.input:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
 .root .input { padding: 0; border: 0; border-radius: 0; background: transparent; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 10px; margin-top: 10px; border-top: 0.5px solid var(--dsw-alias-border-l2); }
 .cancel { margin-inline-end: auto; }
@@ -21,11 +22,15 @@
 .range { color: var(--dsw-alias-label-secondary); font-size: 12px; }
 .commentBody { white-space: pre-wrap; overflow-wrap: anywhere; }
 .threadActions { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px -8px -4px; }
-.gutter { position: relative; }
-.line { display: block; width: 100%; height: 100%; padding: 0; color: inherit; text-align: inherit; cursor: pointer; border: 0; border-radius: 0; background: transparent; font: inherit; user-select: none; touch-action: pan-y; }
+.gutter { position: relative; align-self: start; }
+.line { display: block; width: 100%; min-height: 22px; padding: 0; color: inherit; text-align: inherit; cursor: pointer; border: 0; border-radius: 0; background: transparent; font: inherit; user-select: none; touch-action: pan-y; }
 .selected { background: var(--dsw-alias-interactive-bg-hover); outline: 1px solid var(--dsw-alias-border-l2); outline-offset: -1px; }
 @media (hover: hover) { .line:hover { color: var(--dsw-alias-state-business-primary); } }
-@media (pointer: coarse) { .input { font-size: 16px; } .line { min-height: 28px; } }
+@media (pointer: coarse) {
+  .input { font-size: 16px; }
+  .line { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
+  .gitArrow { min-width: var(--dsw-touch-target); }
+}
 
 /* The plus starts just inside the number's padding and covers the sign column, or the empty lane side-by-side cells keep instead, so the line number and the code stay clickable. */
 .add, .hoverAdd { position: absolute; z-index: 1; inset-inline-start: calc(100% - 4px); top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: var(--dsw-radius-xs); background: var(--dsw-alias-button-primary-fill); color: var(--dsw-alias-label-primary-foreground); font: inherit; cursor: pointer; user-select: none; }
@@ -35,3 +40,14 @@
 /* The mouse shortcut appears only for the hovered side of a row: a split cell or a unified line. */
 .hoverAdd { display: none; }
 @media (hover: hover) { [data-diff-side]:hover .hoverAdd, [data-diff-line]:hover .hoverAdd { display: inline-flex; } }
+
+@media (pointer: coarse) {
+  .gutter .add {
+    position: static;
+    display: flex;
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    margin-top: var(--dsw-space-1);
+    transform: none;
+  }
+}

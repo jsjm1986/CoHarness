@@ -434,6 +434,7 @@ export class SqliteStore implements PersistenceBackend<number> {
 
   private writeRow(storage: SessionStorageMetadata): void {
     const meta = storage.meta
+    if (meta.sshTarget !== undefined) throw new Error('SQLite Session storage cannot retain a managed SSH target')
     const result = this.db.prepare(sql('upsert-session')).get(
       meta.id,
       meta.version,

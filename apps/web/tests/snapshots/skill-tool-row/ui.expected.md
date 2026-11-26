@@ -65,9 +65,9 @@
   - img
 - button "Send message" [disabled]
 - group "Session statistics":
-  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+  - "button \"1 turn · 2 steps · {{throughput}} tok/s\"":
     - img
-    - text: "1 turns · 2 steps{{throughput}} tok/s"
+    - text: "1 turn · 2 steps{{throughput}} tok/s"
   - button "310 tok · Cache hit 0%":
     - img
     - text: 310 tokCache hit 0%

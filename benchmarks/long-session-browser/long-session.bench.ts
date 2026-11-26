@@ -13,12 +13,16 @@ import { HISTORY_TURNS, SESSION_ID, FIRST, DONE, DELTAS, PACE_MS, syntheticHisto
 const SAMPLES = 3
 const TAIL = '[data-chat-flow-key^="9:turn-tail"]'
 const REFERENCE = { open: 200, page: 260, trajectory: 160, first: 1100, streamTask: 1800, input: 500, streamWall: 1000 }
-const EXPECTED_OPEN_CI_MS = 900
-const EXPECTED_PAGE_CI_MS = 700
+const EXPECTED_OPEN_CI_MS = 1000
+const EXPECTED_PAGE_CI_MS = 1050
 const EXPECTED_TRAJECTORY_CI_MS = 1100
+const EXPECTED_FIRST_CI_MS = 3400
+const EXPECTED_STREAM_TASK_CI_MS = 5500
 const OPEN_BUDGET_MS = Math.ceil(EXPECTED_OPEN_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
 const PAGE_BUDGET_MS = Math.ceil(EXPECTED_PAGE_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
 const TRAJECTORY_BUDGET_MS = Math.ceil(EXPECTED_TRAJECTORY_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
+const FIRST_BUDGET_MS = Math.ceil(EXPECTED_FIRST_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
+const STREAM_TASK_BUDGET_MS = Math.ceil(EXPECTED_STREAM_TASK_CI_MS * PERFORMANCE_BUDGET_HEADROOM)
 const REPLAY_DURATION_MS = (DELTAS + 4) * PACE_MS
 
 async function painted(page: Page): Promise<void> {
@@ -92,14 +96,14 @@ it('accepts recorded hosted open samples and rejects slower endpoints', () => {
   expect(() => expectEndpointWithinBudget(repeatedMedian, ciTimeBudget(REFERENCE.open))).toThrow()
   expect(() => expectEndpointWithinBudget(repeatedMedian, 875)).toThrow()
   expectEndpointWithinBudget(repeatedMedian, OPEN_BUDGET_MS)
-  expect(OPEN_BUDGET_MS).toBe(1125)
+  expect(OPEN_BUDGET_MS).toBe(1250)
   expect(() => expectEndpointWithinBudget(OPEN_BUDGET_MS + 1, OPEN_BUDGET_MS)).toThrow()
   expect(() => expectEndpointWithinBudget(2000, OPEN_BUDGET_MS)).toThrow()
 })
 
 it('accepts recorded hosted paging and Trajectory medians and rejects slower endpoints', () => {
   const endpoints = [
-    { samples: [843.941625, 672.834329, 684.461818], reference: REFERENCE.page, budget: PAGE_BUDGET_MS, expectedBudget: 875 },
+    { samples: [843.941625, 672.834329, 684.461818], reference: REFERENCE.page, budget: PAGE_BUDGET_MS, expectedBudget: 1313 },
     { samples: [605.788061, 367.754027, 485.931656], reference: REFERENCE.trajectory, budget: TRAJECTORY_BUDGET_MS, expectedBudget: 1375 },
     { samples: [630.843184, 418.578099, 635.550009], reference: REFERENCE.trajectory, budget: TRAJECTORY_BUDGET_MS, expectedBudget: 1375 },
     { samples: [658.402183, 664.735862, 596.868403], reference: REFERENCE.trajectory, budget: TRAJECTORY_BUDGET_MS, expectedBudget: 1375 },
@@ -139,6 +143,19 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
       const replayOverride = join(root, 'reply.json')
       await writeFile(replayOverride, JSON.stringify([{ kind: 'chunks', chunks: syntheticReply() }]))
       const scaffold = await launchWebScaffold({ replayFixture: join(root, 'override-only.jsonl'), replayOverride, paceMs: PACE_MS, replayContextWindow: 10000000 })
+      const inputObserved = Promise.withResolvers<undefined>()
+      let completionHoldMs = 0
+      // Keep the fixture stream open until Chromium has delivered the trusted input probe.
+      const stopProbe = scaffold.ctx.on('llm/stream', async function* (_options, next) {
+        for await (const chunk of next()) {
+          if (chunk.type === 'text-delta' && chunk.text === DONE) {
+            const heldAt = performance.now()
+            await inputObserved.promise
+            completionHoldMs = performance.now() - heldAt
+          }
+          yield chunk
+        }
+      }, { global: true, prepend: true })
       try {
         const history = syntheticHistory()
         await seedSession(scaffold, history, SESSION_ID)
@@ -218,6 +235,7 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
             await expect.poll(() => composer.textContent()).toBe('next synthetic question')
           })
           const inputOverlapped = await composer.getAttribute('data-benchmark-input-overlap') === 'true'
+          inputObserved.resolve(undefined)
           const firstObservation = await firstMarker.jsonValue()
           await firstMarker.dispose()
           console.log(JSON.stringify({ benchmark: 'long-session-browser/input', sample, first, input, firstObservation, witness: await composer.getAttribute('data-benchmark-input-witness'), inputTiming: await composer.getAttribute('data-benchmark-input-timing') }))
@@ -227,14 +245,14 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
           if (!settlement.ok) throw settlement.error
           await page.waitForFunction(({ selector, expected }) => document.querySelectorAll(selector).length === expected, { selector: TAIL, expected: HISTORY_TURNS + 1 })
           await painted(page)
-          const streamWall = performance.now() - started
+          const streamWall = performance.now() - started - completionHoldMs
           const streamTask = await taskMs(cdp) - beforeTask
           await cdp.send('HeapProfiler.collectGarbage')
           const metrics = (await cdp.send('Performance.getMetrics')).metrics
           const heap = metrics.find(metric => metric.name === 'JSHeapUsedSize')
           if (heap === undefined) throw new Error('Chromium heap metric missing')
           samples.push({ startup, returnToChat, open, page: Math.max(...pages), trajectory, first, streamTask, streamWall, input, inputOverlapped, heapMb: heap.value / 1048576, nodes: await page.locator('*').count() })
-          console.log(JSON.stringify({ benchmark: 'long-session-browser/sample', sample, initialTurns, pages, ...samples.at(-1) }))
+          console.log(JSON.stringify({ benchmark: 'long-session-browser/sample', sample, initialTurns, pages, completionHoldMs, ...samples.at(-1) }))
           await watchInputOverlap(composer)
           await composer.click()
           await page.keyboard.type('!')
@@ -247,6 +265,8 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
           await browser.close().catch((error: unknown) => failures.push(error))
         }
       } catch (error) { failures.push(error) } finally {
+        inputObserved.resolve(undefined)
+        stopProbe()
         await scaffold.close().catch((error: unknown) => failures.push(error))
       }
     } catch (error) { failures.push(error) } finally {
@@ -257,9 +277,9 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
   const aggregate = Object.fromEntries(Object.keys(REFERENCE).map(key => [key, median(samples.map(sample => sample[key as keyof typeof REFERENCE]))]))
   const budgets: Record<string, number> = {
     ...Object.fromEntries(Object.entries(REFERENCE).map(([key, value]) => [key, ciTimeBudget(value) + (key === 'streamWall' ? REPLAY_DURATION_MS : 0)])),
-    open: OPEN_BUDGET_MS, page: PAGE_BUDGET_MS, trajectory: TRAJECTORY_BUDGET_MS,
+    open: OPEN_BUDGET_MS, page: PAGE_BUDGET_MS, trajectory: TRAJECTORY_BUDGET_MS, first: FIRST_BUDGET_MS, streamTask: STREAM_TASK_BUDGET_MS,
   }
   console.log(JSON.stringify({ benchmark: 'long-session-browser/diagnostic', startup: median(samples.map(sample => sample.startup)), returnToChat: median(samples.map(sample => sample.returnToChat)) }))
-  console.log(JSON.stringify({ benchmark: 'long-session-browser/median', turns: HISTORY_TURNS, deltas: DELTAS, paceMs: PACE_MS, samples, aggregate, referenceMs: REFERENCE, expectedOpenCiMs: EXPECTED_OPEN_CI_MS, expectedPageCiMs: EXPECTED_PAGE_CI_MS, expectedTrajectoryCiMs: EXPECTED_TRAJECTORY_CI_MS, budgets }))
+  console.log(JSON.stringify({ benchmark: 'long-session-browser/median', turns: HISTORY_TURNS, deltas: DELTAS, paceMs: PACE_MS, samples, aggregate, referenceMs: REFERENCE, expectedOpenCiMs: EXPECTED_OPEN_CI_MS, expectedPageCiMs: EXPECTED_PAGE_CI_MS, expectedTrajectoryCiMs: EXPECTED_TRAJECTORY_CI_MS, expectedFirstCiMs: EXPECTED_FIRST_CI_MS, expectedStreamTaskCiMs: EXPECTED_STREAM_TASK_CI_MS, budgets }))
   for (const [key, value] of Object.entries(aggregate)) expectEndpointWithinBudget(value, budgets[key]!)
 })

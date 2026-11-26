@@ -2,7 +2,7 @@
 import type { RuntimeId } from './runtime-catalog.ts'
 import { publicNumber } from './postgres/runtime-context.ts'
 import type { Queryable } from './postgres/database.ts'
-import type { ProjectActivityItem, ProjectActivityPage } from './services.ts'
+import type { ProjectActivityItem, ProjectActivityMember, ProjectActivityOptions, ProjectActivityPage } from './services.ts'
 import { NodeContentUnavailable } from './node-content-store.ts'
 
 interface ActivityRow {
@@ -29,25 +29,22 @@ interface ActivityCursor {
   entryId?: string
 }
 
-/** Decode a Runtime-qualified precision-preserving cursor; unscoped, foreign or malformed input reads the first page. */
-function parseActivityCursor(raw: string | undefined, organizationId: string, runtimeId: RuntimeId): ActivityCursor | undefined {
-  if (raw === undefined) return undefined
-  if (raw.startsWith('v2.')) {
-    const encoded = raw.slice(3), bytes = Buffer.from(encoded, 'base64url')
-    if (bytes.toString('base64url') !== encoded) return undefined
-    let value: unknown
-    try { value = JSON.parse(bytes.toString('utf8')) } catch { return undefined }
-    if (!Array.isArray(value) || value.length !== 6 || value[0] !== organizationId || value[1] !== runtimeId) return undefined
-    const [, , ts, sessionId, seq, entryId] = value as unknown[]
-    if (typeof ts !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/.test(ts)
-      || ts.startsWith('0000') || !Number.isFinite(Date.parse(ts))
-      || new Date(ts).toISOString().slice(0, 23) !== ts.slice(0, 23)
-      || typeof sessionId !== 'string' || sessionId === '' || sessionId.includes('\0')
-      || typeof entryId !== 'string' || entryId === '' || entryId.includes('\0')
-      || typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < -1) return undefined
-    return { ts, sessionId, seq, entryId }
-  }
-  return undefined
+/** Resume a cursor only for the Runtime and member filter that issued it. */
+function parseActivityCursor(raw: string | undefined, prefix: string, scope: readonly (string | number)[]): ActivityCursor | undefined {
+  if (raw === undefined || !raw.startsWith(prefix)) return undefined
+  const encoded = raw.slice(prefix.length), bytes = Buffer.from(encoded, 'base64url')
+  if (bytes.toString('base64url') !== encoded) return undefined
+  let value: unknown
+  try { value = JSON.parse(bytes.toString('utf8')) } catch { return undefined }
+  if (!Array.isArray(value) || value.length !== scope.length + 4 || !scope.every((part, index) => value[index] === part)) return undefined
+  const [ts, sessionId, seq, entryId] = value.slice(scope.length) as unknown[]
+  if (typeof ts !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/.test(ts)
+    || ts.startsWith('0000') || !Number.isFinite(Date.parse(ts))
+    || new Date(ts).toISOString().slice(0, 23) !== ts.slice(0, 23)
+    || typeof sessionId !== 'string' || sessionId === '' || sessionId.includes('\0')
+    || typeof entryId !== 'string' || entryId === '' || entryId.includes('\0')
+    || typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < -1) return undefined
+  return { ts, sessionId, seq, entryId }
 }
 
 /** Render a claimed answer's selected labels and custom text into one bounded line. */
@@ -102,24 +99,43 @@ function activityItem(row: ActivityRow): ProjectActivityItem {
   }
 }
 
+/** Read an authorized project's active member roster independently of the visible activity window.
+ * @param control - the organization control database.
+ * @param organizationId - the owning organization.
+ * @param projectId - the authorized project's public id.
+ * @returns display identities for current project members.
+ */
+export async function readProjectActivityMembers(control: Queryable, organizationId: string, projectId: number): Promise<ProjectActivityMember[]> {
+  const { rows } = await control.query<{ public_id: string; display_name: string }>(`
+    SELECT u.public_id::text,u.display_name FROM harness.projects p
+    JOIN harness.project_members pm ON pm.organization_id=p.organization_id AND pm.project_id=p.id
+    JOIN harness.users u ON u.organization_id=pm.organization_id AND u.id=pm.user_id AND u.status='active' AND u.deleted_at IS NULL
+    JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id AND m.status='active'
+    WHERE p.organization_id=$1 AND p.public_id=$2 AND p.status='active'
+    ORDER BY u.display_name COLLATE "C",u.public_id`, [organizationId, projectId])
+  return rows.map(row => ({ userId: publicNumber(row.public_id, 'user'), label: row.display_name }))
+}
+
 /** Page activity after the caller has selected an authorized root relation.
  * @param query - selected content transaction.
  * @param input - trusted root query and credentials for this allocation.
  * @returns visible messages and submitted answers, including an exact continuation when more exist.
  */
-export async function readProjectActivity(query: Queryable, input: {
+export async function readProjectActivity(query: Queryable, input: ProjectActivityOptions & {
   schema: 'harness'|'node_content'
   rootRelation: string
   coordinates: [string, string|number, string|number]
   organizationId: string
   runtimeId: RuntimeId
-  limit: number
-  before?: string
+  /** Responder UUID for a node-owned member filter. An unknown public id matches no answers. */
+  responderId?: string
   people?: (ids:string[])=>Promise<Map<string,{ display_name:string; public_id:string }>>
 }): Promise<ProjectActivityPage> {
     const {schema} = input, local=schema==='node_content'
     const limit = Math.min(Math.max(input.limit,1),200)
-    const before = parseActivityCursor(input.before,input.organizationId,input.runtimeId)
+    const prefix = input.member === undefined ? 'v2.' : 'v3.'
+    const scope = input.member === undefined ? [input.organizationId, input.runtimeId] : [input.organizationId, input.runtimeId, input.member]
+    const before = parseActivityCursor(input.before, prefix, scope)
     const result = await query.query<ActivityRow>(`WITH visible AS (
       SELECT r.organization_id,r.runtime_namespace,r.id,COALESCE(to_json(${schema}.human_session_title(r.title)), (SELECT ${schema}.conversation_search_text(search.content,search.content_nul_parts,80)
         FROM ${schema}.conversation_search search
@@ -138,6 +154,7 @@ export async function readProjectActivity(query: Queryable, input: {
         AND e.seq=search_row.event_seq
       JOIN visible v ON v.organization_id=e.organization_id AND v.runtime_namespace=e.runtime_namespace AND v.id=e.session_id
       WHERE search_row.role='user' AND e.query_fields->>'actorUid' IS NOT NULL
+        AND ($9::bigint IS NULL OR e.query_fields->>'actorUid'=$9::bigint::text)
       UNION ALL
       SELECT 'answer',c.organization_id,c.runtime_namespace,c.conversation_id,COALESCE(res.seq,-1),c.responded_at,
         NULL,${local ? 'NULL::json,NULL::text' : 'to_json(u.display_name),u.public_id::text'},
@@ -150,6 +167,7 @@ export async function readProjectActivity(query: Queryable, input: {
       LEFT JOIN ${schema}.conversation_events call_args ON call_args.organization_id=c.organization_id AND call_args.runtime_namespace=c.runtime_namespace AND call_args.session_id=c.conversation_id
         AND call_args.event_type='tool/call' AND call_args.query_fields->>'callId'=c.call_id
       WHERE c.interaction_kind='question' AND ${local ? 'c.has_answers' : "jsonb_typeof(c.outcome->'answers')='array'"}
+        AND ($9::bigint IS NULL OR ${local ? 'c.responder_user_id=$10::uuid' : 'u.public_id=$9::bigint'})
     )
     SELECT f.*,v.title conversation_title,
       to_char(f.ts AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') cursor_ts
@@ -160,7 +178,7 @@ export async function readProjectActivity(query: Queryable, input: {
     ORDER BY f.ts DESC,f.session_id,f.seq DESC,f.entry_id LIMIT $8`,
       [...input.coordinates,
         before?.ts ?? null, before?.sessionId ?? '', before?.seq ?? 0, before?.entryId ?? null,
-        limit + 1])
+        limit + 1, input.member ?? null, ...(local ? [input.responderId ?? null] : [])])
     const rows = result.rows.slice(0, limit)
     if (input.people !== undefined) {
       const answers = rows.filter(row=>row.kind==='answer')
@@ -176,8 +194,8 @@ export async function readProjectActivity(query: Queryable, input: {
     const last = result.rows.length > rows.length ? rows.at(-1) : undefined
     return {
       items,
-      ...(last === undefined ? {} : { nextBefore: 'v2.' + Buffer.from(JSON.stringify([
-        input.organizationId,input.runtimeId, last.cursor_ts, last.session_id, Number(last.seq), last.entry_id,
+      ...(last === undefined ? {} : { nextBefore: prefix + Buffer.from(JSON.stringify([
+        ...scope, last.cursor_ts, last.session_id, Number(last.seq), last.entry_id,
       ])).toString('base64url') }),
     }
 }

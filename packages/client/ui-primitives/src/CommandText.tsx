@@ -41,6 +41,12 @@ export function CommandText({ text, label, className }: CommandTextProps) {
       tabIndex={overflow ? 0 : undefined}
       role={overflow ? 'group' : undefined}
       aria-label={overflow ? label : undefined}
+      onKeyDown={overflow ? (event) => {
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+        event.preventDefault()
+        event.currentTarget.scrollBy({ left: event.key === 'ArrowLeft' ? -40 : 40, behavior: 'instant' })
+      } : undefined}
     >{text}</span>
   )
 }

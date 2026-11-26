@@ -14,6 +14,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SessionProjectionCache from '@deepseek-ai/dsh-session-projection-cache'
 import SessionQueryEngine from '@deepseek-ai/dsh-session-query'
 import type { SessionEventSearchPage, SessionSearchHit, SessionSearchPage } from '@deepseek-ai/dsh-session-query'
+import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
@@ -98,6 +99,15 @@ async function fixture(options: { cache?: boolean; retainOnArchive?: boolean; ma
 }
 
 type Fixture = Awaited<ReturnType<typeof fixture>>
+
+class ArchiveSettings extends SettingsProvider {
+  readonly values: Record<string, unknown> = {}
+  get writable(): boolean { return true }
+  protected async load(): Promise<Record<string, unknown>> { return this.values }
+  protected async persist(namespace: SettingsNamespace, value: Record<string, unknown>): Promise<void> {
+    this.values[namespace] = value
+  }
+}
 
 /** The settled attempt of `session`, or null when the service registered none. */
 async function settled(f: Fixture, session: Session = f.session): Promise<WorktreeCleanup | null> {
@@ -467,6 +477,24 @@ describe('archive-triggered worktree cleanup', { timeout: 30_000 }, () => {
     await f.ctx.workspaceRegistry.unarchiveSession(f.session.id)
     f.worktrees.update({ retainOnArchive: false })
     await f.worktrees.await()
+    await f.ctx.workspaceRegistry.archiveSession(f.session.id)
+    expect(await settled(f)).toMatchObject({ status: 'removed' })
+  })
+
+  it('uses saved archive retention and returns to composition settings when the provider withdraws', async () => {
+    const f = await fixture({ retainOnArchive: false })
+    const provider = f.ctx.plugin(ArchiveSettings)
+    await provider
+    const namespace = settingsNamespace('worktree')
+    await vi.waitFor(() => {
+      expect(f.ctx.settings.describe().find(entry => entry.ns === namespace)?.value).toEqual({ retainOnArchive: false })
+    })
+    await f.ctx.settings.update(namespace, { retainOnArchive: true })
+    await f.ctx.workspaceRegistry.archiveSession(f.session.id)
+    expect(await f.ctx.worktrees.cleanupOf(f.session, null)).toBeNull()
+    await access(f.worktree.path)
+    await f.ctx.workspaceRegistry.unarchiveSession(f.session.id)
+    await provider.dispose()
     await f.ctx.workspaceRegistry.archiveSession(f.session.id)
     expect(await settled(f)).toMatchObject({ status: 'removed' })
   })

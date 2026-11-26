@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/client-ui-voice-input/README.md
 document:
-  en: 954ba3b3c9ad291ec834804bfa82fbf0c6ba8498
-  zh: 7180b036dc2fc9e98226a26bfe88d4bf9f0f7414
+  en: 381e6f810b81b06d864ba12942159209828e4227
+  zh: 1d8c580cca39157d7c4a9e97e5c33e7970d2ffd9
 /:
   en: 03616f946faebe55
   zh: 293309d5ea63305e
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 364c80ee00a374ff
 /deepseek-ai-dsh-experimental-client-ui-voice-input/use-this-package:
-  en: be0f24decd1dd838
-  zh: 4d424333f6a2ec74
+  en: 5d9db08d9b6f0ca0
+  zh: beab08511b907178
 /deepseek-ai-dsh-experimental-client-ui-voice-input/understand-the-implementation:
   en: 99d31791ec7cf9c1
   zh: f04ad8e4c9c24e54

@@ -39,6 +39,13 @@
   font: inherit;
 }
 
+@media (pointer: coarse), (max-width: 767px) {
+  .search input {
+    min-height: var(--dsw-touch-target);
+    font-size: 1rem;
+  }
+}
+
 .list {
   display: flex;
   flex-direction: column;

@@ -1,0 +1,4 @@
+- strong: Personal Runtime disaster recovery
+- paragraph: Validating personal data, documents and execution configuration on the target computer. Isolation cannot be confirmed until validation finishes.
+- button "Cancel takeover"
+- button "Refresh takeover status"

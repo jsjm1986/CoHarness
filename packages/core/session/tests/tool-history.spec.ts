@@ -1,5 +1,5 @@
 /** Capability-independent tool history folded from committed headers and developer messages. */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createDeveloperMessage, projectToolUpdates } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, ToolSchema } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
@@ -158,5 +158,26 @@ describe('Session.toolHistory', () => {
     projection.apply(headerEvent(0, 'initial'))
     projection.apply(headerEvent(1, 'change'))
     expect(() => { projection.apply(developerEvent) }).toThrow('tool history: missing definition for fetch')
+  })
+
+  it('compares retained tool definitions structurally without JSON.stringify', () => {
+    const a: ToolSchema = { name: 'search', description: 'Search', parameters: { type: 'object', properties: { a: { type: 'string' }, b: { type: 'number' } } } }
+    const sameOrder: ToolSchema = { name: 'search', description: 'Search', parameters: { type: 'object', properties: { a: { type: 'string' }, b: { type: 'number' } } } }
+    const reordered: ToolSchema = { name: 'search', description: 'Search', parameters: { type: 'object', properties: { b: { type: 'number' }, a: { type: 'string' } } } }
+    const session = opened([a, fetch])
+    header(session, [fetch])
+    const removed = update(session, [remove('search')])
+    const stringify = vi.spyOn(JSON, 'stringify')
+    try {
+      const restoredSeq = header(session, [sameOrder, fetch])
+      update(session, [add('search')], restoredSeq)
+      expect(session.toolHistory().updates.map(entry => entry.messageId)).toContain(removed.id)
+      const redeclaredSeq = header(session, [reordered, fetch])
+      update(session, [add('search')], redeclaredSeq)
+      expect(session.toolHistory().tools).toEqual([reordered, fetch])
+      expect(stringify).not.toHaveBeenCalled()
+    } finally {
+      stringify.mockRestore()
+    }
   })
 })

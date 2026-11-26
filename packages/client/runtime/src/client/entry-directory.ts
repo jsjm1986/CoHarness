@@ -1,5 +1,6 @@
 /** Passive, paged account directory for an explicitly scoped multi-computer entry. */
 import type { OwnerProjectDisplay } from './project-metadata.ts'
+import { VerifiedProjectDisplayCache } from './project-display-cache.ts'
 import { addressRuntimeUrl, runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { SessionRuntimeTarget } from './contract/sessions.ts'
 
@@ -28,7 +29,11 @@ function uuid(value: unknown): value is NonNullable<SessionRuntimeTarget['runtim
 
 interface Environment { target: SessionRuntimeTarget; status: string; observedState: string; metadataOnNode?: true }
 
-function environments(input: unknown, account: number): { entries: Environment[]; nextCursor: string | null } {
+function environments(
+  input: unknown,
+  account: number,
+  displayCache: VerifiedProjectDisplayCache,
+): { entries: Environment[]; nextCursor: string | null } {
   const page = record(input)
   if (!Array.isArray(page.items)) throw new Error('Invalid Runtime directory')
   const entries: Environment[] = []
@@ -39,8 +44,11 @@ function environments(input: unknown, account: number): { entries: Environment[]
       || (owner.kind !== 'personal' && owner.kind !== 'project')) throw new Error('Invalid authorized Runtime')
     if (owner.kind === 'personal' && owner.id !== account) continue
     const location = { runtimeId: row.id, nodeId: String(node.id) as NonNullable<SessionRuntimeTarget['nodeId']>, nodeName: node.name }
+    const cached = owner.kind === 'project' && row.metadataOnNode === true
+      ? displayCache.lookup(account, location.nodeId, owner.id, location.runtimeId)
+      : undefined
     const target: SessionRuntimeTarget = owner.kind === 'personal' ? { kind: 'personal', ...location }
-      : { kind: 'project', projectId: owner.id, projectName: row.metadataOnNode === true ? `#${owner.id}` : owner.name, ...location }
+      : { kind: 'project', projectId: owner.id, projectName: row.metadataOnNode === true ? (cached?.name ?? `#${owner.id}`) : owner.name, ...location }
     entries.push({ target, status: node.status, observedState: row.observedState,
       ...(row.metadataOnNode === true ? { metadataOnNode: true } : {}) })
   }
@@ -71,9 +79,15 @@ export class EntryDirectory {
   private personal: { id: number; name: string } | undefined
   private active: SessionRuntimeTarget | undefined
   private more: string | null = null
+  private readonly displayCache: VerifiedProjectDisplayCache
 
-  /** @param read - account-fenced, bounded and coalesced metadata reader. */
-  constructor(private readonly read: Read) {}
+  /**
+   * @param read - account-fenced, bounded and coalesced metadata reader.
+   * @param displayCache - optional owned cache for verified project display names.
+   */
+  constructor(private readonly read: Read, displayCache = new VerifiedProjectDisplayCache()) {
+    this.displayCache = displayCache
+  }
 
   /** Whether this account's deployment metadata has been read in the current generation. */
   get ready(): boolean { return this.active !== undefined }
@@ -91,7 +105,7 @@ export class EntryDirectory {
     const pageCursor = next ? this.more : null
     if (next && pageCursor === null) return
     const governance = '/account/api/runtimes' + (pageCursor === null ? '' : `?cursor=${encodeURIComponent(pageCursor)}`)
-    const contextUrl = new URL('/account/api/context', globalThis.location.origin)
+    const contextUrl = new URL('/account/api/workbench/context', globalThis.location.origin)
     addressRuntimeUrl(contextUrl, bootstrap)
     const [raw, context] = await Promise.all([this.read(governance, signal), this.read(contextUrl.pathname + contextUrl.search, signal)])
     signal?.throwIfAborted()
@@ -100,11 +114,11 @@ export class EntryDirectory {
     if (user.id !== account || typeof user.displayName !== 'string' || env.id !== bootstrap.runtimeId || !Array.isArray(root.projects)) {
       throw new Error('Computer directory returned a different account or environment')
     }
-    const page = environments(raw, account)
+    const page = environments(raw, account, this.displayCache)
     const granted = next ? new Map(this.entries) : new Map<string, Environment>()
     for (const item of page.entries) granted.set(runtimeTargetKey(item.target), item)
     if (!granted.has(runtimeTargetKey(bootstrap))) {
-      const own = environments(await this.read(`/account/api/runtimes?ids=${encodeURIComponent(bootstrap.runtimeId)}`, signal), account)
+      const own = environments(await this.read(`/account/api/runtimes?ids=${encodeURIComponent(bootstrap.runtimeId)}`, signal), account, this.displayCache)
       signal?.throwIfAborted()
       if (this.epoch !== version) throw new Error('Computer directory owner changed')
       const match = own.entries.find(row => runtimeTargetKey(row.target) === runtimeTargetKey(bootstrap))
@@ -113,8 +127,16 @@ export class EntryDirectory {
     }
     this.entries = granted
     for (const key of this.retained.keys()) if (!granted.has(key)) this.retained.delete(key)
-    this.members = root.projects.map(record).map(member => member.metadataOnNode === true
-      ? { ...member, name: `#${String(member.projectId)}`, path: '' } : member)
+    this.members = root.projects.map(record).map((member) => {
+      if (member.metadataOnNode !== true) return member
+      const projectId = typeof member.projectId === 'number' ? member.projectId : undefined
+      const matched = projectId === undefined ? undefined
+        : [...granted.values()].find(row => row.target.kind === 'project' && row.target.projectId === projectId)?.target
+      const nodeId = typeof member.nodeId === 'string' ? member.nodeId : matched?.nodeId
+      const runtimeId = typeof member.runtimeId === 'string' ? member.runtimeId : matched?.runtimeId
+      const cached = projectId === undefined ? undefined : this.displayCache.lookup(account, nodeId, projectId, runtimeId)
+      return { ...member, name: cached?.name ?? `#${String(member.projectId)}`, path: cached?.rootPath ?? '' }
+    })
     this.personal = { id: account, name: user.displayName }
     this.active = granted.get(runtimeTargetKey(bootstrap))?.target
     this.more = page.nextCursor
@@ -144,7 +166,7 @@ export class EntryDirectory {
     if (known || !member || this.more === null) return known
     const version = this.epoch
     const raw = record(await this.read(`/account/api/runtimes?projectId=${encodeURIComponent(scope)}`, signal))
-    const page = environments(raw, account)
+    const page = environments(raw, account, this.displayCache)
     signal?.throwIfAborted()
     if (this.epoch !== version) throw new Error('Project directory changed')
     const count = (raw.items as unknown[]).length
@@ -179,8 +201,39 @@ export class EntryDirectory {
     if (this.epoch !== version) throw new Error('Project directory changed')
     const target = this.target(String(display.projectId))
     if (target?.runtimeId !== display.runtimeId || target.nodeId !== display.nodeId) throw new Error('Project owner changed')
+    if (this.personal !== undefined) this.displayCache.remember(this.personal.id, [display])
+    const entryKey = runtimeTargetKey(target)
+    const entry = this.entries.get(entryKey)
+    if (entry !== undefined && entry.target.kind === 'project') {
+      this.entries.set(entryKey, { ...entry, target: { ...entry.target, projectName: display.name } })
+    }
     this.members = this.members.map(row => row.projectId === display.projectId
       ? { ...row, name: display.name, path: display.rootPath, ownerDisplayLoaded: true } : row)
+  }
+
+  /**
+   * Cache owner-verified project displays fetched outside `selectedProjectDisplay()` without mutating directory authority.
+   * @param account - authenticated account that received the displays.
+   * @param displays - freshly verified owner project metadata entries.
+   */
+  rememberProjectDisplays(account: number, displays: readonly OwnerProjectDisplay[]): void {
+    this.displayCache.remember(account, displays)
+  }
+
+  /**
+   * Evict cached displays for projects whose owner metadata lookup was refused.
+   * @param account - authenticated account whose lookup failed.
+   * @param nodeId - computer identifier targeted by the lookup.
+   * @param projects - project references denied by the owner.
+   */
+  evictProjectDisplays(
+    account: number,
+    nodeId: string,
+    projects: ReadonlyArray<{ readonly projectId: number; readonly runtimeId?: string | undefined }>,
+  ): void {
+    for (const project of projects) {
+      this.displayCache.evict(account, nodeId, project.projectId, project.runtimeId)
+    }
   }
 
   /** Read one selected node's rows without waking its Host.
@@ -302,8 +355,11 @@ export class EntryDirectory {
       }) }
   }
 
-  /** Revoke cached grants, private rows and any reads from this generation. */
-  clear(): void {
+  /** Revoke cached grants, private rows and any reads from this generation.
+   * @param evictDisplays - when true (default), also purge cached verified project labels for this account.
+   */
+  clear(evictDisplays = true): void {
+    if (evictDisplays) this.displayCache.clear(this.personal?.id)
     this.epoch++
     this.entries.clear()
     this.retained.clear()
@@ -316,6 +372,9 @@ export class EntryDirectory {
 
   private withdraw(target: SessionRuntimeTarget): void {
     const key = runtimeTargetKey(target)
+    if (target.kind === 'project' && this.personal !== undefined) {
+      this.displayCache.evict(this.personal.id, target.nodeId, target.projectId, target.runtimeId)
+    }
     this.entries.delete(key)
     this.retained.delete(key)
     if (target.kind === 'project') this.members = this.members.filter(row => row.projectId !== target.projectId)

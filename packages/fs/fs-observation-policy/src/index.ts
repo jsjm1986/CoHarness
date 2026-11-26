@@ -15,7 +15,7 @@ import type { FsObservationActor } from './types.ts'
 export type { FsObservationActor } from './types.ts'
 
 /**
- * Per-context observed-file state and the three `fs/*` decisions over it. One
+ * Per-context observed-file state and its mutation decisions. One
  * instance is created per `apply()` so disposal can drop all state for HMR.
  */
 class ObservedStateGate {
@@ -71,18 +71,18 @@ class ObservedStateGate {
   }
 
   /**
-   * Decide the edit version guard: unseen rejects with `FS_NOT_OBSERVED`,
+   * Decide the edit or delete version guard: unseen rejects with `FS_NOT_OBSERVED`,
    * confirmed absence rejects with `FS_NOT_FOUND`, and presence supplies the
    * observed version as the CAS basis.
    */
-  editIntent(target: FsTarget, actor: object | undefined): { version: FsVersion } {
+  mutationIntent(target: FsTarget, actor: object | undefined, operation: 'edit' | 'delete'): { version: FsVersion } {
     const owner = this.owner(actor)
     const prior = owner ? this.get(owner, target.targetKey) : undefined
     if (!owner || prior === undefined) {
-      throw new FsError(`edit requires reading "${target.displayPath}" first`, 'FS_NOT_OBSERVED')
+      throw new FsError(`${operation} requires reading "${target.displayPath}" first`, 'FS_NOT_OBSERVED')
     }
     if (prior.kind === 'absent') {
-      throw new FsError(`cannot edit "${target.displayPath}": not found`, 'FS_NOT_FOUND')
+      throw new FsError(`cannot ${operation} "${target.displayPath}": not found`, 'FS_NOT_FOUND')
     }
     return { version: prior.version }
   }
@@ -98,7 +98,7 @@ class ObservedStateGate {
 export const name = 'fs-observation-policy'
 
 /**
- * Register the three `fs/*` listeners. No `inject` — this plugin reads no
+ * Register the observation and mutation listeners. No `inject` — this plugin reads no
  * services; it operates only on its own `WeakMap`. The waterfalls are unbound
  * (the tool dispatches them with no `this`), so the listeners take the raw
  * `(target, actor, next)` arguments.
@@ -118,8 +118,8 @@ export function apply(ctx: Context): void {
   // holds (a throw rejects, never escapes synchronously through the waterfall).
   ctx.on('fs/write-intent', (target, actor) => Promise.resolve().then(() => gate.writeIntent(target, actor)))
 
-  // fs/edit-intent: occupy the single decision slot — do not call next().
-  ctx.on('fs/edit-intent', (target, actor) => Promise.resolve().then(() => gate.editIntent(target, actor)))
+  ctx.on('fs/edit-intent', (target, actor) => Promise.resolve().then(() => gate.mutationIntent(target, actor, 'edit')))
+  ctx.on('fs/delete-intent', (target, actor) => Promise.resolve().then(() => gate.mutationIntent(target, actor, 'delete')))
 
   // fs/observed must remain synchronous and non-throwing: emit does not await
   // promises, and successful mutations have already committed. WeakMap.set

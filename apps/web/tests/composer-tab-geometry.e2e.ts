@@ -42,10 +42,11 @@
 //
 // Zero model calls: a seeded cold session renders from its log, and switching
 // tabs asks the host for nothing. A stray stream would fail loud with NO_ADAPTER.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { createChatScrollFixture } from './chat-scroll-fixture.ts'
 import {
@@ -308,7 +309,7 @@ describe('web e2e: input card position across view tabs', () => {
     await seedSession(scaffold, FIXTURE.log, SEED_ID)
     // Scrollbars must take layout space here or the scenario proves nothing;
     // see the file header for the measurement behind dropping this argument.
-    browser = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] })
+    browser = await responsiveBrowser.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] })
     page = await newEnglishPage(browser, WIDE_VIEWPORT.height)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

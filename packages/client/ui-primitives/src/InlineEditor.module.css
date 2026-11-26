@@ -21,3 +21,11 @@
 .editor:focus {
   border-color: var(--dsw-alias-state-business-primary);
 }
+
+@media (pointer: coarse), (max-width: 767px) {
+  .editor { min-height: var(--dsw-touch-target); font-size: 16px; }
+}
+
+@media (forced-colors: active) {
+  .editor:focus { outline: 2px solid Highlight; outline-offset: -2px; }
+}

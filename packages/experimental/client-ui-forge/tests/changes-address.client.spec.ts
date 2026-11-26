@@ -49,22 +49,32 @@ describe('changesDefinition', () => {
     expect(definition).toMatchObject({ id: CHANGES_ID, kind: CHANGES_KIND, keepMounted: true, patterns: ['dsh-resource://forge-changes/**'] })
     const address = changesAddress({ sessionId: SESSION, source: { kind: 'change', url: URL } })
     expect(definition.canOpen?.(address)).toBe(true)
+    expect(definition.resourceSession?.(address)).toBe(SESSION)
     expect(definition.title(address)).toBe('Changes in #7')
     expect(definition.canOpen?.('dsh-resource://forge-changes/s/remote')).toBe(false)
+    expect(definition.resourceSession?.('dsh-resource://forge-changes/s/remote')).toBeUndefined()
     expect(definition.title('dsh-resource://forge-changes/s/remote')).toBe('dsh-resource://forge-changes/s/remote')
   })
 })
 
 describe('createChangesStore', () => {
+  it('records an explicit split choice from a unified responsive presentation', () => {
+    const store = createChangesStore().create()
+    store.actions.navigated('phone', 1)
+    store.actions.toggledSplit('phone', false)
+    store.actions.navigated('phone', 2)
+    expect(store.getSnapshot().byTab['phone']?.split).toBe(true)
+  })
+
   it('seeds a tab on its first navigation, keeps its choices, and forgets it', () => {
     const store = createChangesStore().create()
     store.actions.navigated('tab-1', 1)
     expect(store.getSnapshot().byTab['tab-1']).toEqual({
-      scope: 'branch', base: null, commits: null, lens: 'all', hideTests: false, split: true, wrap: true, navigated: 1,
+      scope: 'branch', base: null, commits: null, lens: 'all', hideTests: false, split: null, wrap: true, navigated: 1,
     })
     store.actions.scoped('tab-1', 'staged')
     store.actions.based('tab-1', { ref: 'refs/heads/topic', name: 'topic' })
-    store.actions.toggledSplit('tab-1')
+    store.actions.toggledSplit('tab-1', true)
     store.actions.toggledWrap('tab-1')
     store.actions.lensed('tab-1', 'interface')
     store.actions.toggledTests('tab-1')

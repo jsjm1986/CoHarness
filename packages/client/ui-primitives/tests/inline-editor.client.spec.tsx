@@ -16,6 +16,19 @@ function renderEditor(value = 'draft') {
 }
 
 describe('InlineEditor', () => {
+  it('preserves the draft through composition Escape and modified editing shortcuts', () => {
+    const { box, onCancel, onSave } = renderEditor()
+    fireEvent.compositionStart(box)
+    fireEvent.keyDown(box, { key: 'Escape' })
+    fireEvent.compositionEnd(box)
+    fireEvent.keyDown(box, { key: 'Escape' })
+    fireEvent.keyUp(box, { key: 'Escape' })
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(onSave).not.toHaveBeenCalled()
+    fireEvent.keyDown(box, { key: 'Escape' })
+    expect(onCancel).toHaveBeenCalledOnce()
+  })
   it('focuses a one-row textarea that keeps line breaks', () => {
     const { box, onChange } = renderEditor('one\ntwo')
     expect(document.activeElement).toBe(box)

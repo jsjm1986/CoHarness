@@ -1,14 +1,3 @@
-- banner:
-  - navigation "Session hierarchy":
-    - button "Use the read tool twice" [disabled]
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
-  - button "Manage conversation sharing":
-    - img
-    - text: Conversation sharing
-  - button "Open right sidebar":
-    - img
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
 - group "Message time and speed": "{{clock}}"
 - button "Copy":
@@ -41,11 +30,9 @@
   - img
 - button "Send message" [disabled]
 - group "Session statistics":
-  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+  - "button \"1 turn · 2 steps · {{throughput}} tok/s\"":
     - img
-    - text: "1 turns · 2 steps{{throughput}} tok/s"
+    - text: "1 turn · 2 steps{{throughput}} tok/s"
   - button "16K tok · Cache hit 98%":
     - img
     - text: 16K tokCache hit 98%
-- separator "Adjust transcript content width"
-- separator "Adjust transcript content width"

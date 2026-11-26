@@ -42,6 +42,7 @@ kind: "package-reference"
 
 - `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` 校验持久种子／头部数据并生成脱离副本，补齐版本和 id，在未提供 `createdAt` 时使用当前时间，发布会话并将其绑定到调用方 fiber。带种子的 header（`meta.isSeeded: true`）必须同时提供 `seed` 与精确的 `inheritedEventCount`，因为构造种子可能在继承前缀之后还包含子级自有的初始化事件；无种子的 header 拒绝非零切点。持久化重建会提供原始的 `createdAt`、谱系与 `delegationDepth`。
 - `ctx.sessions.flush(session)` 通过会话捕获的作用域分发一个需等待完成的并行持久性检查点。每个监听器都会启动；调用会等待全部结算后才报告失败。未发布、已脱离和陈旧的对象会被拒绝。
+- `ctx.sessions.sealForShutdown(session)` 在实时 Session 的工作结算后关闭该实例的追加入口，并返回最终日志长度。Session 在其所有方解除附接前仍可执行 `flush`。
 - `ctx.sessions.fork(source, boundary?, childSessionId?): Session`：解析实时会话对象或 id，选取截至 `boundary` 事件序号（含该事件）的种子（默认为当前最后一个事件），要求所选前缀结束时没有开放轮次，再创建带谱系元数据的实时子会话。
 - `ctx.sessions.get(id: SessionId): Session | undefined`
 - `ctx.sessions.list(): Session[]`
@@ -119,7 +120,11 @@ kind: "package-reference"
 
 `request/header` 记录非历史请求封装的完整规范快照，其原因为 `initial`、`resume` 或 `change`。其可选 `adapterDefaults` 映射会标记由精确模型解析填入的生效 `reasoningEffort` 或 `maxTokens` 值，使下一次请求提议能够将它们与显式对话设置区分开。`foldRequestHeader()` 选择最新快照；旧版增量事件和已移除的 `fallback` 原因会被拒绝。详见[可重建请求 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.zh.md)。
 
+判断请求头是否相同时，直接按 JSON 序列化顺序比较规范工具 schema，包含嵌套属性的顺序。
+
 `user/message` 会直接存储完整的 `UserMessage`，其中包括收件箱路由或进入步骤前创建的标识。无论它是直接人类提示词、合成注入，还是已进入的 Goal Round，都会原样呈现其 `content`；带类型的 `source` 是区分三者的唯一通道，并携带各领域专有的持久事实。`assistant/message` 和 `tool/result` 也会存储完整的消息值。轮次执行仍由 `turn/start` 与 `turn/end` 包围；`agent.inject()` 会把输入排队，直到后续某次 pre-step 领取它，并在 enter 决策中返回它。
+
+用户输入带有持久入队回执时，持久化提供方会存储会话前缀。草稿是否有可见内容由 surface 消息决定。
 
 `tool/result` 持久保存一条带标识、user-role 的工具结果消息，以及可选内部失败标识和可选呈现元数据。工具成功时的规范 `value` 和便于人类阅读的规范失败消息只存在于执行本地；渲染后的错误内容是回放权威消息。
 

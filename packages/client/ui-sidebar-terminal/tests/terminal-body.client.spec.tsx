@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /** Terminal startup, title editing and xterm's screen lifetime. */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import type { ITheme } from '@xterm/xterm'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
@@ -9,7 +9,7 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { TerminalViewState } from '@deepseek-ai/dsh-api-terminal-controller/client'
 import type { WebTerminalId } from '@deepseek-ai/dsh-api-terminal-controller/types'
 import { TerminalBody, type TerminalBodyProps } from '../src/client/terminal.tsx'
-import { TerminalTitle } from '../src/client/TerminalTitle.tsx'
+import { TerminalTitle, TerminalRenameItem } from '../src/client/TerminalTitle.tsx'
 import { en, zh } from '../src/client/locales.ts'
 
 const fake = vi.hoisted(() => ({
@@ -82,17 +82,23 @@ function mount(initial: TerminalViewState | undefined = idle, dictionary = en) {
     rename: vi.fn(async () => {}), connect: vi.fn(), write: vi.fn(), resize: vi.fn(), acknowledge: vi.fn(),
   }
   const openTab = vi.fn()
+  const unbindRename = vi.fn()
+  const bindRename = vi.fn((_key: string, _edit: () => void) => unbindRename)
   const tab = () => ({ tab: { id: 'tab', title: 'Terminal', visible, actions: { openTab } } })
-  // The test supplies the owner and model hooks consumed here; the remaining slot props are framework-owned.
+  function useTerminal(key: string): TerminalViewState | undefined
+  function useTerminal(key: string, select: (value: TerminalViewState | undefined) => string | undefined): string | undefined
+  function useTerminal(_key: string, select?: (value: TerminalViewState | undefined) => string | undefined) {
+    return select === undefined ? state : select(state)
+  }
   const props = {
     view: () => model,
-    useTerminal: (_key: string, select?: (value: TerminalViewState | undefined) => unknown) => select === undefined ? state : select(state),
-    useTheme: (select: (value: ThemeSnapshot) => unknown) => select(theme),
-    useTabInfo: tab, t: makeTranslate(dictionary),
-  } as unknown as TerminalBodyProps
+    useTerminal,
+    useTheme: (select: (value: ThemeSnapshot) => ThemeSnapshot) => select(theme),
+    useTabInfo: tab, bindRename, t: makeTranslate(dictionary),
+  } satisfies TerminalBodyProps & Parameters<typeof TerminalTitle>[0]
   const view = render(<TerminalBody {...props} />)
   return {
-    view, props, model, detach, openTab,
+    view, props, model, detach, openTab, bindRename, unbindRename,
     changeTheme(next: Partial<ThemeSnapshot> = {}) {
       theme = { ...theme, ...next, revision: theme.revision + 1 }
       view.rerender(<TerminalBody {...props} />)
@@ -388,10 +394,44 @@ it.each(titleSurfaces)('removes the native $name listener when its title unmount
   const listener = add.mock.calls.find(([type]) => type === 'dblclick')?.[1]
   expect(listener).toBeTypeOf('function')
   title.rerender(seat(false))
-  expect(remove).toHaveBeenCalledExactlyOnceWith('dblclick', listener)
+  expect(remove).toHaveBeenCalledWith('dblclick', listener)
+  expect(remove).toHaveBeenCalledWith('keydown', add.mock.calls.find(([type]) => type === 'keydown')?.[1])
+  expect(h.unbindRename).toHaveBeenCalledOnce()
   fireEvent.doubleClick(chip)
   expect(outer).toHaveBeenCalledOnce()
   expect(h.model.rename).not.toHaveBeenCalled()
+})
+
+it.each(titleSurfaces)('opens the $name editor from F2 and its registered menu action', (surface) => {
+  const h = mount({ ...idle, info })
+  const title = render(surface.wrap(<TerminalTitle {...h.props} />))
+  const chip = title.container.querySelector(surface.selector)!
+  fireEvent.keyDown(chip, { key: 'F2', altKey: true })
+  expect(title.queryByRole('textbox', { name: en.rename })).toBeNull()
+  fireEvent.keyDown(chip, { key: 'F2' })
+  const input = title.getByRole('textbox', { name: en.rename })
+  expect(document.activeElement).toBe(input)
+  fireEvent.keyDown(input, { key: 'Escape' })
+  expect(h.model.rename).not.toHaveBeenCalled()
+  const edit = h.bindRename.mock.calls[0]![1]
+  act(edit)
+  expect(document.activeElement).toBe(title.getByRole('textbox', { name: en.rename }))
+  title.unmount()
+  expect(h.unbindRename).toHaveBeenCalledOnce()
+})
+
+it('dismisses the tab menu before requesting terminal renaming and omits other kinds', () => {
+  const h = mount(idle)
+  const dismiss = vi.fn()
+  const renameTitle = vi.fn(() => { expect(dismiss).toHaveBeenCalledOnce() })
+  const props = { t: h.props.t, tab: { id: 'tab', kind: 'terminal' }, dismiss, renameTitle }
+  const menu = render(<TerminalRenameItem {...props} />)
+  const action = menu.getByRole('menuitem', { name: /Rename terminal/ })
+  expect(action.getAttribute('aria-keyshortcuts')).toBe('F2')
+  fireEvent.click(action)
+  expect(renameTitle).toHaveBeenCalledExactlyOnceWith('tab')
+  menu.rerender(<TerminalRenameItem {...props} tab={{ ...props.tab, kind: 'files' }} />)
+  expect(menu.queryByRole('menuitem')).toBeNull()
 })
 
 it('starts a recovered screen with no local history when environment discovery is unavailable', () => {

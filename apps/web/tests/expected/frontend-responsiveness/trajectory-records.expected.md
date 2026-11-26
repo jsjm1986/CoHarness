@@ -1,0 +1,82 @@
+## visible-record-kinds
+- table:
+  - rowgroup:
+    - row "SYSTEM, Initial System Prompt":
+      - cell "SYSTEM"
+      - cell "Initial System Prompt"
+    - row "USER, Review recorded trajectory turn 1.":
+      - cell "Turn 1 USER": USER
+      - cell "Review recorded trajectory turn 1."
+    - 'row "CONTEXT, TRAJECTORY_CONTEXT_1: fixture-owned context."':
+      - cell "CONTEXT"
+      - 'cell "TRAJECTORY_CONTEXT_1: fixture-owned context."'
+    - row "Request 1, ASSISTANT, Initial recorded answer.":
+      - 'cell "Request #1 ASSISTANT"':
+        - 'button "Request #1"'
+        - text: ASSISTANT
+      - cell "Initial recorded answer."
+    - row "SYSTEM, System Prompt Updated":
+      - cell "SYSTEM"
+      - cell "System Prompt Updated"
+    - row "USER, Review recorded trajectory turn 2.":
+      - cell "Turn 2 USER": USER
+      - cell "Review recorded trajectory turn 2."
+    - 'row "CONTEXT, TRAJECTORY_CONTEXT_2: fixture-owned context."':
+      - cell "CONTEXT"
+      - 'cell "TRAJECTORY_CONTEXT_2: fixture-owned context."'
+    - row "Request 2, ASSISTANT, TRAJECTORY_RECORD_STATES_DONE":
+      - 'cell "Request #2 ASSISTANT"':
+        - 'button "Request #2"'
+        - text: ASSISTANT
+      - cell "TRAJECTORY_RECORD_STATES_DONE"
+    - 'row "TOOL, bash {\"command\":\"false\",\"description\":\"Recorded failed shell command\"}"':
+      - cell "TOOL"
+      - 'cell "bash{\"command\":\"false\",\"description\":\"Recorded failed shell command\"} → error"'
+    - row "TOOL, run_code Recorded failed program":
+      - cell "TOOL"
+      - cell "run_codeRecorded failed program → error":
+        - img
+        - text: run_codeRecorded failed program → error
+
+## prompt-added-removed
+- complementary "Event details":
+  - separator "Resize event details"
+  - text: SYSTEM System Prompt Updated
+  - button "Close details"
+  - tablist "Event details":
+    - tab "Diff" [selected]
+    - tab "System Prompt"
+    - tab "Tools"
+  - tabpanel "Diff":
+    - heading "System Prompt" [level=3]
+    - text: "@@ -1,2 +1,2 @@ Shared prompt line -TRAJECTORY_PROMPT_BEFORE +TRAJECTORY_PROMPT_AFTER"
+
+## bash-failed-output
+- complementary "Event details":
+  - separator "Resize event details"
+  - text: TOOL Turn 2 · Step 1
+  - button "Close details"
+  - tablist "Event details":
+    - tab "Summary"
+    - tab "Payload"
+    - tab "Result" [selected]
+    - tab "Schema"
+    - tab "Timing"
+  - tabpanel "Result": "error TRAJECTORY_BASH_FAILURE: command exited with status 1"
+
+## run_code-failed-output
+- complementary "Event details":
+  - separator "Resize event details"
+  - text: TOOL Turn 2 · Step 1
+  - button "Close details"
+  - tablist "Event details":
+    - tab "Summary"
+    - tab "Code"
+    - tab "Result" [selected]
+    - tab "Schema"
+    - tab "Timing"
+  - tabpanel "Result":
+    - text: Output
+    - button "Copy output":
+      - img
+    - text: "TRAJECTORY_PROGRAM_FAILURE: recorded program rejected"

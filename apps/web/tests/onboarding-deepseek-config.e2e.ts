@@ -2,12 +2,13 @@
 // credential is absent, the credential step uses the shipped modal chrome,
 // and the inline key write lands in an isolated harness home without a reload
 // or model call.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { randomBytes } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
@@ -29,7 +30,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ deepSeekMissingCredential: true })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     // The scenario asserts the shipped Chinese copy, so the browser asks for it.
     page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)

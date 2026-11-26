@@ -41,7 +41,7 @@ export function GuideTitle({ useTabInfo }: PropsRuntime<'sidebar.right.pane.tab.
   return (
     <>
       <CompassGlyph className={css.titleIcon} />
-      {tab.title}
+      <span>{tab.title}</span>
     </>
   )
 }

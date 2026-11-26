@@ -30,6 +30,12 @@
       "path": "../../packages/context/gateway-execution"
     },
     {
+      "path": "../../packages/core/agent"
+    },
+    {
+      "path": "../../packages/core/agent-loop"
+    },
+    {
       "path": "../../packages/core/session"
     },
     {

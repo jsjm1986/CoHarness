@@ -241,10 +241,8 @@ export function apply(ctx: ClientContext): void {
     inject: logoutInjected,
   }, LogoutButton))
 
-  ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
-    name: 'conversation.input.left',
-    id: 'collaboration-steward-notice',
-    order: -10,
+  ctx.slots.inject('conversation.input.status', () => ctx.slots.register({
+    name: 'conversation.input.status',
     locale: NS,
     inject: (): StewardChipInjected => ({ hooks }),
   }, StewardChip))

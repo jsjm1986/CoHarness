@@ -208,7 +208,12 @@ export interface GatewayProjectService {
 
 /** Project membership and shared-conversation authorization operations. */
 export interface GatewayCollaborationService {
-  projectsForUser(userId: number): Awaitable<ProjectScopeView[]>
+  /**
+   * @param userId - authenticated account.
+   * @param view - the browser account context requests current owner, management and theme fields. Omit for the compact roster.
+   * @returns authorized project scopes.
+   */
+  projectsForUser(userId: number, view?: 'account-context'): Awaitable<ProjectScopeView[]>
   /**
    * Admit prepared browser project metadata using one current account and project authority read without node I/O.
    * @param userId - server-authenticated account identifier.
@@ -243,8 +248,23 @@ export interface GatewayCollaborationService {
     userId: number,
     runtimeId: RuntimeId,
     projectId: number,
-    options: { limit: number; before?: string },
+    options: ProjectActivityOptions,
   ): Awaitable<ProjectActivityPage>
+}
+
+/** Coordinates for one project activity page. */
+export interface ProjectActivityOptions {
+  readonly limit: number
+  /** Cursor for the same Runtime and member filter. Omission requests the first page and roster. */
+  readonly before?: string
+  /** Public contributor id. Omission includes every visible contributor. */
+  readonly member?: number
+}
+
+/** Display identity of an active project member. */
+export interface ProjectActivityMember {
+  readonly userId: number
+  readonly label: string
 }
 
 /** One member-visible feed row: a signed message or a claimed question answer. */
@@ -269,6 +289,8 @@ export interface ProjectActivityItem {
 export interface ProjectActivityPage {
   readonly items: readonly ProjectActivityItem[]
   readonly nextBefore?: string
+  /** Current project roster, included when the request has no cursor. */
+  readonly members?: readonly ProjectActivityMember[]
 }
 
 /** Audit operations consumed by request handlers and policy application. */
@@ -486,19 +508,23 @@ export interface GatewayModelGovernanceService {
 /** Instance lifecycle operations; Admin adapters preserve supplied administrator ids, while omission permits trusted maintenance. */
 export type GatewayInstanceService = Pick<
   InstanceManager,
-  'beforeStart' | 'beforeUse' | 'portOf' | 'stateOf' | 'stopReasonOf' | 'generationOf' | 'isLive' | 'liveEndpoint' | 'touch' | 'wsRef' | 'ensureRunning' | 'startRequest' | 'reapIdle' | 'reconcile'
+  'beforeStart' | 'beforeUse' | 'portOf' | 'stateOf' | 'stopReasonOf' | 'generationOf' | 'isLive' | 'liveEndpoint' | 'touch' | 'wsRef' | 'ensureRunning' | 'startRequest' | 'prepareSessionRuntime' | 'reapIdle' | 'reconcile'
   | 'stop' | 'stopAll' | 'withStopped'
 > & {
   /** Exact Runtime assignment lookup; omitted only by legacy single-assignment adapters. */
   resolveTarget?: InstanceManager['resolveTarget']
   /** Local Runtime enumeration for owner-wide policy and lifecycle changes. */
   targetsForOwner?: InstanceManager['targetsForOwner']
+  /** Apply committed owner invalidation, including retained generations after catalog retirement. */
+  stopForAccessChange?: InstanceManager['stopForAccessChange']
   /** Persisted per-Runtime local storage, without process startup. */
   storageOf?: InstanceManager['storageOf']
   /** Node-local assignment or retained lifecycle ownership, when provided by the manager. */
   owns?: InstanceManager['owns']
   /** Optional long-request lease supported by the production manager. */
   operationRef?: InstanceManager['operationRef']
+  /** Exact, already-supervised Session operation admission. */
+  retainReadySession?: InstanceManager['retainReadySession']
   /** Node-local managed Runtime admission observations, when supported by the provider. */
   capacitySnapshot?: () => import('./runtime-capacity.ts').RuntimeCapacitySnapshot
 }

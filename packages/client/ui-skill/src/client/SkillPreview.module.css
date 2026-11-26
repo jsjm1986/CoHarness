@@ -1,0 +1,4 @@
+.source pre {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}

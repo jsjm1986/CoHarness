@@ -10,11 +10,12 @@
 // theme/layout golden: aria snapshots are color-blind (lane scope: the
 // browser-e2e-lane Agent Note); the hero's waiting state gets the one golden
 // here.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
@@ -47,7 +48,7 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
   beforeAll(async () => {
     scaffold = await launchWebScaffold(MODE === 'record' ? {} : { replayFixture: FIXTURE, paceMs: REPLAY_PACE_MS })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -64,18 +65,21 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
   it.skipIf(MODE === 'record')('opens the shared slash menu from plus with only Command candidates', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-command-menu-launcher'))
     const launcher = page.getByRole('button', { name: 'Commands' })
-    await launcher.click()
+    const input = page.locator('textarea').first()
     const menu = page.getByRole('listbox', { name: 'Trigger suggestions' })
-    await menu.waitFor({ timeout: 10_000 })
+    if (await menu.isVisible()) await input.press('Escape')
+    if (await input.inputValue() !== '') await input.fill('')
+    await launcher.click()
+    await menu.getByRole('option', { name: 'Goal Set or view the goal for a long-running task', exact: true }).waitFor()
+    await menu.getByRole('option', { name: 'Compact Compact older conversation history', exact: true }).waitFor()
     const snapshot = await captureStableAria(page, '[role="listbox"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(COMMAND_MENU_EXPECTED, snapshot, MODE)
     expect(snapshot).toContain('text: Commands')
     expect(snapshot).not.toContain('text: Skills')
     expect(snapshot).not.toContain('text: Subagents')
     const launchedBox = await menu.boundingBox()
-    await page.locator('textarea').first().press('Escape')
+    await input.press('Escape')
     await expect.poll(() => menu.count()).toBe(0)
-    const input = page.locator('textarea').first()
     await input.fill('/')
     await menu.waitFor({ timeout: 10_000 })
     const typedBox = await menu.boundingBox()
@@ -244,6 +248,7 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
     // request would fail the scenario loudly at close().
     await expect.poll(() => page.getByText('LIGHTHOUSE', { exact: true }).count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(1)
     await expect.poll(() => page.locator('[role="treeitem"][aria-selected="true"]').count(), { timeout: 10_000 }).toBe(1)
+    await page.getByText('Standard mode', { exact: true }).waitFor({ timeout: 10_000 })
     // Golden of the recovered conversation region: rebuilt from the log, it
     // must render the same settled transcript the live turn produced.
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)

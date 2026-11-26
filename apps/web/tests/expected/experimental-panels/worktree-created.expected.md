@@ -1,0 +1,43 @@
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
+- text: Start this message inside the new checkout.
+- group "Message time and speed": "{{clock}}"
+- button "Copy":
+  - img
+- status: Completed
+- "button \"Completed in {{duration}}\"":
+  - text: "Completed in {{duration}}"
+  - img
+- button "Analysis completed"
+- paragraph: The new worktree is ready for its first message.
+- button "Copy":
+  - img
+- button "Branch into a new conversation":
+  - img
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{clock}}"
+- textbox "Message COHARNESS"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"'
+- button "Select model, current acceptance"
+- button "0% of context used": 0%
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turn · 1 step · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turn · 1 step{{throughput}} tok/s"
+  - button "28 tok · Cache hit 0%":
+    - img
+    - text: 28 tokCache hit 0%
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

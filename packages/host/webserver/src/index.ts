@@ -56,6 +56,9 @@ export interface WebRoute {
   handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
 }
 
+/** Synchronous admission before HTTP route dispatch; false means the guard has answered or closed the response. */
+export type WebRequestGuard = (request: IncomingMessage, response: ServerResponse) => boolean
+
 /** One exact-path HTTP upgrade registration. */
 export interface WebUpgradeRoute {
   /** Absolute pathname, no trailing slash. */
@@ -324,6 +327,7 @@ export class WebServer extends Service {
 
   private readonly exact = new Map<string, WebRoute>()
   private readonly prefixes = new Map<string, WebRoute>()
+  private readonly requestGuards = new Set<WebRequestGuard>()
   private readonly upgrades = new Map<string, WebUpgradeRoute>()
   private readonly upgradedSockets = new Set<Duplex>()
   /**
@@ -399,6 +403,17 @@ export class WebServer extends Service {
   }
 
   /**
+   * Qualify HTTP requests before named routes and the fallback; upgrades retain their own admission.
+   * Guards run synchronously in registration order, so removal cannot race an unfinished guard.
+   * @param guard - returns true to continue dispatch, or false after taking response ownership.
+   * @returns the disposer removing this guard.
+   */
+  registerRequestGuard(guard: WebRequestGuard): () => void {
+    this.requestGuards.add(guard)
+    return () => { this.requestGuards.delete(guard) }
+  }
+
+  /**
    * Register an exact-path HTTP upgrade route. Duplicate paths throw because
    * one socket can have only one protocol owner.
    * @param route - pathname and handler owning negotiation plus socket use.
@@ -445,6 +460,7 @@ export class WebServer extends Service {
   /** Listen; resolves once the socket is bound (rejection = FAILED fiber). */
   async [Service.init](): Promise<void> {
     const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+      for (const guard of this.requestGuards) if (!guard(req, res)) return
       /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
       requests; the field is only optional on the client-side IncomingMessage type */
       const rawPath = new URL(req.url ?? '/', 'http://x').pathname

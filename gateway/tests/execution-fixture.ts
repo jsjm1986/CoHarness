@@ -12,6 +12,7 @@ import { PostgresConversationStore } from '../src/postgres/conversation-reposito
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import { PostgresSshTargetService } from '../src/postgres/ssh-target-service.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
+import type { PostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import { createRuntimeApiHandler } from '../src/runtime-api.ts'
 import { DesktopCoordinator } from '../src/desktop-coordinator.ts'
@@ -37,6 +38,11 @@ export interface Receipt { inputId: string; actors: Array<{ userId: number }>; p
 export async function createExecutionFixture(pool: Pool, options: {
   executionWatchHeartbeatMs?: number
   executionWatchAuthorizationTimeoutMs?: number
+  resourceStatusWaitMs?: number
+  executionWriteEpoch?: bigint
+  performanceEnabled?: boolean
+  /** Use a credential resolver backed by the fixture's organization. */
+  governance?: (context: PostgresRuntimeContext) => Parameters<typeof createRuntimeApiHandler>[0]['governance']
   /** Enable multi-computer topology and establish a control lease before starting managed fixture Runtimes. */
   nodeConnection?: { id: string; epoch: number }
   resourceBudget?: NodeResourceBudgetConfig
@@ -112,13 +118,17 @@ export async function createExecutionFixture(pool: Pool, options: {
   const documents = createDocumentCatalogHandlers(new PostgresDocumentCatalogService({ ...context, pool: options.documentCatalogPool ?? pool }))
   const handler = createRuntimeApiHandler({ context, instances, conversations: conversationStore, principals,
     accessMonitor: scopeAccessMonitor(accessMonitor, context.nodeId as RuntimeNodeId), desktops,
+    executionWriteEpoch: options.executionWriteEpoch,
+    performanceEnabled: options.performanceEnabled,
     documentCatalogOverview: documents.overview, documentCatalogHistory: documents.history,
     documentCatalogAuthorize: documents.authorize, documentCatalogSync: documents.sync, documentCatalogPurge: documents.purge,
     resourceBudget,
     executionWatchHeartbeatMs: options.executionWatchHeartbeatMs ?? 60_000,
     executionWatchAuthorizationTimeoutMs: options.executionWatchAuthorizationTimeoutMs,
+    resourceStatusWaitMs: options.resourceStatusWaitMs,
     sshTargets: new PostgresSshTargetService(context),
-    collaboration: new PostgresCollaborationService(context), governance: { resolveOrganizationCredential: async () => null } })
+    collaboration: new PostgresCollaborationService(context),
+    governance: options.governance?.(context) ?? { resolveOrganizationCredential: async () => null } })
   const server = createServer((req, res) => {
     void (async () => {
       const chunks: Buffer[] = []
@@ -176,5 +186,5 @@ export async function createExecutionFixture(pool: Pool, options: {
   }
   return { base, context, project, other, personal, peerPersonal, admin, member, peer, principals, headers, dispose,
     publicKey: key.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
-    conversations, accessMonitor, desktops, instances, resourceBudget, call, session, admit, enter, organizationId }
+    conversations, accessMonitor, desktops, instances, resourceBudget, handler, call, session, admit, enter, organizationId }
 }

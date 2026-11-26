@@ -27,12 +27,14 @@ export interface UserDeclaredLookup {
  */
 export class ReloadableModelAccess implements ModelAccessService {
   private snapshot: ModelAccessSnapshot
+  private policy: GovernancePolicyFile | undefined
 
   /**
    * @param policy - the policy that was validated during plugin activation.
    * @param userDeclared - the live user-declared provider lookup.
    */
   constructor(policy: GovernancePolicyFile, private readonly userDeclared: UserDeclaredLookup) {
+    this.policy = policy
     this.snapshot = createSnapshot(policy)
   }
 
@@ -41,11 +43,14 @@ export class ReloadableModelAccess implements ModelAccessService {
    * @param policy - the newly validated policy.
    */
   replace(policy: GovernancePolicyFile): void {
+    if (this.policy === policy) return
     this.snapshot = createSnapshot(policy)
+    this.policy = policy
   }
 
   /** Enter fail-closed mode until a valid policy is published. */
   unavailable(): void {
+    this.policy = undefined
     this.snapshot = {
       defaultAllowed: false,
       userDeclaredAllowed: false,

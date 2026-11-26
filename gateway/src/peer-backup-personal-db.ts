@@ -2,13 +2,17 @@
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { lstat, open, realpath } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import type { Pool,PoolClient } from 'pg'
 import { z } from 'zod'
 import { transaction } from './postgres/database.ts'
+import type { Queryable } from './postgres/database.ts'
 import type { NodeContentStore } from './node-content-store.ts'
 import { PeerBackupError } from './peer-backup-repository.ts'
 import type { PeerBackupBinding } from './peer-backup-restic.ts'
+import type { PeerPersonalRecoveryOperation } from './peer-backup-personal-recovery.ts'
+import type { PeerSourceWrites } from './peer-backup-source-space.ts'
 
 const tables = ['plugin_states', 'conversation_sessions', 'conversation_events', 'conversation_append_batches',
   'conversation_participants', 'conversation_interaction_responses', 'conversation_migrations', 'conversation_migrated_events'] as const
@@ -16,9 +20,20 @@ type Table = typeof tables[number]
 function sessionColumn(table: Table): 'conversation_id' | 'session_id' {
   return table === 'conversation_participants' || table === 'conversation_interaction_responses' ? 'conversation_id' : 'session_id'
 }
-type Budget = { maxBytes: number; maxRows: number }
+type Budget = { maxBytes: number; maxRows: number; space?:PeerSourceWrites }
 const invalid = () => new PeerBackupError(409, 'peer-backup/invalid-export')
 const over = () => new PeerBackupError(507, 'peer-backup/export-budget')
+const configurationDigest=(rows:readonly string[])=>createHash('sha256').update([...rows].sort().join('\n')).digest('hex')
+
+/** Read only configuration and legacy-provider existence around a native snapshot; no Runtime is contacted. */
+export async function personalRuntimeFacts(control:Queryable,binding:PeerBackupBinding,owner:string){
+  const result=await control.query<{body:string|null;legacy:boolean}>(`SELECT row_to_json(p)::text body,
+    EXISTS(SELECT FROM harness.conversation_sessions s WHERE s.organization_id=$1 AND s.runtime_id=$2) legacy
+    FROM (SELECT 1) anchor LEFT JOIN harness.plugin_states p ON p.organization_id=$1 AND p.runtime_id=$2 AND p.user_id=$3 AND p.project_id IS NULL`,
+    [binding.organizationId,binding.scopeId,owner])
+  return {configurationDigest:configurationDigest(result.rows.flatMap(row=>row.body===null?[]:[JSON.stringify(JSON.parse(row.body))])),
+    legacySessions:result.rows.some(row=>row.legacy)}
+}
 
 /** Bounded, private receipt for one repeatable-read snapshot. Empty Runtime tables are distinguished from absent coverage. */
 export const personalDatabaseReceipt = z.object({
@@ -29,7 +44,8 @@ export const personalDatabaseReceipt = z.object({
 
 const rowBudget=8<<20
 async function captureRows(db:PoolClient,path:string,statements:{table:string;sql:string;args:string[]}[],budget:Budget,signal:AbortSignal){
-  const file=await open(path,'wx',0o600),hash=createHash('sha256');let rows=0,bytes=0
+  const create=()=>open(path,'wx',0o600)
+  const file=budget.space?await budget.space.write(dirname(path),0,create):await create(),hash=createHash('sha256');let rows=0,bytes=0
   try{
     for(const statement of statements){
       await db.query(`DECLARE personal_rows NO SCROLL CURSOR FOR SELECT CASE WHEN octet_length(row_to_json(t)::text)<=$${statement.args.length+1}
@@ -43,7 +59,9 @@ async function captureRows(db:PoolClient,path:string,statements:{table:string;sq
           const line='{"table":'+JSON.stringify(statement.table)+',"row":'+body+'}\n'
           bytes+=Buffer.byteLength(line)
           if(++rows>budget.maxRows||bytes>budget.maxBytes)throw over()
-          await file.writeFile(line);hash.update(line)
+          if(budget.space)await budget.space.write(dirname(path),Buffer.byteLength(line),()=>file.writeFile(line))
+          else await file.writeFile(line)
+          hash.update(line)
         }
       }
       await db.query('CLOSE personal_rows')
@@ -106,13 +124,15 @@ export async function capturePersonalDatabase(pool: Pool, binding: PeerBackupBin
 
 /** Reject a modified file, an unowned generation or a child outside its exported personal Session on the recovery computer. */
 export async function verifyPersonalDatabase(binding: PeerBackupBinding, receipt: z.infer<typeof personalDatabaseReceipt>,
-  directory: string, budget: Budget, signal: AbortSignal): Promise<void> {
+  directory: string, budget: Budget, signal: AbortSignal): Promise<{configurationDigest:string;legacySessions:boolean}> {
   if (receipt.organizationId !== binding.organizationId || receipt.nodeId !== binding.sourceNodeId || receipt.runtimeId !== binding.scopeId) throw invalid()
   const sessions=new Set<string>()
+  const configurations:string[]=[]
   await verifyRows(join(directory,'personal-runtime.jsonl'),receipt,budget,signal,(table,row)=>{
       if (!(tables as readonly string[]).includes(table) || row.organization_id !== binding.organizationId || row.runtime_id !== binding.scopeId) throw invalid()
       if (table === 'plugin_states') {
         if (row.user_id !== receipt.owner || row.project_id !== null || !Array.isArray(row.entries) || !Array.isArray(row.bundles)) throw invalid()
+        configurations.push(JSON.stringify(row))
       } else if (table === 'conversation_sessions') {
         if (row.creator_user_id !== receipt.owner || row.project_id !== null || typeof row.id !== 'string' || sessions.has(row.id)) throw invalid()
         sessions.add(row.id)
@@ -121,6 +141,7 @@ export async function verifyPersonalDatabase(binding: PeerBackupBinding, receipt
         if (typeof session !== 'string' || !sessions.has(session)) throw invalid()
       }
   })
+  return {configurationDigest:configurationDigest(configurations),legacySessions:sessions.size>0}
 }
 
 const docTables=['document_roots','document_entries','document_events','document_receipts'] as const
@@ -169,4 +190,60 @@ export async function verifyPersonalDocuments(binding:PeerBackupBinding,receipt:
     }else if(row.catalog_id!==null&&(typeof row.catalog_id!=='string'||!entries.has(row.catalog_id)))throw invalid()
   })
   if(roots!==1)throw invalid()
+}
+
+/** Compare a frozen UserDoc journal and every incarnation with its exported PostgreSQL catalog. */
+export async function verifyPersonalDocumentCheckpoint(receipt:z.infer<typeof personalDocumentReceipt>,directory:string,metadata:string,budget:Budget,signal:AbortSignal){
+  const database=new DatabaseSync(metadata,{readOnly:true})
+  try{
+    database.exec('PRAGMA query_only=ON; PRAGMA trusted_schema=OFF')
+    const head=database.prepare('SELECT head_sequence,head_ordinal FROM document_projection_progress WHERE slot=1').get()
+    if(database.prepare('SELECT root_id FROM document_identity_root WHERE slot=1').get()?.root_id!==receipt.rootId||
+      String(head?.head_sequence)!==receipt.sequence||head?.head_ordinal!==receipt.ordinal||
+      database.prepare('SELECT 1 FROM document_identity_pending LIMIT 1').get()||
+      database.prepare('SELECT legacy_phase FROM document_identity_storage WHERE slot=1').get()?.legacy_phase!=='complete')throw invalid()
+    const records=new Map<string,string>()
+    const signature=(id:unknown,revision:unknown,path:unknown,state:unknown,bytes:unknown,media:unknown,trash:unknown)=>
+      JSON.stringify([id,String(revision),path,state,String(bytes),media,trash??null])
+    for(const row of database.prepare('SELECT incarnation_id,revision,doc_id,state,record FROM document_identities').iterate()){
+      if(records.size>=budget.maxRows)throw over()
+      const item=JSON.parse(String(row.record)) as {bytes:unknown;mediaType:unknown;trash?:{trashId?:unknown}}
+      records.set(String(row.incarnation_id),signature(row.incarnation_id,row.revision,row.doc_id,row.state,item.bytes,item.mediaType,item.trash?.trashId))
+    }
+    await verifyRows(join(directory,'personal-documents.jsonl'),receipt,budget,signal,(table,row)=>{
+      if(table!=='document_entries')return
+      const id=String(row.incarnation_id)
+      if(records.get(id)!==signature(row.incarnation_id,row.revision,row.doc_id,row.state,row.bytes,row.media_type,row.trash_id))throw invalid()
+      records.delete(id)
+    })
+    if(records.size)throw invalid()
+  }finally{database.close()}
+}
+
+/** Install the already verified personal document catalog on its replacement volume, refusing mixed or pre-existing content. */
+export async function importPersonalRecoveryDocuments(store:Pick<NodeContentStore,'readVolume'|'writeVolume'>,op:PeerPersonalRecoveryOperation,
+  receipt:z.infer<typeof personalDocumentReceipt>,directory:string,budget:Budget,signal:AbortSignal):Promise<void>{
+  if(op.documentReceiptOperationId)return
+  const rows:{table:typeof docTables[number];row:Record<string,unknown>}[]=[]
+  await verifyRows(join(directory,'personal-documents.jsonl'),receipt,budget,signal,(table,row)=>{
+    if(!(docTables as readonly string[]).includes(table)||row.organization_id!==op.organizationId||row.root_id!==op.sourceDocumentRoot||row.runtime_id!==null)throw invalid()
+    rows.push({table:table as typeof docTables[number],row:table==='document_roots'?{...row,node_id:op.targetNode,volume_id:op.targetVolume,writer_epoch:op.targetDocumentEpoch}:row})
+  })
+  await store.writeVolume(async tx=>{
+    if(!(await tx.query('SELECT 1 FROM node_content.volume WHERE organization_id=$1 AND node_id=$2 AND volume_id=$3',[op.organizationId,op.targetNode,op.targetVolume])).rowCount)throw invalid()
+    for(const table of docTables){
+      const fields=(await tx.query<{name:string}>(`SELECT attname name FROM pg_attribute WHERE attrelid=$1::regclass AND attnum>0 AND NOT attisdropped AND attgenerated='' ORDER BY attnum`,['node_content.'+table])).rows.map(row=>row.name)
+      if(fields.some(field=>!/^[a-z_][a-z0-9_]*$/u.test(field)))throw invalid()
+      const columns=fields.map(field=>'"'+field+'"').join(',')
+      for(const record of rows.filter(row=>row.table===table)){
+        signal.throwIfAborted()
+        if(fields.some(field=>!Object.hasOwn(record.row,field)))throw invalid()
+        const text=JSON.stringify(record.row)
+        await tx.query(`INSERT INTO node_content.${table}(${columns}) SELECT ${columns} FROM jsonb_populate_record(NULL::node_content.${table},$1::jsonb) ON CONFLICT DO NOTHING`,[text])
+        if(!(await tx.query(`SELECT 1 FROM node_content.${table} actual,jsonb_populate_record(NULL::node_content.${table},$1::jsonb) expected WHERE actual=expected`,[text])).rowCount)throw invalid()
+      }
+      const count=(await tx.query<{count:number}>(`SELECT count(*)::integer count FROM node_content.${table} WHERE organization_id=$1 AND root_id=$2`,[op.organizationId,op.sourceDocumentRoot])).rows[0]!.count
+      if(count!==rows.filter(row=>row.table===table).length)throw invalid()
+    }
+  },signal)
 }

@@ -32,8 +32,5 @@
       - /url: /admin/remote-desktops
     - link "审计":
       - /url: /admin/audit
-  - text: 管理中心
-  - combobox "界面语言":
-    - option "中文" [selected]
-    - option "English"
+  - button "中文，切换为 English"
   - button "退出登录"

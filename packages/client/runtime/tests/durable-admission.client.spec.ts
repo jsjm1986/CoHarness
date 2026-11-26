@@ -5,10 +5,120 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import { Session } from '../src/client/sessions/session.ts'
 import type { SessionRuntimeTarget } from '../src/client/contract/sessions.ts'
-import { PreparedSessionApi } from '../src/client/prepare-runtime.ts'
+import { PreparedSessionApi, PromptTargetUnverified } from '../src/client/prepare-runtime.ts'
 import { FakeApiClient, fakeRemote } from './fake-api.client.ts'
 
 afterEach(() => { vi.unstubAllGlobals() })
+
+it.each([
+  { kind: 'personal', committed: false },
+  { kind: 'personal', committed: true },
+  { kind: 'project', committed: false },
+  { kind: 'project', committed: true },
+] as const)('resumes one $kind submission after lease turnover (already committed=$committed)', async ({ kind, committed }) => {
+  vi.stubGlobal('location', new URL('https://harness.invalid/'))
+  const slots = new Map<string, string>()
+  vi.stubGlobal('sessionStorage', {
+    getItem: (key: string) => slots.get(key) ?? null,
+    setItem: (key: string, value: string) => { slots.set(key, value) },
+    removeItem: (key: string) => { slots.delete(key) },
+  })
+  const target = { kind, ...(kind === 'project' ? { projectId: 14 } : {}),
+    nodeId: '10000000-0000-4000-8000-000000000008', runtimeId: '10000000-0000-4000-8000-000000000009' } as SessionRuntimeTarget
+  const connection = { interactions: 'none', metadataTiming: { requestTimeoutMs: 1000, retryAfterMs: 1 } } as ConnectionHandle
+  const api = new PreparedSessionApi(connection, target, 7)
+  const calls: string[] = [], dispatched: object[] = []
+  const blocked = Promise.withResolvers<undefined>()
+  let accountVerified = true
+  const session = new Session('original' as SessionId, new FakeApiClient(), fakeRemote(), { admission: () => {
+    if (!accountVerified) {
+      blocked.resolve(undefined)
+      throw new PromptTargetUnverified()
+    }
+    return api
+  } })
+  const input = { text: 'retain this draft on the original computer', mode: 'queue' as const, images: [] }
+  const echo = session.beginSubmission(input)
+  const durable = new Map<string, string>()
+  let statusCalls = 0
+  vi.stubGlobal('fetch', async (url: URL, init: RequestInit) => {
+    expect(url.searchParams.get('dshRuntime')).toBe(target.runtimeId)
+    expect(url.searchParams.get('dshNode')).toBe(target.nodeId)
+    expect(url.searchParams.get('dshTarget')).toBe(kind === 'project' ? 'project:14' : 'personal')
+    expect(new Headers(init.headers).get('x-dsh-expected-principal-id')).toBe('7')
+    if (typeof init.body !== 'string') throw new Error('Expected a JSON request body')
+    const { rpcId, payload } = JSON.parse(init.body) as {
+      rpcId: string
+      payload: { requestId: string; sessionId: string; mode: string; clientTimeZone?: string; content: unknown[] }
+    }
+    expect(payload).toMatchObject({ sessionId: 'original', requestId: echo.requestId })
+    const operation = url.pathname.endsWith('/session.status') ? 'status' : 'prompt'
+    calls.push(operation)
+    let value: unknown
+    if (operation === 'prompt') {
+      dispatched.push(payload)
+      const first = dispatched.length === 1
+      if (first && !committed) return Response.json({ error: 'node-access/lease-lost' }, { status: 409 })
+      const digest = createHash('sha256').update(JSON.stringify([payload.mode, payload.clientTimeZone ?? null, payload.content])).digest('hex')
+      durable.set(payload.requestId, createHash('sha256').update(JSON.stringify([payload.requestId, digest])).digest('hex'))
+      if (first) throw new TypeError('The transport failed after durable acceptance')
+      value = { accepted: true }
+    } else {
+      if (++statusCalls === 1) {
+        accountVerified = false
+        return Response.json({ error: { code: 'INSTANCE_STARTING' } }, { status: 503 })
+      }
+      value = committed ? { state: 'accepted', inputProof: durable.get(payload.requestId) } : { state: 'unknown' }
+    }
+    return Response.json({ type: 'server-response', rpcId, result: { ok: true, value } }, { headers: { 'x-dsh-runtime-id': target.runtimeId! } })
+  })
+  try {
+    const pending = session.prompt([{ type: 'text', text: input.text }], 'queue', undefined, echo.requestId)
+    await blocked.promise
+    expect(session.getSnapshot().pendingSubmissions?.[0]?.text).toBe(input.text)
+    expect(JSON.stringify([...slots])).not.toContain(input.text)
+    accountVerified = true
+    expect(await pending).toEqual({ ok: true, value: { accepted: true } })
+    expect(calls).toEqual(committed ? ['prompt', 'status', 'status'] : ['prompt', 'status', 'status', 'prompt'])
+    if (!committed) expect(dispatched[0]).toEqual(dispatched[1])
+    expect([...durable.keys()]).toEqual([echo.requestId])
+    expect(slots.size).toBe(0)
+  } finally { session.dispose() }
+})
+
+it.each(['steering', 'revoked', 'ownership changed'] as const)('leaves the input unconfirmed when recovery is refused (%s)', async (reason) => {
+  vi.stubGlobal('location', new URL('https://harness.invalid/'))
+  const slots = new Map<string, string>()
+  vi.stubGlobal('sessionStorage', {
+    getItem: (key: string) => slots.get(key) ?? null,
+    setItem: (key: string, value: string) => { slots.set(key, value) },
+    removeItem: (key: string) => { slots.delete(key) },
+  })
+  const target = { kind: 'personal', nodeId: '10000000-0000-4000-8000-000000000008',
+    runtimeId: '10000000-0000-4000-8000-000000000009' } as SessionRuntimeTarget
+  const connection = { interactions: 'none', metadataTiming: { requestTimeoutMs: 1000, retryAfterMs: 1 } } as ConnectionHandle
+  const original = new PreparedSessionApi(connection, target, 7)
+  let api = original
+  const calls: string[] = []
+  vi.stubGlobal('fetch', async (url: URL, init: RequestInit) => {
+    calls.push(url.pathname)
+    if (url.pathname.endsWith('/session.prompt')) return new Response(null, { status: 503 })
+    if (reason === 'revoked') return new Response(null, { status: 403 })
+    if (reason === 'ownership changed') api = new PreparedSessionApi(connection, target, 8)
+    if (typeof init.body !== 'string') throw new Error('Expected a JSON request body')
+    const { rpcId } = JSON.parse(init.body) as { rpcId: string }
+    return Response.json({ type: 'server-response', rpcId, result: { ok: true, value: { state: 'unknown' } } },
+      { headers: { 'x-dsh-runtime-id': target.runtimeId! } })
+  })
+  const session = new Session('original' as SessionId, new FakeApiClient(), fakeRemote(), { admission: () => api })
+  try {
+    const mode = reason === 'steering' ? 'steer' : 'queue'
+    const content = [{ type: 'text' as const, text: 'retain this input' }]
+    expect((await session.prompt(content, mode)).ok).toBe(false)
+    expect(slots.size).toBe(1)
+    expect(calls).toEqual(['/api/admit/v1/session.prompt', '/api/admit/v1/session.status'])
+  } finally { session.dispose() }
+})
 
 it('queries an uncertain submission and an explicit retry uses the same request ID after status becomes available', async () => {
   vi.stubGlobal('location', new URL('https://harness.invalid/'))

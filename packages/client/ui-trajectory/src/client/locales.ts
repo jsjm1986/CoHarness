@@ -5,6 +5,7 @@ export const NS = 'trajectory'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'copy.options': '复制选项',
   'view.trajectory': '轨迹',
   'toolbar.aria': '轨迹工具栏',
   'toolbar.duration': '时长',
@@ -175,6 +176,17 @@ export const zh = {
   'details.toolCall': '工具调用',
   'timeline.aria': '轨迹时间线',
   'timeline.overviewAria': '时间线概览；水平拖动可聚焦事件',
+  'timeline.controls': '调整时间线',
+  'timeline.adjust': '调整',
+  'timeline.closeControls': '关闭时间线调整',
+  'timeline.zoomIn': '放大',
+  'timeline.zoomOut': '缩小',
+  'timeline.zoomLevel': '缩放 {value}%',
+  'timeline.reset': '重置时间线',
+  'timeline.rangeHint': '调整起点和终点，聚焦此范围内的事件。',
+  'timeline.rangeStart': '范围起点',
+  'timeline.rangeEnd': '范围终点',
+  'timeline.operationOffset': '操作位置 {value}',
   'timeline.noTimingData': '无计时数据',
   'timeline.total': '总计 {duration}',
   'timeline.started': '开始于 {time}',
@@ -219,6 +231,7 @@ export type TrajectoryTranslate =
 
 /** English dictionary, checked complete against the Chinese source of truth. */
 export const en: Record<TrajectoryKey, string> = {
+  'copy.options': 'Copy options',
   'view.trajectory': 'Trajectory',
   'toolbar.aria': 'Trajectory toolbar',
   'toolbar.duration': 'Duration',
@@ -389,6 +402,17 @@ export const en: Record<TrajectoryKey, string> = {
   'details.toolCall': 'Tool Call',
   'timeline.aria': 'Trajectory timeline',
   'timeline.overviewAria': 'Timeline overview; drag horizontally to focus events',
+  'timeline.controls': 'Adjust timeline',
+  'timeline.adjust': 'Adjust',
+  'timeline.closeControls': 'Close timeline controls',
+  'timeline.zoomIn': 'Zoom in',
+  'timeline.zoomOut': 'Zoom out',
+  'timeline.zoomLevel': 'Zoom {value}%',
+  'timeline.reset': 'Reset timeline',
+  'timeline.rangeHint': 'Adjust the start and end to focus events within that range.',
+  'timeline.rangeStart': 'Range start',
+  'timeline.rangeEnd': 'Range end',
+  'timeline.operationOffset': 'Operation offset {value}',
   'timeline.noTimingData': 'No timing data',
   'timeline.total': 'Total {duration}',
   'timeline.started': 'Started {time}',

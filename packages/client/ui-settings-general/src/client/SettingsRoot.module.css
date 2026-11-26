@@ -150,6 +150,7 @@
    gap 18, no own fill — the panel white shows through. */
 .nav {
   flex: none;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -160,6 +161,7 @@
 
 /* Title row (figma 501:29959): 16/500 lh24, 12px side padding. */
 .navTitle {
+  flex: none;
   padding: 0 var(--dsw-space-3);
   font-size: 16px;
   line-height: 24px;
@@ -170,14 +172,18 @@
 /* Cell stack (figma 501:29961): gap 4. */
 .navList {
   display: flex;
+  min-height: 0;
   flex-direction: column;
   gap: var(--dsw-space-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Nav cell (figma .Setting-nav-cell 501:29962): 164x40, r12, pad
    (12,9,16,9), gap 8; label 14/400 lh22; selected fill #EBEEF2. */
 .navCell {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--dsw-space-2);
   height: 40px;
@@ -237,7 +243,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--dsw-space-2);
-  height: 54px;
+  min-block-size: 54px;
   padding: var(--dsw-space-5) 14px var(--dsw-space-2) 10px;
   box-sizing: border-box;
 }
@@ -331,8 +337,7 @@
   .header {
     grid-column: 2;
     grid-row: 1;
-    height: auto;
-    min-height: var(--dsw-touch-target);
+    min-block-size: var(--dsw-touch-target);
     align-items: center;
     padding: calc(var(--dsw-space-3) + var(--dsw-safe-top)) var(--dsw-space-3) 0;
   }
@@ -400,7 +405,15 @@
   }
 }
 
+@media (min-width: 768px) and (max-height: 480px) {
+  .overlay { bottom: auto; height: var(--dsw-viewport-height, 100dvh); }
+  .panel { width: 100%; height: 100%; max-width: none; border-radius: 0; }
+  .header { min-block-size: var(--dsw-touch-target); padding-block: 4px; }
+}
+
 @media (pointer: coarse) {
+  .navCell { min-height: var(--dsw-touch-target); }
+
   .trigger {
     height: auto;
     min-height: var(--dsw-touch-target);

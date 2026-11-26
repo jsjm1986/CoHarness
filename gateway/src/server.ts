@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto'
+import { AccessNodeDrainingError } from './access-invalidation.ts'
+import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_INGRESS_TIMING_HEADER, isResourceAdmissionRequest } from '@deepseek-ai/dsh-resource-budget/wire'
 import { checkDocumentAttachmentTarget } from './node-content-documents-target.ts'
 import { NodeContentUnavailable } from './node-content-store.ts'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { createServer, STATUS_CODES } from 'node:http'
+import type { Socket } from 'node:net'
 import type { Duplex } from 'node:stream'
 import type { UserRow } from './auth.ts'
 import {
@@ -11,14 +14,17 @@ import {
   AccountPreferencesUnavailableError,
   normalizeAccountPreferenceMutation,
 } from './account-preferences.ts'
-import { CollaborationDeniedError, type ProjectReadAuthorityView } from './collaboration.ts'
+import { CollaborationDeniedError, type ProjectReadAuthorityView, type ProjectScopeView } from './collaboration.ts'
 import type { GatewayConfig } from './config.ts'
 import type { WriteGateVerdict } from './postgres/maintenance-service.ts'
 import { RuntimeStartBlockedError, type ProjectRuntime, type RuntimeSubject } from './instances.ts'
+import type { RuntimeCredentialSubject } from './runtime-api.ts'
 import type { PrincipalScope } from './principal.ts'
-import { forwardRequestMatches } from './forwarded-principal.ts'
+import { forwardRequestMatches, type GatewayForwardClaims, type GatewayForwardSessionCandidate } from './forwarded-principal.ts'
 import type { GatewayPushService, PushProvider } from './push-notifications.ts'
-import { gateCopy, gateLanguage, loginPage, passwordPage, environmentsPage, runtimeStartFailurePage, type RuntimeStartFailureReason, type RuntimeStartRetry } from './html.ts'
+import { gateCopy, gateLanguage, loginPage, passwordPage, environmentsPage, waitingPage, runtimeStartFailurePage, type RuntimeStartFailureReason, type RuntimeStartRetry } from './html.ts'
+import { RuntimeStartObservations } from './runtime-start-observation.ts'
+import { NodeServiceResponseUnknownError } from './node-service-proxy.ts'
 import { browserReturnPath } from './browser-return.ts'
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './password.ts'
 import {
@@ -52,29 +58,46 @@ import { ResponseBodyTooLargeError } from './response-budget.ts'
 import { removeBootstrapAdminPassword } from './bootstrap-admin.ts'
 import type { ProjectConfigurationView } from './project-configuration.ts'
 import type { ProjectInvitation, ProjectKind, ProjectThemePolicy } from './projects.ts'
-import { applyModelGovernanceToProject, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
+import { applyModelGovernanceToProject, modelPolicyProjectionDiagnostics, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
 import { ProjectModelSettingsConflictError, type ModelSettingsPathOp } from './model-governance.ts'
 import type { GatewayWorkbenchCatalogHandler } from './workbench.ts'
-import { OperationTimings, timeOperation } from './operation-timing.ts'
-import { GatewayPerformanceObserver } from './performance-observer.ts'
+import { OperationTimings, recordReadySession, timeOperation, timeResourceBearer } from './operation-timing.ts'
+import { GatewayPerformanceObserver, type ReadySessionOutcome, type ReadySessionRoute } from './performance-observer.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { RuntimeAccountError } from './launcher.ts'
-import { RuntimeCatalogError } from './runtime-catalog.ts'
-import { isExplicitScopeRequest, isExplicitSessionRequest, pinRuntimeRequestPath } from './runtime-request-path.ts'
+import { RuntimeCatalogError, type RuntimeId, type RuntimeNodeId } from './runtime-catalog.ts'
+import { isDelegatablePersonalRead, isExplicitScopeRequest, isExplicitSessionRequest, isImmutableRuntimeAssetRequest, isPersonalExecutionWriteRequest, isReadyRuntimeInteractive, isReadyRuntimeRead, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest, pinRuntimeRequestPath, RUNTIME_MODEL_CREDENTIAL_PATH } from './runtime-request-path.ts'
+import { sendCompressed } from './http-compression.ts'
 import { DocumentCatalogError, parseDocumentOverviewOptions } from './document-catalog.ts'
+import { BROWSER_DOCUMENT_OVERVIEW_STREAM } from './browser-documents.ts'
 import { ComputerAccessError, type GatewayComputerAccess } from './computer-access.ts'
 import { computerAccessApi } from './computer-access-api.ts'
 import { DeploymentTopologyError } from './deployment-topology.ts'
 import { isCentralRuntimeManagementRequest } from './runtime-management-api.ts'
 import { GatewayRuntimeRouter, InvalidRuntimeTargetError, LocalRuntimeAdapter, type RuntimePlacement } from './runtime-router.ts'
-import { NodeAccessError, nodeUuidSchema } from './node-access.ts'
+import { NodeAccessError, nodeUuidSchema, type NodeServiceIdentityLease } from './node-access.ts'
 import { NODE_CHANNEL_PATH, NodeChannelError } from './node-channel-protocol.ts'
-import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_STREAM_PATH, NODE_SERVICE_TARGET_HEADER, NodeServiceError } from './node-service-stream.ts'
+import { NODE_SERVICE_IDENTITY_PATH, NODE_SERVICE_LOCAL_PORT_HEADER, NODE_SERVICE_PROTOCOL_VERSION, NODE_SERVICE_STREAM_PATH, NODE_SERVICE_TARGET_HEADER, NodeServiceError, RELEASE_COMBO_DIGEST_HEADER } from './node-service-stream.ts'
 import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
 import { PostgresCheckoutQueueFullError, type PostgresPoolAdmissionSnapshot } from './postgres/database.ts'
 import { forwardedClientAddress, trustedProxyList } from './login-source.ts'
 
+interface DatabasePoolPerformance {
+  total: number
+  idle: number
+  waiting: number
+  maximum: number | null
+  admission?: PostgresPoolAdmissionSnapshot | null
+}
+
 export interface GatewayDeps {
+  /** Installed only when startup found a governance rebuild; ordinary organizations add no admission query. */
+  governanceRecovery?: {
+    /** Recheck the same imported governance epoch until its administrator releases normal access. */
+    admission(): Awaitable<{ operationId: string; bootstrapUserId: number; state: 'review' | 'released' }>
+    /** Recheck the bound database generation for recovery administration even after release. */
+    verifyAdministration(): Awaitable<void>
+  }
   /** Verify the originating database and independently held historical copies after project cutover. */
   sourceRetirement?: Pick<import('./node-content-source-retirement.ts').NodeContentSourceRetirement,'report'|'open'|'finalize'>
   contentMigrations?: Pick<import('./node-content-migration-admin.ts').NodeContentMigrationAdmin,'choices'|'preflight'|'prepare'|'publish'>
@@ -101,6 +124,10 @@ export interface GatewayDeps {
   auth: GatewayAuthService
   /** Current browser session and local computer permission after acquiring a Runtime. */
   revalidateOnComputer?(token:string): Promise<UserRow|null>
+  /** Current browser session, earliest deadline, and local computer permission on the business pool for initial WebSocket upgrades. */
+  qualifyStreamOnComputer?: GatewayAuthService['qualifyForStream']
+  /** Fresh session and project authority for existing event socket renewal. */
+  streamPrincipalAuthority?: Pick<GatewayAuthService, 'qualifyForStream'> & Pick<GatewayCollaborationService, 'projectForUser'>
   users: GatewayUserService
   projects: GatewayProjectService
   audit: GatewayAuditService
@@ -115,7 +142,9 @@ export interface GatewayDeps {
   /** Placement and local owner resolution; metadata-only compositions may omit execution routing. */
   runtimeRouter?: Pick<GatewayRuntimeRouter, 'resolve' | 'placement' | 'landing'>
   /** Center-owned node credentials and control-only outbound connection leases. */
-  nodeAccess?: Pick<import('./postgres/node-access-service.ts').PostgresNodeAccessService, 'issue' | 'mutate' | 'list' | 'enroll' | 'connect' | 'heartbeat' | 'disconnect'>
+  nodeAccess?: Pick<import('./postgres/node-access-service.ts').PostgresNodeAccessService, 'issue' | 'mutate' | 'list' | 'enroll' | 'connect' | 'heartbeat' | 'disconnect' | 'checkRemoval' | 'remove'>
+  /** Ordinary-maintenance lease admission bound to this process's write epoch and shutdown state. */
+  maintainNodeConnection?: (operation: import('./node-access.ts').NodeControlOperation, token: string, input: unknown) => Promise<import('./node-access.ts').NodeLease | void>
   /** Optional outbound control-channel owner; its supplying lifecycle closes it before the PostgreSQL pool. */
   nodeChannels?: Pick<import('./node-channel.ts').GatewayNodeChannels, 'accept' | 'probe' | 'revoke'>
   /** Binary connections to this center, owned and closed independently of control probes. */
@@ -124,24 +153,20 @@ export interface GatewayDeps {
   nodeServiceIdentity?: {
     nodeId: import('./runtime-catalog.ts').RuntimeNodeId
     organizationId: string
-    authorize(token: string, input: unknown): Promise<import('./node-access.ts').NodeLease>
+    authorize(token: string, input: unknown): Promise<import('./node-access.ts').NodeServiceIdentityLease>
   }
   /** Authenticated forwarding to another computer's existing Gateway, when explicitly enabled. */
-  nodeServiceProxy?: Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'http' | 'upgrade'> & Partial<Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'webhook' | 'closeIdle'>>
+  nodeServiceProxy?: Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'http' | 'upgrade'> & Partial<Pick<import('./node-service-proxy.ts').GatewayNodeServiceProxy, 'webhook' | 'closeIdle' | 'diagnostics'>>
   /** Shared process diagnostics; its supplying owner disposes it after all observed listeners close. */
   performance?: GatewayPerformanceObserver
   /** Native pool counters, without querying the database or retaining connection details. */
-  databasePerformance?: () => {
-    total: number
-    idle: number
-    waiting: number
-    maximum: number | null
-    admission?: PostgresPoolAdmissionSnapshot | null
-  }
+  databasePerformance?: () => DatabasePoolPerformance & { control?: DatabasePoolPerformance; accessListener?: DatabasePoolPerformance }
   /** Durable revocations shared by Gateways using the same organization. */
   accessMonitor?: import('./access-invalidation.ts').GatewayAccessMonitor
   /** Peer-signed forwarded-request assertion verifier; null falls back to session validation. */
   forwardedPrincipal?: (assertion: string) => Promise<import('./forwarded-principal.ts').GatewayForwardClaims | null>
+  /** Verify a Session signature with known key bytes whose publication is checked during ready admission. */
+  forwardedSessionPrincipal?: (assertion: string) => GatewayForwardSessionCandidate | null
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
   /** Optional human-facing project progress journal; absent without PostgreSQL. */
@@ -164,9 +189,11 @@ export interface GatewayDeps {
   stewardAccess?: Pick<import('./steward-access.ts').StewardAccess, 'get' | 'set' | 'list'>
   /** Optional administrator-owned shared-memory write qualification store. */
   memoryAccess?: Pick<import('./memory-access.ts').MemoryAccess, 'get' | 'set'>
-  pluginManagement?: Pick<import('./plugin-management.ts').GatewayPluginManagement, 'target' | 'invoke' | 'state' | 'saveState' | 'overview'>
+  pluginManagement?: Pick<import('./plugin-management.ts').GatewayPluginManagement, 'target' | 'invoke' | 'state' | 'saveState' | 'overview' | 'inventory'>
   /** Optional durable plugin desired-state store backing spawn projection and runtime write-back. */
   pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'get' | 'set' | 'readForSubject' | 'publishForSubject' | 'projection' | 'markApplied' | 'applied' | 'observed' | 'project' | 'list'>
+  /** Optional durable plugin inventory store backing runtime reports and the administrator overview. */
+  pluginInventory?: Pick<import('./plugin-inventory.ts').PostgresPluginInventory, 'report' | 'list'>
   terminalManagement?: Pick<import('./terminal-management.ts').GatewayTerminalManagement, 'list' | 'close'>
   terminalAccess?: Pick<import('./terminal-access.ts').TerminalAccess, 'get' | 'set'>
   sshAccess?: Pick<import('./ssh-access.ts').SshAccess, 'get' | 'set'>
@@ -198,6 +225,8 @@ export interface GatewayDeps {
    * process predates a completed restore. Absent leaves every write open.
    */
   maintenanceGate?: () => Promise<import('./postgres/maintenance-service.ts').WriteGateVerdict>
+  /** Fresh maintenance and write-epoch check for node and Runtime stream control. */
+  leaseControlGate?: GatewayDeps['maintenanceGate']
   /**
    * Mark one mutating request as an in-flight writer until its handler
    * settles, even if its client disconnects. Called at gate admission — before the gate verdict is read — so
@@ -220,6 +249,7 @@ export interface GatewayDeps {
    * every asset path.
    */
   releaseAssets?: Pick<import('./release-assets.ts').ReleaseAssets, 'serve'>
+    & Partial<Pick<import('./release-assets.ts').ReleaseAssets, 'serveDeferredIndex'>>
 }
 
 /** Backup execution wiring shared by the admin backup routes. */
@@ -227,6 +257,12 @@ export type GatewayBackupWork = Pick<import('./postgres/deployment-backups.ts').
 
 export const SESSION_COOKIE = 'hgw_session'
 export const SCOPE_COOKIE = 'hgw_scope'
+
+class GovernanceAdmissionUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super('Governance recovery admission could not be verified', { cause })
+  }
+}
 
 /** A browser's previously observed account is a refusal condition, never an identity grant. */
 function browserPrincipalMatches(req: IncomingMessage, user: UserRow): boolean {
@@ -598,6 +634,32 @@ class ReadPublicationUnavailableError extends Error {
   constructor(kind: 'project' | 'invitation' | 'usage', cause: unknown) { super(`${kind}-read-authority-unavailable`, { cause }) }
 }
 
+/** Read the browser account's project directory, including current ownership and theme policy. */
+async function accountContextProjects(deps: GatewayDeps, user: UserRow): Promise<ProjectScopeView[]> {
+  const scopes = await deps.collaboration?.projectsForUser(user.id, 'account-context') ?? []
+  const ids = scopes.filter(scope => scope.owner === undefined || scope.origin === undefined || scope.uiThemePolicy === undefined)
+    .map(scope => scope.projectId)
+  const details = ids.length === 0 ? [] : deps.projects.getScopeMetadataByIds !== undefined
+    ? await deps.projects.getScopeMetadataByIds(ids)
+    : deps.projects.getByIds === undefined
+      ? await deps.projects.list()
+      : await deps.projects.getByIds(ids)
+  const byId = new Map(details.map(project => [project.id, project]))
+  return Promise.all(scopes.map(async ({ canManage: granted, ...scope }) => {
+    const detail = byId.get(scope.projectId)
+    const owner = detail?.owner !== undefined ? detail.owner
+      : scope.owner !== undefined ? scope.owner : (await deps.projects.getById(scope.projectId))?.owner
+    const canManage = granted ?? (user.role === 'admin' || owner?.id === user.id)
+    return {
+      ...scope,
+      ...(canManage ? { canManage: true } : {}),
+      ...(detail?.origin === undefined ? {} : { origin: detail.origin }),
+      ...(detail?.owner === undefined ? {} : { owner: detail.owner }),
+      ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
+    }
+  }))
+}
+
 /** Authority lookup failures withhold prepared records and database diagnostics. */
 async function readPublicationAuthority<T>(kind: 'project' | 'invitation' | 'usage', read: () => Awaitable<T>): Promise<T> {
   try { return await read() }
@@ -662,13 +724,93 @@ export interface GatewayRequestContext {
   runtime: RuntimeSubject
   /** Explicit stable environment identity; process generation is resolved by the local lifecycle owner. */
   environment?: { id: import('./runtime-catalog.ts').RuntimeId; nodeId: import('./runtime-catalog.ts').RuntimeNodeId; nodeName?: string }
+  /** Verified organization access revision already synchronized by the forwarding primary. */
+  forwardedAccessRevision?: bigint
 }
 
 export type ProxyHandler = (req: IncomingMessage, res: ServerResponse, context: GatewayRequestContext) => Promise<void>
+
+/** Exact personal event target resolved by the authenticated entry route. */
+export interface ReadyEventSelection {
+  actor: UserRow
+  sessionToken: string
+  runtimeId: RuntimeId
+  nodeId: RuntimeNodeId
+  entryNodeId?: RuntimeNodeId
+  forwarded?: GatewayForwardSessionCandidate
+}
+
+/**
+ * Admit an already running personal event connection with one current Runtime qualification.
+ * @param req - original browser upgrade.
+ * @param socket - browser transport, adopted only when the handler accepts it.
+ * @param head - bytes after the upgrade headers.
+ * @param selection - authenticated browser session and exact personal allocation.
+ * @returns true if the handler owns the upgrade, or false for general Runtime preparation.
+ */
+export type ReadyEventHandler = (req: IncomingMessage, socket: Duplex, head: Buffer, selection: ReadyEventSelection) => Promise<boolean>
+
+/**
+ * Upgrade after general Runtime preparation.
+ * @param req - original browser upgrade.
+ * @param socket - browser transport.
+ * @param head - bytes after the upgrade headers.
+ * @param context - authenticated account and resolved Runtime scope.
+ * @returns after adopting or closing the transport.
+ */
 export type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer, context: GatewayRequestContext) => Promise<void>
+
+type ReadySessionObservation = (route: ReadySessionRoute, outcome: ReadySessionOutcome) => void
+
+/**
+ * Dispatch an exact Session operation or a qualified Runtime read against the supervised generation.
+ * @param req - original request.
+ * @param res - response owned by the handler after it accepts the request.
+ * @param selection - authenticated browser session and exact local target.
+ * @returns true if the handler owns the response, or false if normal routing must continue.
+ */
+export type ReadySessionHandler = (req: IncomingMessage, res: ServerResponse, selection: {
+  actor: UserRow
+  sessionToken: string
+  runtimeId: RuntimeId
+  nodeId: RuntimeNodeId
+  target: RuntimePlacement['target']
+  entryNodeId?: RuntimeNodeId
+  forwarded?: GatewayForwardSessionCandidate
+  managedPersonalRead?: true
+  /** Observe the forwarding decision before the response settles. */
+  observe?: ReadySessionObservation
+}) => Promise<boolean>
+
+function exactSessionSelectors(selection: URLSearchParams): { runtimeId: RuntimeId; target: RuntimePlacement['target'] } | undefined {
+  const targets = selection.getAll('dshTarget'), runtimes = selection.getAll('dshRuntime')
+  const target = targets[0] ?? '', project = /^project:([1-9][0-9]*)$/u.exec(target)
+  if (runtimes.length !== 1 || !nodeUuidSchema.safeParse(runtimes[0]).success || targets.length !== 1
+    || target !== 'personal' && (!project || !Number.isSafeInteger(Number(project[1])))) return undefined
+  return { runtimeId: runtimes[0] as RuntimeId, target: target as RuntimePlacement['target'] }
+}
+
+function forwardedSessionMatches(forward: GatewayForwardClaims,
+  selection: { runtimeId: RuntimeId; nodeId: RuntimeNodeId; target: RuntimePlacement['target'] }): boolean {
+  return forward.selection?.runtimeId === selection.runtimeId && forward.selection.target === selection.target
+    && forward.context?.environment.id === selection.runtimeId && forward.context.environment.nodeId === selection.nodeId
+}
 
 /** Invalidate already admitted runtime traffic after a committed access change. */
 export type GatewayAccessInvalidation = (subject: import('./access-invalidation.ts').AccessInvalidationSubject) => void
+
+/** Admission for a bounded personal execution request with a recognized bearer. */
+interface PersonalExecutionWriteAdmission {
+  readonly subject: RuntimeCredentialSubject
+  /** The bearer requires fresh authorization before a general write or a failure response. */
+  readonly fromCandidate: boolean
+  /**
+   * Retain a writer span and check the local stop gate or the shared maintenance gate.
+   * @param sqlFenced - the exact write checks authority and maintenance in its own SQL statement.
+   * @returns false after sending a write refusal.
+   */
+  admit(sqlFenced: boolean): Promise<boolean>
+}
 
 /** Buffered runtime control dispatcher with an optional authenticated stream entry. */
 export interface GatewayRuntimeHandler {
@@ -677,9 +819,22 @@ export interface GatewayRuntimeHandler {
    * @param res - response owned when this dispatcher returns true.
    * @param pathname - parsed request pathname.
    * @param body - bounded control payload, empty for GET and HEAD.
+   * @param executionWrite - admission for exact personal execution or a model credential lookup.
+   * @param controlSubject - exact Runtime identity preauthenticated for renewal or completion, with a final ownership check in the dispatcher.
    * @returns whether this dispatcher owns the response.
    */
-  (req: IncomingMessage, res: ServerResponse, pathname: string, body: string): Promise<boolean>
+  (req: IncomingMessage, res: ServerResponse, pathname: string, body: string, executionWrite?: PersonalExecutionWriteAdmission,
+    controlSubject?: RuntimeCredentialSubject): Promise<boolean>
+  /**
+   * Identify a request whose parsed payload can select a transaction that checks its own authority.
+   * @param subject - recognized Runtime identity to be checked for the exact write.
+   * @param pathname - parsed request pathname.
+   * @param method - HTTP method.
+   * @param activeModelCheck - whether the provider requested an exact active model confirmation.
+   * @returns whether the dispatcher will choose and apply the write gate before dispatch.
+   */
+  defersPersonalExecutionWrite?(subject: RuntimeCredentialSubject, pathname: string, method: string | undefined,
+    activeModelCheck?: boolean): boolean
   /**
    * Handle raw bytes before buffered control admission; authenticate each operation before using them.
    * @param req - runtime-token-authenticated request with its body untouched.
@@ -692,6 +847,8 @@ export interface GatewayRuntimeHandler {
 }
 
 export interface GatewayHandlers {
+  /** Restricted recovery actions, authenticated here before any selected-node routing. */
+  governanceRecovery?: Pick<import('./governance-rebuild-gateway.ts').GovernanceRebuildGateway, 'admin'>
   /** Authorized policies and opaque peer repositories for this ingress. */
   peerBackups?: Pick<import('./peer-backup-gateway.ts').PeerBackupGateway, 'admin' | 'internal'>
   /** Runtime-qualified node index. */
@@ -705,7 +862,13 @@ export interface GatewayHandlers {
   /** Stops affected HTTP responses and WebSockets; new requests authorize normally. */
   invalidateAccess?: GatewayAccessInvalidation
   proxy?: ProxyHandler
+  /** False leaves the body untouched for ordinary Runtime selection and preparation. */
+  readySession?: ReadySessionHandler
+  readyEvent?: ReadyEventHandler
   upgrade?: UpgradeHandler
+  /** Exact immutable resources retain no execution activity and never recover a Runtime. */
+  runtimeAssets?: Pick<import('./runtime-assets.ts').RuntimeAssets, 'handle'>
+    & Partial<Pick<import('./runtime-assets.ts').RuntimeAssets, 'diagnostics'>>
   /** Account catalog including personal runtime metadata and ACL-filtered projects. */
   workbenchCatalog?: GatewayWorkbenchCatalogHandler
   /** Gateway-owned alternate-scope document listing; never expose runtime URLs. */
@@ -723,7 +886,17 @@ export interface GatewayHandlers {
    * callback at the HTTP boundary prevents unauthenticated callers from
    * forcing a 64 MiB allocation before the runtime handler can reject them.
    */
-  runtimeAuthorize?: (req: IncomingMessage) => Awaitable<boolean>
+  runtimeAuthorize?: (req: IncomingMessage) => Awaitable<boolean | 'shutdown-storage' | RuntimeCredentialSubject>
+  /** Previously verified coordinates for an exact personal write with its own SQL authority check. */
+  runtimePersonalExecutionCandidate?: (req: IncomingMessage) => RuntimeCredentialSubject | null
+  /** Previously verified personal or project coordinates for the model credential endpoint alone. */
+  runtimeModelCredentialCandidate?: (req: IncomingMessage) => RuntimeCredentialSubject | null
+  /** Process-local shutdown gate for a write that checks the shared epoch in its own transaction. */
+  runtimePersonalExecutionStopGate?: () => WriteGateVerdict
+  /** Deployment maintenance and write-epoch checks for one authenticated planned-stop checkpoint. */
+  runtimeShutdownStorageWriteGate?: () => Promise<WriteGateVerdict>
+  /** Check the write epoch before accepting an authenticated resource completion in maintenance. */
+  runtimeResourceCompletionWriteGate?: () => Promise<WriteGateVerdict>
   runtime?: GatewayRuntimeHandler
   /** Override `serveAdmin` root (tests); default `gateway/public/admin`. */
   adminRoot?: string
@@ -736,6 +909,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     forwardedClientAddress(req.socket.remoteAddress ?? '', req.headers['x-forwarded-for'], trustedProxies)
   const runtimeRouter = deps.runtimeRouter ?? new GatewayRuntimeRouter(new LocalRuntimeAdapter(deps))
   const runtimeStartForms = new WeakMap<IncomingMessage, RuntimeStartRetry | null>()
+  const runtimeStartObservations = new RuntimeStartObservations(cfg.readinessTimeoutMs + cfg.runtimeCapacity.maxQueueWaitMs)
+  const recoveryAdmission = async () => {
+    try { return await deps.governanceRecovery?.admission() }
+    catch (error) { throw new GovernanceAdmissionUnavailableError(error) }
+  }
 
   const sendStartFailure = (req: IncomingMessage, res: ServerResponse, problem: { status: number; reason: RuntimeStartFailureReason; retryable: boolean }, retry: RuntimeStartRetry | null): void => {
     res.setHeader('cache-control', 'no-store')
@@ -788,6 +966,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     return probe
   }
 
+  const auditForwardedAccount = (req: IncomingMessage, path: string, claims: GatewayForwardClaims): void => {
+    if (path.startsWith('/api/') || isImmutableRuntimeAssetRequest(req.method, req.url ?? '/')) return
+    void Promise.resolve(audit.write({ userId: claims.user.id, action: 'auth.forwarded',
+      methodPath: `${req.method ?? ''} ${path}`, ip: clientIp(req),
+      detail: JSON.stringify({ issuerNode: claims.issuerNode, nonce: claims.nonce }) }))
+      .catch((error: unknown) => { console.error('[gateway] audit write failed:', error) })
+  }
+
   const currentUser = async (req: IncomingMessage): Promise<{ token: string; user: UserRow;
       forward?: import('./forwarded-principal.ts').GatewayForwardClaims } | null> => {
     // A peer-signed assertion proves the forwarding Gateway already validated
@@ -805,28 +991,43 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       // a stand-in for session validation and the ordinary path runs instead.
       const path = new URL(req.url ?? '/', 'http://gateway').pathname
       if (claims !== null && forwardRequestMatches(claims, { method: req.method, path, sessionToken: token })) {
-        // Acceptance requires the bound session cookie itself; gateway-local
-        // (non-/api) mutations journal their own row because no downstream
-        // revalidation distinguishes them from the user's own traffic.
-        if (!path.startsWith('/api/')) {
-          void Promise.resolve(audit.write({ userId: claims.user.id, action: 'auth.forwarded',
-            methodPath: `${req.method ?? ''} ${path}`, ip: clientIp(req),
-            detail: JSON.stringify({ issuerNode: claims.issuerNode, nonce: claims.nonce }) }))
-            .catch((error: unknown) => { console.error('[gateway] audit write failed:', error) })
-        }
+        auditForwardedAccount(req, path, claims)
         return { token: token ?? '', user: claims.user, forward: claims }
       }
     }
     if (token === undefined) return null
+    const requestPath = new URL(req.url ?? '/', 'http://gateway').pathname
+    if (req.method === 'GET' && requestPath === '/account/api/node-document-overview') {
+      const qualified = await timeOperation('authorize', async () => auth.qualifyForStream(token))
+      if (qualified !== null) return { token, user: qualified.user }
+    }
     const user = await timeOperation('authorize',async()=>auth.validate(token))
     return user === null ? null : { token, user }
+  }
+
+  const signedPersonalForward = (req: IncomingMessage, pathname: string, selection: {
+    runtimeId: RuntimeId; nodeId: RuntimeNodeId; target: 'personal'
+  }, observe?: ReadySessionObservation): {
+    sessionToken: string; forwarded: GatewayForwardSessionCandidate
+  } | undefined => {
+    const assertion = req.headers['x-dsh-gateway-forward']
+    if (req.headers[NODE_SERVICE_TARGET_HEADER] !== selection.nodeId || typeof assertion !== 'string') return undefined
+    const forwarded = deps.forwardedSessionPrincipal?.(assertion)
+    const sessionToken = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
+    if (forwarded == null || sessionToken === undefined || !browserPrincipalMatches(req, forwarded.claims.user)
+      || !forwardRequestMatches(forwarded.claims, { method: req.method, path: pathname, sessionToken })
+      || !forwardedSessionMatches(forwarded.claims, selection)) {
+      observe?.('forwarded', 'fallbackCandidate')
+      return undefined
+    }
+    return { sessionToken, forwarded }
   }
 
   /** Parse the selector target exactly as the destination router would; no query. */
   const parsedTarget = (raw: string | null | undefined): 'personal' | `project:${number}` =>
     raw !== undefined && raw !== null && /^project:[1-9][0-9]*$/u.test(raw) ? raw as `project:${number}` : 'personal'
 
-  const requestContext = (req: IncomingMessage, user: UserRow, checked?:RuntimePlacement,
+  const requestContext = async (req: IncomingMessage, user: UserRow, checked?:RuntimePlacement,
     forward?: import('./forwarded-principal.ts').GatewayForwardClaims) => {
     const query = new URL(req.url ?? '/', 'http://x').searchParams
     const runtimeId = query.get('dshRuntime'), target = query.get('dshTarget')
@@ -836,17 +1037,20 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     // selectors exactly and the claimed environment lands on this node. The
     // destination still resolves scope and node-local runtime storage itself.
     const claimed = forward?.context, effectiveTarget = target ?? parsedTarget(scopeCookie)
+    const forwardedAccessRevision = forward?.accessRevision === undefined ? undefined : BigInt(forward.accessRevision)
+    const attach = (resolved: Awaited<ReturnType<typeof runtimeRouter.resolve>>) => forwardedAccessRevision === undefined
+      ? resolved : { ...resolved, context: { ...resolved.context, forwardedAccessRevision } }
     if (claimed !== undefined && forward?.selection !== undefined
       && (forward.selection.runtimeId ?? null) === runtimeId
       && (forward.selection.target ?? null) === effectiveTarget
       && claimed.environment.nodeId === deps.nodeServiceIdentity?.nodeId) {
       const claimedTarget = forward.selection.target as 'personal' | `project:${number}`
-      return runtimeRouter.resolve(user, { runtimeId, target: claimedTarget, scopeCookie },
+      return attach(await runtimeRouter.resolve(user, { runtimeId, target: claimedTarget, scopeCookie },
         { target: claimedTarget, local: true, resetScope: false,
           environment: { id: claimed.environment.id,
-            node: { id: claimed.environment.nodeId, name: claimed.environment.nodeName } } as RuntimePlacement['environment'] })
+            node: { id: claimed.environment.nodeId, name: claimed.environment.nodeName } } as RuntimePlacement['environment'] }))
     }
-    return runtimeRouter.resolve(user, { runtimeId, target, scopeCookie },checked)
+    return attach(await runtimeRouter.resolve(user, { runtimeId, target, scopeCookie }, checked))
   }
 
   const conversationRuntime = (context: GatewayRequestContext): import('./runtime-catalog.ts').RuntimeId => {
@@ -860,8 +1064,27 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     enabled: cfg.performanceEnabled,
     eventLoopResolutionMs: cfg.performanceEventLoopResolutionMs,
   })
+  const observeReadySession = cfg.performanceEnabled ? {
+    observe(route: ReadySessionRoute, outcome: ReadySessionOutcome) {
+      performanceObserver.recordReadySession(route, outcome)
+      recordReadySession(route, outcome)
+    },
+  } : undefined
+  const unclaimedLoopback = new Map<string, { socket: Socket; forget: () => void }>()
+  const nodeReadBridges = new WeakMap<Socket, RuntimeNodeId>()
+  const bridgeCoordinate = (socket: Socket, port: number | undefined = socket.remotePort): string | undefined => {
+    const address = socket.remoteAddress
+    if (port === undefined || address !== '127.0.0.1' && address !== '::1' && address !== '::ffff:127.0.0.1') return undefined
+    return `${socket.localAddress}:${String(socket.localPort)}:${address}:${String(port)}`
+  }
+  const forgetUnclaimedBridge = (socket: Socket): void => {
+    const key = bridgeCoordinate(socket)
+    const candidate = key === undefined ? undefined : unclaimedLoopback.get(key)
+    if (candidate?.socket === socket) candidate.forget()
+  }
   const operationTimings=new OperationTimings(cfg.performanceEnabled?cfg.performanceOperationSamples:0)
   const server = createServer((req, res) => {
+    forgetUnclaimedBridge(req.socket)
     // Baseline response headers for every route. `writeHead` on relayed
     // responses can still override them when the upstream supplied its own.
     // CSP ships as Report-Only: the SPA, admin pages with inline scripts,
@@ -876,7 +1099,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (!res.writableEnded && res.headersSent) {
         res.destroy()
       } else if (!res.writableEnded && !res.destroyed) {
-        if (runtimeStartForms.has(req)) {
+        if (error instanceof GovernanceAdmissionUnavailableError) {
+          req.resume(); res.setHeader('cache-control', 'no-store')
+          send(res, 503, '{"error":"peer-backup/governance-admission-unavailable"}', 'application/json')
+        } else if (runtimeStartForms.has(req)) {
           sendStartFailure(req, res, runtimeStartProblem(error) ?? { status: 500, reason: 'unknown', retryable: false }, runtimeStartForms.get(req) ?? null)
         } else if (error instanceof BodyTooLargeError) {
           send(res, 413, JSON.stringify({ error: 'request-too-large' }), 'application/json')
@@ -889,7 +1115,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             code: error.code,
             message: 'The server is at its database capacity. Try again later.',
           } }), 'application/json')
-        } else if (error instanceof RuntimeCatalogError || error instanceof NodeAccessError || error instanceof NodeServiceError || error instanceof NodeChannelError || error instanceof ComputerAccessError || error instanceof DeploymentTopologyError) {
+        } else if (error instanceof AccessNodeDrainingError || error instanceof RuntimeCatalogError || error instanceof NodeAccessError || error instanceof NodeServiceError || error instanceof NodeChannelError || error instanceof ComputerAccessError || error instanceof DeploymentTopologyError) {
           res.setHeader('cache-control', 'no-store')
           send(res, error.status, JSON.stringify({ error: error.code }), 'application/json')
         } else if (error instanceof RuntimeAccountError) {
@@ -926,9 +1152,20 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           send(res, 500, 'internal error', 'text/plain')
         }
       }
-      if (!(error instanceof BodyTooLargeError) && !(error instanceof RuntimeCapacityError) && !(error instanceof RuntimeCatalogError) && !(error instanceof NodeAccessError)
+      if (!(error instanceof AccessNodeDrainingError) && !(error instanceof BodyTooLargeError) && !(error instanceof RuntimeCapacityError) && !(error instanceof RuntimeCatalogError) && !(error instanceof NodeAccessError)
         && !(error instanceof NodeServiceError) && !(error instanceof NodeChannelError) && !(error instanceof ComputerAccessError) && !(error instanceof DeploymentTopologyError) && !(error instanceof WebhookEndpointError) && !(error instanceof PostgresCheckoutQueueFullError)) console.error('[gateway] request failed:', error)
     }).finally(() => { writerReleases.get(res)?.(); writerReleases.delete(res) })
+  })
+  if (cfg.nodeService.preparedReadDelegation === true) server.on('connection', (socket) => {
+    const key = bridgeCoordinate(socket)
+    if (key === undefined) return
+    const forget = (): void => {
+      if (unclaimedLoopback.get(key) === candidate) unclaimedLoopback.delete(key)
+      socket.removeListener('close', forget)
+    }
+    const candidate = { socket, forget }
+    unclaimedLoopback.set(key, candidate)
+    socket.once('close', forget)
   })
   // Idle keep-alive connections must outlive the front proxy's origin pool
   // (cloudflared 90s default): a shorter timeout lets the proxy reuse a socket
@@ -936,7 +1173,59 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   // headersTimeout to exceed keepAliveTimeout.
   server.keepAliveTimeout = cfg.keepAliveTimeoutMs
   server.headersTimeout = cfg.keepAliveTimeoutMs + 5_000
-  if (deps.performance === undefined) server.once('close', () => { performanceObserver.dispose() })
+  const nodeIdentityCache = new Map<string, { lease: NodeServiceIdentityLease; expiresAtMs: number }>()
+  const nodeIdentityInFlight = new Map<string, { epoch: number; promise: Promise<NodeServiceIdentityLease> }>()
+  let nodeIdentityCacheEpoch = 0
+  const monitorCaughtUp = (): boolean => deps.accessMonitor !== undefined
+    && (deps.accessMonitor.currentRevision !== undefined ? deps.accessMonitor.currentRevision() !== undefined : deps.accessMonitor.available)
+  const cachedNodeIdentity = (key: string | undefined, stale?: NodeServiceIdentityLease): NodeServiceIdentityLease | undefined => {
+    const cached = key === undefined ? undefined : nodeIdentityCache.get(key)
+    return cached !== undefined && cached.lease !== stale && cached.expiresAtMs > Date.now() && monitorCaughtUp() ? cached.lease : undefined
+  }
+  const authorizeNodeIdentity = async (
+    identity: NonNullable<GatewayDeps['nodeServiceIdentity']>, token: string, input: unknown, key: string | undefined,
+  ): Promise<NodeServiceIdentityLease> => {
+    if (key !== undefined) nodeIdentityCache.delete(key)
+    const epoch = nodeIdentityCacheEpoch
+    const existing = key === undefined ? undefined : nodeIdentityInFlight.get(key)
+    if (existing !== undefined && existing.epoch === epoch) return existing.promise
+    const promise = identity.authorize(token, input)
+    if (key !== undefined) nodeIdentityInFlight.set(key, { epoch, promise })
+    try {
+      const lease = await promise
+      if (key !== undefined && epoch === nodeIdentityCacheEpoch && monitorCaughtUp()
+        && deps.nodeServiceIdentity === identity && lease.nodeId === identity.nodeId && lease.organizationId === identity.organizationId) {
+        const now = Date.now(), leaseExpiry = Date.parse(lease.expiresAt)
+        const cacheExpiry = now + cfg.nodeServiceIdentityCacheMs
+        const expiresAtMs = Number.isFinite(leaseExpiry) ? Math.min(leaseExpiry, cacheExpiry) : cacheExpiry
+        if (expiresAtMs > now) {
+          if (nodeIdentityCache.size >= 64) {
+            const oldest = nodeIdentityCache.keys().next().value
+            if (oldest !== undefined) nodeIdentityCache.delete(oldest)
+          }
+          nodeIdentityCache.set(key, { lease, expiresAtMs })
+        }
+      }
+      return lease
+    } finally {
+      if (key !== undefined && nodeIdentityInFlight.get(key)?.promise === promise) nodeIdentityInFlight.delete(key)
+    }
+  }
+  const clearNodeIdentityCache = (): void => {
+    nodeIdentityCacheEpoch += 1
+    nodeIdentityCache.clear()
+  }
+  const unsubscribeNodeIdentityCache = deps.accessMonitor?.subscribe(subject => {
+    if (subject.userId === undefined && subject.projectId === undefined
+      && (subject.nodeId === undefined || subject.nodeId === deps.nodeServiceIdentity?.nodeId)) {
+      clearNodeIdentityCache()
+    }
+  })
+  server.once('close', () => {
+    unsubscribeNodeIdentityCache?.()
+    clearNodeIdentityCache()
+    if (deps.performance === undefined) performanceObserver.dispose()
+  })
 
   /**
    * Maintenance-mode write gate: mutating requests consult the shared
@@ -945,25 +1234,27 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
    * can observe and close the window.
    */
   const writeVerdict = async (
-    req: IncomingMessage, res: ServerResponse, pathname: string, explicitWrite = false,
+    req: IncomingMessage, res: ServerResponse, pathname: string, explicitWrite = false, trackWriter = true,
+    gate: (() => Awaitable<WriteGateVerdict>) | undefined = deps.maintenanceGate,
   ): Promise<WriteGateVerdict> => {
-    if (deps.maintenanceGate === undefined) return 'open'
+    if (gate === undefined) return 'open'
     if (!explicitWrite && (req.method === 'GET' || req.method === 'HEAD')) return 'open'
     if (!explicitWrite && (pathname === '/login' || pathname === '/logout' || pathname === '/account/password'
       || pathname.startsWith('/admin/api/deployment') || pathname.startsWith('/admin/api/backups'))) return 'open'
-    if (pathname !== '/api' && !pathname.startsWith('/api/') && !writerReleases.has(res)) {
+    if (trackWriter && pathname !== '/api' && !pathname.startsWith('/api/') && !writerReleases.has(res)) {
       const release = deps.writerSpan?.()
       if (release !== undefined) writerReleases.set(res, release)
     }
-    const verdict = await deps.maintenanceGate()
+    const verdict = await gate()
     if (verdict === 'open') return 'open'
     if (verdict === 'maintenance' && req.method === 'POST'
       && (/^\/admin\/api\/(users|projects)\/\d+\/instance\/stop$/u.test(pathname)
         || /^\/admin\/api\/runtimes\/[^/]+\/stop$/u.test(pathname))) return 'open'
     return verdict
   }
-  const writesOpen = async (req: IncomingMessage, res: ServerResponse, pathname: string, explicitWrite = false): Promise<boolean> => {
-    const verdict = await writeVerdict(req, res, pathname, explicitWrite)
+  const writesOpen = async (req: IncomingMessage, res: ServerResponse, pathname: string, explicitWrite = false,
+    gate: (() => Awaitable<WriteGateVerdict>) | undefined = deps.maintenanceGate): Promise<boolean> => {
+    const verdict = await writeVerdict(req, res, pathname, explicitWrite, true, gate)
     if (verdict === 'open') return true
     if (runtimeStartForms.has(req)) sendStartFailure(req, res, { status: 503, reason: 'changed', retryable: false }, null)
     else send(res, 503, JSON.stringify({ error: verdict }), 'application/json')
@@ -972,8 +1263,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
   let nodeControlsInFlight = 0
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const pathname = new URL(req.url ?? '/', 'http://x').pathname
-    if (req.method === 'POST' && pathname === '/account/runtime/start') runtimeStartForms.set(req, null)
+    const requestUrl = new URL(req.url ?? '/', 'http://x')
+    const pathname = requestUrl.pathname
+    if (req.method === 'POST' && pathname === '/account/runtime/start' || pathname === '/account/runtime/wait') runtimeStartForms.set(req, null)
     if (deps.nodeServiceIdentity !== undefined) res.setHeader(NODE_SERVICE_TARGET_HEADER, deps.nodeServiceIdentity.nodeId)
     const requestedNode = req.headers[NODE_SERVICE_TARGET_HEADER]
     if (requestedNode !== undefined && requestedNode !== deps.nodeServiceIdentity?.nodeId) {
@@ -998,23 +1290,75 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       return
     }
 
+    const recovery = await recoveryAdmission()
+    const recoveryRestricted = recovery?.state === 'review'
+    const recoveryApi = pathname === '/admin/api/governance-recovery' || pathname.startsWith('/admin/api/governance-recovery/')
+    const localRecoveryPage = pathname === '/admin/governance-recovery/local'
+    const recoveryPage = pathname === '/admin/governance-recovery' || localRecoveryPage
+    if (recoveryRestricted) {
+      const read = req.method === 'GET' || req.method === 'HEAD'
+      const allowed = recoveryApi
+        || (read && (pathname === '/' || pathname === '/admin' || pathname === '/admin/governance-recovery' || pathname.startsWith('/admin/assets/')))
+        || ((req.method === 'GET' || req.method === 'POST') && (pathname === '/login' || pathname === '/account/password'))
+        || (req.method === 'POST' && pathname === '/logout')
+      if (!allowed) {
+        req.resume(); res.setHeader('cache-control', 'no-store')
+        send(res, 503, '{"error":"governance-recovery-required","recoveryPath":"/admin/governance-recovery"}', 'application/json')
+        return
+      }
+    }
+    if ((recoveryRestricted || recoveryApi || recoveryPage) && ['dshNode', 'dshRuntime', 'dshTarget'].some(key => requestUrl.searchParams.has(key))) {
+      req.resume(); send(res, 409, '{"error":"governance-recovery-local-entry-required"}', 'application/json'); return
+    }
+
     if (pathname === NODE_SERVICE_IDENTITY_PATH) {
       req.resume(); res.setHeader('cache-control', 'no-store')
       if (req.method !== 'GET') { res.setHeader('allow', 'GET'); send(res, 405, '{"error":"method-not-allowed"}', 'application/json'); return }
-      if (deps.nodeServiceIdentity === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
+      const identity = deps.nodeServiceIdentity
+      if (identity === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
       if (nodeControlsInFlight >= cfg.nodeAccess.maxInFlight) throw new NodeAccessError(503, 'node-access/busy')
       const bearer = req.headers.authorization
       if (typeof bearer !== 'string' || !bearer.startsWith('Bearer ')) throw new NodeAccessError(401, 'node-access/unauthorized')
-      nodeControlsInFlight += 1
-      try {
-        const lease = await deps.nodeServiceIdentity.authorize(bearer.slice(7), {
-          connectionId: req.headers['x-dsh-node-connection'], epoch: req.headers['x-dsh-node-epoch'],
-        })
-        if (lease.nodeId !== deps.nodeServiceIdentity.nodeId || lease.organizationId !== deps.nodeServiceIdentity.organizationId) {
+      const port = req.headers[NODE_SERVICE_LOCAL_PORT_HEADER]
+      const coordinate = cfg.nodeService.preparedReadDelegation === true && typeof port === 'string'
+        && /^[1-9][0-9]{0,4}$/u.test(port) && Number(port) <= 65535 ? bridgeCoordinate(req.socket, Number(port)) : undefined
+      const bridge = coordinate === undefined ? undefined : unclaimedLoopback.get(coordinate)
+      const pendingBridge = () => coordinate !== undefined && bridge !== undefined && !bridge.socket.destroyed
+        && unclaimedLoopback.get(coordinate) === bridge ? bridge : undefined
+      const { nodeId, organizationId } = identity
+      const assertIdentity = (lease: NodeServiceIdentityLease): void => {
+        if (deps.nodeServiceIdentity !== identity || identity.nodeId !== nodeId || identity.organizationId !== organizationId
+          || lease.nodeId !== nodeId || lease.organizationId !== organizationId) {
           throw new NodeServiceError(409, 'node-service/mismatch')
         }
+      }
+      nodeControlsInFlight += 1
+      try {
+        const token = bearer.slice(7)
+        const connectionId = req.headers['x-dsh-node-connection'], epoch = req.headers['x-dsh-node-epoch']
+        const cacheKey = monitorCaughtUp() && cfg.nodeServiceIdentityCacheMs > 0 && typeof connectionId === 'string' && typeof epoch === 'string'
+          ? `${createHash('sha256').update(token).digest('hex')}:${connectionId}:${epoch}` : undefined
+        const cacheEpoch = nodeIdentityCacheEpoch
+        const cached = cachedNodeIdentity(cacheKey)
+        const authorize = () => authorizeNodeIdentity(identity, token, { connectionId, epoch }, cacheKey)
+        let lease = cached ?? await authorize()
+        assertIdentity(lease)
         await checkReadiness()
-        send(res, 200, JSON.stringify({ protocolVersion: 1, organizationId: lease.organizationId,
+        const primary = lease.managedPrimary
+        const appliedRevision = deps.accessMonitor?.currentRevision?.()
+        if (cached !== undefined && primary !== undefined && appliedRevision !== undefined && primary.accessRevision < appliedRevision
+          && cacheEpoch === nodeIdentityCacheEpoch && pendingBridge() !== undefined) {
+          // An unrelated access change can leave the identity cached but age out its delegation proof.
+          lease = cachedNodeIdentity(cacheKey, cached) ?? await authorize()
+        }
+        assertIdentity(lease)
+        const candidate = pendingBridge(), proof = lease.managedPrimary
+        if (candidate !== undefined && proof !== undefined && proof.nodeId === primary?.nodeId
+          && cacheEpoch === nodeIdentityCacheEpoch && deps.accessMonitor?.currentRevision?.() === proof.accessRevision) {
+          candidate.forget()
+          nodeReadBridges.set(candidate.socket, proof.nodeId)
+        }
+        send(res, 200, JSON.stringify({ protocolVersion: NODE_SERVICE_PROTOCOL_VERSION, organizationId: lease.organizationId,
           nodeId: lease.nodeId, release: cfg.releaseId ?? null }), 'application/json')
       } finally { nodeControlsInFlight -= 1 }
       return
@@ -1049,27 +1393,54 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
       nodeControlsInFlight += 1
       try {
-        if (!await writesOpen(req, res, pathname)) return
-        if (pathname === '/internal/nodes/disconnect') {
-          await deps.nodeAccess.disconnect(token, input)
-          send(res, 204, '', 'application/json')
-        } else {
-          const result = pathname === '/internal/nodes/enroll' ? await deps.nodeAccess.enroll(token, input)
-            : pathname === '/internal/nodes/connect' ? await deps.nodeAccess.connect(token, input)
-              : await deps.nodeAccess.heartbeat(token, input)
-          send(res, 200, JSON.stringify(result), 'application/json')
+        if (pathname === '/internal/nodes/enroll') {
+          if (!await writesOpen(req, res, pathname)) return
+          send(res, 200, JSON.stringify(await deps.nodeAccess.enroll(token, input)), 'application/json')
+          return
         }
+        // Ordinary-maintenance leases do not acknowledge or contribute business writers.
+        const verdict = await writeVerdict(req, res, pathname, false, false, deps.leaseControlGate)
+        const operation = pathname === '/internal/nodes/connect' ? 'connect'
+          : pathname === '/internal/nodes/heartbeat' ? 'heartbeat' : 'disconnect'
+        if (verdict !== 'open' && (verdict !== 'maintenance' || deps.maintainNodeConnection === undefined)) {
+          send(res, 503, JSON.stringify({ error: verdict }), 'application/json'); return
+        }
+        if (verdict === 'open' && operation === 'connect') {
+          // Serving connect can promote pending attachment. Its transaction also excludes maintenance entry.
+          const release = deps.writerSpan?.()
+          if (release !== undefined) writerReleases.set(res, release)
+        }
+        const result = verdict === 'maintenance'
+          ? await deps.maintainNodeConnection!(operation, token, input)
+          : await deps.nodeAccess[operation](token, input)
+        send(res, operation === 'disconnect' ? 204 : 200, result === undefined ? '' : JSON.stringify(result), 'application/json')
       } finally { nodeControlsInFlight -= 1 }
       return
     }
 
     if (pathname.startsWith('/internal/runtime/')) {
-      if (handlers.runtimeAuthorize !== undefined) {
-        let authorized = false
+      let authorized: boolean | 'shutdown-storage' | RuntimeCredentialSubject = false
+      const stopGate = handlers.runtimePersonalExecutionStopGate
+      const activeModelCheck = req.headers[RESOURCE_ACTIVE_MODEL_CHECK_HEADER] === '1'
+      const findCandidate = pathname === RUNTIME_MODEL_CREDENTIAL_PATH
+        ? handlers.runtimeModelCredentialCandidate ?? handlers.runtimePersonalExecutionCandidate
+        : handlers.runtimePersonalExecutionCandidate
+      const candidate = stopGate !== undefined && isPersonalExecutionWriteRequest(pathname, req.method, activeModelCheck)
+        ? findCandidate?.(req) : undefined
+      const fromCandidate = candidate != null && handlers.runtime?.defersPersonalExecutionWrite?.(candidate, pathname, req.method, activeModelCheck) === true
+      const resourceCompletion = isRuntimeResourceCompletionRequest(pathname, req.method)
+      const measureIngress = cfg.performanceEnabled && handlers.runtimeAuthorize !== undefined
+        && (isResourceAdmissionRequest(pathname, req.method) || resourceCompletion)
+      const authorizationStarted = measureIngress ? performance.now() : 0
+      if (fromCandidate) authorized = candidate
+      else if (handlers.runtimeAuthorize !== undefined) {
+        const authenticate = handlers.runtimeAuthorize
         try {
-          authorized = await handlers.runtimeAuthorize(req)
+          authorized = await (measureIngress ? timeResourceBearer(() => authenticate(req)) : authenticate(req))
         } catch {
-          authorized = false
+          req.resume()
+          send(res, 503, '{"error":"runtime-authorization-unavailable"}', 'application/json')
+          return
         }
         if (!authorized) {
           // Drain the request so keep-alive clients cannot strand the socket,
@@ -1086,9 +1457,30 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 401, '{"error":"invalid-runtime-token"}', 'application/json')
         return
       }
+      const authorizationMs = measureIngress ? performance.now() - authorizationStarted : 0
       if (handlers.runtime?.stream !== undefined
         && await handlers.runtime.stream(req, res, pathname, () => writeVerdict(req, res, pathname, true))) return
-      if (!await writesOpen(req, res, pathname)) { req.resume(); return }
+      const streamControl = isRuntimeStreamControlRequest(pathname, req.method)
+      const rechecksControlSubject = (streamControl && req.method === 'POST') || resourceCompletion
+      const controlSubject = typeof authorized === 'object' && rechecksControlSubject ? authorized : undefined
+      const gate = authorized === 'shutdown-storage' ? handlers.runtimeShutdownStorageWriteGate
+        : resourceCompletion && controlSubject !== undefined ? handlers.runtimeResourceCompletionWriteGate
+        : streamControl ? deps.leaseControlGate : undefined
+      const admitWrite = async (selectedGate: (() => Awaitable<WriteGateVerdict>) | undefined): Promise<boolean> => {
+        if (!measureIngress) return writesOpen(req, res, pathname, false, selectedGate)
+        const started = performance.now()
+        const open = await timeOperation('resourceWriteAdmission', () => writesOpen(req, res, pathname, false, selectedGate))
+        if (open) {
+          const writeMs = performance.now() - started
+          res.setHeader(RESOURCE_INGRESS_TIMING_HEADER, JSON.stringify([authorizationMs, writeMs].map(ms => Math.round(ms * 100) / 100)))
+        }
+        return open
+      }
+      const executionWrite: PersonalExecutionWriteAdmission | undefined = typeof authorized === 'object' && stopGate !== undefined
+        && handlers.runtime?.defersPersonalExecutionWrite?.(authorized, pathname, req.method, activeModelCheck) === true
+        ? { subject: authorized, fromCandidate, admit: sqlFenced => admitWrite(sqlFenced ? stopGate : gate) }
+        : undefined
+      if (executionWrite === undefined && !await admitWrite(gate)) { req.resume(); return }
       let body = ''
       try {
         body = req.method === 'GET' || req.method === 'HEAD'
@@ -1099,7 +1491,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 413, '{"error":"runtime-request-too-large"}', 'application/json')
         return
       }
-      if (handlers.runtime !== undefined && await handlers.runtime(req, res, pathname, body)) return
+      if (handlers.runtime !== undefined && await handlers.runtime(req, res, pathname, body, executionWrite, controlSubject)) return
       send(res, 404, '{"error":"not-found"}', 'application/json')
       return
     }
@@ -1128,17 +1520,58 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (pathname === '/login') {
       const returnQuery = new URL(req.url ?? '/login', 'http://gateway.invalid').searchParams
       const gateT = gateCopy(gateLanguage(req.headers.cookie))
-      if (req.method === 'GET') { send(res, 200, loginPage('', gateLanguage(req.headers.cookie), browserReturnPath(returnQuery.get('returnTo')))); return }
+      if (req.method === 'GET') { send(res, 200, loginPage('', gateLanguage(req.headers.cookie), recoveryRestricted ? '/admin/governance-recovery' : browserReturnPath(returnQuery.get('returnTo')))); return }
       if (req.method === 'POST') {
         const form = new URLSearchParams(await readBody(req))
         const username = form.get('username') ?? ''
-        const returnTo = browserReturnPath(form.get('returnTo') ?? returnQuery.get('returnTo'))
+        const returnTo = recoveryRestricted ? '/admin/governance-recovery' : browserReturnPath(form.get('returnTo') ?? returnQuery.get('returnTo'))
         const result = await auth.login(username, form.get('password') ?? '', clientIp(req), req.headers['user-agent'] ?? '')
         if (result === 'locked') { await audit.write({ action: 'login.locked', ip: clientIp(req), detail: JSON.stringify({ username }) }); send(res, 429, loginPage(gateT('loginLocked'), gateLanguage(req.headers.cookie), returnTo)); return }
         if (result === 'invalid') { await audit.write({ action: 'login.failed', ip: clientIp(req), detail: JSON.stringify({ username }) }); send(res, 401, loginPage(gateT('loginInvalid'), gateLanguage(req.headers.cookie), returnTo)); return }
+        if (recoveryRestricted && (result.user.id !== recovery.bootstrapUserId || result.user.role !== 'admin')) {
+          await auth.revoke(result.token)
+          await audit.write({ userId: result.user.id, action: 'login.failed', ip: clientIp(req),
+            detail: JSON.stringify({ reason: 'governance-recovery-bootstrap-required' }) })
+          send(res, 401, loginPage(gateT('loginInvalid'), gateLanguage(req.headers.cookie), returnTo))
+          return
+        }
         await audit.write({ userId: result.user.id, action: 'login', ip: clientIp(req) })
         redirect(res, returnTo, [sessionCookie(result.token, cfg)])
         return
+      }
+    }
+
+    const explicitSession = isExplicitSessionRequest(req.method, pathname)
+    const expectedPrincipal = req.headers['x-dsh-expected-principal-id']
+    const runtimeRead = typeof expectedPrincipal === 'string' && isReadyRuntimeRead(req.method, requestUrl)
+    const readyInteractive = typeof expectedPrincipal === 'string' && isReadyRuntimeInteractive(req.method, pathname)
+    const sessionSelectors = explicitSession || runtimeRead || readyInteractive ? exactSessionSelectors(requestUrl.searchParams) : undefined
+    const localNode = deps.nodeServiceIdentity?.nodeId
+    const sessionNode = requestUrl.searchParams.get('dshNode')
+    const readySession = sessionSelectors === undefined || localNode === undefined || recoveryRestricted
+      || sessionNode !== null && sessionNode !== localNode || requestUrl.searchParams.getAll('dshNode').length > 1
+      || req.headers['x-dsh-prepare-continuation'] !== undefined ? undefined
+      : { ...sessionSelectors, nodeId: localNode, ...observeReadySession }
+    const delegatableRead = isDelegatablePersonalRead(req.method, requestUrl, typeof expectedPrincipal === 'string', req.headers.accept)
+    let skipOrdinaryReadySession = false
+    if (readySession?.target === 'personal' && (req.method === 'POST' || delegatableRead) && handlers.readySession !== undefined) {
+      const candidate = signedPersonalForward(req, pathname, { ...readySession, target: 'personal' }, readySession.observe)
+      if (candidate !== undefined) {
+        const claims = candidate.forwarded.claims
+        const managedPersonalRead = delegatableRead && claims.context?.personalRead !== undefined
+          && claims.user.status === 'active' && !claims.user.mustChangePassword && nodeReadBridges.get(req.socket) === claims.issuerNode
+        if (readyInteractive && claims.user.mustChangePassword) {
+          // Preserve password-change enforcement before admitting interactive RPCs.
+        } else if (req.method !== 'POST' && !managedPersonalRead) readySession.observe?.('forwarded', 'fallbackDelegation')
+        else {
+          if (!managedPersonalRead) skipOrdinaryReadySession = true
+          if (await handlers.readySession(req, res, {
+            ...readySession, ...candidate, actor: claims.user, ...(managedPersonalRead ? { managedPersonalRead: true } : {}),
+          })) {
+            auditForwardedAccount(req, pathname, claims)
+            return
+          }
+        }
       }
     }
 
@@ -1148,7 +1581,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       send(res, 401, '{"error":"unauthorized"}', 'application/json')
       return
     }
-    if (pathname === '/api' || pathname.startsWith('/api/') || pathname.startsWith('/account/api/')) {
+    if (recoveryRestricted && (session.user.id !== recovery.bootstrapUserId || session.user.role !== 'admin')) {
+      req.resume(); send(res, 403, '{"error":"governance-recovery-bootstrap-required"}', 'application/json'); return
+    }
+    if (runtimeRead || pathname === '/api' || pathname.startsWith('/api/') || pathname.startsWith('/account/api/')) {
       res.setHeader('x-dsh-principal-id', String(session.user.id))
       if (!browserPrincipalMatches(req, session.user)) {
         req.resume()
@@ -1156,11 +1592,19 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
     }
+    const { token, user, forward } = session
+    if (forward === undefined) delete req.headers[RELEASE_COMBO_DIGEST_HEADER]
+    if (!skipOrdinaryReadySession && readySession !== undefined && (!(runtimeRead || readyInteractive) || !user.mustChangePassword)
+      && (forward === undefined || forwardedSessionMatches(forward, readySession))
+      && await handlers.readySession?.(req, res, { ...readySession, actor: user, sessionToken: token,
+        ...(forward === undefined ? {} : { entryNodeId: forward.issuerNode }) })) return
     const nodeAccessWrite = req.method === 'POST' && (pathname === '/admin/api/deployment/nodes/enrollments'
       || pathname.startsWith('/admin/api/deployment/nodes/access/') || pathname.startsWith('/admin/api/deployment/project-names/')
       || pathname.startsWith('/admin/api/deployment/project-content-migrations/'))
-    if (!await writesOpen(req, res, pathname, nodeAccessWrite)) return
-    const { token, user, forward } = session
+    // Recovery transactions validate the imported epoch and revision while the
+    // cluster remains restoring; ordinary maintenance exemptions do not apply.
+    if (!(recoveryRestricted && recoveryApi) && !await writesOpen(req, res, pathname, nodeAccessWrite)) return
+    if (explicitSession && sessionSelectors === undefined) { send(res, 400, '{"error":"invalid-prepare-target"}', 'application/json'); return }
 
     if (pathname === '/logout' && req.method === 'POST') {
       await auth.revoke(token)
@@ -1173,6 +1617,33 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (user.mustChangePassword && pathname !== '/account/password') {
       if (wantsHtml(req)) { const returnTo = browserReturnPath(req.url); redirect(res, returnTo === '/' ? '/account/password' : `/account/password?returnTo=${encodeURIComponent(returnTo)}`); return }
       send(res, 403, '{"error":"password-change-required"}', 'application/json')
+      return
+    }
+
+    if (recoveryRestricted && (pathname === '/' || pathname === '/admin')) {
+      redirect(res, '/admin/governance-recovery'); return
+    }
+    if (recoveryApi) {
+      if (user.role !== 'admin') { sendAdminGate(res, pathname, 'forbidden'); return }
+      try { await deps.governanceRecovery?.verifyAdministration() }
+      catch (error) { throw new GovernanceAdmissionUnavailableError(error) }
+      const abort = requestAbort(req, res)
+      try {
+        if (handlers.governanceRecovery !== undefined && await handlers.governanceRecovery.admin(req, res, user.id,
+          { directLocal: forward === undefined, signal: abort.signal })) return
+        req.resume(); send(res, 404, '{"error":"governance-recovery-unavailable"}', 'application/json')
+      } finally { abort.dispose() }
+      return
+    }
+    if (recoveryPage || recoveryRestricted && pathname.startsWith('/admin/assets/')) {
+      if (user.role !== 'admin') { sendAdminGate(res, pathname, 'forbidden'); return }
+      if (localRecoveryPage && recovery?.state !== 'released') {
+        send(res, 404, '{"error":"governance-recovery-unavailable"}', 'application/json'); return
+      }
+      if (localRecoveryPage && forward !== undefined) {
+        send(res, 409, '{"error":"governance-recovery-local-entry-required"}', 'application/json'); return
+      }
+      if (!serveAdmin(req, res, pathname, handlers.adminRoot)) send(res, 404, 'not found', 'text/plain')
       return
     }
 
@@ -1203,6 +1674,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             ? await deps.topology.candidates(user, new URL(req.url!, 'http://gateway').searchParams.get('cursor') ?? undefined) : await deps.topology.adminRead(user)), 'application/json')
         else if (req.method === 'PUT' && pathname === '/admin/api/deployment/topology') {
           const result = await deps.topology.save(user, jsonObject(await readBody(req)), clientIp(req))
+          clearNodeIdentityCache()
           send(res, 200, JSON.stringify(result), 'application/json')
         } else send(res, 405, '{"error":"method-not-allowed"}', 'application/json')
       }
@@ -1216,7 +1688,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (req.method !== 'GET') { res.setHeader('allow', 'GET'); send(res, 405, '{"error":"method-not-allowed"}', 'application/json'); return }
       if (deps.documentLocations === undefined) { send(res, 501, '{"error":"document-locations-unavailable"}', 'application/json'); return }
       const query = new URL(req.url ?? '/', 'http://gateway').searchParams
-      try { send(res, 200, JSON.stringify(await deps.documentLocations.page(user.id, {
+      try { await sendCompressed(req, res, 200, JSON.stringify(await deps.documentLocations.page(user.id, {
         ...(query.has('cursor') ? { cursor: query.get('cursor')! } : {}),
         ...(query.has('limit') ? { limit: query.get('limit')! } : {}),
       })), 'application/json') } catch (error) {
@@ -1235,15 +1707,25 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const read = pathname.endsWith('/overview') || operation === 'capabilities'
         if (req.method !== (read ? 'GET' : 'POST')) { send(res, 405, '{"error":"method-not-allowed"}', 'application/json'); return }
         if (pathname.endsWith('/overview')) {
+          res.setHeader('vary', 'accept')
           const query = new URL(req.url ?? '/', 'http://gateway').searchParams
           const options = parseDocumentOverviewOptions({ query: query.get('q') ?? undefined, type: query.get('type') ?? undefined,
             sort: query.get('sort') ?? undefined, cursor: query.get('cursor') ?? undefined,
             limit: query.has('limit') ? Number(query.get('limit')) : undefined })
           let result: unknown
-          if (handlers.browserDocuments !== undefined) result = await handlers.browserDocuments(req,user,'overview',options,abort.signal)
+          if (handlers.browserDocuments !== undefined) {
+            const stream = req.headers.accept === BROWSER_DOCUMENT_OVERVIEW_STREAM && forward === undefined ? {
+              response: res,
+              authorize: async () => {
+                const current = await auth.validate(token)
+                return current?.id === user.id && !current.mustChangePassword
+              },
+            } : undefined
+            result = await handlers.browserDocuments(req,user,'overview',options,abort.signal,stream)
+          }
           else if (deps.documentOverview !== undefined) result = await deps.documentOverview.overview(user.id, options, true)
           else { send(res, 501, '{"error":"documents-unavailable"}', 'application/json'); return }
-          if (!abort.signal.aborted) send(res, 200, JSON.stringify(result), 'application/json')
+          if (!abort.signal.aborted && !res.headersSent) await sendCompressed(req, res, 200, JSON.stringify(result), 'application/json')
         } else {
           if (handlers.browserDocuments === undefined) { send(res, 501, '{"error":"documents-unavailable"}', 'application/json'); return }
           let payload: unknown
@@ -1252,14 +1734,66 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             catch (error) { if (error instanceof BodyTooLargeError) throw error; throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document request JSON.') }
           }
           const result = await handlers.browserDocuments(req, user, operation, payload, abort.signal)
-          if (!abort.signal.aborted) send(res, 200, JSON.stringify(result), 'application/json')
+          if (!abort.signal.aborted) await sendCompressed(req, res, 200, JSON.stringify(result), 'application/json')
         }
       } catch (error) {
-        if (abort.signal.aborted) return
+        if (abort.signal.aborted || res.destroyed) return
+        if (res.headersSent) { res.destroy(); return }
         if (error instanceof DocumentCatalogError || error instanceof DocumentTransferError) send(res, error.status, JSON.stringify({ error: { code: error.code, message: error.message } }), 'application/json')
         else if (error instanceof BodyTooLargeError) send(res, 413, '{"error":"request-too-large"}', 'application/json')
         else { console.error('[gateway] browser document operation failed:', error); send(res, 503, '{"error":{"code":"DOCUMENT_TRANSFER_UNAVAILABLE","message":"Document service is temporarily unavailable."}}', 'application/json') }
       } finally { req.removeListener('aborted', onAbort); res.removeListener('close', onAbort) }
+      return
+    }
+    if (pathname === '/account/api/workbench/context') {
+      res.setHeader('cache-control', 'no-store')
+      if (req.method !== 'GET') { res.setHeader('allow', 'GET'); send(res, 405, '{"error":"method-not-allowed"}', 'application/json'); return }
+      const query = new URL(req.url ?? pathname, 'http://gateway').searchParams
+      const runtimeId = query.get('dshRuntime'), target = query.get('dshTarget'), nodeId = query.get('dshNode')
+      if (query.getAll('dshRuntime').length !== 1 || !nodeUuidSchema.safeParse(runtimeId).success
+        || query.getAll('dshTarget').length !== 1 || target === null
+        || target !== 'personal' && !/^project:[1-9][0-9]*$/u.test(target)
+        || query.getAll('dshNode').length > 1 || nodeId !== null && !nodeUuidSchema.safeParse(nodeId).success) {
+        throw new RuntimeCatalogError(400, 'runtime-catalog/invalid-id')
+      }
+      const { environment } = await runtimeRouter.placement(user, { runtimeId, target, scopeCookie: undefined })
+      if (environment === undefined) throw new RuntimeCatalogError(503, 'runtime-catalog/unavailable')
+      if (nodeId !== null && nodeId !== environment.node.id) throw new RuntimeCatalogError(400, 'runtime-catalog/target-mismatch')
+      await deps.topology?.assertNode(environment.node.id)
+      const projects = await deps.collaboration?.projectsForUser(user.id) ?? []
+      await sendCompressed(req, res, 200, JSON.stringify({ user: { id: user.id, displayName: user.displayName },
+        environment: { id: environment.id, nodeId: environment.node.id }, projects }), 'application/json')
+      return
+    }
+    if (pathname === '/account/runtime/wait') {
+      res.setHeader('cache-control', 'no-store')
+      if (req.method !== 'GET') { res.setHeader('allow', 'GET'); sendStartFailure(req, res, { status: 405, reason: 'invalid', retryable: false }, null); return }
+      const query = new URL(req.url ?? pathname, 'http://gateway').searchParams
+      const observation = query.getAll('observation').length === 1 ? runtimeStartObservations.read(query.get('observation'), user.id) : null
+      if (observation === null || query.size !== 1) {
+        sendStartFailure(req, res, { status: 400, reason: 'invalid', retryable: false }, null); return
+      }
+      if (deps.runtimeCatalog === undefined) throw new RuntimeCatalogError(503, 'runtime-catalog/unavailable')
+      const page = await deps.runtimeCatalog.pageForAccount(user, { ids: observation.runtimeId })
+      const environment = page.items.find(item => item.id === observation.runtimeId)
+      if (environment === undefined) throw new RuntimeCatalogError(403, 'runtime-catalog/forbidden')
+      const target = environment.owner.kind === 'personal' ? 'personal' : `project:${environment.owner.id}`
+      if (environment.node.id !== observation.nodeId || target !== observation.target) throw new RuntimeCatalogError(409, 'runtime-catalog/target-mismatch')
+      await deps.topology?.assertNode(environment.node.id)
+      if (observation.expiresAt <= Date.now()) {
+        sendStartFailure(req, res, { status: 504, reason: 'pending', retryable: false }, null); return
+      }
+      if (environment.node.status !== 'active') {
+        sendStartFailure(req, res, { status: 503, reason: 'unavailable', retryable: false }, null); return
+      }
+      if (environment.observedState === 'ready') {
+        redirect(res, '/?' + new URLSearchParams({ dshRuntime: environment.id, dshNode: environment.node.id, dshTarget: target }))
+        return
+      }
+      if (environment.observedState !== 'starting') {
+        sendStartFailure(req, res, { status: 409, reason: 'changed', retryable: false }, null); return
+      }
+      send(res, 200, waitingPage(gateLanguage(req.headers.cookie), 'observe'))
       return
     }
     if (pathname === '/account/api/runtimes' || pathname === '/admin/api/runtimes') {
@@ -1280,7 +1814,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const result = pathname === '/account/api/runtimes'
         ? await deps.runtimeCatalog.pageForAccount(user, options)
         : await deps.runtimeCatalog.pageForAdministrator(user, options)
-      send(res, 200, JSON.stringify(result), 'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify(result), 'application/json')
       return
     }
 
@@ -1300,6 +1834,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     // path this release's dist does not hold.
     if (deps.releaseAssets !== undefined && (pathname.startsWith('/assets/') || pathname === '/favicon.svg')
       && await deps.releaseAssets.serve(req, res, pathname)) return
+    if (handlers.runtimeAssets !== undefined && await handlers.runtimeAssets.handle(req, res, user, forward?.issuerNode)) return
     let selectedUrl = new URL(req.url ?? '/', 'http://gateway')
     let selection = selectedUrl.searchParams
     if ((pathname.startsWith('/assets/') || pathname.startsWith('/plugins/') || pathname === '/favicon.svg') && deps.runtimeCatalog !== undefined && !selection.has('dshRuntime') && req.headers.referer !== undefined) {
@@ -1344,17 +1879,36 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
     }
-    const explicitSession = isExplicitSessionRequest(req.method, pathname)
-    const explicitScope = isExplicitScopeRequest(req.method, selectedUrl)
-    if (explicitSession) {
-      const targets = selection.getAll('dshTarget'), runtimes = selection.getAll('dshRuntime')
-      const target = targets[0] ?? '', project = /^project:([1-9][0-9]*)$/u.exec(target)
-      if (runtimes.length !== 1 || !nodeUuidSchema.safeParse(runtimes[0]).success || targets.length !== 1
-        || target !== 'personal' && (!project || !Number.isSafeInteger(Number(project[1])))) {
-        send(res, 400, '{"error":"invalid-prepare-target"}', 'application/json')
+    if (pathname === '/' && req.method === 'GET' && (selection.get('dshBootstrap') === '1' || selection.get('dshBootstrap') === 'full')) {
+      res.setHeader('x-dsh-principal-id', String(user.id))
+      if (!browserPrincipalMatches(req, user)) {
+        send(res, 409, '{"error":"account-changed"}', 'application/json')
         return
       }
     }
+    if (pathname === '/' && req.method === 'GET' && wantsHtml(req) && !recoveryRestricted
+      && requestedNode === undefined && !selection.has('dshBootstrap')
+      && selection.getAll('dshRuntime').length === 1 && selection.getAll('dshTarget').length <= 1
+      && selection.getAll('dshNode').length <= 1 && deps.releaseAssets?.serveDeferredIndex !== undefined
+      && deps.runtimeCatalog !== undefined && deps.nodeServiceProxy !== undefined
+      && deps.topology !== undefined && (await deps.topology.read()).role === 'primary') {
+      await deps.accessMonitor?.synchronize()
+      const runtimeId = selection.get('dshRuntime')!
+      if (!nodeUuidSchema.safeParse(runtimeId).success) throw new RuntimeCatalogError(400, 'runtime-catalog/invalid-id')
+      const environment = (await deps.runtimeCatalog.pageForAccount(user, { ids: runtimeId, limit: '1' })).items[0]
+      if (environment?.id !== runtimeId) throw new RuntimeCatalogError(404, 'runtime-catalog/not-found')
+      if (environment.node.id !== deps.nodeServiceIdentity?.nodeId) {
+        if (selection.has('dshNode') && selection.get('dshNode') !== environment.node.id) throw new NodeServiceError(400, 'node-service/invalid-target')
+        const scope = environment.owner.kind === 'personal' ? 'personal' : `project:${environment.owner.id}` as const
+        if (selection.has('dshTarget') && selection.get('dshTarget') !== scope) throw new RuntimeCatalogError(400, 'runtime-catalog/target-mismatch')
+        await deps.topology.assertNode(environment.node.id)
+        if (await deps.releaseAssets.serveDeferredIndex(res, {
+          principalId: user.id, runtimeId: environment.id, nodeId: environment.node.id, nodeName: environment.node.name,
+          scope, language: gateLanguage(req.headers.cookie),
+        })) return
+      }
+    }
+    const explicitScope = isExplicitScopeRequest(req.method, selectedUrl)
     const selectedNode = selection.get('dshNode')
     if (selectedNode !== null) {
       const nodeProjectCreation = pathname === '/account/api/projects' && req.method === 'POST'
@@ -1365,13 +1919,13 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (!selection.has('dshRuntime') && !pathname.startsWith('/api/documents') && !nodeProjectCreation && !nodeMetadata
         && (!pathname.startsWith('/admin/api/') || user.role !== 'admin')) throw new NodeServiceError(403, 'node-service/invalid-target')
       if (!explicitSession && !explicitScope && selectedNode !== deps.nodeServiceIdentity?.nodeId && deps.nodeServiceProxy === undefined) throw new NodeServiceError(503, 'node-service/unavailable')
-      if ((pathname.startsWith('/api/documents') || nodeProjectCreation || nodeMetadata) && selectedNode === deps.nodeServiceIdentity?.nodeId) {
+      if ((pathname.startsWith('/api/documents') || nodeProjectCreation || nodeMetadata) && selectedNode === deps.nodeServiceIdentity?.nodeId && deps.nodeServiceProxy === undefined) {
         await deps.computerAccess?.authorize(user.id)
       }
     }
     let admittedPlacement:RuntimePlacement|undefined
     const remember = explicitSession ? (placement:RuntimePlacement)=>{admittedPlacement=placement} : undefined
-    if (deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.http(req, res, user,undefined,remember)) return
+    if (!(pathname === '/account/runtime/start' && req.method === 'POST') && !recoveryRestricted && deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.http(req, res, user,undefined,remember)) return
     if (deps.nodeServiceProxy === undefined && selection.has('dshRuntime') && !pathname.startsWith('/admin/api/')) {
       const placement = await runtimeRouter.placement(user, { runtimeId: selection.get('dshRuntime'), target: selection.get('dshTarget'),
         scopeCookie: parseCookies(req.headers.cookie).get(SCOPE_COOKIE) })
@@ -1388,7 +1942,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (req.method!=='GET') {send(res,405,'{"error":"method-not-allowed"}','application/json');return}
       const id=selection.get('id')
       if (id!==null && !nodeUuidSchema.safeParse(id).success) {send(res,400,'{"error":"invalid-operation-id"}','application/json');return}
-      send(res,200,JSON.stringify({operations:operationTimings.samples(id??undefined)}),'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify({ operations: operationTimings.samples(id ?? undefined) }), 'application/json')
       return
     }
     if (pathname === '/admin/api/performance') {
@@ -1399,9 +1953,12 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 405, '{"error":"method-not-allowed"}', 'application/json')
         return
       }
-      send(res, 200, JSON.stringify({
+      await sendCompressed(req, res, 200, JSON.stringify({
         ...performanceObserver.snapshot(deps.instances.capacitySnapshot?.() ?? null),
         databasePool: deps.databasePerformance?.() ?? null,
+        modelPolicyProjection: modelPolicyProjectionDiagnostics(deps),
+        nodeForwarding: deps.nodeServiceProxy?.diagnostics?.() ?? null,
+        runtimeAssets: handlers.runtimeAssets?.diagnostics?.() ?? null,
       }), 'application/json')
       return
     }
@@ -1443,11 +2000,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (pathname === '/account/password') {
       const returnQuery = new URL(req.url ?? '/account/password', 'http://gateway.invalid').searchParams
       const gateLang = gateLanguage(req.headers.cookie)
-      if (req.method === 'GET') { send(res, 200, passwordPage('', gateLang, browserReturnPath(returnQuery.get('returnTo')))); return }
+      if (req.method === 'GET') { send(res, 200, passwordPage('', gateLang, recoveryRestricted ? '/admin/governance-recovery' : browserReturnPath(returnQuery.get('returnTo')))); return }
       if (req.method === 'POST') {
         const form = new URLSearchParams(await readBody(req))
         const password = form.get('password') ?? ''
-        const returnTo = browserReturnPath(form.get('returnTo') ?? returnQuery.get('returnTo'))
+        const returnTo = recoveryRestricted ? '/admin/governance-recovery' : browserReturnPath(form.get('returnTo') ?? returnQuery.get('returnTo'))
         if (password.length < MIN_PASSWORD_LENGTH) { send(res, 400, passwordPage(gateCopy(gateLang)('passwordTooShort', { min: String(MIN_PASSWORD_LENGTH) }), gateLang, returnTo)); return }
         if (password.length > MAX_PASSWORD_LENGTH) { send(res, 400, passwordPage(gateCopy(gateLang)('passwordTooLong', { max: String(MAX_PASSWORD_LENGTH) }), gateLang, returnTo)); return }
         await users.changeOwnPassword(user.id, password, token)
@@ -1510,11 +2067,13 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const token = stringField(input?.token)
       const provider = input?.provider
       const sessionId = stringField(input?.sessionId)
+      const runtimeId = input?.runtimeId
       const eventSeq = input?.eventSeq
       const kind = input?.kind
       if (token === undefined || token.length > 4096
         || (provider !== 'fcm' && provider !== 'jpush' && provider !== 'unifiedpush')
         || sessionId === undefined || sessionId.length > 512
+        || runtimeId !== undefined && !nodeUuidSchema.safeParse(runtimeId).success
         || typeof eventSeq !== 'number' || !Number.isSafeInteger(eventSeq) || eventSeq < 0
         || (kind !== 'arrived' && kind !== 'opened')) {
         send(res, 400, '{"error":"invalid-push-receipt"}', 'application/json')
@@ -1522,6 +2081,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
       const outcome = await deps.push.recordReceipt(user.id, {
         provider, token, sessionId, eventSeq, kind,
+        ...(runtimeId === undefined ? {} : { runtimeId: runtimeId as RuntimeId }),
       })
       if (outcome === 'missing') {
         send(res, 404, '{"error":"push-receipt-target-missing"}', 'application/json')
@@ -1602,10 +2162,25 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         runtimeId: scopeQuery.get('dshRuntime'), target: requestedTarget, scopeCookie: undefined,
       })
       if (explicitScope) assertPlacementComputer(placement, selectedNode, requestedNode, deps.nodeServiceIdentity?.nodeId)
+      if (placement.environment !== undefined) await deps.topology?.assertNode(placement.environment.node.id)
       if (!placement.local) {
         if (deps.nodeServiceProxy === undefined || placement.environment === undefined) throw new RuntimeCatalogError(503, 'runtime-catalog/remote-unavailable')
-        if (!await deps.nodeServiceProxy.http(req, res, user, { body, runtimeId: placement.environment.id })) {
-          throw new RuntimeCatalogError(503, 'runtime-catalog/remote-unavailable')
+        const forwarded = new URL(req.url ?? '/', 'http://gateway')
+        forwarded.searchParams.set('dshRuntime', placement.environment.id)
+        forwarded.searchParams.set('dshNode', placement.environment.node.id)
+        forwarded.searchParams.set('dshTarget', placement.target)
+        req.url = forwarded.pathname + forwarded.search
+        if (htmlStart) runtimeStartForms.set(req, value.kind === 'personal'
+          ? { action: req.url, kind: 'personal' }
+          : { action: req.url, kind: 'project', projectId: value.projectId as number })
+        try {
+          if (!await deps.nodeServiceProxy.http(req, res, user, { body, runtimeId: placement.environment.id })) {
+            throw new RuntimeCatalogError(503, 'runtime-catalog/remote-unavailable')
+          }
+        } catch (error) {
+          if (!htmlStart || !(error instanceof NodeServiceResponseUnknownError) || res.headersSent || res.destroyed) throw error
+          res.writeHead(303, { 'cache-control': 'no-store', location: runtimeStartObservations.issue(user.id, placement.environment, placement.target) })
+          res.end()
         }
         return
       }
@@ -1682,7 +2257,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           target!==(scope.kind==='personal'?'personal':`project:${scope.projectId}`)) throw new RuntimeCatalogError(400,'runtime-catalog/target-mismatch')
         if(scope.kind==='project') {
           if(operation.kind==='save' && scope.mode!=='rw') throw new CollaborationDeniedError('forbidden')
-          if(sessionId) {
+          if(sessionId && !handlers.nodeDrafts?.applyAuthenticated) {
             if(!deps.collaboration) throw new CollaborationDeniedError('forbidden')
             await deps.collaboration.access(fresh.id,environment.id,sessionId,operation.kind==='read'?'read':'write')
           }
@@ -1905,31 +2480,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (pathname === '/account/api/context' && req.method === 'GET') {
       res.setHeader('cache-control', 'no-store')
       const resolved = await selectedContext()
-      const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
-      // Membership resolution supplies the authorized ids for owner and theme metadata.
-      const scopedIds = scopes.map(scope => scope.projectId)
-      const scopedDetails = deps.projects.getScopeMetadataByIds !== undefined
-        ? await deps.projects.getScopeMetadataByIds(scopedIds)
-        : deps.projects.getByIds === undefined
-          ? (scopedIds.length === 0 ? [] : await deps.projects.list())
-          : await deps.projects.getByIds(scopedIds)
-      const details = new Map(scopedDetails.map(project => [project.id, project]))
-      const projects = await Promise.all(scopes.map(async (scope) => {
-        const detail = details.get(scope.projectId)
-        // Project directories carry remote owner metadata. Legacy catalogs
-        // can resolve an omitted owner from their node-local detail provider.
-        const owner = detail?.owner !== undefined
-          ? detail.owner
-          : scope.owner !== undefined ? scope.owner : (await deps.projects.getById(scope.projectId))?.owner
-        const canManage = scope.canManage === true || user.role === 'admin' || owner?.id === user.id
-        return {
-          ...scope,
-          ...(canManage ? { canManage: true } : {}),
-          ...(detail?.origin === undefined ? {} : { origin: detail.origin }),
-          ...(detail?.owner === undefined ? {} : { owner: detail.owner }),
-          ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
-        }
-      }))
+      const projects = await accountContextProjects(deps, user)
       const activeProjectId = resolved.context.scope.kind === 'project'
         ? resolved.context.scope.projectId
         : undefined
@@ -1944,7 +2495,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           ...(activeProject.kind === 'steward' ? { steward: true } : {}),
           ...(activeProject.uiThemePolicy === undefined ? {} : { uiThemePolicy: activeProject.uiThemePolicy }),
         }
-      send(res, 200, JSON.stringify({
+      await sendCompressed(req, res, 200, JSON.stringify({
         user: {
           id: user.id,
           username: user.username,
@@ -1967,6 +2518,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (req.method !== 'GET') { send(res,405,'{"error":"method-not-allowed"}','application/json'); return }
       if (selectedNode === null || selectedNode !== deps.nodeServiceIdentity?.nodeId) throw new NodeServiceError(400,'node-service/invalid-target')
       if (!deps.documentOverview?.localOverview) { send(res,503,'{"error":"node-content/unavailable"}','application/json'); return }
+      const abort = requestAbort(req, res)
       try {
         const options = parseDocumentOverviewOptions({ query: selection.get('q') ?? undefined, type: selection.get('type') ?? undefined,
           sort: selection.get('sort') ?? undefined })
@@ -1974,12 +2526,13 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         if (!/^(?:0|[1-9][0-9]*)$/u.test(offset ?? '') || !/^[1-9][0-9]*$/u.test(limit ?? '')) {
           throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA',400,'Invalid document page.')
         }
-        const page = await deps.documentOverview.localOverview(user.id,options,Number(offset),Number(limit))
-        send(res,200,JSON.stringify(page),'application/json')
+        const page = await deps.documentOverview.localOverview(user.id,options,Number(offset),Number(limit),abort.signal)
+        if (!abort.signal.aborted) await sendCompressed(req, res, 200, JSON.stringify(page), 'application/json')
       } catch (error) {
+        if (abort.signal.aborted) return
         if (!(error instanceof DocumentCatalogError)) throw error
         send(res,error.status,JSON.stringify({error:{code:error.code,message:error.message}}),'application/json')
-      }
+      } finally { abort.dispose() }
       return
     }
     if ((pathname === '/account/api/project-metadata' || pathname === '/admin/api/project-metadata') && req.method === 'GET') {
@@ -1992,18 +2545,24 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res,400,'{"error":"invalid-project-selection"}','application/json'); return
       }
       if (deps.projectMetadata === undefined) { send(res,503,'{"error":"node-content/unavailable"}','application/json'); return }
-      send(res,200,JSON.stringify({ items: await deps.projectMetadata.authorizedMetadata(user.id, adminView ? 'admin' : 'account', ids.map(Number)) }), 'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify({ items: await deps.projectMetadata.authorizedMetadata(user.id, adminView ? 'admin' : 'account', ids.map(Number)) }), 'application/json')
       return
     }
     if (pathname === '/account/api/workbench/rows' && req.method === 'GET') {
       res.setHeader('cache-control', 'no-store')
       if (handlers.workbenchRows === undefined) { send(res, 503, '{"error":"workbench-rows-unavailable"}', 'application/json'); return }
       const owner = (await selectedContext()).context
+      const draftStore=handlers.nodeDrafts,identity=deps.nodeServiceIdentity,environment=owner.environment
+      const reservedSession=draftStore?.reservedSessionAuthenticated&&identity&&environment
+        ? (sessionId:string)=>draftStore.reservedSessionAuthenticated!({organizationId:identity.organizationId,
+          nodeId:environment.nodeId,userId:user.id,runtimeId:environment.id,
+          target:owner.scope.kind==='personal'?'personal':`project:${owner.scope.projectId}`,sessionId},createHash('sha256').update(token).digest())
+        : undefined
       const page = selection.has('documentSession')
-        ? await checkDocumentAttachmentTarget(handlers.workbenchRows,owner,selection)
+        ? await checkDocumentAttachmentTarget(handlers.workbenchRows,owner,selection,undefined,reservedSession)
         : await handlers.workbenchRows(owner,selection)
       res.setHeader('x-dsh-runtime-id', page.runtimeId)
-      send(res, 200, JSON.stringify(page), 'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify(page), 'application/json')
       return
     }
 
@@ -2029,18 +2588,24 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
       res.setHeader('cache-control', 'no-store')
-      const scopes = await deps.collaboration.projectsForUser(user.id)
       const abort = requestAbort(req, res)
+      const catalogAbort = new AbortController()
+      const catalogSignal = AbortSignal.any([abort.signal, catalogAbort.signal])
+      let scopes: Awaited<ReturnType<NonNullable<typeof deps.collaboration>['projectsForUser']>>
       let catalog: Awaited<ReturnType<GatewayWorkbenchCatalogHandler>>
       try {
-        catalog = handlers.workbenchCatalog === undefined
-          ? { items: await deps.collaboration.listAccountConversations(user.id), personalComplete: false }
-          : await handlers.workbenchCatalog(user, abort.signal, { kind: activeRuntime.kind,
-            ...(environment === undefined ? {} : { runtimeId: environment.id }) })
+        [scopes, catalog] = await Promise.all([
+          deps.collaboration.projectsForUser(user.id),
+          handlers.workbenchCatalog === undefined
+            ? Promise.resolve(deps.collaboration.listAccountConversations(user.id)).then(items => ({ items, personalComplete: false }))
+            : handlers.workbenchCatalog(user, catalogSignal, { kind: activeRuntime.kind,
+              ...(environment === undefined ? {} : { runtimeId: environment.id }) }),
+        ])
       } finally {
+        catalogAbort.abort()
         abort.dispose()
       }
-      send(res, 200, JSON.stringify({
+      await sendCompressed(req, res, 200, JSON.stringify({
         personal: { id: user.id, name: user.displayName || user.username },
         activeRuntime: { ...activeRuntime, ...(environment === undefined ? {} : {
           runtimeId: environment.id, nodeId: environment.nodeId,
@@ -2228,7 +2793,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       try {
         if (req.method === 'GET') {
           const targets = await deps.sshTargets.listForProject(user.id, projectId)
-          send(res, 200, JSON.stringify({ targets }), 'application/json')
+          await sendCompressed(req, res, 200, JSON.stringify({ targets }), 'application/json')
           return
         }
         if (req.method === 'POST') {
@@ -2322,7 +2887,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           if (!await deps.governance.authorizeProjectModelRead(projectId, user.id)) {
             throw new CollaborationDeniedError('forbidden')
           }
-          send(res, 200, JSON.stringify({ models }), 'application/json')
+          await sendCompressed(req, res, 200, JSON.stringify({ models }), 'application/json')
           return
         }
         if (suffix === 'credentials') {
@@ -2465,7 +3030,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const active = all.filter(u => u.status === 'active').map(u => ({
         id: u.id, username: u.username, displayName: u.displayName,
       }))
-      send(res, 200, JSON.stringify(active), 'application/json')
+      await sendCompressed(req, res, 200, JSON.stringify(active), 'application/json')
       return
     }
 
@@ -2489,7 +3054,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             if (fresh === null || fresh.id !== user.id || fresh.mustChangePassword) throw new CollaborationDeniedError('forbidden')
           }
           const current = new Map(authorities.map(authority => [authority.projectId, authority]))
-          send(res, 200, JSON.stringify(prepared.flatMap(item => {
+          await sendCompressed(req, res, 200, JSON.stringify(prepared.flatMap(item => {
             if (item === null) return []
             const { project, nodeId } = item
             const authority = current.get(project.id)
@@ -2592,7 +3157,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           if (deps.projects.listInvitableUsers === undefined) { send(res, 503, '{"error":"users-unavailable"}', 'application/json'); return }
           const cursor = selection.get('cursor')
           if (cursor !== null && !/^[1-9][0-9]*$/u.test(cursor)) { send(res, 400, '{"error":"invalid-user-cursor"}', 'application/json'); return }
-          send(res, 200, JSON.stringify(await deps.projects.listInvitableUsers(projectId, user.id,
+          await sendCompressed(req, res, 200, JSON.stringify(await deps.projects.listInvitableUsers(projectId, user.id,
             cursor === null ? undefined : Number(cursor))), 'application/json'); return
         }
         if (isInvitationPath) {
@@ -2605,7 +3170,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             const current = (await readPublicationAuthority('project', () => deps.collaboration!.projectReadAuthorities!(user.id, projectId)))
               .find(current => current.nodeId === selectedNodeId)
             if (current === undefined) throw new CollaborationDeniedError('forbidden')
-            send(res, 200, JSON.stringify(current.canManage ? invitations : invitations.filter(invitation =>
+            await sendCompressed(req, res, 200, JSON.stringify(current.canManage ? invitations : invitations.filter(invitation =>
               invitation.invitee.id === user.id || invitation.inviter.id === user.id)), 'application/json'); return
           }
           if (req.method === 'POST') {
@@ -2630,7 +3195,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           const current = (await readPublicationAuthority('project', () => deps.collaboration!.projectReadAuthorities!(user.id, projectId)))
             .find(current => current.nodeId === selectedNodeId)
           if (current === undefined) throw new CollaborationDeniedError('forbidden')
-          send(res, 200, JSON.stringify({ ...project,
+          await sendCompressed(req, res, 200, JSON.stringify({ ...project,
             owner: current.owner,
             uiThemePolicy: current.uiThemePolicy, canManage: current.canManage,
           }), 'application/json'); return
@@ -2657,7 +3222,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 400, '{"error":"project-scope-required"}', 'application/json')
         return
       }
-      send(res, 200, JSON.stringify({
+      await sendCompressed(req, res, 200, JSON.stringify({
         items: await deps.collaboration.listConversations(user.id, conversationRuntime(resolved.context), resolved.context.scope.projectId),
       }), 'application/json')
       return
@@ -2677,9 +3242,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
       const before = params.get('before') ?? undefined
+      const memberValue = params.get('member')
+      const member = memberValue === null ? undefined : Number(memberValue)
+      if (member !== undefined && (!Number.isSafeInteger(member) || member <= 0 || String(member) !== memberValue || params.getAll('member').length !== 1)) {
+        send(res, 400, '{"error":"invalid-member"}', 'application/json')
+        return
+      }
       try {
-        send(res, 200, JSON.stringify(await deps.collaboration.listActivity(
-          user.id, conversationRuntime(resolved.context), resolved.context.scope.projectId, { limit, before })), 'application/json')
+        await sendCompressed(req, res, 200, JSON.stringify(await deps.collaboration.listActivity(
+          user.id, conversationRuntime(resolved.context), resolved.context.scope.projectId, { limit, before, member })), 'application/json')
       } catch (error) {
         if (error instanceof CollaborationDeniedError) {
           send(res, error.code === 'not-member' ? 403 : 404, JSON.stringify({ error: error.code }), 'application/json')
@@ -2697,7 +3268,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
       try {
-        send(res, 200, JSON.stringify(await deps.progress.progressForUser(
+        await sendCompressed(req, res, 200, JSON.stringify(await deps.progress.progressForUser(
           resolved.context.scope.projectId, user.id)), 'application/json')
       } catch (error) {
         if (error instanceof CollaborationDeniedError) {
@@ -2716,7 +3287,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         return
       }
       try {
-        send(res, 200, JSON.stringify(await deps.progress.generateNow(
+        await sendCompressed(req, res, 200, JSON.stringify(await deps.progress.generateNow(
           resolved.context.scope.projectId, user.id)), 'application/json')
       } catch (error) {
         if (error instanceof CollaborationDeniedError) {
@@ -2746,7 +3317,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             send(res, 404, '{"error":"conversation-not-found"}', 'application/json'); return
           }
           const items = await deps.collaboration.listConversations(user.id, runtimeId, access.projectId)
-          send(res, 200, JSON.stringify({ access, conversation: items.find(item => item.sessionId === access.rootSessionId) ?? null }), 'application/json')
+          await sendCompressed(req, res, 200, JSON.stringify({ access, conversation: items.find(item => item.sessionId === access.rootSessionId) ?? null }), 'application/json')
           return
         }
         if (req.method === 'PATCH') {
@@ -2830,6 +3401,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   }
 
   server.on('upgrade', (req, socket, head) => {
+    forgetUnclaimedBridge(req.socket)
     const settlePerformance = performanceObserver.beginRequest('websocket')
     let upgradeStatus = 400
     socket.once('close', (hadError: boolean) => { settlePerformance(upgradeStatus, hadError) })
@@ -2839,7 +3411,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     // process. The 'close' listener above still records the failed upgrade.
     socket.on('error', () => {})
     const finish = async (): Promise<void> => {
-      const pathname = new URL(req.url ?? '/', 'http://x').pathname
+      const requestUrl = new URL(req.url ?? '/', 'http://gateway')
+      const { pathname } = requestUrl
+      if ((await recoveryAdmission())?.state === 'review') {
+        upgradeStatus = 503
+        const body = '{"error":"governance-recovery-required"}'
+        socket.end(`HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`)
+        return
+      }
       if (pathname === NODE_CHANNEL_PATH) {
         if (deps.nodeChannels === undefined) throw new NodeChannelError(503, 'node-channel/unavailable')
         await deps.nodeChannels.accept(req, socket, head)
@@ -2856,6 +3435,20 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (requestedNode !== undefined && requestedNode !== deps.nodeServiceIdentity?.nodeId) throw new NodeServiceError(409, 'node-service/mismatch')
       const origin = req.headers.origin
       if (origin !== undefined && !cfg.publicOrigins.includes(origin)) { upgradeStatus = 403; socket.destroy(); return }
+      if (handlers.upgrade === undefined || !pathname.startsWith('/api')) { socket.destroy(); return }
+      const nodeId = deps.nodeServiceIdentity?.nodeId
+      const event = pathname === '/api/events.mux' || pathname === '/api/events.host'
+      const selection = event ? exactSessionSelectors(requestUrl.searchParams) : undefined
+      const nodes = requestUrl.searchParams.getAll('dshNode')
+      const exactEvent = nodeId !== undefined && selection?.target === 'personal' && nodes.length <= 1
+        && (nodes[0] === undefined || nodes[0] === nodeId) ? { runtimeId: selection.runtimeId, nodeId, target: 'personal' as const } : undefined
+      const candidate = exactEvent === undefined || handlers.readyEvent === undefined
+        ? undefined : signedPersonalForward(req, pathname, exactEvent)
+      if (candidate !== undefined && exactEvent !== undefined) {
+        upgradeStatus = 101
+        if (await handlers.readyEvent?.(req, socket, head, { ...exactEvent, ...candidate, actor: candidate.forwarded.claims.user })) return
+        if (socket.destroyed) return
+      }
       const session = await currentUser(req)
       if (session === null || session.user.mustChangePassword) { upgradeStatus = 401; socket.destroy(); return }
       if (!browserPrincipalMatches(req, session.user)) {
@@ -2864,16 +3457,24 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         socket.end(`HTTP/1.1 409 Conflict\r\nConnection: close\r\nx-dsh-principal-id: ${session.user.id}\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`)
         return
       }
-      if (handlers.upgrade === undefined || !pathname.startsWith('/api')) { socket.destroy(); return }
-      if (deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.upgrade(req, socket, head, session.user)) {
-        upgradeStatus = 101; return
-      }
-      const resolved = await requestContext(req, session.user, undefined, session.forward)
+      const readyEvent = candidate === undefined && exactEvent !== undefined
+        && (session.forward === undefined || forwardedSessionMatches(session.forward, exactEvent))
+        ? { ...exactEvent, entryNodeId: session.forward?.issuerNode,
+            actor: session.user, sessionToken: session.token } : undefined
       upgradeStatus = 101
+      if (readyEvent !== undefined && await handlers.readyEvent?.(req, socket, head, readyEvent)) return
+      if (socket.destroyed) return
+      if (deps.nodeServiceProxy !== undefined && await deps.nodeServiceProxy.upgrade(req, socket, head, session.user)) return
+      const resolved = await requestContext(req, session.user, undefined, session.forward)
       await handlers.upgrade(req, socket, head, resolved.context)
     }
     void finish().catch((error: unknown) => {
-      if (error instanceof RuntimeCatalogError || error instanceof InvalidRuntimeTargetError || error instanceof CollaborationDeniedError
+      if (error instanceof GovernanceAdmissionUnavailableError) {
+        upgradeStatus = 503
+        const body = '{"error":"peer-backup/governance-admission-unavailable"}'
+        if (!socket.destroyed) socket.end(`HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`)
+        console.error('[gateway] governance recovery admission failed:', error)
+      } else if (error instanceof RuntimeCatalogError || error instanceof InvalidRuntimeTargetError || error instanceof CollaborationDeniedError
         || error instanceof NodeChannelError || error instanceof NodeAccessError || error instanceof NodeServiceError || error instanceof ComputerAccessError || error instanceof DeploymentTopologyError) {
         const status = error instanceof RuntimeCatalogError || error instanceof NodeChannelError || error instanceof NodeAccessError || error instanceof NodeServiceError || error instanceof ComputerAccessError || error instanceof DeploymentTopologyError
           ? error.status : error instanceof InvalidRuntimeTargetError ? 400 : 403

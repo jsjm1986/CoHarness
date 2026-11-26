@@ -3,6 +3,7 @@ import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { SessionDraftId, SessionId, WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionRuntimeTarget } from './contract/sessions.ts'
 import { createSnapshotStore } from './contract/store.ts'
+import { SessionCreateError } from './sessions/service.ts'
 
 /** One click's fixed Host reservation and editable input. */
 export interface ConversationIntent {
@@ -15,7 +16,8 @@ export interface ConversationIntent {
   readonly label: string
   readonly text: string
   readonly phase: 'preparing' | 'unavailable'
-  readonly denied?: boolean
+  /** Safe presentation category; the intent ID is also the preparation operation ID. */
+  readonly failure?: 'denied' | 'preset-unavailable' | 'unavailable'
 }
 
 /** Pending input remains addressable after another navigation supersedes its view. */
@@ -81,7 +83,8 @@ export class ConversationIntents {
     this.active = id
     const controller = new AbortController()
     entry.controller = controller
-    entry.intent = { ...entry.intent, phase: 'preparing' }
+    const { failure: _failure, ...previous } = entry.intent
+    entry.intent = { ...previous, phase: 'preparing' }
     this.publish()
     void entry.prepare(entry.intent, controller.signal, () => {
       if (this.active !== id || controller.signal.aborted) return
@@ -92,7 +95,9 @@ export class ConversationIntents {
       if (entry.controller !== controller || controller.signal.aborted) return
       const refusal = error instanceof Error && ('status' in error && (error.status === 401 || error.status === 403)
         || 'code' in error && error.code === 'access-revoked' || error.name === 'ProjectReadOnlyError')
-      entry.intent = { ...entry.intent, denied: refusal }
+      const preset = error instanceof SessionCreateError
+        && (error.rpcError.code === 'agent-preset-invalid' || error.rpcError.code === 'agent-preset-not-found')
+      entry.intent = { ...entry.intent, failure: refusal ? 'denied' : preset ? 'preset-unavailable' : 'unavailable' }
     }).finally(() => {
       if (entry.controller !== controller) return
       delete entry.controller

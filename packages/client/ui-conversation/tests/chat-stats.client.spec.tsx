@@ -200,7 +200,7 @@ describe('StatsLine', () => {
     const view = render(<StatsLine {...props(source)} />)
     // No timing on the fixture: the duration group drops out whole. Tokens come
     // from the projection, so paging the window cannot change them.
-    expect(view.container.textContent).toBe('1 turns · 1 steps| Cache hit 90%| Input 100 tok · Output 5 tok')
+    expect(view.container.textContent).toBe('1 turn · 1 step| Cache hit 90%| Input 100 tok · Output 5 tok')
     const empty = makeSource()
     const emptyView = render(<StatsLine {...props(empty.source, {
       tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
@@ -245,7 +245,7 @@ describe('StatsLine', () => {
     expect(view.container.querySelector('[role="tooltip"]')).toBeNull()
     act(() => { vi.advanceTimersByTime(1) })
     expect(view.container.querySelector('[role="tooltip"]')?.textContent)
-      .toBe('1 turns · 1 steps | Cache hit 99.95% | Input 10K tok · Output 1 tok')
+      .toBe('1 turn · 1 step | Cache hit 99.95% | Input 10K tok · Output 1 tok')
   })
 
   it('suppresses the tooltip while the row fits without truncation', () => {
@@ -330,7 +330,7 @@ describe('StatsLine', () => {
   it('drops every token group when no projection is composed', () => {
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsLine {...props(source, {})} />)
-    expect(view.container.textContent).toBe('1 turns · 1 steps')
+    expect(view.container.textContent).toBe('1 turn · 1 step')
   })
 
   it('renders whole-session counts from the sessionStats projection over the paged window', () => {
@@ -364,7 +364,7 @@ describe('StatsLine', () => {
       tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       sessionStats: sessionStats({ turns: 1, steps: 1 }),
     })} />)
-    expect(view.container.textContent).toBe('1 turns · 1 steps')
+    expect(view.container.textContent).toBe('1 turn · 1 step')
   })
 
   it('keeps the counts group over an empty visible window when the projection carries totals', () => {
@@ -401,7 +401,7 @@ describe('StatsLine', () => {
     const view = render(<StatsLine {...props(source, {
       tokenUsage: { uncachedInputTokens: 0, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 },
     })} />)
-    expect(view.container.textContent).toBe('1 turns · 1 steps| Input 0 tok · Output 7 tok')
+    expect(view.container.textContent).toBe('1 turn · 1 step| Input 0 tok · Output 7 tok')
   })
 
   it('includes cache writes in billed input and the cache-hit denominator', () => {
@@ -415,7 +415,7 @@ describe('StatsLine', () => {
       },
     })} />)
     expect(view.container.textContent)
-      .toBe('1 turns · 1 steps| Cache hit 45%| Input 200 tok · Output 7 tok')
+      .toBe('1 turn · 1 step| Cache hit 45%| Input 200 tok · Output 7 tok')
   })
 
   it('renders ZERO times during streaming chunk frames (RFC hard acceptance)', () => {

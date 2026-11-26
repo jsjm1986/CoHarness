@@ -21,6 +21,8 @@ Status: implemented
 - closed turn 即使没有 assistant 证据也拥有 turn-process 行，只有回复的 turn 仍能折叠其遗留内容；被折叠的成员以 `hidden` 保持挂载而非脱离 DOM，因为迟到回复在隐藏期间仍会变化，展开时必须已绘制完整。
 - 迟到回答落地为 `source` 为 `user-question-reply` 的 `user/message`；`question-reply` 节点定义把它投射为只读回放行，可重新打开记录的答案批次。
 
+waterfall 桥接把响应 promise 返回给编辑器。已接受的传输回执结束发送过程，问题结算和草稿移除仍由 Host 投影负责。失败或被拒绝的回执保留同一卡片，允许用户显式重试。超时回执失败会停止本地倒计时，同时保留回答通道；迟到的超时确认只能解绑提交时的原通道。这样无需新增结算状态，就能区分投递失败与权威的问题结束。
+
 迟到回复的准入负责登记其执行身份。服务先登记实际用户消息的身份再 steer，并在异步检查期间预留唯一回复。Remote 路由策略保留写权限检查，将输入登记交给服务；临时请求身份无法代表在 RPC 结束后继续排队的回复。Agent 与授权服务的实例检查阻止撤下或替换之后的投递，待处理回复则阻止所属 Agent 被空闲回收。缺少身份登记的持久回复在特权执行时仍视为身份未验证。Gateway 准入为人类消息和已继续问题的回复附上已签名项目调用者快照；来源自带的参与者字段不能替换该身份。协作上下文接受这两种人类来源，并记录配对的模型可见归属提示。恢复时保留原答题者，并重新检查当前执行权限。
 
 ## Alternatives considered
@@ -31,6 +33,8 @@ Status: implemented
 
 **用全局存储按 session id 存放问题草稿。** 否决：会话级草稿存储是声明过的抗重挂载状态归属；再起一份只会重复其生命周期规则。
 
+**在 waterfall 桥接处丢弃响应 promise。** 编辑器会在传输失败能够恢复控件之前完成提交，导致计划批准按钮一直忙碌，并丢失失败报告。
+
 ## Consequences
 
 - `SessionPendingEntry` 拓宽为含插件发布条目；消费方先按 `kind` 收窄再读 wire 字段。
@@ -40,3 +44,5 @@ Status: implemented
 ## Testing
 
 `browser-plugin.client.spec.ts` 以 mux `PendingWait` 端到端驱动本次移植——收养、定时 claim 锚定、释放后的延迟 claim 结束与失败、重连回放、源离开，以及 retain/release 契约。`question-composer.e2e.ts` 录制迟到回答场景：回复行折叠挂载在其 turn 的 process 展开件内，展开后为只读答案回看。`timed-question-claim.e2e.ts` 延迟实际浏览器 claim 请求，让真实计时工具继续，再经 Remote 路径提交持久迟到回复，并固定完整装配的 UI 状态。
+
+[桥接测试](../../../../packages/client/ui-user-questions/tests/browser-plugin.client.spec.ts)验证回答和取消提交在收到回执前保持待定、被拒绝的请求得以保留，并允许显式重试。[卡片测试](../../../../packages/client/ui-user-questions/tests/pending-question.client.spec.ts)验证超时失败后仍可回答，并阻止旧超时确认影响替换后的通道。

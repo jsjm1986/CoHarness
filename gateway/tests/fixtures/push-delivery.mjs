@@ -68,7 +68,7 @@ async function personalComputerPermissions() {
       } catch (error) { response.writeHead(500).end(String(error)) }
     })
     await new Promise((done, fail) => { provider.once('error', fail); provider.listen(0, '127.0.0.1', done) })
-    const service = new PostgresPushService({ pool, organizationId }, loadConfig({}), fetch,
+    const service = new PostgresPushService({ pool, organizationId }, loadConfig({ HGW_PERFORMANCE_ENABLED: 'false' }), fetch,
       new JpushRestSender('fixture-app', 'fixture-secret', fetch, `http://127.0.0.1:${provider.address().port}/v3/push`))
     await service.registerDevice(creator.publicId, { token: 'creator-registration', platform: 'android', provider: 'jpush' })
     await service.registerDevice(other.publicId, { token: 'other-registration', platform: 'android', provider: 'jpush' })
@@ -83,6 +83,17 @@ async function personalComputerPermissions() {
       console.log(JSON.stringify({ scenario, secondComputerAllowed: secondAllowed, outgoingCalls: received.length - before, claimed: rows.length }))
     }
     await complete('personal-source-current', rootId, 0, 1)
+    const receipt = { provider: 'jpush', token: 'creator-registration', runtimeId, sessionId: rootId, eventSeq: 0, kind: 'opened' }
+    const wrongOwner = await service.recordReceipt(other.publicId, receipt)
+    const opened = await service.recordReceipt(creator.publicId, receipt)
+    const repeated = await service.recordReceipt(creator.publicId, receipt)
+    const delivery = (await service.listDevices(creator.publicId)).devices[0].lastDelivery
+    assert.equal(delivery.sessionId, rootId)
+    assert.equal(wrongOwner, 'missing')
+    assert.equal(opened, 'recorded')
+    assert.equal(repeated, 'recorded')
+    assert.ok(delivery.deliveredAt && delivery.openedAt)
+    console.log(JSON.stringify({ scenario: 'device-delivery-receipt', wrongOwner, opened, repeated, delivered: true }))
     await complete('personal-child-current', childId, 0, 1)
     await pool.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE organization_id=$1 AND node_id=$2 AND user_id=$3', [organizationId, source, creator.id])
     await complete('personal-source-revoked', rootId, 1, 0)
@@ -91,7 +102,7 @@ async function personalComputerPermissions() {
     await pool.query('INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled) VALUES($1,$2,$3,true)', [organizationId, source, creator.id])
     await complete('personal-source-restored', rootId, 3, 1)
     const beforeRecovery = received.length
-    await new PostgresPushService({ pool, organizationId }, loadConfig({})).notifyCompleted(runtimeId, rootId, 4)
+    await new PostgresPushService({ pool, organizationId }, loadConfig({ HGW_PERFORMANCE_ENABLED: 'false' })).notifyCompleted(runtimeId, rootId, 4)
     assert.equal(received.length, beforeRecovery)
     assert.deepEqual((await pool.query('SELECT status,attempts FROM harness.push_deliveries WHERE organization_id=$1 AND session_id=$2 AND event_seq=4', [organizationId, rootId])).rows, [{ status: 'failed', attempts: 1 }])
     const registrationPreserved = (await pool.query("SELECT 1 FROM harness.push_devices WHERE organization_id=$1 AND token='creator-registration'", [organizationId])).rowCount === 1
@@ -130,7 +141,7 @@ async function gatewayCompletion() {
     organizationId = (await pool.query("INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Push runtime') RETURNING id", [slug])).rows[0].id
     await pool.query("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'local')", [organizationId])
     const context = await resolvePostgresRuntimeContext(pool, slug, 'local')
-    const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state'),
+    const cfg = loadConfig({ HGW_PERFORMANCE_ENABLED: 'false', HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state'),
       HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),
       HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'), HGW_SYSTEMD_UNIT_DIR: join(root, 'units'), HGW_DEFAULT_ENV_FILE: '',
       HGW_DSH_REPO_ROOT: fileURLToPath(new URL('../../../', import.meta.url)) })
@@ -232,7 +243,7 @@ try {
         } catch (error) { response.writeHead(500).end(String(error)) }
       })
       await new Promise((done, fail) => { provider.once('error', fail); provider.listen(0, '127.0.0.1', done) })
-      const cfg = loadConfig(scenario === 'timeout' ? { HGW_PUSH_DELIVERY_TIMEOUT_MS: '100', HGW_PUSH_DELIVERY_LEASE_MS: '1000' } : {})
+      const cfg = loadConfig({ HGW_PERFORMANCE_ENABLED: 'false', ...(scenario === 'timeout' ? { HGW_PUSH_DELIVERY_TIMEOUT_MS: '100', HGW_PUSH_DELIVERY_LEASE_MS: '1000' } : {}) })
       const request = (...args) => { calls += 1; signal = args[1]?.signal; return fetch(...args) }
       const sender = new JpushRestSender('fixture-app', 'fixture-secret', request, `http://127.0.0.1:${provider.address().port}/v3/push`)
       const context = { pool, organizationId }, service = new PostgresPushService(context, cfg, fetch, sender)

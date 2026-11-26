@@ -31,6 +31,8 @@ Use the native **Input device** selector in the voice settings tab to follow the
 
 Before downloading or retrying, **Model download source** offers Automatic and the origins advertised by the Host. SenseVoice normally offers Hugging Face and HF-Mirror; a fixed private deployment exposes only its configured origin. Manual selection uses only that source, while Automatic preserves the provider’s comparison and fallback policy. The choice is retained for retries in the current card, without changing deployment configuration or recognition preferences. Source controls are unavailable during preparation and hidden when resources are ready.
 
+On touch screens, microphone selection and recording actions retain 44-pixel targets. Preparation actions wrap on narrow screens so installation, cancellation and retry remain reachable.
+
 -----
 
 <a id="understand-the-implementation"></a>

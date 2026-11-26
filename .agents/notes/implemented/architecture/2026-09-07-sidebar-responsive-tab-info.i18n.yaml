@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-07-sidebar-responsive-tab-info.md
 document:
-  en: 96f7f047d00a33d6cd48b026ce7762929720d9d6
-  zh: f020068e71777272fd15a967de547ce153884402
+  en: ad6ce05671b054fcc0747613b9a71ea323076e76
+  zh: 120f6b5df862f0ce2ddb51fccc6dc81e04e4f9e6
 /agent-note-responsive-sidebar-and-injected-tab-information:
   en: 63ced560202cf1a3
   zh: 1ec49cd5ae68f909
@@ -12,8 +12,8 @@ document:
   en: f9824b1d6f93d329
   zh: 36bc474f646a1a25
 /agent-note-responsive-sidebar-and-injected-tab-information/decision:
-  en: 1a055f79cb0afcde
-  zh: 78467751791d42d1
+  en: b41a1e257183ad58
+  zh: ba8efeadfec5eef3
 /agent-note-responsive-sidebar-and-injected-tab-information/alternatives-considered:
   en: c05a3ca9a201f01a
   zh: b1b30e134a92c8ed

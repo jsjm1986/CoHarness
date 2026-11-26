@@ -39,7 +39,13 @@ export class PeerControlExporter implements PeerBackupExporter {
         try {
           for (const table of names) {
             const org = table === 'organizations' ? 'id' : 'organization_id'
-            const relation =
+            const relation = table === 'user_quotas'
+              ? '(SELECT q.ctid,u.organization_id,q.* FROM harness.user_quotas q JOIN harness.users u ON u.id=q.user_id) custody'
+              : table === 'project_quotas'
+              ? '(SELECT q.ctid,p.organization_id,q.* FROM harness.project_quotas q JOIN harness.projects p ON p.id=q.project_id) custody'
+              : table === 'model_prices'
+              ? '(SELECT q.ctid,m.organization_id,q.* FROM harness.model_prices q JOIN harness.model_catalog m ON m.id=q.model_id) custody'
+              :
               table === 'project_source_retirement_evidence'
                 ? '(SELECT e.ctid,r.organization_id,e.* FROM harness.project_source_retirement_evidence e JOIN harness.project_source_retirement_reviews r ON r.id=e.review_id) custody'
                 : 'harness.' + table
@@ -71,7 +77,7 @@ export class PeerControlExporter implements PeerBackupExporter {
         await writeFile(
           join(directory, 'governance.json'),
           JSON.stringify({
-            version: 2,
+            version: 7,
             rows,
             sha256: hash.digest('hex'),
             topologyRevision: coordinate.revision,

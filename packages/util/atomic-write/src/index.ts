@@ -64,6 +64,8 @@ export interface WriteFileAtomicOptions {
    * default — pass `0o700` when the tree holds user-private data.
    */
   dirMode?: number
+  /** False requires the parent directory to exist and never creates it. Omission preserves recursive parent creation. */
+  createParent?: boolean
 }
 
 /** Operating-system account owning a newly created file. */
@@ -91,7 +93,7 @@ async function createOwnedFile(filename: string, content: string, mode: number, 
 
 /**
  * Replace `filename` with `content` in one atomic step, creating parent
- * directories. The content is first written to a random-suffix sibling opened
+ * directories unless `createParent` is false. The content is first written to a random-suffix sibling opened
  * with exclusive create (`wx`): the open refuses to follow a symlink planted
  * at the temp path, and the fresh inode carries `options.mode` through the
  * rename, so replacing a wider-permission file narrows it without a chmod
@@ -108,7 +110,7 @@ async function createOwnedFile(filename: string, content: string, mode: number, 
  */
 export async function writeFileAtomic(filename: string, content: string, options: WriteFileAtomicOptions): Promise<void> {
   options.signal?.throwIfAborted()
-  await mkdir(dirname(filename), {
+  if (options.createParent !== false) await mkdir(dirname(filename), {
     recursive: true,
     ...options.dirMode === undefined ? {} : { mode: options.dirMode },
   })

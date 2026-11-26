@@ -7,8 +7,8 @@ import { transaction, type Queryable } from './postgres/database.ts'
 import { literalLikePattern } from './postgres/literal-like-pattern.ts'
 import { publicNumber } from './postgres/runtime-context.ts'
 import type { RuntimeId } from './runtime-catalog.ts'
-import { readProjectActivity } from './node-content-activity.ts'
-import type { ProjectActivityPage } from './services.ts'
+import { readProjectActivity, readProjectActivityMembers } from './node-content-activity.ts'
+import type { ProjectActivityOptions, ProjectActivityPage } from './services.ts'
 
 export type CollaborationContentStore = Pick<NodeContentStore,'read'|'write'> & Partial<Pick<NodeContentStore,'confirmCollaborationRead'>>
 type LocalRead = <T>(work:(tx:PoolClient)=>Promise<T>)=>Promise<T>
@@ -201,17 +201,22 @@ export class NodeContentCollaboration {
   /** Read one actor's project timeline without exposing private roots.
    * @param userId - authenticated account.
    * @param projectId - public project id.
-   * @param options - bounded page size and exact cursor.
-   * @returns messages and question responses from the owning volume.
+   * @param options - bounded page size, exact cursor, and optional contributor.
+   * @returns messages and answers from the owning volume, with the roster on the first request.
    */
-  async listActivity(userId: number,projectId: number,options: { limit:number; before?:string }): Promise<ProjectActivityPage> {
-    return this.authorizedRead(userId,async (actor,read)=>{
-    const b=this.binding
-    if (actor.project!==projectId) throw new CollaborationDeniedError('not-member')
-    return readProjectActivity({query:(sql,params)=>read(tx=>tx.query(sql,params?[...params]:[]))},{schema:'node_content',organizationId:b.organizationId,runtimeId:b.runtimeId,
-      coordinates:[b.organizationId,b.runtimeId,actor.id], ...options, people:ids=>this.people(ids),
-      rootRelation:`FROM node_content.conversation_sessions r WHERE r.organization_id=$1 AND r.runtime_id=$2
-        AND r.id=r.root_session_id AND r.status<>'deleted' AND (r.visibility='project' OR r.creator_user_id=$3 ${actor.administrator?'OR true':''})`})
+  async listActivity(userId: number, projectId: number, options: ProjectActivityOptions): Promise<ProjectActivityPage> {
+    return this.authorizedRead(userId, async (actor, read) => {
+      const b = this.binding
+      if (actor.project !== projectId) throw new CollaborationDeniedError('not-member')
+      const responderId = options.member === undefined ? undefined : (await this.control.query<{ id: string }>(
+        'SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2', [b.organizationId, options.member])).rows[0]?.id
+      const page = await readProjectActivity({ query: (sql, params) => read(tx => tx.query(sql, [...params ?? []])) }, {
+        schema: 'node_content', organizationId: b.organizationId, runtimeId: b.runtimeId,
+        coordinates: [b.organizationId, b.runtimeId, actor.id], ...options, responderId, people: ids => this.people(ids),
+        rootRelation: `FROM node_content.conversation_sessions r WHERE r.organization_id=$1 AND r.runtime_id=$2
+          AND r.id=r.root_session_id AND r.status<>'deleted' AND (r.visibility='project' OR r.creator_user_id=$3 ${actor.administrator ? 'OR true' : ''})`,
+      })
+      return options.before === undefined ? { ...page, members: await readProjectActivityMembers(this.control, b.organizationId, projectId) } : page
     })
   }
 

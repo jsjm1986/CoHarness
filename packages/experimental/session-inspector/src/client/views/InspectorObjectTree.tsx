@@ -69,7 +69,7 @@ function ObjectBranch({ value, name, path, ancestors, root, accessor, absent, na
   if (accessor) return <li>{field}<span className={css.objectMuted}>{t('object.accessor')}</span></li>
   const reference = content.reference
   const link = reference === undefined || navigation === undefined ? undefined : <button type="button" className={css.objectReference}
-    onClick={(event) => { event.preventDefault(); event.stopPropagation(); navigation.navigate(reference) }}>
+    onClick={() => { navigation.navigate(reference) }}>
     ↗ {t(`object.${reference.kind}`)} · {reference.identity}
   </button>
   if (reference !== undefined && (reference.kind !== 'nodeData' || content.circular !== undefined)) return <li>{field}{link}</li>
@@ -77,8 +77,8 @@ function ObjectBranch({ value, name, path, ancestors, root, accessor, absent, na
   // oxlint-disable-next-line typescript/no-non-null-assertion -- Accessors, references, cycles, and read errors return above.
   const display = content.display!
   if (!display.expandable) return <li>{field}<span className={css.objectValue}>{display.label}</span></li>
-  return <li><details open={expanded} onToggle={(event) => { setExpanded(event.currentTarget.open) }}>
-    <summary>{field}{link} <span className={css.objectMuted}>{display.label}</span></summary>
+  return <li>{link}<details open={expanded} onToggle={(event) => { setExpanded(event.currentTarget.open) }}>
+    <summary>{field}<span className={css.objectMuted}>{display.label}</span></summary>
     {expanded && <ul>
       {content.entries.slice(0, limit).map(({ key, properties, ...entry }) => <ObjectBranch key={key} {...entry}
         name={properties ? t('object.properties') : entry.name}

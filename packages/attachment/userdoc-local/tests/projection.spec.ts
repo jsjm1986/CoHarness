@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { expect, it, onTestFinished } from 'vitest'
 import { UserDocDirectoryId, UserDocId, UserDocIncarnationId, UserDocTrashId, UserDocUploadOwnerId } from '@deepseek-ai/dsh-userdoc'
 import { DocumentIdentityStore, type DocumentIdentityChange, type DocumentIdentityRecord, type NewDocumentIdentity } from '../src/identity.ts'
+import { DocumentProjectionGap } from '../src/projection.ts'
 
 const START = { sequence: 0, ordinal: 0 }, OPTIONS = { limit: 100, maxBytes: 1_000_000 }
 const FILE = { device: '1', inode: '1' }
@@ -176,7 +177,10 @@ it('rolls back acknowledgement if deletion of the delivered prefix fails', () =>
   expect(store.projectionChanges(START, OPTIONS)).toEqual(before)
   db.exec('DROP TRIGGER fail_projection_delete')
   store.acknowledgeProjection(before.head)
-  expect(() => store.projectionChanges(START, OPTIONS)).toThrow('precedes')
+  expect(() => store.projectionChanges(START, OPTIONS)).toThrow(DocumentProjectionGap)
+  expect(() => store.projectionChanges(START, OPTIONS)).toThrow(expect.objectContaining({
+    rootId: before.rootId, receiver: START, acknowledged: before.head, head: before.head,
+  }))
 })
 
 it('refuses a missing delivery row instead of skipping its lifecycle transition', () => {

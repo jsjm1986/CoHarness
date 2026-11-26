@@ -9,7 +9,7 @@
 }
 
 .frame {
-  --turn-rail-band: calc(var(--dsh-conversation-viewport-height, 100dvh) - var(--dsh-composer-height, 152px));
+  --turn-rail-band: calc(var(--dsh-conversation-viewport-height, 100dvh) - var(--dsh-composer-overlap-height, 152px));
   --turn-preview-height: 100px;
   position: absolute;
   top: calc(var(--turn-rail-band) / 2);

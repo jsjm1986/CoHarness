@@ -1,0 +1,11 @@
+{
+  "title": "Restore organization management",
+  "states": [
+    "Only the recovery administrator can use this page. Other accounts, computer enrollment and old Runtime execution remain suspended.",
+    "The review revision changed. Your input is retained. Refresh and review the current version before confirming."
+  ],
+  "form": "- heading \"Current review\" [level=2]\n- heading \"closed-member\" [level=3]\n- paragraph: Set a new password to restore login. Former administrators become ordinary members. Computer, project, model and plugin permissions require new grants.\n- text: Account login\n- combobox \"Account login\":\n  - option \"Keep disabled\"\n  - option \"Restore ordinary member login\" [selected]\n- text: New password\n- textbox \"New password\": fresh-ui-member-password\n- text: At least 12 characters; the old password is not restored\n- checkbox \"I have reviewed this subject and the effects above\" [checked]\n- text: I have reviewed this subject and the effects above\n- status: The review revision changed. Your input is retained. Refresh and review the current version before confirming.\n- button \"Use the newly reviewed revision\" [disabled]\n- button \"Confirm review\" [disabled]\n- button \"Cancel editing\"",
+  "ordinaryAdmin": 0,
+  "sourceRestoreButton": 0,
+  "oldWorkNotice": 1
+}

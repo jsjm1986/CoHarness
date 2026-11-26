@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-21-multicomputer-interactive-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-21-multicomputer-interactive-admission.md
+document:
+  en: 231ad1e9f98bb26052cc7c39799414cd95c372a8
+  zh: 95c35bfbcf1bf168f7df17baf8096ed34b39e555
+/agent-note-keep-interactive-admission-responsive-across-computers:
+  en: 465a6457e023848e
+  zh: f0a1e5a279b34760
+/agent-note-keep-interactive-admission-responsive-across-computers/problem:
+  en: d7091e34738ec710
+  zh: 6f0dc303924a9afe
+/agent-note-keep-interactive-admission-responsive-across-computers/decision:
+  en: 2849866b81e34cec
+  zh: 9710bd460a124e19
+/agent-note-keep-interactive-admission-responsive-across-computers/alternatives-considered:
+  en: b59eae317d2f4be5
+  zh: 3d27534755bef8bf
+/agent-note-keep-interactive-admission-responsive-across-computers/consequences:
+  en: 79dee14fec5e2661
+  zh: 078192956669cb61

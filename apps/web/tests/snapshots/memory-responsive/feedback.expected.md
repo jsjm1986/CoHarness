@@ -1,0 +1,17 @@
+phone-320: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+phone-360: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+phone-390: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+phone-430: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+foldable-540: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+tablet-768: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+tablet-1024: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+landscape-568: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+landscape-800: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+landscape-844: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+landscape-932: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+landscape-720: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+browser-chrome-landscape: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+below-compact-breakpoint: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+above-compact-breakpoint: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+below-expanded-breakpoint: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.
+above-expanded-breakpoint: loading, no-match feedback and disabled notice fully visible before acceptance scrolling; read-only actions enforced.

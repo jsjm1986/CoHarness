@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import LlmRuntime, { type RequestMessage, createUserMessage, ToolCallId, LlmError, MessageSource, ProviderRequestId, StreamChunk  } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
@@ -6,7 +6,7 @@ import SessionStore, { Session, SessionEvent, SessionId, TurnEndReason, type Use
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture, type PostToolDecision } from '@deepseek-ai/dsh-tools'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
-import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { installAgentExecutionAdmission, type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
@@ -57,6 +57,24 @@ function inboxText(message: UserMessage): string {
     .flatMap(block => block.type === 'text' ? [block.text] : [])
     .join('')
 }
+
+it('refuses restored identities through direct factories and completes a fresh conversation', async () => {
+  const ctx = await harness(new MockAdapter([textResponse('New conversation accepted')]))
+  onTestFinished(() => ctx.fiber.dispose())
+  const old = SessionId('recovered-old')
+  installAgentExecutionAdmission(ctx, [old])
+  await expect(ctx.agentLoop.create(old)).rejects.toMatchObject({ code: 'recovery-read-only' })
+  await expect(ctx.agentLoop.createAgent(ctx, { sessionId: old })).rejects.toMatchObject({ code: 'recovery-read-only' })
+  await expect(ctx.agentLoop.resume(ctx, { resumeSessionId: old })).rejects.toMatchObject({ code: 'recovery-read-only' })
+  expect(ctx.sessions.get(old)).toBeUndefined()
+  expect(ctx.agents.get(old)).toBeUndefined()
+  const agent = await ctx.agentLoop.create(SessionId('recovered-new'), { provider: 'mock', model: 'fixture' })
+  const idle = waitForIdle(ctx, agent)
+  send(agent, 'Start fresh')
+  await idle
+  const messages = agent.session.snapshotEvents().filter(event => event.type === 'assistant/message')
+  expect(JSON.stringify(messages)).toContain('New conversation accepted')
+})
 
 describe('assistant replay provider and model fields', () => {
   it('records adapter replay state with the assembled assistant content', async () => {

@@ -29,13 +29,15 @@ export interface BackupRecordView {
   error: string | null
 }
 
+/** List metadata and versioned manifest presence. Restore validates the complete manifest. */
+export type BackupRecordSummary = Omit<BackupRecordView, 'managedSnapshot'> & { hasManagedSnapshot: boolean }
+
 /** A registry request was invalid or addressed a missing backup row. */
 export class BackupError extends Error {
   constructor(readonly status: 400 | 404 | 409, message: string) { super(message) }
 }
 
-function view(row: Record<string, unknown>): BackupRecordView {
-  const files = row.managed_files
+function metadata(row: Record<string, unknown>): Omit<BackupRecordView, 'managedSnapshot'> {
   return {
     id: String(row.id),
     path: String(row.path),
@@ -44,7 +46,6 @@ function view(row: Record<string, unknown>): BackupRecordView {
     writeEpoch: String(row.write_epoch),
     sizeBytes: row.size_bytes === null ? null : Number(row.size_bytes),
     sha256: row.sha256 as string | null,
-    managedSnapshot: Array.isArray(files) ? null : parseManagedSnapshot(files),
     status: row.status as BackupStatus,
     createdBy: row.created_by === null ? null : publicNumber(row.created_by as string | number, 'backup actor'),
     createdAt: String(row.created_at),
@@ -54,9 +55,14 @@ function view(row: Record<string, unknown>): BackupRecordView {
   }
 }
 
-const PROJECTION = `SELECT b.id,b.path,b.format,b.migration_version,b.write_epoch,b.size_bytes,b.sha256,
-  b.managed_files,b.status,(SELECT u.public_id FROM harness.users u WHERE u.id=b.created_by) created_by,
-  b.created_at,b.verified_at,b.restored_at,b.error FROM harness.backup_records b`
+function view(row: Record<string, unknown>): BackupRecordView {
+  const files = row.managed_files
+  return { ...metadata(row), managedSnapshot: Array.isArray(files) ? null : parseManagedSnapshot(files) }
+}
+
+const COLUMNS = `b.id,b.path,b.format,b.migration_version,b.write_epoch,b.size_bytes,b.sha256,
+  b.status,(SELECT u.public_id FROM harness.users u WHERE u.id=b.created_by) created_by,
+  b.created_at,b.verified_at,b.restored_at,b.error`
 
 export class PostgresBackupService {
   /** @param context - database and organization owned by this Gateway */
@@ -70,14 +76,18 @@ export class PostgresBackupService {
     })
   }
 
-  /** Newest-first registry rows for the admin deployment page and the applier. */
-  async list(limit = 50): Promise<BackupRecordView[]> {
+  /** List newest backups for the deployment page.
+   * @param limit - maximum number of registry rows.
+   * @returns display metadata and versioned manifest presence for each backup.
+   */
+  async list(limit = 50): Promise<BackupRecordSummary[]> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new RangeError('backup limit out of range')
-    const result = await this.context.pool.query<Record<string, unknown>>(
-      `${PROJECTION} WHERE b.organization_id=$1 ORDER BY b.created_at DESC LIMIT $2`,
+    const result = await this.context.pool.query<Record<string, unknown> & { has_managed_snapshot: boolean }>(
+      `SELECT ${COLUMNS},COALESCE(b.managed_files->'version'='1'::jsonb,false) has_managed_snapshot
+       FROM harness.backup_records b WHERE b.organization_id=$1 ORDER BY b.created_at DESC LIMIT $2`,
       [this.context.organizationId, limit],
     )
-    return result.rows.map(view)
+    return result.rows.map(row => ({ ...metadata(row), hasManagedSnapshot: row.has_managed_snapshot }))
   }
 
   /**
@@ -92,7 +102,7 @@ export class PostgresBackupService {
 
   private async getWithin(database: Queryable, id: string): Promise<BackupRecordView> {
     const result = await database.query<Record<string, unknown>>(
-      `${PROJECTION} WHERE b.organization_id=$1 AND b.id=$2`,
+      `SELECT ${COLUMNS},b.managed_files FROM harness.backup_records b WHERE b.organization_id=$1 AND b.id=$2`,
       [this.context.organizationId, id],
     )
     const row = result.rows[0]

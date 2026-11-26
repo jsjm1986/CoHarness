@@ -41,6 +41,7 @@ import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './sh
 import { createWorkspaceViewStore } from './stores.ts'
 import { derive, derivePair } from './session-actions/derived.ts'
 import { observeInputDraftSessions } from './draft-sessions.ts'
+import { bindStartupDraft } from './startup-draft.ts'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from './session-actions/ArchiveSession.tsx'
 import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
@@ -163,6 +164,9 @@ export function apply(ctx: ClientContext): void {
   const hostDescription = connection.hostDescription
   const lifetime = new AbortController()
   ctx.effect(() => () => { lifetime.abort() }, 'ui-workspace: navigation lifetime')
+  const startupDraft = ctx.get('startupDraft')
+  if (startupDraft !== undefined) ctx.inject(['projectUiPolicy'], scope =>
+    scope.effect(() => bindStartupDraft(scope, connection, startupDraft), 'ui-workspace: startup draft adoption'))
   const inputDraftSessions = createSnapshotStore<readonly SessionId[]>([])
   ctx.effect(() => observeInputDraftSessions({
     list: ctx.sessions.currentScopeList ?? ctx.sessions.list,
@@ -170,8 +174,8 @@ export function apply(ctx: ClientContext): void {
   }, (ids) => { inputDraftSessions.set(ids) }), 'ui-workspace: composer-owned blank rows')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workspace: dictionaries')
 
-  const searchSessions: WorkspaceBrowserInjected['searchSessions'] = async (query, signal) => {
-    const result = await ctx.sessions.search(query, signal)
+  const searchSessions: WorkspaceBrowserInjected['searchSessions'] = async (query, signal, progress) => {
+    const result = await ctx.sessions.search(query, signal, progress)
     if (!result.ok) throw new Error(result.error.message)
     return result.value
   }
@@ -297,6 +301,7 @@ export function apply(ctx: ClientContext): void {
   const startRuntimeSession = async (target: SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal): Promise<void> => {
     const intents = ctx.get('conversationIntents')
     if (intents !== undefined && ctx.sessions.preparedOperationsAvailable?.(target)) {
+      signal?.throwIfAborted()
       const create = ctx.workspaces.createRuntimeSession?.bind(ctx.workspaces)
       if (create === undefined) throw new Error('Runtime conversation creation is unavailable')
       const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
@@ -308,8 +313,10 @@ export function apply(ctx: ClientContext): void {
         // `editing` owns intent death; a view navigation supersede (renewal
         // re-open included) must not abort the pending create — commitOpen's
         // transfer check decides whether the intent still owns the landing.
-        const navigation = AbortSignal.any([
-          editing, lifetime.signal, ...(signal === undefined ? [] : [signal])])
+        // The caller's `signal` dies with its own view once `selectPanel`
+        // above hands the surface to the intent, so it is checked at entry
+        // only and never joined into this navigation.
+        const navigation = AbortSignal.any([editing, lifetime.signal])
         const perform = async (active: AbortSignal): Promise<void> => {
           const id = await create(target, workspaceId, active, intent)
           active.throwIfAborted()

@@ -9,7 +9,7 @@ const bundle = clientBundle('@deepseek-ai/dsh-client-ui-workbench', ['lib/types/
     : fileName.endsWith('client.excel.js') ? excelLicenseBanner() : undefined,
 })
 const require = createRequire(import.meta.url)
-const workerSpecifier = 'pdfjs-dist/build/pdf.worker.min.mjs?raw'
+const workerSpecifier = 'pdfjs-dist/build/pdf.worker.mjs?raw'
 const workerModule = '\0dsh-pdf-worker.mjs'
 
 /** License files bundled with the lazy spreadsheet chunk: FortuneSheet omits its repository license from the npm payload. */
@@ -51,17 +51,47 @@ function pdfAssets(directory: 'cmaps' | 'standard_fonts' | 'wasm'): string {
   ))
 }
 
-/** The dynamic client factory has no module URL from which to resolve a Worker file. */
+/** Embed a Worker whose image decoders use the packaged binary resource loader. */
 const pdfWorker: NonNullable<UserConfig['plugins']> = [{
   name: 'dsh-pdf-worker-source',
   resolveId(source) {
     return source === workerSpecifier ? workerModule : null
   },
-  load(id) {
+  async load(id) {
     if (id !== workerModule) return null
-    const path = require.resolve('pdfjs-dist/build/pdf.worker.min.mjs')
+    const path = require.resolve('pdfjs-dist/build/pdf.worker.mjs')
     this.addWatchFile(path)
-    return `export default ${JSON.stringify(readFileSync(path, 'utf8'))};`
+    const worker = await Rolldown.rolldown({
+      input: path, platform: 'neutral',
+      plugins: [{
+        name: 'dsh-pdf-decoder-fallback',
+        transform(source, file) {
+          if (file !== path) return null
+          const nativeFallback = /const mod = await import\(\s*\/\*webpackIgnore: true\*\/\s*\/\*@vite-ignore\*\/\s*`\$\{WasmImage\.#wasmUrl\}\$\{this\._noWasmFilename\}`\);\s*instance = mod\.default\(\);/gu
+          if ([...source.matchAll(nativeFallback)].length !== 1) {
+            throw new Error('PDF.js worker decoder fallback changed; check the local resource adapter')
+          }
+          return source.replace(nativeFallback, `
+            const bytes = await WasmImage.#handler.sendWithPromise("FetchBinaryData", {
+              kind: "wasmUrl", filename: this._noWasmFilename,
+            });
+            const url = URL.createObjectURL(new Blob([bytes], { type: "text/javascript" }));
+            try {
+              const mod = await import(url);
+              instance = mod.default();
+            } finally {
+              URL.revokeObjectURL(url);
+            }
+          `)
+        },
+      }],
+    })
+    try {
+      const result = await worker.generate({ format: 'es', minify: true })
+      const [chunk] = result.output
+      if (result.output.length !== 1 || chunk?.type !== 'chunk') throw new Error('PDF worker must emit one JavaScript chunk')
+      return `export default ${JSON.stringify(chunk.code)};`
+    } finally { await worker.close() }
   },
 }]
 

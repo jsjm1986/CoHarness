@@ -1,4 +1,4 @@
-/** Shared menu material and the macOS backing that lets Chromium blur transparent windows. */
+/** Opaque Web menu material and native macOS vibrancy backing. */
 import { forwardRef, useId, useLayoutEffect, useRef, type ComponentPropsWithoutRef, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
@@ -11,7 +11,7 @@ export interface MenuSurfaceProps extends ComponentPropsWithoutRef<'div'> {
 }
 
 /**
- * Paint a menu and, on macOS, an opaque backing behind the page content within its bounds.
+ * Paint an opaque Web menu; native macOS uses translucent material with a backing behind page content.
  * CSS anchors keep each backing aligned during placement, resizing, and nested-menu movement.
  * @param props - Div content and placement, and compact geometry.
  * @param ref - The visible menu div, excluding the non-interactive backing.
@@ -32,7 +32,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, MenuSurfaceProps>(function
     '--dsh-menu-anchor': `--dsh-menu-${id.replaceAll(':', '')}`,
   }
   return <>
-    <div {...props} ref={ref} data-menu-material="translucent"
+    <div {...props} ref={ref} data-menu-material=""
       className={clsx(css.surface, compact && css.compact, className)} style={{ ...style, ...anchorStyle }}>
       <div aria-hidden="true" data-menu-material-fill="" className={css.material} />
       {children}

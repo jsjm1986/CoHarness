@@ -2,6 +2,10 @@
  * same full-width separators, so the group adds none of its own. When the
  * group ends the General column, its last visible row drops the separator. */
 
+.group {
+  container-type: inline-size;
+}
+
 .group:last-child > :last-child,
 .group:last-child > :last-child > :last-child {
   border-bottom: 0;
@@ -9,8 +13,8 @@
 
 .notice {
   margin: 0;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   color: var(--dsw-alias-label-secondary);
 }
 

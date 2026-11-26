@@ -7,10 +7,10 @@ import { sameExecutionAuthority, type ExecutionAuthority } from '@deepseek-ai/ds
 import { LlmError, type GenerateOptions, type RequestMessage, type StreamChunk, type TokenUsage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { ReloadableModelAccess } from './access.ts'
+import { POLICY_UNAVAILABLE_REASON, ReloadableModelAccess } from './access.ts'
 import { UsageOutbox, type UsageRecord } from './outbox.ts'
 import { OrganizationCredentialLayer } from './organization-credentials.ts'
-import { loadPolicy } from './policy.ts'
+import { policyReader } from './policy.ts'
 import { ReloadableModelProviderConfig, stagedProviderSnapshot } from './provider-config.ts'
 import { PolicyReloader } from './reload.ts'
 import { baselineRegistrations, diffRegistrations } from './registration.ts'
@@ -107,7 +107,8 @@ async function billingExecution(
 export function apply(ctx: Context): void {
   const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
   const policyPath = process.env.DSH_MODEL_GOVERNANCE ?? join(home, 'model-governance.json')
-  const policy = loadPolicy(policyPath)
+  const reader = policyReader(policyPath)
+  const policy = reader.load()
   let stopped = false
   const requests = new AsyncLocalStorage<ModelExecution>()
   let activeRequests = 0
@@ -125,6 +126,7 @@ export function apply(ctx: Context): void {
   })
   ctx.provide('modelAccess', {
     decide(target) {
+      if (stopped) return { allowed: false, reason: POLICY_UNAVAILABLE_REASON }
       const execution = requests.getStore()
       execution?.signal?.throwIfAborted()
       const decision = access.decide(target)
@@ -158,33 +160,55 @@ export function apply(ctx: Context): void {
     userDeclared.refresh(ctx.llm, sctx.settings)
     sctx.effect(() => () => userDeclared.clear())
   })
-  const outbox = new UsageOutbox(join(home, 'model-governance-outbox'), policy.intakeUrl, policy.intakeToken)
+  const outbox = new UsageOutbox(join(home, 'model-governance-outbox'), policy.intakeUrl, policy.intakeToken,
+    message => ctx.logger.warn(message))
   let personalRuntime = policy.userDeclaredAllowed
+  let applied: typeof policy | undefined = policy
+  let refreshTail = Promise.resolve()
+  let pendingRefresh: Promise<void> | undefined
+  const runRefresh = async (): Promise<void> => {
+    if (stopped) return
+    try {
+      const next = await reader.read()
+      if (stopped || next === applied) return
+      const configuration = { revision: next.version, providers: next.providers }
+      providerConfig.replace(stagedProviderSnapshot(providerConfig.snapshot(), configuration))
+      access.replace(next)
+      outbox.setEndpoint(next.intakeUrl, next.intakeToken)
+      personalRuntime = next.userDeclaredAllowed
+      providerConfig.replace(configuration)
+      applied = next
+    } catch (error) {
+      if (stopped) return
+      access.unavailable()
+      if (applied === undefined) return
+      applied = undefined
+      ctx.logger.warn(`model-governance: policy reload failed at ${policyPath}. New model requests are blocked.`)
+      ctx.logger.warn(error)
+    }
+  }
+  const refreshPolicy = (): Promise<void> => {
+    if (stopped) return Promise.resolve()
+    if (pendingRefresh !== undefined) return pendingRefresh
+    const task = refreshTail.then(() => {
+      pendingRefresh = undefined
+      return runRefresh()
+    })
+    pendingRefresh = task
+    refreshTail = task.then(() => undefined, () => undefined)
+    return task
+  }
   let reloader: PolicyReloader | undefined
   ctx.effect(() => async () => {
     stopped = true
     access.unavailable()
     await reloader?.close()
+    await refreshTail
     await outbox.close()
   }, 'model-governance: drain policy reload and usage outbox')
   reloader = new PolicyReloader({
     filename: policyPath,
-    onValid: next => {
-      if (stopped) return
-      providerConfig.replace(stagedProviderSnapshot(providerConfig.snapshot(), {
-        revision: next.version,
-        providers: next.providers,
-      }))
-      access.replace(next)
-      providerConfig.replace({ revision: next.version, providers: next.providers })
-      outbox.setEndpoint(next.intakeUrl, next.intakeToken)
-      personalRuntime = next.userDeclaredAllowed
-    },
-    onInvalid: error => {
-      access.unavailable()
-      ctx.logger.warn(`model-governance: policy reload failed at ${policyPath}; denying new model requests`)
-      ctx.logger.warn(error)
-    },
+    refresh: refreshPolicy,
     onWatcherError: error => {
       ctx.logger.warn(`model-governance: policy watcher failed at ${policyPath}`)
       ctx.logger.warn(error)
@@ -233,20 +257,40 @@ export function apply(ctx: Context): void {
       }
     })
   })
-  const currentAccess = (target: Pick<GenerateOptions, 'provider' | 'model'>) => {
-    if (stopped) return access.decide(target)
-    try { access.replace(loadPolicy(policyPath)) } catch {
-      access.unavailable()
-    }
-    return access.decide(target)
+  const awaitRefresh = (signal?: AbortSignal): Promise<void> => {
+    signal?.throwIfAborted()
+    const task = refreshPolicy()
+    if (signal === undefined) return task
+    return new Promise<void>((resolve, reject) => {
+      const onAbort = (): void => {
+        try { signal.throwIfAborted() } catch (error: unknown) { reject(error) }
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+      void task.then(
+        () => {
+          signal.removeEventListener('abort', onAbort)
+          resolve()
+        },
+        (error: unknown) => {
+          signal.removeEventListener('abort', onAbort)
+          reject(error)
+        },
+      )
+    })
+  }
+  const currentAccess = async (target: Pick<GenerateOptions, 'provider' | 'model'>, signal?: AbortSignal) => {
+    await awaitRefresh(signal)
+    return stopped ? { allowed: false as const, reason: POLICY_UNAVAILABLE_REASON } : access.decide(target)
   }
   ctx.on('llm/pre-dispatch', async (options, next) => {
     options.signal?.throwIfAborted()
-    const decision = currentAccess(options)
-    if (!decision.allowed) throw new LlmError(decision.reason, 'MODEL_FORBIDDEN')
     const execution = requests.getStore()
     if (execution === undefined) throw new LlmError('The model request has no retained execution owner.', 'MODEL_EXECUTION_IDENTITY_FAILED')
     assertExecutionIssuer(ctx, execution)
+    const initialDecision = await currentAccess(options, options.signal)
+    options.signal?.throwIfAborted()
+    assertExecutionIssuer(ctx, execution)
+    if (!initialDecision.allowed) throw new LlmError(initialDecision.reason, 'MODEL_FORBIDDEN')
     const authority = execution.authority
     if (authority !== undefined && (options.purpose === 'auto-review' || options.resourceOrigin !== 'infrastructure')) {
       authority.current()
@@ -266,8 +310,10 @@ export function apply(ctx: Context): void {
       }
     }
     await next()
+    const decision = await currentAccess(options, options.signal)
     options.signal?.throwIfAborted()
     assertExecutionIssuer(ctx, execution)
+    if (!decision.allowed) throw new LlmError(decision.reason, 'MODEL_FORBIDDEN')
   }, { global: true })
   const meter = (options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk> => {
     const agents = ctx.get('agents')
@@ -296,6 +342,7 @@ export function apply(ctx: Context): void {
       activeRequests++
       try {
         let execution: Awaited<ReturnType<typeof billingExecution>>
+        let decision: Awaited<ReturnType<typeof currentAccess>>
         let agent: Agent | undefined
         try {
           options.signal?.throwIfAborted()
@@ -303,6 +350,7 @@ export function apply(ctx: Context): void {
           const captured = infrastructure ? undefined : authority?.current()
           agent = billingAgent ?? (explicitId === undefined && captured !== undefined ? agents?.get(captured.parentSessionId) : undefined)
           execution = await billingExecution(options, billingAgent, authority)
+          decision = await currentAccess(options, options.signal)
           options.signal?.throwIfAborted()
           assertExecutionIssuer(ctx, { authority, deployment })
         } catch {
@@ -331,7 +379,6 @@ export function apply(ctx: Context): void {
             base.actorProjectId = actor.projectId
           }
         }
-        const decision = currentAccess(options)
         if (!decision.allowed) {
           enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'denied' })
           yield { type: 'finish', reason: { kind: 'error', failure: { message: decision.reason, code: 'MODEL_FORBIDDEN' } } }

@@ -6,6 +6,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { LocalRuntimeOwnerStore, type LocalRuntimeOwnerNonce, type LocalRuntimeOwnerRecord } from '../src/local-runtime-owner.ts'
 
 const command = vi.hoisted(() => vi.fn())
+const nativeAcl = vi.hoisted(() => vi.fn())
+vi.mock('../src/local-runtime-owner-win32-acl.ts', () => ({ probeNativeWindowsOwnerAcl: nativeAcl }))
 vi.mock('../src/child-command.ts', () => ({
   runGatewayChildCommand: command,
   runWindowsShellProbe: (args: string[], timeoutMs: number, signal?: AbortSignal, maxBuffer?: number) => command('powershell.exe', args, timeoutMs, signal, maxBuffer),
@@ -22,6 +24,7 @@ afterEach(async () => {
   Object.defineProperty(process, 'platform', platform)
   vi.restoreAllMocks()
   command.mockReset()
+  nativeAcl.mockReset()
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
 })
 
@@ -51,6 +54,16 @@ it('replays each private verdict across repeated reads', async () => {
   expect(command).toHaveBeenCalledTimes(2)
   expect(probes(store.directory)).toHaveLength(1)
   expect(probes(store.recordPath)).toHaveLength(1)
+})
+
+it('honors supported native ACL results without starting PowerShell', async () => {
+  const { store } = await fixture()
+  nativeAcl.mockImplementation(async (path: string) => path === store.recordPath ? 'not-private' : 'private')
+  await expect(store.read()).rejects.toThrow('bounded private file')
+  nativeAcl.mockResolvedValue('private')
+  expect((await store.read())?.phase).toBe('reserved')
+  expect(command).not.toHaveBeenCalled()
+  expect(nativeAcl.mock.calls.map(([path]) => path)).toEqual([store.directory, store.recordPath, store.recordPath])
 })
 
 it('re-probes the record when its file identity changes, not the directory', async () => {

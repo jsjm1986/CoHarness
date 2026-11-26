@@ -16,7 +16,7 @@ it('resolves a selected authorized project outside the first page and rejects an
   let returned = [allocation]
   const read = vi.fn(async (path: string) => {
     if (path === '/account/api/runtimes') return { items: [known], nextCursor: 'two-hundred-more' }
-    if (path.startsWith('/account/api/context?')) return { user: { id: 7, displayName: 'A' }, environment: { id: known.id },
+    if (path.startsWith('/account/api/workbench/context?')) return { user: { id: 7, displayName: 'A' }, environment: { id: known.id },
       projects: [{ projectId: 17, nodeId: node.id, name: 'Known project' }] }
     if (path === '/account/api/runtimes?projectId=17') return { items: returned, nextCursor: null }
     throw new Error('An unselected computer was contacted')
@@ -47,7 +47,7 @@ it('searches only retained, currently authorized rows and keeps each selected se
   const read = vi.fn(async (path: string) => {
     const url = new URL(path, 'https://harness.invalid')
     if (url.pathname === '/account/api/runtimes') return { items: revoked ? [rows[0]] : [...rows, projectRow], nextCursor: null }
-    if (url.pathname === '/account/api/context') return { user: { id: 7, displayName: 'A' }, environment: { id: primary.runtimeId },
+    if (url.pathname === '/account/api/workbench/context') return { user: { id: 7, displayName: 'A' }, environment: { id: primary.runtimeId },
       projects: revoked ? [] : [{ projectId: 9, name: 'Team' }] }
     const selected = [primary, remote, project].find(item => item.runtimeId === url.searchParams.get('dshRuntime'))
     if (selected === undefined) throw new Error('Unselected computer')
@@ -95,7 +95,7 @@ it('reads only central metadata for twenty granted computers, then only rows on 
   const reader = new EntryDirectory(async (path) => {
     calls.push(path)
     if (path === '/account/api/runtimes') return { items: rows, nextCursor: null }
-    if (path.startsWith('/account/api/context?')) return { user: { id: 7, displayName: 'A' }, projects: [], environment: { id: rows[0]!.id } }
+    if (path.startsWith('/account/api/workbench/context?')) return { user: { id: 7, displayName: 'A' }, projects: [], environment: { id: rows[0]!.id } }
     if (path.includes(rows[1]!.id)) return { runtimeId: rows[1]!.id, items: [], workspaces: [], nextCursor: 'more' }
     throw new Error('Unselected computer')
   })
@@ -117,7 +117,7 @@ it('accepts both personal cursors from one owner and rejects a mismatched compan
   let foreign = true
   const reader = new EntryDirectory(async (path) => {
     if (path === '/account/api/runtimes') return { items: rows, nextCursor: null }
-    if (path.startsWith('/account/api/context?')) return { user: { id: 7, displayName: 'A' }, projects: [], environment: { id: owner.runtimeId } }
+    if (path.startsWith('/account/api/workbench/context?')) return { user: { id: 7, displayName: 'A' }, projects: [], environment: { id: owner.runtimeId } }
     expect(new URL(path, 'https://harness.invalid').searchParams.get('include')).toBe('conversations')
     return { runtimeId: owner.runtimeId, workspaces: [{ workspaceId: 'work', sessionIds: [] }], items: [], nextCursor: 'next-folder',
       conversationPage: { runtimeId: foreign ? other.runtimeId : owner.runtimeId,

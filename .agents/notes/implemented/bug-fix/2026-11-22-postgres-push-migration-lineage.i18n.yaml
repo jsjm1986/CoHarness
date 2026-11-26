@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-22-postgres-push-migration-lineage.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-22-postgres-push-migration-lineage.md
+document:
+  en: fb0030687840775ebe7c8e16a7e0bd72bd879094
+  zh: 0da25d0f55f9eb29bbdc3cb2f1fdb48de6c7cba3
+/agent-note-preserve-both-published-postgresql-migration-histories:
+  en: f794a91ee19cb5eb
+  zh: 8294b792e265ba19
+/agent-note-preserve-both-published-postgresql-migration-histories/problem:
+  en: af8f7b0b3b80f2d4
+  zh: 40be27633d02cf95
+/agent-note-preserve-both-published-postgresql-migration-histories/decision:
+  en: 37669733c44b1924
+  zh: b547e2eeeab1fc65
+/agent-note-preserve-both-published-postgresql-migration-histories/alternatives-considered:
+  en: 65c811fd651ac8a2
+  zh: f1e545fafa841083
+/agent-note-preserve-both-published-postgresql-migration-histories/consequences:
+  en: 1f0e46d7e112ca09
+  zh: 3812a196551539a9

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/session/README.md
 document:
-  en: 8de88973c7b5432e28aa3d5e0f833fcdb72f3e71
-  zh: e0478aea536f6443a414dcd72cbfd8541566aa18
+  en: 98b05ff75ee9a77cb49507c660b6f7a90c19754b
+  zh: 452666471b25ebdbd5bf03a4c8b5e862b1ba0540
 /:
   en: 1c8be05e4c02cbd0
   zh: 61495d48365178df
@@ -27,8 +27,8 @@ document:
   en: f9b1ca96aa30e56e
   zh: 27eec0fd054f643b
 /dsh-session/service-sessionstore-ctx-key-sessions/public-api:
-  en: e071dc5d911fde36
-  zh: 9349467848dd927f
+  en: 2f305357954b125d
+  zh: 133ffb121edd69f2
 /dsh-session/service-sessionstore-ctx-key-sessions/public-api/advanced-ordered-teardown-lifecycle-primitives:
   en: 7b9c4b4c811c8fc1
   zh: c86261fafc4ba806
@@ -54,8 +54,8 @@ document:
   en: dabbe938e288c55a
   zh: 6eb0ffcc8d9f511c
 /dsh-session/service-sessionstore-ctx-key-sessions/request-header-reconstruction-request-header-ts:
-  en: 64c984a8f4b5792e
-  zh: 13b8c51d1b3ac3dd
+  en: a5b96648765d0448
+  zh: 9230d656e58a1745
 /dsh-session/service-sessionstore-ctx-key-sessions/session-event-vocabulary-types-ts:
   en: 6e2b151af415848b
   zh: f7d9b2ba8c3dcc4b

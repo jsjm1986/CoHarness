@@ -111,16 +111,16 @@ describe('keyed toolview hole through the real machinery', () => {
   })
 
   it.each([
-    ['read', 'Read', '{"file_path":"a.txt"}'],
-    ['bash', 'Bash', '{"command":"true"}'],
-    ['mystery', 'Tool call', '{"n":1}'],
-  ])('opens %s details with the exact Session and call even without card material', async (name, title, args) => {
+    ['read', '{"file_path":"a.txt"}'],
+    ['bash', '{"command":"true"}'],
+    ['mystery', '{"n":1}'],
+  ])('opens %s details with the exact Session and call even without card material', async (name, args) => {
     const b = await bench([toolResult(3, 'addressed-call', name, args)])
     try {
       const view = b.runtime.renderRoot()
-      fireEvent.click(view.getByText(title, { exact: true }))
       const row = view.container.querySelector('[data-chat-call-id="addressed-call"]')
       expect(row).not.toBeNull()
+      fireEvent.click(row!.querySelector('[aria-expanded]')!)
       fireEvent.click(within(row as HTMLElement).getByRole('button', { name: 'Open details in sidebar' }))
       expect(b.layout.openDetails).toHaveBeenCalledWith(SID, { callId: 'addressed-call' })
     } finally { await b.runtime.dispose() }

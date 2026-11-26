@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { allocateUserRuntime, getAdminComputerContext, listUserRuntimes, operateRuntime,
   type RuntimeCatalogEntry, type RuntimeCatalogPage, type RuntimeId, type RuntimeNodeId } from '../api.ts'
 import { adminComputerTarget } from '../computer-target.ts'
+import { startAdminRuntime } from '../runtime-start-followup.ts'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { ComputerBadge } from '../model-settings-primitives.ts'
 import { zh, en } from '../runtime.copy.ts'
@@ -18,6 +19,7 @@ export function UserRuntimePanel({ userId, onChanged }: { userId: number; onChan
   const deployment = useDeploymentContext().value
   const showComputer = deployment?.mode === 'multi'
   const localNode = deployment?.scope === 'local' ? deployment.entry.nodeId : undefined
+  const routeNode = adminComputerTarget()
   const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const [page, setPage] = useState<RuntimeCatalogPage | null>(null)
   const [nodeId, setNodeId] = useState<RuntimeNodeId>()
@@ -26,6 +28,7 @@ export function UserRuntimePanel({ userId, onChanged }: { userId: number; onChan
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false)
   const [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [needsRefresh, setNeedsRefresh] = useState(false)
+  const [checkingStart, setCheckingStart] = useState(false)
   usePendingEdits(busy)
   const [confirm, setConfirm] = useState<{ runtime: RuntimeCatalogEntry; action: 'start' | 'stop' | 'restart' | 'retire' } | null>(null)
   const [publication,setPublication]=useState<RuntimeCatalogEntry|null>(null)
@@ -36,25 +39,30 @@ export function UserRuntimePanel({ userId, onChanged }: { userId: number; onChan
   const confirmationUnavailable = confirm !== null && localNode !== undefined && confirm.runtime.node.id !== localNode
   useEffect(() => { setCursor(undefined) }, [localNode])
   const lifetime = useRef<AbortController | null>(null)
-  useEffect(() => { const owner = new AbortController(); lifetime.current = owner; return () => { owner.abort(); lifetime.current = null } }, [])
+  useEffect(() => {
+    const owner = new AbortController()
+    lifetime.current = owner
+    setBusy(false); setCheckingStart(false)
+    return () => { owner.abort(); lifetime.current = null }
+  }, [userId, localNode, routeNode])
   useEffect(() => {
     const controller = new AbortController(); setLoading(true)
     void Promise.all([listUserRuntimes(userId, cursor, controller.signal), getAdminComputerContext(controller.signal)])
       .then(([runtimes, context]) => {
         if (controller.signal.aborted) return
         setPage(runtimes); setNeedsRefresh(false)
-        setNodeId(adminComputerTarget(globalThis.location?.pathname ?? '/admin') ?? context.nodeId); setError('')
+        setNodeId(routeNode ?? context.nodeId); setError('')
       }).catch((cause: unknown) => { if (!controller.signal.aborted) { setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : t('readFailed')); setNeedsRefresh(true) } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => { controller.abort() }
-  }, [userId, cursor, revision, t, localNode])
+  }, [userId, cursor, revision, t, localNode, routeNode])
   async function run<T>(operation: () => Promise<T>, completion?: (result: T) => string): Promise<void> {
     if (busy || needsRefresh) return
     const owner = lifetime.current
     setBusy(true); setError(''); setNotice('')
     try { const result = await operation(); if (owner?.signal.aborted) return; setConfirm(null); setRevision(value => value + 1); onChanged?.(); setNotice(completion === undefined ? t('updated') : completion(result)) }
     catch (cause) { if (!owner?.signal.aborted) { setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : t(confirm === null ? 'allocationUnconfirmed' : 'operationUnconfirmed')); if (confirm !== null) setNeedsRefresh(true) } }
-    finally { if (!owner?.signal.aborted) setBusy(false) }
+    finally { if (!owner?.signal.aborted) { setBusy(false); setCheckingStart(false) } }
   }
   async function allocate(): Promise<RuntimeId> {
     if (nodeId === undefined || allocationUnavailable) throw new Error(t('selectionUnavailable'))
@@ -76,9 +84,9 @@ export function UserRuntimePanel({ userId, onChanged }: { userId: number; onChan
     </div>
     {!loading && page !== null && items.length === 0 ? <EmptyState title={t(cursor === undefined ? 'noAllocations' : 'noPageAllocations')} detail={t(cursor === undefined ? showComputer ? 'noAllocationsDetail' : 'localNoAllocations' : 'noPageAllocationsDetail')} /> : null}
     {page === null || items.length === 0 ? null : <div aria-busy={loading || busy}>
-      <div className="tableWrap desktopOnly"><table className="dataTable"><thead><tr>{showComputer && <th>{t('computer')}</th>}<th>{t('identity')}</th><th>{t('state')}</th><th>{t('actions')}</th></tr></thead>
+      <div className="tableWrap desktopOnly" role="region" aria-label={t('title')} tabIndex={0}><table className="dataTable"><thead><tr>{showComputer && <th>{t('computer')}</th>}<th>{t('identity')}</th><th>{t('state')}</th><th>{t('actions')}</th></tr></thead>
       <tbody>{items.map(runtime => <tr key={runtime.id}>
-        {showComputer && <td><ComputerBadge label={t('computer')} name={runtime.node.name} details={[{ label: t('identity'), value: runtime.id }, { label: t('generation'), value: String(runtime.generation) }]} /></td>}
+        {showComputer && <td className="runtimeComputer"><ComputerBadge label={t('computer')} name={runtime.node.name} details={[{ label: t('identity'), value: runtime.id }, { label: t('generation'), value: String(runtime.generation) }]} /></td>}
         <td className="terminalIdentity">{runtime.id}</td><td><InstanceState state={runtime.observedState} /></td>
         <td>{controls(runtime)}</td>
       </tr>)}</tbody></table></div>
@@ -97,7 +105,15 @@ export function UserRuntimePanel({ userId, onChanged }: { userId: number; onChan
       onClose={()=>setPublication(null)} />}
     <ConfirmDialog open={confirm !== null} title={t('confirm', { action: confirm === null ? '' : t(confirm.action) })}
       description={confirm === null ? '' : `${t(showComputer ? 'confirmDetail' : 'localConfirm', { computer: confirm.runtime.node.name, runtime: confirm.runtime.id, generation: String(confirm.runtime.generation) })}${confirm.action === 'retire' ? ` · ${t(showComputer ? 'retiredDetail' : 'localRetired')}` : ''}`}
-      pending={busy} error={confirmationUnavailable ? t('selectionUnavailable') : error} confirmDisabled={needsRefresh || confirmationUnavailable} confirmLabel={confirm === null ? '' : t(confirm.action)} onClose={() => { if (!busy) setConfirm(null) }}
-      onConfirm={() => { if (confirm !== null && !confirmationUnavailable) { const selected = confirm; void run(() => operateRuntime(selected.runtime, selected.action)) } }} />
+      pending={busy} status={checkingStart ? t('startChecking') : undefined} error={confirmationUnavailable ? t('selectionUnavailable') : error} confirmDisabled={needsRefresh || confirmationUnavailable} confirmLabel={confirm === null ? '' : t(confirm.action)} onClose={() => { if (!busy) setConfirm(null) }}
+      onConfirm={() => {
+        const owner = lifetime.current
+        if (confirm === null || confirmationUnavailable || owner === null) return
+        const { runtime, action } = confirm
+        if (action === 'start') {
+          void run(() => startAdminRuntime(runtime, () => operateRuntime(runtime, 'start'), owner.signal, () => setCheckingStart(true)),
+            result => result === 'observed' ? t('startObserved') : t('updated'))
+        } else void run(() => operateRuntime(runtime, action))
+      }} />
   </Section>
 }

@@ -7,7 +7,7 @@ import ExecutionAuthority from '@deepseek-ai/dsh-execution-authority'
 import Schema from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, freezeMessage, MessageId, type UserMessage } from '@deepseek-ai/dsh-llm'
-import type { Session, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+import { materializesSession, type Session, type SessionHeader, type SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-hmr'
 import { readGatewayResponseJson, type GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
@@ -63,6 +63,37 @@ interface RequiredScope {
   capabilities: Set<ExecutionCapability>
 }
 
+interface InboxTiming {
+  insertedAt: number
+  inserted: number
+  claimed?: number
+  preparation?: {
+    assemblyStarted: number
+    assemblyFinished: number
+    preStepStarted: number
+    preStepFinished: number
+  }
+}
+
+interface AdmittedInput {
+  inputId: ExecutionInputId
+  hash: string
+  timing?: InboxTiming | undefined
+}
+
+interface ModelInputTiming {
+  turn: number
+  step: number
+  inbox?: InboxTiming | undefined
+  enterStartedAt: number
+  enterStarted: number
+  inheritanceMs: number
+  enterRpcMs: number
+  enterOperationId?: string | undefined
+  accepted: number
+  request?: { started: number; authorized: number; authorizeOperationId?: string | undefined }
+}
+
 /** Watch updates observed during one permission request, including an idle owner. */
 interface PendingAuthorization {
   readonly users: Set<number>
@@ -88,8 +119,9 @@ export class GatewayExecution extends ExecutionAuthority {
   private readonly admittedTurns = new WeakMap<Agent, number>()
   private readonly currentStep = new WeakMap<Agent, ExecutionState>()
   private readonly registration = new Map<SessionId, Promise<void>>()
+  private readonly unregisteredDrafts = new WeakSet<Session>()
   private readonly inherited = new WeakMap<Session, ExecutionInheritance>()
-  private readonly admitted = new WeakMap<Agent, Map<string, { inputId: ExecutionInputId; hash: string }>>()
+  private readonly admitted = new WeakMap<Agent, Map<string, AdmittedInput>>()
   private readonly required = new Map<Agent, Set<ExecutionCapability>>()
   private readonly scopeRequirements = new WeakMap<Agent, Map<string, RequiredScope>>()
   private readonly grants = new WeakMap<Agent, Map<ExecutionCapability, string>>()
@@ -141,6 +173,7 @@ export class GatewayExecution extends ExecutionAuthority {
       // composition is shared, so publish and read ride the runtime credential.
       readDesiredState: policy.readDesiredState?.bind(policy),
       publishDesiredState: policy.publishDesiredState?.bind(policy),
+      reportInventory: policy.reportInventory?.bind(policy),
       // Install sources are deployment policy, uniform for every caller.
       authorizeInstall: policy.authorizeInstall?.bind(policy),
     })
@@ -201,9 +234,20 @@ export class GatewayExecution extends ExecutionAuthority {
       }) })
       ctx.effect(() => () => policy.dispose(), 'gateway-execution: desktop workflows')
     }
-    ctx.on('agent/created', async ({ agent }) => {
-      await this.register(agent.session)
-      await this.restoreInheritance(agent.session)
+    ctx.on('agent/created', async ({ agent, source }) => {
+      const { session } = agent
+      const { header } = session
+      const caller = ctx.gatewayRuntime.interactive()?.claims
+      if (caller?.personalDraft === 'prepare' && caller.expiresAt > Date.now()
+        && source === 'startup' && header.draft === true && !header.isSeeded && header.parentSession === undefined
+        && header.origin === undefined && this.mirror(session).inheritance === null
+        // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+        && !session.events.some(materializesSession)) {
+        this.unregisteredDrafts.add(session)
+        return
+      }
+      await this.register(session)
+      await this.restoreInheritance(session)
     })
     ctx.on('goal/changed', ({ agent, change }) => {
       if (!['create', 'edit', 'resume'].includes(change.operation) || change.goal === undefined) return
@@ -215,13 +259,86 @@ export class GatewayExecution extends ExecutionAuthority {
       agent.session.append('gateway/continuation', {
         key: `goal:${change.goal.id}:${String(change.goal.revision)}`, scope })
     }, { prepend: true })
-    ctx.on('agent/pre-step', async ({ agent, messages }, next) => {
-      const originals = new Map<string, { inputId: ExecutionInputId; hash: string }>()
+    const timings = ctx.gatewayRuntime.modelTimings ? {
+      inbox: new WeakMap<UserMessage, InboxTiming>(),
+      input: new WeakMap<Agent, ModelInputTiming>(),
+      assembly: new WeakMap<Agent, { signal: AbortSignal; started: number; finished: number }>(),
+      preStep: new WeakMap<Agent, { turn: number; step: number; hooks: ReadonlyArray<{ plugin: string; elapsedMs: number }> }>(),
+    } : undefined
+    if (timings !== undefined) {
+      const reportPreStep: NonNullable<Context['agentPreStepTiming']> = ({ agent, turn, step }, hooks) => {
+        timings.preStep.set(agent, { turn, step, hooks })
+      }
+      ctx.provide('agentPreStepTiming', reportPreStep)
+      ctx.on('agent/inbox/inserted', ({ message }) => {
+        if (executionInputOf(message) !== undefined) timings.inbox.set(message, { insertedAt: Date.now(), inserted: performance.now() })
+      })
+      ctx.on('agent/inbox/claimed', ({ message }) => {
+        const timing = timings.inbox.get(message)
+        if (timing !== undefined) timing.claimed = performance.now()
+      })
+      ctx.on('system-prompt/assemble', async (_assembly, { agent, signal }, next) => {
+        if (agent === undefined || signal === undefined) return next()
+        const started = performance.now()
+        const assembled = await next()
+        timings.assembly.set(agent, { signal, started, finished: performance.now() })
+        return assembled
+      }, { prepend: true })
+      ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+        if (frame.type !== 'start') return
+        const timing = timings.input.get(agent)
+        if (timing === undefined || timing.turn !== frame.turn || timing.step !== frame.step || timing.request === undefined) return
+        timings.input.delete(agent)
+        const { inbox, enterStartedAt, enterStarted, inheritanceMs, enterRpcMs, enterOperationId, accepted, request } = timing
+        const prep = inbox?.preparation, claimed = inbox?.claimed
+        const preStep = timings.preStep.get(agent)
+        timings.preStep.delete(agent)
+        const round = (ms: number): number => Math.round(ms * 100) / 100
+        const streamStartedAt = Date.now(), streamStarted = performance.now()
+        try {
+          console.info(`[model-input-timing] ${JSON.stringify({
+            enterStartedAt, streamStartedAt, elapsedMs: round(streamStarted - (inbox?.inserted ?? enterStarted)),
+            ...(inbox?.claimed === undefined ? {} : { inboxAt: inbox.insertedAt, inboxWaitMs: round(inbox.claimed - inbox.inserted),
+              claimToEnterMs: round(enterStarted - inbox.claimed) }),
+            ...(prep === undefined || claimed === undefined ? {} : {
+              claimToAssemblyHookMs: round(prep.assemblyStarted - claimed),
+              assemblyHooksMs: round(prep.assemblyFinished - prep.assemblyStarted),
+              assemblyToPreStepMs: round(prep.preStepStarted - prep.assemblyFinished),
+              preStepHooksMs: round(prep.preStepFinished - prep.preStepStarted),
+              preStepToEntryMs: round(enterStarted - prep.preStepFinished),
+            }),
+            ...(preStep?.turn !== frame.turn || preStep.step !== frame.step ? {} : {
+              preStepPlugins: preStep.hooks.map(hook => ({ plugin: hook.plugin, elapsedMs: round(hook.elapsedMs) })),
+            }),
+            inheritanceMs: round(inheritanceMs), enterRpcMs: round(enterRpcMs),
+            ...(enterOperationId === undefined ? {} : { enterOperationId }),
+            enterToAcceptedMs: round(accepted - enterStarted),
+            acceptedToRequestMs: round(request.started - accepted), requestAuthorizationMs: round(request.authorized - request.started),
+            ...(request.authorizeOperationId === undefined ? {} : { authorizeOperationId: request.authorizeOperationId }),
+            afterAuthorizationToStreamMs: round(streamStarted - request.authorized),
+          })}`)
+        } catch { /* Diagnostic output cannot interrupt the assistant stream. */ }
+      })
+    }
+    ctx.on('agent/pre-step', async ({ agent, messages, signal }, next) => {
+      const assembly = timings?.assembly.get(agent)
+      timings?.assembly.delete(agent)
+      const preStepStarted = assembly === undefined ? 0 : performance.now()
+      const originals = new Map<string, AdmittedInput>()
       for (const message of messages) {
         const inputId = executionInputOf(message)
-        if (inputId !== undefined) originals.set(message.id, { inputId, hash: inputDigest(message.content) })
+        if (inputId !== undefined) originals.set(message.id, {
+          inputId, hash: inputDigest(message.content), timing: timings?.inbox.get(message),
+        })
       }
       const decision = await next()
+      if (assembly !== undefined && assembly.signal === signal) {
+        const preStepFinished = performance.now()
+        for (const { timing } of originals.values()) {
+          if (timing?.claimed === undefined || timing.claimed > assembly.started) continue
+          timing.preparation = { assemblyStarted: assembly.started, assemblyFinished: assembly.finished, preStepStarted, preStepFinished }
+        }
+      }
       // Trusted context plugins may render references in the admitted content;
       // input identity continues to refer to the exact original human input.
       this.admitted.set(agent, originals)
@@ -237,15 +354,20 @@ export class GatewayExecution extends ExecutionAuthority {
       }
       return decision
     }, { prepend: true })
-    ctx.on('agent/message-entered', async ({ agent, event, turn, signal }) => {
+    ctx.on('agent/message-entered', async ({ agent, event, turn, step, signal }) => {
+      if (this.unregisteredDrafts.has(agent.session)) await this.registerForOperation(agent.session, signal)
+      const inputId = executionInputOf(event.data)
+      const enterStarted = timings === undefined || inputId === undefined ? undefined : performance.now()
+      const enterStartedAt = enterStarted === undefined ? 0 : Date.now()
       await this.restoreInheritance(agent.session, signal)
+      const inheritanceMs = enterStarted === undefined ? 0 : performance.now() - enterStarted
       if (this.admittedTurns.get(agent) !== turn) {
         this.admittedTurns.set(agent, turn)
         this.currentStep.delete(agent)
       }
-      const inputId = executionInputOf(event.data)
       const source = event.data.source as unknown as Record<string, unknown>
       let state: ExecutionState | undefined
+      let modelInput: Omit<ModelInputTiming, 'accepted'> | undefined
       if (inputId !== undefined) {
         const original = this.admitted.get(agent)?.get(event.data.id)
         if (original?.inputId !== inputId) throw this.denied('execute', 'The admitted input has no verified request identity.')
@@ -254,11 +376,19 @@ export class GatewayExecution extends ExecutionAuthority {
           currentScopeId = this.mirror(agent.session).state.scopeId
           if (currentScopeId === undefined) throw this.denied('execute', 'The delegated execution scope is unavailable.')
         }
+        const beforeRpc = enterStarted === undefined ? 0 : performance.now()
+        let enterOperationId: string | undefined
         state = executionState(await this.post('/enter', {
           sessionId: agent.id, inputId, messageId: event.data.id, contentHash: original.hash,
           currentScopeId: currentScopeId ?? null,
           unverifiedHistory: false,
-        }, undefined, signal))
+        }, undefined, signal, enterStarted === undefined ? undefined : (id) => { enterOperationId = id }))
+        if (enterStarted !== undefined) {
+          modelInput = {
+            turn, step, inbox: original.timing, enterStartedAt, enterStarted, inheritanceMs, enterRpcMs: performance.now() - beforeRpc,
+            ...(enterOperationId === undefined ? {} : { enterOperationId }),
+          }
+        }
       } else if (source.gatewayExecutionScope !== undefined) {
         const captured = this.resolvedScope(executionScope(source.gatewayExecutionScope))
         const own = captured.parentSessionId === agent.id ? captured
@@ -279,16 +409,28 @@ export class GatewayExecution extends ExecutionAuthority {
         this.currentStep.set(agent, state)
         this.record(agent.session, state)
       }
+      if (modelInput !== undefined) timings?.input.set(agent, { ...modelInput, accepted: performance.now() })
     })
-    ctx.on('agent/request', async ({ agent, signal }, next) => {
+    ctx.on('agent/request', async ({ agent, turn, step, signal }, next) => {
       if (this.admittedTurns.has(agent) && !this.currentStep.has(agent)) {
+        if (this.unregisteredDrafts.has(agent.session)) await this.registerForOperation(agent.session, signal)
         const unknown = executionState(await this.post('/combine', { sessionId: agent.id, scopeIds: [], unverified: true }, undefined, signal))
         this.currentStep.set(agent, unknown)
         this.record(agent.session, unknown)
       }
       const scope = this.capture(agent)
       return this.runCaptured(agent, scope, async () => {
-        await this.authorize(this.capabilityFor(agent), agent, signal)
+        const timing = timings?.input.get(agent)
+        const started = timing !== undefined && timing.turn === turn && timing.step === step ? performance.now() : undefined
+        let authorizeOperationId: string | undefined
+        await this.authorizeWithTiming(this.capabilityFor(agent), agent, signal, undefined,
+          started === undefined ? undefined : (id) => { authorizeOperationId = id })
+        if (timing !== undefined && started !== undefined) {
+          timing.request = {
+            started, authorized: performance.now(),
+            ...(authorizeOperationId === undefined ? {} : { authorizeOperationId }),
+          }
+        }
         return next()
       })
     })
@@ -375,7 +517,13 @@ export class GatewayExecution extends ExecutionAuthority {
       ? 'plugin-management' : 'execute'
   }
 
-  private async post(path: string, body: unknown, principal?: GatewayRequestPrincipal, signal?: AbortSignal): Promise<unknown> {
+  private async post(
+    path: string,
+    body: unknown,
+    principal?: GatewayRequestPrincipal,
+    signal?: AbortSignal,
+    onOperationId?: (id: string) => void,
+  ): Promise<unknown> {
     this.lifetime.signal.throwIfAborted()
     const operationSignal = signal === undefined ? this.lifetime.signal : AbortSignal.any([signal, this.lifetime.signal])
     const response = await this.dependencies.ctx.gatewayRuntime.request(`/internal/runtime/execution${path}`, {
@@ -386,6 +534,10 @@ export class GatewayExecution extends ExecutionAuthority {
     if (!response.ok) {
       discardGatewayRead(response.body)
       throw this.denied('execute', 'The Gateway refused execution authorization. Use a verified account and an ordinary permission mode.')
+    }
+    const operationId = response.headers.get('x-dsh-operation-id')
+    if (onOperationId !== undefined && operationId !== null && operationId.length > 0 && operationId.length <= 64) {
+      onOperationId(operationId)
     }
     return response.status === 204 ? undefined : readGatewayResponseJson(response, undefined, operationSignal)
   }
@@ -493,11 +645,14 @@ export class GatewayExecution extends ExecutionAuthority {
   async stamp(session: Session, message: UserMessage): Promise<UserMessage> {
     const principal = this.admissionPrincipal()
     if (principal === undefined) throw this.denied('execute', 'A verified interactive caller is required.')
-    await this.register(session)
     const previousInputId = executionInputOf(message)
+    const registerRoot = principal.claims.personalDraft === 'admit-input' && previousInputId === undefined
+      && this.unregisteredDrafts.has(session) && !this.registration.has(session.id)
+    if (!registerRoot) await this.register(session)
     const value = await this.post('/input', {
       sessionId: session.id, messageId: message.id, kind: 'message', contentHash: inputDigest(message.content),
       ...(previousInputId === undefined ? {} : { previousInputId }),
+      ...(registerRoot ? { registerRoot: true } : {}),
     }, principal)
     if (typeof value !== 'object' || value === null || !('inputId' in value) || typeof value.inputId !== 'string') {
       throw new TypeError('invalid Gateway input registration')
@@ -511,6 +666,8 @@ export class GatewayExecution extends ExecutionAuthority {
     const stamped = freezeMessage({ ...message, source: { ...message.source, gatewayExecutionInput: value.inputId,
       ...(participant === undefined ? {} : { participant }) } })
     executionInputOf(stamped)
+    if (registerRoot && !this.registration.has(session.id)) this.registration.set(session.id, Promise.resolve())
+    this.unregisteredDrafts.delete(session)
     return stamped
   }
 
@@ -774,6 +931,16 @@ export class GatewayExecution extends ExecutionAuthority {
    * @returns Gateway-confirmed participants for auditing and attribution; permission checks do not bill model requests.
    */
   async authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal, execution?: ToolExecution): Promise<ExecutionState> {
+    return this.authorizeWithTiming(capability, agent, signal, execution)
+  }
+
+  private async authorizeWithTiming(
+    capability: ExecutionCapability,
+    agent: Agent,
+    signal?: AbortSignal,
+    execution?: ToolExecution,
+    onOperationId?: (id: string) => void,
+  ): Promise<ExecutionState> {
     if (!this.available(agent)) throw this.denied(capability, 'Gateway execution authorization is unavailable.')
     const scope = execution === undefined ? this.currentScope(agent) : this.resolvedScope(this.toolScope(execution, agent))
     const generation = this.watchGeneration
@@ -788,7 +955,7 @@ export class GatewayExecution extends ExecutionAuthority {
       }
       const state = executionState(await this.post('/authorize', {
         sessionId: agent.id, capability, scopeId: scope.scopeId, unverifiedHistory: scope.unverifiedHistory,
-      }, undefined, signal))
+      }, undefined, signal, onOperationId))
       if (!this.available(agent) || generation !== this.watchGeneration || invalidation !== this.invalidationOf(agent, scope)
         || pending.invalidated || state.actors.some(actor => pending.users.has(actor.userId))
         || signal?.aborted

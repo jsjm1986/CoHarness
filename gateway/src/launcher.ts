@@ -11,18 +11,21 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { GatewayConfig } from './config.ts'
 import { scrubbedGatewayChildEnv } from './child-environment.ts'
 import { runGatewayChildCommand } from './child-command.ts'
 import { LocalRuntimeControl } from './local-runtime-control.ts'
-import { LocalRuntimeOwnerStore } from './local-runtime-owner.ts'
+import { LocalRuntimeOwnerStore,localRuntimeOwnerStores } from './local-runtime-owner.ts'
 import { probeLocalLinuxScope } from './local-runtime-linux.ts'
-import { LOCAL_BOOTSTRAP_BYTES, localBootstrapSchema, localKernelBootId } from './local-runtime-protocol.ts'
+import { localBootstrapMessage, localKernelBootId, localSupervisorStagesSchema } from './local-runtime-protocol.ts'
 import { nodeControlPaths } from './node-control-paths.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
+import type { RuntimeLaunchTiming } from './runtime-launch-timing.ts'
+import { readSystemdShutdownReceipt, systemdRuntimeShutdownReceipt, type RuntimeShutdownOutcome } from './runtime-shutdown.ts'
 import { renderUserUnit, unitName, type GrantEntry, type SystemdOptions } from './systemd.ts'
 
 /** Stable process identity and filesystem facts for one runtime. */
@@ -45,6 +48,8 @@ export interface RuntimeProcessIdentity {
   homePath: string
   /** Absolute `$DSH_HOME` for this instance. */
   dshHome: string
+  /** Both private paths come from a verified node-local recovery binding and must already exist. */
+  retainedData?: true
 }
 
 /** Non-secret runtime facts available to policy projection. */
@@ -59,10 +64,20 @@ export interface RuntimeSupervisorIdentity extends RuntimePolicyIdentity {
   credentialHash: string | null
 }
 
+/** Gateway-owned recovery policy pinned before the Runtime imports plugins. */
+export interface RuntimeRecoveryPolicy {
+  /** Private immutable file delivered only to the selected process. */
+  policyFile: string
+  /** SHA-256 of the exact policy bytes approved for this start. */
+  policySha256: string
+}
+
 /** Launch-only facts, including the credential delivered through a private channel. */
 export interface LaunchRuntime extends RuntimeSupervisorIdentity {
   credentialHash: string
   gatewayCredential: string
+  /** Absent for ordinary starts; recovery cannot inherit this from ambient environment. */
+  recoveryPolicy?: RuntimeRecoveryPolicy
   /** Await node admission immediately before process allocation; absent in independent compositions. */
   beforeAllocation?: () => Promise<void>
   /** Cancellation remains live through asynchronous preparation and supervisor handoff. */
@@ -71,8 +86,8 @@ export interface LaunchRuntime extends RuntimeSupervisorIdentity {
 
 /** Handle over one launched instance. */
 export interface InstanceProc {
-  /** Resolve after the generation's complete process range stops and any delayed allocation is fenced; escalate after `graceMs`. */
-  terminate(graceMs: number): Promise<void>
+  /** Resolve after the complete process range stops and delayed allocation is fenced. Return its Session shutdown evidence when available. */
+  terminate(graceMs: number): Promise<RuntimeShutdownOutcome | void>
   /**
    * Whether the underlying process is known to have exited. A systemd unit is
    * not tracked through this handle (systemd supervises it), so callers should
@@ -108,6 +123,8 @@ export interface Launcher {
   attach?(runtime: RuntimeSupervisorIdentity): InstanceProc
   /** Whether graceful Gateway shutdown retains supervisor-owned instances for later reattachment. */
   readonly instancesOutliveGateway: boolean
+  /** Read-only proof for every retained generation of this Runtime; omission means quiescence cannot be established. */
+  assertQuiescent?(runtime:Pick<RuntimeProcessIdentity,'kind'|'ownerId'|'runtimeKey'>):Promise<void>
 }
 
 /** Local POSIX driver with independently recoverable generation ownership. */
@@ -121,6 +138,11 @@ export class LocalLauncher implements Launcher {
     return this.control(runtime)
   }
 
+  async assertQuiescent(runtime:Pick<RuntimeProcessIdentity,'kind'|'ownerId'|'runtimeKey'>):Promise<void>{
+    const stores=await localRuntimeOwnerStores(nodeControlPaths(this.cfg.stateRoot).localRuntime,{node:this.cfg.computeNodeName,...runtime})
+    for(const store of stores)await new LocalRuntimeControl(store,this.cfg.readinessTimeoutMs).assertQuiescent()
+  }
+
   private control(runtime: RuntimeSupervisorIdentity): LocalRuntimeControl {
     if (runtime.credentialHash === null) throw new Error('Legacy local runtime ownership cannot be recovered automatically')
     return new LocalRuntimeControl(new LocalRuntimeOwnerStore(nodeControlPaths(this.cfg.stateRoot).localRuntime, {
@@ -129,24 +151,34 @@ export class LocalLauncher implements Launcher {
     }), this.cfg.readinessTimeoutMs)
   }
 
-  async start(runtime: LaunchRuntime): Promise<InstanceProc> {
+  /**
+   * @param runtime - exact generation and private bootstrap inputs.
+   * @param timing - collect milestones and request supervisor diagnostics when supplied; otherwise leave timing off.
+   * @returns the generation's control handle after the supervisor acknowledges startup.
+   */
+  async start(runtime: LaunchRuntime, timing?: RuntimeLaunchTiming): Promise<InstanceProc> {
     if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
     const previous = this.homes.get(runtime.dshHome)
     if (previous !== undefined) { await previous.terminate(0); this.homes.delete(runtime.dshHome) }
+    timing?.mark('localBootIdStarted')
     const bootId = await localKernelBootId(runtime.signal).catch((error: unknown) => {
       if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
       throw error
     })
+    timing?.mark('localBootIdReady')
     const control = this.control(runtime)
     const lease = await control.store.acquire()
     let allocationAttempted = false
     let supervisor: ChildProcess | undefined
     try {
+      timing?.mark('localLeaseAcquired')
       const linuxScopeMode = await probeLocalLinuxScope(this.cfg.upstreamTimeoutMs, runtime.signal)
       const record = await lease.create(bootId, linuxScopeMode === undefined ? undefined : 'linux-slice')
-      const spec = localBootstrapSchema.parse({
+      timing?.mark('localReservationWritten')
+      const spec = localBootstrapMessage({
         kind: 'start', directory: control.store.directory, identity: control.store.identity, record,
         ...linuxScopeMode === undefined ? {} : { linuxScopeMode },
+        ...timing === undefined ? {} : { reportTiming: true },
         command: this.cfg.dshCommand.map(a => a.replaceAll('{port}', String(runtime.port))),
         cwd: runtime.homePath, dshHome: runtime.dshHome, credential: runtime.gatewayCredential,
         logCapBytes: this.cfg.runtimeLogCapBytes, controlTimeoutMs: this.cfg.upstreamTimeoutMs,
@@ -159,9 +191,12 @@ export class LocalLauncher implements Launcher {
           DSH_MANAGED_DATA_MANIFEST: join(runtime.dshHome, 'managed-data.jsonl'), DSH_GATEWAY_CREDENTIAL_FD: '3',
           NODE_COMPILE_CACHE: join(this.cfg.stateRoot, 'compile-cache'),
           TSX_TSCONFIG_PATH: join(this.cfg.dshRepoRoot, 'tsconfig.base.json'),
+          ...(runtime.recoveryPolicy === undefined ? {} : {
+            HGW_RECOVERY_POLICY_FILE: runtime.recoveryPolicy.policyFile,
+            HGW_RECOVERY_POLICY_SHA256: runtime.recoveryPolicy.policySha256,
+          }),
         },
       })
-      if (Buffer.byteLength(JSON.stringify(spec)) > LOCAL_BOOTSTRAP_BYTES) throw new Error('Local runtime bootstrap exceeds its byte limit')
       const source = import.meta.url.endsWith('.ts')
       const entry = fileURLToPath(new URL(`./local-runtime-supervisor.${source ? 'ts' : 'js'}`, import.meta.url))
       await runtime.beforeAllocation?.()
@@ -172,6 +207,7 @@ export class LocalLauncher implements Launcher {
       // releases its pipe as soon as the bootstrap is delivered.
       const stdio: ('ignore' | 'ipc' | number)[] = ['ignore', 'ignore', 'ignore', 'ipc']
       if (process.platform !== 'win32') stdio.push(lease.fd)
+      timing?.mark('localSupervisorSpawnStarted')
       const child = supervisor = spawn(process.execPath, [...(source ? ['--import', import.meta.resolve('tsx/esm')] : []), entry, String(this.cfg.readinessTimeoutMs)], {
         cwd: this.cfg.dshRepoRoot, detached: true, stdio,
         env: {
@@ -180,8 +216,9 @@ export class LocalLauncher implements Launcher {
           TSX_TSCONFIG_PATH: fileURLToPath(new URL('../tsconfig.run.json', import.meta.url)),
         },
       })
+      if (timing !== undefined && child.pid !== undefined) timing.mark('localSupervisorSpawned')
       const exited = new Promise<void>(resolve => child.once('exit', () => resolve()))
-      await new Promise<void>((resolve, reject) => {
+      const diagnostic = await new Promise<{ stages: unknown } | undefined>((resolve, reject) => {
         const aborted = () => failed(new RuntimeCapacityError('cancelled'))
         const settled = () => { clearTimeout(timer); runtime.signal?.removeEventListener('abort', aborted) }
         const failed = (error: unknown) => { settled(); reject(error) }
@@ -190,7 +227,10 @@ export class LocalLauncher implements Launcher {
         child.once('exit', () => failed(new Error('Local runtime supervisor exited during startup')))
         child.on('message', (message: unknown) => {
           if (typeof message === 'object' && message !== null && 'kind' in message && message.kind === 'ready'
-            && 'nonce' in message && message.nonce === record.nonce) { settled(); resolve() }
+            && 'nonce' in message && message.nonce === record.nonce) {
+            settled()
+            resolve(spec.reportTiming === true && 'localSupervisorStagesMs' in message ? { stages: message.localSupervisorStagesMs } : undefined)
+          }
         })
         runtime.signal?.addEventListener('abort', aborted, { once: true })
         if (runtime.signal?.aborted) aborted()
@@ -199,6 +239,13 @@ export class LocalLauncher implements Launcher {
           else if (process.platform === 'win32') void lease.close()
         })
       })
+      if (timing !== undefined) {
+        timing.mark('localSupervisorReady')
+        if (diagnostic !== undefined) {
+          const parsed = localSupervisorStagesSchema.safeParse(diagnostic.stages)
+          if (parsed.success) timing.localSupervisorStagesMs = parsed.data
+        }
+      }
       if (runtime.signal?.aborted) throw new RuntimeCapacityError('cancelled')
       child.unref()
       await lease.close()
@@ -248,6 +295,8 @@ export interface SystemdLauncherOptions {
   commandTimeoutMs: number
   /** Override systemctl execution; cancellation must join owned command closure. */
   run?: (args: string[], signal?: AbortSignal) => Promise<void>
+  /** Read systemd unit properties without changing unit or process state; omitted uses the native bounded client. */
+  query?: (args:string[])=>Promise<string>
   /** Verify the configured system account before writing credentials or allocating a process. */
   verifySystemUser?: (account: string, signal?: AbortSignal) => Promise<void>
 }
@@ -281,6 +330,21 @@ export class SystemdLauncher implements Launcher {
     })
   }
 
+  async assertQuiescent(runtime:Pick<RuntimeProcessIdentity,'kind'|'ownerId'|'runtimeKey'>):Promise<void>{
+    const legacy=unitName(runtime.runtimeKey),prefix=legacy.slice(0,-'.service'.length)+'@'
+    const units=readdirSync(this.unitDir).filter(name=>name===legacy||name.startsWith(prefix)&&name.endsWith('.service'))
+    if(!units.length)throw new Error('Systemd Runtime ownership evidence is missing')
+    for(const unit of units){
+      if(unit!==legacy&&!new RegExp('^'+prefix+'[1-9][0-9]*-[a-f0-9]{64}\\.service$','u').test(unit))throw new Error('Systemd Runtime generation identity is invalid')
+      const args=['show','--property=ActiveState','--property=SubState','--property=ControlGroup','--property=MainPID','--property=ControlPID',unit]
+      const output=this.options.query?await this.options.query(args):(await runGatewayChildCommand('systemctl',
+        ['--no-ask-password','--no-pager',...args],this.options.commandTimeoutMs,undefined,4096)).stdout
+      const fields=Object.fromEntries(output.trim().split('\n').map(line=>{const split=line.indexOf('=');return [line.slice(0,split),line.slice(split+1)]}))
+      if(fields.ActiveState!=='inactive'||fields.SubState!=='dead'||fields.ControlGroup!==''||fields.MainPID!=='0'||fields.ControlPID!=='0')
+        throw new Error('Systemd Runtime process range is active or unknown')
+    }
+  }
+
   async start(user: LaunchRuntime): Promise<InstanceProc> {
     if (user.signal?.aborted) throw new RuntimeCapacityError('cancelled')
     await this.verifySystemUser(user.systemUser, user.signal)
@@ -288,7 +352,7 @@ export class SystemdLauncher implements Launcher {
     // $DSH_HOME sits under the TemporaryFileSystem mask like the home, so it
     // must be re-bound writable too (session logs, settings, grants file);
     // the renderer itself only auto-binds the home.
-    const { gatewayCredential, credentialHash, beforeAllocation, signal, ...policyIdentity } = user
+    const { gatewayCredential, credentialHash, beforeAllocation, signal, recoveryPolicy: _recoveryPolicy, ...policyIdentity } = user
     const grants: GrantEntry[] = [
       { path: user.dshHome, mode: 'rw' },
       ...await this.options.grantsProvider(policyIdentity),
@@ -301,7 +365,8 @@ export class SystemdLauncher implements Launcher {
     try {
       writeFileSync(
         join(this.unitDir, unitName(user.runtimeKey, user.generation, credentialHash)),
-        renderUserUnit(user, grants, this.options.systemd, credentialPath),
+        renderUserUnit(user, grants, this.options.systemd, credentialPath,
+          systemdRuntimeShutdownReceipt(user.dshHome, user.generation, credentialHash)),
         { flag: 'wx' },
       )
       await this.run(['daemon-reload'], signal)
@@ -339,7 +404,17 @@ export class SystemdLauncher implements Launcher {
         for (const name of units) this.maskGeneration(name)
         await this.run(['daemon-reload'])
         await this.run(['stop', ...units])
-        if (user.credentialHash !== null) rmSync(this.credentialPath({ ...user, credentialHash: user.credentialHash }), { force: true })
+        if (user.credentialHash === null) return 'unconfirmed'
+        const credential = this.credentialPath({ ...user, credentialHash: user.credentialHash })
+        const receipt = systemdRuntimeShutdownReceipt(user.dshHome, user.generation, user.credentialHash)
+        const outcome = await readSystemdShutdownReceipt(receipt, credential)
+        rmSync(credential, { force: true })
+        if (outcome !== 'unconfirmed') {
+          await rm(receipt, { force: true }).catch(error => {
+            console.warn('[gateway] stopped systemd Runtime receipt cleanup failed', { generation: user.generation, error })
+          })
+        }
+        return outcome
       },
     }
   }

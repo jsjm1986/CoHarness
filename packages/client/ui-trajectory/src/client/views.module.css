@@ -27,11 +27,25 @@
   --dsh-trajectory-bottom-clearance: calc(var(--dsh-composer-height, 152px) + 16px);
 }
 
-/* A phone event-details sheet is a focused reading surface. Raise the ledger
-   stacking context above the composer only while that sheet exists; the
-   ordinary Trajectory list keeps the composer reachable above its rows. */
-:global([data-viewport='compact']) .ledger:has([data-trajectory-details-open]) {
-  z-index: 8;
+@container (max-height: 320px) {
+  .ledger { --dsh-trajectory-bottom-clearance: 0px; }
+}
+
+/* The inspector needs the full reading height when the browser chrome leaves
+   less than a row below the timeline. Closing it restores the timeline. */
+@media (min-width: 768px) {
+  @container (max-height: 320px) {
+    .root:has([data-trajectory-details-open]) > :not(.ledger) {
+      display: none;
+    }
+  }
+}
+
+@media (max-width: 767px), (max-height: 480px) and (orientation: landscape) {
+  .ledger:has([data-trajectory-details-open]) {
+    z-index: 8;
+    --dsh-trajectory-bottom-clearance: 0px;
+  }
 }
 
 :global([data-viewport='compact']) .root {

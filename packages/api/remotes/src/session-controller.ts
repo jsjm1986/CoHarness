@@ -15,6 +15,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 
 /** Caller-facing failures preserved by the Gateway's RPC adapter. */
 export type ApiRemoteLookupError =
+  | { readonly code: 'recovery-read-only'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
   | { readonly code: 'agent-busy'; readonly message: string; readonly details: { readonly reason: string } }
   | { readonly code: 'session-not-found'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
   | { readonly code: 'session-writer-held'; readonly message: string; readonly details: { readonly sessionId: SessionId } }

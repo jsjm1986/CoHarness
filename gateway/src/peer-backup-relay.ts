@@ -37,6 +37,7 @@ export class PeerBackupRelay {
       httpMaxIdleConnections: Math.min(config.httpMaxIdleConnections, 1),
       httpMaxIdlePerNode: Math.min(config.httpMaxIdlePerNode, 1),
       httpMaxPendingRequests: 1,
+      httpMaxPendingPerNode: 1,
     })
     this.unsubscribe = monitor?.subscribe((subject) => {
       if (subject.userId !== undefined || subject.projectId !== undefined) return

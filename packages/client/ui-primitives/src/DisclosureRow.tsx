@@ -64,7 +64,8 @@ export const DisclosureRow = memo(function DisclosureRow({
     onToggle()
   }
   const toggleFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!rowExpands || (event.key !== 'Enter' && event.key !== ' ')) return
+    if (!rowExpands || event.target !== event.currentTarget || event.nativeEvent.isComposing
+      || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || (event.key !== 'Enter' && event.key !== ' ')) return
     event.preventDefault()
     onToggle()
   }
@@ -89,7 +90,11 @@ export const DisclosureRow = memo(function DisclosureRow({
         role={rowExpands ? 'button' : undefined}
         tabIndex={rowExpands ? 0 : undefined}
         aria-expanded={rowExpands ? open : undefined}
-        onClick={rowExpands ? onToggle : undefined}
+        onClick={rowExpands ? (event) => {
+          const control = event.target instanceof Element ? event.target.closest('button, a, input, textarea, select, [role="button"]') : null
+          if (control !== null && control !== event.currentTarget) return
+          onToggle()
+        } : undefined}
         onKeyDown={rowExpands ? toggleFromKeyboard : undefined}
       >
         {expandable && !rowExpands ? (
@@ -97,6 +102,7 @@ export const DisclosureRow = memo(function DisclosureRow({
             type="button"
             className={clsx(css.leading, leadingClassName)}
             aria-expanded={open}
+            aria-label={title}
             onClick={toggleFromLeading}
           >
             {leading}

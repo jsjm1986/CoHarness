@@ -39,18 +39,17 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body))
 }
 
-function readBody(req: IncomingMessage, limit: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
-    let bytes = 0
-    req.on('data', (chunk: Buffer) => {
-      bytes += chunk.byteLength
-      if (bytes > limit) { reject(new Error('dispatch body too large')); return }
-      chunks.push(chunk)
-    })
-    req.on('end', () => { resolve(Buffer.concat(chunks).toString('utf8')) })
-    req.on('error', reject)
-  })
+class DispatchBodyTooLargeError extends Error {}
+
+async function readBody(req: IncomingMessage, limit: number): Promise<string> {
+  const chunks: Buffer[] = []
+  let bytes = 0
+  for await (const chunk of req.iterator({ destroyOnReturn: false }) as AsyncIterable<Buffer>) {
+    bytes += chunk.byteLength
+    if (bytes > limit) throw new DispatchBodyTooLargeError('dispatch body too large')
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks, bytes).toString('utf8')
 }
 
 /**
@@ -126,6 +125,11 @@ function registerRoute(ctx: Context, signal: AbortSignal): void {
       send(res, 200, { sessionId })
     })().catch((error: unknown) => {
       if (res.writableEnded) return
+      if (error instanceof DispatchBodyTooLargeError) {
+        res.writeHead(413, { 'content-type': 'application/json', 'cache-control': 'no-store', connection: 'close' })
+        res.end('{"error":"dispatch-body-too-large"}')
+        return
+      }
       const status = error instanceof TypeError || error instanceof WebhookPresetError ? 400
         : CollaborationFailure !== undefined && error instanceof CollaborationFailure && error.code !== 'gateway-unavailable' ? 403 : 502
       send(res, status, {

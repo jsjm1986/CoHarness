@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-17-existing-deployment-latency-sampling.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-17-existing-deployment-latency-sampling.md
+document:
+  en: b9257592c8871df3818b857f303b4dba8146156c
+  zh: 83a304c29df858e05a8419050b586bcf655f44c5
+/agent-note-existing-deployment-latency-sampling:
+  en: 9980a5169cd0c899
+  zh: b62bf049e6a57b98
+/agent-note-existing-deployment-latency-sampling/problem:
+  en: a12f40ed878b6806
+  zh: 47272a43ca3f4d75
+/agent-note-existing-deployment-latency-sampling/decision:
+  en: d4f028171fa2a46b
+  zh: d3b9bde9f0dfe21e
+/agent-note-existing-deployment-latency-sampling/alternatives-considered:
+  en: 908780db51d331b3
+  zh: 79615f5b904d71b0
+/agent-note-existing-deployment-latency-sampling/consequences:
+  en: 889353b4a2da8373
+  zh: 7cf11a5d705368d9

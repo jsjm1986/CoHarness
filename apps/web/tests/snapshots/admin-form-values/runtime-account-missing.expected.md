@@ -4,4 +4,4 @@
   - button "关闭"
   - alert: Linux runtime account "harness-project" is not provisioned on this computer. Complete the configured runtime-account provisioning before starting this Runtime.
   - button "取消"
-  - button "确认执行"
+  - button "刷新 Runtime"

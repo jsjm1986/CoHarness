@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import type { SessionId } from '../src/client/api.ts'
+import type { HostDescription, SessionId } from '../src/client/api.ts'
 import type { ConnectionFailure, ConnectionState } from '../src/client/connection.ts'
 import { ApiTransportError } from '../src/client/api.ts'
 import { ConnectionController } from '../src/client/connection.ts'
@@ -86,6 +86,62 @@ describe('connection lifecycle', () => {
     } finally {
       controller.stop()
     }
+  })
+
+  it.each([
+    { moved: false, initialHostOpen: true },
+    { moved: true, initialHostOpen: true },
+    { moved: false, initialHostOpen: false },
+  ])('offers the same managed Mux (moved: $moved, initial Host open: $initialHostOpen)', async ({ moved, initialHostOpen }) => {
+    const api = new FakeApiClient()
+    const target = { kind: 'personal', runtimeId: 'old-runtime', nodeId: 'owner' } as NonNullable<HostDescription['runtimeTarget']>
+    const identity: HostDescription = {
+      version: '0', cwd: '/f', home: '/h', canOpenPath: true, attachedSessions: 1,
+      executionAuthorityRequired: true, runtimeTarget: target,
+    }
+    let description = identity
+    api.onDescribe = () => Promise.resolve(ok(description))
+    let reconnecting = false
+    const hostReady = deferred<() => void>()
+    const host = api.events.host.bind(api.events)
+    api.events.host = (payload, signal, onOpen) => host(payload, signal, () => {
+      if (reconnecting) hostReady.resolve(() => { onOpen?.() })
+      else if (initialHostOpen) onOpen?.()
+    })
+    const allReady = vi.fn()
+    const delivered = vi.fn()
+    const offered = vi.fn<NonNullable<import('../src/client/connection.ts').ConnectionSinks['onResumeMuxEnvelope']>>()
+      .mockReturnValue(true)
+    const controller = new ConnectionController(api, {
+      onConnected: allReady, onMuxEnvelope: delivered, onResumeMuxEnvelope: offered,
+    }, FAST)
+    controller.start()
+    try {
+      await vi.waitFor(() => { expect(api.openMuxCount).toBe(1) })
+      await new Promise<void>((resolve) => { setImmediate(resolve) })
+      const previousFullHandshakes = initialHostOpen ? 1 : 0
+      expect(allReady).toHaveBeenCalledTimes(previousFullHandshakes)
+      reconnecting = true
+      if (moved) description = { ...identity, runtimeTarget: { ...target, nodeId: 'other' as NonNullable<typeof target.nodeId> } }
+      controller.reconnect()
+      const finishHost = await hostReady.promise
+      await vi.waitFor(() => { expect(api.openMuxCount).toBe(1) })
+      api.pushMux(subscribedFrame(3))
+      if (!moved) {
+        await vi.waitFor(() => { expect(offered).toHaveBeenCalledOnce() })
+        expect(offered.mock.calls[0]?.[0].payload).toEqual(subscribedFrame(3))
+        expect(offered.mock.calls[0]?.[2].aborted).toBe(false)
+      }
+      expect(allReady).toHaveBeenCalledTimes(previousFullHandshakes)
+      expect(delivered).not.toHaveBeenCalled()
+      finishHost()
+      await vi.waitFor(() => { expect(allReady).toHaveBeenCalledTimes(previousFullHandshakes + 1) })
+      expect(offered).toHaveBeenCalledTimes(moved ? 0 : 1)
+      expect(delivered).toHaveBeenCalledTimes(moved ? 1 : 0)
+    } finally {
+      controller.stop()
+    }
+    if (!moved) expect(offered.mock.calls[0]?.[2].aborted).toBe(true)
   })
 
   it.each(['describe', 'mux', 'host'] as const)('keeps preparation and replay behind the final %s prerequisite', async (last) => {

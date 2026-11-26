@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-session-persistence-sqlite",
-  "description": "SQLite durable session persistence with physical chunk-row packing",
+  "description": "Durable SQLite Session persistence with compressed event payloads",
   "version": "0.2.1-rc.1.coharness.1",
   "publishConfig": {
     "access": "public"

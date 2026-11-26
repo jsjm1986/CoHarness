@@ -324,7 +324,16 @@ describe('CI workflow', () => {
     expect(webVerification.if).toBe("github.event_name == 'pull_request'")
     expect(webVerification.needs).toContain('pr-scope')
     expect(String(webVerification['runs-on'])).toContain('DSH_CI_FAILOVER_LINUX')
-    expectExternalCapacityExpression(webVerification.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '1')
+    expectExternalCapacityExpression(webVerification.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '2')
+    // The Admin acceptance sweep runs its page x viewport x engine matrix
+    // serially inside one file, so hosted runners narrow it to a
+    // representative slice; capable runners keep the full sweep.
+    expectExternalCapacityExpression(webVerification.env.DSH_ADMIN_ENGINES, 'chromium,webkit,firefox', 'chromium')
+    expectExternalCapacityExpression(
+      webVerification.env.DSH_ADMIN_VIEWPORTS,
+      '320,360,375,390,412,430,540,667,844,872,767,768,769,839,840,841,1024,1280',
+      '320,390,768,1280',
+    )
     // One stable check name lets branch protection require the lane; the
     // selected tier and groups surface in the job summary instead.
     expect(webVerification.name).toBe('web verification')
@@ -670,8 +679,8 @@ describe('CI workflow', () => {
       expect(manifest.scripts.test).toContain(`--exclude tests/${suite}.spec.ts`)
     }
     expect(gatewaySteps[postgresIndex]?.env).toMatchObject({
-      HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_dump"]',
-      HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_restore"]',
+      HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","/usr/lib/postgresql/17/bin/pg_dump"]',
+      HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","/usr/lib/postgresql/17/bin/pg_restore"]',
     })
   })
 

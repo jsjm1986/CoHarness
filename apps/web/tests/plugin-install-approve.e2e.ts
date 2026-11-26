@@ -5,12 +5,13 @@
  * The private profile disables public registry probing for the offline file install.
  */
 
+import { responsiveBrowser } from './responsive-browser.ts'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+
 import { expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 import { Context } from '@deepseek-ai/cordis'
@@ -93,7 +94,7 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
   if (!existsSync(join(pnpmBin, 'pnpm'))) throw new Error('workspace pnpm is not installed; run pnpm install first')
 
   let host: SubprocessHandle | undefined
-  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
+  let browser: Awaited<ReturnType<typeof responsiveBrowser.launch>> | undefined
   let browserClose: Promise<void> | undefined
   const onAbort = (): void => {
     host?.terminate()
@@ -160,7 +161,7 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
     const baseUrl = await waitForOutput(host, /dsh web: (http:\/\/[^\s]+)/, 'built dsh web')
 
     signal.throwIfAborted()
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     signal.throwIfAborted()
     const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
     signal.throwIfAborted()
@@ -174,6 +175,19 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
 
       const install = page.getByRole('dialog', { name: 'Add plugin' })
       await panel.getByRole('button', { name: 'Add plugin', exact: true }).click()
+      await install.getByRole('button', { name: /^Registry / }).click()
+      const registry = page.locator('[data-install-registry]')
+      const address = registry.getByRole('textbox', { name: 'Custom address', exact: true })
+      await address.waitFor()
+      expect(await address.evaluate(element => element.closest('[role="dialog"]')?.getAttribute('aria-label'))).toBe('Add plugin')
+      expect(await address.evaluate(element => element.closest('[inert], [aria-hidden="true"]') === null)).toBe(true)
+      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'registry.expected.md'),
+        await captureStableAria(page, '[data-install-registry] > div', world), MODE)
+      await address.focus()
+      await registry.getByRole('radio').first().check()
+      await page.keyboard.press('Escape')
+      await registry.waitFor({ state: 'hidden' })
+      expect(await install.isVisible()).toBe(true)
       // The file: spec keeps pnpm's package-install path; a bare directory
       // links instead, and a link never runs install scripts.
       await install.getByRole('textbox').fill(`file:${addon}`)
@@ -267,5 +281,5 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
 }, 180_000)
 
 it('owns the plugin approval goldens', async () => {
-  expect((await readdir(SNAPSHOT_DIR)).sort()).toEqual(['approved.expected.md', 'blocked.expected.md'])
+  expect((await readdir(SNAPSHOT_DIR)).sort()).toEqual(['approved.expected.md', 'blocked.expected.md', 'registry.expected.md'])
 })

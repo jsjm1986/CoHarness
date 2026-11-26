@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/agent/README.md
 document:
-  en: 38dfe6c97395061229fe5b06d1232c65dc0f40c0
-  zh: 19ca21789877cb8c89bddf8da578baa534e6035b
+  en: 1680208821f66a0243ed4f416faa60460ea193cf
+  zh: 9343c0c2f676bb932de72a3aae183940af2f167a
 /:
   en: b6bcf3c8b941d336
   zh: 28b5d2aa43fdd026
@@ -19,13 +19,13 @@ document:
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-agent/use-this-package:
   en: b48322540e229083
-  zh: 05aec0854397f4c3
+  zh: 0a094941929656b8
 /deepseek-ai-dsh-agent/use-this-package/create-or-resume-an-agent:
-  en: e305441a5a4a9b44
-  zh: 3e997b12ce0ce04c
+  en: 9898bcc13b4111e5
+  zh: e5fbc3ac3f8d2109
 /deepseek-ai-dsh-agent/use-this-package/drive-an-agent-s-conversation:
-  en: 71e258897e2e7d73
-  zh: abf0991012faa17e
+  en: ba80d1e396525cc3
+  zh: ddebc74031a7167a
 /deepseek-ai-dsh-agent/use-this-package/scope-registrations-to-one-agent:
   en: 2594a1e02adea801
   zh: cae8860369728efb
@@ -39,8 +39,8 @@ document:
   en: 7c850051d2857bfa
   zh: 4cab817553114e15
 /deepseek-ai-dsh-agent/understand-the-implementation/step-admission:
-  en: 348b9ecd0890c585
-  zh: d0f73d28d0d2c6f1
+  en: 2a56f52488e60de7
+  zh: 8b3ec107b3efc1d4
 /deepseek-ai-dsh-agent/understand-the-implementation/durable-inbox:
   en: f6802c7f94f623b3
   zh: cc3885db80765970

@@ -1,5 +1,5 @@
 import { once } from 'node:events'
-import { createServer, get, type IncomingMessage, type Server } from 'node:http'
+import { Agent, createServer, get, type IncomingMessage, type Server } from 'node:http'
 import { generateKeyPairSync } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -13,13 +13,14 @@ import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
-import { InstanceManager } from '../src/instances.ts'
+import { InstanceManager, RuntimeLeaseUnavailableError, type RuntimeLaunchContext } from '../src/instances.ts'
+import { ModelGovernanceService } from '../src/model-governance.ts'
 import type { Launcher, LaunchRuntime } from '../src/launcher.ts'
 import { RUNTIME_READINESS_NONCE_HEADER, RUNTIME_READINESS_PATH, runtimeReadinessResponseProof } from '../src/runtime-readiness.ts'
 import { ProjectService } from '../src/projects.ts'
 import { createProxyHandlers, projectRuntimeGrants } from '../src/proxy.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
-import type { RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
+import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
 import { RUNTIME_PORT_PUBLISHER, runtimeRelay } from './runtime-relay.ts'
@@ -32,6 +33,7 @@ const ECHO_DSH = `
 const fs = require('fs')
 const crypto = require('crypto')
 const http = require('http')
+const { gzipSync } = require('node:zlib')
 const { WebSocketServer } = require(${JSON.stringify(WS_MODULE)})
 const credential = JSON.parse(fs.readFileSync(3, 'utf8'))
 const material = (kind, nonce) => 'dsh-gateway-readiness-v1\\0' + kind + '\\0' + nonce + '\\0' + credential.runtime.kind + '\\0' + String(credential.runtime.id) + '\\0' + String(credential.runtime.generation)
@@ -57,7 +59,36 @@ const server = http.createServer((req, res) => {
   }
   if (req.url === '/api/redirect') { res.writeHead(302, { location: 'http://127.0.0.1:' + process.argv[1] + '/landing' }); res.end(); return }
   if (req.url === '/api/external-redirect') { res.writeHead(302, { location: 'https://127.0.0.1.evil/landing' }); res.end(); return }
+  if (req.url === '/api/transport-headers') {
+    res.writeHead(200, {
+      connection: 'close, X-Runtime-Hop',
+      'x-runtime-hop': 'upstream connection',
+      'content-type': 'application/json',
+    })
+    res.write('{"ok":')
+    res.end('true}')
+    return
+  }
   if (req.url === '/api/refused') { res.writeHead(403); res.end('refused'); return }
+  const boot = new URL(req.url, 'http://fixture')
+  if (boot.pathname === '/' && boot.searchParams.get('dshBootstrap') === '1') {
+    const document = boot.searchParams.has('tap') ? { version: 1, kind: 'full-index' } : {
+      version: 1, kind: 'injections',
+      rows: [
+        { kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: { principalId: 1 } },
+        { kind: 'script-preload', src: 'plugins/application.js' },
+        { kind: 'script-src', src: 'plugins/bootstrap.js', placement: 'head' },
+      ],
+      ...(boot.searchParams.has('large') ? { padding: ' '.repeat(1024 * 1024) } : {}),
+    }
+    const data = Buffer.from(JSON.stringify(document))
+    const compressed = req.headers['accept-encoding']?.includes('gzip') === true
+    const body = compressed ? gzipSync(data) : data
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'content-length': body.length,
+      ...(compressed ? { 'content-encoding': 'gzip' } : {}) })
+    res.end(body)
+    return
+  }
   res.setHeader('content-type', 'application/json')
   res.end(JSON.stringify({ host: req.headers.host, origin: req.headers.origin ?? null, url: req.url, principal: req.headers[${JSON.stringify('x-dsh-gateway-principal')}] ?? null }))
 })
@@ -131,6 +162,149 @@ async function setup(withPrincipal = false, env: Record<string, string> = {}, la
 }
 
 describe('proxy handlers', () => {
+  it('keeps application preloads out of legacy bootstrap responses and preserves them when negotiated', async () => {
+    const { base, cookie, deps, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const getBootstrap = (flags = '', principal = String(alice.id), extraHeaders: Record<string, string> = {}) => fetch(`${base}/?dshBootstrap=1${flags}`, {
+      headers: { cookie, accept: 'application/json', 'accept-encoding': 'gzip', 'x-dsh-expected-principal-id': principal, ...extraHeaders },
+    })
+    const ready = await getBootstrap()
+    expect(ready.status).toBe(200)
+    expect(ready.headers.get('cache-control')).toBe('no-store')
+    expect(ready.headers.get('content-encoding')).toBeNull()
+    expect(ready.headers.get('x-dsh-principal-id')).toBe(String(alice.id))
+    expect(await ready.json()).toEqual({ version: 1, kind: 'injections', rows: [
+      { kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: { principalId: 1 } },
+      { kind: 'script-src', src: 'plugins/bootstrap.js', placement: 'head' },
+    ] })
+    const overlapped = await getBootstrap('', String(alice.id), { 'x-dsh-bootstrap-preload': '1' })
+    expect(overlapped.status).toBe(200)
+    expect(overlapped.headers.get('cache-control')).toBe('no-store')
+    expect(await overlapped.json()).toEqual({ version: 1, kind: 'injections', rows: [
+      { kind: 'global', name: '__DSH_DOCUMENT_IDENTITY__', value: { principalId: 1 } },
+      { kind: 'script-preload', src: 'plugins/application.js' },
+      { kind: 'script-src', src: 'plugins/bootstrap.js', placement: 'head' },
+    ] })
+    expect(await (await getBootstrap('&tap=1')).json()).toEqual({ version: 1, kind: 'full-index' })
+    const large = await (await getBootstrap('&large=1')).json() as { padding: string; rows: { kind: string }[] }
+    expect(large.padding).toHaveLength(1024 * 1024)
+    expect(large.rows.map(row => row.kind)).toEqual(['global', 'script-preload', 'script-src'])
+    const mismatch = await getBootstrap('', '99')
+    expect(mismatch.status).toBe(409)
+    expect(await mismatch.json()).toEqual({ error: 'account-changed' })
+  })
+
+  it('returns an exact cold preparation receipt through HTTP, rechecks authorization and forwards only after readiness', async () => {
+    const environment = { id: '00000000-0000-4000-8000-000000000091' as RuntimeId, nodeId: '00000000-0000-4000-8000-000000000092' as RuntimeNodeId }
+    const catalog: RuntimeCatalogEntry = { id: environment.id, owner: { kind: 'personal', id: 1, name: 'Alice' },
+      node: { id: environment.nodeId, name: 'Fixture', status: 'active', lastHeartbeatAt: null },
+      generation: 1, observedState: 'stopped', routing: 'unavailable' }
+    const { deps, base, cookie, alice, db } = await setup(false, { HGW_RUNTIME_PREPARE_WAIT_MS: '0' }, undefined, {
+      async placement() { return { target: 'personal', local: true, resetScope: false, environment: catalog } },
+      async landing() { return { target: 'personal', local: true, resetScope: false, environment: catalog } },
+      async resolve(user) { return { context: { user, scope: { kind: 'personal' }, runtime: user, environment }, resetScope: false } },
+    })
+    const entered = barrier(), release = barrier(), previous = deps.instances.beforeStart
+    deps.instances.beforeStart = async (runtime, mode) => { await previous?.(runtime, mode); entered.resolve(); await release.promise }
+    const url = `${base}/api/prepare/v1/session.create?dshRuntime=${environment.id}&dshTarget=personal&dshNode=${environment.nodeId}`
+    const request = (continuation?: string) => fetch(url, { method: 'POST', headers: {
+      cookie, origin: base, 'content-type': 'application/json', ...(continuation === undefined ? {} : { 'x-dsh-prepare-continuation': continuation }),
+    }, body: '{}' })
+    try {
+      const first = await request()
+      expect(first.status, await first.clone().text()).toBe(503)
+      expect(first.headers.get('x-dsh-runtime-id')).toBe(environment.id)
+      expect(first.headers.get('retry-after')).toBe('1')
+      expect(first.headers.get('cache-control')).toBe('no-store')
+      const pending = await first.json() as { error: { code: string }; preparation: { id: string; waitMs: number } }
+      expect(pending).toMatchObject({ error: { code: 'INSTANCE_STARTING' }, preparation: { waitMs: deps.cfg.runtimeCapacity.maxQueueWaitMs + deps.cfg.readinessTimeoutMs } })
+      await entered.promise
+      const second = await request(pending.preparation.id)
+      expect(second.status).toBe(503)
+      expect(await second.json()).toEqual(pending)
+      const ready = deps.instances.startRequest(alice, 'explicit').completion
+      release.resolve()
+      await ready
+      const success = await request(pending.preparation.id)
+      expect(success.status).toBe(200)
+      expect(success.headers.get('x-dsh-runtime-id')).toBe(environment.id)
+      await success.body?.cancel()
+      db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(alice.id)
+      const revoked = await request(pending.preparation.id)
+      expect(revoked.status).toBe(401)
+      await revoked.body?.cancel()
+      expect(await deps.instances.isLive(alice.id)).toBe(true)
+    } finally { release.resolve() }
+  })
+
+  it('resolves a fast cold /api/prepare/v1/* start in one HTTP request within HGW_RUNTIME_PREPARE_WAIT_MS', async () => {
+    const environment = { id: '00000000-0000-4000-8000-000000000093' as RuntimeId, nodeId: '00000000-0000-4000-8000-000000000094' as RuntimeNodeId }
+    const catalog: RuntimeCatalogEntry = { id: environment.id, owner: { kind: 'personal', id: 1, name: 'Alice' },
+      node: { id: environment.nodeId, name: 'Fixture', status: 'active', lastHeartbeatAt: null },
+      generation: 1, observedState: 'stopped', routing: 'unavailable' }
+    const { deps, base, cookie, alice } = await setup(false, { HGW_RUNTIME_PREPARE_WAIT_MS: '5000' }, undefined, {
+      async placement() { return { target: 'personal', local: true, resetScope: false, environment: catalog } },
+      async landing() { return { target: 'personal', local: true, resetScope: false, environment: catalog } },
+      async resolve(user) { return { context: { user, scope: { kind: 'personal' }, runtime: user, environment }, resetScope: false } },
+    })
+    const url = `${base}/api/prepare/v1/session.create?dshRuntime=${environment.id}&dshTarget=personal&dshNode=${environment.nodeId}`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: '{}',
+    })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('x-dsh-runtime-id')).toBe(environment.id)
+    await response.body?.cancel()
+    expect(await deps.instances.isLive(alice.id)).toBe(true)
+  })
+
+  it('projects recovery plugin state without marking it consumed by a running process', async () => {
+    const { deps, alice } = await setup()
+    const state = { entries: [], bundles: [] }
+    const projection = vi.fn(async () => ({ revision: 'reviewed', state }))
+    const project = vi.fn(async () => {})
+    const markApplied = vi.fn(async () => {})
+    const unrelated = () => { throw new Error('Recovery inspection must not use unrelated plugin state operations') }
+    deps.pluginState = { projection, project, markApplied, applied: unrelated, set: unrelated, list: unrelated,
+      get: unrelated, observed: unrelated, readForSubject: unrelated, publishForSubject: unrelated }
+    const prepare = deps.instances.beforeStart!
+    let runtime: RuntimeLaunchContext | undefined
+    deps.instances.beforeStart = (value) => { runtime = value; throw new Error('capture stopped launch context') }
+    await expect(deps.instances.ensureRunning(alice)).rejects.toThrow('capture stopped launch context')
+    if (runtime === undefined) throw new Error('Launch context was not prepared')
+    await prepare(runtime, 'recovery-inspection')
+    expect(project).toHaveBeenCalledWith(runtime.dshHome, state)
+    expect(markApplied).not.toHaveBeenCalled()
+    await prepare(runtime, 'launch')
+    expect(markApplied).toHaveBeenCalledExactlyOnceWith(runtime.target, 'reviewed', runtime.generation)
+  })
+
+  it('drains a pending plugin read after a policy failure without projecting the profile', async () => {
+    const { deps, alice, db } = await setup()
+    const entered = barrier(), release = barrier(), policyRead = barrier()
+    const state = { entries: [], bundles: [] }
+    const projection = vi.fn(async () => { entered.resolve(); await release.promise; return { revision: '1', state } })
+    const project = vi.fn(async () => {})
+    const markApplied = vi.fn(async () => {})
+    const unrelated = () => { throw new Error('Unexpected plugin state operation') }
+    deps.pluginState = { projection, project, markApplied, applied: unrelated, set: unrelated, list: unrelated,
+      get: unrelated, observed: unrelated, readForSubject: unrelated, publishForSubject: unrelated }
+    const governance = new ModelGovernanceService(db)
+    vi.spyOn(governance, 'policyFor').mockImplementation(() => { policyRead.resolve(); throw new Error('Policy unavailable') })
+    deps.governance = governance
+    const starting = expect(deps.instances.ensureRunning(alice)).rejects.toThrow('Policy unavailable')
+    try {
+      await Promise.all([entered.promise, policyRead.promise])
+    } finally {
+      release.resolve()
+      await starting
+    }
+    expect(project).not.toHaveBeenCalled()
+    expect(markApplied).not.toHaveBeenCalled()
+    expect(await deps.instances.isLive(alice.id)).toBe(false)
+  })
+
   it('reports unavailable supervision without restarting or releasing the live Runtime', async () => {
     const { deps, base, cookie, alice } = await setup()
     await deps.instances.ensureRunning(alice)
@@ -455,6 +629,64 @@ describe('proxy handlers', () => {
     expect(proxied.status).toBe(200)
   })
 
+  it.each([
+    ['GET', '/plugins/combo.js??runtime/client.js&rev=fixture'],
+    ['HEAD', '/plugins/@deepseek-ai/dsh-client-runtime/client.js?rev=fixture'],
+    ['GET', '/assets/index-12345678.js'],
+    ['GET', '/favicon.svg'],
+  ])('keeps a stopped Runtime stopped for %s %s', async (method, path) => {
+    const { deps, base, cookie, alice } = await setup()
+    const start = vi.spyOn(deps.instances, 'startRequest')
+    const restart = vi.spyOn(deps.instances, 'ensureRunning')
+    const response = await fetch(`${base}${path}`, { method, headers: { cookie } })
+    expect(response.status).toBe(503)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    await response.body?.cancel()
+    expect(start).not.toHaveBeenCalled()
+    expect(restart).not.toHaveBeenCalled()
+    expect(await deps.instances.isLive(alice.id)).toBe(false)
+  })
+
+  it('refuses an asset whose generation lease was lost without restarting an active Runtime', async () => {
+    const { deps, base, cookie, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const before = await deps.instances.liveEndpoint(alice.id)
+    const restart = vi.spyOn(deps.instances, 'ensureRunning')
+    const start = vi.spyOn(deps.instances, 'startRequest')
+    const stop = vi.spyOn(deps.instances, 'stop')
+    const release = barrier(), held = fetch(`${base}/api/hold`, { headers: { cookie } })
+    const running = await held
+    const reader = running.body!.getReader()
+    expect((await reader.read()).done).toBe(false)
+    const next = reader.read()
+    const outcome = next.then<unknown, unknown>(value => value, error => error)
+    const original = deps.instances.operationRef!.bind(deps.instances)
+    let refused = false
+    vi.spyOn(deps.instances, 'operationRef').mockImplementation(async (target, delta, generation) => {
+      if (delta === 1 && !refused) {
+        refused = true
+        throw new RuntimeLeaseUnavailableError({ kind: 'user', id: alice.id })
+      }
+      await original(target, delta, generation)
+      if (delta === -1) release.resolve()
+    })
+    try {
+      const asset = await fetch(`${base}/plugins/combo.js??runtime/client.js&rev=fixture`, { headers: { cookie } })
+      expect(asset.status).toBe(503)
+      expect(await asset.json()).toMatchObject({ error: { code: 'RUNTIME_LEASE_UNAVAILABLE' } })
+      expect(await deps.instances.liveEndpoint(alice.id)).toEqual(before)
+      expect(start).not.toHaveBeenCalled()
+      expect(restart).not.toHaveBeenCalled()
+      expect(stop).not.toHaveBeenCalled()
+      expect((await fetch(`${base}/api/echo`, { headers: { cookie } })).status).toBe(200)
+    } finally {
+      await reader.cancel()
+      await outcome
+      reader.releaseLock()
+      await release.promise
+    }
+  })
+
   it('closes an admitted WebSocket on logout and requires new authentication', async () => {
     const { deps, base, cookie } = await setup(true)
     await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)
@@ -493,6 +725,71 @@ describe('proxy handlers', () => {
     }
   })
 
+  it.each(['http', 'websocket'] as const)('checks revisions before readiness and after fresh authorization for %s', async (transport) => {
+    const { deps, base, cookie, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const trace: string[] = []
+    deps.accessMonitor = { available: true, synchronize: async () => { trace.push('revision') }, subscribe: () => () => {} }
+    deps.revalidateOnComputer = async token => { trace.push('authorization'); return deps.auth.validate(token) }
+    const ready = deps.instances.liveEndpoint.bind(deps.instances)
+    vi.spyOn(deps.instances, 'liveEndpoint').mockImplementation(async target => { trace.push('ready'); return ready(target) })
+    const method = transport === 'http' ? 'operationRef' : 'wsRef'
+    const lease = deps.instances[method]!.bind(deps.instances)
+    vi.spyOn(deps.instances, method).mockImplementation(async (target, delta, generation) => {
+      if (delta === 1) trace.push('lease')
+      await lease(target, delta, generation)
+    })
+    if (transport === 'http') {
+      expect((await fetch(`${base}/api/echo`, { headers: { cookie }, signal: AbortSignal.timeout(5000) })).status).toBe(200)
+    } else {
+      const ws = new WebSocket(`${base.replace('http', 'ws')}/api/socket`, { headers: { cookie, origin: base } })
+      cleanup.push(() => ws.terminate())
+      await once(ws, 'message', { signal: AbortSignal.timeout(5000) })
+      ws.close()
+    }
+    expect(trace).toEqual(['revision', 'ready', 'lease', 'authorization', 'revision'])
+  })
+
+  it.each(['http', 'websocket'] as const)('rejects a %s revoked while its final account read is completing without stopping the Runtime', async (transport) => {
+    const { deps, base, cookie, alice, handlers } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const stop = vi.spyOn(deps.instances, 'stop'), release = barrier()
+    let checked = false, revoked = false
+    const synchronize = vi.fn(async () => { if (revoked) handlers.invalidateAccess({ userId: alice.id }) })
+    deps.accessMonitor = { available: true, synchronize, subscribe: () => () => {} }
+    deps.revalidateOnComputer = async token => {
+      const user = await deps.auth.validate(token)
+      checked = true
+      await release.promise
+      return user
+    }
+    let forwarded = false
+    const pending = transport === 'http'
+      ? fetch(`${base}/api/echo`, { headers: { cookie }, signal: AbortSignal.timeout(5000) })
+        .then(() => { forwarded = true }, (error: unknown) => { expect(error).toBeInstanceOf(TypeError) })
+      : (() => {
+          const ws = new WebSocket(`${base.replace('http', 'ws')}/api/socket`, { headers: { cookie, origin: base }, handshakeTimeout: 5000 })
+          cleanup.push(() => ws.terminate())
+          ws.once('message', () => { forwarded = true; ws.close() })
+          const closed = new Promise<void>(resolve => ws.once('close', () => { resolve() }))
+          return once(ws, 'error', { signal: AbortSignal.timeout(6000) }).then(async ([error]) => {
+            expect(error).toMatchObject({ code: 'ECONNRESET' })
+            await closed
+          })
+        })()
+    const settled = pending.then<undefined, unknown>(() => undefined, error => error)
+    try {
+      await vi.waitFor(() => { expect(checked).toBe(true) }, { timeout: 5000 })
+      await deps.auth.revoke(cookie.slice('hgw_session='.length))
+      revoked = true
+      release.resolve()
+      expect(await settled).toBeUndefined()
+      expect(synchronize).toHaveBeenCalledTimes(2)
+      expect(forwarded).toBe(false)
+      expect(stop).not.toHaveBeenCalled()
+    } finally { release.resolve(); await settled }
+  })
+
   it('invalidates only matching targets and terminates in-flight HTTP bodies', async () => {
     const { deps, base, cookie, handlers, alice } = await setup(true)
     await deps.instances.ensureRunning(alice)
@@ -523,6 +820,37 @@ describe('proxy handlers', () => {
     expect(response.status).toBe(200)
     const body = await response.text()
     expect(body).toBe('data: open\n\ndata: tick\n\n')
+  })
+
+  it('reuses the downstream connection after a complete Runtime response closes its upstream connection', async () => {
+    const { deps, base, cookie, alice } = await setup()
+    await deps.instances.ensureRunning(alice)
+    const agent = new Agent({ keepAlive: true, maxSockets: 1, maxFreeSockets: 1 })
+    cleanup.push(() => agent.destroy())
+    const sockets = new Set<Socket>()
+    const headers = []
+    for (let index = 0; index < 6; index++) {
+      const response = await new Promise<IncomingMessage>((resolve, reject) => {
+        const request = get(`${base}/api/transport-headers`, {
+          agent, headers: { cookie }, signal: AbortSignal.timeout(5000),
+        }, resolve)
+        request.once('error', reject)
+      })
+      sockets.add(response.socket)
+      headers.push(response.headers)
+      let body = ''
+      response.setEncoding('utf8')
+      for await (const chunk of response) body += chunk
+      expect(response.complete).toBe(true)
+      expect(response.statusCode).toBe(200)
+      expect(body).toBe('{"ok":true}')
+    }
+    expect(sockets.size).toBe(1)
+    for (const response of headers) {
+      expect(response.connection).toBe('keep-alive')
+      expect(response['x-runtime-hop']).toBeUndefined()
+      expect(response['content-type']).toBe('application/json')
+    }
   })
 
   it('aborts incomplete responses when the upstream resets', async () => {
@@ -637,6 +965,35 @@ describe('proxy handlers', () => {
     cleanup.push(() => ws.terminate())
     await once(ws, 'error', { signal: AbortSignal.timeout(5000) })
     expect(qualification).toHaveBeenCalledOnce()
+    expect(handlers.streamPrincipals?.size).toBe(0)
+  })
+
+  it('qualifies initial event upgrades via business-pool qualifyStreamOnComputer without touching control-pool streamPrincipalAuthority', async () => {
+    const { deps, base, cookie, handlers, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const controlQualify = vi.fn(async (token: string) => deps.auth.qualifyForStream(token))
+    const businessQualify = vi.fn(async (token: string) => deps.auth.qualifyForStream(token))
+    const authQualify = vi.spyOn(deps.auth, 'qualifyForStream')
+    deps.streamPrincipalAuthority = {
+      qualifyForStream: controlQualify,
+      projectForUser: async () => null,
+    }
+    deps.qualifyStreamOnComputer = businessQualify
+    cleanup.push(() => { authQualify.mockRestore() })
+
+    const ws = new WebSocket(`${base.replace('http', 'ws')}/api/events.mux`, { headers: { cookie, origin: base } })
+    cleanup.push(() => ws.terminate())
+    await once(ws, 'open', { signal: AbortSignal.timeout(5000) })
+    expect(businessQualify).toHaveBeenCalledOnce()
+    expect(controlQualify).not.toHaveBeenCalled()
+    ws.terminate()
+
+    businessQualify.mockResolvedValueOnce(null)
+    const denied = new WebSocket(`${base.replace('http', 'ws')}/api/events.host`, { headers: { cookie, origin: base } })
+    cleanup.push(() => denied.terminate())
+    await once(denied, 'error', { signal: AbortSignal.timeout(5000) })
+    expect(businessQualify).toHaveBeenCalledTimes(2)
+    expect(controlQualify).not.toHaveBeenCalled()
     expect(handlers.streamPrincipals?.size).toBe(0)
   })
 

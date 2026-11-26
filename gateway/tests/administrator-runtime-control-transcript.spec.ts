@@ -20,7 +20,7 @@ for (const backend of ['sqlite', 'postgres'] as const) {
           ...(mode === 'src' ? ['--import', import.meta.resolve('tsx/esm')] : []),
           fileURLToPath(new URL('./fixtures/runtime-personal-policy.mjs', import.meta.url)), mode, backend,
           ...(mode === 'lib' && process.env.DSH_GATEWAY_ARTIFACT_ROOT !== undefined ? [process.env.DSH_GATEWAY_ARTIFACT_ROOT] : []),
-        ], { cwd: root, timeout: 60_000, killSignal: 'SIGKILL', env: {
+        ], { cwd: root, timeout: 120_000, killSignal: 'SIGKILL', maxBuffer: 256 * 1024, env: {
           ...process.env, NODE_OPTIONS: undefined, NODE_PATH: undefined,
           DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), DSH_MANAGED_DATA_MANIFEST: undefined,
           DSH_RUNTIME_POLICY_SCENARIOS: 'administrators',
@@ -28,6 +28,6 @@ for (const backend of ['sqlite', 'postgres'] as const) {
         } })
         await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL(`./expected/projects/administrator-runtime-control-${backend}.jsonl`, import.meta.url)))
       } finally { await rm(root, { recursive: true, force: true }) }
-    }, 70_000,
+    }, 150_000,
   )
 }

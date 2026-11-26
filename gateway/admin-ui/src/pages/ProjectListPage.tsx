@@ -1,8 +1,8 @@
 import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowUpRight, CheckCircle2, Folder, FolderKanban, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
-import { createProject, getOwnerProjectDisplays, listProjects, type Project } from '../api.ts'
+import { AdminLink } from '../admin-navigation.tsx'
+import { AdminRequestError, createProject, getOwnerProjectDisplays, listProjects, type Project } from '../api.ts'
 import { ProjectDirectoryBrowser } from '../components/ProjectDirectoryBrowser.tsx'
 import {
   Button,
@@ -30,23 +30,31 @@ export function ProjectListPage() {
   const [error, setError] = useState('')
   const [displayPage, setDisplayPage] = useState(1)
   const [nameError, setNameError] = useState(false)
-  const [nameAttempt, setNameAttempt] = useState(0)
   const directoryRequest = useRef<AbortController | undefined>(undefined)
   const visibleProjects = useMemo(() => projects.slice(0, displayPage * 32), [projects, displayPage])
   useEffect(() => {
+    if (nameError) return
     const selected = visibleProjects.filter(row => row.metadataOnNode && !row.ownerDisplayLoaded).slice(0, 32)
     if (!selected.length) return
     const controller = new AbortController()
-    setNameError(false)
     void getOwnerProjectDisplays(selected, controller.signal).then(values => {
       if (controller.signal.aborted) return
       setProjects(previous => previous.map(row => {
         const original = selected.find(item => item.id === row.id && item.nodeId === row.nodeId && item.runtimeId === row.runtimeId)
         return original && values.has(row.id) ? { ...row, ...values.get(row.id), ownerDisplayLoaded: true } : row
       }))
-    }, () => { if (!controller.signal.aborted) setNameError(true) })
+    }, (cause: unknown) => {
+      if (controller.signal.aborted) return
+      if (cause instanceof AdminRequestError && (cause.status === 401 || cause.status === 403)) {
+        const deniedIds = new Set(selected.map(item => item.id))
+        setProjects(previous => previous.map(row => deniedIds.has(row.id)
+          ? { ...row, name: `#${row.id}`, path: '' }
+          : row))
+      }
+      setNameError(true)
+    })
     return () => { controller.abort() }
-  }, [visibleProjects, nameAttempt])
+  }, [visibleProjects, nameError])
   const [createOpen, setCreateOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -144,7 +152,7 @@ export function ProjectListPage() {
           />
         ) : (
           <>
-            <div className="tableWrap desktopOnly">
+            <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionTitle')} tabIndex={0}>
               <table className="dataTable">
                 <thead>
                   <tr>
@@ -159,10 +167,10 @@ export function ProjectListPage() {
                   {visibleProjects.map(project => (
                     <tr key={project.id}>
                       <td>
-                        <Link className="projectLink" to={`/projects/${project.id}`}>
+                        <AdminLink className="projectLink" to={`/projects/${project.id}`}>
                           <Folder aria-hidden="true" />
                           <span>{project.name}</span>
-                        </Link>
+                        </AdminLink>
                       </td>
                       <td>
                         <div className="projectOriginCell">
@@ -172,7 +180,7 @@ export function ProjectListPage() {
                       </td>
                       <td><span className="pathText">{project.path}</span></td>
                       <td><StatusBadge tone={project.memberCount === 0 ? 'neutral' : 'info'}>{t('membersCount', { count: String(project.memberCount) })}</StatusBadge></td>
-                      <td className="alignRight"><Link className="iconLink" to={`/projects/${project.id}`} aria-label={t('openProjectAria', { name: project.name })} title={t('openProjectTitle')}><ArrowUpRight aria-hidden="true" /></Link></td>
+                      <td className="alignRight"><AdminLink className="iconLink" to={`/projects/${project.id}`} aria-label={t('openProjectAria', { name: project.name })} title={t('openProjectTitle')}><ArrowUpRight aria-hidden="true" /></AdminLink></td>
                     </tr>
                   ))}
                 </tbody>
@@ -180,7 +188,7 @@ export function ProjectListPage() {
             </div>
             <div className="mobileList">
               {visibleProjects.map(project => (
-                <Link className="mobileItem mobileProjectLink" key={project.id} to={`/projects/${project.id}`}>
+                <AdminLink className="mobileItem mobileProjectLink" key={project.id} to={`/projects/${project.id}`}>
                   <div className="mobileItemHeader">
                     <div className="projectIdentity">
                       <span className="itemIcon"><Folder aria-hidden="true" /></span>
@@ -193,14 +201,14 @@ export function ProjectListPage() {
                     <span className="pathText">{project.path}</span>
                     <StatusBadge tone={project.memberCount === 0 ? 'neutral' : 'info'}>{t('membersCount', { count: String(project.memberCount) })}</StatusBadge>
                   </div>
-                </Link>
+                </AdminLink>
               ))}
             </div>
           </>
         )}
       </Section>
 
-      {nameError && <p role="status" className="muted">{t('ownerUnavailable')} <Button onClick={() => { setNameAttempt(n => n + 1) }}>{t('loadNames')}</Button></p>}
+      {nameError && <p role="status" className="muted">{t('ownerUnavailable')} <Button onClick={() => setNameError(false)}>{t('loadNames')}</Button></p>}
       {visibleProjects.length < projects.length && <Button onClick={() => { setDisplayPage(n => n + 1) }}>{t('moreProjects')}</Button>}
 
       <Dialog

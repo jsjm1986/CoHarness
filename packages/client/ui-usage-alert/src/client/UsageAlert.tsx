@@ -21,8 +21,10 @@ export function UsageAlert({ loadUsage, t }: UsageAlertProps) {
   return <div className={css.stack} aria-live="polite">
     {view.alerts.map(alert => <div className={css.alert} key={`${alert.metric}-${alert.threshold}`} role="status">
       <strong>{t('alert.title', { threshold: alert.threshold })}</strong><br />
-      {alert.metric === 'tokens' ? t('metric.tokens') : t('metric.companyCost')}
-      {t('alert.reached', { threshold: alert.threshold })}
+      <span>
+        {alert.metric === 'tokens' ? t('metric.tokens') : t('metric.companyCost')}
+        {t('alert.reached', { threshold: alert.threshold })}
+      </span>
     </div>)}
   </div>
 }

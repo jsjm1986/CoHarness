@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-log-export` lets the Web interface download a session's full history: a `Download session log` menu item under the Session Header's more-actions button and an `/export` slash command both hand the session tree — the session, its sub-sessions, and attachments — to the browser as a ZIP download. The package owns the Host archive stream, its authenticated Fetch route, and the browser controls and feedback. The browser chooses the download destination. Setup and usage come first; implementation details follow.
+`dsh-session-log-export` lets the Web interface download a session's full history: the Session Header export action and an `/export` slash command both hand the session tree — the session, its sub-sessions, and attachments — to the browser as a ZIP download. The package owns the Host archive stream, its authenticated Fetch route, and the browser controls and feedback. The browser chooses the download destination. Setup and usage come first; implementation details follow.
 
 ## Table of Contents
 
@@ -29,7 +29,7 @@ The Host download endpoint flushes a live root Session before `readRaw`, so a sl
 <a id="use-this-package"></a>
 ## Use this package
 
-Use this package when the Web bundle should let users export a session log. It requires Connection, the command registry, Session query and persistence, and attachments. Mount the plugin, then choose `Download session log` from the Session Header's more-actions menu or type `/export`; the browser downloads `dsh-session-<id>.zip`.
+Use this package when the Web bundle should let users export a session log. It requires Connection, the command registry, Session query and persistence, and attachments. Mount the plugin, then press `Session log` and `Confirm download?` in the desktop header, use the compact `Export Session log` action, or type `/export`; the browser downloads `dsh-session-<id>.zip`.
 
 ### When to choose it
 
@@ -42,7 +42,7 @@ Choose it for a Web deployment that needs user-facing session export with a visi
   name: '@deepseek-ai/dsh-session-log-export'
 ```
 
-The Web bundle mounts the package with Connection, `dsh-commands`, `dsh-client-ui-commands`, and `dsh-client-ui-conversation`.
+Mount this optional package alongside Connection, `dsh-commands`, `dsh-client-ui-commands`, and `dsh-client-ui-conversation`.
 
 ### Configuration
 
@@ -81,7 +81,7 @@ This section explains how the package wires the export control and points at the
 
 The package has two halves. The Host half ([`src/index.ts`](src/index.ts)) registers the `/export` command; the bounded ZIP stream and its `GET`/`HEAD /api/session.export` route are owned by the API layer. The browser half ([`src/client/index.ts`](src/client/index.ts)) provides the shared download controller and UI, and observes `command/executed` so only the submitting browser starts a download.
 
-The Header’s More action uses the shared compact Button, with a 28px square target and the same radius and hover fill as the right-sidebar expand control.
+The desktop capsule requires a second click within four seconds; the compact header offers a direct export action. Both use the same Session-scoped download state.
 
 ### Download flow
 

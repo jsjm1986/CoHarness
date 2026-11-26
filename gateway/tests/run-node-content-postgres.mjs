@@ -14,13 +14,25 @@ const entry = process.argv.includes('--entry')
 const recovery=process.argv.includes('--recovery')
 const activity=process.argv.includes('--activity')
 const operations=process.argv.includes('--operations')
+const disaster=process.argv.includes('--disaster')
+const disasterUi=process.argv.includes('--disaster-ui')
+const lifecycle=process.argv.includes('--lifecycle')
+const personal=process.argv.includes('--personal')
+const governance=process.argv.includes('--governance')
+const destinations=process.argv.includes('--destinations')
+const rebuild=process.argv.includes('--rebuild')
+const drafts=process.argv.includes('--drafts')
+const assets=process.argv.includes('--assets')
+const webAssembly=process.argv.includes('--web-assembly')
+const assetPerformance=assets&&process.env.HGW_TEST_ASSET_PERFORMANCE==='1'
 if (recovery && !process.env.HGW_TEST_RESTIC) throw new Error('--recovery requires an installed restic executable in HGW_TEST_RESTIC.')
-if (process.argv.slice(2).some(arg=>!['--legacy','--entry','--recovery','--activity','--operations'].includes(arg)) || [legacy,entry,recovery,activity,operations].filter(Boolean).length>1) throw new Error('Select --legacy, --entry, --recovery, --activity or --operations.')
+if (process.argv.slice(2).some(arg=>!['--legacy','--entry','--recovery','--activity','--operations','--lifecycle','--disaster','--disaster-ui','--personal','--governance','--rebuild','--destinations','--drafts','--assets','--web-assembly'].includes(arg)) || [legacy,entry,recovery,activity,operations,lifecycle,disaster,disasterUi,personal,governance,rebuild,destinations,drafts,assets,webAssembly].filter(Boolean).length>1) throw new Error('Select --legacy, --entry, --recovery, --activity, --operations, --lifecycle, --disaster, --disaster-ui, --personal, --governance --rebuild, --destinations, --drafts, --assets or --web-assembly.')
 const binaries = process.env.HGW_TEST_PG_BINDIR
 
 const directory = await mkdtemp(join(await realpath(tmpdir()), 'hgw-node-content-'))
 const pgdata = join(directory, 'pgdata')
 const container = 'hgw-node-content-' + randomUUID()
+const governanceDatabase=governance||rebuild?'hgw_peer_'+randomUUID().replaceAll('-','')+'_test':'hgw_governance_test'
 const ownedOperationsDb=operations?randomUUID():null
 const password = randomBytes(24).toString('hex')
 const dockerEnv = { ...process.env, POSTGRES_PASSWORD: password }
@@ -46,7 +58,7 @@ try {
     const secret=join(directory,'init.secret')
     await writeFile(secret,password+'\n',{mode:0o600})
     await run(join(binaries,'initdb'),['-D',pgdata,'--username=postgres','--auth=scram-sha-256','--encoding=UTF8','--no-locale','--wal-segsize=1','--no-sync','--pwfile',secret])
-    await appendFile(join(pgdata,'postgresql.conf'),"\nlisten_addresses=''\nunix_socket_directories='"+socket.replaceAll("'","''")+"'\nshared_buffers='16MB'\nmax_connections=22\nmax_wal_size='24MB'\nmin_wal_size='2MB'\n")
+    await appendFile(join(pgdata,'postgresql.conf'),"\nlisten_addresses=''\nunix_socket_directories='"+socket.replaceAll("'","''")+"'\nshared_buffers='16MB'\nmax_connections=22\nmax_locks_per_transaction=128\nmax_wal_size='24MB'\nmin_wal_size='2MB'\n")
     await run(join(binaries,'pg_ctl'),['-w','-D',pgdata,'-l',join(directory,'postgres.log'),'start'])
     created=true
     url=new URL('postgresql://postgres@localhost/postgres')
@@ -55,7 +67,7 @@ try {
     await run('docker', ['run','--detach','--pull=never','--name',container,'--memory','256m','--cpus','1',
       '--user',process.getuid()+':'+process.getgid(),'-e','POSTGRES_PASSWORD','-e','POSTGRES_INITDB_ARGS=--wal-segsize=1','-p','127.0.0.1::5432',
       '--mount','type=bind,src='+pgdata+',dst=/var/lib/postgresql/data','postgres:17.6-bookworm',
-      '-c','shared_buffers=16MB','-c','max_connections=22','-c','max_wal_size=24MB','-c','min_wal_size=2MB'])
+      '-c','shared_buffers=16MB','-c','max_connections=22','-c','max_locks_per_transaction=128','-c','max_wal_size=24MB','-c','min_wal_size=2MB'])
     created=true
     const address=(await run('docker',['port',container,'5432/tcp'])).trim()
     if (!/^127\.0\.0\.1:\d+$/u.test(address)) throw new Error('The disposable database must only listen on host loopback.')
@@ -73,20 +85,27 @@ try {
       await setTimeout(250)
     }
   }
-  try { await setup.query('CREATE DATABASE hgw_governance_test'); if(ownedOperationsDb)await setup.query("COMMENT ON DATABASE hgw_governance_test IS '"+ownedOperationsDb+"'"); await setup.query('CREATE DATABASE hgw_node_content_test'); if(recovery) await setup.query('CREATE DATABASE hgw_replacement_content_test') }
+  try { await setup.query('CREATE DATABASE '+governanceDatabase); if(ownedOperationsDb)await setup.query("COMMENT ON DATABASE hgw_governance_test IS '"+ownedOperationsDb+"'"); await setup.query('CREATE DATABASE hgw_node_content_test'); if(recovery) await setup.query('CREATE DATABASE hgw_replacement_content_test') }
   finally { await setup.end() }
   await mkdir(join(pgdata,'harness-node-content-proofs'), { mode: 0o700 })
-  url.pathname = '/hgw_governance_test'
+  url.pathname = '/'+governanceDatabase
   const governanceUrl = url.href
   url.pathname = '/hgw_node_content_test'
-  const suites=[activity?'tests/node-resource-budget-postgres.spec.ts':recovery?'tests/peer-backup-takeover-postgres.spec.ts':'tests/node-content-postgres.spec.ts']
-  if (!activity && !recovery) suites.push('tests/archive-pool-postgres.spec.ts', 'tests/node-content-discard-postgres.spec.ts')
+  const suites=[assets?'tests/runtime-asset-admission-postgres.spec.ts':drafts?'tests/node-reserved-drafts-postgres.spec.ts':destinations?'tests/peer-backup-recovery-access-postgres.spec.ts':rebuild?'tests/peer-governance-rebuild-postgres.spec.ts':governance?'tests/peer-backup-postgres.spec.ts':personal?'tests/peer-backup-personal-native-postgres.spec.ts':disasterUi?'tests/peer-backup-disaster-ui.spec.ts':disaster?'tests/peer-backup-disaster-postgres.spec.ts':lifecycle?'tests/instance-capacity-postgres.spec.ts':activity?'tests/node-resource-budget-postgres.spec.ts':recovery?'tests/peer-backup-takeover-postgres.spec.ts':'tests/node-content-postgres.spec.ts']
+  if(governance)suites.push('tests/macos-release-control.spec.ts')
+  if(rebuild)suites.push('tests/governance-rebuild-import-postgres.spec.ts','tests/governance-rebuild-admission-postgres.spec.ts','tests/governance-rebuild-local-data-postgres.spec.ts','tests/governance-rebuild-user-homes-postgres.spec.ts','tests/governance-rebuild-execution-postgres.spec.ts','tests/peer-governance-rebuild-restic-postgres.spec.ts')
+  if(rebuild&&process.env.HGW_TEST_GOVERNANCE_REBUILD_INDEX==='1')suites.splice(0,suites.length,'tests/governance-rebuild-import-postgres.spec.ts')
+  if(personal)suites.push('tests/peer-backup-personal-postgres.spec.ts','tests/peer-backup-personal-recovery-postgres.spec.ts','tests/peer-backup-personal-full-postgres.spec.ts','tests/peer-backup-personal-source-space-postgres.spec.ts')
+  if (disaster) suites.push('tests/peer-backup-disaster-convergence.spec.ts','tests/peer-backup-disaster-maintenance.spec.ts','tests/peer-backup-disaster-topology.spec.ts','tests/deployment-topology-postgres.spec.ts','tests/peer-backup-execution-postgres.spec.ts','tests/peer-backup-source-isolation-postgres.spec.ts','tests/deployment-name-key-postgres.spec.ts')
+  if (lifecycle) suites.push('tests/runtime-upgrade-continuity-transcript.spec.ts')
+  if (!activity && !recovery && !lifecycle && !disaster && !disasterUi && !personal && !governance && !rebuild && !destinations && !drafts && !assets) suites.push('tests/archive-pool-postgres.spec.ts', 'tests/node-content-discard-postgres.spec.ts')
   if (legacy) suites.push('tests/conversation-runtime-namespace-postgres.spec.ts','tests/execution-runtime-isolation-postgres.spec.ts',
     'tests/project-activity-postgres.spec.ts','tests/project-progress-postgres.spec.ts')
-  const command=operations?[join(gateway,'tests/run-built-node-service.mjs')]:entry?[join(gateway,'tests/fixtures/physical-project-gateway.mjs')]:
+  const command=assetPerformance?['--import',import.meta.resolve('tsx/esm'),join(gateway,'tests/runtime-assets.perf.ts')]:webAssembly?[join(gateway,'tests/run-local-web-assembly.mjs'),'lib']:operations?[join(gateway,'tests/run-built-node-service.mjs')]:entry?[join(gateway,'tests/fixtures/physical-project-gateway.mjs')]:
+    drafts&&process.env.DSH_SNAPSHOT?[join(gateway,'node_modules/vitest/vitest.mjs'),'run','--config','vitest.snapshot.config.ts','gateway/tests/node-reserved-drafts.snapshot.ts','--maxWorkers=1']:
     [join(gateway,'node_modules/vitest/vitest.mjs'),'run',...suites,'--maxWorkers=1']
   await run(process.execPath, command, {
-    stdio: 'inherit', env: { ...process.env, ...(operations?{HGW_TEST_VERSIONED_OPERATIONS:process.env.HGW_TEST_VERSIONED_OPERATIONS??'1',HGW_TEST_OWNED_OPERATIONS_DATABASE:ownedOperationsDb}:{}), HGW_TEST_DATABASE_URL: governanceUrl, HGW_TEST_NODE_CONTENT_DATABASE_URL: url.href, HGW_TEST_NODE_CONTENT_PGDATA: pgdata },
+    stdio: 'inherit', ...(drafts&&process.env.DSH_SNAPSHOT?{cwd:resolve(gateway,'..')}:{}), env: { ...process.env, ...(assetPerformance?{TSX_TSCONFIG_PATH:join(gateway,'tsconfig.run.json')}:{}), ...(disasterUi?{HGW_TEST_DISASTER_UI:'1'}:{}), ...(operations?{HGW_TEST_VERSIONED_OPERATIONS:process.env.HGW_TEST_VERSIONED_OPERATIONS??'1',HGW_TEST_OWNED_OPERATIONS_DATABASE:ownedOperationsDb}:{}), HGW_TEST_DATABASE_URL: governanceUrl, HGW_TEST_NODE_CONTENT_DATABASE_URL: url.href, HGW_TEST_NODE_CONTENT_PGDATA: pgdata },
   })
 } finally {
   try {

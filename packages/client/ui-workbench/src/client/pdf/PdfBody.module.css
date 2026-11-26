@@ -1,3 +1,9 @@
+/* PDF.js appends a temporary font measurement below the full-height app.
+   The document scrollport owns scrolling while the reader is mounted. */
+:global(body):has(.body) {
+  overflow: clip;
+}
+
 .body {
   display: flex;
   flex-direction: column;

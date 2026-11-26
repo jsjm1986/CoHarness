@@ -30,10 +30,11 @@
 // Zero model calls: a fresh workspace's blank session already carries a live
 // composer, and the scenario only types into it. A stray stream would fail loud
 // with NO_ADAPTER.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
   assertFixtureInventory, compareOrRefreshGolden, launchWebScaffold, watchConsole,
@@ -253,7 +254,7 @@ describe('web e2e: composer draft scrolling', () => {
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -325,23 +326,20 @@ describe('web e2e: composer draft scrolling', () => {
 
   it('a wheel gesture over a long draft moves the words, not only the caret', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-composer-draft-scroll-wheel'))
-    const input = page.locator('textarea:enabled').first()
-    await input.hover()
-    const resting = (await measureComposer(page)).caretGlyphGap
-    // One delta past the whole draft: the box clamps at its own end, and the
-    // wheel-chaining handler leaves it native because the box is not yet at its
-    // edge when the gesture starts (the chaining itself is owned by the unit spec).
-    await page.mouse.wheel(0, 2000)
-    // A wheel scroll animates: the box is still climbing when the first poll
-    // tick sees a nonzero offset. Wait for the draft's own end — the gesture
-    // keeps the box until it clamps, then chains onward to the conversation.
+    const scroll = page.locator('[data-input-scroll]').first()
+    await scroll.hover()
+    const resting = await measureComposer(page)
+    const draftRemaining = () => scroll.evaluate(node => node.scrollHeight - node.clientHeight - node.scrollTop)
+    expect(await draftRemaining()).toBeGreaterThan(1)
+    const wheelDelta = 120
     await expect.poll(async () => {
-      const m = await measureComposer(page)
-      return m.scrollMax - m.scrollTop
+      const remaining = await draftRemaining()
+      if (remaining > 1) await page.mouse.wheel(0, wheelDelta)
+      return remaining
     }, { timeout: 10_000 }).toBeLessThanOrEqual(1)
     const metrics = await measureComposer(page)
     // The caret is still on its own glyphs after the gesture.
-    expect(metrics.caretGlyphGap).toBe(resting)
+    expect(metrics.caretGlyphGap).toBe(resting.caretGlyphGap)
     // The reported symptom, stated as what the user sees: the end of the draft
     // is on screen and its beginning is not.
     expect(metrics.lastLineOffset).toBeGreaterThanOrEqual(0)

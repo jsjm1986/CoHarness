@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/ui-cordis/README.md
 document:
-  en: c2366664c97757798feace0b8c4041caccd7531f
-  zh: 8968384985b90e909ac8bc53ea3b7821da8caef6
+  en: b4b37e22331b019fb0d25154442a321c9902beff
+  zh: 0c8f7842fc4a9370ee8c7b2eba147a7f934048eb
 /:
   en: c7dd9af70877ba4e
   zh: 61495d48365178df
 /deepseek-ai-dsh-client-ui-cordis:
-  en: 63d8703a05312146
-  zh: 9e4c02908b65c417
+  en: b57c7358f14d15d3
+  zh: 1a3b30624cbc3f09
 /deepseek-ai-dsh-client-ui-cordis/summary:
   en: 809c3b554785957f
   zh: 7d719a25692aecc7
@@ -18,8 +18,8 @@ document:
   en: 164de71fe671767e
   zh: 93f064ee2db450b2
 /deepseek-ai-dsh-client-ui-cordis/presentation-and-ownership:
-  en: c73893341d1109f8
-  zh: 01f10cd262aed375
+  en: 7e8c2572b39f6153
+  zh: 171a60523171e31f
 /deepseek-ai-dsh-client-ui-cordis/model-experience:
   en: dd230a84ce5fe6c8
   zh: d3012ba6248bd80f

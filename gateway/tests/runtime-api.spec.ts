@@ -22,6 +22,7 @@ import type { DocumentTransferResponse } from '../src/document-transfer.ts'
 import type { RuntimeTarget } from '../src/instances.ts'
 import type { PluginStateSnapshot } from '../src/plugin-state.ts'
 import { createRuntimeApiHandler } from '../src/runtime-api.ts'
+import { PeerBackupError } from '../src/peer-backup-repository.ts'
 import { ExecutionIdentityError, GatewayExecutionIdentity, type ExecutionIdentityState } from '../src/execution-identity.ts'
 import type { RuntimeDocumentStoreHandler } from '../src/runtime-document-store.ts'
 import type { AccessInvalidationSubject, GatewayAccessMonitor } from '../src/access-invalidation.ts'
@@ -73,7 +74,8 @@ function user(id: number, role: UserRow['role'] = 'user'): UserRow {
 async function request(
   handler: RuntimeHandler,
   pathname: string,
-  input: { body: unknown; principal?: string; token?: string; method?: string; stream?: boolean },
+  input: { body: unknown; principal?: string; token?: string; method?: string; stream?: boolean;
+    controlSubject?: Parameters<RuntimeHandler>[5] },
 ): Promise<RuntimeResponse> {
   const headers: IncomingHttpHeaders = {
     authorization: `Bearer ${input.token ?? RUNTIME_TOKEN}`,
@@ -104,7 +106,7 @@ async function request(
   if (input.stream === true) {
     if (handler.stream === undefined) throw new Error('The fixture requires a streaming runtime handler.')
     handled = await handler.stream(req, res, routePath, () => Promise.resolve('open'))
-  } else handled = await handler(req, res, routePath, JSON.stringify(input.body))
+  } else handled = await handler(req, res, routePath, JSON.stringify(input.body), undefined, input.controlSubject)
   return {
     handled,
     status,
@@ -223,6 +225,15 @@ function fixture() {
 }
 
 describe('private event principal renewal transport', () => {
+  it('checks recovery approval before allowing managed profile reload and returns its stable refusal', async () => {
+    const runtime = fixture()
+    const verifySubject = vi.fn(async () => { throw new PeerBackupError(409, 'peer-backup/execution-profile-changed') })
+    const handler = createRuntimeApiHandler({ ...runtime.deps, recoveryExecution: { verifySubject } })
+    expect(await request(handler, '/internal/runtime/plugin-state/verify-profile', { body: {} }))
+      .toMatchObject({ status: 409, body: { error: 'peer-backup/execution-profile-changed' } })
+    expect(verifySubject).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ generation: GENERATION,
+      target: expect.objectContaining({ runtimeId: RUNTIME_ID }) }))
+  })
   it('requires runtime bearer admission and sends no browser-selected authority to renewal', async () => {
     const runtime = fixture()
     const renew = vi.fn(async (subject: unknown, value: unknown, current: () => Promise<boolean>) => {
@@ -257,8 +268,11 @@ describe('private event principal renewal transport', () => {
       stillCurrent = await current()
       return { version: 1, leases: [{ leaseId: 'registered', status: 'denied' }] }
     } })
-    expect(await request(handler, '/internal/runtime/stream-principals/renew', { body: { version: 1, leaseIds: ['registered'] } })).toMatchObject({ status: 200 })
+    expect(await request(handler, '/internal/runtime/stream-principals/renew', {
+      body: { version: 1, leaseIds: ['registered'] }, controlSubject: first!,
+    })).toMatchObject({ status: 200 })
     expect(stillCurrent).toBe(false)
+    expect(authenticate).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -1128,6 +1142,31 @@ describe('runtime completed-turn push notifications', () => {
 })
 
 describe('runtime bounded session history', () => {
+  it('serves a committed event only from the authenticated Runtime and exact Session', async () => {
+    const runtime = fixture()
+    const header: ConversationHeader = {
+      id: 'receipt-session',
+      organizationId: ORGANIZATION_ID,
+      creatorUserId: CREATOR_INTERNAL_ID,
+      projectId: PROJECT_INTERNAL_ID,
+      visibility: 'private',
+      sessionFormatVersion: 0,
+      createdAt: CREATED_AT,
+    }
+    const readEvent = vi.fn(async (_id: string, _seq: number, _signal?: AbortSignal) => ({ header, event }))
+    Object.assign(runtime.conversations, { readEvent })
+    const read = (suffix: string) => request(runtime.handler, `/internal/runtime/session/read-event?sessionId=receipt-session&${suffix}`, {
+      method: 'GET', body: {},
+    })
+    expect(await read('seq=0')).toMatchObject({ status: 200, body: { header: { id: header.id }, events: [event] } })
+    expect(readEvent).toHaveBeenCalledWith(header.id, 0, expect.any(AbortSignal))
+    readEvent.mockResolvedValueOnce({ header: { ...header, projectId: 'foreign-project' }, event })
+    expect(await read('seq=0')).toMatchObject({ status: 404, body: { error: 'conversation-not-found' } })
+    expect(await read('seq=0&seq=1')).toMatchObject({ status: 400, body: { code: 'protocol' } })
+    expect(readEvent).toHaveBeenCalledTimes(2)
+    expect(runtime.conversations.load).not.toHaveBeenCalled()
+  })
+
   it('authorizes from metadata and serves an indexed page without loading the log', async () => {
     const runtime = fixture()
     const header: ConversationHeader = {

@@ -434,6 +434,43 @@ describe('PersistenceCoordinator seed ownership', () => {
       await ctx.fiber.dispose()
     }
   })
+
+  it('commits an admitted inbox insertion before a draft has visible content', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const session = ctx.sessions.create(SessionId('draft-with-receipt'), { meta: { draft: true } })
+      const seed = session.append('turn/start', { turn: 1 })
+      const ordinary = createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'ordinary input' }] })
+      const deferred = session.append('agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [ordinary] })
+      await ctx.sessions.flush(session)
+      expect(backend.store.has(session.id)).toBe(false)
+
+      const source = { kind: 'user' as const, admission: { key: '1'.repeat(64), digest: '2'.repeat(64) } }
+      const message = createUserMessage({ source, content: [{ type: 'text', text: 'queued input' }] })
+      const receipt = session.append('agent/inbox/spliced', { target: 'next-turn', start: 1, inserted: [message] })
+      await ctx.sessions.flush(session)
+      const stored = backend.store.get(session.id)
+      expect(stored?.events).toEqual([seed, deferred, receipt])
+      expect(backend.lastAppendedBatch?.[0]).toBe(seed)
+      expect(backend.lastAppendedBatch?.[1]).toBe(deferred)
+      expect(backend.lastAppendedBatch?.[2]).toBe(receipt)
+      expect(stored?.meta.draft).toBe(true)
+
+      session.append('user/message', message, { surfaceOp: 'append' })
+      await ctx.sessions.flush(session)
+      expect(backend.store.get(session.id)?.events.map(event => event.type))
+        .toEqual(['turn/start', 'agent/inbox/spliced', 'agent/inbox/spliced', 'user/message'])
+      expect(sessionContentMetadata(backend.store.get(session.id)!.events).blank).toBe(false)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
 })
 
 describe('PersistenceCoordinator bounded writes', () => {
@@ -1204,17 +1241,20 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       // Untracked, live-owned, and materialized ids are not detached pendings.
+      expect(coordinator.isMaterialized(SessionId('ghost'))).toBe(false)
       await expect(coordinator.materializeDetached(SessionId('ghost')))
         .rejects.toThrow(/no detached pending state/)
 
       const pending = SessionId('detached-pending')
       await coordinator.create(meta(pending))
       expect(coordinator.isPending(pending)).toBe(true)
+      expect(coordinator.isMaterialized(pending)).toBe(false)
       expect(coordinator.listPending().map(storage => storage.meta.id)).toEqual([pending])
       await coordinator.materializeDetached(pending)
       expect(backend.store.get(pending)?.events).toEqual([])
       // Materialized ownerless state is no longer pending.
       expect(coordinator.isPending(pending)).toBe(false)
+      expect(coordinator.isMaterialized(pending)).toBe(true)
       expect(coordinator.listPending()).toEqual([])
       await expect(coordinator.materializeDetached(pending))
         .rejects.toThrow(/no detached pending state/)

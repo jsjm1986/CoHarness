@@ -42,6 +42,7 @@ Projection events retain original durable messages and sequence identities. `sur
 
 - `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` validates and detaches durable seed/header data, fills the version and id, defaults `createdAt` to now, publishes the session, and binds it to the calling fiber. A seeded header (`meta.isSeeded: true`) must supply both `seed` and the exact `inheritedEventCount`, because the constructor seed can contain child-owned setup events after the inherited prefix; an unseeded header rejects a nonzero cut. Persisted reconstruction supplies its original `createdAt`, lineage, and `delegationDepth`.
 - `ctx.sessions.flush(session)` dispatches the awaited parallel durability checkpoint through the session's captured scope. Every listener starts and the call waits for all to settle before reporting failure; unpublished, detached, and stale objects reject.
+- `ctx.sessions.sealForShutdown(session)` ends appends on the exact live Session after its work has settled and returns the final log length. The Session's attachment remains available for `flush` until its owner detaches it.
 - `ctx.sessions.fork(source, boundary?, childSessionId?): Session` — Resolve a live session object or id, select a seed through the inclusive `boundary` event seq (default: current last event), require that prefix to end outside an open turn, and create a live child session with lineage metadata.
 - `ctx.sessions.get(id: SessionId): Session | undefined`
 - `ctx.sessions.list(): Session[]`
@@ -119,7 +120,11 @@ The package is built on event sourcing: a `Session` is an append-only log of typ
 
 `request/header` records a full canonical snapshot of the non-history request envelope with reason `initial`, `resume`, or `change`. Its optional `adapterDefaults` map marks effective `reasoningEffort` or `maxTokens` values materialized by exact-model resolution, allowing the next request proposal to distinguish them from explicit conversation settings. `foldRequestHeader()` selects the latest snapshot; legacy delta events and the removed `fallback` reason are rejected. See the [reconstructable-requests Agent Note](../../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.md).
 
+Header equality compares canonical tool schemas directly in JSON serialization order, including nested property order.
+
 A `user/message` stores the complete `UserMessage` directly, including the identity created before inbox routing or step entry. It renders its `content` verbatim whether it is a direct human prompt, a synthetic injection, or an entered goal round; its typed `source` is the only channel that tells them apart and carries any domain-specific durable facts. `assistant/message` and `tool/result` likewise store complete message values. Turn execution remains enclosed by `turn/start` and `turn/end`; `agent.inject()` queues input until a later pre-step claims it and returns it in an enter decision.
+
+Persistence treats a user input with a durable inbox receipt as sufficient to store the Session prefix. The visible-content classifier uses surface messages to determine when a draft has conversation content.
 
 `tool/result` persists one identified user-role tool-result message, optional internal failure identity, and optional presentation metadata. A tool's successful canonical `value` and human-readable canonical failure message remain execution-local; rendered error content is the replay-authoritative message.
 

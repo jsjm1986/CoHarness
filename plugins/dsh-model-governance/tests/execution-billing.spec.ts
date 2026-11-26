@@ -811,13 +811,67 @@ describe('verified execution billing', () => {
     })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
     cleanups.push(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())))
-    const outbox = new UsageOutbox(root, `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/usage`, 'fixture-token')
+    const outbox = new UsageOutbox(root, `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/usage`, 'fixture-token', () => {})
     cleanups.push(() => outbox.close())
     const record: UsageRecord = { eventId: 'proof-rejection', occurredAt: 1, provider: 'p', model: 'm', purpose: 'auto-review', sessionId: 'session', actorUserId: 7, executionInputIds: ['input-a'], credentialSource: 'organization', credentialClass: 'company', status: 'succeeded' }
     outbox.enqueue(record)
     await received
     await outbox.close()
     expect(bodies).toEqual([record])
-    expect(JSON.parse(await readFile(join(root, 'proof-rejection.json'), 'utf8'))).toEqual(record)
+    const rejected = await readdir(join(root, 'rejected'))
+    expect(rejected).toHaveLength(1)
+    expect(JSON.parse(await readFile(join(root, 'rejected', rejected[0]!), 'utf8'))).toEqual(record)
+  })
+
+  it('forbids locally revoked models in pre-dispatch before calling execution authority or downstream guards', async () => {
+    const f = await fixture()
+    const entered = Promise.withResolvers<undefined>()
+    const releasePermit = Promise.withResolvers<undefined>()
+    cleanups.push(async () => { releasePermit.resolve(undefined) })
+    f.ctx.provide('resourceBudget', {
+      acquire: async () => {
+        entered.resolve(undefined)
+        await releasePermit.promise
+        return { signal: new AbortController().signal, release: async () => {}, uncertain: async () => {} }
+      },
+    })
+    const downstream = vi.fn(async (_options: GenerateOptions, next: () => Promise<void>) => { await next() })
+    f.ctx.on('llm/pre-dispatch', downstream)
+    const pending = f.ctx.agents.withInitiator(f.agent, () => f.drain(f.options()))
+    await entered.promise
+    f.authority.calls.length = 0
+    await writeFile(join(f.root, 'model-governance.json'), JSON.stringify({
+      version: 2, defaultAllowed: false, userDeclaredAllowed: false,
+      models: [{ provider: 'p', model: 'm', allowed: false }], providers: [],
+      intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'fixture-token',
+    }))
+    releasePermit.resolve(undefined)
+    const chunks = await pending
+    expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'error', failure: { code: 'MODEL_FORBIDDEN' } } })
+    expect(f.authority.calls).toHaveLength(0)
+    expect(downstream).not.toHaveBeenCalled()
+    expect(f.adapter.physical).toBe(0)
+  })
+
+  it('still enforces a policy revocation that lands during execution authorization before physical dispatch', async () => {
+    const f = await fixture()
+    const originalAuthorize = f.authority.authorize.bind(f.authority)
+    let callCount = 0
+    f.authority.authorize = async (capability, agent) => {
+      callCount++
+      const state = await originalAuthorize(capability, agent)
+      if (callCount === 2) {
+        await writeFile(join(f.root, 'model-governance.json'), JSON.stringify({
+          version: 2, defaultAllowed: false, userDeclaredAllowed: false,
+          models: [{ provider: 'p', model: 'm', allowed: false }], providers: [],
+          intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'fixture-token',
+        }))
+      }
+      return state
+    }
+    const chunks = await f.ctx.agents.withInitiator(f.agent, () => f.drain(f.options()))
+    expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'error', failure: { code: 'MODEL_FORBIDDEN' } } })
+    expect(callCount).toBe(2)
+    expect(f.adapter.physical).toBe(0)
   })
 })

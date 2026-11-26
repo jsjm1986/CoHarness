@@ -1,19 +1,25 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseDocument } from 'yaml'
-import { applyModelGovernanceToUser, ensureModelGovernanceForUser, refreshModelGovernance, scheduleModelGovernanceRefresh, writeModelGovernanceFile } from '../src/apply-model-governance.ts'
+import { applyModelGovernanceToProject, applyModelGovernanceToUser, closeModelGovernanceRefresh, ensureModelGovernanceForProject, ensureModelGovernanceForUser, modelPolicyProjectionDiagnostics, refreshModelGovernance, scheduleModelGovernanceRefresh, writeModelGovernanceFile, writeProjectModelGovernanceFile, type ModelPolicyProjectionDiagnostics } from '../src/apply-model-governance.ts'
+import { InstanceManager, RuntimeStartBlockedError, type RuntimeTargetInput } from '../src/instances.ts'
+import type { RuntimeId } from '../src/runtime-catalog.ts'
+import { ProjectService } from '../src/projects.ts'
 import type { GatewayModelGovernanceService } from '../src/services.ts'
 import { AuditService } from '../src/audit.ts'
+import { AuthService } from '../src/auth.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
-import { ModelGovernanceService, type ModelRegistrationEvent, type UsageEvent } from '../src/model-governance.ts'
+import { ModelGovernanceService, type ModelIntakeSubject, type ModelRegistrationEvent, type UsageEvent } from '../src/model-governance.ts'
+import { createGatewayServer, SESSION_COOKIE, type GatewayDeps } from '../src/server.ts'
 import { createUsageIntakeServer } from '../src/usage-intake.ts'
 import { UserService } from '../src/users.ts'
 import { GatewayPerformanceObserver } from '../src/performance-observer.ts'
 import { PostgresCheckoutQueueFullError } from '../src/postgres/database.ts'
+import { NodeContentUnavailable } from '../src/node-content-error.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
 
 const closers: Array<() => Promise<void>> = []
@@ -44,6 +50,122 @@ function deniedEvent(eventId = 'denied-1'): UsageEvent {
 }
 
 describe('model governance integration', () => {
+  it.each([
+    {kind:'user',lazy:false,replace:false},
+    {kind:'user',lazy:true,replace:true},
+    {kind:'project',lazy:false,replace:true},
+    {kind:'project',lazy:true,replace:false},
+  ] as const)('rejects a moved retained home after policy lookup without recreating it: %j',async({kind,lazy,replace})=>{
+    const {cfg,root,user,governance,db}=await fixture()
+    const home=join(realpathSync(root),'retained'),moved=join(realpathSync(root),'moved');mkdirSync(home)
+    const projectRow=new ProjectService(db,cfg).create({name:'Retained policy',createdBy:user.id})
+    const project={kind:'project' as const,id:projectRow.id,name:projectRow.name,path:projectRow.path}
+    const subject={...user,dshHome:home},policy=governance.policyFor(user)
+    const service:GatewayModelGovernanceService=governance
+    service.policyForProject=()=>policy
+    if(kind==='project'){
+      vi.spyOn(governance,'issueIntakeToken').mockReturnValue('fixture-project-token')
+      vi.spyOn(governance,'subjectForIntakeToken').mockReturnValue({kind:'project',id:project.id})
+    }
+    const write=()=>kind==='user'?writeModelGovernanceFile(cfg,service,subject,{existingHome:true})
+      :writeProjectModelGovernanceFile(cfg,service,project,home,{existingHome:true})
+    const initial=await write(),before=readFileSync(initial,'utf8')
+    let entered!:()=>void,release!:()=>void
+    const began=new Promise<void>(resolve=>{entered=resolve}),waiting=new Promise<void>(resolve=>{release=resolve})
+    const read=async()=>{entered();await waiting;return policy}
+    if(kind==='user')service.policyFor=read;else service.policyForProject=read
+    const pending=lazy?(kind==='user'?ensureModelGovernanceForUser(cfg,service,subject,{existingHome:true})
+      :ensureModelGovernanceForProject(cfg,service,project,home,{existingHome:true})):write()
+    const refused=expect(pending).rejects.toThrow()
+    try{
+      await began
+      renameSync(home,moved)
+      if(replace)mkdirSync(home)
+      release();await refused
+      expect(readFileSync(join(moved,'model-governance.json'),'utf8')).toBe(before)
+      expect(existsSync(join(home,'model-governance.json'))).toBe(false)
+      expect(existsSync(home)).toBe(replace)
+    }finally{release();await refused}
+  })
+
+  it('projects and refreshes a personal policy only in its verified recovered home', async () => {
+    const { cfg, root, user, users, governance } = await fixture()
+    const dshHome = join(realpathSync(root), 'retained-personal-home');mkdirSync(dshHome)
+    const recovered = { ...user, dshHome }
+    const path = await writeModelGovernanceFile(cfg, governance, recovered,{existingHome:true})
+    expect(path).toBe(join(dshHome, 'model-governance.json'))
+    governance.setUserAccess(user.id, 'p', 'm', false)
+    await ensureModelGovernanceForUser(cfg, governance, recovered,{existingHome:true})
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ models: [{ allowed: false }] })
+    const instances = {
+      targetsForOwner: async () => [{ kind: 'user' as const, id: user.id }],
+      storageOf: async () => ({ homePath: user.homePath, dshHome, runtimeKey: 'retained-personal',retainedData:true as const }),
+    }
+    governance.setUserAccess(user.id, 'p', 'm', true)
+    await applyModelGovernanceToUser({ cfg, users, governance, instances }, user.id)
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ models: [{ allowed: true }] })
+    expect(existsSync(join(cfg.usersRoot, user.username, 'dsh', 'model-governance.json'))).toBe(false)
+  })
+
+  it('keeps project policy writes on the assigned local home and leaves remote projects untouched', async () => {
+    const { cfg, root, user, governance, db } = await fixture()
+    const projects = new ProjectService(db, cfg)
+    const local = projects.create({ name: 'Local recovered project', createdBy: user.id })
+    const remote = projects.create({ name: 'Remote project', createdBy: user.id })
+    const runtimeId = '00000000-0000-4000-8000-000000000123' as RuntimeId
+    const project = { kind: 'project' as const, id: local.id, name: local.name, path: local.path, runtimeId }
+    const dshHome = join(realpathSync(root), 'retained-project-home');mkdirSync(dshHome)
+    const policyForProject = vi.spyOn(governance, 'policyForProject').mockImplementation(() => governance.policyFor(user))
+    const issue = vi.spyOn(governance, 'issueIntakeToken').mockReturnValue('fixture-project-token')
+    const intakeSubject = { kind: 'project' as const, id: local.id, runtimeId }
+    vi.spyOn(governance, 'subjectForIntakeToken').mockReturnValue(intakeSubject)
+    const path = await writeProjectModelGovernanceFile(cfg, governance, project, dshHome,{existingHome:true})
+    expect(path).toBe(join(dshHome, 'model-governance.json'))
+    expect(issue).toHaveBeenCalledWith({ kind: 'project', id: local.id, runtimeId })
+    governance.setUserAccess(user.id, 'p', 'm', false)
+    await ensureModelGovernanceForProject(cfg, governance, project, dshHome,{existingHome:true})
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ models: [{ allowed: false }] })
+    const instances = {
+      targetsForOwner: async (target: RuntimeTargetInput) => typeof target !== 'number' && target.kind === 'project' && target.id === local.id ? [project] : [],
+      storageOf: vi.fn(async () => ({ homePath: local.path, dshHome, runtimeId, runtimeKey: 'retained-project',retainedData:true as const })),
+    }
+    governance.setUserAccess(user.id, 'p', 'm', true)
+    await refreshModelGovernance({ cfg, users: { list: () => [] }, projects, governance, instances })
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ models: [{ allowed: true }] })
+    governance.setUserAccess(user.id, 'p', 'm', false)
+    await applyModelGovernanceToProject({ cfg, projects, governance, instances }, local.id)
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ models: [{ allowed: false }] })
+    expect(policyForProject.mock.calls.every(([id]) => id === local.id)).toBe(true)
+    for (const id of [local.id, remote.id]) expect(existsSync(join(cfg.projectRuntimesRoot, String(id), 'dsh', 'model-governance.json'))).toBe(false)
+    instances.storageOf.mockRejectedValueOnce(new Error('unverified-recovered-home'))
+    await expect(applyModelGovernanceToProject({ cfg, projects, governance, instances }, local.id)).rejects.toThrow('unverified-recovered-home')
+    expect(existsSync(join(cfg.projectRuntimesRoot, String(local.id), 'dsh', 'model-governance.json'))).toBe(false)
+  })
+
+  it('updates a verified personal Runtime when another assignment still lacks its recovery binding', async () => {
+    const { cfg, root, user, users, governance } = await fixture()
+    const heldId = '00000000-0000-4000-8000-000000000124' as RuntimeId
+    const readyId = '00000000-0000-4000-8000-000000000125' as RuntimeId
+    const ready = { ...user, runtimeId: readyId, dshHome: join(realpathSync(root), 'verified-runtime') };mkdirSync(ready.dshHome)
+    const intakeSubject = { kind: 'user' as const, id: user.id, runtimeId: readyId }
+    vi.spyOn(governance, 'issueIntakeToken').mockReturnValue('fixture-personal-token')
+    vi.spyOn(governance, 'subjectForIntakeToken').mockReturnValue(intakeSubject)
+    const path = await writeModelGovernanceFile(cfg, governance, ready,{existingHome:true})
+    governance.setUserAccess(user.id, 'p', 'm', false)
+    const failure = new Error('unbound-personal-runtime')
+    const instances = {
+      targetsForOwner: async () => [heldId, readyId].map(runtimeId => ({ kind: 'user' as const, id: user.id, runtimeId })),
+      storageOf: vi.fn(async (target: RuntimeTargetInput) => {
+        if (typeof target === 'number' || target.runtimeId !== readyId) throw failure
+        return { homePath: user.homePath, dshHome: ready.dshHome, runtimeId: readyId, runtimeKey: 'verified-runtime',retainedData:true as const }
+      }),
+    }
+    await expect(applyModelGovernanceToUser({ cfg, users, governance, instances }, user.id)).rejects.toBe(failure)
+    expect(instances.storageOf).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ models: [{ allowed: false }] })
+    expect(existsSync(join(cfg.usersRoot, user.username, 'runtimes', heldId))).toBe(false)
+  })
+
   it('does not rotate intake credentials when an existing policy cannot be read as a file', async () => {
     const { cfg, user, governance } = await fixture()
     const path = await writeModelGovernanceFile(cfg, governance, user)
@@ -52,6 +174,223 @@ describe('model governance integration', () => {
     await expect(writeModelGovernanceFile(cfg, governance, user)).rejects.toMatchObject({ code: 'EISDIR' })
     expect(issue).not.toHaveBeenCalled()
     expect(statSync(path).isDirectory()).toBe(true)
+  })
+
+  it('serves readiness and exact Runtime policy while reconciliation waits and retries only the failed Runtime', async () => {
+    const { cfg, db, root, user, users, governance } = await fixture()
+    const failingId = '00000000-0000-4000-8000-000000000126' as RuntimeId
+    const healthyId = '00000000-0000-4000-8000-000000000127' as RuntimeId
+    const runtimes = new Map([failingId, healthyId].map(runtimeId => {
+      const dshHome = join(realpathSync(root), runtimeId)
+      mkdirSync(dshHome)
+      return [runtimeId, { ...user, runtimeId, dshHome }] as const
+    }))
+    const tokens = new Map<string, ModelIntakeSubject>()
+    const service: GatewayModelGovernanceService = governance
+    const issue = vi.spyOn(service, 'issueIntakeToken').mockImplementation(subject => {
+      const token = `fixture-intake-${subject.runtimeId}`
+      tokens.set(token, subject)
+      return token
+    })
+    vi.spyOn(service, 'subjectForIntakeToken').mockImplementation(token => tokens.get(token) ?? null)
+    const healthy = runtimes.get(healthyId)!
+    const unhealthy = runtimes.get(failingId)!
+    const readyFile = await writeModelGovernanceFile(cfg, service, healthy, { existingHome: true })
+    const failingFile = join(unhealthy.dshHome, 'model-governance.json')
+    mkdirSync(failingFile)
+    governance.setUserAccess(user.id, 'p', 'm', false)
+
+    let enterCatalog!: () => void
+    let releaseCatalog!: () => void
+    let enterRetry!: () => void
+    let releaseRetry!: () => void
+    const catalogEntered = new Promise<void>(resolve => { enterCatalog = resolve })
+    const catalogReleased = new Promise<void>(resolve => { releaseCatalog = resolve })
+    const retryEntered = new Promise<void>(resolve => { enterRetry = resolve })
+    const retryReleased = new Promise<void>(resolve => { releaseRetry = resolve })
+    const instances = new InstanceManager(db, cfg)
+    const deps: GatewayDeps = {
+      cfg, users, governance: service, instances,
+      auth: new AuthService(db, cfg), projects: new ProjectService(db, cfg), audit: new AuditService(db),
+      readiness: vi.fn(async () => {}),
+    }
+    const admin = await users.create({ username: 'projection-admin', password: 'pw-12345678', role: 'admin' })
+    await users.changeOwnPassword(admin.id, 'pw-12345678')
+    const session = await deps.auth.login(admin.username, 'pw-12345678', '127.0.0.1', 'fixture')
+    if (typeof session === 'string') throw new Error('Fixture could not sign in its administrator')
+    const listUsers = users.list.bind(users)
+    const list = vi.spyOn(deps.users, 'list').mockImplementation(async () => {
+      enterCatalog()
+      await catalogReleased
+      return listUsers().filter(row => row.id === user.id)
+    })
+    vi.spyOn(instances, 'targetsForOwner').mockResolvedValue(
+      [failingId, healthyId].map(runtimeId => ({ kind: 'user', id: user.id, runtimeId })),
+    )
+    let failingAttempts = 0
+    const storageOf = vi.spyOn(instances, 'storageOf').mockImplementation(async input => {
+      const runtime = typeof input === 'object' && input.runtimeId !== undefined ? runtimes.get(input.runtimeId) : undefined
+      if (runtime === undefined) throw new Error('Expected exact Runtime storage lookup')
+      if (runtime.runtimeId === failingId && ++failingAttempts === 2) {
+        enterRetry()
+        await retryReleased
+      }
+      return { ...runtime, runtimeKey: runtime.runtimeId, retainedData: true }
+    })
+    const server = createGatewayServer(deps)
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', () => {
+      scheduleModelGovernanceRefresh(deps)
+      resolve()
+    }))
+    try {
+      const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+      const readDiagnostics = async (): Promise<ModelPolicyProjectionDiagnostics> => {
+        const response = await fetch(base + '/admin/api/performance', {
+          headers: { cookie: `${SESSION_COOKIE}=${session.token}` },
+          signal: AbortSignal.timeout(2_000),
+        })
+        expect(response.status).toBe(200)
+        expect(response.headers.get('cache-control')).toBe('no-store')
+        return ((await response.json()) as { modelPolicyProjection: ModelPolicyProjectionDiagnostics }).modelPolicyProjection
+      }
+      await catalogEntered
+      const readiness = await fetch(base + '/healthz/ready', {
+        signal: AbortSignal.timeout(2_000),
+      })
+      expect(readiness.status).toBe(200)
+      await readiness.text()
+      expect(deps.readiness).toHaveBeenCalledOnce()
+      const anonymous = await fetch(base + '/admin/api/performance', { signal: AbortSignal.timeout(2_000) })
+      expect(anonymous.status).toBe(401)
+      await anonymous.text()
+      expect(await readDiagnostics()).toEqual({ status: 'in-progress', issueCount: 0, issues: [] })
+      expect(storageOf).not.toHaveBeenCalled()
+
+      await expect(ensureModelGovernanceForUser(cfg, service, unhealthy, { existingHome: true }))
+        .rejects.toMatchObject({ code: 'EISDIR' })
+      await ensureModelGovernanceForUser(cfg, service, healthy, { existingHome: true })
+      expect(JSON.parse(readFileSync(readyFile, 'utf8'))).toMatchObject({
+        models: [{ allowed: false }], intakeToken: `fixture-intake-${healthyId}`,
+      })
+      expect(issue).toHaveBeenCalledOnce()
+      expect(statSync(failingFile).isDirectory()).toBe(true)
+
+      releaseCatalog()
+      await retryEntered
+      expect(list).toHaveBeenCalledOnce()
+      expect(storageOf.mock.calls.map(([target]) => typeof target === 'object' && target.runtimeId))
+        .toEqual([failingId, healthyId, failingId])
+      expect(await readDiagnostics()).toEqual({
+        status: 'in-progress', issueCount: 1,
+        issues: [{ kind: 'user', id: user.id, runtimeId: failingId, status: 'retrying', errorCode: 'EISDIR' }],
+      })
+      rmSync(failingFile, { recursive: true })
+      releaseRetry()
+      await vi.waitFor(async () => {
+        expect(JSON.parse(readFileSync(failingFile, 'utf8'))).toMatchObject({
+          models: [{ allowed: false }], intakeToken: `fixture-intake-${failingId}`,
+        })
+        expect(await readDiagnostics()).toEqual({ status: 'complete', issueCount: 0, issues: [] })
+      })
+      expect(issue).toHaveBeenCalledTimes(2)
+      expect(storageOf).toHaveBeenCalledTimes(3)
+    } finally {
+      releaseCatalog()
+      releaseRetry()
+      await closeModelGovernanceRefresh(deps)
+      server.closeAllConnections()
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+      await instances.stopAll()
+    }
+  })
+
+  it('caps reported failures and exposes only catalog coordinates and recognized error codes', { timeout: 12_000 }, async () => {
+    const { cfg, user, users, governance } = await fixture()
+    const targets = Array.from({ length: 40 }, (_, index) => ({
+      kind: 'user' as const, id: user.id, privatePath: '/private-fixture',
+      runtimeId: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}` as RuntimeId,
+    }))
+    const failure = Object.assign(new Error('private fixture payload'), { code: 'PRIVATE_FIXTURE_PAYLOAD' })
+    const deps = {
+      cfg, users, governance, projects: { list: () => [] },
+      instances: {
+        targetsForOwner: async () => targets,
+        storageOf: async () => { throw failure },
+      },
+    }
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(modelPolicyProjectionDiagnostics(deps)).toEqual({ status: 'idle', issueCount: 0, issues: [] })
+      scheduleModelGovernanceRefresh(deps)
+      await vi.waitFor(() => expect(modelPolicyProjectionDiagnostics(deps)?.status).toBe('complete'), { timeout: 10_000 })
+      expect(modelPolicyProjectionDiagnostics(deps)).toEqual({
+        status: 'complete', issueCount: 40,
+        issues: targets.slice(0, 32).map(({ kind, id, runtimeId }) => ({
+          kind, id, runtimeId, status: 'failed', errorCode: 'unknown',
+        })),
+      })
+      expect(log.mock.calls.at(0)).toEqual(['[gateway] model policy projection remains pending', {
+        kind: 'user', id: user.id, runtimeId: targets[0]!.runtimeId, status: 'failed', errorCode: 'unknown',
+      }])
+    } finally {
+      await closeModelGovernanceRefresh(deps)
+    }
+  })
+
+  it('holds reconciliation during maintenance and drains an admitted projection at shutdown', async () => {
+    const { cfg, users, governance } = await fixture()
+    const service: GatewayModelGovernanceService = governance
+    let open = false
+    let checkGate!: () => void
+    let enterPolicy!: () => void
+    let releasePolicy!: () => void
+    const gateChecked = new Promise<void>(resolve => { checkGate = resolve })
+    const policyEntered = new Promise<void>(resolve => { enterPolicy = resolve })
+    const policyReleased = new Promise<void>(resolve => { releasePolicy = resolve })
+    const maintenanceGate = async () => {
+      const verdict = open ? 'open' : 'maintenance'
+      checkGate()
+      return verdict
+    }
+    let finished = false
+    service.projectionWrite = async operation => {
+      if (!open) throw new RuntimeStartBlockedError('maintenance')
+      try {
+        return await operation()
+      } finally {
+        finished = true
+      }
+    }
+    const readPolicy = governance.policyFor.bind(governance)
+    vi.spyOn(service, 'policyFor').mockImplementation(async target => {
+      enterPolicy()
+      await policyReleased
+      return readPolicy(target)
+    })
+    const list = vi.fn(() => users.list())
+    const deps = { cfg, users: { list }, projects: { list: () => [] }, governance: service, maintenanceGate }
+    try {
+      scheduleModelGovernanceRefresh(deps)
+      await gateChecked
+      await vi.waitFor(() => expect(modelPolicyProjectionDiagnostics(deps)).toMatchObject({ status: 'paused' }))
+      expect(list).not.toHaveBeenCalled()
+      open = true
+      scheduleModelGovernanceRefresh(deps)
+      await policyEntered
+      scheduleModelGovernanceRefresh(deps)
+      open = false
+      const closed = closeModelGovernanceRefresh(deps).then(() => finished)
+      await Promise.resolve()
+      releasePolicy()
+      expect(await closed).toBe(true)
+      expect(modelPolicyProjectionDiagnostics(deps)).toMatchObject({ status: 'stopped' })
+      scheduleModelGovernanceRefresh(deps)
+      await Promise.resolve()
+      expect(list).toHaveBeenCalledOnce()
+    } finally {
+      releasePolicy()
+      await closeModelGovernanceRefresh(deps)
+    }
   })
 
   it.each(['null', '[]', '"invalid"', '{'])('repairs malformed persisted policy %j', async previous => {
@@ -169,16 +508,26 @@ describe('model governance integration', () => {
         const policy = JSON.parse(readFileSync(policyFile, 'utf8')) as { models: { allowed: boolean }[] }
         expect(policy.models[0]?.allowed).toBe(false)
       })
-    } finally { releaseRead() }
+    } finally {
+      releaseRead()
+      await closeModelGovernanceRefresh(deps)
+    }
   })
 
-  it.each(['authentication', 'ingestion'] as const)('keeps a valid bill retryable when %s checkout admission is full', async stage => {
+  it.each([
+    ['authentication', new PostgresCheckoutQueueFullError(1), 'DB_CHECKOUT_QUEUE_FULL'],
+    ['ingestion', new PostgresCheckoutQueueFullError(1), 'DB_CHECKOUT_QUEUE_FULL'],
+    ['ingestion connection', Object.assign(new Error('database disconnected'), { code: '08006' }), 'database-unavailable'],
+    ['ingestion lock', Object.assign(new Error('database lock timeout'), { code: '55P03' }), 'database-unavailable'],
+    ['ingestion content volume', new NodeContentUnavailable(), 'node-content/unavailable'],
+    ['ingestion unexpected', new Error('unavailable accounting service'), null],
+  ] as const)('keeps a valid bill retryable after %s fails', async (stage, failure, code) => {
     const { user, governance } = await fixture()
     const token = governance.issueIntakeToken({ kind: 'user', id: user.id })
     const ingest = governance.ingest.bind(governance)
     const authenticate = governance.subjectForIntakeToken.bind(governance)
-    if (stage === 'authentication') governance.subjectForIntakeToken = () => { throw new PostgresCheckoutQueueFullError(1) }
-    else governance.ingest = () => { throw new PostgresCheckoutQueueFullError(1) }
+    if (stage === 'authentication') governance.subjectForIntakeToken = () => { throw failure }
+    else governance.ingest = () => { throw failure }
     const server = createUsageIntakeServer(governance)
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
     closers.push(() => new Promise(resolve => server.close(() => resolve())))
@@ -189,8 +538,9 @@ describe('model governance integration', () => {
       body: JSON.stringify(deniedEvent('capacity-retry')),
     })
     const overloaded = await post()
-    expect(overloaded.status).toBe(503)
-    expect(await overloaded.json()).toEqual({ error: 'DB_CHECKOUT_QUEUE_FULL' })
+    expect(overloaded.status).toBe(code === null ? 500 : 503)
+    if (code === null) expect(await overloaded.text()).toBe('')
+    else expect(await overloaded.json()).toEqual({ error: code })
     governance.ingest = ingest
     governance.subjectForIntakeToken = authenticate
     const retried = await post()
@@ -218,7 +568,9 @@ describe('model governance integration', () => {
     expect((await post(deniedEvent())).status).toBe(200)
     expect(audit.query({ action: 'model.denied' })).toHaveLength(1)
     const spoofed = { ...deniedEvent('spoof'), status: 'succeeded', credentialSource: 'file', credentialClass: 'company' }
-    expect((await post(spoofed)).status).toBe(400)
+    const rejected = await post(spoofed)
+    expect(rejected.status).toBe(400)
+    expect(await rejected.json()).toEqual({ error: 'credentialClass does not match credentialSource' })
     expect(observation.snapshot(null).operationClasses.internal).toMatchObject({
       started: 4, completed: 4, inflight: 0, clientErrors: 2,
     })

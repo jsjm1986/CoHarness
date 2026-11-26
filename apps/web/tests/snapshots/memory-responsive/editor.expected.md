@@ -1,0 +1,23 @@
+- text: Personal
+- img
+- textbox "Search memory"
+- button "Refresh":
+  - img
+- button "New":
+  - img
+- heading "New memory" [level=2]
+- text: Kind
+- combobox "Kind":
+  - option "Guidance" [selected]
+  - option "Profile"
+  - option "Background"
+  - option "Resource"
+- text: Key
+- textbox "Key"
+- text: Lowercase letters, digits, and single hyphens, at most 64 characters Summary
+- textbox "Summary"
+- text: One line naming this fact for the catalog and recall Content
+- textbox "Content"
+- button "Save"
+- button "Cancel"
+- text: Personal

@@ -1,4 +1,9 @@
 .page-markdown-actions {
+  /* The control pill must win hit testing over the following positioned
+     heading: VitePress h1-h6 are position:relative, and oversized text lets
+     glyph ink overflow their line box into this block. */
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -48,6 +53,10 @@
   .page-markdown-toggle {
     width: 44px;
   }
+
+  .page-markdown-static {
+    min-height: 44px;
+  }
 }
 
 .page-markdown-toggle[aria-expanded="true"] .page-markdown-icon {
@@ -65,8 +74,14 @@
   outline-offset: 2px;
 }
 
-.page-markdown-actions-controls button:hover,
-.page-markdown-menu > :is(button, a):is(:hover, :focus) {
+@media (hover: hover) {
+  .page-markdown-actions-controls button:hover,
+  .page-markdown-menu > :is(button, a):hover {
+    background: var(--vp-c-default-soft);
+  }
+}
+
+.page-markdown-menu > :is(button, a):focus-visible {
   background: var(--vp-c-default-soft);
 }
 

@@ -36,4 +36,4 @@ The [assembled document manager](../../../../apps/web/tests/document-manager.e2e
 
 ## Consequences
 
-The library's intended native PDF iframe can load from its own origin while unrelated uploaded formats keep their existing restrictions. Direct downloads stay attachments and no page-level document cache is introduced. Browsers retain their native PDF capabilities and error handling; embedded PDF support remains browser behavior rather than a new application renderer.
+The library's intended native PDF iframe can load from its own origin while unrelated uploaded formats keep their existing restrictions. Direct downloads stay attachments and no page-level document cache is introduced. Browsers with inline PDF support retain their native capabilities and error handling. Browsers without it use the existing Workbench PDF renderer through the [document preview Factory](../architecture/2026-09-08-document-preview-operations.md), with the same authenticated content URL and response restrictions.

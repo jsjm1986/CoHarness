@@ -4,10 +4,11 @@
 // detect the overlap reported by the browser.
 // Zero model calls: the declared route only supplies catalog data, and a
 // stray stream fails loud through the scaffold's route-only adapter.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
@@ -130,7 +131,7 @@ describe('web e2e: mobile composer model label geometry', () => {
         },
       },
     })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

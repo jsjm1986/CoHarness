@@ -33,7 +33,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {
   ConversationViewportSnapshot, DirectoryListing, SessionRuntimeTarget, SessionId, SessionListState, SessionSearchResultItem,
-  WorkspaceId, WorkspaceView,
+  WorkspaceId, WorkspaceView, SessionSearchProgress,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkspaceViewStore } from '../stores.ts'
 import type { WorkspaceShortcutState } from '../shortcuts.ts'
@@ -207,7 +207,7 @@ export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']
  */
 export type WorkspaceBrowserInjected = {
   /** Create in one exact personal Runtime; directory disclosure alone never calls this. */
-  startRuntimeSession?: (target: import('@deepseek-ai/dsh-client-runtime/client').SessionRuntimeTarget, workspaceId?: WorkspaceId) => Promise<void>
+  startRuntimeSession?: (target: import('@deepseek-ai/dsh-client-runtime/client').SessionRuntimeTarget, workspaceId?: WorkspaceId, signal?: AbortSignal) => Promise<void>
   /** Refresh the granted personal computer directory without opening Runtime connections. */
   refreshComputers?: () => Promise<void>
   /** Maximum expanded groups reading simultaneously within this document’s entry request budget. */
@@ -248,6 +248,7 @@ export type WorkspaceBrowserInjected = {
   searchSessions: (
     query: string,
     signal: AbortSignal,
+    progress?: (value: SessionSearchProgress) => void,
   ) => Promise<{ items: readonly SessionSearchResultItem[]; hasMore: boolean }>
   /** Maximum number of merged rows rendered for one search. */
   searchResultLimit: number

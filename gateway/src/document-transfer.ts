@@ -621,6 +621,24 @@ function scope(value: unknown): DocumentTransferScope {
   throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document transfer scope.')
 }
 
+/** Validate a folder operation without reading document content or starting a Runtime.
+ * @param payload - untrusted versioned folder request.
+ * @param create - require a destination folder and name for creation.
+ * @returns the validated storage scope and folder fields.
+ */
+export function parseDocumentDirectoryRequest(payload: unknown, create: boolean): {
+  scope: DocumentTransferScope; directory: string; name?: string
+} {
+  const candidate = record(payload)
+  if (candidate?.version !== 1 || (candidate.directory !== undefined && !validRelativeId(candidate.directory, true))
+    || create && (typeof candidate.name !== 'string' || candidate.name === '' || candidate.name.length > 255
+      || /[\\/\u0000-\u001f\u007f]/u.test(candidate.name))) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document directory request.')
+  }
+  return { scope: scope(candidate.scope), directory: typeof candidate.directory === 'string' ? candidate.directory : '',
+    ...(create ? { name: candidate.name as string } : {}) }
+}
+
 /**
  * Decode the scope and exact Runtime selection used by browser document routes.
  * @param value - personal or project scope key from the request query.

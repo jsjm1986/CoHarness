@@ -1,5 +1,7 @@
-import { observeOperationSql } from '../operation-timing.ts'
+import { hasOperationTiming, observeOperationCheckout, observeOperationSql, type ConnectionCheckout } from '../operation-timing.ts'
+import { hasLaunchTiming } from '../runtime-launch-timing.ts'
 import { backfillConversationQueryFieldsV1 } from './conversation-query-migration-v1.ts'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -97,11 +99,63 @@ type CheckoutCallback = Parameters<Pool['connect']>[0]
 /** pg.query uses this.connect, so one override owns admission for every native checkout entry. */
 class GatewayPostgresPool extends Pool {
   private readonly checkout: CheckoutState
+  private readonly freshSetup = new WeakMap<PoolClient, number>()
+  private readonly keepsWarmClients: boolean
+  private readonly awaitingReuse = new Set<() => void>()
+  private handoffScheduled = false
 
-  constructor(options: PoolConfig, limit: number, private readonly traceRole:'governance'|'content') {
+  constructor(options: PoolConfig, limit: number, private readonly traceRole: 'governance' | 'content') {
     super(options)
     this.checkout = { pending: 0, limit, rejected: 0 }
+    this.keepsWarmClients = (this.options.min ?? 0) > 0
     checkoutStates.set(this, this.checkout)
+    this.on('connect', client => {
+      if (client instanceof GatewayPostgresClient) this.freshSetup.set(client, performance.now() - client.setupStartedAt)
+    })
+    if (this.keepsWarmClients) this.on('release', () => this.scheduleHandoff())
+  }
+
+  private scheduleHandoff(): void {
+    if (this.handoffScheduled || this.ending || this.awaitingReuse.size === 0) return
+    this.handoffScheduled = true
+    // pg publishes release before it returns the client to idle or to its native queue.
+    queueMicrotask(() => {
+      this.handoffScheduled = false
+      for (const borrow of this.awaitingReuse) {
+        if (this.ending || this.idleCount <= this.waitingCount) break
+        this.awaitingReuse.delete(borrow)
+        borrow()
+      }
+    })
+  }
+
+  private acquire(callback: CheckoutCallback, record: (result: ConnectionCheckout) => void): void {
+    const shouldOfferHandoff = this.keepsWarmClients && this.idleCount === 0 && this.waitingCount === 0
+      && this.totalCount > 0 && this.totalCount < this.options.max
+    const deliver = shouldOfferHandoff || hasOperationTiming() || hasLaunchTiming() ? AsyncLocalStorage.bind(callback) : callback
+    let delivered = false
+    const finish = (error: Error | undefined, client: PoolClient | undefined, release: Parameters<CheckoutCallback>[2], handoff = false): void => {
+      const setupMs = client === undefined ? undefined : this.freshSetup.get(client)
+      if (client !== undefined) this.freshSetup.delete(client)
+      if (delivered) {
+        if (client !== undefined) release()
+        return
+      }
+      if (handoff && error) return
+      delivered = true
+      this.awaitingReuse.delete(borrowReturnedClient)
+      record(error ? { kind: 'failed' } : setupMs === undefined ? { kind: handoff ? 'handoff' : 'reused' }
+        : { kind: 'opened', setupMs })
+      deliver(error, client === undefined ? undefined : guardCheckedOutClient(client, this.traceRole), release)
+    }
+    const borrowReturnedClient = (): void => {
+      super.connect((error, client, release) => finish(error, client, release, true))
+    }
+    if (shouldOfferHandoff) this.awaitingReuse.add(borrowReturnedClient)
+    try { super.connect(finish) } catch (error) {
+      this.awaitingReuse.delete(borrowReturnedClient)
+      throw error
+    }
   }
 
   override connect(): Promise<PoolClient>
@@ -115,36 +169,28 @@ class GatewayPostgresPool extends Pool {
       return
     }
     this.checkout.pending += 1
+    const stopCheckout = observeOperationCheckout(this.traceRole)
     let settled = false
-    const settle = (): void => {
+    const settle = (result: ConnectionCheckout): void => {
       if (settled) return
       settled = true
       this.checkout.pending -= 1
+      stopCheckout(result)
     }
     if (callback !== undefined) {
-      try {
-        super.connect((error, client, release) => {
-          settle()
-          callback(error, client === undefined ? undefined : guardCheckedOutClient(client,this.traceRole), release)
-        })
-      } catch (error) {
-        settle()
+      try { this.acquire(callback, settle) } catch (error) {
+        settle({ kind: 'failed' })
         throw error
       }
       return
     }
-    let connecting: Promise<PoolClient>
-    try { connecting = super.connect() } catch (error) {
-      settle()
-      return Promise.reject(error)
-    }
-    return connecting.then(client => {
-      settle()
-      return guardCheckedOutClient(client,this.traceRole)
-    }, error => {
-      settle()
-      throw error
-    })
+    const PromiseImplementation = this.options.Promise ?? Promise
+    return new PromiseImplementation<PoolClient>((resolve, reject) => {
+      try { this.acquire((error, client) => { if (error) reject(error); else resolve(client!) }, settle) } catch (error) {
+        settle({ kind: 'failed' })
+        reject(error)
+      }
+    }) as Promise<PoolClient>
   }
 }
 
@@ -173,6 +219,28 @@ export async function databaseUrlFromFile(env: NodeJS.ProcessEnv = process.env):
   return value
 }
 
+/**
+ * Resolve the PostgreSQL endpoint used by the reserved control and access-listener pools.
+ * @param connectionString - the business pool URL for the same PostgreSQL database.
+ * @param tunnelPort - optional port of an independent loopback forward to that database.
+ * @returns the configured URL, with only the authority port replaced when a forward is configured.
+ */
+export function databaseControlUrl(connectionString: string, tunnelPort: string | undefined): string {
+  if (tunnelPort === undefined) return connectionString
+  if (!/^[1-9][0-9]{0,4}$/u.test(tunnelPort) || Number(tunnelPort) > 65_535) {
+    throw new Error('HGW_DATABASE_CONTROL_TUNNEL_PORT must be a TCP port from 1 to 65535')
+  }
+  const url = URL.parse(connectionString)
+  if (url === null || (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:')
+    || !['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname)
+    || url.searchParams.has('host') || url.searchParams.has('port')) {
+    throw new Error('HGW_DATABASE_CONTROL_TUNNEL_PORT requires a loopback PostgreSQL URL with its host and port in the authority')
+  }
+  if ((url.port || '5432') === tunnelPort) throw new Error('HGW_DATABASE_CONTROL_TUNNEL_PORT must differ from the business database port')
+  url.port = tunnelPort
+  return url.href
+}
+
 export function createPostgresPool(connectionString: string, overrides: GatewayPoolConfig = {}): Pool {
   const { maxCheckoutQueue, traceRole='governance', ...poolOverrides } = overrides
   const checkoutQueueLimit = checkoutLimit(maxCheckoutQueue)
@@ -187,7 +255,7 @@ export function createPostgresPool(connectionString: string, overrides: GatewayP
     idle_in_transaction_session_timeout: DEFAULT_DATABASE_IDLE_TRANSACTION_TIMEOUT_MS,
     Client: GatewayPostgresClient,
     ...poolOverrides,
-  }, checkoutQueueLimit,traceRole)
+  }, checkoutQueueLimit, traceRole)
   // `pg.Pool` emits an `error` event when an idle client is terminated by the
   // server or network.  Without a listener Node treats that event as
   // uncaught and takes the Gateway down, even though a later checkout could
@@ -410,11 +478,9 @@ export async function transaction<T>(
   let failure: Error | null = null
   try {
     signal?.throwIfAborted()
-    await client.query('BEGIN')
-    if (options?.lockWait === 'statement') {
-      await client.query(`SELECT set_config('lock_timeout',CASE WHEN current_setting('statement_timeout')='0'
-        THEN current_setting('lock_timeout') ELSE current_setting('statement_timeout') END,true)`)
-    }
+    await client.query(options?.lockWait === 'statement' ? `BEGIN;
+      SELECT set_config('lock_timeout',CASE WHEN current_setting('statement_timeout')='0'
+        THEN current_setting('lock_timeout') ELSE current_setting('statement_timeout') END,true)` : 'BEGIN')
     signal?.throwIfAborted()
     const result = await operation(client)
     signal?.throwIfAborted()
@@ -433,6 +499,44 @@ export async function transaction<T>(
 }
 
 interface MigrationFile { version: number; name: string; path: string; checksum: string; sql: string }
+type MigrationRecord = Pick<MigrationFile, 'version' | 'name' | 'checksum'>
+
+/** A published push migration with identical SQL at its canonical version. */
+interface MigrationRelocation { from: number; to: number }
+
+const PUSH_MIGRATION_LINEAGE = [
+  {
+    from: 130, to: 144, suffix: 'push_delivery_outcomes.sql',
+    checksum: '6d7b40d5aa4c660e805ee49c3eaaa0b0901b1524327adadf985530e1a54043d6',
+  },
+  {
+    from: 131, to: 145, suffix: 'unifiedpush_provider.sql',
+    checksum: '59de0ff92952399d707b3c428fa2ad83ed77ea04ff4fb8868c303bc5e290c244',
+  },
+] as const
+const LAST_PUSH_MIGRATION_VERSION = PUSH_MIGRATION_LINEAGE[1].to
+
+function matchesMigration(record: MigrationRecord, migration: MigrationFile | undefined): boolean {
+  return migration !== undefined && record.version === migration.version
+    && record.name === migration.name && record.checksum === migration.checksum
+}
+
+function pushMigrationRelocations(rows: MigrationRecord[], migrations: MigrationFile[]): MigrationRelocation[] | undefined {
+  const common = PUSH_MIGRATION_LINEAGE[0].from - 1
+  const fork = rows.slice(common)
+  if (fork.length === 0 || fork.length > PUSH_MIGRATION_LINEAGE.length
+    || !rows.slice(0, common).every((row, index) => matchesMigration(row, migrations[index]))) return
+  const relocations: MigrationRelocation[] = []
+  for (const [index, { from, to, suffix, checksum }] of PUSH_MIGRATION_LINEAGE.entries()) {
+    const target = migrations[to - 1]
+    if (target?.version !== to || target.name !== `${to}_${suffix}` || target.checksum !== checksum) return
+    const row = fork[index]
+    if (row === undefined) continue
+    if (row.version !== from || row.name !== `${from}_${suffix}` || row.checksum !== checksum) return
+    relocations.push({ from, to })
+  }
+  return relocations
+}
 
 async function migrationFiles(directory: string): Promise<MigrationFile[]> {
   const names = (await readdir(directory)).filter(name => /^\d{3}_[a-z0-9_-]+\.sql$/.test(name)).sort()
@@ -464,16 +568,23 @@ export interface MigrationPlan {
   pending: Array<{ version: number; name: string }>
   /** Applied versions whose recorded name or checksum differs from the packaged file. */
   drifted: number[]
+  /** Checksummed push migrations to renumber during an explicit coordinated apply. */
+  relocations?: MigrationRelocation[]
   /** Highest packaged version, or 0 when the directory is empty. */
   current: number
 }
 
-/** Read-only migration diff; never acquires the advisory lock or writes the ledger. */
-export async function migrationPlan(pool: Pool, directory: string): Promise<MigrationPlan> {
+/**
+ * Diff the installed ledger against the packaged files without locking or writing it.
+ * @param pool - governance database connection.
+ * @param directory - complete packaged SQL sequence.
+ * @returns installed and pending versions, checksum drift, and any recognized push ledger correction.
+ */
+export async function migrationPlan(pool: Queryable, directory: string): Promise<MigrationPlan> {
   const migrations = await migrationFiles(directory)
-  let rows: Array<{ version: number; name: string; checksum: string }> = []
+  let rows: MigrationRecord[] = []
   try {
-    const existing = await pool.query<{ version: number; name: string; checksum: string }>(
+    const existing = await pool.query<MigrationRecord>(
       'SELECT version, name, checksum FROM harness.schema_migrations ORDER BY version',
     )
     rows = existing.rows
@@ -482,30 +593,115 @@ export async function migrationPlan(pool: Pool, directory: string): Promise<Migr
     if (code !== '42P01' && code !== '3F000') throw error
   }
   const byVersion = new Map(migrations.map(migration => [migration.version, migration]))
-  const applied: number[] = []
-  const drifted: number[] = []
-  for (const row of rows) {
-    applied.push(row.version)
-    const migration = byVersion.get(row.version)
-    if (migration === undefined || migration.name !== row.name || migration.checksum !== row.checksum) {
-      drifted.push(row.version)
-    }
+  const applied = rows.map(row => row.version)
+  const relocations = pushMigrationRelocations(rows, migrations)
+  const drifted = relocations === undefined
+    ? rows.filter(row => !matchesMigration(row, byVersion.get(row.version))).map(row => row.version)
+    : []
+  const accountedFor = new Set(applied)
+  for (const { from, to } of relocations ?? []) {
+    accountedFor.delete(from)
+    accountedFor.add(to)
   }
-  const appliedSet = new Set(applied)
   const pending = migrations
-    .filter(migration => !appliedSet.has(migration.version))
+    .filter(migration => !accountedFor.has(migration.version))
     .map(migration => ({ version: migration.version, name: migration.name }))
-  return { applied, pending, drifted, current: migrations.at(-1)?.version ?? 0 }
+  return { applied, pending, drifted, current: migrations.at(-1)?.version ?? 0,
+    ...(relocations === undefined ? {} : { relocations }) }
+}
+
+/** Verify a release's governance migration prefix without running SQL from the release.
+ * @param pool - configured governance database.
+ * @param directory - migration files shipped by the release being checked.
+ * @param exact - require every shipped migration to be applied, as for rollback.
+ * @returns whether the recorded ledger is the required checksummed sequence.
+ */
+export async function verifyReleaseMigrationLedger(pool: Pool, directory: string, exact: boolean): Promise<boolean> {
+  return transaction(pool, async tx => {
+    await tx.query('SET TRANSACTION READ ONLY')
+    const lock = await tx.query<{ locked: boolean }>('SELECT pg_try_advisory_xact_lock($1) AS locked', [MIGRATION_LOCK_KEY])
+    if (!lock.rows[0]?.locked) return false
+    const { rows: [ledger] } = await tx.query<{ present: boolean; occupied: boolean }>(`SELECT
+      to_regclass('harness.schema_migrations') IS NOT NULL present,
+      EXISTS(SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='harness' AND c.relkind IN ('r','p') AND c.relname<>'schema_migrations') occupied`)
+    if (ledger === undefined) return false
+    if (!ledger.present) {
+      await migrationFiles(directory)
+      return !exact && !ledger.occupied
+    }
+    const plan = await migrationPlan(tx, directory)
+    return (plan.applied.length > 0 || !ledger.occupied)
+      && plan.relocations === undefined
+      && plan.drifted.length === 0 && plan.applied.every((version, index) => version === index + 1)
+      && (!exact || plan.pending.length === 0)
+  })
+}
+
+async function applyMigration(client: PoolClient, migration: MigrationFile): Promise<void> {
+  await client.query(migration.sql)
+  if (migration.version === 100) await backfillConversationQueryFieldsV1(client)
+  await client.query(
+    'INSERT INTO harness.schema_migrations(version,name,checksum) VALUES($1,$2,$3)',
+    [migration.version, migration.name, migration.checksum],
+  )
+}
+
+async function applyPushMigrationLineage(
+  client: PoolClient, migrations: MigrationFile[], existing: MigrationRecord[], relocations: MigrationRelocation[],
+  verify: (client: Queryable) => Promise<void>,
+): Promise<number[]> {
+  const applied: number[] = []
+  await client.query('BEGIN')
+  try {
+    await verify(client)
+    for (const { from, to } of relocations) {
+      const previous = existing[from - 1]!
+      const target = migrations[to - 1]!
+      const updated = await client.query(`UPDATE harness.schema_migrations SET version=$1, name=$2
+        WHERE version=$3 AND name=$4 AND checksum=$5`, [to, target.name, from, previous.name, previous.checksum])
+      if (updated.rowCount !== 1) throw new Error(`PostgreSQL push migration ledger changed at version ${from}`)
+    }
+    const alreadyApplied = new Set(relocations.map(relocation => relocation.to))
+    for (const migration of migrations.slice(PUSH_MIGRATION_LINEAGE[0].from - 1, LAST_PUSH_MIGRATION_VERSION)) {
+      if (alreadyApplied.has(migration.version)) continue
+      await applyMigration(client, migration)
+      applied.push(migration.version)
+    }
+    await client.query('COMMIT')
+    return applied
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  }
+}
+
+/** Options for an explicitly coordinated migration apply. */
+export interface MigrationApplyOptions {
+  /** Verify quiescence and retain the maintenance fence in the legacy push upgrade transaction. */
+  verifyPushUpgrade?: (client: Queryable) => Promise<void>
+}
+
+/** Outcome of an applied governance migration sequence. */
+export interface MigrationApplyResult {
+  /** Versions whose SQL committed during this run. */
+  applied: number[]
+  /** Highest version shipped by the release. */
+  current: number
+  /** Published push migrations whose ledger entries moved without replaying their SQL. */
+  relocations?: MigrationRelocation[]
 }
 
 /**
  * Apply checksummed SQL and associated versioned backfills in atomic migration transactions.
  * @param pool - database whose advisory lock serializes all migration runners.
  * @param directory - complete, immutable SQL migration sequence matching this Gateway.
+ * @param options - deployment applier's transactional maintenance check for the legacy push ledger.
  * @returns versions applied by this runner and the latest supported version.
  */
-export async function runMigrations(pool: Pool, directory: string): Promise<{ applied: number[]; current: number }> {
+export async function runMigrations(pool: Pool, directory: string, options?: MigrationApplyOptions): Promise<MigrationApplyResult> {
   const migrations = await migrationFiles(directory)
+  const current = migrations.at(-1)!.version
   const client = await connectFromPool(pool)
   const applied: number[] = []
   try {
@@ -527,36 +723,34 @@ export async function runMigrations(pool: Pool, directory: string): Promise<{ ap
       checksum char(64) NOT NULL,
       applied_at timestamptz NOT NULL DEFAULT now()
     )`)
-    const existing = await client.query<{ version: number; name: string; checksum: string }>(
+    const existing = await client.query<MigrationRecord>(
       'SELECT version, name, checksum FROM harness.schema_migrations ORDER BY version',
     )
-    const byVersion = new Map(existing.rows.map(row => [row.version, row]))
-    for (const [index, recorded] of existing.rows.entries()) {
-      const expected = index + 1
-      if (recorded.version !== expected) {
-        throw new Error(`PostgreSQL migration ledger expected version ${String(expected)}, found ${String(recorded.version)}`)
-      }
-      const migration = migrations[index]
-      if (migration === undefined) {
-        throw new Error(`database contains unknown PostgreSQL migration version ${String(recorded.version)}`)
-      }
-      if (recorded.name !== migration.name || recorded.checksum !== migration.checksum) {
-        throw new Error(`PostgreSQL migration ${migration.name} differs from the applied checksum`)
+    const relocations = pushMigrationRelocations(existing.rows, migrations)
+    let installed = existing.rows.length
+    if (relocations !== undefined) {
+      if (options?.verifyPushUpgrade === undefined) throw new Error('PostgreSQL push migration ledger requires coordinated deploy-apply')
+      applied.push(...await applyPushMigrationLineage(client, migrations, existing.rows, relocations, options.verifyPushUpgrade))
+      installed = LAST_PUSH_MIGRATION_VERSION
+    } else {
+      for (const [index, recorded] of existing.rows.entries()) {
+        const expected = index + 1
+        if (recorded.version !== expected) {
+          throw new Error(`PostgreSQL migration ledger expected version ${String(expected)}, found ${String(recorded.version)}`)
+        }
+        const migration = migrations[index]
+        if (migration === undefined) {
+          throw new Error(`database contains unknown PostgreSQL migration version ${String(recorded.version)}`)
+        }
+        if (!matchesMigration(recorded, migration)) {
+          throw new Error(`PostgreSQL migration ${migration.name} differs from the applied checksum`)
+        }
       }
     }
-    for (const migration of migrations) {
-      const recorded = byVersion.get(migration.version)
-      if (recorded !== undefined) {
-        continue
-      }
+    for (const migration of migrations.slice(installed)) {
       await client.query('BEGIN')
       try {
-        await client.query(migration.sql)
-        if (migration.version === 100) await backfillConversationQueryFieldsV1(client)
-        await client.query(
-          'INSERT INTO harness.schema_migrations(version,name,checksum) VALUES($1,$2,$3)',
-          [migration.version, migration.name, migration.checksum],
-        )
+        await applyMigration(client, migration)
         await client.query('COMMIT')
         applied.push(migration.version)
       } catch (error) {
@@ -564,7 +758,7 @@ export async function runMigrations(pool: Pool, directory: string): Promise<{ ap
         throw error
       }
     }
-    return { applied, current: migrations.at(-1)?.version ?? 0 }
+    return { applied, current, ...(relocations === undefined ? {} : { relocations }) }
   } finally {
     try { await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]) } catch { /* connection close releases it */ }
     client.release()

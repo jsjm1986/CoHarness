@@ -51,10 +51,31 @@ function toUser(row: Omit<PostgresUserRow, 'port' | 'instance_state' | 'runtime_
 
 /** PostgreSQL-backed user administration; effective status includes organization, membership and account eligibility. */
 export class PostgresUserService {
+  /** Resolve restored account homes from this node's accepted private evidence.
+   * Missing map entries retain ordinary allocation; null withdraws local document access until binding succeeds.
+   */
+  resolveLocalHomes?: (ids: readonly number[]) => Promise<ReadonlyMap<number, string | null>>
+
   constructor(
     private readonly context: PostgresRuntimeContext,
     private readonly cfg: GatewayConfig,
   ) {}
+
+  private async localHomes<T extends UserRow>(rows: T[]): Promise<T[]> {
+    if (this.resolveLocalHomes === undefined || rows.length === 0) return rows
+    const homes = await this.resolveLocalHomes(rows.map(row => row.id))
+    return rows.map(row => {
+      if (!homes.has(row.id)) return row
+      const home = homes.get(row.id)!
+      const projected = { ...row }
+      if (home === null) delete projected.homeNodeId
+      else {
+        projected.homePath = home
+        projected.homeNodeId = this.context.nodeId as RuntimeNodeId
+      }
+      return projected
+    })
+  }
 
   private selectUsers(where = '', assignment = true): string {
     return `SELECT u.id internal_id,u.public_id::text,u.username::text,u.display_name,
@@ -134,7 +155,7 @@ export class PostgresUserService {
     const result = await this.context.pool.query<PostgresUserRow>(
       `${this.selectUsers()} ORDER BY u.public_id`, [this.context.organizationId, this.context.nodeId],
     )
-    return result.rows.map(row => ({ ...toUser(row), port: row.port, instanceState: row.instance_state, runtimeCount: row.runtime_count }))
+    return this.localHomes(result.rows.map(row => ({ ...toUser(row), port: row.port, instanceState: row.instance_state, runtimeCount: row.runtime_count })))
   }
 
   async getById(id: number): Promise<UserRow | null> {
@@ -142,7 +163,7 @@ export class PostgresUserService {
       `${this.selectUsers('AND u.public_id=$2', false)} LIMIT 1`,
       [this.context.organizationId, id, this.context.nodeId],
     )
-    return result.rows[0] === undefined ? null : toUser(result.rows[0])
+    return result.rows[0] === undefined ? null : (await this.localHomes([toUser(result.rows[0])]))[0]!
   }
 
   /**
@@ -163,7 +184,7 @@ export class PostgresUserService {
       [this.context.organizationId, this.context.nodeId, id],
     )
     const row = result.rows[0]
-    return row === undefined ? null : { ...toUser(row), port: row.port, instanceState: row.instance_state, runtimeCount: row.runtime_count }
+    return row === undefined ? null : (await this.localHomes([{ ...toUser(row), port: row.port, instanceState: row.instance_state, runtimeCount: row.runtime_count }]))[0]!
   }
 
   async getByUsername(username: string): Promise<UserRow | null> {
@@ -171,7 +192,7 @@ export class PostgresUserService {
       `${this.selectUsers('AND u.username=$2', false)} LIMIT 1`,
       [this.context.organizationId, username, this.context.nodeId],
     )
-    return result.rows[0] === undefined ? null : toUser(result.rows[0])
+    return result.rows[0] === undefined ? null : (await this.localHomes([toUser(result.rows[0])]))[0]!
   }
 
   /** Atomically update administrator-editable fields for one user. */

@@ -52,7 +52,16 @@ async function bench(options: {
   })
   const navigation: unknown[] = []
   let mainSessionId: SessionId = SESSION
+  let pendingNavigation: AbortController | undefined
   ctx.provide('sessions', {
+    beginNavigation: () => {
+      pendingNavigation?.abort()
+      pendingNavigation = new AbortController()
+      return pendingNavigation.signal
+    },
+    finishNavigation: (signal: AbortSignal) => {
+      if (pendingNavigation?.signal === signal) pendingNavigation = undefined
+    },
     refreshSubagents: (id: SessionId) => {
       navigation.push(['refresh', id])
       return options.refreshGate ?? Promise.resolve()
@@ -95,7 +104,10 @@ async function bench(options: {
     remote,
     entry,
     collapseHeader,
-    select: (sessionId: SessionId) => { mainSessionId = sessionId },
+    select: (sessionId: SessionId) => {
+      pendingNavigation?.abort()
+      mainSessionId = sessionId
+    },
   }
 }
 

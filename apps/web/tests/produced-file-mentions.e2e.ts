@@ -2,20 +2,22 @@
 // a built write turn (zero model calls) whose closing message names the written
 // file three ways: by unique basename (links), ambiguously (stays inert), and
 // as a file the turn never touched (stays inert). Package tests cover the
-// resolver in isolation; only the assembled application shows a real write's
-// locations reaching the prose as an opener. The click itself is not driven
-// here: it hands the path to the Host's opener, which would launch a real
-// application on the machine running the suite (the produced-files restraint).
+// resolver in isolation; the assembled application connects the prose link to
+// the Host opener. Its native launch adapter is replaced while the real browser
+// and HTTP carrier resolve the path, so the suite never opens a personal application.
+import { responsiveBrowser } from './responsive-browser.ts'
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-title'
 import {
   launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { saveFailureShot } from './support.ts'
 
 const MODE = webSnapshotMode()
 const SEED_ID = 'produced-file-mentions-web-e2e'
@@ -129,8 +131,8 @@ describe('web e2e: inline-code mentions of produced files', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
     await seedSession(scaffold, mentionFixture(), SEED_ID)
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -160,8 +162,25 @@ describe('web e2e: inline-code mentions of produced files', () => {
     expect(await mentions.first().getAttribute('title')).toBe('site/report.html')
     // The turn still ends with its produced-files row (all three writes).
     expect(await page.getByText('Produced', { exact: true }).count()).toBe(1)
+    const paragraph = mentions.first().locator('xpath=ancestor::p[1]')
+    await auditWorkflowState(page, 'deliverables', 'unique-and-ambiguous-prose-mentions', paragraph, [mentions.first()])
+    await compareWorkflowGolden(fileURLToPath(new URL('./expected/produced-file-mentions/links.expected.md', import.meta.url)),
+      await paragraph.ariaSnapshot(), MODE)
+    const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
+      .mockImplementation(async (request, _signal) => ({ rpcId: request.rpcId,
+        result: { ok: true, value: { opened: true as const } } }))
+    try {
+      if (workflowMatrixEnabled) await page.setViewportSize({ width: 320, height: 740 })
+      const [response] = await Promise.all([
+        page.waitForResponse(response => new URL(response.url()).pathname === '/api/host.openPath'),
+        workflowMatrixEnabled ? mentions.first().tap() : mentions.first().click(),
+      ])
+      expect(response.status()).toBe(200)
+      expect(openPath).toHaveBeenCalledTimes(1)
+      expect(openPath.mock.calls[0]![0].payload).toEqual({ path: `${scaffold.workspaceCwd}/site/report.html` })
+    } finally { openPath.mockRestore() }
 
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-  }, 90_000)
+  }, 180_000)
 })

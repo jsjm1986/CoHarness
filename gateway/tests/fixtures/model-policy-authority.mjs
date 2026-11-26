@@ -21,7 +21,7 @@ const [{ openDb }, { UserService }, { ModelGovernanceService }, { loadConfig }, 
 const root = await mkdtemp(join(tmpdir(), 'model-policy-authority-replay-'))
 let db, pool
 try {
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state'),
+  const cfg = loadConfig({ HGW_PERFORMANCE_ENABLED: 'false', HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state'),
     HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),
     HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'), HGW_SYSTEMD_UNIT_DIR: join(root, 'units'), HGW_DEFAULT_ENV_FILE: '',
     HGW_DSH_REPO_ROOT: fileURLToPath(new URL('../../../', import.meta.url)) })

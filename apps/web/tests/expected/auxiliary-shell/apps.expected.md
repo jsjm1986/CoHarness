@@ -1,0 +1,5 @@
+- menu:
+  - menuitem "VS Code":
+    - text: VS Code
+    - img
+  - menuitem "Cursor"

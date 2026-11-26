@@ -45,6 +45,7 @@ export function WorkbenchPaneHeader({
   const subtitle = identity.workspaceName === '' || identity.workspaceName === identity.scopeName
     ? identity.scopeName
     : `${identity.scopeName} · ${identity.workspaceName}`
+  const visibleSubtitle = identity.workspaceName === identity.title ? identity.scopeName : subtitle
   // Completion on a non-focused pane wears the receipt marker until focus
   // (the object layer clears `completed` on selection).
   const receipt = !active && summary?.completed === true
@@ -88,7 +89,7 @@ export function WorkbenchPaneHeader({
       >
         <ScopeTile name={identity.scopeName} tone={identity.tone} />
         <div className={css.paneLead}>
-          <strong title={summary?.displayTitle}>{identity.title}</strong>
+          <strong className={css.paneTitle} title={summary?.displayTitle}>{identity.title}</strong>
           <div className={css.paneMeta}>
             <span className={css.paneState} data-tone={status}>
               {status === 'newReply'
@@ -97,7 +98,7 @@ export function WorkbenchPaneHeader({
               <span>{t(status)}</span>
             </span>
             {showComputer && identity.computerName !== undefined && <ComputerBadge name={identity.computerName} label={t('computer')} />}
-            <span className={css.paneSubtitle} title={subtitle}>{subtitle}</span>
+            <span className={css.paneSubtitle} title={subtitle}>{visibleSubtitle}</span>
           </div>
         </div>
       </div>
@@ -106,7 +107,7 @@ export function WorkbenchPaneHeader({
         {collapsible && (
           <button
             type="button"
-            className={css.iconAction}
+            className={`${css.iconAction} ${css.paneLayoutAction}`}
             aria-label={t('collapse')}
             title={t('collapse')}
             onClick={(event) => { event.stopPropagation(); onToggleCollapse?.() }}
@@ -117,7 +118,7 @@ export function WorkbenchPaneHeader({
         <Tooltip label={t(maximized ? 'restore' : 'maximize')} side="bottom" delayMs={500}>
           <button
             type="button"
-            className={css.iconAction}
+            className={`${css.iconAction} ${css.paneLayoutAction}`}
             aria-label={t(maximized ? 'restore' : 'maximize')}
             title={t(maximized ? 'restore' : 'maximize')}
             onClick={(event) => { event.stopPropagation(); onMaximize() }}
@@ -126,7 +127,16 @@ export function WorkbenchPaneHeader({
           </button>
         </Tooltip>
         <Menu open={menuOpen} onClose={() => { setMenuOpen(false) }} align="end" portal dense
+          listClassName={css.paneMenu} listStyle={{ overflowY: 'auto' }}
+          header={<div className={css.paneMenuIdentity}>
+            <strong>{identity.title}</strong>
+            <span>{subtitle}</span>
+            {showComputer && identity.computerName !== undefined && <span>{identity.computerName}</span>}
+          </div>}
           items={[
+            ...(collapsible ? [{ id: 'collapse', label: t('collapse'), icon: <IconMinimizeOutline16 /> }] : []),
+            { id: 'maximize', label: t(maximized ? 'restore' : 'maximize'), icon: maximized ? <IconRestoreOutline16 /> : <IconMaximizeOutline16 /> },
+            { type: 'separator' as const, id: 'pane-layout-separator' },
             ...(showFiles ? [
               { id: 'files', label: t('files'), icon: <IconFolderOpenOutline16 /> },
               { type: 'separator' as const, id: 'pane-files-separator' },
@@ -142,7 +152,9 @@ export function WorkbenchPaneHeader({
           ]}
           onSelect={(id: string) => {
             setMenuOpen(false)
-            if (id === 'files') openFiles?.()
+            if (id === 'collapse') onToggleCollapse?.()
+            else if (id === 'maximize') onMaximize()
+            else if (id === 'files') openFiles?.()
             else if (id === 'replace') replacePane()
             else if (id === 'solo') onSolo?.()
             else movePane(id as 'previous' | 'next')

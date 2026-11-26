@@ -81,3 +81,54 @@ it('keeps the latest audit query loading when an older query settles first', asy
   await act(async () => { latest.resolve(page('latest-auditor')) })
   expect(screen.getAllByText('@latest-auditor')).toHaveLength(2)
 })
+
+function rows(count: number, username = 'auditor'): AuditEntry[] {
+  return Array.from({ length: count }, (_, index): AuditEntry => ({
+    id: index + 1, ts: 1, userId: 2, username, displayName: username,
+    action: 'login', status: 200, methodPath: '', ip: '127.0.0.1', outcome: 'success', metadata: {},
+  }))
+}
+
+it('pages forward and back through audit offsets and disables exhausted directions', async () => {
+  vi.mocked(listAudit).mockImplementation(async () => ({ entries: rows(50), total: 120 }))
+  render(<AuditPage />)
+  const directions = () => ({
+    prev: screen.getByRole('button', { name: '上一页' }) as HTMLButtonElement,
+    next: screen.getByRole('button', { name: '下一页' }) as HTMLButtonElement,
+  })
+  await screen.findByText('第 1 页 / 3')
+  expect(directions().prev.disabled).toBe(true)
+  expect(directions().next.disabled).toBe(false)
+
+  fireEvent.click(directions().next)
+  await screen.findByText('第 2 页 / 3')
+  expect(listAudit).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 50, limit: 50 }))
+  expect(directions().prev.disabled).toBe(false)
+  expect(directions().next.disabled).toBe(false)
+
+  fireEvent.click(directions().next)
+  await screen.findByText('第 3 页 / 3')
+  expect(listAudit).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 100 }))
+  expect(directions().next.disabled).toBe(true)
+
+  fireEvent.click(directions().prev)
+  await screen.findByText('第 2 页 / 3')
+  expect(listAudit).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 50 }))
+})
+
+it('sends the datetime range as milliseconds and surfaces a refused range', async () => {
+  vi.mocked(listAudit)
+    .mockResolvedValueOnce({ entries: rows(1), total: 1 })
+    .mockRejectedValueOnce(new Error('invalid audit time range'))
+  render(<AuditPage />)
+  await screen.findAllByText('@auditor')
+  fireEvent.change(screen.getByLabelText('开始时间'), { target: { value: '2026-11-20T10:00' } })
+  fireEvent.change(screen.getByLabelText('结束时间'), { target: { value: '2026-11-01T10:00' } })
+  fireEvent.submit(screen.getByRole('button', { name: '应用筛选' }).closest('form')!)
+  await screen.findByRole('alert')
+  expect(listAudit).toHaveBeenLastCalledWith(expect.objectContaining({
+    from: new Date('2026-11-20T10:00').getTime(),
+    to: new Date('2026-11-01T10:00').getTime(),
+    offset: 0,
+  }))
+})

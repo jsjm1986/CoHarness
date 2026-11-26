@@ -33,6 +33,8 @@ Mount `dsh-agent` wherever live agents exist: it provides `ctx.agents` and the `
 
 ### Create or resume an agent
 
+A recovery owner can install `agentExecutionAdmission` on the root Context before profile composition. `installAgentExecutionAdmission()` retains an immutable set of historical Session identities. Registry reservations, creation, resume and publication reject those identities and their parent identities before preset or factory work; stored history remains readable. The default driver enforces the same check at its direct entry points. This process restriction grants no user, model or tool permission.
+
 `ctx.agents.create()` builds a fresh agent and session under one identity; `ctx.agents.resume()` loads a persisted session and rebuilds the agent on it. Both delegate to the registered factory and return an `AgentHandle` — the only object that can tear that agent down. Set `parentAgent` in either operation's options to make the result a runtime child; omit it for a runtime root. `get(id)`, `list()`, and `roots()` find live agents, and `isOwnedBy(id, parent)` tests that exact live relation.
 
 ```text
@@ -48,7 +50,7 @@ await handle.dispose()   // stops the loop, unregisters, removes the session, un
 
 ### Drive an agent's conversation
 
-The handle's methods route identified user-role messages into the agent's inbox. `followup()` queues an ordinary next-turn prompt and wakes the driver; `steer()` submits next-step input and wakes it; `inject()` adds model-facing context without waking the driver, so it lands in the next admitted step. `cancel(cause)` aborts the active activity and, unless `keepInbox` is set, clears pending work; `whenIdle()` resolves after the whole agent reaches quiescence.
+The handle's methods route identified user-role messages into the agent's inbox. `followup()` queues an ordinary next-turn prompt and wakes the driver; `steer()` submits next-step input and wakes it; `inject()` adds model-facing context without waking the driver, so it lands in the next admitted step. Drivers that expose `hasPendingUserSteer` report a user-authored waking delivery still pending in the next-step inbox. `cancel(cause)` aborts the active activity and, unless `keepInbox` is set, clears pending work; `whenIdle()` resolves after the whole agent reaches quiescence.
 
 ```text
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -89,6 +91,8 @@ This section explains how the package realizes the behavior above; the observabl
 The package is built on one separation: the public `Agent` surface and registry live here, while construction and driving live in the loop package behind a registered factory. Consumers therefore depend on `dsh-agent` and never on `dsh-agent-loop`, keeping the driver swappable. The second idea is the initiator scope: an `AsyncLocalStorage` chain that carries the exact live `Agent` through the asynchronous driver work it starts, so helpers below a driver can attribute their work without forwarding the agent through every call.
 
 ### Step admission
+
+Managed pre-step diagnostics attribute elapsed time to the owning plugin outside its awaited continuation. Traced steps use Cordis’s resolved listeners and preserve their decisions.
 
 `PreStepDecision` is either `{ kind: 'reject' }` or `{ kind: 'enter', messages, startsRequestSeries? }`. The enter branch contains the complete identified, frozen message batch. Acceptance does not commit it: after assembly and `step/start`, `agent/request` and `prepareCall()` resolve the route before the loop commits the system prompt and user batch. Cancellation during either async phase commits neither. `startsRequestSeries: true` declares a distinct model-message series; a wrapping listener preserves that declaration and the batch unless it intentionally replaces either one. Claiming removes offered messages from the inbox, while messages inserted after the claim remain pending for a later boundary.
 

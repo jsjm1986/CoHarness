@@ -1,8 +1,9 @@
 /** A retained read-only CSV keeps its cell geometry through its pooled project transport's outage. */
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Page, type WebSocketRoute } from 'playwright'
+import { type Browser, type Page, type WebSocketRoute } from 'playwright'
 import { afterEach, expect, it, onTestFailed } from 'vitest'
 import { acknowledgeReloadConnectionLoss, captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
 import { saveFailureShot } from './support.ts'
@@ -46,7 +47,7 @@ it.skipIf(MODE === 'record').each([
   const sessionId = await seedSession(scaffold, source, `preview-reconnect-${viewport.name}`)
   const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
   await workspace.attachSession(sessionId)
-  browser = await chromium.launch()
+  browser = await responsiveBrowser.launch()
   page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height }, locale: viewport.locale })
   const target = page
   const host = scaffold
@@ -225,6 +226,10 @@ it.skipIf(MODE === 'record').each([
   if (chinese) {
     const compactWidth = 200
     await target.setViewportSize({ width: compactWidth, height: viewport.height })
+    await expect.poll(async () => {
+      const body = await sheet.boundingBox()
+      return body !== null && body.x >= 0 && body.x + body.width <= compactWidth
+    }).toBe(true)
     const close = preview.getByRole('button', { name: labels.close, exact: true })
     const compactBefore = { body: await sheet.boundingBox(), reload: await reload.boundingBox(), close: await close.boundingBox() }
     console.info('[preview-continuity-wrapped-actions-before]', JSON.stringify({ width: compactWidth, before: compactBefore }))

@@ -2,21 +2,25 @@
 // Reuses the existing recorded workflow parent/child model fixtures; the real
 // workflow tool, worker, subagent provider, Session log, browser plugin graph,
 // and navigation all execute during replay.
-import { readFile } from 'node:fs/promises'
+import { responsiveBrowser } from './responsive-browser.ts'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
+import { deriveReplayScript, parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, expandTurnProcesses,
+  assertFixtureInventory, captureStableAria, expandTurnProcesses,
   fixtureUserPrompts, launchWebScaffold, watchConsole, webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
 import {
-  connectFreshWorkspace, newEnglishPage, REPO_ROOT, saveFailureShot,
+  connectFreshWorkspace, REPO_ROOT, saveFailureShot,
 } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 
 const MODE = webSnapshotMode()
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workflow-run', import.meta.url))
@@ -32,6 +36,8 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
   let page: Page
   let tripwire: ReturnType<typeof watchConsole>
   let prompt: string
+  let replayRoot: string | undefined
+  let releaseFile: string | undefined
 
   const waitForParentSettlement = (): Promise<SessionId> => new Promise((resolve, reject) => {
     let dispose = (): void => {}
@@ -50,13 +56,25 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     const prompts = fixtureUserPrompts(await readFile(PARENT_FIXTURE, 'utf8'))
     expect(prompts).toHaveLength(1)
     prompt = prompts[0]!
+    let override: string | undefined
+    if (workflowMatrixEnabled) {
+      replayRoot = await mkdtemp(join(tmpdir(), 'workflow-responsive-'))
+      releaseFile = join(replayRoot, 'release')
+      override = join(replayRoot, 'child.json')
+      const entries = deriveReplayScript(parseSessionLog(await readFile(CHILD_FIXTURE, 'utf8')))
+      const first = entries[0]
+      if (first?.kind !== 'chunks') throw new Error('Workflow child must start with a recorded stream')
+      entries[0] = { ...first, hold: { after: 0, releaseFile } }
+      await writeFile(override, JSON.stringify(entries))
+    }
     scaffold = await launchWebScaffold({
       replayFixture: PARENT_FIXTURE,
       replayChildFixtures: [CHILD_FIXTURE],
+      ...(override === undefined ? {} : { replayChildOverrideFiles: [override] }),
       paceMs: 50,
     })
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -64,8 +82,11 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
   }, 120_000)
 
   afterAll(async () => {
-    await browser?.close()
-    await scaffold?.close()
+    const failures: unknown[] = []
+    await browser?.close().catch((error: unknown) => failures.push(error))
+    await scaffold?.close().catch((error: unknown) => failures.push(error))
+    if (replayRoot !== undefined) await rm(replayRoot, { recursive: true, force: true }).catch((error: unknown) => failures.push(error))
+    if (failures.length > 0) throw new AggregateError(failures, 'Workflow fixture cleanup failed')
   })
 
   it('shows the live member, opens its local child, then retains the settled record beside the tool row', async () => {
@@ -94,7 +115,8 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     expect(await phaseDisclosure.getAttribute('aria-expanded')).toBe('false')
     expect(await member.count()).toBe(0)
     const liveSnapshot = await captureStableAria(page, '[data-workflow-run]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(UI_LIVE_EXPECTED, liveSnapshot, MODE)
+    await compareWorkflowGolden(UI_LIVE_EXPECTED, liveSnapshot, MODE)
+    await auditWorkflowState(page, 'workflow', 'running-phase-collapsed', workflow)
     await phaseDisclosure.press('Enter')
     await member.waitFor()
     await runDisclosure.click()
@@ -154,6 +176,8 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
       document.body.removeAttribute('data-ds-dark-theme')
     })
     await page.setViewportSize({ width: 1280, height: 800 })
+    await auditWorkflowState(page, 'workflow', 'running-expanded', workflow)
+    if (releaseFile !== undefined) await writeFile(releaseFile, '')
 
     await member.click()
     await page.getByText(CHILD_PROMPT, { exact: true }).waitFor({ timeout: 15_000 })
@@ -170,6 +194,7 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     await terminalWorkflow.waitFor()
     expect(await terminalWorkflow.getAttribute('aria-expanded')).toBe('false')
     expect(await terminalWorkflow.evaluate(element => getComputedStyle(element).cursor)).toBe('pointer')
+    await auditWorkflowState(page, 'workflow', 'completed-collapsed', page.locator('[data-workflow-run]'))
     await terminalWorkflow.click()
     const terminalPhase = page.getByRole('button', { name: /^Run \d/ })
     await terminalPhase.waitFor()
@@ -181,6 +206,7 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
       () => page.getByRole('button', { name: /^Open Reply with exactly the word/ }).count(),
       { timeout: 10_000 },
     ).toBe(0)
+    await auditWorkflowState(page, 'workflow', 'completed-expanded', page.locator('[data-workflow-run]'))
   }, 90_000)
 
   it('rebuilds the terminal record from history after reload', async () => {
@@ -195,7 +221,8 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     // expose it while a local replay has no measured stream rate.
     const snapshot = (await captureStableAria(page, '[data-chat-flow]', scaffold.workspaceCwd))
       .replace(' {{throughput}} tok/s', '')
-    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(UI_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'workflow', 'history-collapsed', page.locator('[data-workflow-run]'))
     await workflow.click()
     const phase = page.getByRole('button', { name: /^Run \d/ })
     await phase.waitFor()
@@ -203,6 +230,7 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     await phase.click()
     await page.getByText(CHILD_PROMPT, { exact: false }).waitFor()
     expect(await page.getByRole('button', { name: /^Open Reply with exactly the word/ }).count()).toBe(0)
+    await auditWorkflowState(page, 'workflow', 'history-expanded', page.locator('[data-workflow-run]'))
 
   }, 60_000)
 

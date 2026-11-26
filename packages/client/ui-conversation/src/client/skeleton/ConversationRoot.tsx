@@ -194,9 +194,10 @@ function PendingIntentComposer({ intent, t, onInput, onRetry, onHide, onFocusCha
   /** Standalone surface (workbench pane body) without the composer-stack column. */
   solo?: boolean
 }) {
-  const phase = intent.phase === 'preparing' ? 'preparing' : intent.denied ? 'denied' : 'unavailable'
+  const phase = intent.phase === 'preparing' ? 'preparing' : intent.failure === 'denied' ? 'denied' : 'unavailable'
+  const presetUnavailable = phase === 'unavailable' && intent.failure === 'preset-unavailable'
   return <div className={clsx(inputCss.root, css.pendingRoot, solo && css.pendingSolo)} data-conversation-intent={intent.id}
-    data-intent-runtime={intent.target.runtimeId}>
+    data-intent-runtime={intent.target.runtimeId} data-intent-failure={intent.failure}>
     <div className={clsx(inputCss.card, css.pendingCard)}>
       <div className={inputCss.scroll}>
         <textarea autoFocus value={intent.text} className={clsx(inputCss.input, css.pendingTextarea)}
@@ -207,10 +208,11 @@ function PendingIntentComposer({ intent, t, onInput, onRetry, onHide, onFocusCha
       <div className={clsx(inputCss.row, css.pendingRow)}>
         <small role="status" className={css.pendingStatus} data-intent-phase={phase}>
           {phase === 'preparing' && <span className={css.pendingSpinner} aria-hidden="true" />}
-          {t(phase === 'preparing' ? 'draft.preparing' : phase === 'denied' ? 'draft.denied' : 'draft.unavailable')}
+          {t(phase === 'preparing' ? 'draft.preparing' : phase === 'denied' ? 'draft.denied'
+            : presetUnavailable ? 'draft.presetUnavailable' : 'draft.unavailable')}
         </small>
         {phase === 'unavailable' &&
-          <Button size="sm" onClick={() => { onRetry?.(intent.id) }}>{t('draft.retry')}</Button>}
+          <Button size="sm" onClick={() => { onRetry?.(intent.id) }}>{t(presetUnavailable ? 'draft.retryAfterCheck' : 'draft.retry')}</Button>}
         <Button size="sm" onClick={() => { onHide?.() }}>{t('draft.back')}</Button>
       </div>
     </div>
@@ -237,6 +239,7 @@ export function ConversationContent({
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
   const workspaceName = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.workspaceName)
   const summaryBlank = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.blank)
+  const recoveryReadOnly = useSessions(s => sessionId !== undefined && s.byId[sessionId]?.executionRestriction === 'recovery-read-only')
   const summaryWorkspaceId = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.workspaceId)
   const workspaces = useWorkspaces(s => s)
   // A plugin this package cannot import (ui-model-selection) says this session cannot
@@ -266,20 +269,45 @@ export function ConversationContent({
   const [workspaceError, setWorkspaceError] = useState<string | undefined>()
   const pickerAnchor = useRef<HTMLButtonElement>(null)
 
-  // Publishes the seat's live height as --dsh-composer-height on the scroll
-  // body so floating controls (ChatView back-to-bottom) clear the composer as
-  // it grows. Callback ref, not an effect; stable identity prevents observer
-  // churn while the first blank session fills the resident body outlet.
+  // The seat and its scrollport can resize independently during page zoom,
+  // keyboard opening or pane resizing. A seat that fills the viewport joins
+  // normal flow; it must not obscure the transcript or reserve overlap space.
   const seatObserver = useRef<ResizeObserver | null>(null)
+  const seatFrame = useRef<number | undefined>(undefined)
+  const seatScroller = useRef<HTMLElement | null>(null)
   const seatResizeRef = useCallback((seat: HTMLDivElement | null): void => {
     seatObserver.current?.disconnect()
     seatObserver.current = null
+    if (seatFrame.current !== undefined) cancelAnimationFrame(seatFrame.current)
+    seatFrame.current = undefined
+    seatScroller.current?.style.removeProperty('--dsh-composer-height')
+    seatScroller.current?.removeAttribute('data-composer-flow')
     const scroller = seat?.parentElement ?? null
+    seatScroller.current = scroller
     if (seat === null || scroller === null) return
-    seatObserver.current = new ResizeObserver(() => {
-      scroller.style.setProperty('--dsh-composer-height', `${seat.offsetHeight}px`)
+    let height: number | undefined
+    let available: number | undefined
+    seatObserver.current = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === seat) {
+          height = Math.round(entry.borderBoxSize[0]?.blockSize ?? seat.offsetHeight)
+        } else {
+          // The scroll body has neither vertical padding nor a horizontal scrollbar.
+          available = Math.round(entry.contentRect.height)
+        }
+      }
+      seatFrame.current ??= requestAnimationFrame(() => {
+        seatFrame.current = undefined
+        if (height === undefined || available === undefined) return
+        const cssHeight = `${height}px`
+        if (scroller.style.getPropertyValue('--dsh-composer-height') !== cssHeight) {
+          scroller.style.setProperty('--dsh-composer-height', cssHeight)
+        }
+        scroller.toggleAttribute('data-composer-flow', available > 0 && height >= available)
+      })
     })
-    seatObserver.current.observe(seat)
+    seatObserver.current.observe(seat, { box: 'border-box' })
+    seatObserver.current.observe(scroller)
   }, [])
 
   // Focus handoff: typing already started in the preparation draft, so the
@@ -445,24 +473,26 @@ export function ConversationContent({
       variant: hero ? 'hero' : 'composer',
       active,
       compact,
-      ...(inert
-        ? {
-          disabled: true,
-          placeholder: t('placeholder.workspace'),
-          workspacePickerOpen: pickerOpen,
-          onRequestWorkspace: () => { setPickerOpen(true) },
-        }
-        : blocked
+      ...(recoveryReadOnly
+        ? { disabled: true, placeholder: t('placeholder.recoveryReadOnly') }
+        : inert
+          ? {
+            disabled: true,
+            placeholder: t('placeholder.workspace'),
+            workspacePickerOpen: pickerOpen,
+            onRequestWorkspace: () => { setPickerOpen(true) },
+          }
+          : blocked
           // `blocked`, not `disabled`: the bar refuses input either way, but a
           // block keeps the model seat live because choosing a model is how the
           // user clears it.
-          ? { blocked: composerBlock, placeholder: composerBlock.reason }
+            ? { blocked: composerBlock, placeholder: composerBlock.reason }
           // The steward maintenance space speaks to a runtime that operates
           // on the deployment itself; its composer hints at that contract
           // instead of the generic agent prompt, in the hero and the docked
           // bar alike.
-          : stewardScope ? { placeholder: t('placeholder.steward') }
-            : hero ? { placeholder: t('placeholder.hero') } : {}),
+            : stewardScope ? { placeholder: t('placeholder.steward') }
+              : hero ? { placeholder: t('placeholder.hero') } : {}),
       overlay: renderSlot('conversation.input.overlay', {}),
       leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
       rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),
@@ -477,7 +507,8 @@ export function ConversationContent({
       {hero && <HeroShell t={t} renderSlot={renderSlot} />}
       {hero && heroWorkspaceRow}
       {workspaceError !== undefined && <p role="alert" className={css.workspaceError}>{workspaceError}</p>}
-      {zone !== undefined && renderSlot('conversation.input.dock', zone)}
+      {!recoveryReadOnly && zone !== undefined && renderSlot('conversation.input.dock', zone)}
+      {recoveryReadOnly && <p role="status" className={css.recoveryNotice}>{t('recovery.historyReadOnly')}</p>}
       {inputBar}
     </div>
   )
@@ -496,40 +527,40 @@ export function ConversationContent({
   const composerSeat = (
     <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer"
       aria-hidden={initialSelectionPending || undefined}>
-      {preparing ? composerBar : composer}
+      {preparing || recoveryReadOnly ? composerBar : composer}
     </div>
   )
 
-  // The committed content width is published imperatively as
-  // --dsh-chat-user-width (the CSS axis resolves it into
-  // --dsh-chat-content-width): the ResizeObserver re-clamps a stored
-  // preference against a shrunken column WITHOUT rewriting the preference,
-  // so widening the window restores it — same rule as the AppFrame drags.
+  // Re-clamp the stored preference after layout. A wider pane restores the
+  // preference without persisting a narrower width from an earlier resize.
   const columnWidth = (): number => rootRef.current?.getBoundingClientRect().width ?? 0
-  const publishCommittedWidth = useCallback((root: HTMLDivElement): void => {
+  const observedWidth = useRef<number | undefined>(undefined)
+  const publishCommittedWidth = useCallback((root: HTMLDivElement, width: number | undefined): void => {
     const settings = displaySettingsRef.current
-    if (settings.chatFullWidth) {
-      root.style.setProperty('--dsh-chat-user-width', 'calc(100% - var(--dsh-composer-side-clearance) * 2)')
-      return
+    const value = settings.chatFullWidth
+      ? 'calc(100% - var(--dsh-composer-side-clearance) * 2)'
+      : `${width === undefined ? settings.chatContentWidth : resolveContentWidth(width, settings.chatContentWidth)}px`
+    if (root.style.getPropertyValue('--dsh-chat-user-width') !== value) {
+      root.style.setProperty('--dsh-chat-user-width', value)
     }
-    root.style.setProperty(
-      '--dsh-chat-user-width',
-      `${resolveContentWidth(root.getBoundingClientRect().width, settings.chatContentWidth)}px`,
-    )
   }, [])
   const rootObserver = useRef<ResizeObserver | null>(null)
   const rootResizeRef = useCallback((root: HTMLDivElement | null): void => {
     rootObserver.current?.disconnect()
     rootObserver.current = null
     rootRef.current = root
+    observedWidth.current = undefined
     if (root === null) return
-    rootObserver.current = new ResizeObserver(() => { publishCommittedWidth(root) })
-    rootObserver.current.observe(root)
-    publishCommittedWidth(root)
+    rootObserver.current = new ResizeObserver(([entry]) => {
+      if (entry === undefined) return
+      observedWidth.current = entry.borderBoxSize[0]?.inlineSize ?? entry.contentRect.width
+      publishCommittedWidth(root, observedWidth.current)
+    })
+    rootObserver.current.observe(root, { box: 'border-box' })
   }, [publishCommittedWidth])
   useEffect(() => {
     const root = rootRef.current
-    if (root !== null) publishCommittedWidth(root)
+    if (root !== null) publishCommittedWidth(root, observedWidth.current)
   }, [displaySettings.chatContentWidth, displaySettings.chatFullWidth, publishCommittedWidth])
 
   // In fill mode the rendered column is the pane minus the side clearance, so
@@ -565,7 +596,7 @@ export function ConversationContent({
   }, [setDisplayWidth])
   const onHandleEnd = useCallback((): void => {
     const root = rootRef.current
-    if (root !== null) publishCommittedWidth(root)
+    if (root !== null) publishCommittedWidth(root, columnWidth())
   }, [publishCommittedWidth])
   const onWidthKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     const step = event.shiftKey ? 64 : 16
@@ -663,7 +694,9 @@ export function ConversationRoot(props: ConversationRootProps) {
   const [draggingPaneId, setDraggingPaneId] = useState<SessionId | undefined>(undefined)
   const dragPaneId = useRef<SessionId | undefined>(undefined)
   const root = useRef<HTMLDivElement | null>(null)
-  const workbench = available && viewport.mode === 'workbench'
+  // A composition without the workbench toolbar still renders panes it
+  // already holds — parked unavailable panes must not drop their explanation.
+  const workbench = viewport.mode === 'workbench' && (available || viewport.paneIds.length > 0)
   useEffect(() => {
     const node = root.current
     if (node === null) return
@@ -801,11 +834,7 @@ export function ConversationRoot(props: ConversationRootProps) {
       {pending !== undefined && (pending.paneId === undefined || !paneIds.includes(pending.paneId)) && editor}
       {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed, layout: layoutPreset, onSelectLayout: applyLayout, toolsHostId })}
       {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', { viewport }) : (
-        <div
-          className={css.workbenchGrid}
-          data-workbench-grid=""
-          style={{ gridTemplateRows: rows.map(row => row.every(id => collapsed.has(id)) ? 'auto' : 'minmax(0, 1fr)').join(' ') }}
-        >
+        <div className={css.workbenchGrid} data-workbench-grid="">
           {rows.map((row, rowIndex) => {
             const ratioStart = rowIndex * columns
             const ratios = row.map((_, index) => viewport.paneRatios[ratioStart + index] ?? 1)
@@ -817,6 +846,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                 key={rowIndex}
                 className={css.workbenchRow}
                 data-workbench-row=""
+                data-collapsed={expandedInRow === 0 || undefined}
                 style={{ minWidth: expandedInRow > 1 ? row.reduce((sum, id) => sum + (collapsed.has(id) ? 46 : minimumPaneWidth), 0) : 0,
                   gridTemplateColumns: row.map((id, column) => collapsed.has(id)
                     ? '46px'

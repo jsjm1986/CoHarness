@@ -48,7 +48,7 @@ kind: "package-reference"
 
 渲染对每个字段取其与附件存储对应图片上限（`maxImagesPerMessage`、`maxImagePixels`、`maxImageDimension`、`maxMessageImageBytes`）中的较小值，并拒绝超过存储 `maxImageBytes` 的单张图片。超出上限的选择直接失败，不会被截断。渲染要求挂载附件存储，且调用方模型路由声明支持图片输入。工具从会话最近一次模型请求读取该路由，首次请求之前则读取 agent 选项；模型的输入模态不含图片或未声明时，在开始任何渲染工作之前就会被拒绝。
 
-输入相对 Session 工作目录解析，并沿用文件系统后端的读取权限，与 `read` 和 Office 预览一致，因此可以读取工作区外的文件。输入扩展名决定文档类别。`office_convert` 接受 Word、Excel 和 PowerPoint 文档：Word 可导出 pdf、docx、odt 或 txt；Excel 可导出 pdf、xlsx、ods 或 csv；PowerPoint 可导出 pdf、pptx 或 odp。多工作表工作簿导出 CSV 时必须指定工作表名。`office_recalculate` 接受 xls、xlsx 和 ods 工作簿，输出必须为 xlsx 或 ods。`office_render` 还接受 PDF。
+输入相对 Session 工作目录解析。工具在检查或打开文件前，校验后端规范路径的读取权限。输入扩展名决定文档类别。`office_convert` 接受 Word、Excel 和 PowerPoint 文档：Word 可导出 pdf、docx、odt 或 txt；Excel 可导出 pdf、xlsx、ods 或 csv；PowerPoint 可导出 pdf、pptx 或 odp。多工作表工作簿导出 CSV 时必须指定工作表名。`office_recalculate` 接受 xls、xlsx 和 ods 工作簿，输出必须为 xlsx 或 ods。`office_render` 还接受 PDF。
 
 转换和重算结果给出 Office 套件私有[输出存储](../office-kit/README.zh.md#use-this-package)中位于 Harness 主目录下的一个文件；模型用 shell 复制它，因此文件落在哪里由 shell 的沙箱和审批决定。文件系统后端无法读取 Host 文件时（例如 SSH 工作区），这两个工具在转换前即失败；渲染不受影响。
 

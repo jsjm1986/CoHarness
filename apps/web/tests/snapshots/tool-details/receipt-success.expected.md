@@ -1,0 +1,29 @@
+- tablist:
+  - tab "workflow Close" [selected]:
+    - text: workflow
+    - button "Close":
+      - img
+  - button "New tab":
+    - img
+  - button "Tab actions":
+    - img
+  - button "Split"
+  - button "Fullscreen"
+  - button "Collapse right sidebar":
+    - img
+- text: workflow
+- button "Close details"
+- text: Input json
+- button "Wrap lines" [pressed]
+- button "Copy":
+  - img
+- code: "{ \"meta\": { \"name\": \"snapshot-flow\", \"description\": \"one child for the snapshot\" }, \"script\": \"\\nphase('Run')\\nconst reply = await agent('Reply with exactly the word WF_CHILD_OK and nothing else.')\\nreturn { reply }\\n\" }"
+- text: Output Recorded result
+- list:
+  - listitem:
+    - text: snapshot-flow Completed
+    - term: Agents started
+    - definition: "1"
+  - listitem:
+    - term: reply
+    - definition: WF_CHILD_OK

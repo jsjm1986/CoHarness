@@ -192,4 +192,78 @@ describe('runProfile with an application-owned profile', () => {
       process.exitCode = oldExitCode
     }
   })
+
+  it('provides runtimeStartupMarks on managed boot and logs metadata-only [runtime-boot-failed] on failure', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-managed-startup-marks-'))
+    homes.push(home)
+    mkdirSync(join(home, 'runtime'))
+    writeFileSync(join(home, 'runtime/package.json'), '{"name":"test-runtime","version":"1.0.0"}')
+    writeFileSync(join(home, 'package.json'), '{"name":"test-bundle","version":"1.0.0"}')
+    vi.stubEnv('DSH_HOME', home)
+    vi.spyOn(process, 'on').mockReturnValue(process)
+    vi.mocked(installProxyFromEnvironment).mockResolvedValue(async () => {})
+    const profile: Profile = {
+      name: 'web', dir: home, patchPath: join(home, 'cordis.patch.yml'),
+      patches: [], layers: [], skippedBundles: [],
+    }
+    const managedEnv = createLaunchEnvironmentSnapshot([
+      { source: 'process', values: { DSH_GATEWAY_CREDENTIAL_FILE: join(home, 'cred.json') } },
+    ])
+    const runtime = { profile, installAnchor: join(home, 'runtime/package.json') }
+
+    const ctx = new Context()
+    ctx.provide('loader', { create: vi.fn() })
+    const settled = vi.fn()
+    vi.mocked(boot).mockImplementationOnce(async (_name, _root, _patches, setup) => {
+      await setup?.(ctx)
+      const marks = ctx.get('runtimeStartupMarks') as {
+        entryUptimeMs?: number
+        proxyInstalledMs?: number
+        profileComposedMs?: number
+        patchesReadMs?: number
+        hostPreparedMs?: number
+        bootSettledMs?: number
+        notifySettled?: () => void
+      } | undefined
+      expect(marks).toBeDefined()
+      expect(typeof marks?.entryUptimeMs).toBe('number')
+      expect(typeof marks?.proxyInstalledMs).toBe('number')
+      expect(typeof marks?.profileComposedMs).toBe('number')
+      expect(typeof marks?.patchesReadMs).toBe('number')
+      expect(typeof marks?.hostPreparedMs).toBe('number')
+      expect(marks?.bootSettledMs).toBeUndefined()
+      if (marks !== undefined) marks.notifySettled = settled
+      return ctx
+    })
+    try {
+      const { shutdown } = await runProfile({
+        environment: managedEnv, profile: 'web', resolvedProfile: runtime, patchFiles: [], args: [],
+      })
+      const marks = ctx.get('runtimeStartupMarks') as { bootSettledMs?: number } | undefined
+      expect(typeof marks?.bootSettledMs).toBe('number')
+      expect(settled).toHaveBeenCalledOnce()
+      await shutdown.shutdown(0)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+
+    const secret = 'sensitive-credential-detail'
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.mocked(boot).mockRejectedValueOnce(new TypeError(secret))
+    try {
+      await expect(runProfile({
+        environment: managedEnv, profile: 'web', resolvedProfile: runtime, patchFiles: [], args: [],
+      })).rejects.toThrow(secret)
+      const failedLines = info.mock.calls.map(([line]) => String(line)).filter(line => line.startsWith('[runtime-boot-failed] '))
+      expect(failedLines).toHaveLength(1)
+      expect(failedLines[0]).not.toContain(secret)
+      const parsed = JSON.parse((failedLines[0] ?? '').slice('[runtime-boot-failed] '.length)) as Record<string, unknown>
+      expect(parsed).toMatchObject({ errorName: 'TypeError' })
+      for (const key of ['entryUptimeMs', 'proxyInstalledMs', 'profileComposedMs', 'patchesReadMs', 'failedUptimeMs']) {
+        expect(typeof parsed[key]).toBe('number')
+      }
+    } finally {
+      info.mockRestore()
+    }
+  })
 })

@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-11-25-transcript-receipt-history-recovery.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-25-transcript-receipt-history-recovery.md
+document:
+  en: 56181856c0376d4a005839a729f8f6b1c02e0624
+  zh: 8f4c701275c7c723532507cf93184f413a0c3051
+/agent-note-recover-transcript-receipts-through-older-history-pages:
+  en: 899430e63dcfe1cb
+  zh: a75fbf82e5084716
+/agent-note-recover-transcript-receipts-through-older-history-pages/problem:
+  en: ed4b94a54ff1f675
+  zh: 9ef4b0fce97bc080
+/agent-note-recover-transcript-receipts-through-older-history-pages/decision:
+  en: b5d053349ecbd20b
+  zh: c69b7c62998c86eb
+/agent-note-recover-transcript-receipts-through-older-history-pages/alternatives-considered:
+  en: 5014b1c2f1db63ab
+  zh: 4d63459519abbb89
+/agent-note-recover-transcript-receipts-through-older-history-pages/consequences:
+  en: ff1527546cf02351
+  zh: ec66edb5d07831bd
+/agent-note-recover-transcript-receipts-through-older-history-pages/verification:
+  en: 90edeb4f9341599b
+  zh: d487ce4dbf976272
+/agent-note-recover-transcript-receipts-through-older-history-pages/related:
+  en: 008efb8032e377c2
+  zh: b7f8d6bc1df991bb

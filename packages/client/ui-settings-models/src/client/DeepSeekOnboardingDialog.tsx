@@ -11,7 +11,7 @@ import type { ReactNode } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ModelDiscoveryProbe } from './ModelListEditor.tsx'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelsSettingsState, ModelsSettingsStore } from './store.ts'
 import { onboardingReadiness } from './store.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
@@ -25,6 +25,8 @@ export interface DeepSeekOnboardingInjected {
   hooks: {
     /** Shared Models-page join state, bound by the slot renderer. */
     models: SnapshotStore<ModelsSettingsState>
+    /** Remote landing gives its conversation baselines priority over first-run discovery. */
+    startupReady: HostObservable<boolean>
   }
   /** Shared Models-page join controller. */
   controller: ModelsSettingsStore
@@ -54,14 +56,15 @@ function assertNever(_value: never): never {
  * @returns the onboarding modal or null when onboarding needs no intervention.
  */
 export function DeepSeekOnboardingDialog(props: DeepSeekOnboardingDialogProps): ReactNode {
-  const { complete, controller, useModels, api, discoverModels, schema, t } = props
+  const { complete, controller, useModels, useStartupReady, api, discoverModels, schema, t } = props
+  const startupReady = useStartupReady(value => value)
   const state = useModels(snapshot => snapshot)
   const readiness = onboardingReadiness(state)
 
   useEffect(() => {
     // The snapshot publishes a refresh failure; this trigger has nothing to add.
-    if (state.status === 'idle') void controller.load().catch(() => {})
-  }, [controller, state.status])
+    if (startupReady && state.status === 'idle') void controller.load().catch(() => {})
+  }, [controller, startupReady, state.status])
 
   useEffect(() => {
     if (

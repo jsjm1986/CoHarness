@@ -1,0 +1,19 @@
+- text: COHARNESS Preview
+- button "Choose workspace":
+  - img
+  - text: "{{workspace}}"
+  - img
+- button "Standard mode":
+  - img
+  - text: Standard mode
+  - img
+- textbox "Describe what you want to build"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"'
+- button "Select model, current DeepSeek-V4-Flash"
+- button "Send message" [disabled]

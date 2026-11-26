@@ -14,7 +14,7 @@ The lock operation attempts `LOCK_EX | LOCK_NB` asynchronously. Keep the caller-
 
 `DirectoryHandle.open(path)` owns a directory descriptor; `openChild(name)` traverses one real child without following a link, `read(count)` streams at most 65,536 entries per batch, and `createDirectory(name)` uses the retained parent. Absolute opens refuse links only in the final component; callers excluding ancestor replacement walk from a filesystem-root handle through every segment. Calls are serialized and `close()` waits for previously admitted work. Children own independent descriptors; callers close every handle. See the [directory behavior contract](../../docs/directory-contract.md).
 
-`volumeIdentity()` reads the retained descriptor's filesystem UUID on macOS. Other POSIX platforms and zero UUIDs return absence; native failures reject. Persistent callers must also verify inodes and directory ownership. This operation requires matching JavaScript and native payloads from version 0.1.4 or later.
+`volumeIdentity()` reads the retained descriptor's macOS filesystem UUID or Linux Btrfs subvolume UUID. Unsupported filesystems, older Btrfs kernels and zero UUIDs return absence. Other native failures reject. Persistent callers must also verify inodes and directory ownership.
 
 Optional OS/CPU platform packages carry the binaries. Linux has `bin/landlock-run` and separate `bin/glibc/system.node` / `bin/musl/system.node`; macOS has `bin/system.node`. Missing or unloadable bindings reject locking or directory access, without installation-time compilation. Landlock remains a separate executable with its existing fail-closed protocol; unsupported kernels/platforms probe unusable.
 

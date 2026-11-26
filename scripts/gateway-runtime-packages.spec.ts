@@ -1,7 +1,7 @@
 /** A standalone Gateway needs both release-local package links and the built entries they expose. */
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative } from 'node:path'
+import { dirname, isAbsolute, join, relative } from 'node:path'
 import { expect, it, onTestFinished } from 'vitest'
 import { ensureGatewayRuntimePackages, gatewayRuntimePackageLinksValid, GATEWAY_RUNTIME_PACKAGES } from './gateway-runtime-packages.ts'
 
@@ -54,12 +54,15 @@ it('refuses a foreign package link even when its own declared entry exists', () 
   expect(() => { ensureGatewayRuntimePackages(root) }).toThrow(/points to/)
 })
 
-it.skipIf(process.platform === 'win32')('creates portable POSIX links and preserves them on repeated assembly', () => {
+it('creates release-local links and preserves them on repeated assembly', () => {
   const { root, packages } = fixture(false)
   expect(gatewayRuntimePackageLinksValid(root)).toBe(false)
   ensureGatewayRuntimePackages(root); ensureGatewayRuntimePackages(root)
   expect(gatewayRuntimePackageLinksValid(root)).toBe(true)
-  for (const pkg of packages) expect(realpathSync(pkg.link)).toBe(realpathSync(pkg.directory))
+  for (const pkg of packages) {
+    expect(realpathSync(pkg.link)).toBe(realpathSync(pkg.directory))
+    expect(isAbsolute(readlinkSync(pkg.link))).toBe(process.platform === 'win32')
+  }
   const first = packages[0]!
   const manifest = readFileSync(join(first.directory, 'package.json'))
   writeFileSync(join(first.directory, 'package.json'), JSON.stringify({ name: '' }))

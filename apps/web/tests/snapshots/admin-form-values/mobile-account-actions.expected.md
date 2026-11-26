@@ -1,0 +1,2 @@
+- button "中文，切换为 English"
+- button "退出登录"

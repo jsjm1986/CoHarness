@@ -1,0 +1,10 @@
+.state {
+  display: grid;
+  height: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: var(--dsw-space-3);
+  padding: var(--dsw-space-4);
+  color: var(--dsw-alias-label-secondary);
+  text-align: center;
+}

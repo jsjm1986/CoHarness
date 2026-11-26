@@ -599,12 +599,23 @@
 }
 
 :global([data-viewport='compact']) .panelRow {
-  min-height: 40px;
+  min-height: var(--dsw-touch-target);
   margin-inline: 0;
 }
 
 :global([data-viewport='compact']) .footArea {
   padding-bottom: var(--dsw-safe-bottom);
+}
+
+@media (max-height: 480px) {
+  .root {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .regionArea {
+    flex: 1 0 calc(var(--dsw-touch-target) * 5);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

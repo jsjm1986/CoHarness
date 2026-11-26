@@ -39,6 +39,8 @@ Panel 通过 `useProjection('agentTeam')` 渲染模式与任务，成员行来�
 
 任务板展示 task identity、owner、blocker、readiness、提示性 write scope 与重叠 warning。它是只读的；agent 通过 Team 工具修改任务，panel 渲染修改后的 view。
 
+窄屏下，成员名单与任务板使用单列。长任务名称换行，面板在可见视口内滚动，关闭操作保持可访问。分组标题的数字徽标居中显示，并与标签保持间距。不透明面板阻止背景会话文字透入阅读区域；空间不足时，模式确认说明和操作在模式标签下方换行。
+
 -----
 
 <a id="understand-the-implementation"></a>

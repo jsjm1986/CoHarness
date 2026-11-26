@@ -4,11 +4,12 @@ import type { ReactNode, RefObject } from 'react'
 import clsx from 'clsx'
 import type { DockIntents } from '../contract/adapter.ts'
 import type { LayoutState, PaneNode, TabId, TabRecord } from '../contract/types.ts'
-import { findTabPane, floatRect, getNode, getPane } from '../engine/tree.ts'
+import { findTabPane, getNode, getPane } from '../engine/tree.ts'
 import type { SizePreview } from './PaneTree.tsx'
 import type { PaneCallbacks } from './render.ts'
-import { FloatHeader, useFloatGestures } from './FloatLayer.tsx'
+import { FloatHeader, FloatResize, useFloatGestures } from './FloatLayer.tsx'
 import { PaneDropHints, TabPanel, TabStrip } from './TabPanel.tsx'
+import { SplitDivider } from './SplitDivider.tsx'
 import css from './dockkit.module.css'
 
 /** Host policy for lazily retaining a tab body without reparenting it. */
@@ -56,11 +57,15 @@ function TabHost({ state, callbacks, intents, tab, pane, column, floats, focusRe
     focusRequest.current = undefined
     // Preserve deliberate focus taken by another control or the newly shown body.
     if (focused !== null && focused !== document.body && focused !== document.documentElement && focused !== request.origin) return
+    if (floating) {
+      section.querySelector<HTMLElement>('[data-dockkit-float-grip]')?.focus({ preventScroll: true })
+      return
+    }
     const strip = section.querySelector('[data-dockkit-strip]')
     const chip = [...strip?.querySelectorAll<HTMLElement>('[data-dockkit-tab]') ?? []]
       .find(element => element.dataset.dockkitTab === tab.id)
     chip?.focus({ preventScroll: true })
-  }, [visible, tab.id, focusRequest])
+  }, [visible, tab.id, floating, pane.id, state, focusRequest])
   // Electron emits a non-bubbling focus event on the webview element.
   useEffect(() => {
     const element = body.current as HTMLDivElement
@@ -73,7 +78,7 @@ function TabHost({ state, callbacks, intents, tab, pane, column, floats, focusRe
     return () => { element.removeEventListener('focus', focus, true) }
   }, [visible, floating, floats, pane.id, state.activePaneId, callbacks])
   const lifted = floating && floats.preview?.paneId === pane.id ? floats.preview.rect : undefined
-  const rect = floating ? lifted ?? floatRect(pane) : undefined
+  const rect = floating ? floats.rect(pane.id) : undefined
   const depth = lifted === undefined ? state.floats.indexOf(pane.id) + 1 : state.floats.length + 1
   return (
     <div className={clsx(css.tabCell, floating && css.floatingCell)} hidden={!selected}
@@ -95,15 +100,18 @@ function TabHost({ state, callbacks, intents, tab, pane, column, floats, focusRe
         <div className={css.tabHostHeader}>
           {selected && (floating
             ? <FloatHeader paneId={pane.id} tab={tab} labels={callbacks.labels} intents={intents}
-              renderTabTitle={callbacks.renderTabTitle} canCloseTab={callbacks.canCloseTab} drag={floats.drag} />
+              onDock={() => {
+                focusRequest.current = { tabId: tab.id, origin: document.activeElement }
+                intents.unfloatPane(pane.id)
+              }}
+              renderTabTitle={callbacks.renderTabTitle} canCloseTab={callbacks.canCloseTab} gestures={floats} />
             : <TabStrip state={state} pane={pane} callbacks={callbacks} />)}
         </div>
         <div ref={body} className={clsx(css.tabHostBody, floating ? css.floatBody : css.paneBody)}>
           {visited && (retained || (active && selected)) ? callbacks.renderTab(tab) : null}
           {!floating && <PaneDropHints pane={pane} callbacks={callbacks} />}
         </div>
-        {floating && <div className={css.floatResize} data-dockkit-float-resize={pane.id}
-          onPointerDown={(event) => { floats.drag('resize', pane.id, event) }} />}
+        {floating && <FloatResize paneId={pane.id} labels={callbacks.labels} gestures={floats} />}
       </section>
     </div>
   )
@@ -120,6 +128,14 @@ export function TabLayout(props: LayoutProps): ReactNode {
   const focusRequest = useRef<{ readonly tabId: TabId; readonly origin: Element | null } | undefined>(undefined)
   const tabCallbacks: PaneCallbacks = {
     ...callbacks,
+    onPlaceTab: (tabId, paneId, index) => {
+      focusRequest.current = { tabId, origin: document.activeElement }
+      callbacks.onPlaceTab(tabId, paneId, index)
+    },
+    onFloatTab: (tabId) => {
+      focusRequest.current = { tabId, origin: document.activeElement }
+      callbacks.onFloatTab(tabId)
+    },
     onFocusTab: (tabId) => {
       // Only changing the selected body replaces its strip; pane-only focus does not.
       focusRequest.current = findTabPane(state, tabId).activeTabId === tabId
@@ -149,9 +165,8 @@ export function TabLayout(props: LayoutProps): ReactNode {
           <TabPanel state={state} pane={pane} callbacks={callbacks} />
         </div>
       ))}
-      {root.kind === 'split' && <div className={clsx(css.divider, css.tabLayoutDivider)}
-        data-dockkit-divider={`${root.id}:0`} style={{ gridColumn: 2, gridRow: 1 }}
-        onPointerDown={(event) => { callbacks.onDividerPressed(root.id, 0, event) }} />}
+      {root.kind === 'split' && <SplitDivider split={root} sizes={sizes} index={0} callbacks={callbacks}
+        className={css.tabLayoutDivider} style={{ gridColumn: 2, gridRow: 1 }} />}
     </div>
   )
 }

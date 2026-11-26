@@ -33,3 +33,12 @@
 @media (prefers-reduced-motion: reduce) {
   .root, .header { transition: none; }
 }
+
+@media (pointer: coarse) {
+  .header { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
+}
+
+:global([data-viewport='compact']) .header {
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
+}

@@ -18,6 +18,12 @@ import type { QueuedInboxItem, ToolEventView } from './events.ts'
 import type { WorkspaceId, WorkspaceView } from './workspace.ts'
 import type { UserDocIdType, UserDocPromptAttachment } from '@deepseek-ai/dsh-userdoc'
 
+/** Timing category for a Host's durable prompt admission. */
+export type PromptAdmissionPhase = 'sessionAuthority' | 'agentReadiness' | 'admissionWait' | 'executionStamp'
+  | 'inboxAppend' | 'inboxPublish' | 'inboxWake' | 'flushReceipt' | 'readReceipt'
+/** Host carrier observer receiving elapsed milliseconds for completed admission phases. */
+export type PromptAdmissionObserver = (phase: PromptAdmissionPhase, durationMs: number) => void
+
 /** Durable attribution for one authenticated human prompt in a shared project. */
 export interface AuthenticatedParticipant {
   userId: number
@@ -131,6 +137,10 @@ export interface HistoryOmittedSpan {
 
 /** A read-authorized conversation page and its matching projection and omission cursors. */
 export interface SessionHistoryPage {
+  /** The exact historical target is readable but cannot resume its prior execution. */
+  executionRestriction?: 'recovery-read-only'
+  /** The owning Host can restore this active personal root before the Session directory loads. */
+  restoredSelection?: SessionSummary
   events: HistoryEntry[]
   hasMore: boolean
   projections?: SessionProjectionsBlock
@@ -292,6 +302,8 @@ export type QueueAction =
 /** One Session list entry. */
 export interface SessionSummary {
   sessionId: SessionId
+  /** Restored history stays readable while its old inbox and execution remain suspended. */
+  executionRestriction?: 'recovery-read-only'
   /**
    * The later of creation and the latest human-authored prompt. Attached
    * Sessions fold their live log; cold Sessions use a projection-cache hint or
@@ -459,6 +471,8 @@ export interface SessionsApi {
     sessionId: SessionId
     /** Require a currently openable conversation when preparing a pane. */
     onlyActive?: true
+    /** Request the current root's selection metadata with an active conversation tail. */
+    restoreSelection?: true
     toolCallId?: ToolCallId
     beforeSeq?: number
     maxMessages?: number
@@ -536,6 +550,9 @@ export interface SessionsApi {
    * the Host validates, canonicalizes, and records it on that exact user message. Omission remains
    * valid for non-browser callers. Session-backed subagents reject with `agent-busy` and use
    * the `subagents/prompt` Remote.
+   * @param request - authorized Session's exact prompt, carrier identity, and receipt option.
+   * @param observe - optional metadata-only observer owned by the Host carrier.
+   * @returns the prompt acceptance or a refusal with no new acceptance receipt.
    */
   prompt(request: RpcRequest<{
     sessionId: SessionId
@@ -546,7 +563,7 @@ export interface SessionsApi {
     requestId?: RpcId
     /** Require a recoverable, durably flushed admission receipt. */
     durable?: true
-  }>):
+  }>, observe?: PromptAdmissionObserver):
   Promise<RpcResponse<{ accepted: true }>>
 
   /** Read an original submitter's committed acceptance. With confirmInput, return the salted proof for this exact request. */

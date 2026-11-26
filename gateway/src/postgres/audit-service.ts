@@ -1,5 +1,6 @@
 import { isIP } from 'node:net'
 import { auditOutcome, type AuditFamily, type AuditQueryFilter, type AuditRow } from '../audit.ts'
+import type { Queryable } from './database.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 const MAX_LIMIT = 500
@@ -59,6 +60,10 @@ function whereClauses(filter: AuditQueryFilter, organizationId: string): { claus
 export class PostgresAuditService {
   constructor(private readonly context: PostgresRuntimeContext) {}
 
+  /**
+   * @param entry - audit event issued by the organization.
+   * @param database - transaction executor for an atomic mutation, or the organization pool when omitted.
+   */
   async write(entry: {
     userId?: number
     action: string
@@ -66,8 +71,8 @@ export class PostgresAuditService {
     status?: number
     ip?: string
     detail?: string
-  }): Promise<void> {
-    await this.context.pool.query(`INSERT INTO harness.audit_events(
+  }, database: Queryable = this.context.pool): Promise<void> {
+    await database.query(`INSERT INTO harness.audit_events(
       organization_id,actor_user_id,action,resource_type,source_ip,outcome,status_code,detail
     ) VALUES($1,(SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2),$3,$4,$5,$6,$7,$8::jsonb)`, [
       this.context.organizationId,

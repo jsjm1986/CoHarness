@@ -508,6 +508,7 @@ describe('workspace browser rows', () => {
 
       if (trigger === 'hover') fireEvent.mouseLeave(create, { relatedTarget: row })
       else fireEvent.blur(create, { relatedTarget: row })
+      act(() => { vi.advanceTimersByTime(200) })
       expect(screen.queryByRole('tooltip')).toBeNull()
       expect(screen.getByText('/projects/project')).toBeTruthy()
     } finally {
@@ -532,6 +533,7 @@ describe('workspace browser rows', () => {
       expect(screen.queryByText('/projects/project')).toBeNull()
 
       fireEvent.mouseLeave(create, { relatedTarget: row })
+      act(() => { vi.advanceTimersByTime(200) })
       expect(screen.queryByRole('tooltip')).toBeNull()
       expect(screen.getByText('/projects/project')).toBeTruthy()
     } finally {

@@ -23,6 +23,8 @@ A `script-preload` row adds an advisory classic-script preload to the head. Its 
 
 `renderIndex(html, request?)` and `collectIndexInjections(request?)` forward the exact index request to `webserver/index-inject` listeners. Without a request, listeners collect only request-independent rows, as used by static workers. The caller authenticates an index before rendering; collecting rows neither admits a request nor installs a Connection request context.
 
+`registerRequestGuard(guard)` installs a synchronous HTTP check before named routes and fallback dispatch. Guards run in registration order; returning false transfers response ownership to that guard and skips later guards and handlers. The returned disposer removes the check. Upgrade admission remains with upgrade-route owners. The carrier supplies no authentication or origin policy of its own.
+
 ## Summary
 
 Browsers reach the web GUI over HTTP through `dsh-host-webserver`: a `node:http` server — `node:https` once `tls` names a certificate and key — where other plugins register named routes, upgrade routes, index startup inputs, and one fallback handler. It knows no harness concepts and serves no files — the `/api` bridge, plugin bundles, the HMR event stream, and the SPA dist belong to the plugins that register them. Route matching is fixed: exact over the whole table, then longest prefix, then the fallback handler. It serves browsers only; Electron loads dist over `file://` and carries fetch over an IPC bridge.

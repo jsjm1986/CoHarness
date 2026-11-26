@@ -135,9 +135,9 @@
   border-radius: var(--dsw-radius-chip);
   background: transparent;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 400;
-  line-height: 20px;
+  line-height: 1.25rem;
   color: var(--dsw-alias-label-primary);
   text-align: left;
   transition: background-color var(--dsw-motion-duration-micro, 0.14s)
@@ -182,8 +182,8 @@
   gap: 6px;
   padding: 3px 7px;
   border-radius: 5px;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .compactList .itemIcon {
@@ -197,8 +197,8 @@
 
 .compactList .label {
   padding: var(--dsw-space-1) 7px;
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.6875rem;
+  line-height: 1rem;
 }
 
 .item:disabled {
@@ -206,16 +206,12 @@
   cursor: not-allowed;
 }
 
-/* Coarse pointers: rows grow to the shared touch target; the dense/compact
-   variants keep a reduced but still tappable height. */
+/* Density changes typography and spacing, not the coarse-pointer target. */
 @media (pointer: coarse) {
-  .item {
-    min-height: var(--dsw-touch-target);
-  }
-
+  .item,
   .denseList .item,
   .compactList .item {
-    min-height: 40px;
+    min-height: var(--dsw-touch-target);
   }
 
   /* Touch-primary devices carry no keyboard; accelerator hints are noise. */
@@ -240,9 +236,9 @@
 }
 
 .shortcut .shortcutKeys {
-  color: var(--dsw-alias-label-caption);
-  font-size: 11px;
-  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 0.6875rem;
+  line-height: 1rem;
 }
 
 .itemLabel {
@@ -290,8 +286,8 @@
 /* Heading row: non-interactive small grey text, padding aligned with items. */
 .label {
   padding: var(--dsw-space-2) 10px;
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 0.75rem;
+  line-height: 1rem;
   color: var(--dsw-alias-label-tertiary);
 }
 
@@ -438,4 +434,10 @@
     animation: none;
     transition: none;
   }
+}
+
+@media (forced-colors: active) {
+  .item:focus-visible:not(:disabled),
+  .danger:focus-visible:not(:disabled) { outline: 2px solid Highlight; outline-offset: -2px; }
+  .selectedFill { border: 1px solid CanvasText; }
 }

@@ -10,7 +10,10 @@ import { WorkspaceRuntime } from '../src/client/workspaces/service.ts'
 import type { WorkspaceArchiveSnapshot } from '../src/client/workspaces/manager.ts'
 import { WorkspaceResourceRegistry, workspaceResourceAddress } from '../src/client/workspace-resources.ts'
 import { PermissionCatalogDirectory } from '../src/client/permission-catalog.ts'
+import { DeploymentContextRuntime } from '../src/client/deployment-context.ts'
+import { ProjectUiPolicyRuntime } from '../src/client/project-policy.ts'
 import { createSnapshotStore } from '../src/client/contract/store.ts'
+import type { SessionRuntimeTarget } from '../src/client/contract/sessions.ts'
 import type { WorkspaceResourceTarget } from '../src/client/workspace-resources.ts'
 import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
 
@@ -32,6 +35,55 @@ function connection(api: FakeApiClient, onStart?: (sinks: Parameters<ConnectionH
 }
 
 describe('SessionRuntimePool', () => {
+  it('uses the verified computer for browser submissions after a Host handshake omits it', async () => {
+    const ctx = new Context()
+    await ctx.plugin(() => {}).await()
+    const api = new FakeApiClient(), handle = connection(api)
+    const account = new ProjectUiPolicyRuntime()
+    account.setVerifiedAccountId(7)
+    const entry = { nodeId: '10000000-0000-4000-8000-000000000006', name: 'Primary' } as NonNullable<ReturnType<DeploymentContextRuntime['getSnapshot']>['context']>['entry']
+    const deployment = new DeploymentContextRuntime(handle.metadataTiming)
+    vi.spyOn(deployment, 'getSnapshot').mockReturnValue({ phase: 'ready', showComputer: true, aggregateComputers: true,
+      context: { mode: 'multi', revision: '1', entry, primary: { ...entry, origin: 'https://harness.invalid' }, scope: 'organization',
+        role: 'primary', refreshAfterMs: 30000, legacyMigrationRequired: false } })
+    ctx.reflect.provide('connection', handle, undefined)
+    ctx.reflect.provide('projectUiPolicy', account, undefined)
+    ctx.reflect.provide('deploymentContext', deployment, undefined)
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, handle, fakeRemote())
+    const bare = { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000009' } as SessionRuntimeTarget
+    const located = { ...bare, nodeId: '10000000-0000-4000-8000-000000000008' } as SessionRuntimeTarget
+    const slots = new Map<string, string>()
+    vi.stubGlobal('location', new URL('https://harness.invalid/'))
+    vi.stubGlobal('sessionStorage', { getItem: (key: string) => slots.get(key) ?? null,
+      setItem: (key: string, value: string) => { slots.set(key, value) }, removeItem: (key: string) => { slots.delete(key) } })
+    const send = vi.fn(async (url: URL, init: RequestInit) => {
+      expect(url.searchParams.get('dshNode')).toBe(located.nodeId)
+      if (typeof init.body !== 'string') throw new Error('Expected a JSON request body')
+      const { rpcId } = JSON.parse(init.body) as { rpcId: string }
+      return Response.json({ type: 'server-response', rpcId, result: { ok: true, value: { accepted: true } } },
+        { headers: { 'x-dsh-runtime-id': bare.runtimeId! } })
+    })
+    vi.stubGlobal('fetch', send)
+    try {
+      pool.setBaseRuntimeTarget(bare)
+      const id = 'retained-personal-chat' as SessionId
+      api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+      await base.refresh()
+      const reference = pool.retain(pool.keyFor(id), { source: 'controllerOperation' })
+      try {
+        await reference.ready
+        pool.setBaseRuntimeTarget(located)
+        pool.setBaseRuntimeTarget(bare)
+        expect((await reference.binding.session.prompt([{ type: 'text', text: 'queued from the same tab' }], 'queue')).ok).toBe(true)
+        expect(send).toHaveBeenCalledOnce()
+      } finally { reference.release() }
+    } finally {
+      await ctx.fiber.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('reuses a verified Runtime list when another directory publication leaves its source and target unchanged', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
@@ -52,6 +104,24 @@ describe('SessionRuntimePool', () => {
       expect(pool.list.getSnapshot().ids).toContain(pool.keyFor(id))
       pool.setBaseRuntimeTarget({ kind: 'project', projectId: 8, projectName: 'Next' })
       expect(keys.mock.calls.length).toBeGreaterThan(reads)
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('keeps directory snapshots when clearing an already empty workbench', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const id = 'empty-workbench-directory' as SessionId
+    api.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    const base = new SessionRuntime(ctx, api, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(api), fakeRemote())
+    try {
+      await base.refresh()
+      const aggregate = pool.list.getSnapshot()
+      const scope = pool.currentScopeList.getSnapshot()
+      expect(aggregate.ids).toContain(pool.keyFor(id))
+      pool.setAdditionalStaged([])
+      expect(pool.list.getSnapshot()).toBe(aggregate)
+      expect(pool.currentScopeList.getSnapshot()).toBe(scope)
     } finally { await ctx.fiber.dispose() }
   })
 
@@ -855,6 +925,50 @@ describe('SessionRuntimePool', () => {
     ])
     expect(result.ok && result.value.hasMore).toBe(true)
   })
+
+  it.each(['failure', 'cancel'] as const)('publishes a fast computer before a delayed %s without opening other Runtimes', async (outcome) => {
+    const ctx = new Context(), baseApi = new FakeApiClient(), remoteApi = new FakeApiClient()
+    const id = 'same-hit' as SessionId, target = { kind: 'project' as const, projectId: 7, nodeName: 'Slow computer' }
+    const held = deferred<Awaited<ReturnType<FakeApiClient['onSearch']>>>()
+    baseApi.onSearch = async () => ok({ items: [{ sessionId: id, snippet: 'fast' }], hasMore: false })
+    remoteApi.onSearch = () => held.promise
+    remoteApi.onList = async () => ok({ items: [{ sessionId: id, updatedAt: 1, running: false, blank: false }] })
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const forTarget = vi.fn(() => connection(remoteApi, (sinks) =>{  queueMicrotask(() => sinks.onConnected?.({
+      version: 'test', cwd: '/project', home: '/home', canOpenPath: false, attachedSessions: 0,
+    })) }))
+    const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget }, fakeRemote())
+    const controller = new AbortController(), progress = vi.fn()
+    let work: ReturnType<typeof pool.search> | undefined
+    try {
+      await pool.ensureSession(target, id)
+      const opened = forTarget.mock.calls.length
+      work = pool.search('hit', controller.signal, progress)
+      const settled = work.catch((error: unknown) => error)
+      await vi.waitFor(() => { expect(progress).toHaveBeenLastCalledWith({ items: [
+        { sessionId: clientSessionKey({ kind: 'personal' }, id), snippet: 'fast' },
+      ], hasMore: false, targets: [
+        { runtime: { kind: 'personal' }, status: 'ready' }, { runtime: target, status: 'pending' },
+      ] }) })
+      expect(forTarget).toHaveBeenCalledTimes(opened)
+      const count = progress.mock.calls.length
+      if (outcome === 'cancel') controller.abort(new Error('Superseded query'))
+      held.resolve(err({ code: 'internal', message: 'Offline computer', details: {} }))
+      const result = await settled
+      if (outcome === 'cancel') {
+        expect(result).toBeInstanceOf(Error)
+        expect(progress).toHaveBeenCalledTimes(count)
+      } else {
+        expect(result).toMatchObject({ ok: true, value: { items: [{ snippet: 'fast' }] } })
+        expect(progress.mock.calls.at(-1)?.[0]).toMatchObject({ targets: [{ status: 'ready' }, { status: 'error' }] })
+      }
+    } finally {
+      controller.abort()
+      held.resolve(ok({ items: [], hasMore: false }))
+      await work?.catch(() => {})
+      await ctx.fiber.dispose()
+    }
+  })
 })
 
 describe('SessionRuntimePool Workspace resources', () => {
@@ -1061,4 +1175,41 @@ it('forwards pooled job reads and kills to the owner runtime under the original 
     await vi.waitFor(() => { expect(pool.list.getSnapshot().observedJobs['project:7:bash-1']).toBeDefined() })
     expect(pool.list.getSnapshot().observedJobs['bash-1']).toBeUndefined()
   } finally { await ctx.fiber.dispose() }
+})
+
+it('starts workspace.list concurrently with session.list when a target runtime connects', async () => {
+  const ctx = new Context()
+  const baseApi = new FakeApiClient()
+  const projectApi = new FakeApiClient()
+  const listGate = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
+  const workspaceGate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+  projectApi.onList = () => listGate.promise
+  projectApi.onWorkspaceList = () => workspaceGate.promise
+  const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+  const targetConnection = connection(projectApi, (sinks) => {
+    queueMicrotask(() => sinks.onConnected?.({
+      version: 'test', cwd: '/projects/parallel', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+    }))
+  })
+  const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => targetConnection }, fakeRemote())
+  try {
+    const target = { kind: 'project' as const, projectId: 19 }
+    const ready = pool.prepareRuntime(target, new AbortController().signal)
+    await vi.waitFor(() => {
+      expect(projectApi.callsOf('session.list')).toHaveLength(1)
+      // Workspace baseline starts immediately without waiting for session.list to settle.
+      expect(projectApi.callsOf('workspace.list')).toHaveLength(1)
+    })
+    listGate.resolve(ok({ items: [{ sessionId: 's-parallel' as SessionId, updatedAt: 1, running: false, blank: false }] }))
+    await ready
+    workspaceGate.resolve(ok({ items: [], archivedSessionIds: ['s-parallel' as SessionId] }))
+    await vi.waitFor(() => {
+      const key = clientSessionKey(target, 's-parallel' as SessionId)
+      expect(pool.list.getSnapshot().archivedById[key]?.id).toBe(key)
+    })
+  } finally {
+    listGate.resolve(ok({ items: [] }))
+    workspaceGate.resolve(ok({ items: [] }))
+    await ctx.fiber.dispose()
+  }
 })

@@ -1,0 +1,16 @@
+- heading "Personal documents" [level=3]
+- button "Back"
+- navigation "Document path":
+  - button "Root folder"
+  - img
+  - button "u01-upload-success" [disabled]
+- group "Document actions":
+  - button "New Folder":
+    - img
+    - text: New Folder
+  - button "Upload Document":
+    - img
+    - text: Upload Document
+  - button "More actions":
+    - img
+- paragraph: No documents uploaded yet

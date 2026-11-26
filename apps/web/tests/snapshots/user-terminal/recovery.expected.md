@@ -1,0 +1,3 @@
+- button "Retry terminal recovery":
+  - img
+  - text: Retry terminal recovery

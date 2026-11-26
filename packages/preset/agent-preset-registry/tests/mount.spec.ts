@@ -6,7 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import Group from '@deepseek-ai/cordis-plugin-group'
-import { PluginPackages } from '@deepseek-ai/dsh-app-boot'
+import { PluginPackages, inspectRecoveryComposition, installRecoveryPolicy, readRecoveryPresetEntries } from '@deepseek-ai/dsh-app-boot'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -106,6 +106,30 @@ afterEach(async () => {
 })
 
 describe('composing an agent from a preset', () => {
+  it('checks file-backed recovery presets before importing unreviewed rows', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-preset-recovery-'))
+    roots.push(root)
+    const presetDir = join(root, 'recovery')
+    await mkdir(presetDir)
+    const plugin = join(FIXTURES, 'plugins', 'contribute.js')
+    const denied = join(root, 'unreviewed.mjs')
+    await writeFile(denied, 'throw new Error("unreviewed preset imported")')
+    const file = join(presetDir, COMPOSITION_FILE)
+    await writeFile(file, JSON.stringify([{ id: 'safe', name: pathToFileURL(plugin).href, config: { tool: 'reviewed' } },
+      { id: 'unknown', name: pathToFileURL(denied).href }]))
+    const scoped = await harness({ default: 'recovery', roots: [{ path: root, trust: 'user' }], includeUserRoot: false })
+    const rows = readRecoveryPresetEntries(file)
+    const inspected = inspectRecoveryComposition({ entries: rows, trustedEntries: [rows[0]!], parentURL: pathToFileURL(file).href,
+      resolveTrustedModule: () => plugin })
+    installRecoveryPolicy(scoped, { version: 1, mode: 'new-conversations-only', operationId: 'restore', pointId: 'point',
+      runtimeId: 'runtime', nodeId: 'node', writerEpoch: '2', reviewRevision: '00000000-0000-4000-8000-000000000001', oldSessionIds: [],
+      approvedItems: [], composition: inspected.composition, compositionDigest: inspected.compositionDigest }, () => {})
+    const original = await readFile(file, 'utf8')
+    const agent = await agentOn(scoped, 'new-recovery-session')
+    expect(toolNames(scoped, agent)).toEqual(['reviewed'])
+    expect(await readFile(file, 'utf8')).toBe(original)
+  })
+
   it('hands an absolute plugin path to Node as a file URL', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-preset-absolute-plugin-'))
     roots.push(root)

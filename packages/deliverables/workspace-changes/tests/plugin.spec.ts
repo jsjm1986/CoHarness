@@ -578,6 +578,7 @@ describe('workspace-changes without a repository', () => {
 describe('workspace-changes without git', () => {
   it.each([true, false])('retries a failed developer-tools probe on an explicit later request, same Session: %s', async (sameSession) => {
     const cwd = await scratchDir('dsh-review-probe-recovery-', cleanups)
+    await mkdir(join(cwd, '.git'))
     const { ctx } = await boot()
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
@@ -650,6 +651,7 @@ describe('workspace-changes without git', () => {
     for (const probe of probes) {
       probe.done.catch(() => undefined)
       const cwd = await scratchDir('dsh-workspace-changes-stub-', cleanups)
+      await mkdir(join(cwd, '.git'))
       const { ctx } = await boot()
       vi.spyOn(ctx.subprocess, 'resolveExecutable').mockResolvedValue(probe.executable ?? '/usr/bin/git')
       const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(async spec =>

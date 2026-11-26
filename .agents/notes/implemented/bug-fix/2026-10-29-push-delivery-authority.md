@@ -30,7 +30,9 @@ The [Android shell decision](../feature/2026-08-17-android-remote-web-fcm-notifi
 
 ## Consequences
 
-Deployment controls the attempt deadline and pending lease through the [Gateway configuration](../../../../gateway/README.md). Existing database columns and device API fields remain sufficient for the claim rules themselves; [device-reported outcome receipts](../feature/2026-11-19-push-delivery-outcome-receipts.md) later added `provider_msg_id`, `delivered_at` and `opened_at` alongside them. Sent claims are durable deduplication records; failed and expired claims are retryable when another notification callback occurs. No background retry or remote exactly-once guarantee is added.
+Deployment controls the attempt deadline and pending lease through the [Gateway configuration](../../../../gateway/README.md). Sent claims are durable deduplication records; failed and expired claims are retryable when another notification callback occurs. Provider acceptance remains uncertain after a lost response.
+
+[Device-reported outcome receipts](../feature/2026-11-19-push-delivery-outcome-receipts.md) bind the registered device and its original recipient to the exact Runtime and Session. A legacy receipt without a Runtime is accepted only for a unique matching delivery. The UnifiedPush HTTP client requires configured HTTPS endpoints and refuses HTTP redirects.
 
 ## Verification
 

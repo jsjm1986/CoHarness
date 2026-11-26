@@ -1,7 +1,26 @@
 /** Real pg.Pool scheduling driven by fixture-owned clients without a database socket. */
 import { Client, type Pool, type QueryResult } from 'pg'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { connectFromPool, createPostgresPool, poolAdmissionSnapshot, transaction } from '../src/postgres/database.ts'
+import { connectFromPool, createPostgresPool, databaseControlUrl, poolAdmissionSnapshot, transaction } from '../src/postgres/database.ts'
+
+describe('independent PostgreSQL control forward', () => {
+  const business = 'postgresql://fixture:encoded%40value@127.0.0.1:15432/fixture?sslmode=disable'
+
+  it('keeps the database, role and connection options when using a dedicated port', () => {
+    expect(databaseControlUrl(business, undefined)).toBe(business)
+    expect(databaseControlUrl(business, '15433')).toBe(
+      'postgresql://fixture:encoded%40value@127.0.0.1:15433/fixture?sslmode=disable',
+    )
+  })
+
+  it('rejects a shared port and endpoints that can override loopback routing', () => {
+    expect(() => databaseControlUrl(business, '15432')).toThrow('must differ')
+    expect(() => databaseControlUrl(business, '65536')).toThrow('TCP port')
+    expect(() => databaseControlUrl('postgresql://database.invalid/fixture', '15433')).toThrow('loopback')
+    expect(() => databaseControlUrl(business + '&host=%2Fvar%2Frun%2Fpostgresql', '15433')).toThrow('loopback')
+    expect(() => databaseControlUrl(business + '&port=15432', '15433')).toThrow('loopback')
+  })
+})
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {

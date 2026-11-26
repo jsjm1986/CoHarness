@@ -342,27 +342,47 @@ describePg('PostgreSQL steward space', () => {
     expect(mirror.rows.some(row => row.outcome === 'success')).toBe(true)
   })
 
+  it('executes a read-only CTE and requires exact one-use approval for a modifying CTE', async () => {
+    const subject = { organizationId, projectInternalId: stewardInternalId, runtimeId: stewardRuntimeId, generation: 1 }
+    const read = await stewardQueries.query(subject, { sql: 'WITH t AS (SELECT 1 AS one) SELECT * FROM t',
+      dryRun: false, rowLimit: 5 })
+    expect(read).toMatchObject({ classification: 'read', rows: [{ one: 1 }] })
+
+    const write = {
+      sql: 'WITH changed AS (UPDATE harness.projects SET name=name WHERE false RETURNING id) SELECT * FROM changed',
+      dryRun: false,
+      rowLimit: 5,
+    }
+    await expect(stewardQueries.query(subject, write)).rejects.toMatchObject({ status: 403, code: 'steward-approval-required' })
+    const session = await addConversation(stewardInternalId, admin.id, 'project')
+    const approvalId = await addApproval(session, admin.id, write.sql)
+    await expect(stewardQueries.query(subject, { ...write, approvalId })).resolves.toMatchObject({ classification: 'write', rowCount: 0 })
+    await expect(stewardQueries.query(subject, { ...write, approvalId }))
+      .rejects.toMatchObject({ status: 403, code: 'steward-approval-invalid' })
+  })
+
   it('lets Postgres enforce read-only execution beyond the keyword classifier', async () => {
     const subject = { organizationId, projectInternalId: stewardInternalId, runtimeId: stewardRuntimeId, generation: 1 }
-    // Data-modifying CTEs and EXPLAIN ANALYZE pass the leading-keyword test;
-    // the READ ONLY transaction rejects them at execution and journals 'error'.
     await expect(stewardQueries.query(subject, {
       sql: `WITH d AS (DELETE FROM harness.projects WHERE false RETURNING id) SELECT id FROM d`,
       dryRun: false, rowLimit: 500,
-    })).rejects.toThrow(/read-only transaction/)
+    })).rejects.toMatchObject({ status: 403, code: 'steward-approval-required' })
     await expect(stewardQueries.query(subject, {
       sql: 'EXPLAIN ANALYZE UPDATE harness.projects SET name=name WHERE false', dryRun: false, rowLimit: 500,
+    })).rejects.toMatchObject({ status: 403, code: 'steward-approval-required' })
+    await expect(stewardQueries.query(subject, {
+      sql: 'SELECT id FROM harness.projects WHERE false FOR UPDATE', dryRun: false, rowLimit: 500,
     })).rejects.toThrow(/read-only transaction/)
 
     const journal = await pool.query<{ count: string }>(
       `SELECT COUNT(*)::text count FROM harness.steward_query_log
       WHERE organization_id=$1 AND classification='read' AND status='error'`, [organizationId])
-    expect(Number(journal.rows[0]!.count)).toBe(2)
+    expect(Number(journal.rows[0]!.count)).toBe(1)
   })
 
   it('denies read-lane statements that call session-escaping functions', async () => {
     const subject = { organizationId, projectInternalId: stewardInternalId, runtimeId: stewardRuntimeId, generation: 1 }
-    for (const sql of [
+    const deniedStatements = [
       `SELECT set_config('search_path','public',false)`,
       'SELECT pg_terminate_backend(1)',
       'SELECT pg_cancel_backend(1)',
@@ -370,7 +390,11 @@ describePg('PostgreSQL steward space', () => {
       'SELECT pg_sleep(60)',
       "SELECT pg_read_file('/etc/passwd')",
       "SELECT * FROM dblink('dbname=x','SELECT 1') AS d(v int)",
-    ]) {
+      "SELECT '/* ', pg_sleep(60), ' */'",
+      "SELECT E'\\'', pg_sleep(60), ''",
+      'SELECT U&"pg_\\0073leep"(60)',
+    ]
+    for (const sql of deniedStatements) {
       await expect(stewardQueries.query(subject, { sql, dryRun: false, rowLimit: 1 }))
         .rejects.toMatchObject({ status: 403, code: 'steward-statement-forbidden' })
     }
@@ -383,7 +407,7 @@ describePg('PostgreSQL steward space', () => {
     const journal = await pool.query<{ count: string }>(
       `SELECT COUNT(*)::text count FROM harness.steward_query_log
       WHERE organization_id=$1 AND status='denied' AND error='statement-forbidden'`, [organizationId])
-    expect(Number(journal.rows[0]!.count)).toBe(7)
+    expect(Number(journal.rows[0]!.count)).toBe(deniedStatements.length)
   })
 
   it('keeps dry-run EXPLAIN pinned to planning: option tricks and the deny-list still apply', async () => {

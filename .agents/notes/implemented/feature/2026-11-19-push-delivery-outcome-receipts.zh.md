@@ -13,8 +13,8 @@
 在[推送投递权威](../bug-fix/2026-10-29-push-delivery-authority.zh.md)之上扩展设备上报结果，保留既有 claim/fence 模型不变：
 
 - 迁移为 `harness.push_deliveries` 增加 `provider_msg_id`、`delivered_at`、`opened_at`。发送端返回运营商消息 id(JPush `msg_id`、FCM `name`)，`notifyCompleted` 在落 `sent` claim 时一并持久化，用于关联。
-- `POST /account/api/push-receipts` 接收 `{provider, token, sessionId, eventSeq, kind}`，`kind` 为 `arrived` 或 `opened`。`recordReceipt` 复核活跃账户，按组织、provider、token、用户解析自有设备，然后给匹配投递打时间戳：`arrived` 写 `delivered_at`;`opened` 写 `opened_at` 并回填 `delivered_at`。同一投递的重复回执幂等；不属该用户或未知目标返回 `missing` → HTTP 404。
-- `GET /account/api/push-devices` 列出当前账户的设备及每台设备最近一次投递；`GET /admin/api/push/overview` 返回全组织设备、最近 200 条投递、按状态与 provider 的聚合计数。
+- `POST /account/api/push-receipts` 接收 `{provider, token, runtimeId?, sessionId, eventSeq, kind}`，结果为 `arrived` 或 `opened`。服务核验活跃账户、登记的设备及 Session 的原创建者。旧客户端省略 Runtime 时，须唯一匹配该账户的投递。到达和打开时间戳均幂等。未知、匹配不唯一或不属于该账户的投递返回 HTTP 404。
+- `GET /account/api/push-devices` 包含每台设备最近一次属于该账户的投递。`GET /admin/api/push/overview` 返回组织设备、最近 200 条投递及状态和服务方计数。
 - Android 壳在 `CoHarnessPushReceiver` 上报两种信号：`onNotifyMessageArrived` 发 `arrived`,`onNotifyMessageOpened` 在既有 [runtimeId 点击桥](../bug-fix/2026-11-19-android-push-bridge-runtimeid-contract.zh.md)之前发 `opened`。`PushReceiptReporter` 在后台线程携带 WebView `CookieManager` 会话 cookie，向 `BuildConfig.PUSH_GATEWAY_ORIGIN`（由 `DSH_ANDROID_WEB_URL` 注入）发送；畸形 extras、缺失或非数字 `eventSeq`、空 token 一律静默丢弃。
 - `NativePushStatusPlugin.getPushStatus()` 通过 `apps/web/src/native-push.ts` 的 `getNativePushStatus()` 向被封装的 web 应用暴露 provider 配置、JPush 同意/初始化、系统通知开关与 JPush registration id。
 
@@ -23,7 +23,7 @@
 - `sent` 现在精确表示运营商受理；`delivered_at` 与 `opened_at` 是仅有的设备真实信号。投递合法地永远停在 `sent` 而无 `delivered_at`（厂商通道被杀死、设备离线、JPush 未配置）。
 - 回执上报是尽力而为且不阻塞：传输失败、缺少会话 cookie 或 WebView 未登录会丢失该回执，但不影响通知展示或点击路由。不加重试/外发队列，与壳的既有异步追加窗口一致。
 - 诊断构建（`NATIVE_PUSH_ENABLED=false`）从不上报回执，`getPushStatus` 报告未配置。
-- 目前只有 JPush 产生回执；FCM 路径注册设备但未接入原生到达/打开回调，在补齐之前 FCM 投递不会越过 `sent`。
+- Android 上的 JPush 和 UnifiedPush 上报到达与打开。FCM 保留服务方受理记录。
 
 ## 备选方案
 

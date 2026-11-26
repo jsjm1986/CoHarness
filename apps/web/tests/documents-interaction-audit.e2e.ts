@@ -1,9 +1,14 @@
 /** Read-only document UI journeys through the assembled Web app. */
+import { responsiveBrowser, responsiveBrowserName, responsiveMobileEmulation, responsiveViewports } from './responsive-browser.ts'
+import { appendFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { chromium, type Browser, type Page } from 'playwright'
+import { type Browser, type Page } from 'playwright'
 import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
-import { saveFailureShot } from './support.ts'
+import { launchWebScaffold, seedBlankSession, watchConsole, type WebScaffold } from './scaffold.ts'
+import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
+import { completionBarrier, saveFailureShot } from './support.ts'
+import { workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { auditResponsiveControls } from './responsive-controls.ts'
 
 const documentName = '客户需求与产品验收资料_完整文件名称需要方便手机阅读_2026.txt'
 const folderName = '客户交付文件夹_包含完整的目录名称'
@@ -37,9 +42,14 @@ describe('web e2e: document interaction coverage', () => {
   let browser: Browser
   let page: Page
   let consoleState: ReturnType<typeof watchConsole>
-  beforeAll(async () => { scaffold = await launchWebScaffold({}); browser = await chromium.launch() }, 120_000)
-  afterEach(async () => {
-    try { expect(consoleState?.pageErrors ?? []).toEqual([]) }
+  beforeAll(async () => { scaffold = await launchWebScaffold({}); browser = await responsiveBrowser.launch() }, 120_000)
+  afterEach(async ({ task }) => {
+    try {
+      if (task.result?.state === 'fail' && page && !page.isClosed()) {
+        await saveFailureShot(page, `documents-interaction-${page.viewportSize()?.width}`)
+      }
+      expect(consoleState?.pageErrors ?? []).toEqual([])
+    }
     finally { await page?.close() }
   })
   afterAll(async () => {
@@ -49,35 +59,113 @@ describe('web e2e: document interaction coverage', () => {
     if (failures.length) throw new AggregateError(failures, 'document UI audit cleanup failed')
   })
 
-  it.each([
+  it('closes a pending document dialog and retries failed management scripts', async () => {
+    page = await browser.newPage({ viewport: { width: 1280, height: 844 }, locale: 'en-US', reducedMotion: 'reduce' })
+    consoleState = watchConsole(page)
+    await fixture(page)
+    const scripts = new Map<string, number>()
+    const releaseDocuments = completionBarrier()
+    await page.route(/\/client\.(DocumentsModal|PluginManagerPage)\.js(?:\?|$)/u, async (route) => {
+      const file = new URL(route.request().url()).pathname.split('/').at(-1)!
+      const attempts = (scripts.get(file) ?? 0) + 1
+      scripts.set(file, attempts)
+      if (attempts === 1) {
+        if (file === 'client.DocumentsModal.js') await releaseDocuments.promise
+        await route.abort()
+      }
+      else await route.continue()
+    })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    const documents = page.getByRole('button', { name: 'Documents', exact: true })
+    await documents.waitFor()
+    expect(scripts.has('client.PluginManagerPage.js')).toBe(false)
+    const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
+    let pending: string
+    try {
+      await documents.click()
+      await manager.getByRole('status').getByText('Loading documents').waitFor()
+      pending = await manager.ariaSnapshot()
+      await manager.getByRole('button', { name: 'Close', exact: true }).click()
+      await manager.waitFor({ state: 'hidden' })
+      await expect.poll(() => documents.evaluate(element => element === document.activeElement)).toBe(true)
+      await documents.click()
+      await manager.getByRole('status').getByText('Loading documents').waitFor()
+      expect(scripts.get('client.DocumentsModal.js')).toBe(1)
+    } finally {
+      releaseDocuments.resolve()
+    }
+    await manager.getByRole('alert').getByText('Could not open the document manager').waitFor()
+    const documentFailure = await manager.ariaSnapshot()
+    await manager.getByRole('button', { name: 'Retry', exact: true }).click()
+    await manager.getByText(documentName, { exact: true }).waitFor()
+    await manager.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect.poll(() => documents.evaluate(element => element === document.activeElement)).toBe(true)
+    expect([...scripts]).toEqual([['client.DocumentsModal.js', 2]])
+
+    const catalog = page.waitForResponse(response => new URL(response.url()).pathname === '/api/pluginManager/catalog')
+    await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Plugins', exact: true }).click()
+    const pluginFailure = page.getByRole('alert').filter({ hasText: 'Could not open Plugins' })
+    await pluginFailure.waitFor()
+    expect((await catalog).ok()).toBe(true)
+    await compareOrRefreshGolden(join(import.meta.dirname, 'snapshots/management-loading/states.expected.md'),
+      [pending, documentFailure, await pluginFailure.ariaSnapshot()].join('\n\n'), webSnapshotMode())
+    await page.getByRole('button', { name: 'Retry', exact: true }).click()
+    await page.locator('[data-plugin-panel][aria-busy="false"]').waitFor()
+    expect(scripts.get('client.PluginManagerPage.js')).toBe(2)
+  })
+
+  it.each(workflowMatrixEnabled ? [
+    ...responsiveViewports.map(viewport => ({ ...viewport, touch: true, theme: 'light' as const })),
+    { width: 430, height: 932, touch: true, theme: 'dark' as const },
+    { width: 768, height: 1024, touch: true, theme: 'dark' as const },
+    { width: 1280, height: 844, touch: false, theme: 'light' as const },
+  ] : [
     { width: 390, height: 844, touch: true, theme: 'light' as const },
     { width: 430, height: 932, touch: true, theme: 'dark' as const },
     { width: 844, height: 390, touch: true, theme: 'light' as const },
     { width: 768, height: 1024, touch: true, theme: 'dark' as const },
     { width: 1280, height: 844, touch: false, theme: 'light' as const },
   ])('complete menus and dialogs fit $width × $height ($theme)', async ({ width, height, touch, theme }) => {
-    page = await browser.newPage({ viewport: { width, height }, hasTouch: touch, isMobile: width < 768, locale: 'en-US', colorScheme: theme, reducedMotion: 'reduce' })
+    page = await browser.newPage({ viewport: { width, height }, hasTouch: touch, isMobile: responsiveMobileEmulation && width < 768, locale: 'en-US', colorScheme: theme, reducedMotion: 'reduce' })
     consoleState = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, `documents-interaction-${width}`))
+    const iconRequests: string[] = []
+    page.on('request', (request) => {
+      const pathname = new URL(request.url()).pathname
+      if (pathname.endsWith('/client.FileTypeIcon.js')) iconRequests.push(pathname)
+    })
     await fixture(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     const compact = width < 768
+    const shortViewport = width <= 1100 && height <= 480
+    const fullScreenPreview = compact || shortViewport
     if (compact) await page.getByRole('button', { name: 'Open sidebar' }).click()
-    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const documentsButton = page.getByRole('button', { name: 'Documents', exact: true })
+    await documentsButton.waitFor()
+    expect(iconRequests).toEqual([])
+    await documentsButton.click()
     const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
     await manager.getByText(documentName, { exact: true }).waitFor()
+    await manager.locator('img[data-document-icon]').first().waitFor()
+    expect(iconRequests).toHaveLength(1)
     const out = process.env.DSH_DOCUMENT_AUDIT_SCREENSHOTS
-    const shot = async (name: string) => { if (out) await page.screenshot({ path: join(out, `${name}-${width}-${theme}.png`) }) }
+    if (out) await mkdir(out, { recursive: true })
+    const shot = async (name: string) => {
+      if (out) {
+        await page.screenshot({ path: join(out, `${responsiveBrowserName}-${name}-${width}-${theme}.png`) })
+        await appendFile(join(out, `${responsiveBrowserName}.jsonl`), JSON.stringify({
+          domain: 'documents', state: name, width, height, theme, status: 'passed',
+        }) + '\n')
+      }
+    }
     const fit = async (dialog: ReturnType<Page['getByRole']>) => {
-      const box = await dialog.evaluate((el) => {
-        const r = el.getBoundingClientRect()
-        return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, overflow: el.scrollWidth-el.clientWidth }
-      })
-      expect(box.x).toBeGreaterThanOrEqual(-1)
-      expect(box.y).toBeGreaterThanOrEqual(-1)
-      expect(box.right).toBeLessThanOrEqual(width+1)
-      expect(box.bottom).toBeLessThanOrEqual(height+1)
-      expect(box.overflow).toBeLessThanOrEqual(1)
+      const viewport = page.viewportSize()!
+      await expect.poll(() => dialog.evaluate((element, bounds) => {
+        const box = element.getBoundingClientRect()
+        return Math.max(-box.x, -box.y, box.right - bounds.width, box.bottom - bounds.height,
+          element.scrollWidth - element.clientWidth)
+      }, viewport)).toBeLessThanOrEqual(1)
+      await auditResponsiveControls(page, dialog, 'document interactions')
     }
     await fit(manager)
     if (compact) {
@@ -125,14 +213,14 @@ describe('web e2e: document interaction coverage', () => {
       await expect.poll(() => rowMore.evaluate(el => el === document.activeElement)).toBe(true)
     }
     await rowAction('Preview')
-    const preview = page.getByRole(compact ? 'dialog' : 'complementary', { name: `Preview: ${documentName}`, exact: true })
+    const preview = page.getByRole(fullScreenPreview ? 'dialog' : 'complementary', { name: `Preview: ${documentName}`, exact: true })
     await preview.getByText('Document preview: complete content remains readable.').waitFor()
-    await fit(compact ? preview : manager)
+    await fit(fullScreenPreview ? preview : manager)
     await shot('preview')
     if (compact) {
       for (const name of ['Move', 'Copy to…', 'Delete']) expect(await preview.getByRole('button', { name, exact: true }).innerText()).toContain(name)
-      await preview.getByRole('button', { name: 'Back to documents' }).click()
-    } else await preview.getByRole('button', { name: 'Close preview' }).click()
+    }
+    await preview.getByRole('button', { name: fullScreenPreview ? 'Back to documents' : 'Close preview' }).click()
 
     const folderMore = manager.getByRole('button', { name: `More actions: folder ${folderName}`, exact: true })
     await folderMore.click()
@@ -149,7 +237,7 @@ describe('web e2e: document interaction coverage', () => {
     await fit(info)
     await info.getByRole('button', { name: 'Close', exact: true }).click()
     const toolbarAction = async (name: string) => {
-      if (compact) {
+      if (compact || shortViewport) {
         await manager.getByRole('button', { name: 'More actions', exact: true }).tap()
         await page.getByRole('dialog', { name: 'More actions', exact: true }).getByRole('button', { name, exact: true }).tap()
       } else if (name === 'Browse another scope' || width <= 1100 && name !== 'New Folder') {
@@ -162,7 +250,7 @@ describe('web e2e: document interaction coverage', () => {
     await fit(create)
     if (compact) expect(await create.getByRole('textbox').evaluate(el => el === document.activeElement)).toBe(false)
     await create.getByRole('textbox').fill('Complete folder name')
-    if (compact) {
+    if (compact && height > 420) {
       await page.setViewportSize({ width, height: 420 })
       await fit(create)
       const footer = await create.locator('[data-documents-dialog-actions]').boundingBox()
@@ -181,7 +269,7 @@ describe('web e2e: document interaction coverage', () => {
     const source = page.getByRole('dialog', { name: 'Choose a document source', exact: true })
     await fit(source)
     await shot('source')
-    await source.getByRole('button', { name: compact ? 'Close' : 'Cancel', exact: true }).click()
+    await source.getByRole('button', { name: compact || shortViewport ? 'Close' : 'Cancel', exact: true }).click()
     await toolbarAction('Trash')
     await manager.getByRole('heading', { name: 'Trash', exact: true }).waitFor()
     await fit(manager)
@@ -241,7 +329,7 @@ describe('web e2e: document interaction coverage', () => {
       await manager.locator('[data-documents-scope-trigger]').click()
       await page.getByRole('dialog', { name: 'Choose document scope', exact: true }).getByRole('button', { name: /All accessible documents/ }).click()
     } else await manager.getByRole('button', { name: /All accessible documents/ }).click()
-    await manager.getByRole('heading', { name: 'All accessible documents', exact: true }).waitFor()
+    await manager.getByRole('region', { name: 'All accessible documents', exact: true }).waitFor()
     await fit(manager)
     await shot('overview')
     await manager.getByRole('button', { name: 'Choose upload scope', exact: true }).click()
@@ -257,4 +345,66 @@ describe('web e2e: document interaction coverage', () => {
     await manager.getByRole('button', { name: 'Close', exact: true }).click()
     expect(await page.getByRole('dialog').count()).toBe(0)
   }, 90_000)
+  it.each([false, true])('prepares manager code after the composer paints (background failure: %s)', async (fail) => {
+    page = await browser.newPage({ viewport: { width: 1280, height: 844 }, locale: 'en-US', reducedMotion: 'reduce' })
+    consoleState = watchConsole(page)
+    await fixture(page)
+    const sessionId = await seedBlankSession(scaffold, fail ? 'document-preparation-failure' : 'document-preparation-success', scaffold.workspaceCwd)
+    await (await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)).attachSession(sessionId)
+    await page.addInitScript((id) => {
+      localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId: id }))
+    }, sessionId)
+
+    const script = /\/client\.DocumentsModal\.js(?:\?|$)/u
+    const editable = page.locator('[data-composer-card] textarea:enabled:not([readonly])').first()
+    const firstRequest = Promise.withResolvers<boolean>()
+    const release = completionBarrier()
+    const dataOrArtwork: string[] = []
+    let attempts = 0
+    page.on('request', (request) => {
+      const pathname = new URL(request.url()).pathname
+      if (/^\/api\/documents(?:\/|$)|\/client\.FileTypeIcon\.js$/u.test(pathname)) dataOrArtwork.push(pathname)
+    })
+    await page.route(script, async (route) => {
+      attempts++
+      if (attempts === 1) {
+        firstRequest.resolve(await editable.isVisible())
+        await release.promise
+        if (fail) {  await route.abort(); return }
+      }
+      await route.continue()
+    })
+
+    const documents = page.getByRole('button', { name: 'Documents', exact: true })
+    const manager = page.getByRole('dialog', { name: 'Document Manager', exact: true })
+    try {
+      await Promise.all([
+        page.waitForRequest(script, { timeout: 10_000 }),
+        page.goto(scaffold.authenticatedUrl, { waitUntil: 'domcontentloaded' }),
+      ])
+      expect(await firstRequest.promise).toBe(true)
+      expect(dataOrArtwork).toEqual([])
+      expect(await manager.count()).toBe(0)
+      await editable.fill('Draft entered during document preparation')
+      expect(await editable.inputValue()).toBe('Draft entered during document preparation')
+      if (fail) {
+        const rejected = page.waitForEvent('requestfailed', request => script.test(request.url()))
+        release.resolve()
+        await rejected
+        await page.locator('script[src*="/client.DocumentsModal.js"]').waitFor({ state: 'detached' })
+        expect(await page.getByRole('alert').filter({ hasText: 'Could not open the document manager' }).count()).toBe(0)
+      }
+      await documents.click()
+      if (!fail) {
+        await manager.getByRole('status').getByText('Loading documents').waitFor()
+        expect(attempts).toBe(1)
+        release.resolve()
+      }
+      await manager.getByText(documentName, { exact: true }).waitFor()
+      expect(attempts).toBe(fail ? 2 : 1)
+    } finally {
+      release.resolve()
+    }
+  })
+
 })

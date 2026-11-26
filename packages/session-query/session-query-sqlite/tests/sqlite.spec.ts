@@ -386,6 +386,91 @@ describe('SQLite session search', () => {
       .toEqual({ seed_length: 1 })
   })
 
+  it('reuses a live log cut until it grows or the owner changes', async () => {
+    const ctx = await liveContext()
+    const id = SessionId('stable-live-cut')
+    const options = { meta: { createdAt: 15 }, seed: messageEvents('first live prefix') }
+    const session = ctx.sessions.prepare(id, options)
+    const detach = ctx.sessions.enter(session)
+    ctx.sessions.announce(session)
+    const read = vi.spyOn(session, 'snapshotEvents')
+    async function search(query: string) {
+      return ctx.sessionQuery.searchEvents({ sessionId: id, query })
+    }
+    try {
+      await expect(search('first')).resolves.toMatchObject({ items: [{ seq: 0 }] })
+      await expect(search('first')).resolves.toMatchObject({ items: [{ seq: 0 }] })
+      expect(read).toHaveBeenCalledTimes(1)
+      session.append('user/message', createUserMessage({
+        content: [{ type: 'text', text: 'appended live prefix' }],
+        source: { kind: 'user' },
+      }), { surfaceOp: 'append' })
+      await expect(search('appended')).resolves.toMatchObject({ items: [{ seq: 2 }] })
+      expect(read).toHaveBeenCalledTimes(2)
+      detach()
+      const replacement = ctx.sessions.prepare(id, {
+        ...options,
+        seed: [
+          ...messageEvents('replacement live prefix'),
+          { ...messageEvents('replacement second event')[0]!, seq: SessionSeq(1) },
+        ],
+      })
+      ctx.sessions.enter(replacement)
+      ctx.sessions.announce(replacement)
+      await expect(search('first')).resolves.toMatchObject({ items: [] })
+      await expect(search('replacement')).resolves.toMatchObject({
+        items: [{ seq: 0 }, { seq: 1 }],
+      })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('bounds changed-log inspections and drains active reads before reporting a source failure', async () => {
+    const entries = ['first', 'second', 'third'].map(id => ({
+      meta: header(id),
+      events: messageEvents('indexed word'),
+    }))
+    TestPersistence.reset(entries)
+    const ctx = await liveContext({ path: ':memory:', persistedReadConcurrency: 2 })
+    await ctx.plugin(TestPersistence)
+    const failFirst = Promise.withResolvers<undefined>()
+    const finishSecond = Promise.withResolvers<undefined>()
+    const started: string[] = []
+    TestPersistence.inspectEffect = async (entry) => {
+      started.push(entry.meta.id)
+      if (entry.meta.id === 'first') {
+        await failFirst.promise
+        throw new Error('first inspection failed')
+      }
+      await finishSecond.promise
+    }
+    const search = () => ctx.sessionQuery.searchSessions({ query: 'indexed' })
+    const request = search()
+    let settled = false
+    const completed = request.then(
+      () => { settled = true },
+      () => { settled = true },
+    )
+    try {
+      await vi.waitFor(() => { expect(started).toEqual(['first', 'second']) })
+      failFirst.resolve(undefined)
+      await new Promise<void>(resolve => setImmediate(resolve))
+      expect(settled).toBe(false)
+      finishSecond.resolve(undefined)
+      await expect(request).rejects.toThrow(expectCode('SESSION_QUERY_PERSISTENCE_FAILED'))
+      expect(started).toEqual(['first', 'second'])
+      await expect(search()).resolves.toMatchObject({ items: [
+        { header: { id: 'first' } }, { header: { id: 'second' } }, { header: { id: 'third' } },
+      ] })
+    } finally {
+      failFirst.resolve(undefined)
+      finishSecond.resolve(undefined)
+      await completed
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('retains a persisted inherited cut and reindexes when that source identity changes', async () => {
     const meta = header('persisted-seed-cut', 10, { isSeeded: true })
     const events: SessionEvent[] = [
@@ -1154,7 +1239,7 @@ describe('SQLite reconciliation and source lifecycle', () => {
 
     await expect(ctx.sessionQuery.searchSessions({ query: 'needle' }))
       .resolves.toMatchObject({ items: [{ header: durable }] })
-    expect(TestPersistence.inspections.get(durable.id)).toBe(2)
+    expect(TestPersistence.inspections.get(durable.id)).toBe(1)
     list.mockRestore()
   })
 
@@ -1659,7 +1744,7 @@ describe('SQLite schema, cancellation, and real persistence integration', () => 
       { meta: first, events: messageEvents('first needle') },
       { meta: second, events: messageEvents('second needle') },
     ])
-    const ctx = await liveContext()
+    const ctx = await liveContext({ path: ':memory:', persistedReadConcurrency: 1 })
     await ctx.plugin(TestPersistence)
     const started = Promise.withResolvers<AbortSignal>()
     const cleanup = Promise.withResolvers<undefined>()

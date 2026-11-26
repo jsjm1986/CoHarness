@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { bytesToBase64, randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { addressRuntimeUrl, createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ObservableSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only imports: a plugin-to-plugin value import is a bundle purity
 // error, so scope resolution goes through the sessions service (scopeOf
 // method) instead of the standalone helper.
@@ -37,6 +37,8 @@ import { createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError }
 export interface IConversation {
   /** The per-session input machine registry (SessionInputResolver face). */
   readonly input: SessionInputResolver
+  /** Optional readiness snapshot that becomes true after the first visible, writable composer paints. */
+  readonly firstEditableComposer?: ObservableSnapshot<boolean>
   /**
    * The per-session composer-block registry: how a plugin the composer
    * cannot import makes a session's input inert with its own reason.
@@ -150,6 +152,9 @@ export class UnsupportedImageMediaTypeError extends Error {
 export class ConversationController extends Service implements IConversation {
   /** The per-session input machine registry (SessionInputResolver face). */
   readonly input: SessionInputResolver
+  private readonly firstEditableState = createSnapshotStore(false)
+  /** The composition's first painted, writable composer readiness. */
+  readonly firstEditableComposer: ObservableSnapshot<boolean> = this.firstEditableState
   /** The per-session composer-block registry. */
   readonly blocks: ComposerBlocks
   private readonly draftAttachments = new Map<DraftAttachmentId, ComposerAttachment>()
@@ -159,6 +164,11 @@ export class ConversationController extends Service implements IConversation {
   private readonly imageGenerations = new Map<SessionId, number>()
   private readonly createdImageUrls = new Set<string>()
   private disposed = false
+
+  /** Publish that the first active composer has painted with an editable textarea. */
+  markComposerEditable(): void {
+    this.firstEditableState.set(true)
+  }
 
   /**
    * @param ctx - owning root context (the plugin apply context; the service

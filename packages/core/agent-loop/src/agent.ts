@@ -125,6 +125,7 @@ export class ReactLoopAgent implements Agent {
   private readonly runtimeContext: RuntimeContextProjection
   /** Process-local revision of assistant frames for this attached Session. */
   private admissionClosed = false
+  private preserveInbox = false
   private assistantStreamRevision = 0
   private assistantAttemptCounter = 0
   private readonly systemPrompt: SystemPromptProjection
@@ -144,7 +145,13 @@ export class ReactLoopAgent implements Agent {
     this.ctx = this.scope.ctx
     this.inbox = new ReactLoopInbox(this.ctx.sessionProjections, session, this.dispatch, inboxLimits)
     // Wake bookkeeping follows the durable inbox outcome, not the splice request.
-    this.ctx.on('agent/inbox/discarded', ({ message }) => { this.pendingWakes.delete(message.id) })
+    this.ctx.on('agent/inbox/discarded', ({ message }) => {
+      if (this.pendingWakes.has(message.id)
+        && !this.inbox.nextTurn.some(item => item.id === message.id)
+        && !this.inbox.nextStep.some(item => item.id === message.id)) {
+        this.pendingWakes.delete(message.id)
+      }
+    })
     this.ctx.on('agent/inbox/claimed', ({ message }) => { this.pendingWakes.delete(message.id) })
     /* v8 ignore next -- the loop registers its own turnBoundary unit, so the key is always present */
     const lastTurn = this.loopCtx.sessionProjections.stateOf(session, 'turnBoundary')?.lastTurn ?? 0
@@ -157,10 +164,18 @@ export class ReactLoopAgent implements Agent {
     return this.phase.kind === 'idle' || this.phase.kind === 'maintenance' ? 'idle' : 'running'
   }
 
-  /** Close input before the lifecycle owner awaits any teardown work. */
-  closeAdmission(): void {
+  get hasPendingUserSteer(): boolean {
+    return this.inbox.nextStep.some(message => message.source.kind === 'user' && this.pendingWakes.has(message.id))
+  }
+
+  /**
+   * Close input and maintenance before the lifecycle owner awaits teardown.
+   * @param preserveInbox - protect admitted human input and keep pending work through cancellation.
+   */
+  closeAdmission(preserveInbox = false): void {
     this.admissionClosed = true
-    this.inbox.closeAdmission()
+    this.preserveInbox ||= preserveInbox
+    this.inbox.closeAdmission(preserveInbox)
   }
 
   /** Refuse busy release without cancelling a turn, maintenance task, or queued input. */
@@ -192,11 +207,12 @@ export class ReactLoopAgent implements Agent {
     const resolvedTarget = wakingAfterAbort ? 'next-turn' : target
     // Register before splice: a synchronous discard/claim observer can then
     // remove the identity, while a refused splice rolls it back below.
-    if (wakeup) this.pendingWakes.add(message.id)
+    const registersWake = wakeup && !this.pendingWakes.has(message.id)
+    if (registersWake) this.pendingWakes.add(message.id)
     try {
       this.inbox.splice(resolvedTarget, Infinity, 0, [message])
     } catch (error: unknown) {
-      this.pendingWakes.delete(message.id)
+      if (registersWake) this.pendingWakes.delete(message.id)
       throw error
     }
     if (wakeup) this.wakeDriver(wakingAfterAbort)
@@ -215,7 +231,7 @@ export class ReactLoopAgent implements Agent {
   }
 
   cancel(cause: AgentCancelCause, options: CancelOptions = {}): void {
-    if (!options.keepInbox) this.inbox.clear()
+    if (!this.preserveInbox && !options.keepInbox) this.inbox.clear()
     if (this.phase.kind !== 'idle') this.phase.wakeRequested = false
     // Kept inbox work parks until the next waking send; a cancellation never
     // turns an already accepted wake into an automatic replay.

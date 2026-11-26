@@ -13,8 +13,8 @@ English | [中文](2026-11-19-push-delivery-outcome-receipts.zh.md)
 Extend [push delivery authority](../bug-fix/2026-10-29-push-delivery-authority.md) with device-reported outcomes, keeping the existing claim/fence model unchanged:
 
 - Migration adds `provider_msg_id`, `delivered_at`, `opened_at` to `harness.push_deliveries`. Senders return the provider's message id (JPush `msg_id`, FCM `name`) which `notifyCompleted` persists alongside the `sent` claim for correlation.
-- `POST /account/api/push-receipts` accepts `{provider, token, sessionId, eventSeq, kind}` where `kind` is `arrived` or `opened`. `recordReceipt` revalidates the active account, resolves the owned device by organization, provider, token and user, then stamps the matching delivery: `arrived` sets `delivered_at`; `opened` sets `opened_at` and backfills `delivered_at`. Repeated receipts for the same delivery are idempotent; unowned or unknown targets return `missing` → HTTP 404.
-- `GET /account/api/push-devices` lists the authenticated account's devices with each device's latest delivery; `GET /admin/api/push/overview` returns all organization devices, the 200 most recent deliveries, and status/provider aggregate counts.
+- `POST /account/api/push-receipts` accepts `{provider, token, runtimeId?, sessionId, eventSeq, kind}` with an `arrived` or `opened` outcome. The service checks the active account, registered device and original Session creator. It requires a unique owned delivery when a legacy client omits the Runtime. Arrival and open timestamps are idempotent. An unknown, ambiguous or unowned delivery returns HTTP 404.
+- `GET /account/api/push-devices` includes the latest owned delivery for each device. `GET /admin/api/push/overview` returns organization devices, the 200 most recent deliveries, and status and provider counts.
 - The Android shell reports both signals from `CoHarnessPushReceiver`: `onNotifyMessageArrived` posts `arrived`, `onNotifyMessageOpened` posts `opened` before the existing [runtimeId click bridge](../bug-fix/2026-11-19-android-push-bridge-runtimeid-contract.md). `PushReceiptReporter` sends on a background thread with the WebView `CookieManager` session cookie against `BuildConfig.PUSH_GATEWAY_ORIGIN` (injected from `DSH_ANDROID_WEB_URL`); malformed extras, missing or nonnumeric `eventSeq`, and empty tokens drop silently.
 - `NativePushStatusPlugin.getPushStatus()` exposes provider configuration, JPush consent/initialization, the system notification toggle, and the JPush registration id to the wrapped web app via `getNativePushStatus()` in `apps/web/src/native-push.ts`.
 
@@ -23,7 +23,7 @@ Extend [push delivery authority](../bug-fix/2026-10-29-push-delivery-authority.m
 - `sent` now means exactly provider acceptance; `delivered_at` and `opened_at` are the only device-truth signals. A delivery can legitimately stay `sent`-without-`delivered_at` forever (killed vendor channel, offline device, unconfigured JPush).
 - Receipt reporting is best-effort and non-blocking: transport failure, missing session cookie, or an unsigned-in WebView loses that receipt without affecting notification display or click routing. No retry/outbox is added, matching the shell's documented append window.
 - Diagnostic builds (`NATIVE_PUSH_ENABLED=false`) never report receipts and `getPushStatus` reports unconfigured.
-- Only JPush produces receipts today; the FCM path registers devices but has no native arrival/open callback wired, so FCM deliveries never advance past `sent` until one is added.
+- Android JPush and UnifiedPush report arrivals and opens. FCM has provider-acceptance records.
 
 ## Alternatives considered
 

@@ -3,12 +3,15 @@
 // separate image origin proves remote loads carry no referrer, and real
 // files below the scaffold workspace exercise the authenticated /api/file
 // route, its byte cap, and the preview/lightbox affordances.
+import { nativeTabKey, responsiveBrowser } from './responsive-browser.ts'
+import type {} from '@deepseek-ai/dsh-host-apiproxy'
+import { auditWorkflowState, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 import { mkdir, open, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { createMessage, createSystemMessage, createUserMessage, type ImageBlock } from '@deepseek-ai/dsh-llm'
 import {
@@ -245,7 +248,7 @@ describe('web e2e: Markdown image rendering', () => {
       data: PNG, mediaType: 'image/png', name: IMAGE_NAME,
     })
     await seedSession(scaffold, durableImageFixture({ type: 'image', attachment }), IMAGE_SEED_ID)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     page.on('response', (response) => {
       const url = new URL(response.url())
@@ -357,8 +360,8 @@ describe('web e2e: Markdown image rendering', () => {
     await expect.poll(() => hoverImage.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1)
     await page.keyboard.press('Escape')
     await hoverImage.waitFor({ state: 'detached' })
-    await link.press('Tab')
-    await page.keyboard.press('Shift+Tab')
+    await link.press(nativeTabKey())
+    await page.keyboard.press(nativeTabKey('backward'))
     await hoverImage.waitFor()
     await page.keyboard.press('Escape')
     await hoverImage.waitFor({ state: 'detached' })
@@ -436,6 +439,50 @@ describe('web e2e: Markdown image rendering', () => {
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 120_000)
+
+  it.skipIf(MODE === 'record' || !workflowMatrixEnabled)('inspects each image source, failure and lightbox at every touch viewport', async () => {
+    const touchPage = await newWorkflowPage(browser)
+    const touchTripwire = watchConsole(touchPage)
+    try {
+      await touchPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await touchPage.locator('[role="treeitem"]').first().click()
+      await touchPage.locator(`[data-row-key^="session:"][data-row-key*="${SEED_ID}"]`).click()
+      await touchPage.getByText('REMOTE_IMAGE_DONE', { exact: true }).waitFor()
+      for (const [index, alt] of [REMOTE_ALT, LOCAL_ALT, WORKSPACE_ALT, 'Space path', 'Encoded path',
+        'Encoded filename', 'Outside workspace image'].entries()) {
+        const open = touchPage.getByRole('button', { name: `View full image: ${alt}`, exact: true })
+        const image = open.getByRole('img', { name: alt, exact: true })
+        await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0)
+        await auditWorkflowState(touchPage, 'markdown', `image-source-${index}`, open, [open], undefined, async () => {
+          const target = await open.boundingBox()
+          expect(target?.width, `${alt}: touch preview width`).toBeGreaterThanOrEqual(44)
+          expect(target?.height, `${alt}: touch preview height`).toBeGreaterThanOrEqual(44)
+        })
+        await open.tap()
+        const lightbox = touchPage.getByRole('dialog', { name: 'Image preview', exact: true })
+        await lightbox.waitFor({ state: 'visible', timeout: 5_000 })
+        const opened = await lightbox.elementHandle()
+        if (opened === null) throw new Error('Image preview did not mount after tapping its thumbnail')
+        const close = lightbox.getByRole('button', { name: 'Close image preview', exact: true })
+        await auditWorkflowState(touchPage, 'markdown', `image-lightbox-${index}`, lightbox, [close], undefined, async () => {
+          expect(await opened.evaluate(element => element.isConnected), 'The same preview survives viewport changes').toBe(true)
+          const target = await close.boundingBox()
+          expect(target?.width, 'Touch preview close width').toBeGreaterThanOrEqual(44)
+          expect(target?.height, 'Touch preview close height').toBeGreaterThanOrEqual(44)
+        })
+        await close.tap()
+        await lightbox.waitFor({ state: 'hidden' })
+        await expect.poll(() => open.evaluate(element => document.activeElement === element)).toBe(true)
+      }
+      for (const [state, text] of [['oversized', 'Oversized image'], ['missing', 'Missing image'],
+        ['corrupt', join(scaffold.workspaceCwd, 'corrupt.png')]] as const) {
+        const fallback = touchPage.getByText(`Image preview unavailable · ${text}`, { exact: true })
+        await auditWorkflowState(touchPage, 'markdown', `image-${state}`, fallback, [], () => fallback.scrollIntoViewIfNeeded())
+      }
+      expect(touchTripwire.pageErrors).toEqual([])
+    } catch (error) { await saveFailureShot(touchPage, 'markdown-images-responsive'); throw error }
+    finally { await touchPage.close() }
+  }, 240_000)
 
   it('keeps the fixture inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md', 'attachments.expected.md'])

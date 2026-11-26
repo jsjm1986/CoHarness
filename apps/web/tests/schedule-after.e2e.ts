@@ -1,13 +1,16 @@
 /** Keyless assembled-Web evidence for conversational Schedule delivery. */
 
-import { readFile } from 'node:fs/promises'
+import { expectViewportFit, responsiveBrowser, responsiveBrowserName, responsiveViewports } from './responsive-browser.ts'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+import type { Browser, Locator, Page } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
+import type {} from '@deepseek-ai/dsh-session-title'
 import { bundlePatchPaths, composeEntries, loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { MessageId, ToolCallId, createUserMessage, LlmAdapter } from '@deepseek-ai/dsh-llm'
 import { appendDelivery } from '../../../packages/schedule/schedule/src/delivery-history.ts'
@@ -19,11 +22,13 @@ import {
   createEveryScheduleRecord,
   foldScheduleEvents,
   type EveryScheduleRecord,
+  type ScheduleRecord,
 } from '@deepseek-ai/dsh-schedule'
+import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import {
+  acknowledgeReloadConnectionLoss,
   assertFixtureInventory,
   captureStableAria,
-  compareOrRefreshGolden,
   launchWebScaffold,
   seedSession,
   watchConsole,
@@ -31,6 +36,47 @@ import {
   type WebScaffold,
 } from './scaffold.ts'
 import { connectFreshWorkspace, conversationContextKey, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden, workflowMatrixEnabled, workflowTouchOptions } from './workflow-responsive-state.ts'
+
+/** Capture each actual deletion outcome before its natural dismissal, retriggering after every resize. */
+async function auditDeleteOutcome(page: Page, state: string, toast: Locator, trigger: (viewport: string) => Promise<void>): Promise<void> {
+  const original = page.viewportSize()
+  if (original === null) throw new Error('Deletion notice acceptance requires a declared viewport')
+  const directory = process.env.DSH_FEATURE_LAYOUT_SCREENSHOTS
+  const receipts = process.env.DSH_FEATURE_COVERAGE_OUTPUT
+  if (directory !== undefined) await mkdir(directory, { recursive: true })
+  if (receipts !== undefined) await mkdir(receipts, { recursive: true })
+  try {
+    for (const viewport of workflowMatrixEnabled ? responsiveViewports : [{ name: 'baseline', ...original }]) {
+      let failure: string | undefined
+      try {
+        await page.setViewportSize(viewport)
+        await trigger(viewport.name)
+        await toast.waitFor()
+        await expect.poll(() => toast.evaluate(element => Number(getComputedStyle(element).opacity))).toBe(1)
+        await expectViewportFit(page, toast)
+        const bounds = await toast.boundingBox()
+        expect(bounds).not.toBeNull()
+        expect(bounds!.y).toBeGreaterThanOrEqual(0)
+        expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height)
+        if (directory !== undefined) {
+          // Disabling animations would finish the toast's fade before capture.
+          await page.screenshot({ path: join(directory, `${responsiveBrowserName}-schedule-${state}-${viewport.name}.png`) })
+          await writeFile(join(directory, `${responsiveBrowserName}-schedule-${state}-${viewport.name}.aria.md`), await toast.ariaSnapshot() + '\n')
+        }
+      } catch (error) {
+        failure = String(error)
+        throw error
+      } finally {
+        if (receipts !== undefined) await appendFile(join(receipts, `${responsiveBrowserName}.jsonl`), JSON.stringify({
+          domain: 'schedule', state, viewport, status: failure === undefined ? 'passed' : 'failed',
+          checker: 'transient-viewport-opacity-v1', ...(failure === undefined ? {} : { error: failure }),
+          touch: await page.evaluate(() => matchMedia('(pointer: coarse)').matches),
+        }) + '\n')
+      }
+    }
+  } finally { await page.setViewportSize(original) }
+}
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -287,10 +333,10 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
       'Schedule Web Every adapter',
     )
 
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await browser.newPage({
       viewport: { width: 1680, height: 1000 },
-      locale: 'en-US',
+      locale: 'en-US', ...workflowTouchOptions,
       timezoneId: AT_BROWSER_ZONE,
     })
     await page.addInitScript(() => { localStorage.setItem('dsh.locale', 'en') })
@@ -418,7 +464,9 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
     expect(atAdapter.requests).toHaveLength(1)
     await expect(scaffold.ctx.sessions.flush(atHandle.agent.session)).resolves.toBe(true)
     await workspace.attachSession(atHandle.agent.id)
+    const reloadWarnings = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })
+    acknowledgeReloadConnectionLoss(tripwire, reloadWarnings)
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     const workspaceItem = page.locator('[role="treeitem"]').first()
     await workspaceItem.waitFor({ timeout: 15_000 })
@@ -469,7 +517,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
     const row = page.locator(selector).filter({ hasText: AFTER_REPLY })
     await row.waitFor({ timeout: 15_000 })
     expect(await row.getAttribute('data-chat-flow-kind')).toBe('assistant-step')
-    await compareOrRefreshGolden(
+    await compareWorkflowGolden(
       AFTER_EXPECTED,
       await captureStableAria(page, selector, scaffold.workspaceCwd),
       MODE,
@@ -510,6 +558,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
       await expect.poll(() => linkedSession.isDisabled(), { timeout: 15_000 }).toBe(true)
       expect(await detail.getByText('The original session is archived.', { exact: true }).count()).toBe(1)
       expect(await detail.getByText('Scheduled After follow-up', { exact: true }).count()).toBe(1)
+      await auditWorkflowState(page, 'schedule', 'linked-session-archived', detail)
       const moreActions = detail.getByRole('button', { name: 'Automation task actions', exact: true })
       await moreActions.click()
       const deleteAction = page.getByRole('menuitem', { name: 'Delete task', exact: true })
@@ -563,7 +612,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
     const row = page.locator(selector).filter({ hasText: EVERY_REPLY })
     await row.waitFor({ timeout: 15_000 })
     expect(await row.getAttribute('data-chat-flow-kind')).toBe('assistant-step')
-    await compareOrRefreshGolden(
+    await compareWorkflowGolden(
       EVERY_EXPECTED,
       await captureStableAria(page, selector, scaffold.workspaceCwd),
       MODE,
@@ -690,7 +739,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
     const row = page.locator(selector).filter({ hasText: AT_REPLY })
     await row.waitFor({ timeout: 15_000 })
     expect(await row.getAttribute('data-chat-flow-kind')).toBe('assistant-step')
-    await compareOrRefreshGolden(
+    await compareWorkflowGolden(
       AT_EXPECTED,
       await captureStableAria(page, selector, scaffold.workspaceCwd),
       MODE,
@@ -742,10 +791,10 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     await workspace.attachSession(DECOY_SESSION_ID)
     await workspace.attachSession(CATALOG_SESSION_ID)
 
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await browser.newPage({
       viewport: { width: 900, height: 900 },
-      locale: 'en-US',
+      locale: 'en-US', ...workflowTouchOptions,
       timezoneId: AT_BROWSER_ZONE,
     })
     await page.clock.setFixedTime(new Date(CATALOG_NOW))
@@ -788,6 +837,7 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     // retired type chip.
     const statuses = manager.getByRole('group', { name: 'Task status' })
     expect(await statuses.getByRole('button').count()).toBe(3)
+    await auditWorkflowState(page, 'schedule', 'catalog', manager)
     await manager.getByRole('button', { name: 'All', exact: true }).click()
     await expect.poll(() => tasks.getByRole('listitem').count()).toBe(4)
     expect(await tasks.textContent()).toContain('Check exact cadence')
@@ -800,8 +850,10 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     await details.getByRole('tab', { name: 'Records', exact: true }).click()
     await details.getByText('No delivery record available', { exact: true }).waitFor()
     expect(await details.getByRole('region', { name: 'Saved delivery record' }).count()).toBe(0)
+    await auditWorkflowState(page, 'schedule', 'empty-delivery-history', details)
     expect(scaffold.ctx.agents.get(otherSessionId)).toBeUndefined()
     await details.getByRole('tab', { name: 'Rules', exact: true }).click()
+    await auditWorkflowState(page, 'schedule', 'task-rules', details)
 
     await page.setViewportSize({ width: 600, height: 340 })
     // The linked Session is a seat in the detail's tab strip, above the rule's
@@ -823,6 +875,7 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     await moreActions.click()
     await page.getByRole('menuitem', { name: 'Delete task', exact: true }).click()
     const confirmation = page.getByRole('dialog', { name: 'Delete this task?' })
+    await auditWorkflowState(page, 'schedule', 'delete-confirmation', confirmation)
     await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
     expect((await scaffold.ctx.schedule.catalog()).some(task => task.id === other.id)).toBe(true)
     await moreActions.click()
@@ -872,7 +925,7 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     await page.getByRole('button', { name: 'Automation tasks', exact: true }).click()
     const manager = page.getByTestId('task-manager-page')
     await manager.getByRole('button', { name: 'Check exact cadence', exact: true }).click()
-    await manager.getByRole('button', { name: `Linked session ${CATALOG_TITLE}: open original session`, exact: true }).click()
+    await manager.getByRole('button', { name: /^Linked session(?: .+)?: open original session$/u }).click()
     await liveAgent(scaffold, CATALOG_SESSION_ID)
     await page.getByRole('navigation', { name: 'Session hierarchy' })
       .getByText(CATALOG_TITLE, { exact: true }).waitFor({ timeout: 15_000 })
@@ -882,6 +935,7 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     await trigger.click()
     const catalog = page.getByRole('list', { name: 'Active reminders' })
     await catalog.waitFor({ timeout: 10_000 })
+    await auditWorkflowState(page, 'schedule', 'active-reminders', catalog)
     expect(await catalog.getByRole('listitem').count()).toBe(3)
     const lightLayout = await page.evaluate(() => {
       const triggerElement = document.querySelector('button[aria-label="3 reminders"]')
@@ -970,11 +1024,8 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     const darkBackground = await catalog.evaluate(element => getComputedStyle(element).backgroundColor)
     expect(darkBackground).not.toBe('rgba(0, 0, 0, 0)')
     expect(darkBackground).not.toBe(lightLayout.background)
-    await compareOrRefreshGolden(
-      CATALOG_EXPECTED,
-      await captureStableAria(page, '[aria-label="Active reminders"]', scaffold.workspaceCwd),
-      MODE,
-    )
+    const reminderSnapshot = await captureStableAria(page, '[aria-label="Active reminders"]', scaffold.workspaceCwd)
+    await compareWorkflowGolden(CATALOG_EXPECTED, reminderSnapshot.replace(/(\d{4}) at (\{\{clock\}\})/gu, '$1, $2'), MODE)
 
     // The next-run line states the target as the reader's local clock stamp
     // followed by the distance to it in parentheses: the stamp is the instant in
@@ -985,10 +1036,13 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     const metadataText = await nextRunLine.first().textContent() ?? ''
     const nextRun = await nextRunLine.first().locator('time').getAttribute('dateTime')
     if (nextRun === null) throw new Error('the next-run line names no instant')
-    const nextRunAbsolute = new Intl.DateTimeFormat('en', {
+    // The page's ICU composes the stamp (schedule-format.ts hourCycle h23 in
+    // the context timezone); format the expectation inside the page so engine
+    // date-time style differences — WebKit inserts "at" — cannot drift.
+    const nextRunAbsolute = await page.evaluate(instant => new Intl.DateTimeFormat('en', {
       month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
-      hour12: false, timeZone: AT_BROWSER_ZONE,
-    }).format(new Date(nextRun))
+      hourCycle: 'h23',
+    }).format(new Date(instant)), nextRun)
     expect(metadataText).toContain(`Next run ${nextRunAbsolute}`)
     expect(metadataText).toMatch(/Next run [^)]+\((?:in \d+ \w+|Due now|\d+ .*overdue)\)/)
     // The stamp is a local clock time, not a bare duration.
@@ -1005,7 +1059,9 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     }
     await expectNoReminderEntry(page)
     expect(await scaffold.ctx.schedule.list({ sessionId: CATALOG_SESSION_ID })).toEqual([])
+    const reloadWarnings = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })
+    acknowledgeReloadConnectionLoss(tripwire, reloadWarnings)
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await expectNoReminderEntry(page)
     // This authored pin owns its sidecars through the snapshot manifest's
@@ -1075,10 +1131,12 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
       await detail.getByRole('button', { name: 'Load more', exact: true }).click()
       await notice.waitFor()
       expect(await saved.count()).toBe(22)
+      await auditWorkflowState(page, 'schedule', 'retained-delivery-history', detail)
       const info = detail.getByRole('button', { name: 'Retention rules', exact: true })
       await info.click()
       const bounds = detail.getByText('Each task keeps up to 200 delivery records from the last 30 days.', { exact: true })
       await bounds.waitFor()
+      await auditWorkflowState(page, 'schedule', 'retention-explanation', detail)
       expect(await detail.locator('footer').innerText()).toMatchInlineSnapshot(`
         "Earlier delivery records have been cleared
 
@@ -1154,6 +1212,7 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
       // The Time zone row is a menu trigger button; the zone is chosen, never typed.
       const zoneField = runTime.getByRole('button', { name: /Time zone/ })
       await zoneField.click()
+      await auditWorkflowState(page, 'schedule', 'timezone-menu', page.getByRole('menu'))
       // Zone rows lead with the current offset and the localized zone name, so
       // the browser's own zone is the row marked as the system one.
       await page.getByRole('menuitem', { name: /China Standard Time \(system\)$/ }).click()
@@ -1161,12 +1220,14 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
       // and the stored rule keeps the millisecond precision the picker writes.
       await timeField.click()
       expect(await timeField.getAttribute('aria-expanded')).toBe('true')
+      await auditWorkflowState(page, 'schedule', 'time-picker', page.getByRole('listbox', { name: 'Hour', exact: true }).locator('..'))
       await page.getByRole('listbox', { name: 'Hour', exact: true }).getByRole('option', { name: '12', exact: true }).click()
       await page.getByRole('listbox', { name: 'Minute', exact: true }).getByRole('option', { name: '34', exact: true }).click()
       await page.getByRole('listbox', { name: 'Second', exact: true }).getByRole('option', { name: '56', exact: true }).click()
       await page.keyboard.press('Escape')
       expect(await timeField.textContent()).toBe('12:34:56')
       await expect.poll(() => detail.getByText('Unsaved changes', { exact: true }).count(), { timeout: 15_000 }).toBe(1)
+      await auditWorkflowState(page, 'schedule', 'edited-rule', detail)
       // The staged draft reaches the Host only through the save bar's Save action.
       await detail.getByRole('button', { name: 'Save changes', exact: true }).click()
       await expect.poll(async () => (await scaffold.ctx.schedule.catalog()).find(task => task.id === created.id), { timeout: 15_000 })
@@ -1185,10 +1246,226 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
       // row; the retired type chips no longer exist.
       await manager.getByRole('button', { name: 'Inactive', exact: true }).click()
       await expect.poll(() => tasks.getByRole('listitem').count()).toBe(0)
+      await auditWorkflowState(page, 'schedule', 'empty-inactive-filter', manager)
       expect(tripwire.pageErrors).toEqual([])
     } finally {
       await scaffold.ctx.schedule.delete({ sessionId: CATALOG_SESSION_ID, id: created.id })
       await page.clock.setFixedTime(new Date(CATALOG_NOW))
     }
-  }, 60_000)
+  }, 150_000)
+
+  it('shows idle Session task marks and the two-task hover preview with an omission count', async () => {
+    const current = await browser.newPage({ viewport: { width: 900, height: 900 }, locale: 'en-US', ...workflowTouchOptions })
+    const ids: ScheduleTask['record']['id'][] = []
+    // The mark counts every active task on the Session: park the shared
+    // fixture's seeded tasks so the created three own the assertion window.
+    const domain = scaffold.ctx.storageDomain.get('schedule')
+    if (domain === undefined) throw new Error('Schedule domain was not opened')
+    const tasks = domain.table('tasks') as KvTable<ScheduleRecord['id'], ScheduleTask>
+    const parked = [...tasks.entries()].map(([, row]) => row)
+      .filter(row => row.sessionId === CATALOG_SESSION_ID)
+    for (const task of parked) await scaffold.ctx.schedule.delete({ sessionId: CATALOG_SESSION_ID, id: task.record.id })
+    try {
+      for (const [index, title] of ['Review release readiness', 'Check long deployment approval and rollback instructions', 'Notify the release owner'].entries()) {
+        const task = await scaffold.ctx.schedule.create(CATALOG_SESSION_ID, {
+          prompt: title, title, at: `2099-08-25T12:0${index + 5}:00.000Z`,
+        })
+        ids.push(task.id)
+      }
+      await current.clock.setFixedTime(new Date(CATALOG_NOW))
+      await current.addInitScript(() => { localStorage.setItem('dsh.locale', 'en') })
+      await current.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await current.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+      const row = current.locator(`[data-row-key^="session:"][data-row-key*="${CATALOG_SESSION_ID}"]`)
+      const decoy = current.locator(`[data-row-key^="session:"][data-row-key*="${DECOY_SESSION_ID}"]`)
+      const showSidebar = async (): Promise<void> => {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const open = current.getByRole('button', { name: 'Open sidebar', exact: true })
+          if (await open.isVisible()) {
+            // A click that lands before the frame's measured width reaches the
+            // layout store flips the wide preference instead of the narrow
+            // drawer override; the drawer then never opens, so confirm the row
+            // is revealed and retry rather than trusting the tap.
+            await open.click()
+          } else if (await row.isVisible()) return
+          try {
+            await row.waitFor({ state: 'visible', timeout: 1200 })
+            return
+          } catch { /* the next pass re-evaluates the toggle against the settled layout */ }
+        }
+      }
+      await showSidebar()
+      await row.click()
+      await expect.poll(() => row.getAttribute('aria-selected')).toBe('true')
+      await showSidebar()
+      await decoy.click()
+      await showSidebar()
+      const mark = row.locator('[data-session-schedule-mark]')
+      await mark.waitFor()
+      expect(await mark.textContent()).toBe('3 scheduled tasks')
+      await mark.click()
+      expect(await decoy.getAttribute('aria-selected')).toBe('true')
+      await auditWorkflowState(current, 'schedule', 'sidebar-task-mark', row, [], showSidebar)
+      const hover = current.locator('[data-session-schedule-tasks]')
+      const card = current.getByRole('button', { name: `Copy: ${CATALOG_TITLE}`, exact: true })
+      const showPreview = async (): Promise<void> => {
+        await showSidebar()
+        await decoy.hover()
+        await row.hover()
+        await hover.waitFor()
+      }
+      await showPreview()
+      expect(await hover.locator('[data-session-schedule-task]').count()).toBe(2)
+      expect(await hover.textContent()).toContain('Review release readiness')
+      expect(await hover.textContent()).toContain('Check long deployment approval and rollback instructions')
+      expect(await hover.textContent()).toContain('1 more tasks')
+      expect(await hover.textContent()).not.toContain('Notify the release owner')
+      await auditWorkflowState(current, 'schedule', 'sidebar-pointer-hover-omission', card, [], showPreview)
+      expect(await decoy.getAttribute('aria-selected')).toBe('true')
+    } finally {
+      try { await current.close() }
+      finally {
+        for (const task of parked) await tasks.put(task.record.id, task)
+        for (const id of ids) await scaffold.ctx.schedule.delete({ sessionId: CATALOG_SESSION_ID, id })
+      }
+    }
+  }, workflowMatrixEnabled ? 180_000 : 60_000)
+
+  it('retains the catalog and task draft through read, update and deletion failures', async () => {
+    const current = await browser.newPage({ viewport: { width: 900, height: 900 }, locale: 'en-US', ...workflowTouchOptions })
+    const createdIds: ScheduleTask['record']['id'][] = []
+    const listReady = Promise.withResolvers<undefined>()
+    const saveReady = Promise.withResolvers<undefined>()
+    const deleteReady = Promise.withResolvers<undefined>()
+    const saveRequested = Promise.withResolvers<undefined>()
+    const deleteRequested = Promise.withResolvers<undefined>()
+    let readMode: 'waiting' | 'failed' | 'unsupported' | 'real' = 'waiting'
+    let holdDelete = true
+    let refuseDelete = true
+    const createTask = async (title: string) => {
+      const task = await scaffold.ctx.schedule.create(CATALOG_SESSION_ID, {
+        prompt: `Review ${title}`, title, at: '2099-08-25T12:08:00.000Z',
+      })
+      createdIds.push(task.id)
+      return task
+    }
+    try {
+      const original = await createTask('Retained deployment approval')
+      await current.route(/\/api\/schedule\/catalog(?:\?.*)?$/, async (route) => {
+        if (readMode === 'waiting') await listReady.promise
+        if (readMode === 'real') { await route.fallback(); return }
+        if (readMode === 'unsupported') {
+          const request = route.request().postDataJSON() as { rpcId: string }
+          await route.fulfill({ json: { type: 'server-response', rpcId: request.rpcId,
+            result: { ok: false, error: { code: 'gateway/service-unavailable', message: 'Schedule unavailable', details: {} } } } })
+          return
+        }
+        await route.fulfill({ status: 503, body: 'Schedule catalog unavailable' })
+      })
+      await current.route(/\/api\/schedule\/update(?:\?.*)?$/, async (route) => {
+        saveRequested.resolve(undefined)
+        await saveReady.promise
+        await route.fulfill({ status: 503, body: 'Schedule update unavailable' })
+      })
+      await current.route(/\/api\/schedule\/delete(?:\?.*)?$/, async (route) => {
+        deleteRequested.resolve(undefined)
+        if (holdDelete) await deleteReady.promise
+        if (refuseDelete) await route.fulfill({ status: 503, body: 'Schedule deletion unavailable' })
+        else await route.fallback()
+      })
+      await current.addInitScript(() => { localStorage.setItem('dsh.locale', 'en') })
+      await current.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await current.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+      const openSidebar = current.getByRole('button', { name: 'Open sidebar', exact: true })
+      if (await openSidebar.isVisible()) await openSidebar.click()
+      await current.getByRole('button', { name: 'Automation tasks', exact: true }).click()
+      const manager = current.getByTestId('task-manager-page')
+      const tasks = manager.getByRole('list', { name: 'Task catalog' })
+      const search = manager.getByRole('searchbox', { name: 'Search tasks' })
+      const details = manager.getByRole('complementary', { name: 'Task details' })
+      await manager.getByRole('status', { name: 'Loading tasks…', exact: true }).waitFor()
+      await auditWorkflowState(current, 'schedule', 'catalog-loading', manager)
+      readMode = 'failed'; listReady.resolve(undefined)
+      await manager.getByText('Could not load tasks.', { exact: true }).waitFor()
+      await auditWorkflowState(current, 'schedule', 'catalog-initial-refused', manager)
+      readMode = 'real'
+      await manager.getByRole('button', { name: 'Retry', exact: true }).click()
+      await tasks.getByRole('button', { name: original.title, exact: true }).waitFor()
+      await auditWorkflowState(current, 'schedule', 'catalog-recovered', manager)
+
+      readMode = 'failed'
+      await createTask('Catalog invalidation witness')
+      await manager.getByText('Could not load tasks.', { exact: true }).waitFor()
+      expect(await tasks.getByRole('button', { name: original.title, exact: true }).isVisible()).toBe(true)
+      await auditWorkflowState(current, 'schedule', 'catalog-refresh-refused-retained', manager)
+      readMode = 'unsupported'
+      await manager.getByRole('button', { name: 'Retry', exact: true }).click()
+      await manager.getByText('Automation tasks are not enabled in this environment.').waitFor()
+      expect(await manager.getByRole('button', { name: 'New', exact: true }).isDisabled()).toBe(true)
+      await auditWorkflowState(current, 'schedule', 'catalog-unsupported', manager)
+      readMode = 'real'
+      await manager.getByRole('button', { name: 'Retry', exact: true }).click()
+      await tasks.getByRole('button', { name: original.title, exact: true }).waitFor()
+      await search.fill('No matching deployment '.repeat(12))
+      await manager.getByText('No matching tasks', { exact: true }).waitFor()
+      await auditWorkflowState(current, 'schedule', 'long-search-empty', manager)
+      await manager.getByRole('button', { name: 'Clear search', exact: true }).click()
+      expect(await search.inputValue()).toBe('')
+      await tasks.getByRole('button', { name: original.title, exact: true }).click()
+      const name = details.getByRole('textbox', { name: 'Automation task name', exact: true })
+      const draft = 'Retained draft — review deployment access before the release window'
+      await name.fill(draft)
+      await details.getByRole('button', { name: 'Save changes', exact: true }).click()
+      await saveRequested.promise
+      expect(await details.getByRole('button', { name: 'Saving…', exact: true }).isDisabled()).toBe(true)
+      expect(await name.isDisabled()).toBe(true)
+      await auditWorkflowState(current, 'schedule', 'rule-save-pending', details)
+      saveReady.resolve(undefined)
+      await details.getByText('Could not confirm the rule update. The row shows the saved rule.', { exact: true }).waitFor()
+      expect(await name.inputValue()).toBe(draft)
+      expect((await scaffold.ctx.schedule.catalog()).find(task => task.id === original.id)?.title).toBe(original.title)
+      await auditWorkflowState(current, 'schedule', 'rule-save-refused-draft-retained', details)
+      await details.getByRole('button', { name: 'Cancel', exact: true }).click()
+      expect(await name.inputValue()).toBe(original.title)
+
+      const confirmDelete = async (): Promise<void> => {
+        await details.getByRole('button', { name: 'Automation task actions', exact: true }).click()
+        await current.getByRole('menuitem', { name: 'Delete task', exact: true }).click()
+        await current.getByRole('dialog', { name: 'Delete this task?' })
+          .getByRole('button', { name: 'Confirm deletion', exact: true }).click()
+      }
+      await confirmDelete()
+      await deleteRequested.promise
+      expect(await name.isDisabled()).toBe(true)
+      expect((await scaffold.ctx.schedule.catalog()).some(task => task.id === original.id)).toBe(true)
+      await auditWorkflowState(current, 'schedule', 'delete-pending', details)
+      holdDelete = false; deleteReady.resolve(undefined)
+      const refusal = current.getByRole('alert').filter({ hasText: 'Could not delete the task.' })
+      await refusal.waitFor()
+      await expect.poll(() => name.isEnabled()).toBe(true)
+      await auditDeleteOutcome(current, 'delete-refused-notice', refusal, async () => {
+        await confirmDelete()
+        await expect.poll(() => name.isEnabled()).toBe(true)
+        expect((await scaffold.ctx.schedule.catalog()).some(task => task.id === original.id)).toBe(true)
+      })
+      await details.getByRole('button', { name: 'Close details', exact: true }).click()
+      refuseDelete = false
+      const success = current.getByRole('status').filter({ hasText: 'Task deleted.' })
+      await auditDeleteOutcome(current, 'delete-success-notice', success, async (viewport) => {
+        const task = await createTask(`Delete outcome ${viewport}`)
+        await search.fill(task.title)
+        await tasks.getByRole('button', { name: task.title, exact: true }).click()
+        await confirmDelete()
+        await expect.poll(async () => (await scaffold.ctx.schedule.catalog()).some(item => item.id === task.id)).toBe(false)
+        await details.waitFor({ state: 'hidden' })
+      })
+    } finally {
+      readMode = 'real'; listReady.resolve(undefined); saveReady.resolve(undefined); deleteReady.resolve(undefined)
+      try { await current.unrouteAll({ behavior: 'wait' }) }
+      finally {
+        try { await current.close() }
+        finally { for (const id of createdIds) await scaffold.ctx.schedule.delete({ sessionId: CATALOG_SESSION_ID, id }) }
+      }
+    }
+  }, workflowMatrixEnabled ? 600_000 : 90_000)
 })

@@ -105,8 +105,10 @@
 }
 
 .input {
-  height: 34px;
-  padding: 0 12px;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: max(34px, calc(1lh + 12px));
+  padding: 6px 12px;
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-3);
@@ -117,8 +119,22 @@
 }
 
 .input:focus-visible {
-  outline: none;
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 1px;
   border-color: var(--dsw-alias-state-business-primary);
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .input {
+    min-height: max(var(--dsw-touch-target, 44px), calc(1lh + 12px));
+    font-size: 16px;
+  }
+
+  .helpButton,
+  .reset {
+    min-width: var(--dsw-touch-target, 44px);
+    min-height: var(--dsw-touch-target, 44px);
+  }
 }
 
 .input:disabled {

@@ -9,6 +9,7 @@ import { resolveDraftEdit, type NodeDraftStorage } from './node-drafts.ts'
 import { CollaborationDeniedError } from './collaboration.ts'
 import { checkDraftSession,confirmDraftAuthority,draftAuthority } from './node-content-draft-authority.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
+import { projectSessionReservation } from './project-session-reservation.ts'
 
 /**
  * Keep personal and not-yet-migrated drafts on the serving computer and enforce the recorded primary for placed projects.
@@ -44,15 +45,16 @@ export function projectNodeDrafts(context: PostgresRuntimeContext, legacy: NodeD
       return { value: row?{revision:Number(row.revision),text:row.body.toString('utf8')}:{revision:0,text:''}, history: row?.previous_versions?.toString('utf8') ?? '[]' }
     }
     const snapshot=await local.read(binding,async db=>{
-        await checkDraftSession(db,'node_content',key,initial)
+        const session=await checkDraftSession(db,'node_content',key,initial)
         const v=(await db.query<{revision:string}>(`SELECT revision::text FROM node_content.conversation_acl_versions
           WHERE organization_id=$1 AND project_id=$2 AND runtime_id=$3`,identity.slice(0,3))).rows[0]
         if(!v)throw new NodeContentUnavailable()
         const stored=await read(db,operation.kind==='read' && operation.revision!==undefined)
-        return {revision:v.revision,value:pinnedDraftValue(stored.value,operation.kind==='read'?operation.revision:undefined,stored.history)}
+        return {revision:v.revision,session,value:pinnedDraftValue(stored.value,operation.kind==='read'?operation.revision:undefined,stored.history)}
     })
     if (!save) {
-      return transaction(context.pool,control=>local.confirmCollaborationRead(binding,snapshot.revision,async()=>{
+      return transaction(context.pool,control=>local.confirmCollaborationRead(binding,snapshot.revision,async db=>{
+        if(snapshot.session==='reservation')await checkDraftSession(db,'node_content',key,initial,true)
         await confirm(control,false)
         return snapshot.value
       }))
@@ -70,6 +72,31 @@ export function projectNodeDrafts(context: PostgresRuntimeContext, legacy: NodeD
       }
       await confirm(control,false)
       return result
+    }))
+  }, async reservedSessionAuthenticated(key,sessionDigest) {
+    if(key.nodeId!==context.nodeId||key.organizationId!==context.organizationId)throw new NodeContentUnavailable()
+    const initial=await draftAuthority(context.pool,key,sessionDigest,true),binding=initial.binding
+    if(!initial.projectId||!key.sessionId)return false
+    const identity={...key,projectId:initial.projectId,actorId:initial.actorId}
+    const confirm=async(control:import('pg').PoolClient)=>confirmDraftAuthority(initial,await draftAuthority(control,key,sessionDigest,true,true))
+    if(!binding)return transaction(context.pool,async control=>{
+      const found=await projectSessionReservation(control,'harness',identity,true)
+      await confirm(control)
+      return found
+    })
+    if(!local||binding.nodeId!==context.nodeId)throw new NodeContentUnavailable()
+    const revision=await local.read(binding,async db=>{
+      if(!await projectSessionReservation(db,'node_content',identity))return undefined
+      const value=(await db.query<{revision:string}>('SELECT revision::text FROM node_content.conversation_acl_versions WHERE organization_id=$1 AND project_id=$2 AND runtime_id=$3',
+        [binding.organizationId,binding.projectId,binding.runtimeId])).rows[0]
+      if(!value)throw new NodeContentUnavailable()
+      return value.revision
+    })
+    if(revision===undefined)return false
+    return transaction(context.pool,control=>local.confirmCollaborationRead(binding,revision,async db=>{
+      const found=await projectSessionReservation(db,'node_content',identity,true)
+      await confirm(control)
+      return found
     }))
   }, async verifyNodeContent({control,local:db,binding:b,migration}) {
     if (!local || context.organizationId!==b.organizationId || context.nodeId!==b.nodeId) throw new NodeContentUnavailable()

@@ -1,4 +1,4 @@
-// Shared time-label helpers for user/assistant IconActions rows.
+// Shared localized time and count labels for conversation chrome.
 
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 
@@ -15,6 +15,21 @@ export interface RunDurationPart {
 }
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
+}
+
+/**
+ * Format turn and step totals with independent singular labels.
+ * @param turns - counted conversation turns.
+ * @param steps - counted model steps.
+ * @param t - the owning conversation translation seat.
+ * @returns localized totals separated by the locale's template.
+ */
+export function formatTurnStepCounts(turns: number, steps: number,
+  t: Translate<'stats.counts' | 'stats.counts.oneTurn' | 'stats.counts.oneStep' | 'stats.counts.oneTurnStep'>): string {
+  const key = turns === 1
+    ? steps === 1 ? 'stats.counts.oneTurnStep' : 'stats.counts.oneTurn'
+    : steps === 1 ? 'stats.counts.oneStep' : 'stats.counts'
+  return t(key, { turns, steps })
 }
 
 /**

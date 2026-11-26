@@ -3,12 +3,18 @@ import type { workbenchRows } from './workbench-rows.ts'
 import type { GatewayRequestContext } from './server.ts'
 import { DocumentTransferError } from './document-transfer.ts'
 
-/** Return only the checked coordinates after the existing owner-filtered directory confirms writable access. */
+/** Return checked coordinates for an existing writable Session or an authenticated creator-owned reservation.
+ * @param read - owner-filtered directory. @param owner - authenticated selected Runtime and scope.
+ * @param input - fully addressed target. @param signal - optional caller cancellation.
+ * @param reservedSession - optional final reservation verifier; absent compositions admit only indexed Sessions. Existing permission errors are never retried through this verifier.
+ * @returns exact writable target without starting a Runtime or reading message content.
+ */
 export async function checkDocumentAttachmentTarget(
   read: ReturnType<typeof workbenchRows>,
   owner: GatewayRequestContext,
   input: URLSearchParams,
   signal?: AbortSignal,
+  reservedSession?: (sessionId:string)=>Promise<boolean>,
 ): Promise<{ runtimeId: string; sessionId: string; canWrite: true }> {
   const id = input.get('documentSession')
   const runtime = input.get('dshRuntime')
@@ -42,7 +48,7 @@ export async function checkDocumentAttachmentTarget(
       'The selected computer cannot verify this conversation.',
     )
   signal?.throwIfAborted()
-  if (await read.exactWritableSession(owner, id)) {
+  if (await read.exactWritableSession(owner, id) || await reservedSession?.(id) === true) {
     signal?.throwIfAborted()
     return { runtimeId: runtime, sessionId: id, canWrite: true }
   }

@@ -3,7 +3,10 @@ import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import { permissionUnavailableReason, type PermissionAvailability } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PermissionCatalog, PermissionSelection as PermissionSelectValue } from '@deepseek-ai/dsh-permission-presets/client'
-import { IconChevronDownOutline14, IconFilePenOutline16, IconShieldAlertOutline16, IconShieldCheckOutline16, Menu, RiskConfirmation, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  focusWithoutRing, IconChevronDownOutline14, IconFilePenOutline16, IconShieldAlertOutline16, IconShieldCheckOutline16,
+  Menu, RiskConfirmation, useMediaQuery,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import css from './PermissionSelect.module.css'
@@ -170,8 +173,11 @@ export function PermissionSelect({ value, catalog, availability, locked, command
               role="menuitemradio"
               aria-checked={item.id === currentValue}
               className={clsx(css.sectionOption, item.id === currentValue && css.sectionOptionSelected)}
-              disabled={locked || busy || item.reason !== undefined}
-              onClick={() => { choose(item.id) }}
+              disabled={locked || pick !== null || item.reason !== undefined}
+              onClick={(event) => {
+                if (item.id === FULL_ACCESS) focusWithoutRing(event.currentTarget)
+                choose(item.id)
+              }}
             >
               {item.icon !== undefined && <span className={css.sectionIcon}>{item.icon}</span>}
               <span className={css.sectionLabel}>{item.label}
@@ -204,8 +210,9 @@ export function PermissionSelect({ value, catalog, availability, locked, command
             title={currentUnavailable === undefined ? current?.description
               : `${t('access.currentUnavailable', { name: modeLabel })} ${t(`access.unavailable.${currentUnavailable}`)}`}
             disabled={locked || busy}
-            onClick={() => {
+            onClick={(event) => {
               if (phone && onOpenSettings !== undefined) {
+                focusWithoutRing(event.currentTarget)
                 onOpenSettings('permission')
               } else {
                 setOpen(!open)

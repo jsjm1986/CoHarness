@@ -6,10 +6,11 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import LlmRuntime, { LlmAdapter } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, LlmOperationDispatch, StreamChunk } from '@deepseek-ai/dsh-llm'
 import * as Governance from '../src/index.ts'
 import { UsageOutbox } from '../src/outbox.ts'
-import { loadPolicy } from '../src/policy.ts'
+import * as ModelPolicy from '../src/policy.ts'
+import * as Reload from '../src/reload.ts'
 
 const oldHome = process.env.DSH_HOME
 afterEach(() => {
@@ -30,8 +31,8 @@ class Adapter extends LlmAdapter {
 async function drain(source: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
   const result: StreamChunk[] = []; for await (const chunk of source) result.push(chunk); return result
 }
-function policy(home: string, allowed: boolean, userDeclaredAllowed = false): void {
-  writeFileSync(join(home, 'model-governance.json'), JSON.stringify({ version: 1, defaultAllowed: false,
+function policy(home: string, allowed: boolean, userDeclaredAllowed = false, version = 1): void {
+  writeFileSync(join(home, 'model-governance.json'), JSON.stringify({ version, defaultAllowed: false,
     userDeclaredAllowed,
     models: [{ provider: 'p', model: 'm', allowed }], providers: [],
     intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
@@ -45,6 +46,22 @@ function replacePolicy(home: string, allowed: boolean): void {
     models: [{ provider: 'p', model: 'm', allowed }], providers: [],
     intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
   renameSync(temp, path)
+}
+
+function observeInitialRefresh(): Promise<{ refresh: () => Promise<void>; finished: Promise<void> }> {
+  const initial = Promise.withResolvers<{ refresh: () => Promise<void>; finished: Promise<void> }>()
+  const PolicyReloader = Reload.PolicyReloader
+  vi.spyOn(Reload, 'PolicyReloader').mockImplementation(function (options: Reload.PolicyReloaderOptions) {
+    return new PolicyReloader({
+      ...options,
+      refresh: () => {
+        const finished = options.refresh()
+        initial.resolve({ refresh: options.refresh, finished })
+        return finished
+      },
+    })
+  })
+  return initial.promise
 }
 
 describe('instance model governance', () => {
@@ -96,7 +113,7 @@ describe('instance model governance', () => {
   it('fails closed on malformed policy and enforces denial before adapter dispatch', async () => {
     const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home
     writeFileSync(join(home, 'model-governance.json'), '{}')
-    expect(() => loadPolicy(join(home, 'model-governance.json'))).toThrow(/version/)
+    expect(() => ModelPolicy.policyReader(join(home, 'model-governance.json')).load()).toThrow(/version/)
     policy(home, false)
     const ctx = new Context(); await ctx.plugin(LlmRuntime)
     const adapter = new Adapter(); ctx.llm.registerAdapter(['p'], adapter)
@@ -106,6 +123,46 @@ describe('instance model governance', () => {
     expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'MODEL_FORBIDDEN' } } })
     expect(readdirSync(join(home, 'model-governance-outbox')).filter(name => name.endsWith('.json'))).toHaveLength(1)
     await ctx.fiber.dispose()
+  })
+
+  it.each(['in-place change', 'missing file'] as const)('denies physical dispatch on %s and admits the restored policy', async change => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-dispatch-'))
+    process.env.DSH_HOME = home
+    const filename = join(home, 'model-governance.json')
+    policy(home, true)
+    const previous = readFileSync(filename)
+    const send = vi.fn(async () => {})
+    let mutate = true
+    const adapter = new class extends LlmAdapter {
+      async *stream(_options: GenerateOptions, dispatch?: LlmOperationDispatch): AsyncIterable<StreamChunk> {
+        if (mutate) {
+          mutate = false
+          if (change === 'in-place change') policy(home, false, false, 2)
+          else rmSync(filename)
+        }
+        if (dispatch === undefined) throw new Error('Missing physical dispatch guard')
+        await dispatch(send)
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      }
+    }()
+    const ctx = new Context()
+    try {
+      await ctx.plugin(LlmRuntime)
+      ctx.llm.registerAdapter(['p'], adapter)
+      await ctx.plugin(Governance)
+      const stream = () => drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [] }))
+      expect((await stream()).at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'MODEL_FORBIDDEN' } } })
+      expect(send).not.toHaveBeenCalled()
+      expect(ctx.modelAccess.decide({ provider: 'p', model: 'm' }).allowed).toBe(false)
+      expect(ctx.modelProviderConfig.snapshot().revision).toBe(change === 'in-place change' ? 2 : 1)
+      writeFileSync(filename, previous)
+      expect((await stream()).at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+      expect(send).toHaveBeenCalledOnce()
+      expect(ctx.modelProviderConfig.snapshot().revision).toBe(1)
+    } finally {
+      await ctx.fiber.dispose()
+      rmSync(home, { recursive: true, force: true })
+    }
   })
 
   it('records usage with personal credential attribution without changing the stream', async () => {
@@ -218,16 +275,110 @@ describe('instance model governance', () => {
     await ctx.fiber.dispose()
   })
 
+  it('serializes policy reads when a refresh request arrives during handoff', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-handoff-'))
+    process.env.DSH_HOME = home
+    policy(home, true)
+    const initial = ModelPolicy.policyReader(join(home, 'model-governance.json')).load()
+    const revoked = {
+      ...initial, version: 2, models: initial.models.map(model => ({ ...model, allowed: false })),
+    }
+    const firstStarted = Promise.withResolvers<void>()
+    const secondStarted = Promise.withResolvers<void>()
+    const first = Promise.withResolvers<ModelPolicy.GovernancePolicyFile>()
+    const second = Promise.withResolvers<ModelPolicy.GovernancePolicyFile>()
+    const read = vi.fn<() => Promise<ModelPolicy.GovernancePolicyFile>>()
+      .mockImplementationOnce(() => { firstStarted.resolve(); return first.promise })
+      .mockImplementationOnce(() => { secondStarted.resolve(); return second.promise })
+      .mockResolvedValue(revoked)
+    vi.spyOn(ModelPolicy, 'policyReader').mockReturnValue({ load: () => initial, read })
+    const watcher = observeInitialRefresh()
+    const ctx = new Context()
+    try {
+      await ctx.plugin(LlmRuntime)
+      const adapter = new Adapter()
+      ctx.llm.registerAdapter(['p'], adapter)
+      await ctx.plugin(Governance)
+      const { refresh, finished } = await watcher
+      await firstStarted.promise
+      const queued = refresh()
+      expect(refresh()).toBe(queued)
+
+      // Arrive after the active read settles, while the next read is still pending.
+      const arrival = first.promise.then(() => Promise.resolve().then(() => ({ finished: refresh() })))
+      first.resolve(initial)
+      await finished
+      const late = await arrival
+      await secondStarted.promise
+      expect(read).toHaveBeenCalledTimes(2)
+      expect(late.finished).toBe(queued)
+      second.resolve(revoked)
+      await queued
+
+      expect(ctx.modelProviderConfig.snapshot().revision).toBe(2)
+      expect(ctx.modelAccess.decide({ provider: 'p', model: 'm' }).allowed).toBe(false)
+      const denied = await drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [] }))
+      expect(denied.at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'MODEL_FORBIDDEN' } } })
+      expect(adapter.calls).toBe(0)
+    } finally {
+      first.resolve(initial)
+      second.resolve(revoked)
+      await ctx.fiber.dispose()
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it('cancels a request waiting for policy without cancelling the shared refresh', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-cancel-refresh-'))
+    process.env.DSH_HOME = home
+    policy(home, true)
+    const initial = ModelPolicy.policyReader(join(home, 'model-governance.json')).load()
+    const read = vi.fn<() => Promise<ModelPolicy.GovernancePolicyFile>>().mockResolvedValue(initial)
+    vi.spyOn(ModelPolicy, 'policyReader').mockReturnValue({ load: () => initial, read })
+    const watcher = observeInitialRefresh()
+    const started = Promise.withResolvers<void>()
+    const held = Promise.withResolvers<ModelPolicy.GovernancePolicyFile>()
+    const ctx = new Context()
+    const controller = new AbortController()
+    let cancelled: Promise<StreamChunk[]> | undefined
+    let peer: Promise<StreamChunk[]> | undefined
+    try {
+      await ctx.plugin(LlmRuntime)
+      const adapter = new Adapter()
+      ctx.llm.registerAdapter(['p'], adapter)
+      await ctx.plugin(Governance)
+      await (await watcher).finished
+      read.mockImplementationOnce(() => { started.resolve(); return held.promise })
+      const options = { provider: 'p', model: 'm', messages: [] }
+      cancelled = drain(ctx.llm.stream({ ...options, signal: controller.signal }))
+      await started.promise
+      peer = drain(ctx.llm.stream(options))
+      controller.abort()
+      expect((await cancelled).at(-1)).toMatchObject({ type: 'finish', reason: { failure: { code: 'ABORTED' } } })
+      expect(adapter.calls).toBe(0)
+
+      held.resolve(initial)
+      expect((await peer).at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+      expect(adapter.calls).toBe(1)
+    } finally {
+      controller.abort()
+      held.resolve(initial)
+      await Promise.allSettled([cancelled, peer])
+      await ctx.fiber.dispose()
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('keeps a failed delivery on disk and drains it after restart', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-outbox-'))
-    const first = new UsageOutbox(dir, 'http://127.0.0.1:1/usage', 't')
+    const first = new UsageOutbox(dir, 'http://127.0.0.1:1/usage', 't', () => {})
     first.enqueue({ eventId: 'e', occurredAt: 1, provider: 'p', model: 'm', purpose: 'assistant',
       credentialSource: 'unknown', credentialClass: 'unknown', status: 'missing-usage' })
     await new Promise(resolve => setTimeout(resolve, 30)); await first.close()
     expect(readdirSync(dir)).toContain('e.json')
     const server = createServer((_req, res) => { res.writeHead(200).end('{}') })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-    const second = new UsageOutbox(dir, `http://127.0.0.1:${(server.address() as AddressInfo).port}/usage`, 't')
+    const second = new UsageOutbox(dir, `http://127.0.0.1:${(server.address() as AddressInfo).port}/usage`, 't', () => {})
     for (let i = 0; i < 30 && readdirSync(dir).includes('e.json'); i++) await new Promise(resolve => setTimeout(resolve, 10))
     await second.close(); await new Promise<void>(resolve => server.close(() => resolve()))
     expect(readdirSync(dir)).not.toContain('e.json')
@@ -245,7 +396,7 @@ describe('instance model governance', () => {
       else res.writeHead(200).end('{}')
     })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-    const outbox = new UsageOutbox(dir, `http://127.0.0.1:${(server.address() as AddressInfo).port}/usage`, 't')
+    const outbox = new UsageOutbox(dir, `http://127.0.0.1:${(server.address() as AddressInfo).port}/usage`, 't', () => {})
     outbox.enqueue({ eventId: 'actor-fallback', occurredAt: 1, provider: 'p', model: 'm', purpose: 'assistant',
       actorUserId: 7, actorProjectId: 3, credentialSource: 'organization', credentialClass: 'company', status: 'succeeded' })
     for (let i = 0; i < 30 && readdirSync(dir).includes('actor-fallback.json'); i++) await new Promise(resolve => setTimeout(resolve, 10))

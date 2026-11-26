@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { UserDocRef } from '@deepseek-ai/dsh-userdoc'
@@ -9,21 +9,29 @@ import type { DocumentsButtonInjected } from '../src/client/DocumentsButton.tsx'
 import { DocumentsOverlay } from '../src/client/DocumentsOverlay.tsx'
 import { apply, inject } from '../src/client/index.ts'
 
+const preloadDocumentsModal = vi.hoisted(() => vi.fn())
+vi.mock('../src/client/DeferredDocumentsModal.tsx', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/client/DeferredDocumentsModal.tsx')>(),
+  preloadDocumentsModal,
+}))
+
 describe('ui-documents apply', () => {
   it('declares only the services it reads', () => {
     expect(inject).toEqual(['slots', 'locale', 'sessions', 'conversation', 'connection', 'deploymentContext'])
   })
 
-  it('registers the footer trigger and one independent picker overlay', async () => {
+  it('registers the picker and owns background preparation after the first editable paint', async () => {
     const ctx = new Context()
     onTestFinished(async () => { await ctx.fiber.dispose() })
+    onTestFinished(() => { preloadDocumentsModal.mockClear() })
+    const firstEditableComposer = createSnapshotStore(false)
     await ctx.plugin(SlotRegistry).await()
     ctx.provide('locale', { register: vi.fn(() => () => {}) })
     const attachDocument = vi.fn(() => true)
     ctx.provide('sessions', {
       list: { getSnapshot: () => ({ current: 'session-1' }), subscribe: () => () => {} },
     })
-    ctx.provide('conversation', { attachDocument })
+    ctx.provide('conversation', { firstEditableComposer, attachDocument })
     ctx.provide('connection', {} as never)
     ctx.provide('deploymentContext', { getSnapshot: () => ({ phase: 'ready', showComputer: false, aggregateComputers: false }), subscribe: () => () => {} } as never)
     ctx.slots.register({
@@ -36,6 +44,9 @@ describe('ui-documents apply', () => {
 
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
+    expect(preloadDocumentsModal).not.toHaveBeenCalled()
+    firstEditableComposer.set(true)
+    expect(preloadDocumentsModal).toHaveBeenCalledOnce()
 
     const entries = ctx.slots.entries('sidebar.footer.action')
     const docEntry = entries.find(entry => entry.component === DocumentsButton)!

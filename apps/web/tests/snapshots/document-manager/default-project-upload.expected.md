@@ -22,10 +22,18 @@
       - img
       - text: Trash
     - button "History"
-  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
   - heading "Compiler" [level=3]
   - navigation "Document path":
     - button "Root folder" [disabled]
+  - group "Document actions":
+    - button "New Folder":
+      - img
+      - text: New Folder
+    - button "Upload Document":
+      - img
+      - text: Upload Document
+    - button "More actions":
+      - img
   - group "Document filters":
     - img
     - textbox "Search document name"
@@ -39,24 +47,14 @@
       - img
       - text: Modified · Newest first
       - img
-  - group "Document actions":
-    - button "New Folder":
-      - img
-      - text: New Folder
-    - button "Upload Document":
-      - img
-      - text: Upload Document
-    - button "More actions":
-      - img
   - checkbox "Select this page"
-  - text: Shared with project members 0 folders · 1 documents
+  - text: "Shared with project members Folders: 0 · Documents: 1"
   - list "Document Manager":
     - group "Upload date 2026-08-14":
       - text: 2026-08-14
       - listitem:
         - checkbox "default-target.txt"
-        - button "Preview default-target.txt": default-target.txt Text · 2026-08-14
+        - button "Preview default-target.txt": default-target.txt Text
         - text: 6 B
-        - button "Add default-target.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: default-target.txt"':
           - img

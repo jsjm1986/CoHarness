@@ -196,6 +196,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // unpublished, as everywhere else in the repository.
   '@deepseek-ai/dsh-client-ui-primitives': ['lib/**/*.css'],
   '@deepseek-ai/dsh-client-ui-dockkit': ['lib/**/*.css'],
+  '@deepseek-ai/dsh-client-ui-plugin-manager': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-remote-desktop': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-documentpreview': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-terminal': ['lib/client.*.js'],
@@ -206,9 +207,9 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   ],
   // TODO(alpha.2): restore 'lib/apply-injections.js' when the worker-page
   // index-injection interpreter is ported with its first consumer.
-  '@deepseek-ai/dsh-client-web': ['lib/**/*.css'],
+  '@deepseek-ai/dsh-client-web': ['lib/boot.js', 'lib/seed.js', 'lib/**/*.css'],
   // Document icons distribute their upstream license notice.
-  '@deepseek-ai/dsh-client-ui-documents': ['LICENSE.material-icon-theme'],
+  '@deepseek-ai/dsh-client-ui-documents': ['lib/client.*.js', 'LICENSE.material-icon-theme'],
   '@deepseek-ai/dsh-client-ui-theme': ['lib/styles'],
   // The physical-key protocol is a public entry usable without the browser service.
   '@deepseek-ai/dsh-client-shortcuts': ['lib/protocol.js'],
@@ -234,7 +235,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-userdoc': ['lib/identity.js'],
   // The runtime provider and Gateway server adapter share generated frame and protocol chunks.
   '@deepseek-ai/dsh-userdoc-gateway': ['lib/protocol.js', 'lib/server.js', 'lib/frame-*.js', 'lib/protocol-*.js'],
-  '@deepseek-ai/dsh-gateway-runtime': ['lib/resource-budget.js'],
+  '@deepseek-ai/dsh-gateway-runtime': ['lib/resource-budget.js', 'lib/steward-statement.js'],
   '@deepseek-ai/dsh-gateway-execution': ['lib/desktop-availability.js'],
   // SDK children load their independent control plugin before profile entries.
   '@deepseek-ai/dsh-subagent-dsh-sdk': ['lib/managed.js'],

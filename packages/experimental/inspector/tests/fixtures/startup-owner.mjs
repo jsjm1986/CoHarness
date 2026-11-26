@@ -13,13 +13,29 @@ const root = new URL('../../../../../', import.meta.url)
 const entry = path => path === 'experimental/inspector' && artifactRoot !== undefined
   ? pathToFileURL(resolve(artifactRoot, 'lib/index.js')).href
   : new URL(`packages/${path}/${mode === 'src' ? 'src/index.ts' : 'lib/index.js'}`, root).href
+const STARTUP_TIMEOUT_MS = Math.max(30_000, Math.floor(Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0) / 2))
+const progress = value => { process.stderr.write(`${JSON.stringify({ at: Math.round(performance.now()), ...value })}\n`) }
+const inspectorBoot = value => value !== null && typeof value === 'object'
+  && value.hostSourcePort !== undefined && value.config !== undefined
 const threads = createRequire(import.meta.url)('node:worker_threads')
 const OriginalWorker = threads.Worker, workers = []
 threads.Worker = class extends OriginalWorker {
   constructor(...args) {
     super(...args)
+    const inspector = inspectorBoot(args[1]?.workerData)
+    if (!inspector) {
+      const keys = args[1]?.workerData !== null && typeof args[1]?.workerData === 'object' ? Object.keys(args[1].workerData).sort() : []
+      progress({ phase: 'worker-ignored', workerDataKeys: keys })
+      return
+    }
+    const index = workers.length
     const record = { exited: false, completion: undefined }
-    record.completion = new Promise(ready => this.once('exit', () => { record.exited = true; ready() }))
+    progress({ phase: 'worker-created', worker: index })
+    record.completion = new Promise(ready => this.once('exit', (code) => {
+      record.exited = true
+      progress({ phase: 'worker-exited', worker: index, code })
+      ready()
+    }))
     workers.push(record)
   }
 }
@@ -32,7 +48,9 @@ console.log = (...args) => {
 }
 let ctx, unblock
 try {
+  progress({ phase: 'boot-import-start', startupTimeoutMs: STARTUP_TIMEOUT_MS })
   const { boot } = await import(entry('boot/app-boot'))
+  progress({ phase: 'boot-imported' })
   const { default: ResourceBudget } = await import(entry('context/resource-budget'))
   const config = join(process.cwd(), 'cordis.yml'), home = join(process.cwd(), '.dsh')
   await writeFile(config, JSON.stringify([
@@ -40,8 +58,12 @@ try {
     { name: entry('host/webserver'), config: { host: '127.0.0.1', port: 0 } },
     { name: entry('client/connection') },
   ]))
+  progress({ phase: 'boot-start' })
   ctx = await boot('inspector-startup-owner', config)
+  progress({ phase: 'booted' })
+  progress({ phase: 'fixture-start', startupTimeoutMs: STARTUP_TIMEOUT_MS })
   for (const change of ['replaced', 'withdrawn', 'unchanged', 'independent']) {
+    progress({ phase: 'change-start', change })
     let admissions = 0, releases = 0, uncertainties = 0, replacementAdmissions = 0
     const entered = Promise.withResolvers(), grant = Promise.withResolvers()
     unblock = () => grant.resolve()
@@ -62,7 +84,8 @@ try {
     let replacement, mounted
     const before = workers.length, announcedBefore = announcements
     try {
-      const load = ctx.loader.create({ id: `inspector-${change}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false } })
+      const load = ctx.loader.create({ id: `inspector-${change}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false, startupTimeoutMs: STARTUP_TIMEOUT_MS } })
+      progress({ phase: 'load-created', change })
       const pending = load.then(async () => {
         mounted = [...ctx.loader.entries()].find(row => row.options.id === `inspector-${change}`)
         assert.ok(mounted?.fiber, 'Inspector did not mount')
@@ -70,6 +93,7 @@ try {
         return { ready: true }
       }).catch(error => ({ ready: false, unavailable: error.reason === 'unavailable' }))
       if (change !== 'independent') await entered.promise
+      progress({ phase: 'admission-entered', change })
       if (change === 'replaced' || change === 'withdrawn') {
         await registration.dispose(); await requirement()
         if (change === 'replaced') replacement = ctx.effect(() => ctx.provide('resourceBudget', {
@@ -78,9 +102,12 @@ try {
       }
       grant.resolve()
       const outcome = await pending
+      progress({ phase: 'startup-settled', change, outcome })
       const published = ctx.get('inspector') !== undefined
       await mounted?.fiber?.dispose()
+      progress({ phase: 'fiber-disposed', change })
       await Promise.all(workers.slice(before).map(worker => worker.completion))
+      progress({ phase: 'workers-exited', change })
       console.log(JSON.stringify({ change, ...outcome, published, announcements: announcements - announcedBefore,
         workers: workers.length - before, exited: workers.slice(before).every(worker => worker.exited),
         admissions, releases, uncertainties, replacementAdmissions }))
@@ -90,13 +117,17 @@ try {
         const fresh = await ctx.plugin(Budget)
         try {
           const retryBefore = workers.length
-          await ctx.loader.create({ id: `retry-${change}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false } })
+          progress({ phase: 'retry-start', change })
+          await ctx.loader.create({ id: `retry-${change}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false, startupTimeoutMs: STARTUP_TIMEOUT_MS } })
+          progress({ phase: 'retry-loaded', change })
           const retry = [...ctx.loader.entries()].find(row => row.options.id === `retry-${change}`)
           assert.ok(retry?.fiber)
           await retry.fiber.await()
           assert.ok(ctx.get('inspector'))
           await retry.fiber.dispose()
+          progress({ phase: 'retry-fiber-disposed', change })
           await Promise.all(workers.slice(retryBefore).map(worker => worker.completion))
+          progress({ phase: 'retry-workers-exited', change })
           assert.equal(workers.length - retryBefore, 1)
         } finally { await fresh.dispose() }
       }
@@ -106,6 +137,7 @@ try {
     }
   }
   for (const clientMode of ['live', 'abandoned']) {
+    progress({ phase: 'bootstrap-start', client: clientMode })
     let releases = 0, mounted, response, received, startup
     const grant = Promise.withResolvers(), entered = Promise.withResolvers(), requestClosed = Promise.withResolvers()
     unblock = () => grant.resolve()
@@ -122,13 +154,14 @@ try {
       void ctx.connection.dispatchHttp(request, reply).then(matched => { if (!matched) reply.writeHead(404).end() })
     })
     try {
-      startup = ctx.loader.create({ id: `bootstrap-${clientMode}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false } })
+      startup = ctx.loader.create({ id: `bootstrap-${clientMode}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false, startupTimeoutMs: STARTUP_TIMEOUT_MS } })
         .then(async () => {
           mounted = [...ctx.loader.entries()].find(row => row.options.id === `bootstrap-${clientMode}`)
           assert.ok(mounted?.fiber)
           await mounted.fiber.await()
         })
       await entered.promise
+      progress({ phase: 'bootstrap-admission-entered', client: clientMode })
       await new Promise((ready, reject) => { carrier.once('error', reject); carrier.listen(0, '127.0.0.1', ready) })
       const path = '/api/experimental-inspector/bootstrap'
       response = fetch(ctx.connection.authenticatedUrl(`http://127.0.0.1:${carrier.address().port}${path}`), { signal: client.signal })
@@ -148,10 +181,13 @@ try {
       }
       grant.resolve()
       await startup
+      progress({ phase: 'bootstrap-startup-settled', client: clientMode })
       const result = await received
       if ('status' in result && result.status === 200) assert.match(JSON.parse(result.body).endpoint, /\/ingest$/)
       await mounted.fiber.dispose()
+      progress({ phase: 'bootstrap-fiber-disposed', client: clientMode })
       await Promise.all(workers.slice(before).map(worker => worker.completion))
+      progress({ phase: 'bootstrap-workers-exited', client: clientMode })
       console.log(JSON.stringify({ phase: 'bootstrap', client: clientMode, headersBefore,
         ...clientMode === 'live' ? { status: result.status } : { fetchRejected, replyUntouched },
         workers: workers.length - before, exited: workers.slice(before).every(worker => worker.exited), releases }))
@@ -163,6 +199,7 @@ try {
       if (carrier.listening) await new Promise(ready => { carrier.closeAllConnections(); carrier.close(ready) })
     }
   }
+  progress({ phase: 'fixture-complete' })
 } finally {
   unblock?.()
   try { await ctx?.fiber.dispose() } finally {

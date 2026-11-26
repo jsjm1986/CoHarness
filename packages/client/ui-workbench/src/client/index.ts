@@ -5,6 +5,8 @@ export type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 export type { WorkbenchKey } from './locales.ts'
 export type { WorkbenchCatalog, WorkbenchConversation } from './catalog.ts'
+export type { PdfPreviewInput } from './contract/pdf-preview.ts'
+export type { PdfLocaleKey } from './pdf/locales.ts'
 
 
 declare module '@deepseek-ai/dsh-client-ui-sidebar-right/client' {

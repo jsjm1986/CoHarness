@@ -81,5 +81,5 @@ export function PlanTitle({ useTabInfo, usePlanDocument, loadPlan }:
   const plan = temporary
     ? (params !== undefined && 'planReview' in params ? params.planReview : undefined)
     : read?.status === 'ready' ? read.plan : undefined
-  return <><FileTypeIcon kind="other" size={16} className={css.titleIcon} />{plan?.title ?? tab.title}</>
+  return <><FileTypeIcon kind="other" size={16} className={css.titleIcon} /><span>{plan?.title ?? tab.title}</span></>
 }

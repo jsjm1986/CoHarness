@@ -7,6 +7,8 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+The deferred remote entry reads the approval inventory at the first verified connection reset. A plugin mounted after connection reads it immediately.
+
 ## Summary
 
 Historical generated-Plugin cards and a frame-wide panel for existing process-local definitions. Users operate definitions supplied by programmatic consumers through the Host runner's authorized endpoints. Creator installs persistent Plugins through Plugin Manager; the model toolset provides only inspection.
@@ -24,6 +26,8 @@ Historical generated-Plugin cards and a frame-wide panel for existing process-lo
 ## Presentation and ownership
 
 Historical `cordis_define`, `cordis_run`, `cordis_stop`, and `cordis_undefine` records retain their source and outcomes. Rendering these records does not register tools, restore definitions, or execute code. Definition cards read the frozen call/result data; a recorded successful removal overrides transient running state.
+
+The source tabs follow arrow-key, Home, and End navigation, with only the selected tab in the Tab order. Unavailable Host or Client source remains disabled; switching tabs only changes the displayed historical code.
 
 The panel reads the Host inventory and pending requests. It groups rows by their owning Session and derives actions from the runner, rather than copying run state into component state. Authorization and definition ownership remain Host responsibilities; displaying a row does not grant permission to execute it.
 

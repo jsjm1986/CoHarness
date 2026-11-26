@@ -35,8 +35,14 @@
   stroke-linejoin: round;
 }
 
-.dsh-diagram-open:hover,
-.dsh-diagram-viewer button:hover,
+@media (hover: hover) {
+  .dsh-diagram-open:hover,
+  .dsh-diagram-viewer button:hover {
+    color: var(--vp-c-brand-1);
+    background: var(--vp-c-bg-soft);
+  }
+}
+
 .dsh-diagram-viewer button[aria-expanded="true"] {
   color: var(--vp-c-brand-1);
   background: var(--vp-c-bg-soft);

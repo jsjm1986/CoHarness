@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-19-progressive-document-overview.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-19-progressive-document-overview.md
+document:
+  en: f4fe68bc7389c4b11363d5c15a698c3c26e13062
+  zh: 900f01d2ea1449cc678176df7df77561346a1d56
+/agent-note-progressive-document-overview:
+  en: a9e0c3d764b43725
+  zh: 2b48c4d99242a1ca
+/agent-note-progressive-document-overview/problem:
+  en: acb0525b270ef36a
+  zh: 696a3c3e1a865a97
+/agent-note-progressive-document-overview/decision:
+  en: 49f3aa6987ed9755
+  zh: 356abf9c8c432bcc
+/agent-note-progressive-document-overview/alternatives-considered:
+  en: a99f92eea5b23f2f
+  zh: e05369d98b55ef81
+/agent-note-progressive-document-overview/consequences:
+  en: e120a526c7af2ab1
+  zh: a72fb64ccbf7b156
+/agent-note-progressive-document-overview/verification:
+  en: 28c70c070bff207d
+  zh: 2c4e6ba67263b54c

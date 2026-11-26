@@ -241,6 +241,20 @@ describe('UserDetailPage', () => {
     expect(api.removeMember).toHaveBeenCalledWith(7, 1)
   })
 
+  it('keeps a refused membership removal in the active confirmation and clears it for the next review', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.removeMember).mockRejectedValue(new Error('Membership changed; review again.'))
+    renderPage()
+    await user.click((await screen.findAllByRole('button', { name: '移出 Shared' }))[0]!)
+    const dialog = await screen.findByRole('dialog', { name: '移出项目' })
+    await user.click(within(dialog).getByRole('button', { name: '确认移出' }))
+    await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toContain('Membership changed; review again.'))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    await user.click(within(dialog).getByRole('button', { name: '取消' }))
+    await user.click(screen.getAllByRole('button', { name: '移出 Shared' })[0]!)
+    expect(within(await screen.findByRole('dialog', { name: '移出项目' })).queryByRole('alert')).toBeNull()
+  })
+
   it('saves a custom user quota', async () => {
     const user = userEvent.setup()
     renderPage()

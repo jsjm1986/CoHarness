@@ -16,6 +16,8 @@ export type NodeEnrollmentToken = Branded<'NodeEnrollmentToken'>
 export type NodeEnrollmentId = Branded<'NodeEnrollmentId'>
 /** Node-generated bearer capability; only its digest is stored by the center. */
 export type NodeCredential = Branded<'NodeCredential'>
+/** Existing control-lease operations; enrollment cannot continue through maintenance. */
+export type NodeControlOperation = 'connect' | 'heartbeat' | 'disconnect'
 
 /** Control-plane deployment limits, independent of runtime/file transfer traffic. */
 export interface NodeAccessConfig {
@@ -25,13 +27,21 @@ export interface NodeAccessConfig {
   maxInFlight: number
 }
 
+const removalBlockerCodes = [
+  'node-access/removal-attached', 'node-access/removal-in-use', 'node-access/removal-projects',
+  'node-access/removal-runtimes', 'node-access/removal-backups', 'node-access/removal-other-bindings',
+] as const
+
+/** Stable reasons why a computer must remain in the organization registry. */
+export type NodeRemovalBlocker = typeof removalBlockerCodes[number]
+
 /** Stable wire refusals accepted by the node agent. */
 export const NODE_ACCESS_ERROR_CODES = [
   'node-access/invalid-request', 'node-access/unauthorized', 'node-access/forbidden', 'node-access/not-found',
   'node-access/name-conflict', 'node-access/enrollment-already-issued', 'node-access/revision-conflict',
   'node-access/already-connected', 'node-access/lease-lost', 'node-access/unsupported-platform',
   'node-access/unsupported-protocol', 'node-access/response-too-large', 'node-access/busy', 'node-access/unavailable',
-  'node-access/mode-disabled', 'node-access/computer-busy', 'node-access/detached',
+  'node-access/quarantined', 'node-access/mode-disabled', 'node-access/computer-busy', 'node-access/detached',
 ] as const
 
 /** Expected refusal without exposing credential material or database diagnostics. */
@@ -41,7 +51,7 @@ export class NodeAccessError extends Error {
    * @param code - stable reason for the receiving application.
    */
   constructor(readonly status: 400 | 401 | 403 | 404 | 409 | 413 | 422 | 503,
-    readonly code: typeof NODE_ACCESS_ERROR_CODES[number]) {
+    readonly code: typeof NODE_ACCESS_ERROR_CODES[number] | NodeRemovalBlocker | 'node-access/removal-changing') {
     super(code)
     this.name = 'NodeAccessError'
   }
@@ -72,6 +82,11 @@ export const nodeLeaseSchema = nodeIdentitySchema.extend({
 /** Lease response consumed by the outbound node process. */
 export type NodeLease = z.infer<typeof nodeLeaseSchema>
 
+/** Private node service attestation with the primary observed alongside a managed node's lease. */
+export interface NodeServiceIdentityLease extends NodeLease {
+  readonly managedPrimary?: { readonly nodeId: RuntimeNodeId; readonly accessRevision: bigint }
+}
+
 /** One-time ticket response; replaying issuance never returns its secret again. */
 export interface NodeEnrollment {
   nodeId: RuntimeNodeId
@@ -86,7 +101,7 @@ export interface NodeAccessEntry {
   nodeId: RuntimeNodeId
   name: string
   revision: number
-  status: 'pending' | 'connected' | 'disconnected' | 'revoked' | 'detached'
+  status: 'pending' | 'connected' | 'disconnected' | 'revoked' | 'detached' | 'quarantined'
   platform: 'darwin' | 'linux' | 'win32' | null
   architecture: 'x64' | 'arm64' | null
   lastSeenAt: string | null
@@ -113,7 +128,7 @@ export type AdminComputerContext = z.infer<typeof adminComputerContextSchema>
 /** Browser-side validation of cached node metadata, independent of the credential exchange. */
 export const nodeAccessEntrySchema: z.ZodType<NodeAccessEntry> = z.object({
   nodeId: runtimeNodeIdSchema, name: z.string().min(1).max(64), revision: revisionSchema,
-  status: z.enum(['pending', 'connected', 'disconnected', 'revoked', 'detached']),
+  status: z.enum(['pending', 'connected', 'disconnected', 'revoked', 'detached', 'quarantined']),
   platform: z.enum(['darwin', 'linux', 'win32']).nullable(), architecture: z.enum(['x64', 'arm64']).nullable(),
   lastSeenAt: z.iso.datetime().nullable(), leaseExpiresAt: z.iso.datetime().nullable(), executionReady: z.boolean(),
 }).strict()
@@ -135,3 +150,17 @@ export const nodeRevocationSchema = z.object({ nodeId: runtimeNodeIdSchema, revi
 /** Confirmed exit from managed execution; the computer retains its independent local data. */
 export const nodeDetachmentSchema = z.object({ nodeId: runtimeNodeIdSchema, revision: revisionSchema,
   status: z.literal('detached'), topologyRevision: z.string().regex(/^(0|[1-9][0-9]*)$/u) }).strict()
+
+/** Current removal eligibility for one exact directory revision. */
+export const nodeRemovalCheckSchema = z.object({
+  nodeId: runtimeNodeIdSchema, revision: revisionSchema, blockers: z.array(z.enum(removalBlockerCodes)).max(removalBlockerCodes.length),
+}).strict()
+
+/** Read-only assessment used to enable the Admin confirmation. */
+export type NodeRemovalCheck = z.infer<typeof nodeRemovalCheckSchema>
+
+/** Receipt returned only after the directory removal and audit event commit. */
+export const nodeRemovalReceiptSchema = nodeDetachmentSchema.extend({ status: z.literal('removed') })
+
+/** Committed removal of the center's record for one computer. */
+export type NodeRemovalReceipt = z.infer<typeof nodeRemovalReceiptSchema>

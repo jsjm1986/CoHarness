@@ -1,16 +1,22 @@
-import { generateKeyPairSync, sign } from 'node:crypto'
+import { createHmac, generateKeyPairSync, sign } from 'node:crypto'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setImmediate } from 'node:timers/promises'
 import { inspect } from 'node:util'
-import { Context } from '@deepseek-ai/cordis'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { Context, FiberState } from '@deepseek-ai/cordis'
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
+import type { ResourceOperationId } from '@deepseek-ai/dsh-resource-budget'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GatewayPrincipalClaims, GatewayRuntimeCredential } from '../src/index.ts'
+import { recordModelResourceFinish } from '../src/model-tail-timing.ts'
 import GatewayRuntime, {
   GatewayResponseTooLargeError,
   GATEWAY_PRINCIPAL_HEADER,
+  GATEWAY_READINESS_NONCE_HEADER,
+  GATEWAY_READINESS_PATH,
+  GATEWAY_READINESS_REQUEST_HEADER,
   GatewaySessionCreationAuthorization,
   readGatewayResponseBytes,
   readGatewayResponseJson,
@@ -141,6 +147,13 @@ describe('Gateway runtime credential', () => {
     expect(() => parseGatewayRuntimeCredential({ ...selected, runtime: { ...selected.runtime, runtimeId: 'invalid' } })).toThrow(/invalid/)
   })
 
+  it('retains a registered computer in the private launch credential', () => {
+    const { credential } = fixture()
+    const nodeId = '11111111-1111-4111-8111-111111111111'
+    expect(parseGatewayRuntimeCredential({ ...credential, nodeId }).nodeId).toBe(nodeId)
+    expect(() => parseGatewayRuntimeCredential({ ...credential, nodeId: 'another-computer' })).toThrow('invalid Gateway runtime credential')
+  })
+
   it('accepts only the signed administrator archive capability for another personal runtime', () => {
     const { credential, issue } = fixture()
     const personalCredential: GatewayRuntimeCredential = {
@@ -164,6 +177,292 @@ describe('Gateway runtime credential', () => {
 })
 
 describe('Gateway request context', () => {
+  it('writes enabled model phase measurements to the managed process log', async () => {
+    const { credential } = fixture()
+    const root = await mkdtemp(join(tmpdir(), 'dsh-gateway-model-timings-'))
+    const output = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const ctx = new Context()
+    try {
+      const credentialPath = join(root, 'credential.json')
+      await writeFile(credentialPath, JSON.stringify(credential))
+      process.env.DSH_GATEWAY_CREDENTIAL_FILE = credentialPath
+      ctx.provide('connection', {} as never)
+      await ctx.plugin(GatewayRuntime, { modelTimings: true }).await()
+      const sample = {
+        startedAt: 1000, outcome: 'first-text', elapsedMs: 29,
+        adapterPreparationMs: 1, resourceWaitMs: 3, initialAuthorizationMs: 2,
+        adapterDispatchPreparationMs: 4, dispatchAuthorizationMs: 5, adapterCallbacks: 1,
+        afterLastAuthorizationMs: 14,
+      } as const
+      ctx.emit('llm/model-attempt-timing', sample)
+      expect(output).toHaveBeenCalledTimes(1)
+      const prefix = '[model-attempt-timing] '
+      const line = String(output.mock.calls[0]?.[0])
+      expect(line.startsWith(prefix)).toBe(true)
+      expect(JSON.parse(line.slice(prefix.length))).toEqual(sample)
+      const correlated = { ...sample, resourceOperationId: '00000000-0000-4000-8000-000000000001' } as const
+      ctx.emit('llm/model-attempt-timing', correlated)
+      expect(output).toHaveBeenCalledTimes(2)
+      expect(JSON.parse(String(output.mock.calls[1]?.[0]).slice(prefix.length))).toEqual(correlated)
+
+      const session = { id: SessionId('tail-session') } as never
+      const opId = '00000000-0000-4000-8000-000000000002' as ResourceOperationId
+      const opId2 = '00000000-0000-4000-8000-000000000003' as ResourceOperationId
+      const retryOpId = '00000000-0000-4000-8000-000000000099' as ResourceOperationId
+      // No-op when target has no attached recorder (e.g. modelTimings disabled).
+      recordModelResourceFinish({}, {
+        sessionId: SessionId('tail-session'), operationId: opId, outcome: 'quiescent',
+        acknowledged: true, retry: false, startedAt: 1000, finishedPerf: performance.now(), elapsedMs: 1.0,
+      })
+      ctx.emit('session/event', session, { type: 'step/end', seq: SessionSeq(1), time: 1, data: { turn: 1, step: 1 } } as never)
+      recordModelResourceFinish(ctx.gatewayRuntime, {
+        sessionId: SessionId('tail-session'), operationId: opId, outcome: 'quiescent',
+        acknowledged: true, retry: false, startedAt: 1000, finishedPerf: performance.now(), elapsedMs: 12.34,
+      })
+      ctx.emit('session/event', session, { type: 'turn/start', seq: SessionSeq(2), time: 2, data: { turn: 1 } } as never)
+      ctx.emit('session/event', session, { type: 'user/message', seq: SessionSeq(2), time: 2, data: {} } as never)
+      ctx.emit('session/event', session, { type: 'step/start', seq: SessionSeq(2), time: 2, data: { turn: 1, step: 1 } } as never)
+      ctx.emit('session/event', session, { type: 'step/end', seq: SessionSeq(2), time: 2, data: { turn: 1, step: 0 } } as never)
+      // Same-step retry (assistant/attempt -> assistant/message on step 1) keeps stepCount at 1.
+      ctx.emit('session/event', session, { type: 'assistant/attempt', seq: SessionSeq(2), time: 2, data: { turn: 1, step: 1 } } as never)
+      recordModelResourceFinish(ctx.gatewayRuntime, {
+        sessionId: SessionId('tail-session'), operationId: opId, outcome: 'quiescent',
+        acknowledged: true, retry: false, startedAt: 1000, finishedPerf: performance.now(), elapsedMs: 12.34,
+      })
+      // A deferred background retry from an earlier turn cannot overwrite the active turn's finish correlation.
+      recordModelResourceFinish(ctx.gatewayRuntime, {
+        sessionId: SessionId('tail-session'), operationId: retryOpId, outcome: 'quiescent',
+        acknowledged: true, retry: true, startedAt: 900, finishedPerf: performance.now(), elapsedMs: 5.5,
+      })
+      ctx.emit('session/event', session, { type: 'assistant/message', seq: SessionSeq(3), time: 3, data: { turn: 1, step: 1 } } as never)
+      // Mismatched step/end cannot close step 1; matching step/end closes step 1.
+      ctx.emit('session/event', session, { type: 'step/end', seq: SessionSeq(4), time: 4, data: { turn: 1, step: 99 } } as never)
+      ctx.emit('session/event', session, { type: 'step/end', seq: SessionSeq(4), time: 4, data: { turn: 1, step: 1 } } as never)
+      ctx.emit('session/event', session, { type: 'turn/end', seq: SessionSeq(5), time: 5, data: { turn: 1, reason: { kind: 'completed' } } } as never)
+      const tailPrefix = '[model-turn-tail-timing] '
+      const tailLine = String(output.mock.calls.at(-1)?.[0])
+      expect(tailLine.startsWith(tailPrefix)).toBe(true)
+      const tail = JSON.parse(tailLine.slice(tailPrefix.length)) as Record<string, unknown>
+      expect(tail).toMatchObject({
+        turn: 1, reason: 'completed', assistantEventType: 'assistant/message', assistantSeq: 3, step: 1,
+        resourceOperationId: opId, resourceFinishOutcome: 'quiescent', resourceFinishAcknowledged: true,
+        resourceFinishElapsedMs: 12.34,
+      })
+      expect(tail.stepCount).toBeUndefined()
+      for (const key of ['resourceFinishToAssistantMs', 'assistantToStepEndMs', 'stepEndToTurnEndMs', 'assistantToTurnEndMs', 'resourceFinishToTurnEndMs']) {
+        expect(typeof tail[key]).toBe('number')
+      }
+
+      // Exercise multi-step turn recording (>16 step cap and steps without finish).
+      ctx.emit('session/event', session, { type: 'turn/start', seq: SessionSeq(10), time: 10, data: { turn: 3 } } as never)
+      ctx.emit('session/event', session, { type: 'step/start', seq: SessionSeq(10), time: 10, data: { turn: 3, step: 1 } } as never)
+      recordModelResourceFinish(ctx.gatewayRuntime, {
+        sessionId: SessionId('tail-session'), operationId: opId, outcome: 'quiescent',
+        acknowledged: true, retry: false, startedAt: 1010, finishedPerf: performance.now(), elapsedMs: 3.2,
+      })
+      ctx.emit('session/event', session, { type: 'assistant/message', seq: SessionSeq(11), time: 11, data: { turn: 3, step: 1 } } as never)
+      ctx.emit('session/event', session, { type: 'step/end', seq: SessionSeq(12), time: 12, data: { turn: 3, step: 1 } } as never)
+      for (let step = 2; step <= 18; step++) {
+        ctx.emit('session/event', session, { type: 'step/start', seq: SessionSeq(9 + step * 2), time: 9 + step, data: { turn: 3, step } } as never)
+        if (step === 2) {
+          recordModelResourceFinish(ctx.gatewayRuntime, {
+            sessionId: SessionId('tail-session'), operationId: opId2, outcome: 'quiescent',
+            acknowledged: true, retry: false, startedAt: 1015, finishedPerf: performance.now(), elapsedMs: 4.1,
+          })
+        }
+        ctx.emit('session/event', session, {
+          type: 'assistant/message',
+          seq: SessionSeq(10 + step * 2),
+          time: 10 + step,
+          data: { turn: 3, step },
+        } as never)
+        ctx.emit('session/event', session, { type: 'step/end', seq: SessionSeq(11 + step * 2), time: 11 + step, data: { turn: 3, step } } as never)
+      }
+      ctx.emit('session/event', session, { type: 'turn/end', seq: SessionSeq(99), time: 99, data: { turn: 3, reason: { kind: 'completed' } } } as never)
+      const multiStep = JSON.parse(String(output.mock.calls.at(-1)?.[0]).slice(tailPrefix.length)) as Record<string, unknown>
+      expect(multiStep).toMatchObject({ turn: 3, stepCount: 18, reason: 'completed' })
+      expect(Array.isArray(multiStep.steps)).toBe(true)
+      expect((multiStep.steps as unknown[]).length).toBe(16)
+
+      // Step 2 aborting before assistant/message must not duplicate Step 1 in steps.
+      ctx.emit('session/event', session, { type: 'turn/start', seq: SessionSeq(100), time: 100, data: { turn: 4 } } as never)
+      ctx.emit('session/event', session, { type: 'step/start', seq: SessionSeq(101), time: 101, data: { turn: 4, step: 1 } } as never)
+      ctx.emit('session/event', session, { type: 'assistant/message', seq: SessionSeq(102), time: 102, data: { turn: 4, step: 1 } } as never)
+      ctx.emit('session/event', session, { type: 'step/end', seq: SessionSeq(103), time: 103, data: { turn: 4, step: 1 } } as never)
+      ctx.emit('session/event', session, { type: 'step/start', seq: SessionSeq(104), time: 104, data: { turn: 4, step: 2 } } as never)
+      ctx.emit('session/event', session, { type: 'step/end', seq: SessionSeq(105), time: 105, data: { turn: 4, step: 2 } } as never)
+      ctx.emit('session/event', session, { type: 'turn/end', seq: SessionSeq(106), time: 106, data: { turn: 4, reason: { kind: 'aborted' } } } as never)
+      const abortedStep2 = JSON.parse(String(output.mock.calls.at(-1)?.[0]).slice(tailPrefix.length)) as Record<string, unknown>
+      expect(abortedStep2).toMatchObject({ turn: 4, reason: 'aborted' })
+      expect(abortedStep2.assistantEventType).toBeUndefined()
+      expect(abortedStep2.steps).toBeUndefined()
+
+      // Exercise turn/end without assistant/step, session/disposed, bounded session eviction, and error containment.
+      ctx.emit('session/event', session, { type: 'turn/start', seq: SessionSeq(6), time: 6, data: { turn: 2 } } as never)
+      recordModelResourceFinish(ctx.gatewayRuntime, {
+        sessionId: SessionId('tail-session'), operationId: opId, outcome: 'not-started',
+        acknowledged: true, retry: false, startedAt: 1001, finishedPerf: performance.now(), elapsedMs: 1.5,
+      })
+      ctx.emit('session/event', session, { type: 'turn/end', seq: SessionSeq(7), time: 7, data: { turn: 2, reason: { kind: 'aborted' } } } as never)
+      const emptyTurnLine = String(output.mock.calls.at(-1)?.[0])
+      expect(JSON.parse(emptyTurnLine.slice(tailPrefix.length))).toMatchObject({
+        turn: 2, reason: 'aborted', resourceOperationId: opId, resourceFinishOutcome: 'not-started',
+      })
+
+      const disposed = { id: SessionId('disposed-session') } as never
+      ctx.emit('session/event', disposed, { type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } } as never)
+      ctx.emit('session/disposed', disposed)
+      ctx.emit('session/event', disposed, { type: 'turn/end', seq: SessionSeq(2), time: 2, data: { turn: 1, reason: { kind: 'completed' } } } as never)
+
+      for (let i = 0; i <= 1025; i++) {
+        ctx.emit('session/event', { id: SessionId(`evict-${i}`) } as never, { type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } } as never)
+      }
+      const tailLines = () => output.mock.calls.filter(([line]) => String(line).startsWith(tailPrefix)).length
+      const beforeEvicted = tailLines()
+      ctx.emit('session/event', { id: SessionId('evict-0') } as never, { type: 'turn/end', seq: SessionSeq(2), time: 2, data: { turn: 1, reason: { kind: 'completed' } } } as never)
+      expect(tailLines()).toBe(beforeEvicted)
+      ctx.emit('session/event', { id: SessionId('evict-1025') } as never, { type: 'assistant/attempt', seq: SessionSeq(2), time: 2, data: { turn: 1, step: 1 } } as never)
+      ctx.emit('session/event', { id: SessionId('evict-1025') } as never, { type: 'turn/end', seq: SessionSeq(3), time: 3, data: { turn: 1, reason: { kind: 'error' } } } as never)
+      expect(JSON.parse(String(output.mock.calls.at(-1)?.[0]).slice(tailPrefix.length))).toMatchObject({
+        turn: 1, reason: 'error', assistantEventType: 'assistant/attempt', assistantSeq: 2,
+      })
+
+      output.mockImplementationOnce(() => { throw new Error('sink failed') })
+      ctx.emit('session/event', { id: SessionId('evict-1024') } as never, { type: 'turn/end', seq: SessionSeq(2), time: 2, data: { turn: 1, reason: { kind: 'completed' } } } as never)
+    } finally {
+      output.mockRestore()
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('emits [runtime-boot-timing] once on the first authenticated readiness 200 with startup marks and 503 counts', async () => {
+    const { credential } = fixture()
+    const root = await mkdtemp(join(tmpdir(), 'dsh-gateway-boot-timings-'))
+    const output = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const ctx = new Context()
+    let readinessHandler: ((req: IncomingMessage, res: ServerResponse) => void) | undefined
+    try {
+      const credentialPath = join(root, 'credential.json')
+      await writeFile(credentialPath, JSON.stringify(credential))
+      process.env.DSH_GATEWAY_CREDENTIAL_FILE = credentialPath
+      const startupMarks: {
+        entryUptimeMs: number
+        proxyInstalledMs: number
+        profileComposedMs: number
+        patchesReadMs: number
+        hostPreparedMs: number
+        bootSettledMs?: number
+        notifySettled?: () => void
+      } = {
+        entryUptimeMs: 120, proxyInstalledMs: 10, profileComposedMs: 25,
+        patchesReadMs: 30, hostPreparedMs: 45,
+      }
+      ctx.provide('runtimeStartupMarks', startupMarks)
+      ctx.provide('connection', {
+        http: {
+          handlePrefix: (_path: string, handler: (req: IncomingMessage, res: ServerResponse) => void) => {
+            readinessHandler = handler
+            return async () => {}
+          },
+        },
+      } as never)
+      await ctx.plugin(GatewayRuntime, { modelTimings: true, requiredPlugins: ['req-a'] }).await()
+      const probe = async () => {
+        const nonce = 'nonce-12345678901234567890'
+        const proof = createHmac('sha256', credential.token)
+          .update(`dsh-gateway-readiness-v1\u0000request\u0000${nonce}\u0000${credential.runtime.kind}\u0000${credential.runtime.id}\u0000${credential.runtime.generation}`)
+          .digest('base64url')
+        let status = 0
+        const res = Object.assign({} as ServerResponse, {
+          writeHead(code: number) { status = code; return res },
+          end() { return res },
+        })
+        await ctx.waterfall('connection/request', {
+          kind: 'http', method: 'GET', pathname: GATEWAY_READINESS_PATH,
+          headers: { [GATEWAY_READINESS_NONCE_HEADER]: nonce, [GATEWAY_READINESS_REQUEST_HEADER]: proof },
+        }, async () => {
+          readinessHandler?.({} as IncomingMessage, res)
+        })
+        return status
+      }
+      expect(await probe()).toBe(503)
+      ctx.provide('resourceBudget', {} as never)
+      expect(await probe()).toBe(503)
+      ctx.provide('loader', {
+        entries: () => [{ options: { id: 'req-a' }, fiber: { state: FiberState.ACTIVE } }],
+      } as never)
+      expect(await probe()).toBe(200)
+      expect(await probe()).toBe(200)
+      const bootLines = output.mock.calls.map(([line]) => String(line)).filter(line => line.startsWith('[runtime-boot-timing] '))
+      expect(bootLines).toHaveLength(1)
+      const bootSample = JSON.parse((bootLines[0] ?? '').slice('[runtime-boot-timing] '.length)) as Record<string, unknown>
+      expect(bootSample).toMatchObject({
+        kind: 'project', ownerId: 41, generation: 7,
+        readiness503ResourceBudget: 1, readiness503RequiredPlugins: 1, pluginCount: 1,
+        profileBoot: {
+          entryUptimeMs: 120, proxyInstalledMs: 10, profileComposedMs: 25,
+          patchesReadMs: 30, hostPreparedMs: 45,
+        },
+      })
+      for (const key of ['credentialReadStartUptimeMs', 'credentialReadMs', 'gatewayRuntimeReadyUptimeMs', 'firstReadinessUptimeMs']) {
+        expect(typeof bootSample[key]).toBe('number')
+      }
+      expect(typeof startupMarks.notifySettled).toBe('function')
+      startupMarks.bootSettledMs = 95
+      startupMarks.notifySettled?.()
+      expect(startupMarks.notifySettled).toBeUndefined()
+      const settledLines = output.mock.calls.map(([line]) => String(line)).filter(line => line.startsWith('[runtime-boot-settled] '))
+      expect(settledLines).toHaveLength(1)
+      const settled = JSON.parse((settledLines[0] ?? '').slice('[runtime-boot-settled] '.length)) as Record<string, unknown>
+      expect(settled).toMatchObject({ kind: 'project', ownerId: 41, generation: 7, bootSettledMs: 95, pluginCount: 1 })
+      expect(typeof settled.bootSettledUptimeMs).toBe('number')
+      await ctx.fiber.dispose()
+      expect(startupMarks.notifySettled).toBeUndefined()
+
+      // An in-flight readiness probe running after fiber transitions to UNLOADING must never leak notifySettled onto ctx.root.
+      const unloadingCtx = new Context()
+      const unloadingMarks: typeof startupMarks = {
+        entryUptimeMs: 120, proxyInstalledMs: 10, profileComposedMs: 25, patchesReadMs: 30, hostPreparedMs: 45,
+      }
+      unloadingCtx.provide('runtimeStartupMarks', unloadingMarks)
+      unloadingCtx.provide('resourceBudget', {} as never)
+      unloadingCtx.provide('loader', {
+        entries: () => [{ options: { id: 'req-a' }, fiber: { state: FiberState.ACTIVE } }],
+      } as never)
+      let unloadingHandler: ((req: IncomingMessage, res: ServerResponse) => void) | undefined
+      unloadingCtx.provide('connection', {
+        http: {
+          handlePrefix: (_path: string, handler: (req: IncomingMessage, res: ServerResponse) => void) => {
+            unloadingHandler = handler
+            return async () => {}
+          },
+        },
+      } as never)
+      const fiber = unloadingCtx.plugin(GatewayRuntime, { modelTimings: true, requiredPlugins: ['req-a'] })
+      await fiber.await()
+      const nonce = 'nonce-unloading-1234567890'
+      const proof = createHmac('sha256', credential.token)
+        .update(`dsh-gateway-readiness-v1\u0000request\u0000${nonce}\u0000${credential.runtime.kind}\u0000${credential.runtime.id}\u0000${credential.runtime.generation}`)
+        .digest('base64url')
+      const res = Object.assign({} as ServerResponse, { writeHead() { return res }, end() { return res } })
+      await unloadingCtx.waterfall('connection/request', {
+        kind: 'http', method: 'GET', pathname: GATEWAY_READINESS_PATH,
+        headers: { [GATEWAY_READINESS_NONCE_HEADER]: nonce, [GATEWAY_READINESS_REQUEST_HEADER]: proof },
+      }, async () => {
+        const disposing = fiber.dispose()
+        unloadingHandler?.({} as IncomingMessage, res)
+        await disposing
+      })
+      expect(unloadingMarks.notifySettled).toBeUndefined()
+      await unloadingCtx.fiber.dispose()
+    } finally {
+      output.mockRestore()
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('isolates concurrent principals and forwards only the selected assertion', async () => {
     const { credential, issue } = fixture()
     const root = await mkdtemp(join(tmpdir(), 'dsh-gateway-runtime-'))

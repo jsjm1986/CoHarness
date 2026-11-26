@@ -29,7 +29,7 @@ import type { createSidebarRightStore } from '../src/client/stores.ts'
 import type { RightbarActions } from '@deepseek-ai/dsh-client-ui-layout/src/client/service.ts'
 import { RightbarSeat } from '../src/client/shell/SidebarRight.tsx'
 import { RightbarRoot, type RightbarRootInjected } from '../src/client/shell/RightbarRoot.tsx'
-import { ExpandButton } from '../src/client/shell/ExpandButton.tsx'
+import { ExpandButton, MobileExpandButton } from '../src/client/shell/ExpandButton.tsx'
 import { GuideBody } from '../src/client/tabs/guide/GuideBody.tsx'
 import { GuideTitle } from '../src/client/tabs/guide/GuideTitle.tsx'
 import { ToolBody } from '../src/client/tabs/tool/ToolBody.tsx'
@@ -161,7 +161,7 @@ describe('ui-sidebar-right apply', () => {
   })
 
   it('provides both faces, and registers the guide through the same two-stage path as any other type', async () => {
-    const { ctx, registered, dictionaries, seat } = await boot()
+    const { ctx, registered, dictionaries, seat, injectedOf } = await boot()
     expect(ctx.sidebarRightTabs).toBeInstanceOf(SidebarRightTabRegistry)
     expect(ctx.sidebarRight).toBeInstanceOf(SidebarRightController)
     expect('adopt' in ctx.sidebarRight).toBe(false)
@@ -181,6 +181,7 @@ describe('ui-sidebar-right apply', () => {
       ['rightbar', undefined, undefined, RightbarRoot],
       ['rightbar.session', undefined, 'sidebarRight', RightbarSeat],
       ['conversation.session.header.corner', undefined, 'sidebarRight', ExpandButton],
+      ['shell.mobile.header.actions', undefined, 'sidebarRight', MobileExpandButton],
       ['sidebar.right.pane.tab', GUIDE_ID, undefined, GuideBody],
       ['sidebar.right.pane.tab.title', GUIDE_ID, undefined, GuideTitle],
     ])
@@ -192,6 +193,10 @@ describe('ui-sidebar-right apply', () => {
     // Both seats read one store: the button only needs to know whether the panel is expanded.
     expect(seat('rightbar.session').store).toBeDefined()
     expect(seat('conversation.session.header.corner').store).toBe(seat('rightbar.session').store)
+    expect(seat('shell.mobile.header.actions').store).toBe(seat('rightbar.session').store)
+    const mobile = injectedOf(seat('shell.mobile.header.actions')) as { hooks: Pick<RightbarRootInjected['hooks'], 'viewport'> }
+    const root = injectedOf(seat('rightbar')) as RightbarRootInjected
+    expect(mobile.hooks.viewport).toBe(root.hooks.viewport)
   })
 
   it('names the root-selected Session as on screen', async () => {
@@ -513,7 +518,7 @@ describe('ui-sidebar-right apply', () => {
     expect(dictionaries.size).toBe(0)
     await ctx.plugin({ inject: [...inject], apply }).await()
     expect(ctx.sidebarRightTabs.get('guide')?.id).toBe(GUIDE_ID)
-    expect(registered).toHaveLength(7)
+    expect(registered).toHaveLength(8)
   })
 
   it('routes tool details through the bar binding and collapses on close', async () => {
@@ -647,9 +652,9 @@ describe('ui-sidebar-right apply', () => {
     await fiber.dispose()
   })
 
-  it('focuses the bar from the corner expand face', async () => {
+  it.each(['conversation.session.header.corner', 'shell.mobile.header.actions'])('focuses the bar from %s', async (name) => {
     const { seat, injectedOf, layout, fiber } = await boot()
-    ;(injectedOf(seat('conversation.session.header.corner')) as { focus(): void }).focus()
+    ;(injectedOf(seat(name)) as { focus(): void }).focus()
     expect(layout.focusRightbar).toHaveBeenCalledWith(SESSION)
     await fiber.dispose()
   })

@@ -19,10 +19,12 @@
   background: var(--dsw-alias-bg-layer-2);
 }
 
+.plot[data-controls] { grid-template-columns: 44px minmax(0, 1fr) auto; }
+
 .labels {
   position: relative;
   border-right: 0.5px solid var(--dsw-alias-border-l1);
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xs-13);
   font-size: 10px;
   line-height: 1;
@@ -124,7 +126,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xs-13);
 }
 

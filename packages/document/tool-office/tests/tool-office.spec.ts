@@ -20,6 +20,7 @@ import type { GenerateOptions, LlmModelInfo, LlmResolvedModelInfo, StreamChunk }
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { RUN_CODE_NAME, defineTool } from '@deepseek-ai/dsh-tools'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import { FsError } from '@deepseek-ai/dsh-fs'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import OfficeKit, { OfficeKitError, type OfficeKitErrorCode, type OfficeImagesRequest, type OfficeImagesResult, type OfficeKitSource } from '@deepseek-ai/dsh-office-kit'
@@ -281,6 +282,21 @@ describe('render', () => {
       maxImages: Math.min(20, limits.maxImagesPerMessage), maxBytes: Math.min(32 * 1024 * 1024, limits.maxMessageImageBytes),
       maxPixels: Math.min(8_388_608, limits.maxImagePixels), maxDimension: Math.min(8192, limits.maxImageDimension),
     })
+  })
+
+  it('authorizes the resolved input before reading Office metadata or content', async () => {
+    const { ctx, kit } = await setup()
+    const stat = vi.spyOn(ctx.fs, 'stat')
+    ctx.on('fs/authorize-target', (path, mode) => {
+      expect(path).toBe(join(dir, 'deck.pptx'))
+      expect(mode).toBe('read')
+      throw new FsError('Read permission required', 'FS_PERMISSION_DENIED')
+    })
+    const result = await office(ctx, { operation: 'render', input: 'deck.pptx' })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('Read permission required')
+    expect(stat).not.toHaveBeenCalled()
+    expect(kit.renderImages).not.toHaveBeenCalled()
   })
 
   it('passes worksheet selections and reports substituted fonts', async () => {

@@ -329,7 +329,7 @@ Source: [`packages/remote-desktop/remote-desktop/src/index.ts`](../../packages/r
  * @param agent - caller's Session address; supplies session-scope matching.
  * @param request - optional principal, revoked-row, and attachable filters.
  * @param signal - request cancellation.
- * @returns matching grants, newest administration first.
+ * @returns matching grants, newest administration first; empty when no desktop provider is enabled.
  */
 @Remote async listGrants( agent: Agent, request: { principal?: string; includeRevoked?: boolean; attachable?: boolean }, signal: AbortSignal, ): Promise<RemoteDesktopGrantView[]>
 

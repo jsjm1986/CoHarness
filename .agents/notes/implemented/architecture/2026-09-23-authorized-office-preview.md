@@ -14,7 +14,7 @@ The upstream [Office converter](../../../../packages/document/office-kit/README.
 
 Deferred reads use version-guarded FS byte windows within the admitted capacity. This preserves the SSH provider's window limit without truncating an accepted document or weakening version checks. A cold Session header suffices; conversion neither activates an Agent nor adds Session events. Principal revocation, request cancellation, and plugin disposal invalidate pending results.
 
-The existing Workbench file tab selects Office or PDF presentation. Upstream PDF.js worker ownership, same-version embedded assets, lazy visible-page rendering, selectable text, and font notices are adapted to that tab. The tab retains its page preference while hidden; its body releases workers and bytes. There is no second resource subscription or client PDF cache. Changed source metadata requires explicit reload; access denial hides and releases content immediately.
+The existing Workbench file tab selects Office or PDF presentation. Upstream PDF.js worker ownership, same-version embedded assets, lazy visible-page rendering, selectable text, and font notices are adapted to that tab. The Worker imports same-version JavaScript image decoders through the packaged resource loader when WebAssembly instantiation fails. Missing-font notices are part of the document scrollport so the reader keeps space for pages and zoom controls in short panes. The tab retains its page preference while hidden; its body releases workers and bytes. There is no second resource subscription or client PDF cache. Changed source metadata requires explicit reload; access denial hides and releases content immediately.
 
 ## Alternatives considered
 

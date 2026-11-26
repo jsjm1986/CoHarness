@@ -95,8 +95,9 @@ describe('display-settings stylesheet contract', () => {
     // re-point the preference stops at the .markdown container and transcript
     // text never changes size. The re-point scales around the 16px/28px design
     // baseline (preference 14 ↔ design 16), keeping the 1.75 ratio.
-    expect(root).toContain('--dsw-font-markdown-base: calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family)')
-    expect(root).toContain('--dsw-font-markdown-base-strong: 600 calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family)')
-    expect(root).toContain('--dsw-font-markdown-h4: 600 calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family)')
+    const bodySize = 'calc(1rem + var(--dsh-chat-font-size) - 14px)/1.75 var(--dsw-font-family)'
+    expect(root).toContain(`--dsw-font-markdown-base: ${bodySize}`)
+    expect(root).toContain(`--dsw-font-markdown-base-strong: 600 ${bodySize}`)
+    expect(root).toContain('--dsw-font-markdown-h4: var(--dsw-font-markdown-base-strong)')
   })
 })

@@ -17,6 +17,7 @@ description: "完成通知以有界提供方尝试保留当前收件人和重试
 
 ## 迁移
 
-1. 升级完整 Gateway 构建。设备 API 字段和数据库 schema 无需迁移。确认来源电脑使用权限撤销后，即使另一台电脑仍获准，个人会话也停止通知；整个账户的设备注册仍可使用。
+1. 升级包含迁移 144 和 145 的完整 Gateway 构建。保留已应用的迁移名称和校验值。确认撤销来源电脑的权限后，该电脑的个人会话停止通知，账号的设备注册仍可使用。
 2. 可设置正数 `HGW_PUSH_DELIVERY_TIMEOUT_MS`（默认 `30000`）和 `HGW_PUSH_DELIVERY_LEASE_MS`（默认 `120000`）。租期必须大于超时；无效值会令启动失败。
 3. 考虑响应丢失前远端已经接受的情况：后续重试可能重复通知。failed 与过期记录需要再次触发回调；不增加后台 worker。见[投递归属](../../../../.agents/notes/implemented/bug-fix/2026-10-29-push-delivery-authority.zh.md)。
+4. 更新回执客户端以提交通知中的 `runtimeId`。旧回执省略 `runtimeId` 时，仅匹配一条投递才会成功。使用 UnifiedPush 的部署需设置 `HGW_UP_ENDPOINT_ALLOWLIST`。

@@ -1,0 +1,61 @@
+- 'img "Change request state: Needs attention"'
+- text: "Keep shared controls reachable across phones, landscape and keyboard navigation #42"
+- 'button "Commits shown: All commits"':
+  - text: All commits
+  - img
+- button "Submit review"
+- button "Open in browser":
+  - img
+- button "All 1 files":
+  - text: All 1 files
+  - img
+- 'button "Review layer: All"':
+  - text: All
+  - img
+- switch "Hide test files"
+- button "Review threads, 2 in total": Threads 2
+- progressbar "Viewed files": 0 / 1 viewed
+- text: +2 −1
+- button "Refresh changes":
+  - img
+- button "Collapse all files":
+  - img
+- button "Side by side" [pressed]:
+  - img
+- button "Wrap lines" [pressed]
+- region "All 1 files":
+  - button "Collapse controls.ts" [expanded]:
+    - img
+  - text: controls.ts
+  - button "controls.ts has 1 unresolved threads; go to the next one": 1 unresolved
+  - text: +2 −1
+  - checkbox "Mark controls.ts as viewed"
+  - button "More actions for controls.ts":
+    - img
+  - button "Select line L1": "1"
+  - text: export const title = "Shared controls"
+  - button "Select line R1": "1"
+  - text: export const title = "Shared controls"
+  - button "Select line L2": "2"
+  - text: export const target = 28
+  - button "Select line R2": "2"
+  - text: export const target = 44
+  - img
+  - text: Resolved thread · reviewer
+  - button "Expand"
+  - region "R2":
+    - text: R2 · on aaaaaaa reviewer 1 min ago
+    - button "Actions for the comment by reviewer":
+      - img
+    - paragraph: The forty-four-pixel action remains reachable on touch screens.
+    - button "Reply…"
+    - button "Add to input"
+    - button "View on GitHub":
+      - img
+      - text: View on GitHub
+    - button "Resolve thread"
+  - button "Select line R3": "3"
+  - text: export const description = "Keep every action reachable on a phone and a keyboard"
+  - button "Remaining unchanged lines":
+    - img
+    - text: Remaining unchanged lines

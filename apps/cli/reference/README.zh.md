@@ -11,6 +11,10 @@
 
 不可变启动快照中继承的非空 `DSH_GATEWAY_CREDENTIAL_FD` 或 `DSH_GATEWAY_CREDENTIAL_FILE` 会选择托管执行。应用在 SDK 引导和 profile 条目挂载前，就要求模型策略、资源准入和执行身份。提供方等待激活或不可用时，相关操作会被拒绝；凭据通道标记不会认证调用者，也不会授予权限。环境文件中的值不能选择此模式。独立启动保留可选提供方。这些要求属于应用，在 profile 提供方重载期间保持有效。
 
+托管启动通过私有父进程 IPC 通道发布 `dsh-runtime-stop-ready`。收到 `dsh-runtime-stop` 后，进程关闭 Agent 准入，等待[计划停止 Agent 与 Session](../../../packages/core/agent-loop/README.zh.md#planned-shutdown)，然后释放 profile。`dsh-runtime-stopped` 报告 `confirmed`、`failed` 或 `timeout`。经 IPC 确认停止时，回执送达后以 0 退出。托管进程收到 `SIGTERM` 后用退出码 80 表示已确认、81 表示失败、82 表示超时、83 表示第二次信号强制退出。监督进程设置 `DSH_GATEWAY_SHUTDOWN_RECEIPT` 时，托管进程还会为 `SIGTERM` 独占写入回执，内容含停止结果及由私有启动凭据文件计算的 HMAC。回执发布失败时以 81 退出。
+
+监督进程可在私有停止消息中传入正整数 `graceMs`。启动器在该期限内完成检查点和 profile 清理。信号停止或停止消息未带可用期限时，按五秒处理。
+
 ## Profile 启动
 
 `dsh <name>` 是 `dsh --profile <name>` 的简写，启动位于 `$DSH_HOME/profiles/<name>` 的 profile。简写中的名称必须紧跟 `dsh`；`plugin` 仍为插件管理命令，因此启动同名 profile 时须使用 `dsh --profile plugin`。生效配置树以空根节点为起点，依次叠加 profile manifest（元数据清单）的 `dsh.profile.bundles` 列表中指定的各组合包 patch、profile 自身的 `cordis.patch.yml`、home 级的 `$DSH_HOME/cordis.patch.yml`（这是各 profile 共享的机器本地偏好，因此优先于逐 profile 配置层），以及按 argv 顺序指定的各个 `--patch <path>` 覆盖层。对同一配置行，后应用的层优先。patch 会替换目标行的整个 `config` 值，而不是深度合并其中的键；patch 也可以插入新行。最终 YAML 组合决定是否由 `dsh-hmr` 监视配置；未启用 HMR 时，更改需要重启。配置解析、schema 校验、模块解析或插件启动失败时，系统会报告错误并以非零状态退出。收到 SIGINT 或 SIGTERM 时，挂载的根节点会先 dispose（资源释放）再退出。
@@ -123,7 +127,7 @@ dsh web --help
 
 生产 Web 运行器需要已构建的包和前端产物（`pnpm run build`）。配置了 `--public-url` 时打印公告根，否则打印采用监听器协议的绑定地址 URL（默认为 `http://127.0.0.1:3080`，配置 TLS 时为 `https://`）。Host/Origin 栅栏直接接受 bind IP；代理或 DNS authority 仍需 `--trusted-host`。启动行与默认浏览器交接都等待完整 Loader 配置树结算。继承的 `SSH_CONNECTION` 或 `SSH_TTY` 非空时会跳过浏览器打开，但启动行仍会打印。本机交接前会打印英文提示 `dsh web: opening the default browser; pass --no-open to disable`；若操作系统交接失败，stderr 会说明原因并指向启动 URL，服务器仍继续运行。
 
-进程关闭时，插件树最多有 5 秒完成 dispose。首次收到 `SIGINT` 或 `SIGTERM` 时会开始优雅排空：`SIGTERM` 是监督进程发出的常规停止请求，在所有运行模式下都以 0 退出；`SIGINT` 则报告 130。第二次收到信号时会立即强制退出。如果一次性运行在正常结束时已经卡在 dispose 阶段，第一次按下 `Ctrl+C` 就会直接升级为强制退出，而不会被忽略。
+进程关闭时，插件树最多有 5 秒完成资源释放。独立启动收到 `SIGTERM` 时以 0 退出，收到 `SIGINT` 时以 130 退出。再次收到信号会立即强制退出。一次性运行若在正常结束时已卡在资源释放阶段，首次按下 `Ctrl+C` 即会强制退出。[托管启动](#managed-launch)会向监督进程报告计划停止的结果。
 
 基于 base 的模式都将运行命令时所在的目录作为默认 workspace 根目录，以 65,536 字节渲染预算加载适用的 `AGENTS.md` 或 `CLAUDE.md` 指令，并使用内存 SQLite 会话内容索引。独立的 `sdk-minimal` profile 把运行命令时所在的目录作为沙箱策略根目录，但刻意省略文件系统工具、指令发现与 SQLite。启用的 HMR 插件会监视 profile 与 home 两个 `cordis.patch.yml` 配置层的有效变更，并以事务方式重新应用；未启用 HMR 时只应用一次。一次性运行模式通过有界关闭流程退出，该流程会 dispose 所有实时监视器。
 

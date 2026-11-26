@@ -2,7 +2,7 @@
  * Prop shares the kit's own components pass among themselves. These are internal
  * to the package — the outward contracts are in `adapter.ts`.
  */
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { DockLabels, TabMenuExtras, TabRenderer } from '../contract/adapter.ts'
 import type { PaneId, SplitId, TabId } from '../contract/types.ts'
 import type { DropTarget } from '../engine/geometry.ts'
@@ -17,10 +17,15 @@ export interface PaneCallbacks {
   readonly onSplitPane: (paneId: PaneId) => void
   readonly onAddTab: (paneId: PaneId) => void
   readonly onCloseTab: (tabId: TabId) => void
+  readonly onPlaceTab: (tabId: TabId, paneId: PaneId, index: number) => void
+  readonly onFloatTab: (tabId: TabId) => void
   /** Begin dragging a tab; the surface owns the gesture from here. */
   readonly onTabPressed: (tabId: TabId, event: ReactPointerEvent<HTMLElement>) => void
   /** Begin dragging a divider inside `splitId`, at the boundary after `index`. */
   readonly onDividerPressed: (splitId: SplitId, index: number, event: ReactPointerEvent<HTMLElement>) => void
+  readonly onDividerKey: (splitId: SplitId, index: number, event: ReactKeyboardEvent<HTMLElement>) => void
+  readonly onAdjustDivider: (splitId: SplitId, index: number, delta: number) => void
+  readonly minPaneFraction: number
   /** Why a pane cannot split right now, or `undefined` while it can. */
   readonly splitBlock: (paneId: PaneId) => SplitBlock | undefined
   /** Hide blocked split controls instead of rendering them disabled. */

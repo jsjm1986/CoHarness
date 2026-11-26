@@ -14,8 +14,8 @@ export class AdministratorReadUnavailableError extends Error {
 /** Headers published with authorized JSON data, never with an authority refusal. */
 export type AdministratorResponseHeaders = Readonly<Record<string, string>>
 
-/** One already-selected JSON response's synchronous transport writer. */
-export type AdministratorJsonWriter = (status: number, body: unknown, headers?: AdministratorResponseHeaders) => void
+/** One already-selected JSON response's transport writer. */
+export type AdministratorJsonWriter = (status: number, body: unknown, headers?: AdministratorResponseHeaders) => void | Promise<void>
 
 /** Awaited responses keep current read qualification ahead of both data and metadata headers. */
 export interface AdministratorResponse {
@@ -69,11 +69,11 @@ export function createAdministratorResponse(
     if (current === null || current.status !== 'active' || current.role !== 'admin' || current.mustChangePassword) {
       throw new CollaborationDeniedError('forbidden')
     }
-    write(status, body, headers)
+    await write(status, body, headers)
   }
   const json: AdministratorResponse['json'] = async (status, body, headers) => {
     if (isRead) await readJson(status, body, headers)
-    else write(status, body, headers)
+    else await write(status, body, headers)
   }
   return { json, readJson, error: (status, error, code) => json(status, { error, ...(code === undefined ? {} : { code }) }) }
 }

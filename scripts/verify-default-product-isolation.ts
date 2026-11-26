@@ -4,7 +4,7 @@
  * switch on, selected by no shipped template, its own dependency graph outside the default product's.
  */
 
-import { existsSync, globSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, globSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, extname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
@@ -55,14 +55,26 @@ export interface ProductIsolationResult {
 /**
  * Check default app installations and their authored runtime/configuration inputs.
  * Experimental opt-in packages and separate Web preview entries are outside these roots.
- * @param root - repository root; no build outputs or installed workspace links are read.
+ * @param root - repository directory or its filesystem alias; the check reads authored workspace files.
  * @returns violations and the sizes of the checked package, source, and configuration sets.
  */
 export function verifyDefaultProductIsolation(root: string): ProductIsolationResult {
+  root = realpathSync(root)
   const failures: string[] = []
   const packages = new Map<string, Package>()
   const directories = new Map<string, Package>()
   const display = (path: string): string => relative(root, path).replaceAll('\\', '/')
+  const canonicalize = (target: string): string => {
+    const suffix: string[] = []
+    let current = target
+    while (!existsSync(current)) {
+      const parent = dirname(current)
+      if (parent === current) return target
+      suffix.unshift(basename(current))
+      current = parent
+    }
+    return resolve(realpathSync(current), ...suffix)
+  }
   for (const path of globSync([
     'apps/*/package.json', 'packages/*/*/package.json', 'vendor/*/package.json',
     'native/system/packages/*/package.json', 'python/sdk-runtime/package.json',
@@ -129,8 +141,8 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
   }
   const reference = (name: string, origin: string, owner?: Package): void => {
     if (name.startsWith('.') || name.startsWith('/') || /^(?:file|link):/.test(name)) {
-      const target = name.startsWith('file://') ? fileURLToPath(name)
-        : resolve(owner?.directory ?? root, name.replace(/^(?:file|link):/, ''))
+      const target = canonicalize(name.startsWith('file://') ? fileURLToPath(name)
+        : resolve(owner?.directory ?? root, name.replace(/^(?:file|link):/, '')))
       const pkg = directories.get(target) ?? ownerOf(target)
       if (pkg !== undefined) add(pkg, origin)
       return
@@ -202,7 +214,7 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
         if (!composedWeb && Array.isArray(entry.config.patches)) entry.config.patches.forEach(visit)
         const included = entry.config.path
         if (typeof included !== 'string') return
-        const filename = included.startsWith('file:') ? fileURLToPath(included) : resolve(dirname(path), included)
+        const filename = canonicalize(included.startsWith('file:') ? fileURLToPath(included) : resolve(dirname(path), included))
         if (includeStack.has(filename)) {
           failures.push(`${display(path)}: cyclic Include path ${display(filename)}`)
           return

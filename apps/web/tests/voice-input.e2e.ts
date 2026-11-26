@@ -9,27 +9,34 @@ import type { SpeechInput, SpeechPreparationState, SpeechProviderId } from '@dee
 import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
-  captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, webSnapshotMode, watchConsole,
+  captureStableAria, fixtureUserPrompts, launchWebScaffold, selectedSessionFixture, webSnapshotMode, watchConsole,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage } from './support.ts'
+import { completionBarrier, connectFreshWorkspace } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
 
-const fixture = fileURLToPath(new URL('../../../snapshots/web/fresh-round-trip/session.v3.jsonl', import.meta.url))
+const fixturePath = fileURLToPath(new URL('../../../snapshots/web/fresh-round-trip/session.v7.jsonl', import.meta.url))
 const expected = fileURLToPath(new URL('../../../snapshots/web/voice-input/ui.expected.md', import.meta.url))
 const interruptedExpected = fileURLToPath(new URL('../../../snapshots/web/voice-input/interrupted.expected.md', import.meta.url))
 const recordingExpected = fileURLToPath(new URL('../../../snapshots/web/voice-input/recording.expected.md', import.meta.url))
 const bundle = fileURLToPath(new URL('../../../packages/experimental/voice-input-bundle', import.meta.url))
 
-it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from standby and submits only the reviewed transcript through Session replay', async () => {
+it.skipIf(webSnapshotMode() === 'record' || responsiveBrowserName !== 'chromium')('guides voice setup, records from standby and submits only the reviewed transcript through Session replay', async () => {
   const scratch = await mkdtemp(join(tmpdir(), 'dsh-voice-browser-'))
+  const transcriptRelease = completionBarrier()
+  const cancelledTranscriptRelease = completionBarrier()
   const resources: { scaffold?: WebScaffold; browser?: Browser } = {}
   onTestFinished(async () => {
+    transcriptRelease.resolve()
+    cancelledTranscriptRelease.resolve()
     try { await resources.browser?.close() } finally {
       try { await resources.scaffold?.close() } finally { await rm(scratch, { recursive: true, force: true }) }
     }
   })
   const overlay = join(scratch, 'voice.patch.yml')
   await writeFile(overlay, '- id: speech-to-text-sensevoice\n  disabled: true\n')
+  const fixture = await selectedSessionFixture(fixturePath)
   const prompt = fixtureUserPrompts(await readFile(fixture, 'utf8'))[0]!
   const prefix = 'Use the bash tool to '
   const scaffold = await launchWebScaffold({
@@ -37,9 +44,11 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
     extraOverlayPath: [join(bundle, 'cordis.patch.yml'), overlay], replayFixture: fixture,
   })
   resources.scaffold = scaffold
-  const recognize = vi.fn(async (input: SpeechInput) => {
+  const recognize = vi.fn(async (input: SpeechInput, signal: AbortSignal) => {
+    signal.throwIfAborted()
     expect(Buffer.from(input.audio).subarray(0, 4).toString()).toBe('RIFF')
     expect(input.audio.byteLength).toBeGreaterThan(44)
+    await transcriptRelease.promise
     return { text: prompt.slice(prefix.length), audioSeconds: 1, inferenceSeconds: 0.1 }
   })
   let preparation: SpeechPreparationState = { phase: 'unprepared' }
@@ -62,7 +71,7 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   })
   const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] })
   resources.browser = browser
-  const page = await newEnglishPage(browser), tripwire = watchConsole(page)
+  const page = await newWorkflowPage(browser), tripwire = watchConsole(page)
   await page.addInitScript(() => {
     const holder = window as Window & {
       voiceTestStreams?: MediaStream[]
@@ -90,11 +99,21 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   await page.goto(scaffold.authenticatedUrl)
   await connectFreshWorkspace(page, scaffold.workspaceCwd)
   const input = page.locator('[data-composer-card] textarea:enabled'), mic = page.getByRole('button', { name: 'Start recording', exact: true })
+  const auditCapture = async (state: string, phase: 'recording' | 'transcribing' | 'feedback' | 'idle'): Promise<void> => {
+    const verify = async (): Promise<void> => {
+      const activity = page.locator('[data-voice-activity]')
+      if (phase === 'idle') await expect.poll(() => activity.count()).toBe(0)
+      else await expect.poll(() => activity.getAttribute('data-voice-activity')).toBe(phase)
+    }
+    await verify()
+    await auditWorkflowState(page, 'voice', state, page.locator('[data-composer-card]'), [], undefined, verify)
+  }
   const setupMic = page.getByRole('button', { name: 'Open voice input setup', exact: true })
   await input.fill(prefix)
   await setupMic.click()
   const setup = page.getByRole('dialog', { name: 'Set up voice input before recording', exact: true })
   await setup.waitFor()
+  await auditWorkflowState(page, 'voice', 'setup', setup)
   const setupAction = setup.getByRole('button', { name: 'Go to setup', exact: true })
   await expect.poll(() => setupAction.evaluate(element => element === document.activeElement)).toBe(true)
   await page.keyboard.type('NoDraftEdits')
@@ -104,7 +123,7 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   expect(await setup.getByRole('button', { name: 'Cancel', exact: true }).evaluate(element => element === document.activeElement)).toBe(true)
   await page.keyboard.press('Shift+Tab')
   expect(await setupAction.evaluate(element => element === document.activeElement)).toBe(true)
-  await compareOrRefreshGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/setup.expected.md', import.meta.url)),
+  await compareWorkflowGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/setup.expected.md', import.meta.url)),
     await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
   await setup.getByRole('button', { name: 'Later', exact: true }).click()
   expect(await setup.count()).toBe(0)
@@ -115,7 +134,8 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   await setupMic.click()
   const unavailable = page.getByRole('dialog', { name: 'Speech recognition is not ready', exact: true })
   await unavailable.waitFor()
-  await compareOrRefreshGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/unavailable.expected.md', import.meta.url)),
+  await auditWorkflowState(page, 'voice', 'unavailable', unavailable)
+  await compareWorkflowGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/unavailable.expected.md', import.meta.url)),
     await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
   await page.setViewportSize({ width: 420, height: 900 })
   const dialogBox = await unavailable.boundingBox()
@@ -134,6 +154,7 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.locator('[data-plugin-item-detail="speech-to-text"]')
     .getByRole('button', { name: 'Retry preparation', exact: true }).waitFor()
+  await auditWorkflowState(page, 'voice', 'preparation-failed', page.locator('[data-plugin-item-detail="speech-to-text"]'))
   expect(await unavailable.count()).toBe(0)
   expect(messages).toBe(0)
   expect(recognize).not.toHaveBeenCalled()
@@ -147,11 +168,12 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   const selectedDevice = devices[0]!
   await devicePicker.selectOption(selectedDevice.deviceId)
   await expect.poll(() => devicePicker.inputValue()).toBe(selectedDevice.deviceId)
+  await auditWorkflowState(page, 'voice', 'device-selected', page.locator('[data-plugin-item-detail="speech-to-text"]'))
   await expect.poll(() => page.evaluate(() => {
     const streams = (window as Window & { voiceTestStreams?: MediaStream[] }).voiceTestStreams!
     return streams.filter(stream => stream.getTracks().some(track => track.readyState === 'live')).length
   })).toBe(1)
-  await compareOrRefreshGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/device.expected.md', import.meta.url)),
+  await compareWorkflowGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/device.expected.md', import.meta.url)),
     await captureStableAria(page, '[data-voice-input-device]', scaffold.workspaceCwd), webSnapshotMode())
   const acquisitions = await page.evaluate(() => (window as Window & { voiceTestStreams?: MediaStream[] }).voiceTestStreams!.length)
   const otherDevice = devices[1]!
@@ -176,7 +198,8 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   expect(await missing.isDisabled()).toBe(true)
   await level.waitFor({ state: 'hidden' })
   expect(await devicePicker.evaluate(element => (element as HTMLSelectElement).selectedOptions[0]?.textContent)).toContain('Unavailable')
-  await compareOrRefreshGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/device-missing.expected.md', import.meta.url)),
+  await auditWorkflowState(page, 'voice', 'device-missing', page.locator('[data-plugin-item-detail="speech-to-text"]'))
+  await compareWorkflowGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/device-missing.expected.md', import.meta.url)),
     await captureStableAria(page, '[data-voice-input-device]', scaffold.workspaceCwd), webSnapshotMode())
   await page.evaluate(() => {
     (window as Window & { voiceTestExcluded?: string[] }).voiceTestExcluded = []
@@ -195,10 +218,11 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
     navigator.mediaDevices.dispatchEvent(new Event('devicechange'))
   }, { id: selectedDevice.deviceId, label: longName })
   await expect.poll(() => devicePicker.evaluate(element => (element as HTMLSelectElement).selectedOptions[0]?.textContent)).toBe(longName)
+  await auditWorkflowState(page, 'voice', 'device-long-name', page.locator('[data-plugin-item-detail="speech-to-text"]'))
   await page.setViewportSize({ width: 360, height: 900 })
   await level.waitFor()
   await devicePicker.scrollIntoViewIfNeeded()
-  await compareOrRefreshGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/device-long.expected.md', import.meta.url)),
+  await compareWorkflowGolden(fileURLToPath(new URL('../../../snapshots/web/voice-input/device-long.expected.md', import.meta.url)),
     await captureStableAria(page, '[data-voice-input-device]', scaffold.workspaceCwd), webSnapshotMode())
   const pickerBounds = (await devicePicker.boundingBox())!, levelBounds = (await level.boundingBox())!
   expect(levelBounds.x).toBeGreaterThan(pickerBounds.x + pickerBounds.width / 2)
@@ -232,24 +256,32 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   await input.fill(prefix)
   await mic.click()
   await page.getByRole('button', { name: 'Stop and transcribe', exact: true }).waitFor()
+  await auditCapture('recording', 'recording')
   expect(await page.evaluate(() => (window as Window & { voiceTestStreams?: MediaStream[] }).voiceTestStreams!
     .at(-1)!.getAudioTracks()[0]!.getSettings().deviceId)).toBe(selectedDevice.deviceId)
-  await compareOrRefreshGolden(recordingExpected,
+  await compareWorkflowGolden(recordingExpected,
     await captureStableAria(page, '[data-composer-card]', scaffold.workspaceCwd), webSnapshotMode())
   expect(await page.getByRole('dialog').count()).toBe(0)
   // Controlled fake microphone audio occupies this recording interval; it is not a readiness wait.
   await page.waitForTimeout(300)
   await page.getByRole('button', { name: 'Stop and transcribe', exact: true }).click()
+  await expect.poll(() => recognize.mock.calls.length).toBe(1)
+  await auditCapture('transcribing', 'transcribing')
+  expect(await input.inputValue()).toBe(prefix)
+  expect(messages).toBe(0)
+  transcriptRelease.resolve()
   await expect.poll(() => input.inputValue()).toBe(prompt)
   expect(recognize).toHaveBeenCalledOnce()
   expect(messages).toBe(0)
-  await compareOrRefreshGolden(expected, await captureStableAria(page, '[data-conversation-region="chat"]', scaffold.workspaceCwd), webSnapshotMode())
+  await auditCapture('review-transcript', 'idle')
+  await compareWorkflowGolden(expected, await captureStableAria(page, '[data-conversation-region="chat"]', scaffold.workspaceCwd), webSnapshotMode())
   const settled = scaffold.whenTurnSettled()
   await input.press('Enter')
   await settled
   await page.getByText('DONE', { exact: true }).waitFor()
   const meter = page.getByRole('button', { name: /% of context used/ })
   await meter.waitFor()
+  const contextUsage = await meter.getAttribute('aria-label')
   for (const width of [1280, 420]) {
     await page.setViewportSize({ width, height: 900 })
     await expect.poll(async () => {
@@ -260,8 +292,10 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
     await page.getByRole('dialog', { name: 'of context used', exact: true }).waitFor()
     await page.keyboard.press('Escape')
   }
-  await mic.hover()
-  await page.getByRole('tooltip', { name: 'Dictate', exact: true }).waitFor()
+  if (!workflowMatrixEnabled) {
+    await mic.hover()
+    await page.getByRole('tooltip', { name: 'Dictate', exact: true }).waitFor()
+  }
   await mic.click()
   const stop = page.getByRole('button', { name: 'Stop and transcribe', exact: true })
   await stop.waitFor()
@@ -285,14 +319,130 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
     track.stop(); track.dispatchEvent(new Event('ended'))
   })
   await page.getByRole('button', { name: 'Record again', exact: true }).waitFor()
+  await auditCapture('recording-interrupted', 'feedback')
   await page.evaluate(() => { navigator.mediaDevices.dispatchEvent(new Event('devicechange')) })
   expect(await stop.count()).toBe(0)
-  await compareOrRefreshGolden(interruptedExpected,
-    await captureStableAria(page, '[data-composer-card]', scaffold.workspaceCwd), webSnapshotMode())
+  await meter.waitFor()
+  expect(await meter.getAttribute('aria-label')).toBe(contextUsage)
+  await compareWorkflowGolden(interruptedExpected,
+    await captureStableAria(page, '[data-composer-tool-layout]', scaffold.workspaceCwd), webSnapshotMode())
   expect(recognize).toHaveBeenCalledOnce()
   await page.getByRole('button', { name: 'Record again', exact: true }).click()
   await stop.waitFor()
+  await auditCapture('recording-retry', 'recording')
   await page.keyboard.press('Escape')
+  await mic.waitFor()
+  const retainedDraft = 'Keep this draft while voice input recovers.'
+  await input.fill(retainedDraft)
+  recognize.mockRejectedValueOnce(new Error('Recognition service unavailable'))
+  await mic.click()
+  await stop.waitFor()
+  // Capture a non-empty fake-device WAV before sending it to the failing provider.
+  await page.waitForTimeout(300)
+  await stop.click()
+  await page.getByRole('status').filter({ hasText: 'Recognition service unavailable' }).waitFor()
+  await auditCapture('transcription-failed', 'feedback')
+  expect(await input.inputValue()).toBe(retainedDraft)
+  expect(recognize).toHaveBeenCalledTimes(2)
+  recognize.mockImplementationOnce(async () => {
+    await cancelledTranscriptRelease.promise
+    return { text: 'Late cancelled transcript', audioSeconds: 1, inferenceSeconds: 0.1 }
+  })
+  await page.getByRole('button', { name: 'Record again', exact: true }).click()
+  await stop.waitFor()
+  await page.waitForTimeout(300)
+  await stop.click()
+  await expect.poll(() => recognize.mock.calls.length).toBe(3)
+  const cancelledSignal = recognize.mock.calls[2]![1]
+  expect(cancelledSignal.aborted).toBe(false)
+  await auditCapture('transcribing-cancellable', 'transcribing')
+  await page.locator('[data-voice-activity]').getByRole('button', { name: 'Cancel', exact: true }).click()
+  await mic.waitFor()
+  await expect.poll(() => cancelledSignal.aborted).toBe(true)
+  cancelledTranscriptRelease.resolve()
+  const lateResult = recognize.mock.results[2]
+  if (lateResult?.type !== 'return') throw new Error('Cancelled transcription did not start')
+  await lateResult.value
+  await auditCapture('cancelled-transcription-retains-draft', 'idle')
+  expect(await input.inputValue()).toBe(retainedDraft)
+  await expect.poll(() => page.evaluate(() => (window as Window & { voiceTestStreams?: MediaStream[] }).voiceTestStreams!
+    .every(stream => stream.getTracks().every(track => track.readyState === 'ended')))).toBe(true)
   expect(messages).toBe(1)
   expect(tripwire.pageErrors).toEqual([])
-}, 120_000)
+}, workflowMatrixEnabled ? 420_000 : 120_000)
+
+it.skipIf(webSnapshotMode() === 'record')('keeps every recognizer preparation state readable without downloading model resources', async () => {
+  const scratch = await mkdtemp(join(tmpdir(), 'dsh-voice-preparation-'))
+  const resources: { scaffold?: WebScaffold; browser?: Browser } = {}
+  onTestFinished(async () => {
+    try { await resources.browser?.close() } finally {
+      try { await resources.scaffold?.close() } finally { await rm(scratch, { recursive: true, force: true }) }
+    }
+  })
+  const overlay = join(scratch, 'voice.patch.yml')
+  await writeFile(overlay, '- id: speech-to-text-sensevoice\n  disabled: true\n')
+  const scaffold = await launchWebScaffold({ extraInstallAnchors: [join(bundle, 'package.json')],
+    extraOverlayPath: [join(bundle, 'cordis.patch.yml'), overlay] })
+  resources.scaffold = scaffold
+  let preparation: SpeechPreparationState = { phase: 'unprepared' }
+  const listeners = new Set<() => void>()
+  await scaffold.ctx.plugin({ inject: ['speechToText'], apply(ctx) {
+    ctx.effect(() => ctx.speechToText.register({
+      info: { id: 'sensevoice-local' as SpeechProviderId, name: 'Review recognizer', location: 'host-local', languages: ['auto', 'en', 'zh'],
+        setupEstimate: { recommendedDiskBytes: 1_000_000_000, expectedMemoryBytes: 500_000_000, minimumMinutes: 1, maximumMinutes: 3 },
+        downloadSources: ['https://huggingface.co', 'https://hf-mirror.com'] },
+      preparation: {
+        snapshot: () => preparation,
+        subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+        prepare: () => { throw new Error('This UI fixture never downloads model resources') }, cancel: async () => {},
+      },
+      transcribe: async () => { throw new Error('Preparation inspection does not record audio') },
+    }))
+  } })
+  const browser = await responsiveBrowser.launch()
+  resources.browser = browser
+  const page = await newWorkflowPage(browser), tripwire = watchConsole(page)
+  await page.goto(scaffold.authenticatedUrl, { waitUntil: 'domcontentloaded' })
+  await connectFreshWorkspace(page, scaffold.workspaceCwd)
+  await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+  await page.locator('[data-plugin-item="speech-to-text"]').getByRole('button', { name: 'View Voice', exact: true }).click()
+  const detail = page.locator('[data-plugin-item-detail="speech-to-text"]')
+  await detail.getByText('Review recognizer', { exact: true }).last().waitFor()
+  const states: readonly SpeechPreparationState[] = [
+    { phase: 'unprepared' },
+    { phase: 'checking', step: 'check', startedAt: Date.now() },
+    { phase: 'downloading', resource: 'speech-model.bin', completedBytes: 12_000_000, totalBytes: 48_000_000, step: 'model', steps: [
+      { kind: 'check', status: 'complete' }, { kind: 'model', status: 'running' }, { kind: 'vad', status: 'pending' },
+      { kind: 'verify', status: 'pending' }, { kind: 'load', status: 'pending' },
+    ] },
+    { phase: 'loading', step: 'load', startedAt: Date.now() },
+    { phase: 'waking', startedAt: Date.now() },
+    { phase: 'cancelling', startedAt: Date.now() },
+    { phase: 'cancelled' },
+    { phase: 'failed', message: 'Unable to prepare the selected speech model.', download: {
+      resource: 'speech-model.bin', source: 'https://huggingface.co', reason: 'network', code: 'ECONNRESET',
+    } },
+    { phase: 'standby' },
+    { phase: 'ready' },
+  ]
+  const summaries: Readonly<Record<SpeechPreparationState['phase'], string>> = {
+    unprepared: 'First use downloads the local recognition models.', checking: 'Checking local resources…',
+    downloading: 'Prepare recognition model', loading: 'Loading Review recognizer…', waking: 'Waking local speech recognition…',
+    cancelling: 'Cancelling preparation…', cancelled: 'Preparation cancelled. Completed downloads are retained.',
+    failed: 'Setup failed', standby: 'Local resources are prepared. Recording wakes the recognizer.', ready: 'Local speech recognition is ready.',
+  }
+  for (const state of states) {
+    preparation = state
+    for (const listener of listeners) listener()
+    const summary = detail.getByText(summaries[state.phase], { exact: true })
+    await summary.waitFor()
+    await auditWorkflowState(page, 'voice-preparation', state.phase, detail)
+    if (state.phase === 'downloading') {
+      await summary.click()
+      await detail.getByRole('listitem', { name: 'Prepare recognition model · In progress', exact: true }).waitFor()
+      await auditWorkflowState(page, 'voice-preparation', 'download-steps', detail)
+      await detail.getByText('Preparation steps', { exact: true }).click()
+    }
+  }
+  expect(tripwire.pageErrors).toEqual([])
+}, workflowMatrixEnabled ? 300_000 : 90_000)

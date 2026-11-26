@@ -3,6 +3,7 @@
   max-height: calc(var(--dsw-viewport-height, 100dvh) - var(--dsw-space-8));
   gap: 0;
   padding: 0;
+  overflow: auto;
 }
 
 .wide {
@@ -51,7 +52,7 @@
 }
 .iconButton:disabled { cursor: default; opacity: .5; }
 .iconButton:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color); outline-offset: 1px; }
-.body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--dsw-space-6); }
+.body { flex: 1 1 auto; min-height: 160px; overflow: auto; overscroll-behavior: contain; padding: var(--dsw-space-6); }
 .footer {
   display: flex;
   flex: none;

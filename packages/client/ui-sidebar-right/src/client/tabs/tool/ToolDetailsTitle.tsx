@@ -48,7 +48,7 @@ export function ToolDetailsTitle({ useSession, useTabInfo }: PropsRuntime<'sideb
   return (
     <>
       <CallGlyph card={call?.card} />
-      {call?.name ?? tab.title}
+      <span>{call?.name ?? tab.title}</span>
     </>
   )
 }

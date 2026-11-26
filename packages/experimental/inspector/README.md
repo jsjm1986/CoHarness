@@ -45,6 +45,8 @@ The [distribution build](scripts/build-devtools.ts) emits ESM entries, shared ch
 
 The frontend uses browser runtime adapters and excludes Node-only transports at build time, without an import map. Its same-origin connection bootstrap precedes the application entry. The bottom panel adds `disableLocaleInfoBar=true`; the bootstrap sets DevTools' own `disable-locale-info-bar` preference without changing its language. Updating the frontend requires changing the npm pin and source configuration together, then rerunning the panel and Worker checks; incompatible source edits fail the build.
 
+On touch screens, the bottom panel keeps a larger resize handle and close target. Its title and actions wrap when the viewport is narrow.
+
 <a id="runtime-layout"></a>
 ## Runtime layout
 

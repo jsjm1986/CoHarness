@@ -62,15 +62,15 @@ vendored Loader 经其 `internal` 约定消费模块系统——唯一调用点�
 
 为什么名册是 yml 行而不是扫描？因为哪些插件组合进一次部署是组合决策，不是包属性——一个在仓库中声明了 dsh.client 的包，不代表这次部署要挂载它，扫描发现无从替人做这个决定；node 半只扫描配置树实际挂载了的东西。
 
-**第一阶段——模块面。**注入的 HTML 以 queue 模式安装 `window.__ModuleLoader__`，以阻塞式 classic script 执行 modules 与 runtime graph row，赋值 `window.__DSH_BOOT__`，然后启动 Vite 主模块。内核把原始图和外壳 seed 传给 facade 的 `create()`。Facade 移除 modules registration，用拒绝全部 external 的 bootstrap `require` 将其物化，再调用其 `createClientModuleSystem` 导出。Modules bundle 解析图、构造系统、记忆化自身 exports，并在模块闭包中保留该实例；构造过程先把同一 facade 切换到 live registration，再排空 runtime 的 pending factory。随后内核并行预取每个 `immediately` row；prefetch 会递归登记已声明的动态请求和 row 自身，但不物化任一项。单行预取失败在这里被吞下，因为第二阶段 import 会重试并拥有那次大声失败。`immediately` 仍是到达标记，不是生命周期屏障或包身份。
+**第一阶段——模块面。**注入的 HTML 以队列模式安装 `window.__ModuleLoader__`，以阻塞式经典脚本执行 modules 和 runtime 条目，赋值 `window.__DSH_BOOT__`，然后启动 Vite 主模块。内核把原始图和外壳模块传给注册接口的 `create()`。该接口移除 modules 注册，使用拒绝外部请求的引导 `require` 将其物化，再调用 `createClientModuleSystem`。Modules bundle 解析启动图、构造系统并缓存自身导出。构造过程先切换到实时注册模式，再接纳队列中的 runtime 工厂。内核并行预取必需的 `immediately` 条目，注册条目及其声明依赖。第二阶段的导入会重试并报告预取失败。
 
 **第二阶段——插件面。**
 
 1. 内核挂载 vendored Loader，在任何 entry 存在之前就把模块系统注入为 `internal`。顺序有讲究：`tree.import` 的裸 import 兜底分支在浏览器里绝不能跑到。
-2. 它统一创建每个 graph row。Import modules row 会返回记忆化的 bootstrap exports，其 `apply()` 把闭包中的系统提供为 `ctx.modules`；需要该 service 的 row 会保持 PENDING 直至此时，因此 modules row 无需特殊创建位置。渲染组装是由 `dsh-client-ui-renderer` 提供的普通 host graph row；内核不追加组装伪 entry。
+2. 内核通过 Loader 创建必需的图条目。导入 modules 条目会返回已缓存的引导导出，其 `apply()` 将系统提供为 `ctx.modules`。消费方通过 Cordis 注入等待该服务。渲染组装是由 `dsh-client-ui-renderer` 提供的普通 Host 图条目。
 3. Graph 顺序治理同步 factory 可用性；Cordis 激活与之独立，仍经服务等待推进。
-4. `settled` = 每个 entry 已创建 + `loader.await()` 完全停稳 + 一次全 ACTIVE 扫描。扫描列出每个 import 失败、FAILED 或 PENDING 的 fiber 及其缺失的服务。它存在的理由：cordis 的 inject 等待没有超时——这次扫描就是大声失败的兜底线。
-5. 不依赖框架的 loading 页经 `internal/status` 投影真实 fiber 状态。检查完成后，内核调用 `ctx.uiRenderer.mount(container)`，一次切换到真实 UI。
+4. 必需条目创建并经 `loader.await()` 稳定后，内核检查是否全部进入 ACTIVE。检查报告导入失败、FAILED 和 PENDING 的 fiber 以及缺失的服务。
+5. 无框架启动页通过 `internal/status` 显示必需条目的 fiber 状态。检查完成后，内核调用 `ctx.uiRenderer.mount(container)`。[可选条目](2026-11-20-web-plugin-startup-isolation.zh.md)在渲染器挂载后加载。
 
 ### 热重载：一个驱动插件，自行监视的 bundle
 

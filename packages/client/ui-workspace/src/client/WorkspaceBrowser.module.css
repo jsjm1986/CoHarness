@@ -24,8 +24,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--dsh-workspace-target, 28px);
+  height: var(--dsh-workspace-target, 28px);
   border: none;
   border-radius: 50%;
   corner-shape: round;
@@ -40,28 +40,15 @@
 }
 
 @media (pointer: coarse) {
-  .iconButton,
-  .searchButton {
-    width: var(--dsw-touch-target);
-    height: var(--dsw-touch-target);
+  .root {
+    --dsh-workspace-target: var(--dsw-touch-target);
+    --dsh-workspace-input-size: 16px;
   }
 }
 
-:global([data-viewport='compact']) .iconButton,
-:global([data-viewport='compact']) .searchButton {
-  width: var(--dsw-touch-target);
-  height: var(--dsw-touch-target);
-}
-
-:global([data-viewport='compact']) .sectionHeader {
-  height: auto;
-  min-height: var(--dsw-touch-target);
-}
-
-/* Two 44px touch targets outgrow the desktop pair's 60px cap; uncapped the
-   last action overflows the container and can paint past the drawer edge. */
-:global([data-viewport='compact']) .headerActions {
-  max-width: calc(var(--dsw-touch-target) * 2 + var(--dsw-space-1));
+:global([data-viewport='compact']) .root {
+  --dsh-workspace-target: var(--dsw-touch-target);
+  --dsh-workspace-input-size: 16px;
 }
 
 /* Section header: title, an inline search control, and the two trailing
@@ -72,7 +59,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--dsw-space-1);
-  height: 36px;
+  height: var(--dsh-workspace-target, 36px);
   padding-left: var(--dsw-space-1);
   margin-bottom: var(--dsw-space-1);
   box-sizing: border-box;
@@ -116,7 +103,7 @@
 
 .searchSlot {
   flex: 1;
-  max-width: 28px;
+  max-width: var(--dsh-workspace-target, 28px);
   min-width: 0;
   display: flex;
   align-items: center;
@@ -138,7 +125,7 @@
   display: flex;
   align-items: center;
   gap: var(--dsw-space-1);
-  max-width: 60px;
+  max-width: calc(var(--dsh-workspace-target, 28px) * 2 + var(--dsw-space-1));
   opacity: 1;
   overflow: hidden;
   visibility: visible;
@@ -166,7 +153,7 @@
   align-items: center;
   gap: 0;
   width: 100%;
-  height: 28px;
+  height: var(--dsh-workspace-target, 28px);
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -186,7 +173,7 @@
 
 .searchExpanded {
   width: calc(100% + 4px);
-  height: 30px;
+  height: var(--dsh-workspace-target, 30px);
   margin-inline: -2px;
   padding: 0 var(--dsw-space-1) 0 0;
   border: 0.5px solid var(--dsw-alias-border-l2);
@@ -200,8 +187,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--dsh-workspace-target, 28px);
+  height: var(--dsh-workspace-target, 28px);
   border: none;
   border-radius: 50%;
   corner-shape: round;
@@ -212,8 +199,8 @@
 }
 
 .searchExpanded .searchButton {
-  width: 28px;
-  height: 30px;
+  width: var(--dsh-workspace-target, 28px);
+  height: var(--dsh-workspace-target, 30px);
 }
 
 .searchButton:hover {
@@ -228,12 +215,13 @@
   flex: 1;
   width: 0;
   min-width: 0;
+  padding: 0;
   border: none;
   outline: none;
   background: transparent;
   opacity: 0;
   pointer-events: none;
-  font-size: 13px;
+  font-size: var(--dsh-workspace-input-size, 13px);
   line-height: 18px;
   color: var(--dsw-alias-label-primary);
   transition: opacity 120ms var(--ds-ease-in-out);
@@ -246,7 +234,8 @@
 }
 
 .searchInput::placeholder {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
+  opacity: 1;
 }
 
 .clearButton {
@@ -254,8 +243,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: var(--dsh-workspace-target, 24px);
+  height: var(--dsh-workspace-target, 24px);
   border: none;
   border-radius: 50%;
   corner-shape: round;
@@ -285,14 +274,14 @@
 }
 
 .rail .iconButton {
-  width: 36px;
-  height: 36px;
+  width: var(--dsh-workspace-target, 36px);
+  height: var(--dsh-workspace-target, 36px);
   color: var(--dsw-alias-label-primary);
 }
 
 .rail .search {
-  width: 36px;
-  height: 36px;
+  width: var(--dsh-workspace-target, 36px);
+  height: var(--dsh-workspace-target, 36px);
   padding: 0;
   margin: 0 0 var(--dsw-space-3);
   gap: 0;
@@ -301,8 +290,8 @@
 }
 
 .rail .searchButton {
-  width: 36px;
-  height: 36px;
+  width: var(--dsh-workspace-target, 36px);
+  height: var(--dsh-workspace-target, 36px);
   color: var(--dsw-alias-label-primary);
 }
 

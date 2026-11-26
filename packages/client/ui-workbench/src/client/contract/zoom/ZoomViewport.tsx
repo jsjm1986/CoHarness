@@ -51,7 +51,7 @@ export interface ZoomViewportProps {
 /**
  * Keep zoom controls and trackpad gestures independent from document rendering.
  * @param props - renderer content, intrinsic width, tab preference, and localized labels.
- * @returns the owned scrollport and floating zoom controls.
+ * @returns the owned scrollport and zoom controls, with a separate touch control row.
  */
 export function ZoomViewport(props: ZoomViewportProps): ReactNode {
   const [viewportWidth, setViewportWidth] = useState(0)

@@ -13,6 +13,42 @@ function inside(root:string,candidate:string):boolean {
   const rest=relative(root,candidate)
   return rest==='' || rest!=='..'&&!rest.startsWith('..'+sep)&&!isAbsolute(rest)
 }
+
+/** A live path bound to one directory within the project snapshot subvolume. */
+export interface PeerBtrfsBindMount {
+  readonly path:string
+  readonly sourcePath:string
+}
+
+async function mountTable() {
+  const raw=await readFile('/proc/self/mountinfo','utf8')
+  return raw.trim().split('\n').map(line=>{
+    const fields=line.split(' ')
+    const path=fields[4]!.replace(/\\([0-7]{3})/gu,(_,oct:string)=>String.fromCharCode(parseInt(oct,8)))
+    return {id:fields[0]!,path}
+  })
+}
+
+async function verifyBindMounts(source:string,staging:string,binds:readonly PeerBtrfsBindMount[]):Promise<string> {
+  if(!binds.length)return ''
+  const mounts=await mountTable()
+  const overlap=(left:string,right:string)=>inside(left,right)||inside(right,left)
+  const proof:string[][]=[]
+  for(const bind of binds) {
+    if(!isAbsolute(bind.path)||!isAbsolute(bind.sourcePath)||overlap(bind.path,source)||overlap(bind.path,staging)||
+      !inside(source,bind.sourcePath)||bind.sourcePath===source||
+      binds.some(other=>other!==bind&&(overlap(other.path,bind.path)||overlap(other.sourcePath,bind.sourcePath))))throw denied()
+    if(await realpath(bind.path)!==bind.path || await realpath(bind.sourcePath)!==bind.sourcePath)throw denied()
+    const exact=mounts.filter(mount=>mount.path===bind.path)
+    if(exact.length!==1)throw denied()
+    if(mounts.some(mount=>mount.path!==bind.path&&inside(bind.path,mount.path)))throw new PeerBackupError(409,'peer-backup/nested-filesystem')
+    const [live,physical]=await Promise.all([lstat(bind.path,{bigint:true}),lstat(bind.sourcePath,{bigint:true})])
+    if(!live.isDirectory()||!physical.isDirectory()||live.dev!==physical.dev||live.ino!==physical.ino)throw denied()
+    proof.push([exact[0]!.id,String(live.dev),String(live.ino)])
+  }
+  return JSON.stringify(proof)
+}
+
 async function witness(path:string,timeout:number,signal?:AbortSignal) {
   const binary=resolve(import.meta.dirname,'../libexec/hgw-btrfs-witness')
   const stat=await lstat(binary)
@@ -21,6 +57,22 @@ async function witness(path:string,timeout:number,signal?:AbortSignal) {
   const row=/^([a-f0-9-]{36}) ([a-f0-9-]{36}) ([a-f0-9-]{36}) ([1-9]\d*) ([01]) ([01])$/u.exec(stdout.trim())
   if(!row)throw denied()
   return {uuid:row[1]!,parent:row[2]!,filesystem:row[3]!,device:row[4]!,readonly:row[5]==='1',nested:row[6]==='1'}
+}
+
+/** Verify the stable volume and subvolume identities and their current Linux device number.
+ * @param source - canonical source subvolume.
+ * @param staging - separate snapshot directory.
+ * @param binds - actual live mounts of directories in source.
+ * @param timeout - kernel probe command deadline.
+ * @param signal - owner cancellation.
+ * @returns an identity that distinguishes a remount from a replacement volume.
+ */
+export async function attestPeerBtrfsSource(source:string,staging:string,binds:readonly PeerBtrfsBindMount[],timeout:number,signal:AbortSignal) {
+  if(process.platform!=='linux' || await realpath(source)!==source || await realpath(staging)!==staging)throw denied()
+  const volume=await witness(source,timeout,signal)
+  if(volume.readonly||volume.nested)throw denied()
+  await verifyBindMounts(source,staging,binds)
+  return {filesystem:volume.filesystem,subvolume:volume.uuid,device:volume.device}
 }
 
 const guid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u
@@ -56,9 +108,10 @@ async function captureOwner() {
  * @param source - configured canonical Btrfs subvolume, containing the approved live roots.
  * @param staging - private directory on the same filesystem, outside the source and all backup roots.
  * @param timeout - operating system command deadline. @param signal - current background job lifetime.
+ * @param binds - optional live bind mounts whose directory identities must match their configured subvolume locations.
  * @returns a frozen filesystem path, source identity and an idempotent release operation.
  */
-export async function openPeerBtrfsSnapshot(source:string,staging:string,timeout:number,signal:AbortSignal){
+export async function openPeerBtrfsSnapshot(source:string,staging:string,timeout:number,signal:AbortSignal,binds:readonly PeerBtrfsBindMount[]=[]){
   if(process.platform!=='linux' || !isAbsolute(source)||!isAbsolute(staging)||source===sep||inside(source,staging)||inside(staging,source))throw denied()
   if(await realpath(source)!==source || await realpath(staging)!==staging || await privateDirectoryState(staging,await lstat(staging))!=='private')throw denied()
   const binary='/usr/bin/btrfs'
@@ -68,8 +121,14 @@ export async function openPeerBtrfsSnapshot(source:string,staging:string,timeout
     windowsHide:true,env:{LC_ALL:'C',PATH:'/usr/sbin:/usr/bin:/sbin:/bin'}})).stdout
   const volume=await witness(source,timeout,signal),sourceUuid=volume.uuid
   if(volume.nested)throw new PeerBackupError(409,'peer-backup/nested-filesystem')
-  const mounts=(await readFile('/proc/self/mountinfo','utf8')).trim().split('\n').map(line=>line.split(' ')[4]!.replace(/\\([0-7]{3})/gu,(_,oct:string)=>String.fromCharCode(parseInt(oct,8))))
-  if(mounts.some(p=>p!==source && inside(source,p)))throw new PeerBackupError(409,'peer-backup/nested-filesystem')
+  if((await mountTable()).some(mount=>mount.path!==source && inside(source,mount.path)))throw new PeerBackupError(409,'peer-backup/nested-filesystem')
+  const bindProof=await verifyBindMounts(source,staging,binds)
+  const physicalPath=(original:string):string|undefined=>{
+    if(resolve(original)!==original)return undefined
+    if(inside(source,original))return original
+    const bind=binds.find(item=>inside(item.path,original))
+    return bind&&join(bind.sourcePath,relative(bind.path,original))
+  }
   const owner=await captureOwner()
   const prefix='hgw-peer-v1.'+sourceUuid+'.'
 
@@ -120,7 +179,8 @@ export async function openPeerBtrfsSnapshot(source:string,staging:string,timeout
     const captured=await witness(path,timeout,signal)
     const sourceAfter=await witness(source,timeout,signal)
     if(captured.uuid===sourceUuid || captured.parent!==sourceUuid || !captured.readonly || captured.nested || captured.filesystem!==volume.filesystem ||
-      sourceAfter.uuid!==sourceUuid || sourceAfter.filesystem!==volume.filesystem || sourceAfter.device!==volume.device || sourceAfter.nested)throw denied()
+      sourceAfter.uuid!==sourceUuid || sourceAfter.filesystem!==volume.filesystem || sourceAfter.device!==volume.device || sourceAfter.nested||
+      await verifyBindMounts(source,staging,binds)!==bindProof)throw denied()
     const sealed=path+'.'+captured.uuid
     await rename(path,sealed)
     path=sealed
@@ -129,10 +189,14 @@ export async function openPeerBtrfsSnapshot(source:string,staging:string,timeout
     const devices={filesystem:volume.filesystem,sourceVolume:sourceUuid,snapshotVolume:snapshotUuid,sourceDevice:volume.device,snapshotDevice:captured.device}
     const confirm=async()=>{
       const held=await witness(path,timeout,signal)
-      if(held.uuid!==snapshotUuid || held.device!==captured.device || held.parent!==sourceUuid || held.filesystem!==volume.filesystem || !held.readonly)throw denied()
+      if(held.uuid!==snapshotUuid || held.device!==captured.device || held.parent!==sourceUuid || held.filesystem!==volume.filesystem || !held.readonly||
+        await verifyBindMounts(source,staging,binds)!==bindProof)throw denied()
     }
-    return {root:path,id:snapshotUuid,devices,confirm,map:(original:string)=>{if(!inside(source,original))throw new PeerBackupError(409,'peer-backup/source-outside-snapshot')
-      return join(path,relative(source,original))},release}
+    return {root:path,id:snapshotUuid,devices,confirm,covers:(original:string)=>physicalPath(original)!==undefined,map:(original:string)=>{
+      const physical=physicalPath(original)
+      if(physical===undefined)throw new PeerBackupError(409,'peer-backup/source-outside-snapshot')
+      return join(path,relative(source,physical))
+    },release}
   } catch(error) {
     try {await release()} catch(cleanup) {throw new AggregateError([error,cleanup],'Project snapshot capture and release failed')}
     throw error

@@ -2,6 +2,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle, AgentOptions, AgentSetup } from '@deepseek-ai/dsh-agent'
+import { AgentExecutionRestrictedError } from '@deepseek-ai/dsh-agent'
 import type { Session, SessionEvent, SessionHeader, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import { TypertLookupFailure, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
@@ -157,6 +158,9 @@ export function createApiRemoteAgentResolver(
   const agentFor = async (sessionId: SessionId): Promise<ApiRemoteAgentResult> => {
     let admission: Disposable
     try { admission = ctx.agents.reserveUse([sessionId]) } catch (error: unknown) {
+      if (error instanceof AgentExecutionRestrictedError) {
+        return { error: { code: error.code, message: error.message, details: { sessionId: error.sessionId } } }
+      }
       return { error: { code: 'internal', message: String(error), details: {} } }
     }
     using _admission = admission

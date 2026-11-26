@@ -63,6 +63,27 @@ describe('Client UI i18n source check', () => {
     )).toEqual([])
   })
 
+  it('keeps ARIA keyboard tokens and references literal while checking descriptive prop-bag text', () => {
+    expect(messages(`
+      const aria = { 'aria-keyshortcuts': 'Control+P F2', 'aria-controls': 'DetailsPanel', 'aria-haspopup': 'dialog' }
+      const shortcut = { keys: ['F2'], aria: 'F2' }
+      const labels = [{ shortcut: { keys: ['Control', 'P'], aria: 'Control+P' } }]
+      const View = () => <MenuItem aria={{ 'aria-keyshortcuts': 'F2' }} />
+      const Rename = () => <MenuItem shortcut={{ keys: ['F2'], aria: 'F2' }} />
+    `)).toEqual([])
+    expect(messages(`
+      const View = () => <MenuItem aria={{
+        'aria-label': 'Rename terminal',
+        'aria-description': 'Change its visible name',
+        'aria-valuetext': 'Ready to rename',
+        'aria-roledescription': 'Terminal action',
+      }} />
+    `)).toEqual(['Rename terminal', 'Change its visible name', 'Ready to rename', 'Terminal action'])
+    expect(messages('const View = () => <div aria-roledescription="Desktop viewer" />'))
+      .toEqual(['Desktop viewer'])
+    expect(messages('const label = { aria: "Rename terminal" }')).toEqual(['Rename terminal'])
+  })
+
   it('rejects Electron dialog, title, prompt, and DOM copy outside locale owners', () => {
     const source = `
       dialog.showMessageBox({ title: 'Update available', message: 'Install it now?' })

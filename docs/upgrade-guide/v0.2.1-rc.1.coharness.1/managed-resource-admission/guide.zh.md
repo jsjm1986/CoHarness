@@ -29,7 +29,7 @@ CLI 在 SDK 引导和 profile 条目运行前，根据继承的凭据通道标�
 
 本地启动环境继承会排除 Gateway 部署设置与凭据名称变量。负载设置通过显式运行时配置或运维选择的默认 env 文件提供；参见[运行时环境](../../../../gateway/README.zh.md#performance-and-runtime-admission)。监督不可达时返回 `503 INSTANCE_UNAVAILABLE` 并保留占用；恢复监督控制访问后再重试。
 
-1. 通过既有部署流程部署同一发布版本的 Gateway 与 Runtime 产物，包括 PostgreSQL 迁移 062 至 072。重新开放流量前停止旧托管 Runtime；通过实例管理重新启动，让每个新代次注册其提供方。Linux 单元名称包含代次，已停止的单元保持屏蔽；保留这些文件，通过实例管理操作，避免手动重启监督单元。参见 [Runtime 准入](../../../../gateway/README.zh.md#performance-and-runtime-admission)。
+1. 通过既有部署流程部署同一发布版本的 Gateway 与 Runtime 产物，包括直至138的 PostgreSQL 迁移。重新开放流量前停止旧托管 Runtime；通过实例管理重新启动，让每个新代次注册其提供方。Linux 单元名称包含代次，已停止的单元保持屏蔽；保留这些文件，通过实例管理操作，避免手动重启监督单元。参见 [Runtime 准入](../../../../gateway/README.zh.md#performance-and-runtime-admission)。
 2. 替换 Gateway 前确认旧本地 Runtime 已停止。macOS/Linux 本地执行包含私有独立监督进程；替换与恢复应用数据时保留 `HGW_STATE_ROOT/local-runtime-supervisors`，不要将其纳入自定义备份根目录。发布物包含完整的已编译 Gateway 目录（包括监督进程入口）与原生 flock 包。初始化保留活跃分配；旧版所有权缺失时，在确认停止前 Runtime 保持不可用。保留托管 patch 中的 `gateway-resource-budget` 项（`@deepseek-ai/dsh-gateway-runtime/resource-budget`），以及 `llm` 和 `subprocess` 的 `resourceBudget` 注入。注册必须先于就绪。参见[提供方参考](../../../../packages/context/gateway-runtime/README.zh.md#resource-admission)。 保留 `gateway-runtime.requiredPlugins`：模型治理、执行授权及启用的目录守卫必须激活后才就绪。
 3. 等待每个 `ctx.subprocess.spawn(spec)` 调用。自定义子进程提供方实现 `spawnProcess` 与 `spawnTerminalProcess`，由共享服务负责准入。自定义资源消费方监听 `lease.signal`，等待完成报告，并在确认清理前保留不确定占用。执行权限提供方为捕获的异步工作实现 `current()`。
 4. 按部署的迁移容量设置 JSONL 的 `verificationConcurrency` 与 `maxQueuedVerifications`。每个后端拥有自己的队列；过载会拒绝操作，不会将健康历史标记为损坏。提供者卸载会等待已接收的迁移完成。参见[存储配置](../../../../packages/session/session-persistence-jsonl/README.zh.md#config)。

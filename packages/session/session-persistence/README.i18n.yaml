@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-persistence/README.md
 document:
-  en: dc9201912923f6180c2a15e08b0bf74fd41a27c4
-  zh: 99ce36521cff9e8e1d8d530b11ec7402112d7a45
+  en: b871a53f38754cede1cec010f29331216893ac52
+  zh: 544945132fe8e3f4668aa04a09f61f86c8554cec
 /:
   en: 79f97239370fedab
   zh: 61495d48365178df
@@ -18,14 +18,14 @@ document:
   en: 3a5d1af52c15115f
   zh: 2f745eeef88ffde8
 /deepseek-ai-dsh-session-persistence/service-api-ctx-sessionpersistence:
-  en: 38e96c10402aa864
-  zh: 54b9462c802729d0
+  en: b37b9e947061f64c
+  zh: 6e7b24971b340330
 /deepseek-ai-dsh-session-persistence/invariants-every-backend-must-honor:
-  en: 2bd1269a71b6683e
-  zh: 26936deecece938e
+  en: 128e836e1daedb2d
+  zh: 69f77c3c24834a60
 /deepseek-ai-dsh-session-persistence/the-write-coordinator:
-  en: f66726df5d12bd69
-  zh: 851b32c514670d30
+  en: 440212201a591b59
+  zh: ba97ae0cc7ec558f
 /deepseek-ai-dsh-session-persistence/metadata-and-location-types:
   en: 6ae7dbaf569a41cb
   zh: aedcad620959681b

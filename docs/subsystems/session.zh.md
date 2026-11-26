@@ -1080,6 +1080,15 @@ announce(session: Session): void
 async flush(session: Session): Promise<boolean>
 
 /**
+ * Close publication on an exact live Session after its producers have settled.
+ * The attachment remains available for the final durability checkpoint.
+ * @param session - the Session whose owner is completing planned shutdown.
+ * @returns the stable length of its final event prefix.
+ * @throws if the Session is detached or publication is in progress.
+ */
+sealForShutdown(session: Session): SessionLogOffset
+
+/**
  * Look up a live session.
  * @param id - the session id to look up.
  * @returns the session, or undefined when no live session has that id.

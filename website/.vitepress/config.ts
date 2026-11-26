@@ -362,6 +362,24 @@ export default withMermaid({
   markdown: {
     config(md) {
       isolateCodeGroupRadios(md)
+      md.core.ruler.after('inline', 'standalone-document-links', ({ tokens }) => {
+        for (const [index, token] of tokens.entries()) {
+          if (token.type !== 'inline' || !['paragraph_open', 'td_open', 'th_open'].includes(tokens[index - 1]?.type ?? '')) continue
+          const children = token.children?.filter(child => child.type !== 'text' || child.content.trim() !== '') ?? []
+          const link = children.at(0)
+          if (link?.type === 'link_open' && children.at(-1)?.type === 'link_close'
+            && children.findIndex(child => child.type === 'link_close') === children.length - 1) {
+            link.attrJoin('class', 'standalone-document-link')
+          }
+        }
+      })
+      md.renderer.rules.table_open = (tokens, index, options, env: { localeIndex?: string }, renderer) => {
+        const label = env.localeIndex === 'en' ? 'Scrollable table' : '可横向滚动的表格'
+        return `<div class="documentation-table-scroll" role="region" tabindex="0" aria-label="${label}">\n`
+          + renderer.renderToken(tokens, index, options)
+      }
+      md.renderer.rules.table_close = (tokens, index, options, _env, renderer) =>
+        renderer.renderToken(tokens, index, options) + '</div>\n'
       const renderText = md.renderer.rules.text
       const renderCode = md.renderer.rules.code_inline
       const renderFence = md.renderer.rules.fence

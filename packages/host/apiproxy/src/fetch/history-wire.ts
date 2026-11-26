@@ -16,12 +16,14 @@ import type { RpcId, ServerResponse } from '../api/rpc.ts'
 import type { ResponseValue } from '../api/rpc-map.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import type { HistoryEntry, HistoryOmittedSpan, SessionProjectionsBlock } from '../api/sessions.ts'
-import { historyEntrySchema, historyOmittedSpanSchema, sessionProjectionsBlockSchema } from '../api/sessions.schema.ts'
+import { historyEntrySchema, historyOmittedSpanSchema, sessionProjectionsBlockSchema, sessionSummarySchema } from '../api/sessions.schema.ts'
 import { appendOriginGroupStart, clipOmittedSpans } from './history-detail.ts'
 
 type HistoryValue = ResponseValue<'session.history'>
 
 interface HistoryWireValue {
+  executionRestriction?: 'recovery-read-only'
+  restoredSelection?: HistoryValue['restoredSelection']
   records: HistoryEntry[]
   hasMore: boolean
   projections?: SessionProjectionsBlock
@@ -56,9 +58,13 @@ function toWireValue(
   hasMore: boolean,
   projections: SessionProjectionsBlock | undefined,
   omittedSpans: readonly HistoryOmittedSpan[] | undefined,
+  executionRestriction: HistoryValue['executionRestriction'],
+  restoredSelection: HistoryValue['restoredSelection'],
 ): HistoryWireValue {
   return {
     records: [...entries],
+    ...executionRestriction === undefined ? {} : { executionRestriction },
+    ...restoredSelection === undefined ? {} : { restoredSelection },
     hasMore,
     ...projections === undefined ? {} : { projections },
     ...omittedSpans === undefined || omittedSpans.length === 0 ? {} : { omittedSpans },
@@ -100,6 +106,8 @@ function candidate(
     value.hasMore || cutOmitsPrefix,
     value.projections,
     cutSeq === undefined ? value.omittedSpans : clipOmittedSpans(value.omittedSpans, cutSeq),
+    value.executionRestriction,
+    value.restoredSelection,
   ))
 }
 
@@ -183,13 +191,13 @@ function isRecordObject(value: unknown): value is Record<string, unknown> {
  * Expand one physical record: exactly `{ event }` or `{ event, view }`. Any
  * other key set fails before parsing so unknown fields cannot drop silently.
  */
-function expandWireRecord(record: unknown): HistoryEntry {
+function expandWireRecord(record: unknown): Wire<HistoryEntry> {
   if (!isRecordObject(record)) throw new Error('history wire record must be an object')
   const keys = Object.keys(record)
   const ordinary = Object.hasOwn(record, 'event')
     && keys.every(key => key === 'event' || key === 'view')
   if (!ordinary) throw new Error('history wire record must be exactly { event, view? }')
-  return historyEntrySchema.parse(record) as HistoryEntry
+  return historyEntrySchema.parse(record)
 }
 
 /**
@@ -198,15 +206,19 @@ function expandWireRecord(record: unknown): HistoryEntry {
  * before any events are produced.
  */
 export const historyWireValueSchema: z.ZodType<Wire<HistoryValue>> = z.object({
+  executionRestriction: z.literal('recovery-read-only').optional(),
+  restoredSelection: sessionSummarySchema.optional(),
   records: z.array(z.unknown()),
   hasMore: z.boolean(),
   projections: sessionProjectionsBlockSchema.optional(),
   omittedSpans: z.array(historyOmittedSpanSchema).optional(),
 }).transform(value => ({
+  ...value.executionRestriction === undefined ? {} : { executionRestriction: value.executionRestriction },
+  ...value.restoredSelection === undefined ? {} : { restoredSelection: value.restoredSelection },
   events: value.records.map(expandWireRecord),
   hasMore: value.hasMore,
   ...value.projections === undefined ? {} : { projections: value.projections },
   ...value.omittedSpans === undefined || value.omittedSpans.length === 0
     ? {}
     : { omittedSpans: value.omittedSpans },
-})) as unknown as z.ZodType<Wire<HistoryValue>>
+}))

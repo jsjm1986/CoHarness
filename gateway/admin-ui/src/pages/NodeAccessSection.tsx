@@ -2,21 +2,28 @@
 import { usePendingEdits } from '../pending-edits.tsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Plus, RefreshCw } from 'lucide-react'
-import type { NodeEnrollmentId } from '../../../src/node-access.ts'
+import { nodeAccessPageSchema, type NodeEnrollmentId, type NodeRemovalBlocker } from '../../../src/node-access.ts'
 import { randomUUID } from '../../../../packages/util/crypto/src/index.ts'
 import {
   AdminRequestError, issueNodeEnrollment, listNodeAccess, reissueNodeEnrollment, revokeNodeAccess, detachNodeAccess, listDeploymentCandidates,
-  type NodeAccessEntry, type NodeAccessPage, type NodeEnrollment,
+  checkNodeRemoval, removeNodeAccess, type NodeAccessEntry, type NodeAccessPage, type NodeEnrollment, type NodeRemovalCheck,
 } from '../api.ts'
+import { unwrapDeploymentOverviewSlice, useDeploymentOverview } from '../deployment-overview.tsx'
 import { adminLanguage, translateCopy, type CopyTranslate } from '../language.ts'
 import { Button, Dialog, EmptyState, ErrorBanner, Field, IconButton, LoadingState, Section, StatusBadge } from '../components/ui.tsx'
 import { zh, en, type NodeAccessCopyKey } from './node-access.copy.ts'
 
-type Action = { kind: 'create' } | { kind: 'reissue' | 'revoke' | 'detach'; node: NodeAccessEntry }
+type Action = { kind: 'create' } | { kind: 'reissue' | 'revoke' | 'detach' | 'remove'; node: NodeAccessEntry }
 type Ticket = { name: string; receipt: NodeEnrollment }
 const NAME = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,63}$/u
 const STATUS: Record<NodeAccessEntry['status'], 'neutral' | 'success' | 'warning' | 'danger'> = {
-  detached: 'neutral', pending: 'warning', connected: 'success', disconnected: 'neutral', revoked: 'danger',
+  detached: 'neutral', pending: 'warning', connected: 'success', disconnected: 'neutral', revoked: 'danger', quarantined: 'danger',
+}
+
+const removalMessages: Record<NodeRemovalBlocker, NodeAccessCopyKey> = {
+  'node-access/removal-attached': 'removeAttached', 'node-access/removal-in-use': 'removeInUse',
+  'node-access/removal-projects': 'removeProjects', 'node-access/removal-runtimes': 'removeRuntimes',
+  'node-access/removal-backups': 'removeBackups', 'node-access/removal-other-bindings': 'removeOther',
 }
 
 function mutationMessage(error: unknown, t: CopyTranslate<NodeAccessCopyKey>): { message: string; uncertain: boolean } {
@@ -28,6 +35,7 @@ function mutationMessage(error: unknown, t: CopyTranslate<NodeAccessCopyKey>): {
     'node-access/enrollment-already-issued': 'issuedBefore', 'maintenance': 'maintenance', 'stale-epoch': 'maintenance',
     'node-access/mode-disabled': 'modeDisabled', 'node-access/not-found': 'notFound',
     'node-access/detached': 'nodeDetached',
+    'node-access/quarantined': 'quarantinedDetail', ...removalMessages, 'node-access/removal-changing': 'removeChanging',
   }
   if (error.status === 401 || error.status === 403) return { message: t('denied'), uncertain: false }
   const known = Object.hasOwn(key, error.code) ? key[error.code] : undefined
@@ -46,6 +54,7 @@ export function NodeAccessSection() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [action, setAction] = useState<Action | null>(null)
+  const [removal, setRemoval] = useState<NodeRemovalCheck | null>(null)
   const [name, setName] = useState('')
   const [existing, setExisting] = useState('')
   const [candidates, setCandidates] = useState<Awaited<ReturnType<typeof listDeploymentCandidates>>>()
@@ -70,13 +79,49 @@ export function NodeAccessSection() {
   const busy = useRef(false)
   const ticketRevision = useRef(0)
   const nameInput = useRef<HTMLInputElement>(null)
+  const sectionActions = useRef<HTMLDivElement>(null)
+  const restoreSectionFocus = useRef(false)
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   useEffect(() => { if (action?.kind === 'create') nameInput.current?.focus() }, [action])
+  useEffect(() => {
+    if (action !== null || !restoreSectionFocus.current) return
+    restoreSectionFocus.current = false
+    sectionActions.current?.querySelector<HTMLButtonElement>('.button')?.focus()
+  }, [action])
 
   useEffect(() => {
+    if (action?.kind !== 'remove') return
+    const controller = new AbortController()
+    void checkNodeRemoval(action.node, AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])).then(result => {
+      if (!controller.signal.aborted) setRemoval(result)
+    }).catch((cause: unknown) => {
+      if (controller.signal.aborted) return
+      const failure = mutationMessage(cause, t)
+      setActionError(failure.uncertain ? t('removeCheckFailed') : failure.message)
+    })
+    return () => { controller.abort() }
+  }, [action, t])
+
+  const overview = useDeploymentOverview()
+  const waitingForOverview = overview?.status === 'loading' && overview.requested.has('nodeAccess')
+  const overviewPage = overview?.status === 'ready' ? overview.sections?.nodeAccess : undefined
+  const hydratedOverview = useRef<typeof overviewPage>(undefined)
+  const paged = useRef(false)
+
+  useEffect(() => {
+    if (cursor === undefined && refresh === 0 && hydratedOverview.current === undefined && waitingForOverview) {
+      setLoading(true)
+      return
+    }
     let disposed = false, pending = false
     let controller: AbortController | undefined
+    const applyError = (cause: unknown) => {
+      if (cause instanceof AdminRequestError && (cause.status === 401 || cause.status === 403)) {
+        ticketRevision.current += 1
+        setPage(null); setTicket(null); setAction(null); setError(t('denied'))
+      } else setError(t('readFailed'))
+    }
     const load = async () => {
       if (pending || disposed) return
       pending = true
@@ -87,36 +132,56 @@ export function NodeAccessSection() {
         if (!disposed) { setPage(next); setError('') }
       } catch (cause) {
         if (disposed || controller.signal.aborted) return
-        if (cause instanceof AdminRequestError && (cause.status === 401 || cause.status === 403)) {
-          ticketRevision.current += 1
-          setPage(null); setTicket(null); setAction(null); setError(t('denied'))
-        } else setError(t('readFailed'))
+        applyError(cause)
       } finally {
         pending = false
         if (!disposed) setLoading(false)
       }
     }
-    void load()
+    if (cursor === undefined && refresh === 0 && !paged.current && overviewPage !== undefined) {
+      if (hydratedOverview.current !== overviewPage) {
+        hydratedOverview.current = overviewPage
+        try {
+          const parsed = nodeAccessPageSchema.parse(unwrapDeploymentOverviewSlice(overviewPage))
+          setPage(parsed); setError('')
+        } catch (cause) {
+          applyError(cause)
+        } finally {
+          setLoading(false)
+        }
+      }
+    } else void load()
     const whenVisible = () => { if (document.visibilityState === 'visible') void load() }
     const timer = setInterval(whenVisible, 10_000)
     document.addEventListener('visibilitychange', whenVisible)
     return () => { disposed = true; clearInterval(timer); controller?.abort(); document.removeEventListener('visibilitychange', whenVisible) }
-  }, [cursor, refresh, t])
+  }, [cursor, overviewPage, waitingForOverview, refresh, t])
 
   const reread = () => { setRefresh(value => value + 1) }
+  const showPage = (next: string | undefined): void => { paged.current = true; setPage(null); setLoading(true); setCursor(next) }
   const open = (next: Action) => {
-    setAction(next); setName(''); setExisting(''); setCandidateCursor(undefined); setCandidates(undefined); setCandidateError(''); setActionError(''); setUncertain(false); setNotice('')
+    setRemoval(null); setAction(next); setName(''); setExisting(''); setCandidateCursor(undefined); setCandidates(undefined); setCandidateError(''); setActionError(''); setUncertain(false); setNotice('')
   }
   const close = () => { if (!busy.current) { setAction(null); setActionError(''); setUncertain(false) } }
   const time = (value: string) => new Date(value).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
 
+  const canRemove = removal?.blockers.length === 0 && actionError === ''
   const submit = async () => {
-    if (action === null || busy.current || uncertain) return
+    if (action === null || busy.current || uncertain || action.kind === 'remove' && !canRemove) return
     const computerName = action.kind === 'create' ? name.trim() : action.node.name
     if (action.kind === 'create' && existing === '' && (!NAME.test(computerName) || computerName.length > 64)) { setActionError(t('nameInvalid')); return }
     busy.current = true; setActing(true); setActionError('')
     try {
-      if (action.kind === 'detach') {
+      if (action.kind === 'remove') {
+        await removeNodeAccess(action.node)
+        if (mounted.current) {
+          const removed = action.node.nodeId
+          setPage(current => current === null ? null : { ...current, items: current.items.filter(item => item.nodeId !== removed) })
+          setCursor(undefined); setNotice(t('removed', { name: computerName }))
+          restoreSectionFocus.current = true
+          setAction(null)
+        }
+      } else if (action.kind === 'detach') {
         await detachNodeAccess(action.node)
         if (mounted.current) { setNotice(t('detachedNotice', { name: computerName })); setAction(null) }
       } else if (action.kind === 'revoke') {
@@ -142,7 +207,8 @@ export function NodeAccessSection() {
         return
       }
       const failure = mutationMessage(cause, t)
-      setActionError(failure.message); setUncertain(failure.uncertain)
+      setActionError(action.kind === 'remove' && failure.uncertain ? t('removeUncertain') : failure.message)
+      setUncertain(failure.uncertain)
       if (failure.uncertain) { setCursor(undefined); reread() }
     } finally { busy.current = false; if (mounted.current) setActing(false) }
   }
@@ -160,12 +226,13 @@ export function NodeAccessSection() {
 
   const closeTicket = () => { ticketRevision.current += 1; setTicket(null); setCopyStatus(''); setCopyError(''); setRevealed(false) }
 
-  const title = action === null ? '' : action.kind === 'create' ? t('createTitle')
-    : t(action.kind === 'reissue' ? 'reissueTitle' : action.kind === 'detach' ? 'detachTitle' : 'revokeTitle', { name: action.node.name })
+  const title = action === null ? '' : action.kind === 'create' ? t('createTitle') : t(`${action.kind}Title`, { name: action.node.name })
+  const description = action === null || (action.kind === 'remove' && !canRemove) ? undefined : t(`${action.kind}Detail`)
+  const danger = action?.kind === 'revoke' || action?.kind === 'remove'
   return (
     <>
       <Section title={t('title')} meta={t('meta')} actions={(
-        <div className="rowActions">
+        <div className="rowActions" ref={sectionActions}>
           <IconButton label={t('refresh')} icon={RefreshCw} onClick={reread} disabled={loading} />
           <Button icon={Plus} onClick={() => open({ kind: 'create' })}>{t('add')}</Button>
         </div>
@@ -177,20 +244,25 @@ export function NodeAccessSection() {
           <EmptyState title={t('empty')} detail={t('emptyDetail')} />
         ) : (
           <div className="tableWrap" role="region" aria-label={t('table')} tabIndex={0} aria-busy={loading}>
-            <table className="dataTable">
-              <thead><tr><th>{t('name')}</th><th>{t('connection')}</th><th>{t('system')}</th><th>{t('seen')}</th><th>{t('actions')}</th></tr></thead>
+            <table className="dataTable nodeAccessTable">
+              <thead><tr>
+                <th scope="col">{t('name')}</th><th scope="col">{t('connection')}</th><th scope="col">{t('system')}</th>
+                <th scope="col">{t('seen')}</th><th scope="col">{t('actions')}</th>
+              </tr></thead>
               <tbody>{page.items.map(node => (
                 <tr key={node.nodeId}>
-                  <td className="nodeAccessName">{node.name}</td>
+                  <th scope="row" className="nodeAccessName">{node.name}</th>
                   <td><StatusBadge tone={STATUS[node.status]}>{t(node.status)}</StatusBadge></td>
                   <td>{node.platform === null ? t('unknownSystem')
                     : `${node.platform === 'darwin' ? 'macOS' : node.platform === 'linux' ? 'Linux' : 'Windows'}${node.architecture ? ` · ${node.architecture}` : ''}`}</td>
                   <td>{node.lastSeenAt === null ? t('never') : <time dateTime={node.lastSeenAt}>{time(node.lastSeenAt)}</time>}</td>
-                  <td><div className="rowActions">
+                  <td>{node.status === 'quarantined' ? t('quarantinedDetail') : <div className="rowActions">
                     <Button variant="ghost" onClick={() => open({ kind: 'reissue', node })}>{t('reissue')}</Button>
                     {node.status !== 'detached' && <Button variant="ghost" onClick={() => open({ kind: 'detach', node })}>{t('detach')}</Button>}
                     {node.status === 'revoked' || node.status === 'detached' ? null : <Button variant="ghost" onClick={() => open({ kind: 'revoke', node })}>{t('revoke')}</Button>}
-                  </div></td>
+                    <Button variant="ghost" aria-label={t('removeTitle', { name: node.name })}
+                      onClick={() => open({ kind: 'remove', node })}>{t('remove')}</Button>
+                  </div>}</td>
                 </tr>
               ))}</tbody>
             </table>
@@ -198,21 +270,21 @@ export function NodeAccessSection() {
         )}
         {cursor === undefined && page?.nextCursor == null ? null : (
           <div className="formActions">
-            <Button disabled={loading || cursor === undefined} onClick={() => setCursor(undefined)}>{t('previous')}</Button>
-            <Button disabled={loading || page?.nextCursor == null} onClick={() => { if (page?.nextCursor != null) setCursor(page.nextCursor) }}>{t('more')}</Button>
+            <Button disabled={loading || cursor === undefined} onClick={() => showPage(undefined)}>{t('previous')}</Button>
+            <Button disabled={loading || page?.nextCursor == null} onClick={() => { if (page?.nextCursor != null) showPage(page.nextCursor) }}>{t('more')}</Button>
           </div>
         )}
       </Section>
 
-      <Dialog open={action !== null} title={title}
-        description={action === null ? undefined : action.kind === 'create' ? t('createDetail') : t(action.kind === 'reissue' ? 'reissueDetail' : action.kind === 'detach' ? 'detachDetail' : 'revokeDetail')}
-        danger={action?.kind === 'revoke'} onClose={close}
+      <Dialog open={action !== null} title={title} description={description}
+        danger={danger} onClose={close}
         footer={(
           <>
             <Button disabled={acting} onClick={close}>{t('cancel')}</Button>
             {uncertain ? <Button onClick={reread}>{t('refresh')}</Button> : (
-              <Button variant={action?.kind === 'revoke' ? 'danger' : 'primary'} loading={acting} onClick={() => void submit()}>
-                {action?.kind === 'revoke' ? t('revoke') : action?.kind === 'detach' ? t('detach') : t('issue')}
+              <Button variant={danger ? 'danger' : 'primary'} loading={acting}
+                disabled={action?.kind === 'remove' && !canRemove} onClick={() => void submit()}>
+                {action?.kind === 'remove' ? t('removeConfirm') : action?.kind === 'revoke' ? t('revoke') : action?.kind === 'detach' ? t('detach') : t('issue')}
               </Button>
             )}
           </>
@@ -226,10 +298,16 @@ export function NodeAccessSection() {
         {candidates?.nextCursor && <Button disabled={acting || uncertain} onClick={() => setCandidateCursor(candidates.nextCursor!)}>{t('candidatesMore')}</Button>}</>}
         {action?.kind === 'create' && existing === '' ? (
           <Field label={t('name')} hint={t('nameHint')}>
-            <input ref={nameInput} aria-label={t('name')} aria-description={t('nameHint')} value={name} maxLength={64} placeholder={t('namePlaceholder')} disabled={acting || uncertain}
+            <input className="input" ref={nameInput} aria-label={t('name')} aria-description={t('nameHint')} value={name} maxLength={64} placeholder={t('namePlaceholder')} disabled={acting || uncertain}
               onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() } }} />
           </Field>
         ) : null}
+        {action?.kind === 'remove' && actionError === '' && (removal === null ? <LoadingState label={t('removeChecking')} />
+          : removal.blockers.length === 0 ? <p className="fieldHint" role="status">{t('removeReady')}</p>
+            : <div className="nodeRemovalReasons" role="status">
+              <p>{t('removeBlocked')}</p>
+              <ul>{removal.blockers.map(code => <li key={code}>{t(removalMessages[code])}</li>)}</ul>
+            </div>)}
         <ErrorBanner message={actionError} />
       </Dialog>
 
@@ -239,7 +317,7 @@ export function NodeAccessSection() {
         {ticket === null ? null : (
           <div className="nodeAccessTicket">
             <Field label={t('token')}>
-              <input readOnly type={revealed ? 'text' : 'password'} autoComplete="off" spellCheck={false} value={ticket.receipt.token} />
+              <input className="input" readOnly type={revealed ? 'text' : 'password'} autoComplete="off" spellCheck={false} value={ticket.receipt.token} />
             </Field>
             <div className="rowActions">
               <Button icon={Copy} onClick={() => void copy()}>{t('copy')}</Button>

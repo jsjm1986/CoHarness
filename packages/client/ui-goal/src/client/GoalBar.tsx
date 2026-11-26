@@ -5,7 +5,8 @@
  * for paused goals and active goals whose continuation is disarmed. Goal
  * creation belongs to `/goal`; absent, loading, and complete goals render
  * nothing. Durable state comes from the Session projection; activation and
- * mutation callbacks come from the injected face.
+ * mutation callbacks come from the injected face. Blocked reasons expand
+ * below the controls for pointer, touch, and keyboard access.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -126,13 +127,13 @@ export function GoalBar({ goal, activation, onEdit, onPause, onResume, onClear, 
     )
   }
 
-  const title = goal.phase === 'blocked' ? goal.blockedReason?.message : undefined
+  const blockedReason = goal.phase === 'blocked' ? goal.blockedReason?.message : undefined
   const label = goal.phase === 'active' ? activeLabel(activation, t) : t(PHASE_LABELS[goal.phase])
   const showResume = goal.phase === 'paused'
     || (goal.phase === 'active' && activation === 'disarmed')
   return (
     <div className={css.dock} data-goal-bar>
-      <div className={css.bar} title={title}>
+      <div className={css.bar}>
         <span className={css.goalGlyph}><IconGoalOutline16 size={14} /></span>
         <span className={css.label}>{label}</span>
         <span className={css.objective}>{goal.objective}</span>
@@ -169,6 +170,12 @@ export function GoalBar({ goal, activation, onEdit, onPause, onResume, onClear, 
             </button>
           </Tooltip>
         </div>
+        {blockedReason !== undefined && (
+          <details className={css.blockedReason} key={`${goal.id}:${blockedReason}`}>
+            <summary>{t('blocked.reason')}</summary>
+            <div className={css.reasonBody} tabIndex={0}>{blockedReason}</div>
+          </details>
+        )}
       </div>
     </div>
   )

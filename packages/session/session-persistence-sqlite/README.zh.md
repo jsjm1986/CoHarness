@@ -1,5 +1,5 @@
 ---
-description: "English | 中文"
+description: "压缩事件负载的 SQLite Session 持久化"
 kind: "package-reference"
 ---
 
@@ -7,13 +7,13 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-一个可选启用的 SQLite `SessionPersistence` 提供方。它将符合条件的 `assistant/chunk` 连续段存入打包后的物理行，对大型 payload 选择性应用 Zstandard 压缩，并对来源事件序列进行 delta 编码，同时恢复完全一致的逻辑 `SessionEvent[]`。随产品交付的组合均不选择它；部署方需显式挂载本包并提供数据库路径。
+一个可选启用的 SQLite `SessionPersistence` 提供方。它将每个事件存为一行，对较大的负载按需应用 Zstandard 压缩，并紧凑编码来源事件序列，恢复完整一致的逻辑 `SessionEvent[]`。部署方需显式挂载本包并配置数据库路径。
 
 `locate(meta)` 返回 `undefined`，因为所有会话共享同一个数据库。该提供方不暴露逐会话原始产物。`revision(id, signal?)` 读取带索引的会话行，不扫描其他会话元数据或事件行。
 
 ## 概述
 
-使用 `dsh-session-persistence-sqlite` 作为可选的 SQLite `SessionPersistence` 提供方：符合条件的 `assistant/chunk` 段以打包物理行存储，大负载选择性 Zstandard 压缩、源事件序号增量编码，并还原出完全一致的逻辑 `SessionEvent[]`。出厂组合均不选用；部署方需显式挂载并提供数据库路径。
+部署需要在一个 SQLite 数据库中持久保存 Session 日志时，可使用 `dsh-session-persistence-sqlite`。追加会保留既有事件，并将新批次及其修订号一并提交，消费方无需加载历史就能检查 Session 的修订号。
 
 ## 目录
 
@@ -29,30 +29,24 @@ kind: "package-reference"
 <a id="storage-model"></a>
 ## 存储模型
 
-Schema 20 使用整数内部会话键和稳定的外部 `session_key`；复合主键索引 `events(session_id, seq)` 仍负责物理查找。CoHarness 专用的 `session_extensions` 保存草稿标记，`event_extensions` 保存逻辑 `ignorable` 标记，因此两种含义不会复用打包行判别字段。标量行存储一个逻辑事件。打包行把 `text-chunks`、`reasoning-chunks` 或 `tool-call-chunks` 用作物理 `type`；`seq` 与 `time` 标识所表示的第一个事件，`data` 保存共享的分片打包 payload。打包行设置 `is_packed=1`；标量行设置 `is_packed=0`，逻辑可忽略事件另有一行 `event_extensions`。这些标签属于存储记录，而不是 `SessionEventMap` 成员。
+Schema 21 使用整数内部会话键和稳定的外部 `session_key`。复合主键 `events(session_id, seq)` 定位标量事件行，每行的 `is_packed` 为 0。解码器拒绝打包行。`session_extensions` 保存草稿标记，`event_extensions` 保存逻辑 `ignorable` 标记。
 
-Schema 20 在本包内拥有 codec，不导入其他持久化格式中可变的实现。只有字段完全匹配、连续且属于同一分片块的文本、推理或工具调用 delta 才会打包。未知字段、surface 元数据、序列缺口、不兼容的块／调用身份以及不安全时间戳仍以标量行存储。一个打包行最多表示 1,024 个事件，未压缩 UTF-8 `data` 最多 1 MiB；更长的连续段会在不改变逻辑事件的前提下分割。读取会在向持久化协调器返回数据前，重建每个原始序列号、时间戳、token 边界、参数片段和 payload。
+序列化后的 `data` 小于 4 KiB 时保留为 SQLite `TEXT`。达到该阈值后，写入方使用固定字典以 Zstandard 级别 3 压缩，仅在压缩结果比原文本小时存为 `BLOB`。每行可独立解压。带标签的变长整数使用连续区间或差值编码，保留完整且有序的 `source_event_seqs` 数组。
 
-序列化后的 `data` 小于 4 KiB 时保持为 SQLite `TEXT`。达到或超过该阈值时，写入方会使用 Zstandard level 3，并且只在 frame 小于原文本的情况下存储 `BLOB`；读取方会先解压，再执行 UTF-8 校验和 JSON 解析。`source_event_seqs` 仍是完整且有序的来源事件数组。Schema 20 使用带标签的 varint payload，在连续范围更短时采用紧凑范围编码；稀疏或降序值仍使用 delta 编码。不会省略任何来源。大型 data 单元使用固定的 schema zstd 字典，因此每行都可独立解码。
+追加使用 `BEGIN IMMEDIATE` 校验 schema 和事件尾部的有限范围，插入新批次，并递增 Session 修订号。尾部校验会在变更数据前拦截过期写入。默认 200 毫秒的写后缓冲间隔会把新事件合成一个批次。
 
-每次追加持有 `BEGIN IMMEDIATE`，验证有界物理尾部，只打包新的持久批次，插入这些记录，并把会话 revision 递增一次。普通追加绝不删除或替换既有事件行。默认 200 毫秒写后缓冲窗口因此仍能压缩高频流，而物理写入量与新增持久批次成正比，不会反复改写不断增长的打包值。存储层逻辑尾部检查会在陈旧写入方执行变更前拒绝该写入。
-
-完整读取按首个逻辑序列号的顺序扫描物理行。反向扫描会定位最后一个有效 `turn/end`，但不会保留每个物理行的解码副本；正向扫描则逐行解码并校验，写入最终返回的逻辑事件数组。`readFrom(id, fromSeq)` 只检查最大行跨度内的打包前驱，并把后缀锚定在可能包含 `fromSeq` 的最早前驱；这样既可包含从打包行内部开始的事件范围，也能检测相互重叠的物理损坏，而不会解析无关的更早标量行。畸形打包行按全有或全无处理：已提交区域中的损坏会拒绝读取，最终撕裂行则在可变恢复期间从其物理起点删除。修复会在持有写锁时重新读取尾部，并在删除任何数据前拒绝陈旧 marker。打包 `data` 超出 schema 字节上限时，会在解析 JSON 前拒绝。
+读取按序列号扫描事件。`readFrom(id, fromSeq)` 从指定序号开始，避免解码更早的前缀。已提交前缀受损会导致读取失败。修复可以在持有写锁并重新确认未完成尾部的起始序列号后删除该尾部。
 
 <a id="schema-compatibility"></a>
 ## Schema 兼容性
 
-全新数据库直接初始化为 schema 20。旧 schema、外部 application identity、非空未版本化数据库以及不兼容 schema 对象会在打开时拒绝；运行时不会隐式升级文件。停止进程后使用离线工具：
+SQLite Session 存储会拒绝创建绑定受管 SSH 目标的 Session。此类 Session 使用部署的 JSONL 或 Gateway 持久化。
 
-```sh
-pnpm run migrate:session-sqlite-v18-to-v20 -- --input old.db --output new.db
-pnpm run migrate:session-sqlite-v20-to-v18 -- --input new.db --output old.db
-pnpm run migrate:session-sqlite-v18-to-v20 -- --input old.db --verify-only
-```
+全新数据库初始化为 schema 21。打开时会拒绝其他应用的标识、非空且没有版本号的文件、其他 SQLite schema 版本或不兼容的 schema 对象。升级 SQLite schema 必须显式离线转换。[Schema 20 转换工具](../../../.agents/notes/implemented/architecture/2026-08-29-session-sqlite-schema20.zh.md) 支持文档所列的 v18 与 v20 互转。
 
-输入只读，输出必须是不同的新文件；工具返回前会校验逻辑事件 hash。`--replace --keep-backup` 是显式原子替换模式；完成冷加载和回放前保留备份。每条运行时语句和固定 pragma 都位于随包发布的 `.sql` 资源中；值使用 SQLite 参数，运行时代码不会拼装查询文本。
+每次写入均在写事务内校验应用标识、版本号和实际的有序 schema 定义。仅空白有差异的等价定义仍兼容。运行时语句和 pragma 位于随包发布的 `.sql` 资源中。
 
-格式 v0/v1 的 Session header 属于独立的逻辑迁移：首次读取 body 时，在写事务中只将元数据行更新为 v2，事件行保持不变。数据库 schema 升级仍必须离线、显式执行。
+逻辑 Session 格式迁移独立于数据库 schema。提供方按检查时的源修订号验证，在同一事务中发布迁移后的头信息和事件。
 
 <a id="configuration-schemastery"></a>
 ## 配置（schemastery）
@@ -78,7 +72,7 @@ interface Config {
 
 #### 模型看到什么
 
-没有 SQLite 特有内容。恢复得到与 JSONL 相同的逻辑事件和派生消息；物理打包标签绝不会进入 prompt、工具、回放或实时 `session/event` 投递。
+恢复得到与 JSONL 相同的逻辑 `SessionEvent[]` 和派生消息。
 
 #### Token 影响
 
@@ -86,19 +80,16 @@ interface Config {
 
 #### KV Cache 影响
 
-物理打包不会改变请求前缀。与其他持久化后端相同，提供方 cache 复用取决于重建历史、当前 envelope 和模型路由。
+提供方 cache 复用取决于重建后的历史、当前请求及模型路由。
 
 
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
-- **过渡性的 SQLite 专用设计**——这一以效率为重点的实现参考了 [morlay/session-persistence-rdb](https://github.com/morlay/session-persistence-rdb)。支持多种后端与可配置 schema 的统一关系数据库设计尚待后续完善；schema 20 是当前 CoHarness 格式，后续变更必须再次通过离线迁移。
-- **打包服从持久批次边界**——被写后缓冲窗口或显式 flush 分开的兼容连续段会保留为不同物理记录；这以打包率受时序影响为代价，避免改写既有行。
+- **SQLite 专用设计**——实现参考了 [morlay/session-persistence-rdb](https://github.com/morlay/session-persistence-rdb)。其他关系数据库和可配置 schema 超出本包范围。
 - **同步压缩**——Node 的 SQLite 与 Zstandard 调用都会阻塞 JavaScript 线程；4 KiB 阈值限制了小型记录的逐 frame 工作。
-- **`DatabaseSync` 会阻塞事件循环**——减少物理行不会使 SQLite 操作变为异步。
 - **繁忙等待会阻塞事件循环**——SQLite 会在同步 `DatabaseSync` 调用内等待；只有繁忙的 journal-mode 切换会在两次尝试之间让出执行，而且从打开时计算的截止点只阻止新尝试，不会中断正在执行的调用。
-- **外部 SQL 读取方必须理解物理标签**——受支持的消费方通过本提供方读取，而不是把每个 `events.type` 都当作逻辑事件类型。
-- **没有删除或后台历史压缩**——普通追加只做插入。
+- **追加只做插入**——提供方没有后台历史压缩。
 
 <a id="dev-note"></a>
 ### 开发备注

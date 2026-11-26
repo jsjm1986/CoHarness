@@ -1,1 +1,1 @@
-- status: Uploaded 1 of 3 files
+- status: "Uploaded: 1 / 3"

@@ -1,7 +1,9 @@
 // @vitest-environment node
+import { setImmediate } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client'
 import { SessionRuntime } from '../src/client/sessions/service.ts'
 import { SessionRuntimePool } from '../src/client/sessions/pool.ts'
 import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
@@ -78,6 +80,70 @@ describe('pooled Workspace archive reads', () => {
       workspace.resolve(ok({ items: [] }))
       await ctx.fiber.dispose()
       await settled
+    }
+  })
+
+  it('keeps the connection baseline when a navigation that starts after Session readiness cancels', async () => {
+    const { ctx, api, pool, connect, signals } = await fixture()
+    const workspace = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    api.onWorkspaceList = () => workspace.promise
+    const lifetime = new AbortController()
+    let verification: Promise<unknown> | undefined
+    try {
+      const prepared = pool.prepareRuntime(target, lifetime.signal)
+      connect()
+      await prepared
+      expect(signals).toHaveLength(1)
+      const cancelled = new AbortController()
+      const pending = pool.ensureSession(target, ids[0]!, cancelled.signal)
+      verification = expect(pending).rejects.toThrow('Pane navigation cancelled')
+      // All fixture dispatch before the archive wait settles through promises in this turn.
+      await setImmediate()
+      cancelled.abort(new Error('Pane navigation cancelled'))
+      await verification
+      expect(signals[0]?.aborted).toBe(false)
+
+      const next = pool.ensureSession(target, ids[1]!)
+      await setImmediate()
+      workspace.resolve(ok({ items: [], archivedSessionIds: [ids[1]!] }))
+      await expect(next).resolves.toBe(false)
+      expect(api.callsOf('workspace.list')).toHaveLength(1)
+    } finally {
+      lifetime.abort()
+      workspace.resolve(ok({ items: [] }))
+      await ctx.fiber.dispose()
+      await verification
+    }
+  })
+
+  it('fences a verification waiting for the connection baseline when that generation disconnects', async () => {
+    const { ctx, api, pool, connect, disconnect, signals } = await fixture()
+    const workspace = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    api.onWorkspaceList = () => workspace.promise
+    const lifetime = new AbortController()
+    let verification: Promise<unknown> | undefined
+    try {
+      const prepared = pool.prepareRuntime(target, lifetime.signal)
+      connect()
+      await prepared
+      const pending = pool.ensureSession(target, ids[0]!, lifetime.signal)
+      verification = expect(pending).rejects.toThrow('Target runtime disconnected')
+      await setImmediate()
+      disconnect()
+      await verification
+      expect(signals[0]?.aborted).toBe(true)
+
+      api.onWorkspaceList = async () => ok({ items: [], archiveRevision: 1 })
+      const next = pool.ensureSession(target, ids[0]!, lifetime.signal)
+      connect()
+      await expect(next).resolves.toBe(true)
+      workspace.resolve(ok({ items: [], archivedSessionIds: [ids[0]!], archiveRevision: 999 }))
+      await expect(pool.ensureSession(target, ids[0]!, lifetime.signal)).resolves.toBe(true)
+    } finally {
+      lifetime.abort()
+      workspace.resolve(ok({ items: [] }))
+      await ctx.fiber.dispose()
+      await verification
     }
   })
 
@@ -212,5 +278,39 @@ describe('pooled Workspace archive reads', () => {
         expect(pool.list.getSnapshot().archivedById).toEqual({})
       }
     } finally { workspace.resolve(ok({ items: [] })); await ctx.fiber.dispose(); await settled }
+  })
+
+  it('cancels in-flight connectArchive and workspace refreshes on account invalidation without installing late state', async () => {
+    const { ctx, api, pool, connect, signals } = await fixture()
+    const workspace = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    const requested = deferred<undefined>()
+    api.onWorkspaceList = () => { requested.resolve(undefined); return workspace.promise }
+    const lifetime = new AbortController()
+    const pending = pool.prepareRuntime(target, lifetime.signal)
+    try {
+      connect()
+      await requested.promise
+      await pending
+      const signal = signals.at(-1)
+      expect(signal?.aborted).toBe(false)
+      pool.invalidateAccount()
+      expect(signal?.aborted).toBe(true)
+      workspace.resolve(ok({
+        items: [{
+          workspaceId: 'ws-stale' as WorkspaceId, path: '/stale', title: 'Stale',
+          sessionIds: [], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+        }],
+        archivedSessionIds: [ids[0]!],
+        archiveRevision: 5,
+      }))
+      await workspace.promise
+      await setImmediate()
+      expect(pool.workspaceSnapshots.getSnapshot()).toEqual([])
+      expect(pool.list.getSnapshot().archivedById).toEqual({})
+    } finally {
+      lifetime.abort()
+      workspace.resolve(ok({ items: [] }))
+      await ctx.fiber.dispose()
+    }
   })
 })

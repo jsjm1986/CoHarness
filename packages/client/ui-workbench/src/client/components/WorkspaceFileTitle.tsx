@@ -23,7 +23,7 @@ export function WorkspaceFileTitle({ useTabInfo }: PropsRuntime<'sidebar.right.p
   return (
     <>
       <FileTypeIcon path={tab.title} size={14} className={css.titleIcon} />
-      {name === '' ? tab.title : name}
+      <span>{name === '' ? tab.title : name}</span>
     </>
   )
 }

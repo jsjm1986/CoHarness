@@ -495,6 +495,25 @@ Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
 
 ### `fs/*` events
 
+<a id="fsauthorize-target--serial"></a>
+
+#### `fs/authorize-target` — serial
+
+Authorize a structured tool's resolved path before reading or changing that target. Listeners reject with a filesystem error to refuse the operation.
+
+```ts cordis-catalog
+/**
+ * Authorize a structured tool's resolved path before reading or changing that target.
+ * Listeners reject with a filesystem error to refuse the operation.
+ * @param path - canonical process path chosen by the tool's filesystem provider.
+ * @param mode - read or write access required by the operation.
+ * @mode serial
+ */
+'fs/authorize-target'(path: string, mode: 'read' | 'write'): void | Promise<void>
+```
+
+Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
+
 <a id="fsdelete-intent--waterfall"></a>
 
 #### `fs/delete-intent` — waterfall

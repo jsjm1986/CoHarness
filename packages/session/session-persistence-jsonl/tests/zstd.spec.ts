@@ -5,12 +5,12 @@ import type { FileHandle } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
-import { SessionSeq, SessionId } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionSeq, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
-  generationLogPath, logPath, scanLog, sessionDir, toHeaderLine, type JsonlCompression,
+  generationLogFilename, generationLogPath, logPath, scanLog, sessionDir, toHeaderLine, type JsonlCompression,
 } from '../src/format.ts'
 import {
   compressZstdFrame, createZstdFrameDecoder, decompressZstdFrame, decompressZstdPrefix, scanZstdFrames,
@@ -84,6 +84,23 @@ async function appendBatch(persistence: SessionPersistence, id: SessionId, event
     await handle.close()
   }
 }
+
+it.each(['none', 'zstd'] as const)('exports %s storage as a named JSONL artifact without changing its generation', async (compression) => {
+  const root = await freshRoot()
+  const ctx = await mount(root, compression)
+  const header = meta(`export-${compression}`)
+  await writeLog(ctx.sessionPersistence, header, oneTurnLog())
+  const path = logPath(root, header.cwd, header.id, compression)
+  const bytes = await readFile(path)
+  const revision = await stat(path)
+  const artifact = await ctx.sessionPersistence.readRaw(header.id)
+  expect(artifact?.filename).toBe(generationLogFilename(SESSION_FORMAT_VERSION, 'none'))
+  expect(artifact?.content.split('\n').filter(Boolean).map<unknown>(line => JSON.parse(line))).toEqual([
+    toHeaderLine(header), ...oneTurnLog(),
+  ])
+  expect(await readFile(path)).toEqual(bytes)
+  expect((await stat(path)).mtimeMs).toBe(revision.mtimeMs)
+})
 
 async function decodeCompleteFrames(buffer: Buffer): Promise<Buffer> {
   const { frames, tornStart } = scanZstdFrames(buffer)

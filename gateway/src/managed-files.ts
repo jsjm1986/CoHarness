@@ -90,7 +90,9 @@ function metadata(info: { mode: bigint; uid: bigint; gid: bigint; dev: bigint; i
     object: { device: String(info.dev), inode: String(info.ino) } }
 }
 
-async function fingerprint(path: string, destination?: string, signal?: AbortSignal): Promise<{
+type GuardWrite = <T>(bytes: number, write: () => Promise<T>) => Promise<T>
+
+async function fingerprint(path: string, destination?: string, signal?: AbortSignal, guardWrite?: GuardWrite): Promise<{
   sizeBytes: number; sha256: string; object: { device: string; inode: string }; modifiedAt: number
 }> {
   signal?.throwIfAborted()
@@ -100,7 +102,8 @@ async function fingerprint(path: string, destination?: string, signal?: AbortSig
     const before = await source.stat()
     const original = await source.stat({ bigint: true })
     if (!before.isFile()) throw new Error(`Managed data is not a regular file: ${path}`)
-    if (destination !== undefined) copied = await open(destination, 'wx', 0o600)
+    if (destination !== undefined) copied = guardWrite
+      ? await guardWrite(0, () => open(destination, 'wx', 0o600)) : await open(destination, 'wx', 0o600)
     const hash = createHash('sha256'), buffer = Buffer.allocUnsafe(1024 * 1024)
     let sizeBytes = 0
     for (;;) {
@@ -114,7 +117,8 @@ async function fingerprint(path: string, destination?: string, signal?: AbortSig
         let position = 0
         while (position < bytesRead) {
           signal?.throwIfAborted()
-          const { bytesWritten } = await copied.write(bytes.subarray(position))
+          const target = copied, chunk = bytes.subarray(position)
+          const { bytesWritten } = guardWrite ? await guardWrite(chunk.length, () => target.write(chunk)) : await target.write(chunk)
           if (bytesWritten === 0) throw new Error('Managed file write made no progress')
           position += bytesWritten
         }
@@ -139,10 +143,11 @@ async function fingerprint(path: string, destination?: string, signal?: AbortSig
  * @param source - caller-authorized file; replacement or mutation during copying fails.
  * @param destination - exclusively created private staging file.
  * @param signal - operation lifetime, checked between partial writes and after synchronization.
+ * @param guardWrite - optional storage admission wrapping each bounded copy write.
  * @returns the copied size and digest after flushing its bytes.
  */
-export async function copyVerifiedFile(source: string, destination: string, signal?: AbortSignal): Promise<{ sizeBytes: number; sha256: string }> {
-  const { sizeBytes, sha256 } = await fingerprint(source, destination, signal)
+export async function copyVerifiedFile(source: string, destination: string, signal?: AbortSignal, guardWrite?: GuardWrite): Promise<{ sizeBytes: number; sha256: string }> {
+  const { sizeBytes, sha256 } = await fingerprint(source, destination, signal, guardWrite)
   return { sizeBytes, sha256 }
 }
 
@@ -155,7 +160,7 @@ export async function copyVerifiedFile(source: string, destination: string, sign
  * @returns a complete sorted membership and content manifest.
  */
 export async function snapshotManagedFiles(paths: readonly ManagedDataPath[], filesDir?: string, signal?: AbortSignal,
-  budget?:{maxBytes:number;maxEntries:number;rejectNestedBtrfs?:boolean;btrfsDevices?:{sourceDevice:string;snapshotDevice:string};verifiedVssPath?:(path:string)=>string}): Promise<ManagedSnapshot> {
+  budget?:{maxBytes:number;maxEntries:number;guardWrite?:GuardWrite;rejectNestedBtrfs?:boolean;btrfsDevices?:{sourceDevice:string;snapshotDevice:string};verifiedVssPath?:(path:string)=>string}): Promise<ManagedSnapshot> {
   const roots = await normalizeManagedRoots(paths,budget?.verifiedVssPath)
   const destination = filesDir === undefined ? undefined : await canonicalRoot(resolve(filesDir))
   if (destination !== undefined && roots.some(root => beneath(root.path, destination))) {
@@ -207,7 +212,7 @@ export async function snapshotManagedFiles(paths: readonly ManagedDataPath[], fi
         if(!Number.isSafeInteger(bytes)||bytes>budget.maxBytes) throw new Error('Managed snapshot byte limit exceeded')
       }
       const member = `${snapshot.files.length.toString().padStart(8, '0')}.data`
-      const digest = await fingerprint(path, filesDir === undefined ? undefined : join(filesDir, member), signal)
+      const digest = await fingerprint(path, filesDir === undefined ? undefined : join(filesDir, member), signal, budget?.guardWrite)
       if(digest.object.device!==String(info.dev) || digest.object.inode!==String(info.ino))throw new Error('Managed file changed identity before capture')
       snapshot.files.push({ member, sourcePath: path, ...metadata(info), ...digest, object:originalObject(digest.object) })
     }

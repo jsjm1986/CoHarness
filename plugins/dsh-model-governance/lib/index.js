@@ -4,10 +4,10 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { sameExecutionAuthority } from '@deepseek-ai/dsh-execution-authority';
 import { LlmError } from '@deepseek-ai/dsh-llm';
-import { ReloadableModelAccess } from "./access.js";
+import { POLICY_UNAVAILABLE_REASON, ReloadableModelAccess } from "./access.js";
 import { UsageOutbox } from "./outbox.js";
 import { OrganizationCredentialLayer } from "./organization-credentials.js";
-import { loadPolicy } from "./policy.js";
+import { policyReader } from "./policy.js";
 import { ReloadableModelProviderConfig, stagedProviderSnapshot } from "./provider-config.js";
 import { PolicyReloader } from "./reload.js";
 import { baselineRegistrations, diffRegistrations } from "./registration.js";
@@ -89,7 +89,8 @@ async function billingExecution(options, agent, authority) {
 export function apply(ctx) {
     const home = process.env.DSH_HOME ?? join(homedir(), '.dsh');
     const policyPath = process.env.DSH_MODEL_GOVERNANCE ?? join(home, 'model-governance.json');
-    const policy = loadPolicy(policyPath);
+    const reader = policyReader(policyPath);
+    const policy = reader.load();
     let stopped = false;
     const requests = new AsyncLocalStorage();
     let activeRequests = 0;
@@ -108,6 +109,8 @@ export function apply(ctx) {
     });
     ctx.provide('modelAccess', {
         decide(target) {
+            if (stopped)
+                return { allowed: false, reason: POLICY_UNAVAILABLE_REASON };
             const execution = requests.getStore();
             execution?.signal?.throwIfAborted();
             const decision = access.decide(target);
@@ -139,34 +142,61 @@ export function apply(ctx) {
         userDeclared.refresh(ctx.llm, sctx.settings);
         sctx.effect(() => () => userDeclared.clear());
     });
-    const outbox = new UsageOutbox(join(home, 'model-governance-outbox'), policy.intakeUrl, policy.intakeToken);
+    const outbox = new UsageOutbox(join(home, 'model-governance-outbox'), policy.intakeUrl, policy.intakeToken, message => ctx.logger.warn(message));
     let personalRuntime = policy.userDeclaredAllowed;
+    let applied = policy;
+    let refreshTail = Promise.resolve();
+    let pendingRefresh;
+    const runRefresh = async () => {
+        if (stopped)
+            return;
+        try {
+            const next = await reader.read();
+            if (stopped || next === applied)
+                return;
+            const configuration = { revision: next.version, providers: next.providers };
+            providerConfig.replace(stagedProviderSnapshot(providerConfig.snapshot(), configuration));
+            access.replace(next);
+            outbox.setEndpoint(next.intakeUrl, next.intakeToken);
+            personalRuntime = next.userDeclaredAllowed;
+            providerConfig.replace(configuration);
+            applied = next;
+        }
+        catch (error) {
+            if (stopped)
+                return;
+            access.unavailable();
+            if (applied === undefined)
+                return;
+            applied = undefined;
+            ctx.logger.warn(`model-governance: policy reload failed at ${policyPath}. New model requests are blocked.`);
+            ctx.logger.warn(error);
+        }
+    };
+    const refreshPolicy = () => {
+        if (stopped)
+            return Promise.resolve();
+        if (pendingRefresh !== undefined)
+            return pendingRefresh;
+        const task = refreshTail.then(() => {
+            pendingRefresh = undefined;
+            return runRefresh();
+        });
+        pendingRefresh = task;
+        refreshTail = task.then(() => undefined, () => undefined);
+        return task;
+    };
     let reloader;
     ctx.effect(() => async () => {
         stopped = true;
         access.unavailable();
         await reloader?.close();
+        await refreshTail;
         await outbox.close();
     }, 'model-governance: drain policy reload and usage outbox');
     reloader = new PolicyReloader({
         filename: policyPath,
-        onValid: next => {
-            if (stopped)
-                return;
-            providerConfig.replace(stagedProviderSnapshot(providerConfig.snapshot(), {
-                revision: next.version,
-                providers: next.providers,
-            }));
-            access.replace(next);
-            providerConfig.replace({ revision: next.version, providers: next.providers });
-            outbox.setEndpoint(next.intakeUrl, next.intakeToken);
-            personalRuntime = next.userDeclaredAllowed;
-        },
-        onInvalid: error => {
-            access.unavailable();
-            ctx.logger.warn(`model-governance: policy reload failed at ${policyPath}; denying new model requests`);
-            ctx.logger.warn(error);
-        },
+        refresh: refreshPolicy,
         onWatcherError: error => {
             ctx.logger.warn(`model-governance: policy watcher failed at ${policyPath}`);
             ctx.logger.warn(error);
@@ -228,26 +258,45 @@ export function apply(ctx) {
             }
         });
     });
-    const currentAccess = (target) => {
-        if (stopped)
-            return access.decide(target);
-        try {
-            access.replace(loadPolicy(policyPath));
-        }
-        catch {
-            access.unavailable();
-        }
-        return access.decide(target);
+    const awaitRefresh = (signal) => {
+        signal?.throwIfAborted();
+        const task = refreshPolicy();
+        if (signal === undefined)
+            return task;
+        return new Promise((resolve, reject) => {
+            const onAbort = () => {
+                try {
+                    signal.throwIfAborted();
+                }
+                catch (error) {
+                    reject(error);
+                }
+            };
+            signal.addEventListener('abort', onAbort, { once: true });
+            void task.then(() => {
+                signal.removeEventListener('abort', onAbort);
+                resolve();
+            }, (error) => {
+                signal.removeEventListener('abort', onAbort);
+                reject(error);
+            });
+        });
+    };
+    const currentAccess = async (target, signal) => {
+        await awaitRefresh(signal);
+        return stopped ? { allowed: false, reason: POLICY_UNAVAILABLE_REASON } : access.decide(target);
     };
     ctx.on('llm/pre-dispatch', async (options, next) => {
         options.signal?.throwIfAborted();
-        const decision = currentAccess(options);
-        if (!decision.allowed)
-            throw new LlmError(decision.reason, 'MODEL_FORBIDDEN');
         const execution = requests.getStore();
         if (execution === undefined)
             throw new LlmError('The model request has no retained execution owner.', 'MODEL_EXECUTION_IDENTITY_FAILED');
         assertExecutionIssuer(ctx, execution);
+        const initialDecision = await currentAccess(options, options.signal);
+        options.signal?.throwIfAborted();
+        assertExecutionIssuer(ctx, execution);
+        if (!initialDecision.allowed)
+            throw new LlmError(initialDecision.reason, 'MODEL_FORBIDDEN');
         const authority = execution.authority;
         if (authority !== undefined && (options.purpose === 'auto-review' || options.resourceOrigin !== 'infrastructure')) {
             authority.current();
@@ -267,8 +316,11 @@ export function apply(ctx) {
             }
         }
         await next();
+        const decision = await currentAccess(options, options.signal);
         options.signal?.throwIfAborted();
         assertExecutionIssuer(ctx, execution);
+        if (!decision.allowed)
+            throw new LlmError(decision.reason, 'MODEL_FORBIDDEN');
     }, { global: true });
     const meter = (options, next) => {
         const agents = ctx.get('agents');
@@ -297,6 +349,7 @@ export function apply(ctx) {
             activeRequests++;
             try {
                 let execution;
+                let decision;
                 let agent;
                 try {
                     options.signal?.throwIfAborted();
@@ -304,6 +357,7 @@ export function apply(ctx) {
                     const captured = infrastructure ? undefined : authority?.current();
                     agent = billingAgent ?? (explicitId === undefined && captured !== undefined ? agents?.get(captured.parentSessionId) : undefined);
                     execution = await billingExecution(options, billingAgent, authority);
+                    decision = await currentAccess(options, options.signal);
                     options.signal?.throwIfAborted();
                     assertExecutionIssuer(ctx, { authority, deployment });
                 }
@@ -334,7 +388,6 @@ export function apply(ctx) {
                         base.actorProjectId = actor.projectId;
                     }
                 }
-                const decision = currentAccess(options);
                 if (!decision.allowed) {
                     enqueue({ ...base, credentialSource: 'none', credentialClass: 'unknown', status: 'denied' });
                     yield { type: 'finish', reason: { kind: 'error', failure: { message: decision.reason, code: 'MODEL_FORBIDDEN' } } };

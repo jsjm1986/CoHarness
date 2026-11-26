@@ -165,7 +165,12 @@ export class WorkspaceManager {
         this.error = folded.ok ? null : folded.error
       } finally {
         if (this.refreshFrames === frames) this.refreshFrames = null
-        if (!controller.signal.aborted) this.notifier.markDirty()
+        if (controller.signal.aborted && this.state === 'loading' && this.inflight?.controller === controller) {
+          this.state = 'idle'
+          this.notifier.markDirty()
+        } else if (!controller.signal.aborted) {
+          this.notifier.markDirty()
+        }
       }
     })()
     const operation: WorkspaceRefresh = {
@@ -387,6 +392,10 @@ export class WorkspaceManager {
     this.inflight?.controller.abort()
     this.inflight = null
     this.refreshFrames = null
+    if (this.state === 'loading') {
+      this.state = 'idle'
+      this.notifier.markDirty()
+    }
   }
 
   /**

@@ -32,6 +32,8 @@ const agentRegistryDisposers = new WeakMap<Agent, () => Promise<void>>()
 const agentScopeFibers = new WeakMap<Agent, { dispose: () => Promise<void> }>()
 /** Mutable fake next-step inbox per agent, so a spec can queue input without an unknown assertion. */
 const fakeInboxes = new WeakMap<Agent, ReturnType<typeof createUserMessage>[]>()
+/** Pending wake ids for fake agents, matching ReactLoopAgent.hasPendingUserSteer. */
+const fakePendingWakes = new WeakMap<Agent, Set<string>>()
 
 /** Registry knobs a test may narrow; every producer here pushes, so the pump stays idle. */
 interface RegistryConfig {
@@ -96,8 +98,14 @@ async function fakeAgent(ctx: Context, sessionId: string, delivery: FakeDelivery
   // Session projections fold the fake Session when a test logs a notice into it.
   Object.assign(agent.session, { inheritedEventCount: 0, snapshotEvents: () => [] })
   const nextStep: ReturnType<typeof createUserMessage>[] = []
+  const pendingWakes = new Set<string>()
+  Object.defineProperty(agent, 'hasPendingUserSteer', {
+    get: () => nextStep.some(message => message.source.kind === 'user' && pendingWakes.has(message.id)),
+    enumerable: true,
+  })
   Object.assign(agent, { inbox: { nextStep, nextTurn: [], remove: delivery.remove ?? (() => true) } })
   fakeInboxes.set(agent, nextStep)
+  fakePendingWakes.set(agent, pendingWakes)
   agentRegistryDisposers.set(agent, await ctx.agents.register(agent))
   agentScopeFibers.set(agent, scopeFiber)
   return agent
@@ -109,6 +117,7 @@ function insertNextStep(ctx: Context, owner: Agent, text: string): void {
   const nextStep = fakeInboxes.get(owner)
   if (nextStep === undefined) throw new Error(`fake agent "${owner.id}" has no next-step inbox`)
   nextStep.push(message)
+  fakePendingWakes.get(owner)?.add(message.id)
   emitAgentEvent(ctx, owner, 'agent/inbox/inserted', { message })
 }
 

@@ -35,8 +35,8 @@ const [{ loadConfig }, { createPostgresPool }, { resolvePostgresRuntimeContext }
   'organization-model-credentials', 'access-invalidation', 'principal', 'node-resource-budget', 'instances',
   'launcher', 'server', 'proxy', 'runtime-api', 'apply-model-governance', 'apply-grants', 'usage-intake', 'tunnel-access', 'postgres/tunnel-access-service', 'admin-api', 'tunnel-supervisor',
 ].map(load))
-const [{ PostgresRuntimeCatalog }, { GatewayRuntimeRouter, LocalRuntimeAdapter }] = await Promise.all([
-  load('postgres/runtime-catalog'), load('runtime-router'),
+const [{ PostgresRuntimeCatalog }, { GatewayRuntimeRouter, LocalRuntimeAdapter }, { RuntimeAssets }, { PostgresRuntimeAssetAdmission }] = await Promise.all([
+  load('postgres/runtime-catalog'), load('runtime-router'), load('runtime-assets'), load('runtime-asset-admission'),
 ])
 
 const cfg = loadConfig({
@@ -151,7 +151,17 @@ const runtimeCatalog = new PostgresRuntimeCatalog(context, cfg.runtimeCatalog, c
 const deps = { cfg, users, auth, projects, audit, instances: manager, governance, accessMonitor: monitor,
   collaboration: new PostgresCollaborationService(context), tunnelAccess, runtimeCatalog }
 deps.runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(deps), { catalog: runtimeCatalog, localNodeId: context.nodeId })
-const proxies = createProxyHandlers(deps, keys.signer), server = createGatewayServer(deps, { ...proxies, runtime, admin: createAdminApiHandler(deps) })
+const proxies = createProxyHandlers(deps, keys.signer)
+const runtimeAssets = new RuntimeAssets({ cfg, localNodeId: context.nodeId, admission: new PostgresRuntimeAssetAdmission(context),
+  instances: manager, monitor, signer: keys.signer })
+const proxyWork = new Set()
+const server = createGatewayServer(deps, { ...proxies, runtimeAssets, runtime, admin: createAdminApiHandler(deps),
+  proxy: async (req, res, context) => {
+    const work = proxies.proxy(req, res, context)
+    proxyWork.add(work)
+    try { await work } finally { proxyWork.delete(work) }
+  },
+})
 {
   const provision = manager.beforeStart
   manager.beforeStart = async runtime => {
@@ -187,7 +197,7 @@ const dshHome = runtimeStorage.dshHome
 let stopping
 async function stop() {
   return stopping ??= (async () => {
-    await tunnelAccess.shutdown(); await manager.stopAll(); await documentBroker?.dispose(); await proxies.close()
+    await tunnelAccess.shutdown(); await runtimeAssets.close(); await manager.stopAll(); await documentBroker?.dispose(); await proxies.close()
     for (const listener of [server, intake, cloudflare]) {
       listener.closeAllConnections(); await new Promise(resolve => listener.close(resolve))
     }
@@ -201,9 +211,10 @@ process.on('message', input => {
     if (input.kind === 'status') {
       reply({ kind: 'status', state: await manager.stateOf(target), generation: await manager.generationOf(target),
         resident: manager.capacitySnapshot().resident, admittedStarts: (await resources.snapshot()).outcomes.runtime_starts_admitted })
-    } else if (input.kind === 'stop-runtime') {
-      await manager.stop({ ...target, runtimeId: runtimeStorage.runtimeId })
-      reply({ kind: 'stop-runtime' })
+    } else if (input.kind === 'asset-state') {
+      await Promise.all([...proxyWork])
+      const row = (await pool.query('SELECT last_activity_at::text activity,generation::text generation FROM harness.instances WHERE runtime_id=$1', [runtimeStorage.runtimeId])).rows[0]
+      reply({ kind: 'asset-state', ...row })
     } else if (input.kind === 'tunnel-status') {
       reply({ kind: 'tunnel-status', ...cloudflareCalls, view: await tunnelAccess.view() })
     } else if (input.kind === 'reuse-runtime') {

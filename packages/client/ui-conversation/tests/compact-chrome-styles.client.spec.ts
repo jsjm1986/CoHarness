@@ -18,11 +18,10 @@ describe('conversation compact chrome', () => {
     expect(root).toContain('.crumb')
     expect(root).toContain('max-width: 100%')
     expect(root).toContain('display: contents')
-    // The compact header collapses the desktop 52px recipe to a 36px chrome
-    // strip with 28px tab pills inside a 34px track.
+    // Compact header geometry grows with the touch targets inside the track.
     expect(root).toMatch(/\.header\s*\{[^}]*min-height:\s*36px/u)
-    expect(root).toMatch(/\.tabs\s*\{[^}]*min-height:\s*34px/u)
-    expect(root).toMatch(/\.tab\s*\{[^}]*min-height:\s*28px/u)
+    expect(root).toMatch(/\.tabs\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/u)
+    expect(root).toMatch(/\.tab\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/u)
     expect(root).toContain('.headerUtilities')
     // The corner seat never reaches past the header's trailing padding — a
     // negative right margin glued its button to the viewport edge on every
@@ -44,8 +43,11 @@ describe('conversation compact chrome', () => {
     expect(input).toContain('.primary')
     expect(input).toContain('.documentRail')
     expect(input).toContain('.documentStatus')
-    expect(input).toContain('width: var(--dsw-touch-target)')
-    expect(input).toContain('width: 36px')
+    expect(input).toMatch(new RegExp(
+      /\.add,\s*:global\(:is\([^)]*\[data-composer-tool-layout='compact'\]\)\)\s*/u.source
+        + /\.primary,[^{]*\{\s*width:\s*var\(--dsw-touch-target\);\s*height:\s*var\(--dsw-touch-target\);/u.source,
+      'u',
+    ))
     expect(input).toContain('var(--dsw-mobile-icon-secondary)')
     expect(input).toContain('flex-wrap: wrap')
     expect(input).toContain('[data-viewport-short]')
@@ -70,10 +72,9 @@ describe('conversation compact chrome', () => {
     expect(contextMeter).toContain('var(--dsw-mobile-sheet-radius)')
     const actions = readFileSync(fileURLToPath(new URL('../src/client/chat/MessageIconActions.module.css', import.meta.url)), 'utf8')
     expect(actions).toContain('flex-wrap: wrap')
-    // Message actions retain their compact 40px geometry; coarse pointers
-    // outside the compact layout use the shared 44px target.
+    // Compact actions wrap without reducing their touch targets.
     expect(actions).toMatch(/@media\s*\(pointer:\s*coarse\)[^{]*\{[^@]*width:\s*var\(--dsw-touch-target\)/u)
-    expect(actions).toMatch(/\[data-viewport='compact'\]\s*\)\s*\.action\s*\{[^}]*min-width:\s*40px/u)
+    expect(actions).toMatch(/\[data-viewport='compact'\]\s*\)\s*\.action\s*\{[^}]*min-width:\s*var\(--dsw-touch-target\)/u)
     // Phone keeps the primary figure per stats pill; speed and cache-hit
     // segments hide instead of ellipsizing mid-number (dialogs keep them).
     const pills = readFileSync(fileURLToPath(new URL('../src/client/chat/StatsPills.module.css', import.meta.url)), 'utf8')
@@ -107,15 +108,19 @@ describe('conversation compact chrome', () => {
     expect(input).toMatch(/\.row\s*\{[^}]*container-type:\s*inline-size/u)
     expect(permission).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.triggerLabel,[^@]*\.chevron\s*\{[^}]*display:\s*none/u)
     expect(permission).toMatch(/\.triggerIcon\s*\{[^}]*width:\s*24px/u)
-    expect(permission).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.triggerLabel,[^@]*display:\s*none/u)
+    expect(permission).toMatch(/:global\(:is\([^)]*\[data-composer-tool-layout='compact'\]\)\)\s*\.triggerLabel,[^@]*display:\s*none/u)
     // The tool seats are transparent circles with a hover fill at every
     // width; only the lane gaps close on narrow panes.
     expect(input).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.tools\s*\{[^}]*gap:\s*var\(--dsw-space-2\)/u)
     expect(input).toMatch(/\.add\s*\{[^}]*background:\s*transparent/u)
     expect(input).toMatch(/\.add:hover:not\(:disabled\)\s*\{[^}]*background:\s*var\(--dsw-alias-interactive-bg-hover\)/u)
-    // The very narrowest panes hide the context meter; compact phones keep it.
-    expect(contextMeter).toMatch(/@container\s*\(max-width:\s*340px\)\s*\{[^@]*\.root\s*\{[^}]*display:\s*none/u)
-    expect(contextMeter).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.root\s*\{[^}]*display:\s*inline-flex/u)
+    // The toolbar budgets a touch-sized meter. The footer allows a wider reading.
+    expect(contextMeter).toMatch(new RegExp(
+      /:global\(:is\([^)]*\[data-composer-tool-layout='compact'\]\)\)\s*/u.source
+        + /\.trigger\s*\{[^}]*inline-size:\s*var\(--dsw-touch-target\)/u.source,
+      'u',
+    ))
+    expect(contextMeter).toMatch(/:global\(\[data-composer-footer\]\)\s*\.trigger\s*\{[^}]*flex-wrap:\s*nowrap/u)
     // Contributed-item lanes and the modes seat share one degrade contract:
     // a clip seat publishes data-clipped while it overflows, every descendant
     // marked data-clip-label drops whole under the shared rule, and the lane

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-21-project-progress-journal.md
 document:
-  en: 54a7a81fb6f05c0478d4b3956d241413138b67bc
-  zh: d8d070fe119b0187c9f0161c07a3d014a3c0a2c7
+  en: bd99f7b624b5bb51a73e5f0dcfdec812f8e4ff38
+  zh: 504d7ffa55769926616525b3a6600689fb449026
 /agent-note-project-progress-journal:
   en: 4d7ef63300ca8e0d
   zh: 5c6ea11af38ed88f
@@ -12,17 +12,17 @@ document:
   en: e9183a9a97e4bffa
   zh: 05316040b1d5b5b0
 /agent-note-project-progress-journal/decision:
-  en: dfd461e09c297812
-  zh: 5ed701d12168124d
+  en: 9cbda75a684f569a
+  zh: aa041eb7a2bca7a9
 /agent-note-project-progress-journal/decision/request-ownership-and-evidence:
   en: 77b3acdff3af4d81
   zh: b9c33f35c446ed41
 /agent-note-project-progress-journal/decision/publication-and-source-privacy:
-  en: d05251eaf1ba74ff
-  zh: 42adf23eb7d4cbcf
+  en: 7fba38c17ee1d93e
+  zh: cb8fe62e2fa1bf3c
 /agent-note-project-progress-journal/decision/product-surface:
-  en: 3a1fe3d4f7a36e3b
-  zh: 79aee8b339c57cc1
+  en: 1acfcaa3d61e453e
+  zh: 51d0c412e72d155b
 /agent-note-project-progress-journal/alternatives-considered:
   en: 914d52a4b5415752
   zh: 35a63fbfb45b60fa

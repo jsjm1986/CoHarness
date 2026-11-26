@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/cordis-plugin-loader'
 import Schema from '@deepseek-ai/schemastery'
 import { publishWorkspaceCatalog } from './workspace-catalog.ts'
 import { launchAuthorityOf } from './launch-authority.ts'
+import { attachModelResourceFinishRecorder, installModelTurnTailObserver } from './model-tail-timing.ts'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type {
   ConnectionAuthenticationRequest,
@@ -89,7 +90,11 @@ export interface GatewayPrincipalClaims {
   expiresAt: number
   nonce: string
   /** Optional capability purpose used by loopback-only runtime integrations. */
-  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch'
+  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch' | 'runtime-asset'
+  /** Exact resource coordinates; required only for a read-only asset assertion. */
+  asset?: { method: 'GET' | 'HEAD'; path: string }
+  /** Request step for an empty draft in the selected personal Runtime. */
+  personalDraft?: 'prepare' | 'admit-input'
 }
 
 /** Private launch credential delivered through an inherited FD or systemd credential file. */
@@ -98,6 +103,8 @@ export interface GatewayRuntimeCredential {
   gatewayUrl: string
   organization: string
   runtime: GatewayRuntimeIdentity
+  /** Registered computer supplied by the launcher. Legacy launch credentials omit it. */
+  nodeId?: Branded<'RuntimeNodeId'>
   token: string
   principalPublicKey: string
   /** Present only when this managed release enables private event-connection renewal. */
@@ -145,9 +152,22 @@ export class GatewayResponseTooLargeError extends Error {
   }
 }
 
+/** Process-uptime offsets recorded by the managed CLI launcher during cold boot. */
+export interface RuntimeStartupMarks {
+  readonly entryUptimeMs: number
+  readonly proxyInstalledMs?: number
+  readonly profileComposedMs?: number
+  readonly patchesReadMs?: number
+  readonly hostPreparedMs?: number
+  readonly bootSettledMs?: number
+  /** Callback registered if authenticated readiness answers before `boot()` settles. */
+  notifySettled?: () => void
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     gatewayRuntime: GatewayRuntime
+    runtimeStartupMarks?: RuntimeStartupMarks
   }
 }
 
@@ -162,7 +182,7 @@ function positiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
-function validRuntimeId(value: unknown): boolean {
+function optionalIdentityUuid(value: unknown): boolean {
   return value === undefined || typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(value)
 }
 /* jscpd:ignore-end */
@@ -258,6 +278,8 @@ export async function readGatewayResponseBytes(
   } finally {
     reader.releaseLock()
   }
+  const [single] = chunks
+  if (chunks.length === 1 && single !== undefined) return single
   const bytes = new Uint8Array(total)
   let offset = 0
   for (const chunk of chunks) {
@@ -329,7 +351,8 @@ export function parseGatewayRuntimeCredential(value: unknown): GatewayRuntimeCre
     || !nonEmptyString(credential.organization) || !nonEmptyString(credential.token)
     || !nonEmptyString(credential.principalPublicKey)
     || (runtime?.kind !== 'user' && runtime?.kind !== 'project')
-    || !positiveInteger(runtime.id) || !positiveInteger(runtime.generation) || !validRuntimeId(runtime.runtimeId)) {
+    || !positiveInteger(runtime.id) || !positiveInteger(runtime.generation)
+    || !optionalIdentityUuid(runtime.runtimeId) || !optionalIdentityUuid(credential.nodeId)) {
     throw new Error('invalid Gateway runtime credential')
   }
   let gatewayUrl: URL
@@ -356,6 +379,28 @@ export function parseGatewayRuntimeCredential(value: unknown): GatewayRuntimeCre
   return value as GatewayRuntimeCredential
 }
 
+const ASSET_PACKAGE = '(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*'
+const ASSET_COMBO_ENTRY = new RegExp(`^${ASSET_PACKAGE}/client\\.js(\\.map)?$`, 'u')
+const ASSET_CHUNK = new RegExp(`^/plugins/${ASSET_PACKAGE}/client\\.[A-Za-z0-9][A-Za-z0-9._-]*\\.js(?:\\.map)?$`, 'u')
+const ASSET_REVISION = /^[a-f0-9]{12}(?:[a-f0-9]{52})?$/u
+
+/** Validate the resource protocol at the Runtime process, independently of the Gateway parser. */
+function immutableAssetRequest(method: string, path: string): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false
+  const question = path.indexOf('?')
+  const pathname = question < 0 ? path : path.slice(0, question)
+  const query = question < 0 ? '' : path.slice(question + 1)
+  if (/^\/assets\/[^/?%\\]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9.]+$/u.test(pathname)) return query === ''
+  if (pathname === '/plugins/combo.js') {
+    const match = /^\?([^&]+)&rev=([^&]+)$/u.exec(query)
+    const list = match?.[1], revision = match?.[2]
+    if (list === undefined || revision === undefined || !ASSET_REVISION.test(revision)) return false
+    const resources = list.split(',').map(entry => ASSET_COMBO_ENTRY.exec(entry))
+    return resources.every(entry => entry !== null && entry[1] === resources[0]?.[1])
+  }
+  return ASSET_CHUNK.test(pathname) && query.startsWith('rev=') && ASSET_REVISION.test(query.slice(4))
+}
+
 function principalClaims(value: unknown): GatewayPrincipalClaims {
   const claims = record(value)
   const user = record(claims?.user)
@@ -368,18 +413,26 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || (scope?.kind !== 'personal' && scope?.kind !== 'project')
     || (runtime?.kind !== 'user' && runtime?.kind !== 'project')
     || !positiveInteger(runtime.id) || !positiveInteger(runtime.generation)
-    || !validRuntimeId(runtime.runtimeId)
+    || !optionalIdentityUuid(runtime.runtimeId)
     || typeof claims.issuedAt !== 'number' || !Number.isSafeInteger(claims.issuedAt) || claims.issuedAt < 0
     || typeof claims.expiresAt !== 'number' || !Number.isSafeInteger(claims.expiresAt)
     || claims.expiresAt <= claims.issuedAt || !nonEmptyString(claims.nonce)) {
     throw new Error('invalid Gateway principal assertion')
   }
-  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin' && claims.purpose !== 'terminal-admin' && claims.purpose !== 'plugin-admin' && claims.purpose !== 'webhook-dispatch') {
+  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin' && claims.purpose !== 'terminal-admin' && claims.purpose !== 'plugin-admin' && claims.purpose !== 'webhook-dispatch' && claims.purpose !== 'runtime-asset') {
     throw new Error('invalid Gateway principal assertion')
   }
-  if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch' && user.role !== 'admin') {
+  if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch' && claims.purpose !== 'runtime-asset' && user.role !== 'admin') {
     throw new Error('invalid Gateway principal assertion')
   }
+  const asset = record(claims.asset)
+  if (claims.purpose === 'runtime-asset'
+    ? (asset?.method !== 'GET' && asset?.method !== 'HEAD') || typeof asset.path !== 'string'
+      || !immutableAssetRequest(asset.method, asset.path)
+    : claims.asset !== undefined) throw new Error('invalid Gateway asset assertion')
+  if (claims.personalDraft !== undefined && ((claims.personalDraft !== 'prepare' && claims.personalDraft !== 'admit-input')
+    || claims.purpose !== undefined || scope.kind !== 'personal' || runtime.kind !== 'user' || runtime.id !== user.id
+    || runtime.runtimeId === undefined)) throw new Error('invalid personal draft assertion')
   if (scope.kind === 'project' && (!positiveInteger(scope.projectId)
     || !nonEmptyString(scope.projectName) || (scope.mode !== 'ro' && scope.mode !== 'rw')
     || (scope.canManage !== undefined && typeof scope.canManage !== 'boolean'))) {
@@ -494,6 +547,8 @@ export interface Config {
   workspaceCatalogTimeoutMs?: number
   /** Loader entry ids that must each have one active instance before readiness; absent means no additional entries. */
   requiredPlugins?: string[]
+  /** Log metadata-only timings for managed model input, resource admission and provider attempts. Defaults to false. */
+  modelTimings?: boolean
 }
 
 /** Authenticated Gateway context whose application retains launch identity across provider replacement. */
@@ -502,26 +557,55 @@ export class GatewayRuntime extends Service {
   static Config: Schema<Config> = Schema.object({
     workspaceCatalogTimeoutMs: Schema.natural().min(1).default(30_000),
     requiredPlugins: Schema.array(Schema.string().min(1)).default([]),
+    modelTimings: Schema.boolean().default(false),
   })
 
   /** Non-sensitive runtime identity bound to every accepted principal. */
   readonly identity: GatewayRuntimeIdentity
+  /** Registered computer of this process, when supplied by the launcher. */
+  readonly nodeId: GatewayRuntimeCredential['nodeId']
   /** Gateway organization bound to this runtime. */
   readonly organization: string
+  /** Whether managed model phases may emit metadata-only timing samples. */
+  readonly modelTimings: boolean
 
   private readonly credential: GatewayRuntimeCredential
   private readonly gatewayUrl: URL
   private readonly publicKey: KeyObject
-  private readonly requests = new AsyncLocalStorage<{ principal: GatewayRequestPrincipal; interactive: boolean }>()
+  private readonly requests = new AsyncLocalStorage<{ principal: GatewayRequestPrincipal; interactive: boolean; operationId?: string }>()
   private readonly readinessRequests = new AsyncLocalStorage<string>()
   private readonly sessionCreations = new Map<SessionId, Promise<GatewaySessionCreationAuthorization>>()
   private readonly readinessPlugins: readonly string[]
   private readonly streamPrincipals: StreamPrincipalLeasePool | undefined
   private executionSettings: () => RuntimeExecutionSettings = () => ({ mode: 'resident' })
+  private readonly credentialReadStartUptimeMs: number
+  private readonly credentialReadMs: number
+  private readonly gatewayRuntimeReadyUptimeMs: number
+  private readiness503ResourceBudget = 0
+  private readiness503RequiredPlugins = 0
+  private firstReadinessLogged = false
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'gatewayRuntime')
     this.readinessPlugins = [...new Set(config.requiredPlugins ?? [])]
+    this.modelTimings = config.modelTimings === true
+    if (this.modelTimings) {
+      ctx.on('llm/model-attempt-timing', (sample) => {
+        try {
+          const round = (ms: number) => Math.round(ms * 100) / 100
+          console.info(`[model-attempt-timing] ${JSON.stringify({
+            outcome: sample.outcome, startedAt: sample.startedAt, elapsedMs: round(sample.elapsedMs),
+            adapterPreparationMs: round(sample.adapterPreparationMs), resourceWaitMs: round(sample.resourceWaitMs),
+            ...(sample.resourceOperationId === undefined ? {} : { resourceOperationId: sample.resourceOperationId }),
+            initialAuthorizationMs: round(sample.initialAuthorizationMs),
+            adapterDispatchPreparationMs: round(sample.adapterDispatchPreparationMs),
+            dispatchAuthorizationMs: round(sample.dispatchAuthorizationMs), adapterCallbacks: sample.adapterCallbacks,
+            afterLastAuthorizationMs: round(sample.afterLastAuthorizationMs),
+          })}`)
+        } catch { /* Diagnostic output cannot interrupt model attempts. */ }
+      })
+      attachModelResourceFinishRecorder(this, installModelTurnTailObserver(ctx))
+    }
     installSettingsSection(ctx, runtimeExecutionNamespace, runtimeExecutionSchema, { mode: 'resident' }, {
       label: { en: 'Runtime execution', zh: '运行时策略' },
       owner: 'project',
@@ -529,12 +613,18 @@ export class GatewayRuntime extends Service {
       setSource: (source) => { this.executionSettings = source },
       onChange: () => {},
     })
+    const round = (ms: number) => Math.round(Math.max(0, ms) * 100) / 100
+    this.credentialReadStartUptimeMs = round(process.uptime() * 1000)
+    const credentialReadStarted = performance.now()
     const authority = launchAuthorityOf(ctx, () => {
       const credential = readGatewayRuntimeCredential()
       return { credential, publicKey: createPublicKey(credential.principalPublicKey) }
     })
+    this.credentialReadMs = round(performance.now() - credentialReadStarted)
+    this.gatewayRuntimeReadyUptimeMs = round(process.uptime() * 1000)
     this.credential = authority.credential
     this.identity = { ...this.credential.runtime }
+    this.nodeId = this.credential.nodeId
     this.organization = this.credential.organization
     this.gatewayUrl = new URL(this.credential.gatewayUrl)
     this.publicKey = authority.publicKey
@@ -548,6 +638,9 @@ export class GatewayRuntime extends Service {
         })
         if (!response.ok) {
           await response.body?.cancel()
+          if (response.status === 401 || response.status === 403) {
+            return { version: 1, leases: leaseIds.map(leaseId => ({ leaseId, status: 'denied' })) }
+          }
           throw new Error('Gateway event connection renewal is unavailable')
         }
         return readGatewayResponseJson(response, 4 * 1024 * 1024, signal)
@@ -600,13 +693,23 @@ export class GatewayRuntime extends Service {
       }
       const pathname = new URL(request.url ?? '/', 'http://dsh.invalid').pathname
       try {
-        this.assertPurposePermitted(claims, request.kind, request.method, pathname)
+        this.assertPurposePermitted(claims, request.kind, request.method, pathname, request.url)
       } catch {
         return 'deny'
       }
       return 'allow'
     })
     ctx.inject(['webServer'], (scope) => {
+      scope.effect(() => scope.webServer.registerRequestGuard((request, response) => {
+        const pathname = new URL(request.url ?? '/', 'http://dsh.invalid').pathname
+        if (!pathname.startsWith('/assets/') && !pathname.startsWith('/plugins/') && pathname !== '/favicon.svg') return true
+        const rejection = ctx.connection.requestRejection(request, 'http')
+        if (rejection === undefined) return true
+        request.resume()
+        response.writeHead(rejection, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        response.end(JSON.stringify({ error: rejection === 401 ? 'unauthorized' : 'forbidden' }))
+        return false
+      }), 'gateway-runtime: resource principal admission')
       scope.on('webserver/index-inject', (rows, request) => {
         if (request === undefined) return
         const header = headerString(request.headers, GATEWAY_PRINCIPAL_HEADER)
@@ -642,13 +745,20 @@ export class GatewayRuntime extends Service {
         assertion: header,
         claims: verifyGatewayPrincipal(header, this.credential, this.publicKey),
       }
-      this.assertPurposePermitted(principal.claims, request.kind, requestMeta.method, requestMeta.pathname)
+      this.assertPurposePermitted(principal.claims, request.kind, requestMeta.method, requestMeta.pathname, request.url)
+      const draftStep = principal.claims.personalDraft
+      if (draftStep !== undefined && (request.kind !== 'http' || requestMeta.method !== 'POST'
+        || requestMeta.pathname !== (draftStep === 'prepare' ? '/api/prepare/v1/session.create' : '/api/admit/v1/session.prompt'))) {
+        throw new Error('personal draft assertion does not match the request')
+      }
       if (request.kind === 'upgrade' && request.signal !== undefined
         && (requestMeta.pathname === '/api/events.mux' || requestMeta.pathname === '/api/events.host')
         && this.streamPrincipals !== undefined) {
         principal = this.streamPrincipals.open(principal, request.signal)
       }
-      const requestScope = { principal, interactive: request.kind === 'http' }
+      const operationId = headerString(request.headers, 'x-dsh-operation-id')
+      const requestScope = { principal, interactive: request.kind === 'http',
+        ...(operationId !== undefined && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(operationId) ? { operationId } : {}) }
       return this.requests.run(requestScope, async () => {
         try { await next() } finally { requestScope.interactive = false }
       })
@@ -679,13 +789,21 @@ export class GatewayRuntime extends Service {
    * @param kind - carrier the assertion arrives on: index, HTTP, or upgrade.
    * @param method - request method, when the carrier reports one.
    * @param pathname - request pathname, when the carrier reports one.
+   * @param url - original request target; required for resource assertions and unused by other purposes.
    */
   private assertPurposePermitted(
     claims: GatewayPrincipalClaims,
     kind: 'index' | 'http' | 'upgrade',
     method: string | undefined,
     pathname: string | undefined,
+    url?: string,
   ): void {
+    if (claims.purpose === 'runtime-asset') {
+      const asset = claims.asset as NonNullable<GatewayPrincipalClaims['asset']>
+      if (kind !== 'http' || method !== asset.method || url !== asset.path) {
+        throw new Error('Asset assertions permit only their exact resource request.')
+      }
+    }
     if (claims.purpose === 'archive-read' && (method !== 'GET' || kind !== 'http'
       || pathname !== '/api/internal/archive/read')) {
       throw new Error('Archive assertions permit only the archive read endpoint.')
@@ -721,6 +839,7 @@ export class GatewayRuntime extends Service {
       return
     }
     if (this.ctx.get('resourceBudget') === undefined) {
+      this.readiness503ResourceBudget += 1
       response.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' })
       response.end(JSON.stringify({ error: 'resource-admission-unavailable' }))
       return
@@ -731,10 +850,15 @@ export class GatewayRuntime extends Service {
         const matching = entries.filter(entry => entry.options.id === id)
         return matching.length !== 1 || matching[0]?.fiber?.state !== FiberState.ACTIVE
       })) {
+        this.readiness503RequiredPlugins += 1
         response.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         response.end(JSON.stringify({ error: 'required-plugins-unavailable' }))
         return
       }
+    }
+    if (this.modelTimings && !this.firstReadinessLogged) {
+      this.firstReadinessLogged = true
+      this.reportBootTiming()
     }
     response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
     const policy = this.executionSettings().mode
@@ -750,6 +874,68 @@ export class GatewayRuntime extends Service {
       proof: readinessProof('response', this.credential.token, nonce, this.identity),
       idle: { policy, canStop, proof: createHmac('sha256', this.credential.token).update(idleMaterial).digest('base64url') },
     }))
+  }
+
+  private reportBootTiming(): void {
+    try {
+      const round = (ms: number): number => Math.round(Math.max(0, ms) * 100) / 100
+      const uptimeMs = process.uptime() * 1000
+      const marks = this.ctx.root.get('runtimeStartupMarks')
+      if (marks !== undefined && marks.bootSettledMs === undefined && this.ctx.fiber.state === FiberState.ACTIVE) {
+        const onSettled = (): void => {
+          if (marks.notifySettled === onSettled) delete marks.notifySettled
+          this.reportBootSettled(marks)
+        }
+        this.ctx.effect(() => {
+          marks.notifySettled = onSettled
+          return () => {
+            if (marks.notifySettled === onSettled) delete marks.notifySettled
+          }
+        }, 'gateway-runtime: boot settled timing')
+      }
+      const profileBoot = marks === undefined ? undefined : {
+        entryUptimeMs: round(marks.entryUptimeMs),
+        ...(marks.proxyInstalledMs === undefined ? {} : { proxyInstalledMs: round(marks.proxyInstalledMs) }),
+        ...(marks.profileComposedMs === undefined ? {} : { profileComposedMs: round(marks.profileComposedMs) }),
+        ...(marks.patchesReadMs === undefined ? {} : { patchesReadMs: round(marks.patchesReadMs) }),
+        ...(marks.hostPreparedMs === undefined ? {} : { hostPreparedMs: round(marks.hostPreparedMs) }),
+        ...(marks.bootSettledMs === undefined ? {} : { bootSettledMs: round(marks.bootSettledMs) }),
+      }
+      const loader = this.ctx.get('loader')
+      const pluginCount = loader === undefined ? undefined : [...loader.entries()].length
+      console.info(`[runtime-boot-timing] ${JSON.stringify({
+        runtimeId: this.identity.runtimeId,
+        kind: this.identity.kind,
+        ownerId: this.identity.id,
+        generation: this.identity.generation,
+        startedAt: Date.now() - Math.round(uptimeMs),
+        firstReadinessUptimeMs: round(uptimeMs),
+        credentialReadStartUptimeMs: this.credentialReadStartUptimeMs,
+        credentialReadMs: this.credentialReadMs,
+        gatewayRuntimeReadyUptimeMs: this.gatewayRuntimeReadyUptimeMs,
+        readiness503ResourceBudget: this.readiness503ResourceBudget,
+        readiness503RequiredPlugins: this.readiness503RequiredPlugins,
+        ...(pluginCount === undefined ? {} : { pluginCount }),
+        ...(profileBoot === undefined ? {} : { profileBoot }),
+      })}`)
+    } catch { /* Diagnostic output cannot interrupt authenticated readiness. */ }
+  }
+
+  private reportBootSettled(marks: RuntimeStartupMarks): void {
+    try {
+      const round = (ms: number): number => Math.round(Math.max(0, ms) * 100) / 100
+      const loader = this.ctx.get('loader')
+      const pluginCount = loader === undefined ? undefined : [...loader.entries()].length
+      console.info(`[runtime-boot-settled] ${JSON.stringify({
+        runtimeId: this.identity.runtimeId,
+        kind: this.identity.kind,
+        ownerId: this.identity.id,
+        generation: this.identity.generation,
+        bootSettledUptimeMs: round(process.uptime() * 1000),
+        ...(marks.bootSettledMs === undefined ? {} : { bootSettledMs: round(marks.bootSettledMs) }),
+        ...(pluginCount === undefined ? {} : { pluginCount }),
+      })}`)
+    } catch { /* Diagnostic output cannot interrupt profile startup settlement. */ }
   }
 
   private canReleaseRuntime(): boolean {
@@ -844,6 +1030,11 @@ export class GatewayRuntime extends Service {
     const { principal = false, ...init } = options
     const headers = new Headers(init.headers)
     headers.set('authorization', `Bearer ${this.credential.token}`)
+    const scope = this.requests.getStore()
+    if (scope?.interactive === true && scope.operationId !== undefined
+      && (rawPathname === '/internal/runtime/execution/input' || rawPathname === '/internal/runtime/execution/register-session')) {
+      headers.set('x-dsh-operation-id', scope.operationId)
+    }
     if (principal === true) headers.set(GATEWAY_PRINCIPAL_HEADER, this.requireCurrent().assertion)
     else if (principal !== false) headers.set(GATEWAY_PRINCIPAL_HEADER, principal.assertion)
     else headers.delete(GATEWAY_PRINCIPAL_HEADER)

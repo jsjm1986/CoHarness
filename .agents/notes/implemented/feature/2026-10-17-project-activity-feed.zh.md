@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决定
 
-新增**项目动态记录**：`ui-project-activity` 客户端插件，按三种维度（时间 / 会话 / 成员）分组展示当前项目的成员消息与提问回答，并支持跳转到对应消息。面板后来增加了第四个、默认的 `进展` 档，渲染[面向人的项目进展纪要](2026-10-21-project-progress-journal.zh.md)；三种 feed 分组仍是其原始视图。
+**项目动态记录**按时间、会话或成员分组展示成员消息和提问回答，并链接到对应会话事件。同一面板提供[进展纪要](2026-10-21-project-progress-journal.zh.md)，供成员了解项目决定和进展。
 
 ### 记录内容
 
@@ -30,13 +30,13 @@ Status: implemented
 
 ### 服务端
 
-Gateway 新增 `GET /account/api/activity?before=<keyset>&limit=<n>`，与 `/account/api/conversations` 并列。处理器要求调用者的账户 scope 已解析为项目，对所属根会话应用 `listConversations` 的可见性条件，返回规范化的 `ProjectActivityItem` 列表。浏览器与其他协作读操作一样携带会话 cookie 调用。
+Gateway 在项目根会话的可见性规则下提供 `GET /account/api/activity?before=<keyset>&limit=<n>`。可选的 `member` 在分页前筛选消息和提问回答。没有游标的首页请求返回活跃项目成员名单，让筛选器包含当前页面里没有动态的成员。
 
-游标是不透明的版本化值，包含 PostgreSQL 完整微秒时间、Session id、日志锚点及单条动态标识。继续读取的比较条件与时间降序、Session id 升序、锚点降序、动态标识升序一致。最后一项标识可区分同样缺少日志锚点的历史回答。带分隔符的 Session id 会完整保留。旧式毫秒游标仍可读取；无效游标读取第一页。历史回答数组中非对象元素不贡献摘要文本；响应仍保留原始 outcome。
+不透明游标绑定 Runtime、PostgreSQL 完整微秒时间、Session ID、日志锚点和单条动态标识。筛选游标还绑定成员 ID。继续读取按时间降序、Session ID 升序、锚点降序和动态标识升序比较。动态标识区分无锚点的历史回答。Session ID 可含分隔符。无效或不匹配的游标读取第一页。历史回答里的非对象元素不贡献摘要文本。响应保留原始 outcome。
 
 ### 客户端
 
-- `packages/client/ui-project-activity` 注册 `sidebarRightTabs` 类型及带 key 的正文、标题插槽。注册跟随当前会话的项目 Runtime，因此从个人启动页面打开项目会话时仍提供活动入口。未限定 Runtime 的独立会话使用页面策略。正文在生命周期内保留所属会话身份，以 `dshRuntime`、`dshTarget` 限定 Feed、纪要和生成请求；另一标签的空间 cookie 不能重定向它们。Gateway 继续负责检查当前访问权限。纪要轮询只有一个有限窗口，仍在生成的响应不会重启轮次预算。已被新刷新替代的读取不能再发布结果，包括 JSON 解码之后。
+- `packages/client/ui-project-activity` 为当前选中的项目 Runtime 注册标签，从个人空间启动后选中项目会话也适用。未限定 Runtime 的独立会话使用页面策略。面板通过 `dshRuntime` 与 `dshTarget` 将账号请求绑定到所属 Runtime。Gateway 检查当前权限。同一会话的可见正文共用有限的状态查询窗口。最后一个正文不可见时，取消 HTTP 读取和轮询计时器。被替代的请求完成解码后也无法发布结果。
 - 请求经同源账号 cookie 认证，显式 Runtime 参数不授予访问权限。[带 Runtime 的 Session 决策](../architecture/2026-09-27-runtime-qualified-client-sessions.zh.md)定义共用浏览器寻址和账号生命周期隔离。
 - 会话名调用 `conversationViewport.replaceActive`，带锚点的行调用 `ConversationViewport.reveal(sessionId, seq)`。所属 Chat 视图经 `loadHistoryUntil` 加载历史并滚动到该事件。Feed 中的会话 ID 只在 Host 内有效，因此 `sessions.keyFor` 必须接收正文捕获的完整 Runtime，包括 UUID。浏览器汇集多个 Runtime 连接时，仅项目限定的键不能标识一个分配。
 

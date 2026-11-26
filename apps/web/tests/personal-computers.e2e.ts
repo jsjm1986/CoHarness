@@ -1,16 +1,98 @@
 /** Unified personal navigation through real independent Hosts and their shipped client plugins. @module */
+import { responsiveBrowser } from './responsive-browser.ts'
+import { auditWorkflowState, compareWorkflowGolden, workflowTouchOptions } from './workflow-responsive-state.ts'
+import type { Page } from 'playwright'
 import { fileURLToPath } from 'node:url'
 import { mkdir } from 'node:fs/promises'
-import { chromium } from 'playwright'
+
 import { expect, it, onTestFailed } from 'vitest'
 import { launchPersonalComputersFixture, personalTargets } from './personal-computers-fixture.ts'
-import { acknowledgeReloadConnectionLoss, captureStableAria, compareOrRefreshGolden, watchConsole, webSnapshotMode } from './scaffold.ts'
-import { saveFailureShot } from './support.ts'
+import { acknowledgeReloadConnectionLoss, captureStableAria, watchConsole, webSnapshotMode } from './scaffold.ts'
+import { completionBarrier, saveFailureShot } from './support.ts'
+
+async function revealSidebar(page: Page): Promise<void> {
+  const drawer = page.locator('[data-viewport] > [class*="drawer"]')
+  if (page.viewportSize()!.width < 768 && await drawer.getAttribute('data-open') !== 'true') {
+    await page.getByRole('button', { name: 'Open sidebar', exact: true }).click()
+    await expect.poll(() => drawer.getAttribute('data-open')).toBe('true')
+  }
+}
+
+it('publishes a fast computer search before a slow peer and keeps computer and conversation matches together', async () => {
+  const fixture = await launchPersonalComputersFixture()
+  const browser = await responsiveBrowser.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US', ...workflowTouchOptions })
+  const release = completionBarrier()
+  let waiting = false
+  onTestFailed(() => saveFailureShot(page, 'personal-computers-search'))
+  try {
+    await page.goto(fixture.url, { waitUntil: 'networkidle' })
+    for (const owner of ['Office', 'Compute']) {
+      const computer = page.getByRole('region', { name: `${owner} computer`, exact: true })
+      const heading = computer.getByRole('button', { name: `${owner} computer`, exact: true })
+      await heading.evaluate((button) => {
+        if (button instanceof HTMLButtonElement && button.getAttribute('aria-expanded') === 'false') button.click()
+      })
+      await expect.poll(() => heading.getAttribute('aria-expanded')).toBe('true')
+      const row = computer.locator('[data-row-key^="session:"]').first()
+      const workspace = computer.getByText(`${owner} work`, { exact: true })
+      await expect.poll(async () => await row.isVisible() || await workspace.isVisible()).toBe(true)
+      if (!await row.isVisible()) await workspace.click()
+      await row.click()
+      await page.locator('[data-conversation-intent]').waitFor({ state: 'hidden' })
+    }
+    await page.locator('textarea:enabled').last().fill('The active Compute draft stays intact')
+    await page.route('**/api/session.search?**', async (route) => {
+      if (new URL(route.request().url()).searchParams.get('dshRuntime') !== personalTargets[1]!.runtimeId) return route.continue()
+      const response = await route.fetch()
+      waiting = true
+      await release.promise
+      await route.fulfill({ response })
+    })
+    const search = page.getByPlaceholder('Search computers, workspaces or conversations…')
+    await page.getByRole('button', { name: 'Search sessions', exact: true }).click()
+    await search.fill('read tool')
+    await expect.poll(() => waiting, { timeout: 10_000 }).toBe(true)
+    const results = page.getByRole('tree', { name: 'Search results', exact: true })
+    await results.getByText('Office conversation', { exact: true }).waitFor()
+    await page.getByText('Still searching: Compute computer', { exact: true }).waitFor()
+    expect(waiting).toBe(true)
+    expect(await results.getByText('Compute conversation', { exact: true }).count()).toBe(0)
+    await compareWorkflowGolden(fileURLToPath(new URL('./expected/personal-computers/search-independent.expected.md', import.meta.url)),
+      await captureStableAria(page, '[role="tree"][aria-label="Search results"]', fixture.worlds[0]!.workspaceCwd), webSnapshotMode())
+    await auditWorkflowState(page, 'workspace-and-computers', 'cross-computer-partial-search', results, [search], () => revealSidebar(page))
+    release.resolve()
+    await results.getByText('Compute conversation', { exact: true }).waitFor()
+    await page.getByText('Still searching: Compute computer', { exact: true }).waitFor({ state: 'hidden' })
+    await search.fill('Office')
+    await page.getByRole('button', { name: 'Office computer', exact: true }).waitFor()
+    await results.getByText('Office conversation', { exact: true }).waitFor()
+    await auditWorkflowState(page, 'workspace-and-computers', 'cross-computer-complete-search', results, [search], () => revealSidebar(page))
+    expect(await page.locator('textarea:enabled').last().inputValue()).toBe('The active Compute draft stays intact')
+    for (const target of personalTargets.slice(2)) expect(fixture.calls.get(target.runtimeId) ?? 0).toBe(0)
+    expect(fixture.preparations.size).toBe(0)
+    await mkdir(fileURLToPath(new URL('../../../.artifacts/multi-computer-validation/', import.meta.url)), { recursive: true })
+    await page.screenshot({ path: fileURLToPath(new URL('../../../.artifacts/multi-computer-validation/search-desktop.jpg', import.meta.url)), type: 'jpeg', quality: 85, animations: 'disabled' })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.getByRole('button', { name: 'Open sidebar', exact: true }).click()
+    await page.getByRole('button', { name: 'Search sessions', exact: true }).click()
+    await search.fill('Office')
+    await results.getByText('Office conversation', { exact: true }).waitFor()
+    const choice = page.getByRole('button', { name: 'Office computer', exact: true })
+    await expect.poll(async () => (await choice.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.screenshot({ path: fileURLToPath(new URL('../../../.artifacts/multi-computer-validation/search-mobile.jpg', import.meta.url)), type: 'jpeg', quality: 85, animations: 'disabled' })
+  } catch (error) {
+    await saveFailureShot(page, 'personal-computers-search')
+    console.error((await page.locator('body').innerText()).slice(0, 5000))
+    throw error
+  } finally { release.resolve(); await browser.close(); await fixture.close() }
+}, 90_000)
 
 it('retains a pending New Session and its origin draft across transport renewal', async () => {
   const fixture = await launchPersonalComputersFixture()
-  const browser = await chromium.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
-  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
+  const browser = await responsiveBrowser.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US', ...workflowTouchOptions })
   const warnings = watchConsole(page)
   const held = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
   const delivered = Promise.withResolvers<undefined>()
@@ -53,8 +135,9 @@ it('retains a pending New Session and its origin draft across transport renewal'
     await (await refreshed).finished()
     expect(await editor.isEditable()).toBe(true)
     expect(await editor.inputValue()).toBe('Text on the intended new conversation')
-    await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/renewal-preparing.expected.md', import.meta.url)),
+    await compareWorkflowGolden(fileURLToPath(new URL('./expected/personal-computers/renewal-preparing.expected.md', import.meta.url)),
       await captureStableAria(page, '[data-conversation-intent]', fixture.worlds[0]!.workspaceCwd), webSnapshotMode())
+    await auditWorkflowState(page, 'workspace-and-computers', 'pending-new-session-renewed-draft', page.locator('[data-conversation-intent]'), [editor])
     release.resolve(undefined)
     await delivered.promise
     await page.locator('textarea[placeholder="Describe what you want to build"]').waitFor()
@@ -75,8 +158,8 @@ it('retains a pending New Session and its origin draft across transport renewal'
 
 it('reads project names only from the chosen computer in the authorized space picker', async () => {
   const fixture = await launchPersonalComputersFixture({ projectMetadata: true })
-  const browser = await chromium.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
-  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
+  const browser = await responsiveBrowser.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US', ...workflowTouchOptions })
   try {
     await page.goto(fixture.url, { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: 'Switch personal or project scope', exact: true }).click()
@@ -88,8 +171,9 @@ it('reads project names only from the chosen computer in the authorized space pi
     await choose.selectOption(personalTargets[1]!.nodeId)
     await selector.getByText('Compute project', { exact: true }).waitFor()
     expect(fixture.projectReads).toEqual([[18]])
-    await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/owner-projects.expected.md', import.meta.url)),
+    await compareWorkflowGolden(fileURLToPath(new URL('./expected/personal-computers/owner-projects.expected.md', import.meta.url)),
       await captureStableAria(page, '[role="dialog"][aria-label="Switch personal or project scope"]', fixture.worlds[0]!.workspaceCwd), webSnapshotMode())
+    await auditWorkflowState(page, 'workspace-and-computers', 'computer-owned-project-picker', selector, [choose])
     expect(await selector.getByText('Office project', { exact: true }).count()).toBe(0)
     expect(fixture.preparations.size).toBe(0)
     expect(fixture.calls.get(personalTargets[1]!.runtimeId) ?? 0).toBe(0)
@@ -98,8 +182,8 @@ it('reads project names only from the chosen computer in the authorized space pi
 
 it('opens an authorized create tail inline and falls back on the same Session when an older node omits the page', async () => {
   const fixture = await launchPersonalComputersFixture()
-  const browser = await chromium.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
-  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
+  const browser = await responsiveBrowser.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US', ...workflowTouchOptions })
   const creates: string[] = [], reads: string[] = [], unguardedReads: string[] = []
   let omit = false
   try {
@@ -131,6 +215,7 @@ it('opens an authorized create tail inline and falls back on the same Session wh
       expect(reads.filter(value => value === id)).toHaveLength(fallback ? 1 : 0)
       expect(unguardedReads.filter(value => value === id)).toHaveLength(0)
       expect(creates).toHaveLength(fallback ? 2 : 1)
+      await auditWorkflowState(page, 'workspace-and-computers', fallback ? 'created-session-fallback' : 'created-session-inline', page.locator('[data-conversation-region="composer"]'), [page.locator('textarea:enabled').last()])
     }
     expect(new Set(creates).size).toBe(2)
   } finally { await browser.close(); await fixture.close() }
@@ -139,8 +224,8 @@ it('opens an authorized create tail inline and falls back on the same Session wh
 it('confirms an ambiguous send on the original personal Runtime without resubmitting the turn', async () => {
   const file = fileURLToPath(new URL('./snapshots/lifecycle-chrome/session.jsonl', import.meta.url))
   const fixture = await launchPersonalComputersFixture({ remoteReplay: { file, children: [] } })
-  const browser = await chromium.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
-  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
+  const browser = await responsiveBrowser.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US', ...workflowTouchOptions })
   const target = personalTargets[1]!.runtimeId
   const sends: { sessionId: string; requestId: string }[] = []
   try {
@@ -192,14 +277,15 @@ it('confirms an ambiguous send on the original personal Runtime without resubmit
       value: { state: 'accepted', inputProof: expect.stringMatching(/^[0-9a-f]{64}$/u) as object } })
     await expect.poll(() => editor.inputValue()).toBe('')
     expect(fixture.receipts.filter(row => row.path === '/api/admit/v1/session.prompt').map(row => row.runtimeId)).toEqual([target])
+    await auditWorkflowState(page, 'workspace-and-computers', 'ambiguous-send-confirmed', page.locator('[data-conversation-region="composer"]'), [editor])
   } finally { await browser.close(); await fixture.close() }
 }, 120_000)
 
 it('browses twenty cold computers and keeps personal conversations, drafts and tabs independent', async () => {
   const fixture = await launchPersonalComputersFixture()
   await mkdir(fileURLToPath(new URL('../../../.artifacts/multi-computer-validation/', import.meta.url)), { recursive: true })
-  const browser = await chromium.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
-  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, locale: 'en-US', colorScheme: 'dark' })
+  const browser = await responsiveBrowser.launch(process.env['DSH_TEST_BROWSER_EXECUTABLE'] ? { executablePath: process.env['DSH_TEST_BROWSER_EXECUTABLE'] } : {})
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, locale: 'en-US', ...workflowTouchOptions, colorScheme: 'dark' })
   const page = await context.newPage(), warnings = watchConsole(page)
   onTestFailed(() => saveFailureShot(page, 'personal-computers'))
   try {
@@ -246,8 +332,14 @@ it('browses twenty cold computers and keeps personal conversations, drafts and t
     expect(new URL(page.url()).searchParams.get('dshRuntime')).toBe(personalTargets[0]!.runtimeId)
     const saved = await page.evaluate(() => sessionStorage.getItem('dsh.personal.current.v1.account:7.runtime:10000000-0000-4000-8000-000000000001'))
     expect(saved).toContain(personalTargets[1]!.runtimeId)
-    await compareOrRefreshGolden(fileURLToPath(new URL('./expected/personal-computers/groups.expected.md', import.meta.url)),
+    await compareWorkflowGolden(fileURLToPath(new URL('./expected/personal-computers/groups.expected.md', import.meta.url)),
       await captureStableAria(page, 'section[aria-label="Compute computer"]', fixture.worlds[1]!.workspaceCwd), webSnapshotMode())
+    await auditWorkflowState(page, 'workspace-and-computers', 'twenty-computers-directory', page.locator('[data-sidebar-root]'), [], () => revealSidebar(page))
+    await auditWorkflowState(page, 'workspace-and-computers', 'multi-runtime-independent-draft', page.locator('[data-conversation-region="composer"]'), [composer()], async () => {
+      const close = page.getByRole('button', { name: 'Close sidebar', exact: true })
+      if (await close.isVisible()) await close.click()
+      expect(await composer().inputValue()).toBe('Compute draft stays on Compute')
+    })
     const warningStart = warnings.warnings.length
     // Recovery needs the Compute receipt and both acknowledged pointers in this
     // tab's storage before navigation; polling only the composer value leaves a

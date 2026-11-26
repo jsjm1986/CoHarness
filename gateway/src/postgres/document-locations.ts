@@ -5,7 +5,7 @@ import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 import type { DocumentTransferScope } from '../document-transfer.ts'
 import type { RuntimeCatalogLimits, RuntimeNodeId } from '../runtime-catalog.ts'
 
-interface Row { node_id: RuntimeNodeId; node_name: string; kind: 'personal' | 'project'; public_id: string; name: string; mode: 'ro' | 'rw' }
+interface Row { node_id: RuntimeNodeId; node_name: string; kind: 'personal' | 'project'; public_id: string; name: string; metadata_on_node: boolean; mode: 'ro' | 'rw' }
 
 /** Bounded directory of currently authorized, computer-local document roots. */
 export class PostgresDocumentLocations {
@@ -40,6 +40,7 @@ export class PostgresDocumentLocations {
     for (const row of rows.slice(0, limit)) {
       const location = { nodeId: row.node_id, nodeName: row.node_name }
       const item: UserDocLocation = { name: row.name, nodeName: row.node_name, mode: row.mode,
+        ...(row.metadata_on_node ? { metadataOnNode: true as const } : {}),
         scope: row.kind === 'personal' ? { kind: 'personal', ...location }
           : { kind: 'project', projectId: publicNumber(row.public_id, 'project'), ...location } }
       const continuation = rows.length > items.length + 1 ? this.cursor(actor, row) : null
@@ -62,7 +63,7 @@ export class PostgresDocumentLocations {
     const selected = { ...scope, nodeId: scope.nodeId ?? this.context.nodeId as RuntimeNodeId }
     const row = (await this.read(actor, undefined, 1, selected))[0]
     if (row === undefined || action === 'write' && row.mode !== 'rw') throw new DocumentCatalogError('DOCUMENT_NOT_OWNER', 403, 'This document location is unavailable or read-only.')
-    return { name: row.name, nodeName: row.node_name, mode: row.mode, scope: {
+    return { name: row.name, nodeName: row.node_name, mode: row.mode, ...(row.metadata_on_node ? { metadataOnNode: true as const } : {}), scope: {
       ...scope, nodeId: row.node_id, nodeName: row.node_name,
     } }
   }
@@ -74,15 +75,18 @@ export class PostgresDocumentLocations {
       JOIN harness.organizations organization ON organization.id=u.organization_id AND organization.status='active'
       WHERE u.organization_id=$1 AND u.public_id=$2 AND u.status='active' AND u.deleted_at IS NULL
     ), locations AS (
-      SELECT n.id node_id,n.name::text node_name,'personal'::text kind,actor.public_id,actor.display_name::text name,'rw'::text mode
+      SELECT n.id node_id,n.name::text node_name,'personal'::text kind,actor.public_id,actor.display_name::text name,false metadata_on_node,'rw'::text mode
       FROM actor JOIN harness.node_user_accounts account ON account.organization_id=actor.organization_id AND account.user_id=actor.id
       JOIN harness.compute_nodes n ON n.organization_id=account.organization_id AND n.id=account.node_id
       WHERE harness.computer_use_allowed(actor.organization_id,actor.id,n.id)
       UNION ALL
-      SELECT n.id,n.name::text,'project'::text,p.public_id,p.name::text,
+      SELECT n.id,n.name::text,'project'::text,p.public_id,
+        CASE WHEN placement.project_id IS NULL THEN p.name::text ELSE '#'||p.public_id::text END,
+        placement.project_id IS NOT NULL,
         CASE WHEN actor.role='admin' THEN 'rw'::text ELSE member.access_mode END mode
       FROM actor JOIN harness.projects p ON p.organization_id=actor.organization_id AND p.status='active'
       JOIN harness.instances instance ON instance.organization_id=p.organization_id AND instance.project_id=p.id
+      LEFT JOIN harness.project_content_placement placement ON placement.organization_id=p.organization_id AND placement.project_id=p.id
       JOIN harness.compute_nodes n ON n.organization_id=instance.organization_id AND n.id=instance.assigned_node_id
       LEFT JOIN harness.project_members member ON member.organization_id=p.organization_id AND member.project_id=p.id AND member.user_id=actor.id
       WHERE harness.project_computer_use_allowed(actor.organization_id,actor.id,p.id) AND (actor.role='admin' OR member.user_id IS NOT NULL)

@@ -102,6 +102,7 @@ export function changesDefinition(t: TranslateNS<typeof NS>): SidebarRightTabDef
     keepMounted: true,
     patterns: [`${PREFIX}**`],
     canOpen: address => parseChangesAddress(address) !== undefined,
+    resourceSession: address => parseChangesAddress(address)?.sessionId,
     title: (address) => {
       const target = parseChangesAddress(address)
       return target === undefined ? address : changesTitle(target.source, t)

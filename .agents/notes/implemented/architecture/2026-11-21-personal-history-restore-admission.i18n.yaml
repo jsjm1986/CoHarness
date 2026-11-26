@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-21-personal-history-restore-admission.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-21-personal-history-restore-admission.md
+document:
+  en: e2ad5d1c333bbbb9d31538c85c8e36232a17a25b
+  zh: 38dd1a1558fd6d3a2a87b98649be2b42f6740b76
+/agent-note-restore-saved-personal-history-on-its-owning-gateway:
+  en: 5e22ed63146dc030
+  zh: 8f0fae0a42a29a82
+/agent-note-restore-saved-personal-history-on-its-owning-gateway/problem:
+  en: 5ae25548a5acbae2
+  zh: af8a185bffd1e22e
+/agent-note-restore-saved-personal-history-on-its-owning-gateway/decision:
+  en: af584a9648debe97
+  zh: 81afb52711f11aeb
+/agent-note-restore-saved-personal-history-on-its-owning-gateway/alternatives-considered:
+  en: 0374da5349f5831c
+  zh: ba9b6289ecc2c673
+/agent-note-restore-saved-personal-history-on-its-owning-gateway/consequences:
+  en: 82f0cfe15701b0ae
+  zh: 5bef1a167c23be65

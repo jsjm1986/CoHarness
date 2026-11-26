@@ -141,3 +141,15 @@ button.leading {
   width: var(--dsw-touch-target);
   height: var(--dsw-touch-target);
 }
+
+@media (pointer: coarse) {
+  .row {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+    overflow: visible;
+    flex-wrap: wrap;
+  }
+
+  .contentWrap { flex: 1 1 0; }
+  button.leading { width: var(--dsw-touch-target); height: var(--dsw-touch-target); }
+}

@@ -8,11 +8,14 @@ import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager, INSTANCE_PROFILE, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from '../src/instances.ts'
 import { computeLaunchStamps } from '../src/launch-stamp.ts'
+import * as launchStamp from '../src/launch-stamp.ts'
 import type { InstanceRepository, RuntimeInstanceSnapshot, RuntimeTarget, RuntimeStopReason, RuntimeStartIntent } from '../src/instances.ts'
+import type { RuntimeId } from '../src/runtime-catalog.ts'
 import { LocalLauncher, RuntimeLaunchCleanupError, type InstanceProc } from '../src/launcher.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
 import { RUNTIME_PORT_PUBLISHER, runtimeRelay } from './runtime-relay.ts'
 import { UserService } from '../src/users.ts'
+import { barrier } from './barrier.ts'
 
 const FAKE_DSH = `const fs=require('fs'),crypto=require('crypto'),http=require('http');const c=JSON.parse(fs.readFileSync(3,'utf8'));const material=(kind,nonce)=>'dsh-gateway-readiness-v1\\0'+kind+'\\0'+nonce+'\\0'+c.runtime.kind+'\\0'+String(c.runtime.id)+'\\0'+String(c.runtime.generation);const proof=(kind,nonce)=>crypto.createHmac('sha256',c.token).update(material(kind,nonce)).digest('base64url');http.createServer((q,s)=>{if(q.url==='/exit'){s.end('bye');process.exit(0);return}if(q.url==='/api/internal/gateway/readiness'){const nonce=q.headers['x-dsh-gateway-readiness-nonce'];const request=q.headers['x-dsh-gateway-readiness-request'];if(typeof nonce!=='string'||request!==proof('request',nonce)){s.statusCode=403;s.end();return}s.setHeader('content-type','application/json');const file=process.env.DSH_HOME+'/idle-state.json';const state=fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):{policy:'on-demand',canStop:true};const idle=state.legacy?undefined:{...state,proof:state.forged?'invalid':crypto.createHmac('sha256',c.token).update(['dsh-gateway-idle-v1',nonce,c.runtime.kind,String(c.runtime.id),String(c.runtime.generation),state.policy,String(state.canStop)].join('\\0')).digest('base64url')};s.end(JSON.stringify({version:1,runtime:c.runtime,proof:proof('response',nonce),idle}));return}s.end('ok')}).listen(0,'127.0.0.1',function(){${RUNTIME_PORT_PUBLISHER}(process.env.DSH_HOME+'/child-port',this.address().port)})`
 
@@ -188,6 +191,25 @@ class ProjectRepository implements InstanceRepository {
   }
 }
 
+async function startIdleCandidate(runtimeId: RuntimeId) {
+  const { cfg, root } = await setup({ HGW_GUARD_PATCH: 'off' })
+  const path = join(root, 'idle-project')
+  mkdirSync(path, { recursive: true })
+  const target = { kind: 'project' as const, id: 41, runtimeId }
+  const project = { ...target, name: 'Idle project', path }
+  const port = await claimRuntimePort(join(cfg.projectRuntimesRoot, String(target.id), 'dsh'))
+  const repository = new ProjectRepository(path, port)
+  const local = new InstanceManager(Object.assign(repository, {
+    resolveTarget: async (selected: RuntimeTarget) => selected,
+    idleTargets: async () => [target],
+    idleTarget: async () => true,
+    markIdleStopping: (selected: RuntimeTarget, generation: number) => repository.markStopping(selected, generation, 'idle'),
+  }), cfg)
+  manager = local
+  await local.ensureRunning(project, 'explicit')
+  return { local, repository, project, target }
+}
+
 class SurvivorRepository implements InstanceRepository {
   state = 'ready'
   generation = 7
@@ -278,6 +300,394 @@ class FailingStopRepository implements InstanceRepository {
 }
 
 describe('InstanceManager', () => {
+  it('retains an immutable asset without activity writes, refuses a replacement, and never reattaches an untracked generation', async () => {
+    const { cfg, root } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const runtimeId = '70000000-0000-4000-8000-000000000001' as RuntimeId
+    const target = { kind: 'project' as const, id: 41, runtimeId }
+    const repository = new SurvivorRepository(root, 43250, mintedLaunchStamp(cfg))
+    const touch = vi.spyOn(repository, 'touch'), admit = vi.spyOn(repository, 'admitLease')
+    const attach = vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate: async () => {} }))
+    const local = new InstanceManager(repository, cfg, { instancesOutliveGateway: false, attach, start: async () => { throw new Error('asset must never start') } })
+    manager = local
+    const qualify = vi.fn(async () => ({ snapshot: await repository.snapshotOf(target) }))
+    expect(await local.retainAsset(runtimeId, qualify)).toBeNull()
+    expect(qualify).not.toHaveBeenCalled(); expect(attach).not.toHaveBeenCalled()
+    expect(await local.liveEndpoint(target)).toMatchObject({ generation: 7 })
+    const retained = await local.retainAsset(runtimeId, qualify)
+    expect(retained?.admission.snapshot.generation).toBe(7)
+    expect(touch).not.toHaveBeenCalled(); expect(admit).not.toHaveBeenCalled()
+    retained?.release(); retained?.release()
+    repository.generation = 8
+    await expect(local.retainAsset(runtimeId, qualify)).rejects.toBeInstanceOf(RuntimeLeaseUnavailableError)
+    expect(attach).toHaveBeenCalledOnce()
+    expect(touch).not.toHaveBeenCalled(); expect(admit).not.toHaveBeenCalled()
+  })
+
+  it('keeps an asset reference through idle scans and leaves a successor reference intact after the old release', async () => {
+    const runtimeId = '70000000-0000-4000-8000-000000000003' as RuntimeId
+    const { local, repository, project, target } = await startIdleCandidate(runtimeId)
+    const qualify = async () => ({ snapshot: await repository.snapshotOf(target) })
+    const first = await local.retainAsset(runtimeId, qualify)
+    if (first === null) throw new Error('Started Runtime did not retain the asset')
+    expect(await local.reapIdle()).toBe(0)
+    await local.stop(target)
+    await local.ensureRunning(project, 'explicit')
+    const next = await local.retainAsset(runtimeId, qualify)
+    if (next === null) throw new Error('Successor Runtime did not retain the asset')
+    first.release()
+    expect(await local.reapIdle()).toBe(0)
+    next.release()
+    expect(await local.reapIdle()).toBe(1)
+    expect(await repository.stateOf(target)).toBe('stopped')
+  })
+
+  it('refuses resource admission when supervision fails or the recorded launch stamp is incompatible', async () => {
+    const { cfg, root } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const runtimeId = '70000000-0000-4000-8000-000000000004' as RuntimeId
+    const target = { kind: 'project' as const, id: 41, runtimeId }
+    const repository = new SurvivorRepository(root, 43250, mintedLaunchStamp(cfg))
+    const alive = vi.fn(async () => true), terminate = vi.fn(async () => {})
+    const local = new InstanceManager(repository, cfg, { instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => false, isAlive: alive, terminate }),
+      start: async () => { throw new Error('asset must never start') } })
+    manager = local
+    await local.liveEndpoint(target)
+    const qualify = vi.fn(async () => ({ snapshot: await repository.snapshotOf(target) }))
+    alive.mockRejectedValueOnce(new Error('supervisor unavailable'))
+    await expect(local.retainAsset(runtimeId, qualify)).rejects.toBeInstanceOf(RuntimeLeaseUnavailableError)
+    expect(qualify).not.toHaveBeenCalled()
+    repository.launchStamp = 'incompatible-build'
+    await expect(local.retainAsset(runtimeId, qualify)).rejects.toBeInstanceOf(RuntimeLeaseUnavailableError)
+    expect(terminate).not.toHaveBeenCalled(); expect(repository.generation).toBe(7)
+  })
+
+  it('reads asset authority only after queued lifecycle and supervisor waits and refuses the resulting revocation', async () => {
+    const { cfg, root } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const runtimeId = '70000000-0000-4000-8000-000000000002' as RuntimeId
+    const target = { kind: 'project' as const, id: 41, runtimeId }
+    const repository = new SurvivorRepository(root, 43250, mintedLaunchStamp(cfg))
+    let hold = false
+    const entered = barrier(), resume = barrier()
+    const local = new InstanceManager(repository, cfg, { instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => false, terminate: async () => {}, isAlive: async () => {
+        if (hold) { entered.resolve(); await resume.promise }
+        return true
+      } }), start: async () => { throw new Error('asset must never start') } })
+    manager = local
+    await local.liveEndpoint(target)
+    hold = true
+    let revoked = false
+    const qualify = vi.fn(async () => {
+      if (revoked) throw new Error('authority revoked')
+      return { snapshot: await repository.snapshotOf(target) }
+    })
+    const retained = local.retainAsset(runtimeId, qualify)
+    const refused = expect(retained).rejects.toThrow('authority revoked')
+    try {
+      await entered.promise
+      expect(qualify).not.toHaveBeenCalled()
+      revoked = true
+      resume.resolve()
+      await refused
+      expect(qualify).toHaveBeenCalledOnce()
+    } finally { resume.resolve(); await retained.catch(() => {}) }
+  })
+
+  it('admits another ready Session while recording completion and protects the held Runtime from idle reaping', async () => {
+    const runtimeId = '70000000-0000-4000-8000-000000000005' as RuntimeId
+    const { local, repository, target } = await startIdleCandidate(runtimeId)
+    const qualify = async () => ({ snapshot: await repository.snapshotOf(target) })
+    const first = await local.retainReadySession(target, qualify)
+    if (first === null) throw new Error('Started Runtime did not retain the Session')
+    const writing = barrier(), finish = barrier()
+    vi.spyOn(repository, 'touch').mockImplementationOnce(async () => { writing.resolve(); await finish.promise })
+    const completed = first.release()
+    let next: Awaited<ReturnType<typeof local.retainReadySession>> | undefined
+    const queued = vi.fn(qualify)
+    const remaining = local.retainReadySession(target, queued)
+    try {
+      await writing.promise
+      await expect.poll(() => queued.mock.calls.length).toBe(1)
+      next = await remaining
+      await next?.release()
+      expect(await local.reapIdle()).toBe(0)
+    } finally {
+      finish.resolve()
+      await completed
+      if (next === undefined) await (await remaining)?.release()
+    }
+    expect(await local.reapIdle()).toBe(1)
+  })
+
+  it('rejects qualified authority for a generation replaced during a slow database reply', async () => {
+    const { cfg, root } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const runtimeId = '70000000-0000-4000-8000-000000000006' as RuntimeId
+    const target = { kind: 'project' as const, id: 41, runtimeId }
+    const repository = Object.assign(new SurvivorRepository(root, 43250, mintedLaunchStamp(cfg)), {
+      resolveTarget: async (selected: RuntimeTarget) => selected,
+    })
+    const control = () => ({ hasExited: () => false, isAlive: async () => true, terminate: async () => {} })
+    const local = new InstanceManager(repository, cfg, { instancesOutliveGateway: false, attach: control,
+      start: async () => { throw new Error('unexpected Runtime start') } })
+    manager = local
+    await local.liveEndpoint(target)
+    const started = barrier(), finish = barrier()
+    const pending = local.retainReadySession(target, async () => {
+      const snapshot = await repository.snapshotOf(target)
+      started.resolve()
+      await finish.promise
+      return { snapshot }
+    })
+    const refused = expect(pending).rejects.toBeInstanceOf(RuntimeLeaseUnavailableError)
+    let stopping: Promise<void> | undefined
+    try {
+      await started.promise
+      let stopped = false
+      stopping = local.stop(target).then(() => { stopped = true })
+      await expect.poll(() => stopped).toBe(true)
+      repository.state = 'ready'; repository.generation += 1
+      await expect(local.liveEndpoint(target)).resolves.toMatchObject({ generation: repository.generation })
+      finish.resolve()
+      await refused
+    } finally { finish.resolve(); await pending.catch(() => {}); await stopping }
+  })
+
+  it.each(['wsRef', 'operationRef'] as const)('admits prepared work while the exact %s checks or records activity', async method => {
+    const { cfg, root } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const runtimeId = '70000000-0000-4000-8000-000000000007' as RuntimeId
+    const target = { kind: 'project' as const, id: 41, runtimeId }
+    const repository = Object.assign(new SurvivorRepository(root, 43250, mintedLaunchStamp(cfg)), {
+      resolveTarget: async (selected: RuntimeTarget) => selected,
+    })
+    const control = () => ({ hasExited: () => false, isAlive: async () => true, terminate: async () => {} })
+    const local = new InstanceManager(repository, cfg, { instancesOutliveGateway: false, attach: control,
+      start: async () => { throw new Error('unexpected Runtime start') } })
+    manager = local
+    const endpoint = await local.liveEndpoint(target)
+    expect(endpoint).not.toBeNull()
+    const generation = endpoint!.generation
+    for (const delta of [1, -1] as const) {
+      const entered = barrier(), finish = barrier()
+      if (delta === 1) vi.spyOn(repository, 'admitLease').mockImplementationOnce(async () => {
+        entered.resolve(); await finish.promise; return true
+      })
+      else vi.spyOn(repository, 'touch').mockImplementationOnce(async () => { entered.resolve(); await finish.promise })
+      const pending = local[method](target, delta, generation)
+      const qualify = vi.fn(async () => ({ snapshot: await repository.snapshotOf(target) }))
+      await entered.promise
+      const other = local.retainReadySession(target, qualify)
+      try {
+        await expect.poll(() => qualify.mock.calls.length).toBe(1)
+        expect(local['operationTotals'].size).toBe(1)
+        expect(local['wsTotals'].size).toBe(0)
+      } finally {
+        finish.resolve()
+        await pending
+        await (await other)?.release()
+      }
+    }
+    expect(local['operationTotals'].size).toBe(0)
+    expect(local['wsTotals'].size).toBe(0)
+  })
+
+  it('rejects an ordinary HTTP lease whose process changed during governance admission', async () => {
+    const { cfg, root } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const runtimeId = '70000000-0000-4000-8000-000000000008' as RuntimeId
+    const target = { kind: 'project' as const, id: 41, runtimeId }
+    const repository = Object.assign(new SurvivorRepository(root, 43250, mintedLaunchStamp(cfg)), {
+      resolveTarget: async (selected: RuntimeTarget) => selected,
+    })
+    const control = () => ({ hasExited: () => false, isAlive: async () => true, terminate: async () => {} })
+    const local = new InstanceManager(repository, cfg, { instancesOutliveGateway: false, attach: control,
+      start: async () => { throw new Error('unexpected Runtime start') } })
+    manager = local
+    await local.liveEndpoint(target)
+    const entered = barrier(), finish = barrier()
+    vi.spyOn(repository, 'admitLease').mockImplementationOnce(async () => {
+      entered.resolve(); await finish.promise; return true
+    })
+    const admission = local.operationRef(target, 1, repository.generation)
+    const refused = expect(admission).rejects.toBeInstanceOf(RuntimeLeaseUnavailableError)
+    let stopping: Promise<void> | undefined
+    try {
+      await entered.promise
+      let stopped = false
+      stopping = local.stop(target).then(() => { stopped = true })
+      await expect.poll(() => stopped).toBe(true)
+      repository.state = 'ready'; repository.generation++
+      await local.liveEndpoint(target)
+      await local.operationRef(target, 1, repository.generation)
+      finish.resolve()
+      await refused
+      expect([...local['operationTotals'].values()]).toEqual([1])
+      await local.operationRef(target, -1, repository.generation)
+      expect(local['operationTotals'].size).toBe(0)
+    } finally { finish.resolve(); await admission.catch(() => {}); await stopping }
+  })
+
+  it('shares concurrent preparation receipts and never restarts a stopped or replaced generation on continuation', async () => {
+    const { alice, manager } = await setup()
+    const release = barrier()
+    manager.beforeStart = () => release.promise
+    try {
+      const [first, second] = await Promise.all([manager.prepareSessionRuntime(alice), manager.prepareSessionRuntime(alice)])
+      expect(first.kind).toBe('pending')
+      expect(second).toEqual(first)
+      if (first.kind !== 'pending') throw new Error('Expected an admitted cold preparation')
+      expect(await manager.prepareSessionRuntime(alice, first.id)).toEqual(first)
+      const running = manager.startRequest(alice, 'explicit').completion
+      release.resolve()
+      const endpoint = await running
+      expect(await manager.prepareSessionRuntime(alice, first.id)).toMatchObject({ kind: 'ready', endpoint })
+      await manager.stop(alice.id)
+      const stoppedGeneration = await manager.generationOf(alice.id)
+      await expect(manager.prepareSessionRuntime(alice, first.id)).rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE' })
+      expect(await manager.generationOf(alice.id)).toBe(stoppedGeneration)
+      const replacement = await manager.ensureRunning(alice, 'explicit')
+      expect(await manager.isLive(alice.id)).toBe(true)
+      await expect(manager.prepareSessionRuntime(alice, first.id)).rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE' })
+      expect(await manager.generationOf(alice.id)).toBe(replacement.generation)
+    } finally { release.resolve() }
+  })
+
+  it('does not remove a newer preparation when an older endpoint observation completes after stop and restart', async () => {
+    const { alice, manager } = await setup()
+    const launch = barrier()
+    manager.beforeStart = () => launch.promise
+    const first = await manager.prepareSessionRuntime(alice)
+    if (first.kind !== 'pending') throw new Error('Expected a cold preparation')
+    const running = manager.startRequest(alice, 'explicit').completion
+    launch.resolve()
+    await running
+    const read = barrier(), resume = barrier(), nextLaunch = barrier()
+    const observe = manager.liveEndpoint.bind(manager)
+    const spy = vi.spyOn(manager, 'liveEndpoint').mockImplementationOnce(async target => {
+      const endpoint = await observe(target)
+      read.resolve(); await resume.promise
+      return endpoint
+    })
+    const old = manager.prepareSessionRuntime(alice, first.id).catch((error: unknown) => error)
+    try {
+      await read.promise
+      await manager.stop(alice.id)
+      manager.beforeStart = () => nextLaunch.promise
+      const next = await manager.prepareSessionRuntime(alice)
+      if (next.kind !== 'pending') throw new Error('Expected the replacement to be pending')
+      resume.resolve()
+      expect(await old).toMatchObject({ code: 'INSTANCE_UNAVAILABLE' })
+      expect(await manager.prepareSessionRuntime(alice, next.id)).toEqual(next)
+      const replacement = manager.startRequest(alice, 'explicit').completion
+      nextLaunch.resolve()
+      await replacement
+    } finally { resume.resolve(); nextLaunch.resolve(); spy.mockRestore() }
+  })
+
+  it('does not reissue a failed accepted start when its preparation is continued', async () => {
+    const { alice, manager } = await setup()
+    const entered = barrier(), release = barrier()
+    manager.beforeStart = async () => { entered.resolve(); await release.promise; throw new Error('Synthetic profile failure') }
+    try {
+      const preparation = await manager.prepareSessionRuntime(alice)
+      if (preparation.kind !== 'pending') throw new Error('Expected an admitted start')
+      const running = manager.startRequest(alice, 'explicit').completion.catch((error: unknown) => error)
+      await entered.promise
+      release.resolve()
+      expect(await running).toMatchObject({ message: 'Synthetic profile failure' })
+      const generation = await manager.generationOf(alice.id)
+      await expect(manager.prepareSessionRuntime(alice, preparation.id)).rejects.toThrow()
+      expect(await manager.generationOf(alice.id)).toBe(generation)
+    } finally { release.resolve() }
+  })
+
+  it('requires read-only supervisor quiescence even when the restored database says stopped',async()=>{
+    const {db,cfg,alice}=await setup()
+    const start=vi.fn(async()=>{throw new Error('must not start')}),attach=vi.fn(()=>{throw new Error('must not attach')})
+    const proof=vi.fn(async()=>{}),local=new InstanceManager(db,cfg,{instancesOutliveGateway:false,start,attach,assertQuiescent:proof})
+    manager=local
+    const before=db.prepare('SELECT * FROM instances WHERE user_id=?').get(alice.id),projection=vi.fn(async()=>{})
+    local.beforeStart=projection
+    await local.assertRuntimeQuiescent({kind:'user',id:alice.id})
+    expect(proof).toHaveBeenCalledWith({kind:'user',ownerId:alice.id,runtimeKey:'alice'})
+    expect(db.prepare('SELECT * FROM instances WHERE user_id=?').get(alice.id)).toEqual(before)
+    proof.mockRejectedValueOnce(new Error('unknown live generation'))
+    await expect(local.assertRuntimeQuiescent({kind:'user',id:alice.id})).rejects.toThrow('unknown live generation')
+    expect(start).not.toHaveBeenCalled();expect(attach).not.toHaveBeenCalled();expect(projection).not.toHaveBeenCalled()
+    db.prepare("UPDATE instances SET state='ready' WHERE user_id=?").run(alice.id)
+    await local.assertRuntimeQuiescent({kind:'user',id:alice.id})
+    expect(db.prepare('SELECT state FROM instances WHERE user_id=?').get(alice.id)).toEqual({state:'ready'})
+    const missing=new InstanceManager(db,cfg,{instancesOutliveGateway:false,start,attach})
+    await expect(missing.assertRuntimeQuiescent({kind:'user',id:alice.id})).rejects.toThrow('quiescence is not confirmed')
+  })
+  it('prepares only the stopped personal assignment and preserves its generation without spawning', async () => {
+    const { db, cfg, alice } = await setup()
+    const start = vi.fn(async () => { throw new Error('offline preparation must not launch') })
+    const attach = vi.fn(() => { throw new Error('offline preparation must not attach') })
+    const local = new InstanceManager(db, cfg, { instancesOutliveGateway: false, start, attach })
+    manager = local
+    const target = { kind: 'user' as const, id: alice.id }
+    const before = db.prepare('SELECT * FROM instances WHERE user_id=?').get(alice.id)
+    const projection = vi.fn(async () => {})
+    local.beforeStart = projection
+    await local.prepareRecoveryProfile(target)
+    expect(projection).toHaveBeenCalledWith(expect.objectContaining({ kind: 'user', ownerId: alice.id, generation: 1 }), 'recovery-inspection')
+    expect(db.prepare('SELECT * FROM instances WHERE user_id=?').get(alice.id)).toEqual(before)
+    expect(start).not.toHaveBeenCalled()
+    expect(attach).not.toHaveBeenCalled()
+    db.prepare("UPDATE instances SET state='ready' WHERE user_id=?").run(alice.id)
+    await expect(local.prepareRecoveryProfile(target)).rejects.toThrow('stopped Runtime')
+    expect(projection).toHaveBeenCalledOnce()
+    db.prepare("UPDATE instances SET state='stopped' WHERE user_id=?").run(alice.id)
+  })
+
+  it('prepares a stopped recovery profile without allocating a process or changing its generation', async () => {
+    const { root, cfg } = await setup()
+    const path = join(root, 'recovered-project'); mkdirSync(path)
+    const repository = new ProjectRepository(path, 43100)
+    const start = vi.fn(async () => { throw new Error('preparation must not start a process') })
+    const attach = vi.fn(() => { throw new Error('preparation must not attach a process') })
+    const local = new InstanceManager(repository, cfg, { instancesOutliveGateway: false, start, attach })
+    manager = local
+    const target = { kind: 'project' as const, id: 41 }
+    const projection = vi.fn(async () => {})
+    local.beforeStart = projection
+    const begin = vi.spyOn(repository, 'beginStart'), stop = vi.spyOn(repository, 'markStopping')
+    await local.prepareRecoveryProfile(target)
+    expect(projection).toHaveBeenCalledWith(expect.objectContaining({ generation: 0, ownerId: 41 }), 'recovery-inspection')
+    expect(await repository.stateOf(target)).toBe('stopped')
+    expect(start).not.toHaveBeenCalled()
+    expect(attach).not.toHaveBeenCalled()
+    expect(begin).not.toHaveBeenCalled()
+    expect(stop).not.toHaveBeenCalled()
+    await repository.markReady(target, 0)
+    await expect(local.prepareRecoveryProfile(target)).rejects.toThrow('stopped Runtime')
+    expect(projection).toHaveBeenCalledOnce()
+    expect(stop).not.toHaveBeenCalled()
+  })
+
+  it('passes the recovery policy to the launcher after normal policy projection and refuses an unapproved start', async () => {
+    const { root, cfg } = await setup()
+    const path = join(root, 'recovered-project'); mkdirSync(path)
+    const repository = new ProjectRepository(path, 43100)
+    const reached = new Error('launcher reached')
+    const start = vi.fn(async () => { throw reached })
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false, start, attach: () => { throw new Error('cold start must not attach') },
+    })
+    manager = local
+    const subject = { kind: 'project' as const, id: 41, path, name: 'Recovered' }
+    const policy = { policyFile: join(root, 'approved.json'), policySha256: 'a'.repeat(64) }
+    const steps: string[] = []
+    local.beforeStart = () => { steps.push('normal') }
+    local.prepareRecovery = async () => { steps.push('recovery'); return policy }
+    await expect(local.ensureRunning(subject, 'explicit')).rejects.toThrow('launcher reached')
+    expect(steps).toEqual(['normal', 'recovery'])
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ recoveryPolicy: policy }))
+    start.mockClear()
+    local.prepareRecovery = async () => { throw new Error('approval required') }
+    await expect(local.ensureRunning(subject, 'explicit')).rejects.toThrow('approval required')
+    expect(start).not.toHaveBeenCalled()
+  })
+
   it('authorizes destructive cancellation before interrupting a queued project start', async () => {
     const { root, cfg } = await setup({ HGW_RUNTIME_MAX_RESIDENT: '1', HGW_RUNTIME_MAX_STARTING: '1' })
     const repository: InstanceRepository = new ProjectRepository(join(root, 'project'), 43100)
@@ -558,6 +968,52 @@ describe('InstanceManager', () => {
     expect(response.status).toBe(200)
   })
 
+  it('reports one cold launch through authenticated readiness for concurrent and warm callers', async () => {
+    const { alice, manager } = await setup({ HGW_PERFORMANCE_ENABLED: 'true' })
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      const [endpoint] = await Promise.all([manager.ensureRunning(alice), manager.ensureRunning(alice)])
+      await manager.ensureRunning(alice)
+      const lines = info.mock.calls.map(([line]) => String(line)).filter(line => line.startsWith('[runtime-start-timing] '))
+      expect(lines).toHaveLength(1)
+      const timing = JSON.parse(lines[0]!.slice('[runtime-start-timing] '.length)) as {
+        stagesMs: Record<string, number>
+        localSupervisorStagesMs?: Record<string, number>
+        elapsedMs: number
+        readinessProbes: number
+      }
+      expect(timing).toMatchObject({ ownerId: alice.id, kind: 'user', intent: 'passive', generation: endpoint.generation, outcome: 'ready' })
+      const stages = ['targetResolved', 'lifecycleAcquired', 'capacityRequested', 'capacityGranted', 'startAdmitted', 'contextReady',
+        'portReady', 'stampReady', 'generationClaimed', 'profileReady', 'localBootIdStarted', 'localBootIdReady',
+        'localLeaseAcquired', 'localReservationWritten', 'allocationRequested', 'allocationAuthorized',
+        'localSupervisorSpawnStarted', 'localSupervisorSpawned', 'localSupervisorReady', 'launcherReturned',
+        'readinessAuthenticated', 'readyPublished']
+      expect(timing.readinessProbes).toBeGreaterThanOrEqual(1)
+      expect(Object.keys(timing.stagesMs)).toEqual(stages)
+      const offsets = [0, ...stages.map(stage => timing.stagesMs[stage]!), timing.elapsedMs]
+      expect(offsets.every((ms, index) => Number.isFinite(ms) && (index === 0 || ms >= offsets[index - 1]!))).toBe(true)
+      expect(timing.localSupervisorStagesMs).toMatchObject({ ownerLeaseAdopted: expect.any(Number), ready: expect.any(Number) })
+    } finally { info.mockRestore() }
+  })
+
+  it.each([true, false])('records only reached stages of a failed launch when diagnostics are %s', async enabled => {
+    const { alice, manager } = await setup({ HGW_PERFORMANCE_ENABLED: String(enabled) })
+    manager.beforeStart = () => { throw new Error('fixture-private-policy') }
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      await expect(manager.ensureRunning(alice, 'explicit')).rejects.toThrow('fixture-private-policy')
+      const lines = info.mock.calls.map(([line]) => String(line)).filter(line => line.startsWith('[runtime-start-timing] '))
+      expect(lines).toHaveLength(enabled ? 1 : 0)
+      if (enabled) {
+        const timing = JSON.parse(lines[0]!.slice('[runtime-start-timing] '.length)) as { stagesMs: Record<string, number> }
+        expect(timing).toMatchObject({ intent: 'explicit', outcome: 'failed', stagesMs: { generationClaimed: expect.any(Number), profileReady: expect.any(Number) } })
+        expect(timing.stagesMs).not.toHaveProperty('policiesReady')
+        expect(timing.stagesMs).not.toHaveProperty('readyPublished')
+        expect(lines[0]).not.toContain('fixture-private-policy')
+      }
+    } finally { info.mockRestore() }
+  })
+
   it('cancels before local allocation even when node admission resolves after stop', async () => {
     const { alice, cfg, db } = await setup()
     let entered!: () => void, grant!: () => void
@@ -694,7 +1150,18 @@ describe('InstanceManager', () => {
     expect(local.capacitySnapshot().resident).toBe(0)
   })
 
-  it.each(['unread', 'isLive'])('retires adopted survivors whose launch stamp is no longer minted despite %s', async read => {
+  it('mints the release launch stamps on startup even without a retained Runtime', async () => {
+    const { manager } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const compute = vi.spyOn(launchStamp, 'computeLaunchStamps')
+    try {
+      expect(await manager.inspectUpgradeSurvivors()).toEqual({ compatible: 0, pending: 0 })
+      expect(await manager.inspectUpgradeSurvivors()).toEqual({ compatible: 0, pending: 0 })
+      expect(compute).toHaveBeenCalledOnce()
+      expect(manager.capacitySnapshot().resident).toBe(0)
+    } finally { compute.mockRestore() }
+  })
+
+  it.each(['unread', 'isLive'])('retains incompatible survivors without admitting new work after %s', async read => {
     const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
     const projectPath = join(root, 'drained-survivor'); mkdirSync(projectPath)
     const terminate = vi.fn(async () => {})
@@ -709,13 +1176,13 @@ describe('InstanceManager', () => {
       expect(await local.isLive(target)).toBe(false)
       expect(attach).not.toHaveBeenCalled()
     }
-    const { retired, kept } = await local.retireIncompatibleSurvivors()
-    expect(retired).toBe(1)
-    expect(kept).toBe(0)
-    expect(attach).toHaveBeenCalledOnce()
-    expect(terminate).toHaveBeenCalledOnce()
-    expect(repository.state).toBe('stopped')
-    expect(repository.reason).toBe('shutdown')
+    expect(await local.inspectUpgradeSurvivors()).toEqual({ compatible: 0, pending: 1 })
+    expect(attach).not.toHaveBeenCalled()
+    expect(terminate).not.toHaveBeenCalled()
+    expect(repository.state).toBe('ready')
+    expect(repository.reason).toBeNull()
+    expect(local.capacitySnapshot().resident).toBe(1)
+    await local.stopAll(true)
   })
 
   it('keeps an adopted survivor whose launch stamp this build still mints', async () => {
@@ -727,9 +1194,7 @@ describe('InstanceManager', () => {
     const local = new InstanceManager(repository, cfg, {
       instancesOutliveGateway: false, attach, start: async () => { throw new Error('unexpected replacement') },
     })
-    const { retired, kept } = await local.retireIncompatibleSurvivors()
-    expect(retired).toBe(0)
-    expect(kept).toBe(1)
+    expect(await local.inspectUpgradeSurvivors()).toEqual({ compatible: 1, pending: 0 })
     expect(terminate).not.toHaveBeenCalled()
     expect(await local.isLive({ kind: 'project', id: 41 })).toBe(true)
     expect(await local.ensureRunning({ kind: 'project', id: 41, name: 'Compiler', path: projectPath }))
@@ -737,7 +1202,7 @@ describe('InstanceManager', () => {
     await local.stopAll()
   })
 
-  it('retires a warm survivor with an unminted stamp and falls through to a fresh start', async () => {
+  it('refuses new work on an incompatible survivor until an explicit administrative stop', async () => {
     const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
     const projectPath = join(root, 'stale-survivor'); mkdirSync(projectPath)
     const terminate = vi.fn(async () => {})
@@ -746,14 +1211,17 @@ describe('InstanceManager', () => {
     const start = vi.fn(async () => { throw new Error('replacement is not exercised') })
     const local = new InstanceManager(repository, cfg, { instancesOutliveGateway: false, attach, start })
     await expect(local.ensureRunning({ kind: 'project', id: 41, name: 'Compiler', path: projectPath }))
-      .rejects.toThrow('survivor should be reattached')
-    // The retire settled the stale generation under `shutdown` before the
-    // fresh claim ran into the fixture's own start refusal.
+      .rejects.toMatchObject({ name: 'RuntimeStartBlockedError', reason: 'unavailable', code: 'INSTANCE_UNAVAILABLE',
+        message: 'This Runtime process is retained and awaiting a safe upgrade. Gateway restarts can interrupt tasks. Ask an administrator to confirm a safe stopping point before stopping and restarting it.' })
     expect(attach).toHaveBeenCalledOnce()
+    expect(terminate).not.toHaveBeenCalled()
+    expect(repository.state).toBe('ready')
+    expect(repository.reason).toBeNull()
+    expect(start).not.toHaveBeenCalled()
+    await local.stop({ kind: 'project', id: 41 }, 'manual')
     expect(terminate).toHaveBeenCalledOnce()
     expect(repository.state).toBe('stopped')
-    expect(repository.reason).toBe('shutdown')
-    expect(start).not.toHaveBeenCalled()
+    expect(repository.reason).toBe('manual')
   })
 
   it('records the minted launch stamp with the claimed generation', async () => {
@@ -763,7 +1231,7 @@ describe('InstanceManager', () => {
     expect(row.launch_stamp).toBe(mintedLaunchStamp(cfg))
   })
 
-  it('reconcile retires a ready row whose launch stamp is no longer minted', async () => {
+  it('reconcile observes an incompatible survivor without stopping its work', async () => {
     const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
     const projectPath = join(root, 'retired-probe'); mkdirSync(projectPath)
     const repository = new SurvivorRepository(projectPath, 43250, 'superseded-stamp')
@@ -773,13 +1241,12 @@ describe('InstanceManager', () => {
       instancesOutliveGateway: false, attach, start: async () => { throw new Error('probe path attaches only') },
     })
     const summary = await local.reconcile()
-    // The stamp fence runs before any liveness probe: the generation is
-    // fenced, terminated and settled under `shutdown`, never counted failed.
     expect(summary.failed).toBe(0)
     expect(attach).toHaveBeenCalledOnce()
-    expect(terminate).toHaveBeenCalledOnce()
-    expect(repository.state).toBe('stopped')
-    expect(repository.reason).toBe('shutdown')
+    expect(terminate).not.toHaveBeenCalled()
+    expect(repository.state).toBe('ready')
+    expect(repository.reason).toBeNull()
+    await local.stopAll(true)
   })
 
   it('keeps an owned runtime serving across a retaining shutdown', async () => {
@@ -894,6 +1361,7 @@ describe('InstanceManager', () => {
     try {
       writeFileSync(portFile, String((squatter.address() as AddressInfo).port))
       const repository = Reflect.get(manager, 'repository') as InstanceRepository
+      const portReads = vi.spyOn(repository, 'portOf')
       const reassign = vi.spyOn(repository, 'reassignPort').mockImplementation(async () => {
         const claimed = await claimRuntimePort(dshHome)
         db.prepare(`UPDATE instances SET port=? WHERE user_id=?`).run(claimed, alice.id)
@@ -902,6 +1370,7 @@ describe('InstanceManager', () => {
       })
       const endpoint = await manager.ensureRunning(alice)
       expect(reassign).toHaveBeenCalledTimes(1)
+      expect(portReads).toHaveBeenCalledTimes(1)
       const assigned = (db.prepare(`SELECT port FROM instances WHERE user_id=?`).get(alice.id) as { port: number }).port
       expect(endpoint.port).toBe(assigned)
       expect(await manager.stateOf(alice.id)).toBe('ready')
@@ -970,6 +1439,50 @@ describe('InstanceManager', () => {
     expect(await manager.stateOf(alice.id)).toBe('ready')
     const row = db.prepare(`SELECT last_activity_at FROM instances WHERE user_id=?`).get(alice.id) as { last_activity_at: number }
     expect(row.last_activity_at).toBe(stale)
+  })
+
+  it.each(['shutdown', 'failed'] as const)('recovers an old running obligation after %s without opening unused assignments', async reason => {
+    const { alice, manager, db, users, cfg } = await setup()
+    const unused = await users.create({ username: 'unused', password: 'pw-123456' })
+    await manager.ensureRunning(alice)
+    await manager.stop(alice.id, reason)
+    const stale = Date.now() - cfg.reconcile.warmWindowMs - 60_000
+    db.prepare('UPDATE instances SET last_activity_at=?').run(stale)
+    expect(db.prepare('SELECT desired_state FROM instances WHERE user_id=?').get(alice.id)).toEqual({ desired_state: 'running' })
+    expect((await manager.reconcile()).warmed).toBe(1)
+    expect(await manager.stateOf(alice.id)).toBe('ready')
+    expect(await manager.stateOf(unused.id)).toBe('stopped')
+  })
+
+  it.each(['manual', 'idle', 'access-change'] as const)('keeps %s ahead of infrastructure reconciliation', async reason => {
+    const { alice, manager, db, cfg } = await setup()
+    await manager.ensureRunning(alice)
+    if (reason === 'idle') {
+      db.prepare('UPDATE instances SET last_activity_at=? WHERE user_id=?').run(Date.now() - cfg.idleTimeoutMs - 1000, alice.id)
+      expect(await manager.reapIdle()).toBe(1)
+    } else await manager.stop(alice.id, reason)
+    await manager.stop(alice.id, 'failed')
+    expect(db.prepare('SELECT desired_state,stop_reason FROM instances WHERE user_id=?').get(alice.id))
+      .toEqual({ desired_state: 'stopped', stop_reason: reason })
+    expect((await manager.reconcile()).warmed).toBe(0)
+  })
+
+  it('keeps an incompatible survivor with unavailable supervision and retains its generation', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const repository = new SurvivorRepository(root, 43250, 'superseded-stamp')
+    const terminate = vi.fn(async () => {})
+    const local = new InstanceManager(repository, cfg, {
+      instancesOutliveGateway: false,
+      attach: () => ({ hasExited: () => false, isAlive: async () => { throw new Error('temporarily unavailable') }, terminate }),
+      start: async () => { throw new Error('unconfirmed survivor cannot be replaced') },
+    })
+    expect(await local.inspectUpgradeSurvivors()).toEqual({ compatible: 0, pending: 1 })
+    expect((await local.reconcile()).failed).toBe(0)
+    expect(terminate).not.toHaveBeenCalled()
+    expect(repository.state).toBe('ready')
+    expect(repository.generation).toBe(7)
+    expect(local.capacitySnapshot().resident).toBe(1)
+    await local.stopAll(true)
   })
 
   it('skips the dead-stop when the row moved past the observed generation', async () => {
@@ -1132,7 +1645,8 @@ describe('InstanceManager', () => {
     await manager.ensureRunning(alice, 'explicit')
     const patch = readFileSync(join(root, 'users', 'alice', 'dsh', 'cordis.patch.yml'), 'utf8')
     expect(patch).toContain('- id: gateway-resource-budget\n  config:\n    requestTimeoutMs: 60000\n    cleanupTimeoutMs: 120000\n')
-    expect(patch).toContain('- id: connection\n  config:\n    rpcTimeoutMs: 120000\n    recovery:\n      streamOpenTimeoutMs: 60000\n      generationReadyTimeoutMs: 120000\n')
+    expect(patch.match(/^- id: connection$/gmu)).toHaveLength(1)
+    expect(patch).toContain('- id: connection\n  config:\n    serverTiming: true\n    rpcTimeoutMs: 120000\n    recovery:\n      streamOpenTimeoutMs: 60000\n      generationReadyTimeoutMs: 120000\n')
   })
 
   it('publishes readable policy code from restrictive release directories while keeping Runtime data private', async () => {
@@ -1189,12 +1703,12 @@ describe('InstanceManager', () => {
       '- insert:\n    - id: gateway-runtime\n      name: \'@deepseek-ai/dsh-gateway-runtime\'\n'
       + '    - id: governance\n'
       + '- id: gateway-runtime\n  config:\n    requiredPlugins: ["model-governance","gateway-execution","desktop-availability","directory-guard"]\n'
+      + '    modelTimings: true\n'
       + '- id: gateway-resource-budget\n  config:\n    requestTimeoutMs: 5000\n    cleanupTimeoutMs: 30000\n'
-      + '- id: connection\n  config:\n    rpcTimeoutMs: 30000\n    recovery:\n      streamOpenTimeoutMs: 3000\n      generationReadyTimeoutMs: 15000\n'
+      + '- id: connection\n  config:\n    serverTiming: true\n    rpcTimeoutMs: 30000\n    recovery:\n      streamOpenTimeoutMs: 3000\n      generationReadyTimeoutMs: 15000\n'
       + '- insert: []\n'
       + '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
       + '- id: api-gateway\n  inject: [executionAuthority]\n'
-      + '- id: connection\n  config:\n    serverTiming: true\n'
       + `- id: office-kit\n  config:\n    fontMetadataCacheDirectory: ${JSON.stringify(join(root, 'state', 'cache', 'office-font-metadata'))}\n`
       + "- insert:\n    - id: desktop-availability\n      name: '@deepseek-ai/dsh-gateway-execution/desktop-availability'\n"
       + `- id: remote-desktop-vnc\n  config:\n    endpointsFile: ${JSON.stringify(join(root, 'state', 'remote-desktop', 'endpoints.json'))}\n`
@@ -1616,7 +2130,10 @@ describe('InstanceManager', () => {
     await expect(manager.ensureRunning(alice)).rejects.toBeInstanceOf(RuntimeStartBlockedError)
     await expect(manager.ensureRunning(alice, 'webhook')).rejects.toBeInstanceOf(RuntimeStartBlockedError)
     expect(await manager.isLive(alice.id)).toBe(false)
+    const repository = Reflect.get(manager, 'repository') as InstanceRepository
+    const stopReasonReads = vi.spyOn(repository, 'stopReasonOf')
     await manager.ensureRunning(alice, 'explicit')
+    expect(stopReasonReads).not.toHaveBeenCalled()
     expect(await manager.isLive(alice.id)).toBe(true)
     expect(await manager.stopReasonOf(alice.id)).toBeNull()
   })
@@ -1798,7 +2315,8 @@ describe('InstanceManager', () => {
     writeFileSync(retainedFile, 'connection recovery preserves workspace\n')
     const project = { kind: 'project' as const, id: 41, name: 'Renewed connection', path: projectPath }
     const target = { kind: 'project' as const, id: 41 }
-    const port = await claimRuntimePort(join(root, 'project-runtimes', '41', 'dsh'))
+    const dshHome = join(root, 'project-runtimes', '41', 'dsh')
+    const port = await claimRuntimePort(dshHome)
     const repository: InstanceRepository = new ProjectRepository(projectPath, port)
     let currentBinding = true
     const eligibility = repository.startEligibility.bind(repository), beginStart = repository.beginStart.bind(repository)
@@ -1815,6 +2333,17 @@ describe('InstanceManager', () => {
     const oldProcess = await starts.mock.results[0]!.value
     await owned.operationRef(target, 1, first.generation)
     currentBinding = false
+    await expect(owned.ensureRunning(project)).rejects.toBeInstanceOf(RuntimeStartBlockedError)
+    await owned.operationRef(target, -1, first.generation)
+    const idleEvidence = join(dshHome, 'idle-state.json')
+    for (const policy of ['on-demand', 'resident']) {
+      writeFileSync(idleEvidence, JSON.stringify({ policy, canStop: false }))
+      await expect(owned.ensureRunning(project)).rejects.toBeInstanceOf(RuntimeStartBlockedError)
+      expect(await repository.stateOf(target)).toBe('ready')
+      expect(starts).toHaveBeenCalledOnce()
+      expect(await oldProcess.isAlive!()).toBe(true)
+    }
+    writeFileSync(idleEvidence, JSON.stringify({ policy: 'on-demand', canStop: true }))
     if (failStop) {
       const stopping = vi.spyOn(oldProcess, 'terminate').mockRejectedValueOnce(new Error('termination not confirmed'))
       try {
@@ -1823,6 +2352,8 @@ describe('InstanceManager', () => {
         expect(starts).toHaveBeenCalledOnce()
         expect(await oldProcess.isAlive!()).toBe(true)
       } finally { stopping.mockRestore() }
+      repository.activeTargets = async () => [target]
+      await owned.reconcile()
     }
     const renewed = await owned.ensureRunning(project)
     expect(renewed.generation).toBe(first.generation + 1)

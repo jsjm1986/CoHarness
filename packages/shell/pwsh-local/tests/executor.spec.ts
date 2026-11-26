@@ -76,6 +76,11 @@ const hasPwsh = spawnSync(resolvePwshPath(), ['-NoLogo', '-NoProfile', '-NonInte
 /** Normalize PowerShell's platform line endings (CRLF on Windows, LF elsewhere). */
 const lf = (text: string): string => text.replace(/\r\n/g, '\n')
 
+/** Real PowerShell startup uses the lane budget when CI grants one; these cases do not test deadline expiry. */
+const LANE_TEST_TIMEOUT_MS = Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0)
+const PROCESS_CASE_TIMEOUT_MS = Math.max(15_000, LANE_TEST_TIMEOUT_MS)
+const SIMPLE_COMMAND_TIMEOUT_MS = Math.max(10_000, LANE_TEST_TIMEOUT_MS)
+
 /** Filesystem path equality across macOS temp symlinks and Windows drive-letter casing. */
 function samePath(actual: string, expected: string): boolean {
   const norm = (value: string) => (
@@ -434,15 +439,15 @@ describe('cancellation against a hanging backend (fake backend, every platform)'
 })
 
 describe.skipIf(!hasPwsh)('PwshLocalExecutor.run', () => {
-  it('resolves with output and the effective timeout', { timeout: 15_000 }, async () => {
-    const { bash } = await setup({ timeoutMs: 10_000 })
+  it('resolves with output and the effective timeout', { timeout: PROCESS_CASE_TIMEOUT_MS }, async () => {
+    const { bash } = await setup({ timeoutMs: SIMPLE_COMMAND_TIMEOUT_MS })
     const result = await run(bash, bash.resolve({ command: 'Write-Output hi' }))
     expect(result.exitCode).toBe(0)
     expect(lf(result.stdout.text)).toBe('hi\n')
-    expect(result.timeoutMs).toBe(10_000)
+    expect(result.timeoutMs).toBe(SIMPLE_COMMAND_TIMEOUT_MS)
   })
 
-  it('uses config cwd, overridable per call', async () => {
+  it('uses config cwd, overridable per call', { timeout: PROCESS_CASE_TIMEOUT_MS }, async () => {
     const first = mkdtempSync(join(tmpdir(), 'dsh-pwsh-cwd-a-'))
     const second = mkdtempSync(join(tmpdir(), 'dsh-pwsh-cwd-b-'))
     tempDirs.push(first, second)

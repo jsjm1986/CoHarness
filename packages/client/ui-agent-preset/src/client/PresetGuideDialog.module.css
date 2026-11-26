@@ -28,15 +28,15 @@
 
 .guideTitle {
   margin: 0;
-  font-size: 20px;
-  line-height: 28px;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
   font-weight: 600;
 }
 
 .guideIntro {
   margin: 8px 0 0;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   color: var(--dsw-alias-label-secondary);
 }
 
@@ -63,7 +63,7 @@
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   padding: 0 24px 24px 28px;
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--dsw-alias-label-primary);
   overflow-wrap: anywhere;
 }
@@ -75,8 +75,8 @@
 
 .guidePanel h3 {
   margin: 28px 0 10px;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 1rem;
+  line-height: 1.5rem;
   font-weight: 600;
 }
 
@@ -86,7 +86,7 @@
 
 .guidePanel p {
   margin: 0 0 16px;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.625;
   color: var(--dsw-alias-label-primary);
 }
@@ -107,8 +107,8 @@
 /* Usage pages emphasize the example input, with expected results as supporting copy. */
 .guidePanel[data-guide-page='usage'] p {
   margin-bottom: 12px;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   color: var(--dsw-alias-label-secondary);
 }
 
@@ -140,7 +140,7 @@
 
 .guidePanel[data-guide-page='usage'] blockquote p {
   margin: 0;
-  font-size: 16px;
-  line-height: 26px;
+  font-size: 1rem;
+  line-height: 1.625rem;
   color: var(--dsw-alias-label-primary);
 }

@@ -4,9 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
+import { runtimeFixture } from '../components/runtime-fixture.ts'
 import { ProjectDetailPage } from './ProjectDetailPage.tsx'
 
-vi.mock('../api.ts', () => ({
+vi.mock('../api.ts', async importOriginal => ({
+  ...await importOriginal<typeof api>(),
+  adminRequest: vi.fn(),
   controlProjectInstance: vi.fn(),
   deleteProject: vi.fn(),
   getProjectModelAccess: vi.fn(),
@@ -200,6 +203,45 @@ describe('ProjectDetailPage', () => {
     vi.mocked(api.setProjectModelAccess).mockResolvedValue(undefined)
     vi.mocked(api.setAllProjectModelAccess).mockResolvedValue(undefined)
     vi.mocked(api.setQuota).mockResolvedValue(undefined)
+  })
+
+  it('observes the selected project after a lost start reply and prevents another submission', async () => {
+    const runtime = runtimeFixture('project', 7)
+    const statusRead = Promise.withResolvers<typeof runtime>()
+    vi.mocked(api.getProject).mockResolvedValue({ ...project, configurationSummary: {
+      themePolicy: 'follow-user', managementSurface: 'user-frontend', filesystemManagedIn: '/admin',
+      runtimeId: runtime.id, nodeId: runtime.node.id, runtimeState: 'stopped', runtimeGeneration: runtime.generation,
+    } })
+    vi.mocked(api.controlProjectInstance).mockRejectedValueOnce(new api.AdminRequestError(503, 'reply lost', 'node-service/unavailable'))
+    vi.mocked(api.adminRequest).mockReturnValue(statusRead.promise)
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: '启动实例' }))
+    const dialog = within(screen.getByRole('dialog'))
+    await userEvent.click(dialog.getByRole('button', { name: '确认执行' }))
+    expect(await dialog.findByRole('status')).toHaveProperty('textContent', '启动请求的回复中断，正在核实所选 Runtime 的状态')
+    expect(dialog.getByRole('button', { name: '确认执行' })).toHaveProperty('disabled', true)
+    expect(api.adminRequest).toHaveBeenCalledWith(`/admin/api/runtimes/${runtime.id}`, expect.objectContaining({ cache: 'no-store' }), 'organization')
+    await act(async () => statusRead.resolve({ ...runtime, generation: runtime.generation + 1 }))
+    expect(await screen.findByText('所选 Runtime 已就绪')).toBeTruthy()
+    expect(api.controlProjectInstance).toHaveBeenCalledTimes(1)
+    expect(api.controlProjectInstance).toHaveBeenCalledWith(7, 'start', { id: runtime.id, node: { id: runtime.node.id }, owner: { kind: 'project', id: 7 }, observedState: 'stopped', generation: runtime.generation })
+  })
+
+  it('keeps a project re-start disabled after an unidentifiable reply until its details are refreshed', async () => {
+    vi.mocked(api.controlProjectInstance).mockRejectedValueOnce(new TypeError('network error'))
+    renderPage()
+    const start = await screen.findByRole('button', { name: '启动实例' })
+    await userEvent.click(start)
+    const dialog = within(screen.getByRole('dialog'))
+    await userEvent.click(dialog.getByRole('button', { name: '确认执行' }))
+    expect(await dialog.findByRole('alert')).toHaveProperty('textContent', '暂时无法确认启动结果，请刷新 Runtime 状态后再操作')
+    expect(dialog.queryByRole('button', { name: '确认执行' })).toBeNull()
+    await userEvent.click(dialog.getByRole('button', { name: '取消' }))
+    expect(start).toHaveProperty('disabled', true)
+    expect(api.adminRequest).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: '刷新 Runtime' }))
+    expect(await screen.findByRole('button', { name: '启动实例' })).toHaveProperty('disabled', false)
+    expect(api.controlProjectInstance).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the existing local project-settings shortcut', async () => {

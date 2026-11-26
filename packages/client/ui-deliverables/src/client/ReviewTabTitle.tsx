@@ -16,7 +16,7 @@ export function ReviewTabTitle({ useTabInfo }: PropsRuntime<'sidebar.right.pane.
   return (
     <>
       <IconFilePenOutline16 className={css.titleIcon} aria-hidden="true" />
-      {tab.title}
+      <span>{tab.title}</span>
     </>
   )
 }

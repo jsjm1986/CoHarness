@@ -1,6 +1,7 @@
 import type { RuntimeId } from '../runtime-catalog.ts'
 /** Audited SQL execution channel for the resident steward runtime. */
 import { Query, type Pool, type PoolClient } from 'pg'
+import { classifyStewardStatement, hasStewardReadDeniedIdentifier } from '@deepseek-ai/dsh-gateway-runtime/steward-statement'
 import { connectFromPool } from './database.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 
@@ -18,9 +19,6 @@ const MAX_ROW_LIMIT = 5_000
 const MAX_RESULT_BYTES = 256 * 1024
 const STATEMENT_TIMEOUT_MS = 15_000
 const APPROVAL_TTL_MINUTES = 15
-
-const LEADING_NOISE = /^\s*(?:--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|\s)*/
-const READONLY_HEAD = /^(select|with|values|table|show|explain)\b/i
 
 /** Authenticated steward target coordinates carried by the runtime token. */
 export interface StewardQuerySubject {
@@ -49,17 +47,6 @@ export interface StewardQueryResult {
 }
 
 /**
- * Statement classification gates which lane a statement enters; it is not the
- * write-safety boundary. Read-classified statements run inside a READ ONLY
- * transaction, so `EXPLAIN ANALYZE` and data-modifying CTEs that pass the
- * leading-keyword test still fail at execution and are audited as errors.
- */
-function classify(sql: string): 'read' | 'write' {
-  const stripped = sql.replace(LEADING_NOISE, '')
-  return READONLY_HEAD.test(stripped) ? 'read' : 'write'
-}
-
-/**
  * Functions denied on the read lane: every entry escapes the READ ONLY
  * wrapper — `set_config` and session-level advisory locks persist on the
  * pooled connection past COMMIT, signaling functions reach other backends,
@@ -67,21 +54,20 @@ function classify(sql: string): 'read' | 'write' {
  * channels, and `pg_sleep` burns pool slots. The write lane still permits
  * them through an approved statement; dry-run EXPLAIN never executes.
  */
-const READ_LANE_DENY = /\b(?:pg_terminate_backend|pg_cancel_backend|pg_signal_backend|pg_reload_conf|pg_log_backend_memory_contexts|set_config|pg_advisory_lock|pg_advisory_lock_shared|pg_advisory_unlock|pg_advisory_unlock_shared|pg_advisory_unlock_all|pg_try_advisory_lock|pg_try_advisory_lock_shared|pg_notify|pg_read_file|pg_read_binary_file|pg_stat_file|pg_ls_dir|pg_ls_logdir|pg_ls_waldir|pg_ls_archive_statusdir|pg_ls_tmpdir|lo_import|lo_export|dblink|dblink_exec|dblink_send_query|dblink_cancel_query|dblink_connect|dblink_connect_u|postgres_fdw_disconnect|postgres_fdw_disconnect_all|pg_sleep)\b/i
-
-/**
- * Scrub comments, string bodies and identifier quoting so the deny-list reads
- * identifier text only — neither a literal containing a denied name nor a
- * `pg_catalog.` qualifier or quoted form can shift the verdict.
- */
-function scrubbedSql(sql: string): string {
-  return sql
-    .replace(/--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\$([a-zA-Z_][a-zA-Z_0-9]*)?\$[\s\S]*?\$\1\$/g, ' ')
-    .replace(/'(?:[^']|'')*'/g, "''")
-    .replace(/"([^"]|"")*"/g, '$1')
-    .replace(/\bpg_catalog\s*\.\s*/gi, '')
-}
+const READ_LANE_DENY = new Set([
+  'pg_terminate_backend', 'pg_cancel_backend', 'pg_signal_backend', 'pg_reload_conf',
+  'pg_log_backend_memory_contexts', 'set_config',
+  'pg_advisory_lock', 'pg_advisory_lock_shared', 'pg_advisory_unlock',
+  'pg_advisory_unlock_shared', 'pg_advisory_unlock_all',
+  'pg_try_advisory_lock', 'pg_try_advisory_lock_shared',
+  'pg_notify', 'pg_read_file', 'pg_read_binary_file', 'pg_stat_file',
+  'pg_ls_dir', 'pg_ls_logdir', 'pg_ls_waldir', 'pg_ls_archive_statusdir', 'pg_ls_tmpdir',
+  'lo_import', 'lo_export',
+  'dblink', 'dblink_exec', 'dblink_send_query', 'dblink_cancel_query',
+  'dblink_connect', 'dblink_connect_u',
+  'postgres_fdw_disconnect', 'postgres_fdw_disconnect_all',
+  'pg_sleep',
+])
 
 /**
  * Bounded administrator-facing summary of one steward query attempt. The
@@ -222,8 +208,8 @@ export class StewardQueryService {
     if (Buffer.byteLength(statement, 'utf8') > MAX_STATEMENT_BYTES) {
       throw new StewardQueryError(413, 'steward-statement-too-large', `statement exceeds ${MAX_STATEMENT_BYTES} bytes`)
     }
-    const classification = classify(statement)
-    if (classification === 'read' && READ_LANE_DENY.test(scrubbedSql(statement))) {
+    const classification = classifyStewardStatement(statement)
+    if (classification === 'read' && hasStewardReadDeniedIdentifier(statement, READ_LANE_DENY)) {
       await this.journal(subject, statement, classification, input.dryRun === true, 'denied', null, null, null, 'statement-forbidden', input.approvalId)
       throw new StewardQueryError(403, 'steward-statement-forbidden', 'the statement calls a function whose effects escape the read-only lane')
     }

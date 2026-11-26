@@ -93,7 +93,9 @@ it.skipIf(!process.env.DEEPSEEK_API_KEY || !runtime)('keeps Office skills and th
       expect(calls.filter(event => event.data.name === 'skill')).toEqual([])
       const answer = events.filter(event => event.type === 'assistant/message').at(-1)?.data.message.content
         .filter(block => block.type === 'text').map(block => block.text).join('')
-      expect(answer?.trim()).toBe('391')
+      // The model may echo the equation before the result; the skill-routing
+      // contract only requires the arithmetic answer, not its phrasing.
+      expect(answer?.trim()).toMatch(/391$/)
     },
   })
 })

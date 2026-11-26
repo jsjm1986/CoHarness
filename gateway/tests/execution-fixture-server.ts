@@ -21,6 +21,7 @@ const continuation = new Promise<boolean>(resolve => { continueStartup = resolve
 const startup = (async () => {
   await runMigrations(pool, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
   prepared = await createExecutionFixture(pool, {
+    performanceEnabled: true,
     resourceBudget: { ...loadConfig({}).resourceBudget, sampleMs: 20, staleMs: 300_000 },
   })
   reply({ initializing: true })

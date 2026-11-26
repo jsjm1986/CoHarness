@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-21-document-catalog-recovery-gap.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-21-document-catalog-recovery-gap.md
+document:
+  en: 428db7f7a766f00b89cfb9d7b732cc042a1a8ce6
+  zh: ea4a57cc1c68ea039821e94d188b433d33a94039
+/agent-note-recover-a-document-catalog-s-acknowledged-prefix:
+  en: 8d10c2ebb97def23
+  zh: 6fd8180202640c83
+/agent-note-recover-a-document-catalog-s-acknowledged-prefix/problem:
+  en: f4a67b8e4e03b000
+  zh: 42312d8188b21687
+/agent-note-recover-a-document-catalog-s-acknowledged-prefix/decision:
+  en: 1a2579dd14e0163b
+  zh: f78288f02505f36a
+/agent-note-recover-a-document-catalog-s-acknowledged-prefix/alternatives-considered:
+  en: 7468b257771d7dbc
+  zh: 4c698a19198817bc
+/agent-note-recover-a-document-catalog-s-acknowledged-prefix/consequences:
+  en: 7f544baa03de4825
+  zh: 0e2aa8caa0c0a378

@@ -8,6 +8,12 @@ import type { RuntimeId, RuntimeNodeId } from '../../src/runtime-catalog.ts'
 export type { ConversationArchiveId } from '../../src/archive-identity.ts'
 import { adminComputerRequestUrl, adminComputerTarget } from './computer-target.ts'
 import { computerErrorMessage } from './computer.copy.ts'
+import {
+  clearAdminProjectDisplayCache,
+  evictAdminProjectDisplayById,
+  lookupAdminProjectDisplay,
+  rememberAdminProjectDisplays,
+} from './project-display-cache.ts'
 import type { DesktopEnvironment } from '@deepseek-ai/dsh-native-command'
 export type { DesktopEnvironment } from '@deepseek-ai/dsh-native-command'
 
@@ -63,6 +69,8 @@ export type ProjectDetail = Project & {
     managementSurface: 'user-frontend'
     runtimeState: string
     runtimeGeneration: number
+    runtimeId?: RuntimeId
+    nodeId?: RuntimeNodeId
     filesystemManagedIn: '/admin'
     projectModels?: { providerCount: number; revision: number }
   }
@@ -301,19 +309,24 @@ async function responseError(res: Response): Promise<AdminRequestError> {
   } catch {
     // Preserve the HTTP status when the upstream body is absent, invalid or too large.
   }
-  return new AdminRequestError(res.status, computerErrorMessage(message), code ?? message)
+  return new AdminRequestError(res.status, computerErrorMessage(message, code), code ?? message)
 }
 
-async function request<T>(url: string, init: RequestInit = {}, target?: 'computer' | 'organization'): Promise<T> {
+export async function adminRequest<T>(url: string, init: RequestInit = {}, target?: 'computer' | 'organization'): Promise<T> {
   const res = await fetch(adminComputerRequestUrl(url, undefined, target), {
     ...init,
     credentials: 'same-origin',
     headers: { 'content-type': 'application/json', ...init.headers },
   })
-  if (!res.ok) throw await responseError(res)
+  if (!res.ok) {
+    if (res.status === 401) clearAdminProjectDisplayCache()
+    throw await responseError(res)
+  }
   if (res.status === 204) return undefined as T
   return await readResponseJson<T>(res)
 }
+
+const request = adminRequest
 
 /** Read or confirm a reviewed personal directory or account UserDoc publication at its exact computer. */
 export function personalPublication<T>(kind:'directory'|'documents', userId:number, runtimeId:string,nodeId:string, signal:AbortSignal,approval?:Record<string,unknown>):Promise<T> {
@@ -322,9 +335,14 @@ export function personalPublication<T>(kind:'directory'|'documents', userId:numb
   return request(path+'?dshNode='+encodeURIComponent(nodeId),{signal,...(approval?{method:'POST',body:JSON.stringify(approval)}:{})},'organization')
 }
 
-/** Read shared account choices, or explicitly request the selected computer's instance columns. */
-export function listUsers(target: 'organization' | 'computer' = 'organization'): Promise<AdminUser[]> {
-  return request('/admin/api/users', {}, target)
+/**
+ * Read shared account choices or the selected computer's instance columns.
+ * @param target - requested account listing.
+ * @param signal - optional cancellation of the listing request.
+ * @returns the matching accounts.
+ */
+export function listUsers(target: 'organization' | 'computer' = 'organization', signal?: AbortSignal): Promise<AdminUser[]> {
+  return request('/admin/api/users', signal === undefined ? {} : { signal }, target)
 }
 
 export function getUser(id: number): Promise<AdminUser> {
@@ -382,8 +400,9 @@ export function controlInstance(id: number, op: 'start' | 'stop' | 'restart'): P
 }
 
 /** Operate this node's project runtime without changing project membership or ownership. */
-export function controlProjectInstance(id: number, op: 'start' | 'stop' | 'restart'): Promise<void> {
-  return request(`/admin/api/projects/${id}/instance/${op}`, { method: 'POST' })
+export function controlProjectInstance(id: number, op: 'start' | 'stop' | 'restart', target?: { id: RuntimeId; node: { id: RuntimeNodeId } }): Promise<void> {
+  const selected = target === undefined ? '' : `?dshNode=${encodeURIComponent(target.node.id)}&dshRuntime=${encodeURIComponent(target.id)}`
+  return request(`/admin/api/projects/${id}/instance/${op}${selected}`, { method: 'POST' })
 }
 
 export type { NodeConfigurationView, NodeSettingValues } from '../../src/node-config-fields.ts'
@@ -425,14 +444,22 @@ export function inspectBackupNodeConfiguration(id: string): Promise<BackupNodeCo
 export async function getOwnerProjectDisplays(projects: readonly Project[], signal?: AbortSignal): Promise<Map<number, { name: string; path: string }>> {
   if (!projects.length) return new Map()
   const node = projects[0]?.nodeId
-  const selected = adminComputerTarget(globalThis.location?.pathname ?? '/admin')
+  const selected = adminComputerTarget()
   const uuid = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/iu
   if (!node || !uuid.test(node) || selected && selected !== node || projects.length > 32 || projects.some(row => !row.metadataOnNode || row.nodeId !== node || !row.runtimeId || !uuid.test(row.runtimeId)
     || !Number.isSafeInteger(row.id) || row.id <= 0)) throw new Error('Invalid project owner selection')
   const expected = new Map(projects.map(row => [row.id, row.runtimeId]))
   if (expected.size !== projects.length) throw new Error('Duplicate project selection')
   const query = new URLSearchParams({ dshNode: node, ids: [...expected.keys()].join(',') })
-  const raw = await request<unknown>(`/admin/api/project-metadata?${query}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
+  let raw: unknown
+  try {
+    raw = await request<unknown>(`/admin/api/project-metadata?${query}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
+  } catch (error) {
+    if (error instanceof AdminRequestError && (error.status === 401 || error.status === 403)) {
+      for (const projectId of expected.keys()) evictAdminProjectDisplayById(projectId)
+    }
+    throw error
+  }
   if (!raw || typeof raw !== 'object' || !('items' in raw) || !Array.isArray(raw.items)) throw new Error('Invalid project metadata')
   const result = new Map<number, { name: string; path: string }>()
   for (const item of raw.items as unknown[]) {
@@ -443,6 +470,12 @@ export async function getOwnerProjectDisplays(projects: readonly Project[], sign
     result.set(item.projectId, { name: item.name, path: item.rootPath })
   }
   if (result.size !== expected.size) throw new Error('Project names unavailable from their computer')
+  rememberAdminProjectDisplays(node, [...result.entries()].map(([projectId, display]) => ({
+    projectId,
+    runtimeId: expected.get(projectId)!,
+    name: display.name,
+    path: display.path,
+  })))
   return result
 }
 
@@ -452,12 +485,13 @@ export async function listProjects(origin?: 'admin' | 'user', display?: 'directo
   if (display) query.set('display', display)
   const rows = await request<Project[]>(`/admin/api/projects${query.size ? `?${query}` : ''}`, signal === undefined ? {} : { signal })
   if (display !== 'directory') return rows
-  const selected = adminComputerTarget(globalThis.location?.pathname ?? '/admin')
+  const selected = adminComputerTarget()
   const nodes = new Set(rows.filter(row => row.metadataOnNode).map(row => row.nodeId))
   if (nodes.size > 1 || selected && nodes.size && !nodes.has(selected)) throw new Error('Project directory belongs to another computer')
   return rows.map(row => {
     if (!row.metadataOnNode) return row
-    const neutral = { ...row, name: `#${row.id}`, path: '' }
+    const cached = lookupAdminProjectDisplay(row.nodeId, row.id, row.runtimeId)
+    const neutral = { ...row, name: cached?.name ?? `#${row.id}`, path: cached?.path ?? '' }
     delete neutral.ownerDisplayLoaded
     return neutral
   })
@@ -481,12 +515,14 @@ export async function getProject(id: number, display?: 'directory' | 'members', 
   return { ...row, ...values.get(id)!, ownerDisplayLoaded: true }
 }
 
-export function renameProject(id: number, name: string): Promise<void> {
-  return request(`/admin/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+export async function renameProject(id: number, name: string): Promise<void> {
+  await request(`/admin/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+  evictAdminProjectDisplayById(id)
 }
 
-export function deleteProject(id: number): Promise<void> {
-  return request(`/admin/api/projects/${id}`, { method: 'DELETE' })
+export async function deleteProject(id: number): Promise<void> {
+  await request(`/admin/api/projects/${id}`, { method: 'DELETE' })
+  evictAdminProjectDisplayById(id)
 }
 
 export function setMember(projectId: number, userId: number, mode: GrantMode): Promise<void> {
@@ -1209,6 +1245,12 @@ export type ModelRegistrationReport = {
   rows: ModelRegistrationRow[]
 }
 
+/**
+ * Read the registration history matching the supplied filters.
+ * @param filter - requested scope and pagination.
+ * @param signal - optional cancellation when the view or filters change.
+ * @returns the matching events and counts.
+ */
 export function listModelRegistrations(filter: {
   userId?: number
   provider?: string
@@ -1218,13 +1260,13 @@ export function listModelRegistrations(filter: {
   to?: number
   offset?: number
   limit?: number
-} = {}): Promise<ModelRegistrationReport> {
+} = {}, signal?: AbortSignal): Promise<ModelRegistrationReport> {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(filter)) {
     if (value !== undefined && value !== '') query.set(key, String(value))
   }
   const suffix = query.toString()
-  return request(`/admin/api/model-registrations${suffix === '' ? '' : `?${suffix}`}`)
+  return request(`/admin/api/model-registrations${suffix === '' ? '' : `?${suffix}`}`, signal === undefined ? {} : { signal })
 }
 
 export function listModels(): Promise<ModelGovernanceRow[]> {
@@ -1413,6 +1455,62 @@ export interface PluginManagementOverviewRow {
 export function pluginManagementOverview(signal?: AbortSignal): Promise<PluginManagementOverviewRow[]> {
   return request('/admin/api/plugins/overview', { signal })
 }
+
+/** Localized display text a runtime reports for one bundle or entry. */
+export type PluginInventoryLocalizedText = string | ({ en: string } & Record<string, string>)
+/** Localizable display metadata in a reported inventory. */
+export interface PluginInventoryMeta {
+  title?: PluginInventoryLocalizedText
+  description?: PluginInventoryLocalizedText
+  icon?: string
+  error?: string
+}
+/** One composition row a reported bundle declares. */
+export interface PluginInventoryBundleRow { rowId: string; moduleName: string; meta?: PluginInventoryMeta; entryId?: string }
+/** One bundle as the reporting runtime's catalog lists it. */
+export interface PluginInventoryBundle {
+  name: string
+  version?: string
+  meta?: PluginInventoryMeta
+  description?: string
+  enabled: boolean
+  installed: boolean
+  optional: boolean
+  removable: boolean
+  readOnlyReason?: string
+  source?: string
+  error?: { code: string; diagnostic?: string }
+  rows: PluginInventoryBundleRow[]
+  overrides: string[]
+}
+/** One live runtime entry as the reporting runtime's catalog lists it. */
+export interface PluginInventoryPlugin {
+  entryId: string
+  moduleName: string
+  meta?: PluginInventoryMeta
+  enabled: boolean
+  fiberPhase: string | null
+  patchId?: string
+  readOnlyReason?: string
+}
+/** The composition one runtime last reported. */
+export interface PluginInventoryReport { bundles: PluginInventoryBundle[]; plugins: PluginInventoryPlugin[] }
+/** One space's inventory row as the cross-space list returns it. */
+export interface PluginInventorySpaceRow {
+  target: { kind: 'user' | 'project'; id: number; runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId; label: string; steward: boolean }
+  live: boolean
+  generation: number | null
+  /** Last report time; null while the runtime has never reported. */
+  reportedAt: string | null
+  /** The runtime's last reported catalog; null without a report. */
+  inventory: PluginInventoryReport | null
+  /** The saved desired composition, when an override exists. */
+  desired: PluginDesiredState | null
+}
+/** Every space's last reported plugin inventory on this node. */
+export function pluginInventoryList(signal?: AbortSignal): Promise<PluginInventorySpaceRow[]> {
+  return request('/admin/api/plugins/inventory', { signal })
+}
 export function pluginManagementSaveState(input: { target: { kind: 'user' | 'project'; id: number; runtimeId?: import('../../src/runtime-catalog.ts').RuntimeId }; revision: string; state: PluginDesiredState | null }, signal?: AbortSignal): Promise<PluginManagementState> {
   return request('/admin/api/plugins/state', { method: 'POST', body: JSON.stringify(input), signal })
 }
@@ -1430,6 +1528,8 @@ export interface DeploymentNode {
   /** -1 means the node's build predates inflight reporting; it cannot quiesce. */
   inflightWrites: number
   activeRuntimes: number
+  /** Physical isolation confirmed separately from observed Runtime shutdown. */
+  externallyFenced?: true
   quiesced: boolean
 }
 
@@ -1458,6 +1558,8 @@ export interface ClusterState {
 }
 
 export interface DeploymentState extends ClusterState {
+  /** Release of the Gateway that served this deployment state, when configured. */
+  releaseId?: string
   migrations: { applied: number[]; pending: Array<{ version: number; name: string }>; drifted: number[]; current: number } | null
   operations: DeploymentOperation[]
 }
@@ -1485,6 +1587,48 @@ export interface DeploymentBackup {
   error: string | null
 }
 
+/** Backup list metadata with the manifest-presence flag used by the restore action. */
+export type DeploymentBackupSummary = Omit<DeploymentBackup, 'managedSnapshot'> & { hasManagedSnapshot: boolean }
+
+/** Backup entries returned by current and older deployment endpoints. */
+export type DeploymentBackupEntry = DeploymentBackupSummary | DeploymentBackup
+
+export type DeploymentOverviewSectionKey =
+  | 'deployment'
+  | 'backups'
+  | 'tunnel'
+  | 'nodeConfiguration'
+  | 'nodeConnection'
+  | 'runtimeAllocationPolicy'
+  | 'nodeAccess'
+
+export type DeploymentOverviewSlice<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly status: number; readonly error: string; readonly code?: string }
+
+export interface DeploymentOverviewSections {
+  deployment?: DeploymentOverviewSlice<DeploymentState>
+  backups?: DeploymentOverviewSlice<{ backups: DeploymentBackupEntry[] }>
+  tunnel?: DeploymentOverviewSlice<TunnelAccessView>
+  nodeConfiguration?: DeploymentOverviewSlice<import('../../src/node-config-fields.ts').NodeConfigurationView>
+  nodeConnection?: DeploymentOverviewSlice<NodeConnectionView>
+  runtimeAllocationPolicy?: DeploymentOverviewSlice<RuntimeAllocationPolicy>
+  nodeAccess?: DeploymentOverviewSlice<import('../../src/node-access.ts').NodeAccessPage>
+}
+
+export interface DeploymentOverviewResponse {
+  sections: DeploymentOverviewSections
+}
+
+/** Read multiple deployment sections in one compressed Admin snapshot. */
+export function getDeploymentOverview(
+  sections?: readonly DeploymentOverviewSectionKey[],
+  signal?: AbortSignal,
+): Promise<DeploymentOverviewResponse> {
+  const query = sections === undefined || sections.length === 0 ? '' : `?sections=${encodeURIComponent(sections.join(','))}`
+  return request(`/admin/api/deployment/overview${query}`, { cache: 'no-store', ...(signal === undefined ? {} : { signal }) })
+}
+
 export function getDeployment(signal?: AbortSignal): Promise<DeploymentState> {
   return request('/admin/api/deployment', signal === undefined ? {} : { signal })
 }
@@ -1495,7 +1639,7 @@ export function setDeploymentNodeStatus(nodeId: string, status: DeploymentNodeSt
   return request('/admin/api/deployment/nodes/status', { method: 'POST', body: JSON.stringify({ nodeId, status }) })
 }
 
-export type { NodeAccessEntry, NodeAccessPage, NodeEnrollment } from '../../src/node-access.ts'
+export type { NodeAccessEntry, NodeAccessPage, NodeEnrollment, NodeRemovalCheck } from '../../src/node-access.ts'
 
 /** A success response did not identify the requested node operation; its effect remains unconfirmed. */
 export class NodeAccessResponseError extends Error {
@@ -1570,7 +1714,7 @@ export async function revokeNodeAccess(node: import('../../src/node-access.ts').
 export function requestDeploymentRestore(backupId: string): Promise<DeploymentOperation> {
   return request('/admin/api/deployment/restore', { method: 'POST', body: JSON.stringify({ backupId }) })
 }
-export function listBackups(signal?: AbortSignal): Promise<{ backups: DeploymentBackup[] }> {
+export function listBackups(signal?: AbortSignal): Promise<{ backups: DeploymentBackupEntry[] }> {
   return request('/admin/api/backups', signal === undefined ? {} : { signal })
 }
 export function createBackup(): Promise<DeploymentBackup> {
@@ -1666,8 +1810,8 @@ export type TunnelAccessView = {
   updatedAt: string
 }
 
-export function getTunnelAccess(): Promise<TunnelAccessView> {
-  return request('/admin/api/tunnel')
+export function getTunnelAccess(signal?: AbortSignal): Promise<TunnelAccessView> {
+  return request('/admin/api/tunnel', signal === undefined ? undefined : { signal })
 }
 export function installTunnelBinary(): Promise<TunnelAccessView> {
   return request('/admin/api/tunnel/install', { method: 'POST', body: '{}' })
@@ -1744,14 +1888,16 @@ export async function getDeploymentTopology(signal?: AbortSignal): Promise<Deplo
 /** Save a reviewed mode without changing the current browser selection or form state. */
 export async function saveDeploymentTopology(input: { revision: string; enabled: boolean; primaryOrigin?: string }): Promise<DeploymentContext> {
   const result = deploymentContextSchema.parse(await request<unknown>('/admin/api/deployment/topology', { method: 'PUT', body: JSON.stringify(input) }))
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('hgw-deployment-policy-changed'))
-    if (typeof BroadcastChannel !== 'undefined') {
-      const channel = new BroadcastChannel('hgw-deployment-policy')
-      channel.postMessage({ revision: result.revision }); channel.close()
-    }
-  }
+  publishDeploymentPolicy(result.revision)
   return result
+}
+
+function publishDeploymentPolicy(revision: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('hgw-deployment-policy-changed'))
+  if (typeof BroadcastChannel === 'undefined') return
+  const channel = new BroadcastChannel('hgw-deployment-policy')
+  channel.postMessage({ revision }); channel.close()
 }
 
 /** Inspect the retained attachments that prevent disabling multi-computer mode. */
@@ -1781,10 +1927,37 @@ export async function detachNodeAccess(node: import('../../src/node-access.ts').
   })
   const result = (await import('../../src/node-access.ts')).nodeDetachmentSchema.parse(value)
   if (result.nodeId !== node.nodeId || result.revision !== node.revision + 1) throw new NodeAccessResponseError()
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('hgw-deployment-policy-changed'))
-    if (typeof BroadcastChannel !== 'undefined') { const channel = new BroadcastChannel('hgw-deployment-policy'); channel.postMessage({ revision: result.topologyRevision }); channel.close() }
-  }
+  publishDeploymentPolicy(result.topologyRevision)
+}
+
+/**
+ * Inspect current blockers for the computer the administrator selected.
+ * @param node - exact directory selection and its displayed revision.
+ * @param signal - cancellation owned by the confirmation panel.
+ * @returns the validated current assessment for that selection.
+ */
+export async function checkNodeRemoval(node: import('../../src/node-access.ts').NodeAccessEntry,
+  signal: AbortSignal): Promise<import('../../src/node-access.ts').NodeRemovalCheck> {
+  const value = await request<unknown>(`/admin/api/deployment/nodes/access/${encodeURIComponent(node.nodeId)}/removal`, {
+    cache: 'no-store', signal,
+  })
+  const result = (await import('../../src/node-access.ts')).nodeRemovalCheckSchema.parse(value)
+  if (result.nodeId !== node.nodeId) throw new NodeAccessResponseError()
+  if (result.revision !== node.revision) throw new AdminRequestError(409, 'node-access/revision-conflict')
+  return result
+}
+
+/**
+ * Confirm removal once against the reviewed revision.
+ * @param node - the computer whose removal eligibility the administrator reviewed.
+ */
+export async function removeNodeAccess(node: import('../../src/node-access.ts').NodeAccessEntry): Promise<void> {
+  const value = await request<unknown>(`/admin/api/deployment/nodes/access/${encodeURIComponent(node.nodeId)}/removal`, {
+    method: 'POST', body: JSON.stringify({ revision: node.revision }),
+  })
+  const result = (await import('../../src/node-access.ts')).nodeRemovalReceiptSchema.parse(value)
+  if (result.nodeId !== node.nodeId || result.revision !== node.revision + 1) throw new NodeAccessResponseError()
+  publishDeploymentPolicy(result.topologyRevision)
 }
 
 /** Read one bounded page of already deployed identities without making an enrollment decision. */

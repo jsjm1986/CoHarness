@@ -113,6 +113,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'shell.overlay': { kind: 'list'; scope: 'root' }
     /** Tab-wide identity in the compact topbar or above the center beside a collapsed rail, available before Session selection. */
     'shell.mobile.header.context': { kind: 'list'; scope: 'root'; owner: { compact: boolean } }
+    /** Localized compact title for a global main panel, keyed by its main-panel id. */
+    'shell.mobile.header.title': { kind: 'keyed'; scope: 'root' }
     /** Session-scoped actions rendered in the compact AppFrame topbar. */
     'shell.mobile.header.actions': { kind: 'list'; scope: 'session'; owner: MobileHeaderActionOwnerProps }
   }
@@ -227,6 +229,7 @@ export function apply(ctx: ClientContext): void {
         'shell.bottom': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.mobile.header.context': { kind: 'list', scope: 'root' },
+        'shell.mobile.header.title': { kind: 'keyed', scope: 'root' },
         'shell.mobile.header.actions': { kind: 'list', scope: 'session' },
       },
       store,
@@ -268,7 +271,7 @@ export function apply(ctx: ClientContext): void {
     }
   }, 'ui-layout: theme presenter')
 
-  // Visual-viewport height as a root CSS variable: the compact frame sizes to
+  // Visual-viewport height as a root CSS variable: every frame mode sizes to
   // it (AppFrame.module.css), so the composer stays above the on-screen
   // keyboard where the layout viewport does not shrink (iOS). The scale
   // factor folds pinch-zoom back out — the frame tracks the layout viewport,

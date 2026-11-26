@@ -14,6 +14,8 @@ Status: implemented
 
 每次代理运行创建的一个 `NodeDialer` 实例（`gateway/src/node-dialer.ts`）为三个面向 center 的消费者各自的全新尝试选取源站：`/internal/nodes/*` 控制调用、控制通道的每次（重）连，以及每条服务流的打开——后两者经通道与桥接配置在打开时读取 `dialer.current()`。只有网络层失败才推进列表：fetch 拒绝、WebSocket 在 `open` 之前出错或关闭、握手超时。任何 HTTP 响应——包括 4xx/5xx 和带状态码被拒绝的升级——都说明已到达 center，不是回退触发；`unexpected-response` 被消费，使其保持为普通的拒绝。变化只影响下一次尝试：进行中的请求从不向另一源站重放，保留各调用方原有的不重放语义。`HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS`（默认 60000，与其他节点计时器相同的正整数规则）负责回探候选 0：回退之后首个晚于该时长的全新尝试重新从首选源站开始。每次源站变化记录一条不带凭证的 `dial-origin` 事件及其原因码。节点访问语义不变，因为 center 仅按 bearer 加 connection/epoch 头在既有路由上认证节点流量，与拨号路径无关。本决定服务于 [proposed runtime-management note](../../proposed/architecture/2026-10-28-multi-computer-personal-runtimes.zh.md) 所述的多计算机传输。
 
+`HGW_NODE_SERVICE_DIAL_URLS` 为新服务连接选择独立的 `NodeDialer`，使用同一已接入的中心和确切的连接租约。该线路的传输失败只推进下一次服务连接。控制通道继续负责服务请求和取消。运维人员可以为数据流量优先选择已建立 WebSocket 延迟更稳定的线路，同时保留实测的控制线路。
+
 ## 已考虑的替代方案
 
 **仅拨 center URL，由 DNS 或本地代理前置。** 否决：解析层的技巧对代理不可见，无法确定性回退，也破坏了凭证文件赖以诊断的同源保证。
@@ -28,4 +30,4 @@ Status: implemented
 
 ## 验证
 
-`node-dialer.spec.ts` 覆盖失败推进、陈旧报告与末尾候选不变量，以及注入时钟下的首选回探。`node-agent.spec.ts` 新增列表/计时器校验矩阵、首选候选失效后经第二源站连入并记录变化的回退测试，以及在另一源站服务拨号列表时状态文件仍绑定 `centerUrl` 的测试。`node-service.spec.ts` 以 `[dead, base]` 驱动一条通道加一次代理服务流。`test:postgres` 覆盖不变：进程级 enrollment 仍走默认单源站路径。
+`node-dialer.spec.ts` 覆盖失败推进、陈旧报告与末尾候选不变量，以及注入时钟下的首选回探。`node-agent.spec.ts` 覆盖列表和计时器校验、共享线路回退，以及传输切换时的接入 `centerUrl`。`node-service.spec.ts` 分别关闭首选控制端口和中断一次服务升级，核验失败的服务连接未提交请求，第二次尝试到达同一授权 Runtime，原控制通道仍可用。进程级 PostgreSQL 接入测试覆盖默认单源站路径。

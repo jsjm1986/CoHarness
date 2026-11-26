@@ -9,6 +9,7 @@ import {
   IconSettingsOutline16,
   IconSparkle16,
   IconUserOutline16,
+  focusWithoutRing,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TrajectoryCellKind, TrajectoryCellProps } from './trajectory-record.ts'
 import { formatElapsedSeconds, trajectoryRecordId } from './trajectory-record.ts'
@@ -180,10 +181,9 @@ function turnLabel(record: TrajectoryMobileRecord): string | undefined {
   return `#${record.turn}`
 }
 
-function itemClass(item: TrajectoryMobileFeedItem, selected: boolean, outside: boolean): string {
+function itemClass(item: TrajectoryMobileFeedItem, selected: boolean): string {
   const classes = [css.item]
   if (selected) classes.push(css.itemSelected)
-  if (outside) classes.push(css.itemOutside)
   if (item.record.collapsedSummaryKind !== undefined) classes.push(css.itemSummary)
   if (item.record.cell.isError) classes.push(css.itemError)
   if (stateOf(item.record) === 'running') classes.push(css.itemRunning)
@@ -222,7 +222,6 @@ export function TrajectoryMobileFeed({
       data-scroll-ready={scrollReady || undefined}
       role="list"
       aria-label={t('feed.aria')}
-      aria-setsize={logicalCount}
     >
       {historyLoading && (
         <div className={css.loading} role="status" aria-live="polite">
@@ -277,7 +276,7 @@ export function TrajectoryMobileFeed({
         return (
           <div
             key={trajectoryRecordId(record.cell) + (summary ? `-${record.collapsedSummaryKind}` : '')}
-            className={itemClass(item, selected, outside)}
+            className={itemClass(item, selected)}
             data-trajectory-row-key={trajectoryRecordId(record.cell)}
             data-record-index={record.cell.index}
             data-kind={record.cell.kind}
@@ -289,7 +288,6 @@ export function TrajectoryMobileFeed({
               : outside ? 'outside' : 'inside'}
             data-collapsed-summary={record.collapsedSummaryKind}
             role="listitem"
-            aria-selected={selected}
             aria-setsize={logicalCount}
             aria-posinset={item.position + 1}
           >
@@ -301,6 +299,7 @@ export function TrajectoryMobileFeed({
                 aria-pressed={item.requestSelected}
                 onClick={(event) => {
                   event.stopPropagation()
+                  focusWithoutRing(event.currentTarget)
                   onRequestSelect({
                     turn: record.turn,
                     group: record.group,
@@ -316,7 +315,8 @@ export function TrajectoryMobileFeed({
               className={css.rowButton}
               aria-label={ariaLabel}
               aria-pressed={selected}
-              onClick={() => {
+              onClick={(event) => {
+                focusWithoutRing(event.currentTarget)
                 if (summary) {
                   if (record.collapsedSummaryKind === 'turn' && record.turn !== null) onToggleTurn(record.turn)
                   else onToggleAssistant(trajectoryRecordId(record.cell))

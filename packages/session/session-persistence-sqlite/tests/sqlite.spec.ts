@@ -582,6 +582,48 @@ describe('SessionPersistenceSqlite schema ownership', () => {
     changedApplication.close()
   })
 
+  it('rechecks the schema published by another connection before appending', async () => {
+    const path = await freshDbPath('dsh-sqlite-external-schema-')
+    const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
+    const storage = { meta: meta('external-schema'), inheritedEventCount: SessionLogOffset(0) }
+    try {
+      await store.appendBatch(storage, [attempt(0)], false)
+      const outside = new DatabaseSync(path)
+      try {
+        outside.exec(testSql('add-unexpected-column'))
+        await expect(store.appendBatch(storage, [attempt(1)], true))
+          .rejects.toThrow(/required schema objects/)
+        expect(outside.prepare(testSql('count-events')).get()).toEqual({ count: 1 })
+      } finally {
+        outside.close()
+      }
+    } finally {
+      await store.close()
+    }
+  })
+
+  it('accepts an equivalent schema with different SQL spacing', async () => {
+    const path = await freshDbPath('dsh-sqlite-schema-spacing-')
+    const db = new DatabaseSync(path)
+    try {
+      db.exec(testSql('create-spaced-schema'))
+      db.prepare(sql('insert-persistence-state')).run('00000000-0000-4000-8000-000000000001')
+      db.exec(sql('set-application-id'))
+      db.exec(sql('set-user-version-21'))
+    } finally {
+      db.close()
+    }
+    if (process.platform !== 'win32') await chmod(path, 0o600)
+    const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
+    const storage = { meta: meta('schema-spacing'), inheritedEventCount: SessionLogOffset(0) }
+    try {
+      await store.appendBatch(storage, [attempt(0)], false)
+      expect((await store.loadStored(storage.meta.id))?.events).toEqual([attempt(0)])
+    } finally {
+      await store.close()
+    }
+  })
+
   it('validates creation time and restores every optional header field', () => {
     const base: SessionRow = {
       id: 'stored-header',
@@ -726,6 +768,23 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     expect(Reflect.get(process, 'emitWarning')).toBe(emitWarning)
     expect(typeof (await stat(path)).size).toBe('number')
     await ctx.fiber.dispose()
+  })
+
+  it('refuses to create a Session whose SSH target cannot survive a restart', async () => {
+    const path = await freshDbPath('dsh-sqlite-ssh-')
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(SessionPersistenceSqlite, { path })
+      const id = SessionId('ssh-sqlite')
+      await expect(ctx.sessionPersistence.createStored({
+        id, version: SESSION_FORMAT_VERSION, createdAt: 1, cwd: '/work', isSeeded: false, sshTarget: 42,
+      })).rejects.toThrow('cannot retain a managed SSH target')
+      expect(ctx.sessionPersistence.isPending(id)).toBe(false)
+      expect(await ctx.sessionPersistence.listSnapshots()).toEqual([])
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('folds exact content metadata for a draft row after restart', async () => {

@@ -168,20 +168,17 @@ describe('documentation Mermaid viewer', () => {
     expect(dialog.open).toBe(true)
   })
 
-  it('wraps keyboard focus through the viewer controls in both directions', () => {
+  it('leaves Tab navigation to the native modal dialog', () => {
     render()
     viewer = installMermaidViewer(document, () => 'en-US')
     const dialog = open()
     const close = getByRole(dialog, 'button', { name: 'Close' })
-    const zoomOut = getByRole(dialog, 'button', { name: 'Zoom out' })
     close.focus()
-    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }))
-    expect(document.activeElement).toBe(zoomOut)
-    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true }))
-    expect(document.activeElement).toBe(close)
-    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true }))
-    expect(document.activeElement).toBe(getByRole(dialog, 'button', { name: 'Viewer help' }))
-    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }))
+    for (const shiftKey of [false, true]) {
+      const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, cancelable: true })
+      dialog.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(false)
+    }
     expect(document.activeElement).toBe(close)
   })
 

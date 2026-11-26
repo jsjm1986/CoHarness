@@ -46,9 +46,9 @@
   - img
 - button "Send message" [disabled]
 - group "Session statistics":
-  - button "1 turns · 2 steps":
+  - button "1 turn · 2 steps":
     - img
-    - text: 1 turns · 2 steps
+    - text: 1 turn · 2 steps
 - separator "Adjust transcript content width"
 - separator "Adjust transcript content width"
 
@@ -110,9 +110,9 @@
   - img
 - button "Send message" [disabled]
 - group "Session statistics":
-  - button "1 turns · 2 steps":
+  - button "1 turn · 2 steps":
     - img
-    - text: 1 turns · 2 steps
+    - text: 1 turn · 2 steps
 - separator "Adjust transcript content width"
 - separator "Adjust transcript content width"
 
@@ -132,7 +132,9 @@
   - button "Collapse calls": Calls
   - img
   - searchbox "Search trajectory"
-- region "Trajectory timeline"
+- region "Trajectory timeline":
+  - group "Timeline overview; drag horizontally to focus events"
+  - button "Adjust timeline": Adjust
 - table:
   - rowgroup:
     - row "USER, Inspect the protected operation, but do not run it unless authorized.":
@@ -183,6 +185,6 @@
   - img
 - button "Send message" [disabled]
 - group "Session statistics":
-  - button "1 turns · 2 steps":
+  - button "1 turn · 2 steps":
     - img
-    - text: 1 turns · 2 steps
+    - text: 1 turn · 2 steps

@@ -129,8 +129,7 @@ export async function readProjectScheduleWitness(
   if (actual.length > limits.maxRows) return ambiguous()
   const messages = new Set(actual.map((item) => JSON.stringify([item.session_id, item.message_id])))
   if (messages.size !== actual.length || actual.some((item) => !item.message_id)) return ambiguous()
-  const reported = new Set<string>(),
-    timings = new Map<string, number>()
+  const timings = new Map<string, number>()
   for (const item of actual) timings.set(item.session_id, Math.max(timings.get(item.session_id) ?? 0, item.at))
   // Only the installed plugin decides which saved variants, legacy states and receipts it can resume.
   const validator = tasks.size
@@ -144,13 +143,7 @@ export async function readProjectScheduleWitness(
     if (typeof session !== 'string' || !session || !['active', 'inactive'].includes(String(status))) return ambiguous()
     const next = iso(spec.scheduledAt)
     const recorded = task.deliveryHistory === undefined ? undefined : record(task.deliveryHistory)
-    if (
-      recorded &&
-      (!Array.isArray(recorded.records) ||
-        recorded.earlierRecordsUnavailable === true ||
-        recorded.earlierRecordsPruned === true)
-    )
-      return ambiguous()
+    if (recorded && !Array.isArray(recorded.records)) return ambiguous()
     const history = (recorded?.records as unknown[] | undefined) ?? (task.lastDelivery ? [task.lastDelivery] : [])
     for (const item of history) {
       const receipt = record(item),
@@ -158,11 +151,12 @@ export async function readProjectScheduleWitness(
       if (typeof receipt.messageId !== 'string' || (status === 'active' && at >= next)) return ambiguous()
       const identity = JSON.stringify([session, receipt.messageId])
       if (!messages.has(identity)) return ambiguous()
-      reported.add(identity)
     }
+    // Retention and explicit deletion remove receipts, not committed inbox messages.
+    // A pending occurrence must follow every delivered message in its Session;
+    // this also refuses a crash between inbox persistence and task advancement.
     if (status === 'active' && next <= (timings.get(session) ?? Number.NEGATIVE_INFINITY)) return ambiguous()
   }
-  if ([...messages].some((id) => !reported.has(id))) return ambiguous()
   const hash = createHash('sha256')
   for (const [id, task] of [...tasks].sort(([a], [b]) => Buffer.compare(Buffer.from(a), Buffer.from(b))))
     hash.update(JSON.stringify([id, task]) + '\n')

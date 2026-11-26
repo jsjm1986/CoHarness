@@ -18,6 +18,7 @@ import type { ClientRequest, RpcError, RpcRequest, RpcResponse, ServerResponse }
 import { RpcId, serverRequestJson } from '../api/rpc.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import { clientRequestSchema, clientResponseSchema } from '../api/rpc.schema.ts'
+import type { PromptAdmissionObserver, PromptAdmissionPhase } from '../api/sessions.ts'
 import {
   sessionActivateRequestSchema,
   sessionAttachmentRequestSchema,
@@ -98,7 +99,8 @@ async function closeFrameStream(frames: AsyncIterable<unknown>, reason?: unknown
 type UnaryRoutes = {
   [K in keyof RpcMethodMap]: {
     schema: z.ZodType<Wire<RequestPayload<K>>>
-    invoke(api: ApiProxy, request: RpcRequest<RequestPayload<K>>, signal: AbortSignal): Promise<RpcResponse<ResponseValue<K>>>
+    invoke(api: ApiProxy, request: RpcRequest<RequestPayload<K>>, signal: AbortSignal,
+      options?: VersionedUnary): Promise<RpcResponse<ResponseValue<K>>>
   }
 }
 
@@ -106,14 +108,20 @@ const UNARY_ROUTES: UnaryRoutes = {
   'session.list': { schema: sessionListRequestSchema, invoke: (api, r) => api.sessions.list(r) },
   'session.search': { schema: sessionSearchRequestSchema, invoke: (api, r, signal) => api.sessions.search(r, signal) },
   'session.create': { schema: sessionCreateRequestSchema, invoke: (api, r) => api.sessions.create(r) },
-  'session.history': { schema: sessionHistoryRequestSchema, invoke: (api, r, signal) => api.sessions.history(r, signal) },
+  'session.history': { schema: sessionHistoryRequestSchema, invoke: (api, r, signal, options) => {
+    const limit = options?.preparation?.historyMessages
+    const payload = r.payload
+    if (limit === undefined || payload.beforeSeq !== undefined || payload.detail !== 'conversation') return api.sessions.history(r, signal)
+    const maxMessages = Math.min(payload.maxMessages ?? limit, limit)
+    return api.sessions.history({ ...r, payload: { ...payload, maxMessages } }, signal)
+  } },
   'session.historyIndex': { schema: sessionHistoryIndexRequestSchema, invoke: (api, r, signal) => api.sessions.historyIndex(r, signal) },
   'session.models': { schema: sessionModelsRequestSchema, invoke: (api, r) => api.sessions.models(r) },
   'session.selectModel': { schema: sessionSelectModelRequestSchema, invoke: (api, r) => api.sessions.selectModel(r) },
   'session.rename': { schema: sessionRenameRequestSchema, invoke: (api, r) => api.sessions.rename(r) },
   'session.fork': { schema: sessionForkRequestSchema, invoke: (api, r) => api.sessions.fork(r) },
   'session.promptStatus': { schema: sessionPromptStatusRequestSchema, invoke: (api, r, signal) => api.sessions.promptStatus(r, signal) },
-  'session.prompt': { schema: sessionPromptRequestSchema, invoke: (api, r) => api.sessions.prompt(r) },
+  'session.prompt': { schema: sessionPromptRequestSchema, invoke: (api, r, _signal, options) => api.sessions.prompt(r, options?.observe) },
   'session.attachment': { schema: sessionAttachmentRequestSchema, invoke: (api, r) => api.sessions.attachment(r) },
   'session.updateQueue': { schema: sessionUpdateQueueRequestSchema, invoke: (api, r) => api.sessions.updateQueue(r) },
   'session.cancel': { schema: sessionCancelRequestSchema, invoke: (api, r) => api.sessions.cancel(r) },
@@ -188,12 +196,13 @@ function fullResponse(narrow: RpcResponse<unknown>): Response {
 
 /** Preserve a committed create receipt when its authorized tail cannot fit in the bounded response. */
 async function preparedCreateResponse(api: ApiProxy, rpcId: RpcId, created: ResponseValue<'session.create'>,
-  requested: RequestPayload<'session.create'>, signal: AbortSignal, limit: number): Promise<Response> {
+  requested: RequestPayload<'session.create'>, signal: AbortSignal, limit: number, historyMessages?: number): Promise<Response> {
   if (created.sessionId !== requested.sessionId || !created.workspace
     || requested.workspaceId !== undefined && created.workspace.workspaceId !== requested.workspaceId) {
     return errorResponse(rpcId, { code: 'bad-request', message: 'Prepared Session did not confirm its requested destination', details: { issues: [] } })
   }
-  const history = await api.sessions.history({ rpcId, payload: { sessionId: created.sessionId, detail: 'conversation', onlyActive: true } }, signal)
+  const history = await api.sessions.history({ rpcId, payload: { sessionId: created.sessionId, detail: 'conversation', onlyActive: true,
+    ...(historyMessages === undefined ? {} : { maxMessages: historyMessages }) } }, signal)
   if (!history.result.ok) return fullResponse(history)
   const encoder = new TextEncoder()
   const overhead = encoder.encode(JSON.stringify({ ...created, initialHistory: null })).byteLength - 'null'.length
@@ -202,6 +211,17 @@ async function preparedCreateResponse(api: ApiProxy, rpcId: RpcId, created: Resp
   const text = JSON.stringify({ type: 'server-response', rpcId, result: { ok: true, value: { ...created, initialHistory: packed.result.value } } })
   if (encoder.encode(text).byteLength > limit) return fullResponse({ rpcId, result: { ok: true, value: created } })
   return new Response(text, { headers: { 'content-type': 'application/json' } })
+}
+
+interface PreparationTimings {
+  bodyMs: number
+  sessionMs?: number
+  initialHistoryMs?: number
+}
+
+interface VersionedUnary {
+  observe: PromptAdmissionObserver | undefined
+  preparation: { historyMessages: number | undefined; timings: PreparationTimings | undefined } | undefined
 }
 
 /**
@@ -221,24 +241,31 @@ async function handleUnary<K extends keyof RpcMethodMap>(
   message: ClientRequest,
   signal: AbortSignal,
   historyPageTargetBytes: number,
-  prepared = false,
+  options?: VersionedUnary,
 ): Promise<Response> {
   const route = UNARY_ROUTES[method]
   const payload = route.schema.safeParse(message.payload)
   if (!payload.success) {
     return errorResponse(message.rpcId, { code: 'bad-request', message: `invalid payload for ${method}`, details: { issues: payload.error.issues } })
   }
-  const creation = prepared && method === 'session.create' ? payload.data as RequestPayload<'session.create'> : undefined
+  const preparation = options?.preparation
+  const timings = preparation?.timings
+  const creation = preparation !== undefined && method === 'session.create' ? payload.data as RequestPayload<'session.create'> : undefined
   const initial = creation?.includeInitialHistory === true
   if (initial && (!creation.sessionId || !creation.draftId ||
     !creation.defaultWorkspace && !(creation.workspaceId && creation.includeWorkspace))) {
     return errorResponse(message.rpcId, { code: 'bad-request', message: 'A prepared tail requires a reserved Session and workspace', details: { issues: [] } })
   }
   try {
-    const response = await route.invoke(api, { rpcId: message.rpcId, payload: payload.data }, signal)
+    const sessionStart = timings === undefined ? 0 : performance.now()
+    const response = await route.invoke(api, { rpcId: message.rpcId, payload: payload.data }, signal, options)
+    if (timings !== undefined) timings.sessionMs = Math.round((performance.now() - sessionStart) * 100) / 100
     if (initial && response.result.ok) {
-      return await preparedCreateResponse(api, response.rpcId, response.result.value as ResponseValue<'session.create'>,
-        creation, signal, historyPageTargetBytes)
+      const historyStart = timings === undefined ? 0 : performance.now()
+      const result = await preparedCreateResponse(api, response.rpcId, response.result.value as ResponseValue<'session.create'>,
+        creation, signal, historyPageTargetBytes, preparation?.historyMessages)
+      if (timings !== undefined) timings.initialHistoryMs = Math.round((performance.now() - historyStart) * 100) / 100
+      return result
     }
     if (
       response.result.ok
@@ -311,6 +338,8 @@ export interface FetchHandlerOptions {
   serverTiming?: boolean
   /** Complete history response target in uncompressed UTF-8 JSON bytes. */
   historyPageTargetBytes?: number
+  /** Maximum append-origin messages in a prepared conversation tail. Unset preserves the caller's existing size. */
+  preparedHistoryMessages?: number
   /** Maximum UTF-8 bytes accepted for one unary JSON request body. */
   requestBodyMaxBytes?: number
 }
@@ -421,9 +450,13 @@ export function toFetchHandler(
   const historyPageTargetBytes = options.historyPageTargetBytes
     ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   const requestBodyMaxBytes = options.requestBodyMaxBytes ?? DEFAULT_REQUEST_BODY_MAX_BYTES
+  const preparedHistoryMessages = options.preparedHistoryMessages
   const serverTiming = options.serverTiming ?? false
   if (!Number.isSafeInteger(historyPageTargetBytes) || historyPageTargetBytes < 1) {
     throw new RangeError('historyPageTargetBytes must be a positive safe integer')
+  }
+  if (preparedHistoryMessages !== undefined && (!Number.isSafeInteger(preparedHistoryMessages) || preparedHistoryMessages < 1)) {
+    throw new RangeError('preparedHistoryMessages must be a positive safe integer')
   }
   if (!Number.isSafeInteger(requestBodyMaxBytes) || requestBodyMaxBytes < 1) {
     throw new RangeError('requestBodyMaxBytes must be a positive safe integer')
@@ -489,6 +522,9 @@ export function toFetchHandler(
         return new Response('content type must be application/json', { status: 415 })
       }
 
+      const trace = (prepared || durable || status)
+        && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(req.headers.get('x-dsh-operation-id') ?? '')
+      const bodyStart = prepared && trace ? performance.now() : undefined
       let body: unknown
       try {
         body = JSON.parse(await readRequestBody(req, requestBodyMaxBytes, req.signal)) as unknown
@@ -503,6 +539,8 @@ export function toFetchHandler(
         return new Response('body is not JSON', { status: 400 })
       }
 
+      const timings: PreparationTimings | undefined = bodyStart === undefined ? undefined
+        : { bodyMs: Math.round((performance.now() - bodyStart) * 100) / 100 }
       if (path === '/api/respond') {
         const parsed = clientResponseSchema.safeParse(body)
         if (!parsed.success) return Response.json({ accepted: false, reason: 'bad-response' })
@@ -526,14 +564,22 @@ export function toFetchHandler(
       }
       if (prepared || durable || status) {
         const start = performance.now()
+        const admission: Partial<Record<PromptAdmissionPhase, number>> = {}
+        const observe: PromptAdmissionObserver | undefined = trace && durable && method === 'session.prompt'
+          ? (phase, elapsed) => { admission[phase] = Math.round(((admission[phase] ?? 0) + elapsed) * 100) / 100 }
+          : undefined
         let timed = message
         if ((durable && method === 'session.prompt' || prepared && method === 'session.history') &&
           typeof message.payload === 'object' && message.payload !== null && !Array.isArray(message.payload)) {
           timed = { ...message, payload: { ...message.payload, ...(durable ? { durable: true } : { onlyActive: true }) } }
         }
-        const result = await handleUnary(api, method, timed, req.signal, historyPageTargetBytes, prepared)
-        if (/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(req.headers.get('x-dsh-operation-id') ?? '')) {
+        const result = await handleUnary(api, method, timed, req.signal, historyPageTargetBytes, {
+          observe, preparation: prepared ? { timings, historyMessages: preparedHistoryMessages } : undefined,
+        })
+        if (trace) {
           result.headers.set('x-dsh-host-duration-ms', (performance.now() - start).toFixed(2))
+          if (observe !== undefined) result.headers.set('x-dsh-host-admission-ms', JSON.stringify(admission))
+          if (timings !== undefined) result.headers.set('x-dsh-host-prepare-ms', JSON.stringify(timings))
         }
         return result
       }

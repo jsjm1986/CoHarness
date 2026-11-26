@@ -7,8 +7,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
+import { createSnapshotStore, type ConversationViewportSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { ExpandButton } from '../src/client/shell/ExpandButton.tsx'
+import { ExpandButton, MobileExpandButton } from '../src/client/shell/ExpandButton.tsx'
 import type { ExpandButtonProps } from '../src/client/shell/ExpandButton.tsx'
 import { createSidebarRightStore } from '../src/client/stores.ts'
 
@@ -26,8 +27,10 @@ function hookOf<T>(inst: { subscribe: (fn: () => void) => () => void; getSnapsho
  * rest of the standard kit is framework-injected and never touched here, so one
  * documented cast keeps the harness to what is actually exercised.
  */
-function mountButton() {
+function mountButton(viewport?: ConversationViewportSnapshot) {
   const instance = createSidebarRightStore(() => ({ kind: 'guide', title: 'Start' })).create()
+  const viewportStore = createSnapshotStore<ConversationViewportSnapshot>(viewport
+    ?? { mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })
   const props = {
     sessionId: SESSION,
     focus: vi.fn(),
@@ -37,9 +40,10 @@ function mountButton() {
     // Copy is the dictionary's contract; the key stands in for the translation.
     t: (key: string) => key,
   } as never as ExpandButtonProps
-  const view = render(<ExpandButton {...props} />)
+  const view = render(viewport === undefined ? <ExpandButton {...props} />
+    : <MobileExpandButton {...props} useViewport={hookOf(viewportStore)} />)
   const control = (): HTMLElement | null => view.container.querySelector('[data-sidebar-right-expand]')
-  return { instance, view, control }
+  return { instance, view, control, viewportStore, focus: props.focus }
 }
 
 describe('ExpandButton', () => {
@@ -61,6 +65,53 @@ describe('ExpandButton', () => {
     expect(control()).toBeNull()
     act(() => { instance.actions.setExpanded(SESSION, false) })
     expect(control()).not.toBeNull()
+    cleanup()
+  })
+})
+
+describe('MobileExpandButton', () => {
+  it.each([
+    { pendingIdentity: true as const, activePaneId: SESSION },
+    { activePaneId: 's-other' as SessionId },
+    {},
+  ])('waits for verified foreground identity (%j)', (selection) => {
+    const { instance, control, viewportStore, focus } = mountButton({
+      mode: 'workbench', paneIds: [SESSION], paneRatios: [1], collapsedIds: [], ...selection,
+    })
+    expect(control()).toBeNull()
+    expect(focus).not.toHaveBeenCalled()
+    expect(instance.getSnapshot().bySession[SESSION]).toBeUndefined()
+    act(() => { viewportStore.set({
+      mode: 'workbench', paneIds: [SESSION], activePaneId: SESSION, paneRatios: [1], collapsedIds: [],
+    }) })
+    const button = control()
+    if (button === null) throw new Error('expected verified Session expand control')
+    fireEvent.click(button)
+    expect(focus).toHaveBeenCalledOnce()
+    expect(instance.getSnapshot().bySession[SESSION]?.layout.expanded).toBe(true)
+    cleanup()
+  })
+
+  it('opens a private blank Session without a workbench pane or existing Sidebar surface', () => {
+    const { instance, control, focus } = mountButton({ mode: 'single', paneIds: [], paneRatios: [], collapsedIds: [] })
+    const button = control()
+    if (button === null) throw new Error('expected blank Session expand control')
+    fireEvent.click(button)
+    expect(focus).toHaveBeenCalledOnce()
+    expect(instance.getSnapshot().bySession[SESSION]?.layout.expanded).toBe(true)
+    cleanup()
+  })
+
+  it('withdraws the current Session action when another workbench pane becomes active', () => {
+    const { control, viewportStore, focus } = mountButton({
+      mode: 'workbench', paneIds: [SESSION], activePaneId: SESSION, paneRatios: [1], collapsedIds: [],
+    })
+    expect(control()).not.toBeNull()
+    act(() => { viewportStore.set({
+      mode: 'workbench', paneIds: [SESSION], activePaneId: 's-other' as SessionId, paneRatios: [1], collapsedIds: [],
+    }) })
+    expect(control()).toBeNull()
+    expect(focus).not.toHaveBeenCalled()
     cleanup()
   })
 })

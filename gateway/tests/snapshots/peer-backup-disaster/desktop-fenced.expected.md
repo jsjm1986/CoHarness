@@ -1,0 +1,45 @@
+- main:
+  - heading "Encrypted peer backups" [level=2]
+  - button "Refresh"
+  - button "Add policy"
+  - status: Isolated recovery drill queued.
+  - strong: Source computer → Recovery computer
+  - text: Overdue
+  - paragraph: Scope Project space · [project] · 15 min
+  - paragraph: Protected through 1/1/2026, 12:00:00 AM · Covered 3 · Gaps 0
+  - paragraph: Pending — · Latest rehearsal — Queued
+  - group: Deployment identity
+  - button "Back up now"
+  - button "Recovery points and drills"
+  - button "Edit policy"
+  - text: Recovery point
+  - combobox "Recovery point":
+    - option "1/1/2026, 12:00:00 AM · Gaps 0" [selected]
+  - text: Independent rehearsal computer
+  - combobox "Independent rehearsal computer":
+    - option "Recovery computer"
+    - option "Primary entry"
+    - option "Replacement computer" [selected]
+  - paragraph: Backup computer · Recovery computer
+  - group:
+    - text: Replacement backup read access
+    - paragraph: Backups remain on the original receiver. This approval lets the replacement read this repository’s ciphertext. The repository key may decrypt other historical points; this is not cryptographic access limited to one point.
+    - paragraph: "Read approval expires: [expiry]. Operations still check current permissions and connection."
+    - button "Revoke read approval"
+    - form "Replacement backup read access":
+      - text: Replacement read credential fingerprint (SHA-256)
+      - textbox "Replacement read credential fingerprint (SHA-256)"
+      - text: Configure a dedicated read credential and recovery key on the replacement first. Enter only the credential’s SHA-256 fingerprint here, never the credential or key itself. Read approval expiry (local time)
+      - textbox "Read approval expiry (local time)"
+      - text: The approval cannot exceed the configured backup operation limit of 60 minutes.
+      - button "Approve backup reading on this computer"
+  - strong: Project takeover
+  - paragraph: Source isolated; preparing replacement data
+  - paragraph: Replacement computer · Replacement computer
+  - status: Restored schedules remain paused. Enabling new conversations does not redeliver old tasks. Keep source delivery records and external outcomes for review.
+  - status: Restored data remains isolated from execution. After verification and the ownership switch, review its configuration to enable new conversations. Historical conversations and previous work do not resume automatically.
+  - paragraph: "Isolation evidence recorded: cloud-console/fixture-isolation-42"
+  - button "Refresh takeover status"
+  - button "Start isolated drill"
+  - button "Recovery preflight"
+  - button "Close"

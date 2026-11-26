@@ -32,6 +32,14 @@
       var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
+@media (pointer: coarse) {
+  .main, .chevron {
+    min-inline-size: var(--dsw-touch-target);
+    min-block-size: var(--dsw-touch-target);
+    justify-content: center;
+  }
+}
+
 .main {
   padding: 3px var(--dsw-space-2);
 }

@@ -10,7 +10,7 @@ write-behind controller 会保留失败批次以及后端写入期间到达的�
 
 ## 决策
 
-`SessionWriteBehind` 在待处理队列与活跃批次的总和上同时执行 `maxPendingEvents` 和 `maxPendingBytes` 两项准入限制。字节限制在 controller 取得持久化自有副本前，按事件的 UTF-8 JSON 编码大小计算。默认值为每个活动会话 100,000 个事件和 64 MiB。
+`SessionWriteBehind` 在待处理队列与活跃批次的总和上执行 `maxPendingEvents` 和 `maxPendingBytes`。控制器先检查事件数，再编码事件并计算 UTF-8 JSON 字节数。它保留活动 Session 发布的深度冻结事件。默认值为每个活动会话 100,000 个事件和 64 MiB。
 
 活跃批次会一直计入限制，直到其持久化写入结束。失败批次会恢复到较新待处理事件之前，并继续计入事件数与字节数，因此重试无法绕过任一上限。若某次准入会超过任一限制，系统会报告失败并在修改队列前抛出异常。 controller 保留该失败，防止 Session observer 的异常包含掩盖缺失事件；其终结屏障行为由[接纳失败决策](2026-10-23-write-behind-admission-failure.zh.md)定义。
 
@@ -34,4 +34,4 @@ write-behind controller 会保留失败批次以及后端写入期间到达的�
 
 每个活动会话的 write-behind 队列都有确定的事件数和序列化负载字节上限，包括等待缓慢或失败后端的批次。直接 controller 调用与之后的每个持久化屏障都会明确暴露接纳失败。若活动 Session 的 observer 无法保留已接受事件，仅排空 controller 不能恢复该生命周期；部署必须在接受进一步工作前处理限制。
 
-controller 除了已有的持久化所有权副本外，还会为保留字节估算对每个已接纳事件执行一次序列化。该配额不限制后端 I/O 时长、已持久化历史总量或跨会话聚合内存；部署仍需要会话级与进程级容量控制。
+控制器拥有待处理和活跃批次列表。各批次与活动 Session 共享不可变事件，存储适配器只读借用这些事件。直接调用持久化接口时，仍会校验无损 JSON 并分离输入。后端 I/O 时长、持久历史总量和跨会话内存占用需要另行管控。

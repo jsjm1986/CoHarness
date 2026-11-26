@@ -106,7 +106,7 @@ export function TerminalsPage() {
       {loading ? <LoadingState label={t('loadingInventory')} /> : null}
       {inventory === null ? null : <>
         <p className="muted">{t('nodeLine', { node: inventory.nodeId })} · {inventory.generation === null ? t('instanceStopped') : t('instanceGeneration', { generation: String(inventory.generation) })}</p>
-        {inventory.terminals.length === 0 ? <p>{t('empty')}</p> : <div className="tableWrap"><table className="dataTable" aria-label={t('tableAria')}>
+        {inventory.terminals.length === 0 ? <p>{t('empty')}</p> : <div className="tableWrap" role="region" aria-label={t('tableAria')} tabIndex={0}><table className="dataTable" aria-label={t('tableAria')}>
           <thead><tr><th>{t('columnTerminal')}</th><th>{t('columnSession')}</th><th>{t('columnCreator')}</th><th>{t('columnStatus')}</th><th>{t('columnActions')}</th></tr></thead>
           <tbody>{inventory.terminals.map(entry => <tr key={`${entry.ownerId}:${entry.id}`}>
             <td className="terminalIdentity">{entry.id}</td><td className="terminalIdentity">{entry.sessionId}</td><td>{entry.creatorUserId === undefined ? t('localOperator') : t('creatorUser', { id: String(entry.creatorUserId) })}</td><td><StatusBadge tone={entry.state === 'running' ? 'success' : entry.state === 'failed' ? 'danger' : 'neutral'}>{labels[entry.state]}</StatusBadge></td>

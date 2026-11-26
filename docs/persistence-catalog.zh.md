@@ -801,7 +801,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'model/selection': ModelSelection
 ```
 
-来源：[`packages/host/apiproxy/src/api/sessions.ts:75`](../packages/host/apiproxy/src/api/sessions.ts)
+来源：[`packages/host/apiproxy/src/api/sessions.ts:81`](../packages/host/apiproxy/src/api/sessions.ts)
 
 ### `permission/*`
 
@@ -2447,7 +2447,7 @@ SHA-256: `58015da1c1950a66daf66ae24913d6a1fc6d1d9ac441b155f8847f7f8584ba8e`
 
 SHA-256: `844e2decba6e7c717c04484888eb8c1ee5c1f38e613e9aa8ce7dbe95e53b2e64`
 
-来源：[`packages/host/apiproxy/src/api/sessions.ts:99`](../packages/host/apiproxy/src/api/sessions.ts)
+来源：[`packages/host/apiproxy/src/api/sessions.ts:105`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -2464,7 +2464,7 @@ SHA-256: `844e2decba6e7c717c04484888eb8c1ee5c1f38e613e9aa8ce7dbe95e53b2e64`
 
 SHA-256: `f7e8c6fddd59fe7ecec72b632ae599cbad848dcc487be86881da11c156be7697`
 
-来源：[`packages/host/apiproxy/src/api/sessions.ts:104`](../packages/host/apiproxy/src/api/sessions.ts)
+来源：[`packages/host/apiproxy/src/api/sessions.ts:110`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -2498,7 +2498,7 @@ SHA-256: `2d0824a21ab540965bb50739bd53ead76c452e42a4ce9c4d31f94459a1e18223`
 
 SHA-256: `1e788d9e90f320b51cba113f9dbed35cae28a903fec07a9cd4c52605d2a0c0dd`
 
-来源：[`packages/attachment/userdoc/src/types.ts:469`](../packages/attachment/userdoc/src/types.ts)
+来源：[`packages/attachment/userdoc/src/types.ts:472`](../packages/attachment/userdoc/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -2511,7 +2511,7 @@ SHA-256: `1e788d9e90f320b51cba113f9dbed35cae28a903fec07a9cd4c52605d2a0c0dd`
 
 SHA-256: `275a4fcdb1adac21ee846fc5b6dcd16c6808a3969c53ca22008c6b076f729dfe`
 
-来源：[`packages/attachment/userdoc/src/types.ts:470`](../packages/attachment/userdoc/src/types.ts)
+来源：[`packages/attachment/userdoc/src/types.ts:473`](../packages/attachment/userdoc/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -2545,7 +2545,7 @@ SHA-256: `de4d0da9d9b46f42f9c05e72d6a469a83ac00d89aed6d1a1a0311206cd9666ba`
 
 SHA-256: `11e15542af87e45e8f0f1e133f03e1e0effb99b719a8c2a1cea677a18325f083`
 
-来源：[`packages/host/apiproxy/src/api/sessions.ts:29`](../packages/host/apiproxy/src/api/sessions.ts)
+来源：[`packages/host/apiproxy/src/api/sessions.ts:35`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -2571,7 +2571,7 @@ SHA-256: `efb42e4ced4fa4e9deea742f9f29b0f190e7adcf0bca003d53e09196b3d3cae1`
 
 SHA-256: `c04ca7d7d5b7733834cbc49bf8c396c7d07dd9ec5f4537e45cefd44f8d2df965`
 
-来源：[`packages/context/collaboration/src/types.ts:25`](../packages/context/collaboration/src/types.ts) · [`packages/host/apiproxy/src/api/sessions.ts:28`](../packages/host/apiproxy/src/api/sessions.ts)
+来源：[`packages/context/collaboration/src/types.ts:25`](../packages/context/collaboration/src/types.ts) · [`packages/host/apiproxy/src/api/sessions.ts:34`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7110,7 +7110,7 @@ SHA-256: `a18793d20069aede5679021249b2f1adf2e8a52bbf90f4195ee78fbfd9dc2200`
 
 SHA-256: `6ac1c7d714001a06351d7d757961ef80283e57dcb27943feff64563ba5793716`
 
-来源：[`packages/attachment/userdoc/src/types.ts:473`](../packages/attachment/userdoc/src/types.ts)
+来源：[`packages/attachment/userdoc/src/types.ts:476`](../packages/attachment/userdoc/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7123,7 +7123,7 @@ SHA-256: `6ac1c7d714001a06351d7d757961ef80283e57dcb27943feff64563ba5793716`
 
 SHA-256: `c26f1a79f347ec7b53d88296f7f94ab1cdb173556ee93db6c57734e171839491`
 
-来源：[`packages/attachment/userdoc/src/types.ts:468`](../packages/attachment/userdoc/src/types.ts)
+来源：[`packages/attachment/userdoc/src/types.ts:471`](../packages/attachment/userdoc/src/types.ts)
 
 以下类型之一：
 
@@ -7892,7 +7892,7 @@ SHA-256: `a6b41f5bede8094d7bf635be5d69b1bd7a25e006ca9cf9415bceb9322f1a7feb`
 
 SHA-256: `ac21aa6c9ecfc9c18ab4e0a1759e1396e29be4f15b3e65250af5f6df01d31794`
 
-来源：[`packages/host/apiproxy/src/api/sessions.ts:22`](../packages/host/apiproxy/src/api/sessions.ts)
+来源：[`packages/host/apiproxy/src/api/sessions.ts:28`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7908,7 +7908,7 @@ SHA-256: `ac21aa6c9ecfc9c18ab4e0a1759e1396e29be4f15b3e65250af5f6df01d31794`
 
 SHA-256: `f09e5e7acf5ff5ccd193ff2eeec015fa2ff7c29d98bc465f8c3302058d47e29b`
 
-来源：[`packages/host/apiproxy/src/api/sessions.ts:190`](../packages/host/apiproxy/src/api/sessions.ts)
+来源：[`packages/host/apiproxy/src/api/sessions.ts:200`](../packages/host/apiproxy/src/api/sessions.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|

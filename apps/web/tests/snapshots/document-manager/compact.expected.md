@@ -5,27 +5,26 @@
       - img
     - button "Close":
       - img
-  - button "Personal documents":
+  - button "Personal documents Visible only to you":
     - strong: Personal documents
+    - text: Visible only to you
     - img
   - status:
-    - text: Project scopes could not be refreshed; showing the last result
+    - text: Some locations need refreshing
     - button "Retry"
-  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
   - navigation "Document path":
-    - button "Root folder" [disabled]
-  - group "Document filters":
-    - img
-    - textbox "Search document name"
+    - heading "Root folder" [level=3]
   - group "Document actions":
     - button "Upload Document":
       - img
       - text: Upload
     - button "More actions":
       - img
-      - text: More
+  - group "Document filters":
+    - img
+    - textbox "Search document name"
   - checkbox "Select this page"
-  - text: Visible only to you 1 folders · 2 documents
+  - text: "Folders: 1 · Documents: 2"
   - list "Document Manager":
     - listitem:
       - button "Open folder reports": reports
@@ -35,15 +34,13 @@
       - text: 2026-08-16
       - listitem:
         - checkbox "notes.txt"
-        - button "Preview notes.txt": notes.txt 30.0 KB · 2026-08-16
-        - button "Add notes.txt to conversation" [disabled]: Add to conversation
+        - button "Preview notes.txt": notes.txt 30.0 KB
         - 'button "More actions: notes.txt"':
           - img
     - group "Upload date 2026-08-14":
       - text: 2026-08-14
       - listitem:
         - checkbox "brief.txt"
-        - button "Preview brief.txt": brief.txt 21 B · 2026-08-14
-        - button "Add brief.txt to conversation" [disabled]: Add to conversation
+        - button "Preview brief.txt": brief.txt 21 B
         - 'button "More actions: brief.txt"':
           - img

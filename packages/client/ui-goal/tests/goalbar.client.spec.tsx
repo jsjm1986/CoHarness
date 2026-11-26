@@ -195,19 +195,25 @@ describe('GoalBar', () => {
     }
   })
 
-  it('blocked goal: "受阻的目标" with the block reason as the strip tooltip', () => {
+  it('puts the blocked reason in a native disclosure beside the goal controls', () => {
     const actions = makeActions()
     const goal = makeGoal({ phase: 'blocked', blockedReason: { code: 'stalled', message: 'No progress in 3 rounds' } })
     render(<GoalBar goal={goal} {...actions} t={t} />)
     expect(screen.getByText('受阻的目标')).toBeTruthy()
-    expect(screen.getByText('受阻的目标').closest('[title]')?.getAttribute('title')).toBe('No progress in 3 rounds')
+    const summary = screen.getByText('查看受阻原因')
+    expect(summary.tagName).toBe('SUMMARY')
+    expect(summary.parentElement?.tagName).toBe('DETAILS')
+    expect(summary.parentElement?.hasAttribute('open')).toBe(false)
+    expect(screen.getByText('No progress in 3 rounds').closest('details')).toBe(summary.parentElement)
+    expect(screen.getByText('受阻的目标').closest('[title]')).toBeNull()
   })
 
-  it('blocked goal without a reason carries no tooltip', () => {
+  it('omits the reason disclosure when the blocked goal has no reason', () => {
     const actions = makeActions()
     render(<GoalBar goal={makeGoal({ phase: 'blocked' })} {...actions} t={t} />)
     expect(screen.getByText('受阻的目标')).toBeTruthy()
     expect(screen.getByText('受阻的目标').closest('[title]')).toBeNull()
+    expect(screen.queryByText('查看受阻原因')).toBeNull()
   })
 
   it('keeps the edit draft open and reports a failed save', async () => {

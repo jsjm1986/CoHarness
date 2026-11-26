@@ -71,6 +71,54 @@ describe('createUserDocClient', () => {
     expect(await createUserDocClient().list(signal)).toBeUndefined()
   })
 
+  it('publishes a fragmented overview frame before the terminal page and keeps the authorized URL', async () => {
+    const nodeId = '10000000-0000-4000-8000-000000000001' as NonNullable<UserDocScope['nodeId']>
+    const page = { version: 1, documents: [{ name: '文档.txt' }], totalDocuments: 1 }
+    const frame = (type: string, fields: object) => new TextEncoder().encode(JSON.stringify({ type, ...fields }) + '\n')
+    const bytes = frame('progress', { page, pending: 1 })
+    const split = bytes.findIndex(byte => byte > 127) + 1
+    const sent = Promise.withResolvers<undefined>()
+    let body!: ReadableStreamDefaultController<Uint8Array>
+    const stream = new ReadableStream<Uint8Array>({ start(controller) {
+      body = controller
+      controller.enqueue(bytes.subarray(0, split))
+      controller.enqueue(bytes.subarray(split))
+    } })
+    const fetch = vi.fn(async () => new Response(stream, { headers: { 'content-type': 'application/x-ndjson' } }))
+    vi.stubGlobal('fetch', fetch)
+    const signal = new AbortController().signal
+    const progress = vi.fn(() => { sent.resolve(undefined) })
+    const client = createUserDocClient(url => `${url}&dshPrincipal=17`, () => ({ kind: 'personal', nodeId }))
+    const read = client.overviewProgress!({ query: '文档', limit: 20 }, signal, progress)
+    await sent.promise
+    expect(progress).toHaveBeenCalledWith(page, 1)
+    expect(fetch).toHaveBeenCalledWith('/account/api/documents/overview?limit=20&q=%E6%96%87%E6%A1%A3&dshPrincipal=17', {
+      cache: 'no-store', signal, headers: { accept: 'application/x-ndjson' },
+    })
+    const final = { ...page, documents: [{ name: '远程.txt' }], totalDocuments: 2, nextCursor: 'next' }
+    body.enqueue(frame('complete', { page: final }))
+    body.close()
+    expect(await read).toEqual(final)
+  })
+
+  it('cancels an unfinished overview stream when its request is superseded', async () => {
+    const nodeId = '10000000-0000-4000-8000-000000000001' as NonNullable<UserDocScope['nodeId']>
+    const cancelled = vi.fn()
+    const started = Promise.withResolvers<undefined>()
+    const response = new Response(new ReadableStream<Uint8Array>({ pull: () => { started.resolve(undefined) }, cancel: cancelled }),
+      { headers: { 'content-type': 'application/x-ndjson' } })
+    vi.stubGlobal('fetch', vi.fn(async () => response))
+    const controller = new AbortController()
+    const progress = vi.fn()
+    const read = createUserDocClient(undefined, () => ({ kind: 'personal', nodeId })).overviewProgress!({}, controller.signal, progress)
+    const rejected = expect(read).rejects.toMatchObject({ name: 'AbortError' })
+    await started.promise
+    controller.abort()
+    await rejected
+    expect(progress).not.toHaveBeenCalled()
+    expect(cancelled).toHaveBeenCalledOnce()
+  })
+
   it('maps an unstructured 404 to unavailable and preserves structured document errors', async () => {
     const client = createUserDocClient()
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404, text: async () => '{}' })))

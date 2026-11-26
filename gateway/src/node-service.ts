@@ -17,6 +17,8 @@ import type { PostgresNodeAccessService } from './postgres/node-access-service.t
 /** Independent connection budgets leave the control channel available during bulk transfer. */
 export interface NodeServiceConfig {
   forwarding: boolean
+  /** The current primary can authorize and revalidate personal history on its managed transport. */
+  preparedReadDelegation?: true
   maxConnections: number
   maxPerNode: number
   connectTimeoutMs: number
@@ -24,6 +26,7 @@ export interface NodeServiceConfig {
   httpMaxIdleConnections: number
   httpMaxIdlePerNode: number
   httpMaxPendingRequests: number
+  httpMaxPendingPerNode: number
   httpQueueTimeoutMs: number
 }
 
@@ -35,7 +38,7 @@ export interface NodeServiceRequest {
 
 /** A node connection opens only its operator-configured local Gateway. */
 export interface NodeServiceChannels {
-  requestService(nodeId: RuntimeNodeId, id: NodeProbeId, release: string | null,
+  requestService(nodeId: RuntimeNodeId, id: NodeProbeId,
     failed: (error: unknown) => void, signal: AbortSignal): Promise<NodeServiceRequest>
 }
 
@@ -68,18 +71,23 @@ function setting(env: NodeJS.ProcessEnv, key: string, fallback: number): number 
 export function loadNodeServiceConfig(env: NodeJS.ProcessEnv): NodeServiceConfig {
   const forwarding = env.HGW_NODE_SERVICE_FORWARDING ?? 'off'
   if (forwarding !== 'on' && forwarding !== 'off') throw new Error('HGW_NODE_SERVICE_FORWARDING must be on or off')
+  const prepared = env.HGW_NODE_SERVICE_PREPARED_READ_DELEGATION ?? 'off'
+  if (prepared !== 'on' && prepared !== 'off') throw new Error('HGW_NODE_SERVICE_PREPARED_READ_DELEGATION must be on or off')
   const maxConnections = setting(env, 'HGW_NODE_SERVICE_MAX_CONNECTIONS', 64)
   const maxPerNode = setting(env, 'HGW_NODE_SERVICE_MAX_PER_NODE', 16)
   if (maxPerNode > maxConnections) throw new Error('HGW_NODE_SERVICE_MAX_PER_NODE must not exceed HGW_NODE_SERVICE_MAX_CONNECTIONS')
-  const httpMaxIdleConnections = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS', Math.min(16, maxConnections))
-  const httpMaxIdlePerNode = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE', Math.min(2, maxPerNode, httpMaxIdleConnections))
+  const httpMaxIdleConnections = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_CONNECTIONS', Math.min(32, maxConnections))
+  const httpMaxIdlePerNode = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_IDLE_PER_NODE', Math.min(6, maxPerNode, httpMaxIdleConnections))
   if (httpMaxIdleConnections > maxConnections || httpMaxIdlePerNode > maxPerNode || httpMaxIdlePerNode > httpMaxIdleConnections) {
     throw new Error('Node service HTTP idle limits must fit the global and per-node connection limits')
   }
-  return { forwarding: forwarding === 'on', maxConnections, maxPerNode, connectTimeoutMs: setting(env, 'HGW_NODE_SERVICE_CONNECT_TIMEOUT_MS', 10_000),
+  const httpMaxPendingRequests = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS', 256)
+  const httpMaxPendingPerNode = setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE', Math.min(httpMaxPendingRequests, 32))
+  if (httpMaxPendingPerNode > httpMaxPendingRequests) throw new Error('HGW_NODE_SERVICE_HTTP_MAX_PENDING_PER_NODE must not exceed HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS')
+  return { forwarding: forwarding === 'on', ...(prepared === 'on' ? { preparedReadDelegation: true as const } : {}),
+    maxConnections, maxPerNode, connectTimeoutMs: setting(env, 'HGW_NODE_SERVICE_CONNECT_TIMEOUT_MS', 10_000),
     httpIdleTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_IDLE_TIMEOUT_MS', 30_000), httpMaxIdleConnections, httpMaxIdlePerNode,
-    httpMaxPendingRequests: setting(env, 'HGW_NODE_SERVICE_HTTP_MAX_PENDING_REQUESTS', 256),
-    httpQueueTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS', 60_000) }
+    httpMaxPendingRequests, httpMaxPendingPerNode, httpQueueTimeoutMs: setting(env, 'HGW_NODE_SERVICE_HTTP_QUEUE_TIMEOUT_MS', 60_000) }
 }
 
 /** One center's transport owner; HTTP/user authorization belongs to the existing Gateway request path. */
@@ -100,11 +108,9 @@ export class GatewayNodeServices {
    * @param authority - current enrolled credential and exact lease verification.
    * @param channels - owned outbound node control channels.
    * @param config - validated connection admission and acquisition deadlines.
-   * @param release - center release identity; null permits source development compositions.
    */
   constructor(private readonly authority: Pick<PostgresNodeAccessService, 'authorizeChannel'>,
-    private readonly channels: NodeServiceChannels, private readonly config: NodeServiceConfig,
-    private readonly release: string | null) {}
+    private readonly channels: NodeServiceChannels, private readonly config: NodeServiceConfig) {}
 
   private track<T>(operation: Promise<T>): Promise<T> {
     this.work.add(operation)
@@ -182,7 +188,7 @@ export class GatewayNodeServices {
       this.connections.set(id, connection)
       this.perNode.set(nodeId, (this.perNode.get(nodeId) ?? 0) + 1)
       owner.addEventListener('abort', abort, { once: true })
-      void this.track(this.channels.requestService(nodeId, id, this.release, connection.fail, owner).then(request => {
+      void this.track(this.channels.requestService(nodeId, id, connection.fail, owner).then(request => {
         if (connection.finished) request.dispose()
         else { connection.lease = request.lease; connection.request = request }
       }, connection.fail))
@@ -192,7 +198,7 @@ export class GatewayNodeServices {
   /**
    * Recheck an idle transport's exact credential and connection lease before another HTTP request.
    * @param stream - previously admitted service transport.
-   * @returns after current center authority accepts the same node connection and epoch.
+   * @returns after the exact lease is confirmed by the current authority.
    */
   revalidate(stream: Duplex): Promise<void> {
     const connection = this.streamOwners.get(stream)

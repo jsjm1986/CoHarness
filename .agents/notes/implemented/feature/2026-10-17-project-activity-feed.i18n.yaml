@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-project-activity-feed.md
 document:
-  en: 399d01423a5057e19b3f24893b0fe73f7bbd306f
-  zh: 5b4d93bce051efe9ae89a571ac28a94ce82fca7c
+  en: 975dcc71c8f5d59ff6fffbbab31ab03cc5e42ab6
+  zh: 728b2f431925ea64dfdef3773d09a22844f7e522
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input:
   en: 032f3b6dc17cbb4f
   zh: a67b58c5bcc837c9
@@ -12,8 +12,8 @@ document:
   en: 355eb700fcfe1102
   zh: 98808c588911a8b3
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision:
-  en: e9c9d8d83951e419
-  zh: 3c82803db6e0a4c6
+  en: 0b6ed7f45fd8ac26
+  zh: f578bc46d9165e2a
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/recorded-content:
   en: 7fcbadc963f4bb84
   zh: 0e14415761743834
@@ -21,11 +21,11 @@ document:
   en: 7674f9c22b2bb65b
   zh: 745b08da9d549e66
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/server-surface:
-  en: eca6f107fdde122d
-  zh: cd14d03ac62bf0b4
+  en: 7fd35b8966d4be39
+  zh: adf498ab13bd080b
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/client-surface:
-  en: 0389dba712426b07
-  zh: 8a88fc0b4d071d18
+  en: 998369679800ba9a
+  zh: 1bcb45d255f670ee
 /agent-note-project-activity-feed-a-human-facing-record-of-member-input/decision/presentation-reviewed-html-mock:
   en: 12b1f3dbee3eb215
   zh: e4207996ee9c3211

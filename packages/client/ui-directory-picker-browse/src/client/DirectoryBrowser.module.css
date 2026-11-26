@@ -207,6 +207,7 @@
  * hidden, the effect pins the child pane into view) instead of squeezing
  * the panes. */
 .column {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -426,6 +427,23 @@
   }
 }
 
+@media (min-width: 480px) and (max-width: 767px) and (max-height: 480px) {
+  .footerGap { flex: 1 1 0; }
+  .footerAction { flex: none; }
+  .content { padding-block: var(--dsw-space-2); }
+}
+
+@media (max-height: 480px) {
+  .dialog.dialog {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .content {
+    flex: 1 0 calc(var(--dsw-touch-target) * 2);
+  }
+}
+
 /* Nested create dialog (figma 813:23278): a small centered card. */
 .createDialog.createDialog {
   width: min(380px, 100%);
@@ -436,8 +454,11 @@
 .createBody {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   gap: var(--dsw-space-3);
   padding: 22px var(--dsw-space-6) var(--dsw-space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .createTitle {
@@ -457,6 +478,7 @@
 
 .createInput {
   box-sizing: border-box;
+  flex: none;
   width: 100%;
   height: 44px;
   padding: 7px 14px;
@@ -470,7 +492,8 @@
 }
 
 .createInput::placeholder {
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
+  opacity: 1;
 }
 
 .createActions {
@@ -479,4 +502,19 @@
   justify-content: flex-end;
   gap: var(--dsw-space-2);
   margin-top: var(--dsw-space-2);
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .pathInput,
+  .createInput { font-size: 16px; }
+
+  .row,
+  .crumb,
+  .crumbEditZone,
+  .showHiddenToggle { min-height: var(--dsw-touch-target); }
+}
+
+.createInput:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
 }

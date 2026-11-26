@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/webserver/README.md
 document:
-  en: d7fe691892f1562e16c123c09f5249cf26b92c96
-  zh: 83e579e406ea6bfd381c1e343b6287a69432b29a
+  en: f853cbf68a5b4ff321ed2b754f458ab9db363575
+  zh: 3cf575f6ed67a7f192c0398c98c825c3efd11658
 /:
   en: 6d29f2478cf20e93
   zh: 61495d48365178df
 /deepseek-ai-dsh-host-webserver:
-  en: 517b4b9c1a2215bc
-  zh: 55688ba894f5ee3a
+  en: 6e95e4404611dc9b
+  zh: 76d3a2576394fdf6
 /deepseek-ai-dsh-host-webserver/summary:
   en: 0d1ffed238b25446
   zh: 9f66adce1c593c53

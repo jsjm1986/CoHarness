@@ -32,6 +32,9 @@ export interface ConversationViewport {
    */
   setMode(mode: ConversationViewportMode): void
   /** Add a visible, unarchived root Session; duplicates focus the existing pane.
+   * A catalog-confirmed absent id is parked as an unavailable pane so the open
+   * intent still reports the conversation cannot load; an id the hydrated
+   * catalog cannot yet decide on is refused instead.
    * @param sessionId - Session from the current authenticated list.
    * @returns acceptance or the reason no pane was added.
    */
@@ -45,6 +48,8 @@ export interface ConversationViewport {
    */
   focus(sessionId: SessionId): void
   /** Replace the active pane, or focus the target if it is already pinned.
+   * A catalog-confirmed absent id is parked as an unavailable pane like `add`;
+   * an undecided id is refused as `unknown`.
    * @param sessionId - visible, unarchived root Session.
    * @returns acceptance or an unknown-session result; duplicates only focus.
    */

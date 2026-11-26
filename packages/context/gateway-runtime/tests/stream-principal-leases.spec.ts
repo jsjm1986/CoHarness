@@ -51,6 +51,22 @@ describe('event connection principal pool', () => {
     } finally { await f.pool.close() }
   })
 
+  it('renews the same stream after a transient failure within its original signed lifetime', async () => {
+    const f = fixture()
+    try {
+      const original = f.issue()
+      const handle = f.pool.open(original, new AbortController().signal)
+      f.renew.mockRejectedValueOnce(new Error('transport closed'))
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(handle.assertion).toBe(original.assertion)
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(f.renew.mock.calls.map(call => call[0])).toEqual([[original.claims.nonce], [original.claims.nonce]])
+      expect(handle.claims.expiresAt).toBe(55_000)
+      await vi.advanceTimersByTimeAsync(16_000)
+      expect(handle.signal?.aborted).toBe(false)
+    } finally { await f.pool.close() }
+  })
+
   it('sends at most one bounded batch at a time and schedules the remaining sockets', async () => {
     const f = fixture()
     try {
@@ -79,8 +95,9 @@ describe('event connection principal pool', () => {
       await vi.advanceTimersByTimeAsync(30_000)
       expect(handle.signal?.aborted).toBe(true)
       expect(f.pool.size).toBe(0)
-      expect(f.renew).toHaveBeenCalledTimes(1)
-      expect(f.unavailable).toHaveBeenCalledTimes(1)
+      const count = mode === 'lost' ? 2 : 4
+      expect(f.renew).toHaveBeenCalledTimes(count)
+      expect(f.unavailable).toHaveBeenCalledTimes(count)
     } finally { await f.pool.close() }
   })
 

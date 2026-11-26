@@ -1,7 +1,9 @@
 /** Explicit, operator-owned project recovery. Staging and proving retirement do not start the replacement Runtime. */
+import { confirmDisasterIsolation } from './peer-backup-disaster.ts'
 import { allocateInstancePorts } from './postgres/port-allocation.ts'
 import type { ProjectOrigin } from './projects.ts'
-import { checkPeerBackupNode } from './peer-backup-governance.ts'
+import { admittedRecoveryRead, assertRecoveryWorker } from './peer-backup-recovery-access.ts'
+import { checkPeerBackupNode,disableReplacedPeerSource,lockRecoveryTarget } from './peer-backup-governance.ts'
 import { lockRecoveryOwner, lockRecoveryPolicy } from './peer-backup-takeover-authority.ts'
 import type { PoolClient } from 'pg'
 import { z } from 'zod'
@@ -15,9 +17,12 @@ import { PeerBackupError } from './peer-backup-repository.ts'
 import type { PeerProjectFileGate } from './peer-backup-file-gate.ts'
 import { replacementFileDigest } from './peer-backup-file-digest.ts'
 import { readProjectScheduleWitness } from './peer-backup-takeover-schedule.ts'
+import { bindRecoveryExecutionTransfer, verifyRecoveryExecutionTransfer, type RecoveryExecutionTransfer } from './peer-backup-execution-transfer.ts'
+import { readRecoveryEnvironment } from './peer-recovery-environment.ts'
 
 export interface PeerRecoveryOperation {
   id: string
+  recoveryMode: 'planned' | 'disaster'
   filesDigest: string | null
   targetPortBase: number | null
   policyId: string
@@ -29,6 +34,8 @@ export interface PeerRecoveryOperation {
   projectId: string
   runtimeId: RuntimeId
   sourceNode: string
+  targetVerifiedAt: string | null
+  repositoryNode: string
   sourceVolume: string
   oldEpoch: string
   targetNode: string
@@ -40,19 +47,35 @@ export interface PeerRecoveryOperation {
   phase: string
   publicId: number
   scheduleDigest: string | null
+  suspendedEnvironmentKeys: string[]
+  executionTransfer?: RecoveryExecutionTransfer | null
+  targetExecutionTransferDigest?: string | null
 }
-const statusProjection = `r.id,r.project_id "projectId",r.runtime_id "runtimeId",r.point_id "pointId",r.source_node_id "sourceNodeId",
-  r.target_node_id "targetNodeId",r.phase,r.last_error "lastError",r.target_activated_at "targetActivatedAt",
+const statusProjection = `r.id,r.recovery_mode "recoveryMode",r.suspended_environment_keys "suspendedEnvironmentKeys",r.source_epoch::text "sourceEpoch",
+  (SELECT generation::text FROM harness.instances i WHERE i.organization_id=r.organization_id AND i.runtime_id=r.runtime_id) "sourceGeneration",
+  (SELECT json_build_object('method',a.method,'evidenceReference',a.evidence_reference,'confirmedAt',a.confirmed_at,'confirmedBy',u.public_id) FROM harness.project_recovery_isolations a JOIN harness.users u ON u.id=a.confirmed_by WHERE a.operation_id=r.id) isolation,
+  EXISTS(SELECT FROM harness.project_recovery_execution_holds h WHERE h.operation_id=r.id) "executionReviewRequired",
+  EXISTS(SELECT FROM harness.project_recovery_execution_transfers transfer WHERE transfer.operation_id=r.id) "executionPolicyTransferRequired",
+  coalesce((SELECT h.blockers FROM harness.project_recovery_execution_holds h WHERE h.operation_id=r.id),'[]'::jsonb) "executionBlockers",
+  r.recovery_mode='disaster' AND r.target_verified_at IS NOT NULL "schedulesSuspended",r.project_id "projectId",r.runtime_id "runtimeId",r.point_id "pointId",r.source_node_id "sourceNodeId",
+  r.repository_node_id "repositoryNodeId",r.target_node_id "targetNodeId",r.phase,
+  CASE WHEN r.phase<>'cancelled' AND r.target_activated_at IS NULL AND NOT harness.peer_recovery_worker_supported(r.organization_id,r.target_node_id,'project')
+    THEN 'peer-backup/recovery-worker-unavailable' ELSE r.last_error END "lastError",r.target_activated_at "targetActivatedAt",
   harness.recovery_policy_revision(r.id,r.policy_revision) "policyRevision",p.revision "currentPolicyRevision",p.enabled "policyEnabled",
   (p.revision<>harness.recovery_policy_revision(r.id,r.policy_revision) OR NOT p.enabled)
     AND r.phase<>'cancelled' AND r.target_activated_at IS NULL "reapprovalRequired",
   (r.phase='cancelled' AND NOT EXISTS(SELECT FROM harness.project_recovery_cleanups c WHERE c.operation_id=r.id)) "cleanupPending",
   (SELECT count(*)::float8 FROM harness.project_members m WHERE m.organization_id=r.organization_id AND m.project_id=r.project_id
     AND NOT harness.computer_use_allowed(r.organization_id,m.user_id,r.target_node_id)) "affectedMemberCount"`
-const projection = `r.id,r.target_files_digest "filesDigest",r.target_port_base "targetPortBase",r.policy_id "policyId",harness.recovery_policy_revision(r.id,r.policy_revision) "policyRevision",p.origin,p.logical_name_id "nameId",
+const projection = `r.id,r.target_verified_at "targetVerifiedAt",r.recovery_mode "recoveryMode",r.target_execution_transfer_digest "targetExecutionTransferDigest",r.suspended_environment_keys "suspendedEnvironmentKeys",r.target_files_digest "filesDigest",r.target_port_base "targetPortBase",r.policy_id "policyId",harness.recovery_policy_revision(r.id,r.policy_revision) "policyRevision",p.origin,p.logical_name_id "nameId",
   (SELECT public_id::float8 FROM harness.users WHERE id=harness.recovery_retirement_actor(r.id,r.retirement_approved_by,r.retirement_approved_at) AND organization_id=r.organization_id) "retirementActor",r.organization_id "organizationId",r.project_id "projectId",r.runtime_id "runtimeId",r.source_node_id "sourceNode",r.source_volume_id "sourceVolume",
-  r.source_epoch::text "oldEpoch",r.target_node_id "targetNode",r.target_volume_id "targetVolume",r.target_epoch::text "newEpoch",r.point_id "pointId",
-  r.point_revision::text revision,r.manifest_digest digest,r.phase,p.public_id::float8 "publicId",r.target_schedule_digest "scheduleDigest"`
+  r.repository_node_id "repositoryNode",r.source_epoch::text "oldEpoch",r.target_node_id "targetNode",r.target_volume_id "targetVolume",r.target_epoch::text "newEpoch",r.point_id "pointId",
+  r.point_revision::text revision,r.manifest_digest digest,r.phase,p.public_id::float8 "publicId",r.target_schedule_digest "scheduleDigest",
+  (SELECT json_build_object('operationId',review.operation_id,'reviewId',review.id,'sha256',review.policy_digest,
+    'oldSessionCount',review.old_session_count) FROM harness.project_recovery_execution_transfers transfer
+    JOIN LATERAL(SELECT id,operation_id,policy_digest,old_session_count FROM harness.project_recovery_execution_reviews WHERE id=transfer.source_review_id
+      UNION ALL SELECT id,operation_id,policy_digest,old_session_count FROM harness.governance_rebuild_execution_reviews
+      WHERE id=transfer.source_governance_review_id) review ON true WHERE transfer.operation_id=r.id) "executionTransfer"`
 type Volume = Pick<NodeContentStore, 'readVolume' | 'writeVolume'>
 interface Limits {
   maxBytes: number
@@ -127,15 +150,19 @@ export class PeerProjectRecovery {
       return status ?? denied('recovery-not-found')
     })
   }
-  /** Offer only this policy's designated destination and never accept a browser-provided data path. */
+  /** Offer registered replacement volumes admitted for this scope; browser input never supplies a data path. */
   async choices(actor: number, policyId: string) {
     z.uuid().parse(policyId)
     return this.admin(actor, async (tx) => {
       const targets = (
         await tx.query<{ nodeId: string; volumeId: string }>(
           `SELECT v.node_id "nodeId",v.volume_id "volumeId" FROM harness.peer_backup_policies p
-        JOIN harness.node_content_volumes v ON v.organization_id=p.organization_id AND v.node_id=p.target_node_id
-        WHERE p.organization_id=$1 AND p.id=$2 AND p.scope_kind='project' AND p.enabled`,
+        JOIN harness.node_content_volumes v ON v.organization_id=p.organization_id AND v.node_id<>p.source_node_id
+        JOIN harness.projects project ON project.organization_id=p.organization_id AND project.id=p.scope_id AND project.status='active' AND project.kind='standard'
+        LEFT JOIN harness.users owner ON owner.id=project.owner_user_id AND owner.organization_id=p.organization_id AND owner.status='active' AND owner.deleted_at IS NULL
+        LEFT JOIN harness.computer_use_permissions g ON g.organization_id=p.organization_id AND g.user_id=owner.id AND g.node_id=v.node_id AND g.enabled
+        JOIN harness.compute_nodes node ON node.organization_id=p.organization_id AND node.id=v.node_id AND node.status='active'
+        WHERE p.organization_id=$1 AND p.id=$2 AND p.scope_kind='project' AND p.enabled AND (project.origin='admin' AND project.owner_user_id IS NULL OR owner.id IS NOT NULL AND g.enabled) AND harness.peer_recovery_worker_supported(p.organization_id,v.node_id,'project') AND harness.peer_recovery_destination_supported(p.organization_id,p.target_node_id)`,
           [this.context.organizationId, policyId],
         )
       ).rows
@@ -146,18 +173,25 @@ export class PeerProjectRecovery {
           [this.context.organizationId, policyId],
         )
       ).rows
-      return { targets, attempts }
+      const repository=(await tx.query<{repositoryNodeId:string}>('SELECT target_node_id "repositoryNodeId" FROM harness.peer_backup_policies WHERE organization_id=$1 AND id=$2',[this.context.organizationId,policyId])).rows[0]
+      return { repositoryNodeId:repository?.repositoryNodeId, targets, attempts }
     })
   }
 
   /** Require the selected complete point and a successful independent rehearsal on the exact replacement computer. */
   async request(
     actor: number,
-    input: { requestId: string; policyId: string; pointId: string; targetNode: string; targetVolume: string },
+    input: { requestId: string; policyId: string; pointId: string; targetNode: string; targetVolume: string; recoveryMode?: 'planned' | 'disaster' },
   ) {
-    for (const id of Object.values(input)) z.uuid().parse(id)
+    for (const id of [input.requestId,input.policyId,input.pointId,input.targetNode,input.targetVolume]) z.uuid().parse(id)
+    const mode = z.enum(['planned','disaster']).parse(input.recoveryMode ?? 'planned')
     return this.admin(actor, async (tx) => {
-      await checkPeerBackupNode(tx, this.context.organizationId, input.targetNode, true)
+      if (mode==='disaster' && (await tx.query(`SELECT FROM harness.peer_backup_policies WHERE organization_id=$1 AND id=$2 AND source_node_id=$3`,
+        [this.context.organizationId,input.policyId,this.context.nodeId])).rowCount) denied('isolation-primary-forbidden')
+      await lockRecoveryTarget(tx, this.context.organizationId, input.targetNode)
+      await assertRecoveryWorker(tx,this.context.organizationId,input.policyId,input.targetNode)
+      const policy=(await tx.query<{target_node_id:string}>('SELECT target_node_id FROM harness.peer_backup_policies WHERE organization_id=$1 AND id=$2',[this.context.organizationId,input.policyId])).rows[0]
+      if(policy && policy.target_node_id!==input.targetNode)await admittedRecoveryRead(tx,this.context.organizationId,input.policyId,input.targetNode,undefined,input.pointId)
       await tx.query('SELECT FROM harness.peer_backup_policies WHERE organization_id=$1 AND id=$2 FOR SHARE',
         [this.context.organizationId,input.policyId])
       if ((await tx.query(`SELECT FROM harness.project_recovery_operations r JOIN harness.peer_backup_policies p ON p.id=$2
@@ -166,16 +200,16 @@ export class PeerProjectRecovery {
         [this.context.organizationId,input.policyId,input.targetNode,input.targetVolume,input.requestId])).rowCount) denied('recovery-cleanup-pending')
       const inserted = await tx.query(
         `INSERT INTO harness.project_recovery_operations(id,organization_id,project_id,runtime_id,policy_id,
-        point_id,policy_revision,approved_by,source_node_id,source_volume_id,source_epoch,target_node_id,target_volume_id,target_epoch,manifest_digest,point_revision,phase)
+        point_id,policy_revision,approved_by,source_node_id,source_volume_id,source_epoch,target_node_id,target_volume_id,target_epoch,manifest_digest,point_revision,phase,recovery_mode)
         SELECT $3,b.organization_id,b.project_id,b.runtime_id,p.id,q.id,p.revision,u.id,b.node_id,b.volume_id,b.writer_epoch,$6,$7,b.writer_epoch+1,
-          q.manifest_digest,q.watermark,'prepared' FROM harness.peer_backup_points q JOIN harness.peer_backup_policies p ON p.id=q.policy_id AND p.organization_id=q.organization_id
+          q.manifest_digest,q.watermark,CASE WHEN $8='disaster' THEN 'preparing' ELSE 'prepared' END,$8 FROM harness.peer_backup_points q JOIN harness.peer_backup_policies p ON p.id=q.policy_id AND p.organization_id=q.organization_id
         JOIN harness.project_content_placement b ON b.organization_id=p.organization_id AND b.project_id=p.scope_id AND b.node_id=p.source_node_id
           AND b.writer_epoch=q.writer_epoch JOIN harness.users u ON u.organization_id=b.organization_id AND u.public_id=$2
         JOIN harness.node_content_volumes destination ON destination.organization_id=b.organization_id AND destination.node_id=$6 AND destination.volume_id=$7
         WHERE b.organization_id=$1 AND b.source_retirement IN ('new','retired') AND p.id=$4 AND q.id=$5 AND p.enabled AND p.scope_kind='project' AND q.gap_count=0 AND b.node_id<>$6
-          AND p.revision=q.revision AND p.target_node_id=$6 AND harness.node_execution_available(b.organization_id,$6)
+          AND ($8<>'disaster' OR b.node_id<>$9) AND p.revision=q.revision AND harness.node_execution_available(b.organization_id,$6)
           AND EXISTS(SELECT FROM harness.projects project WHERE project.organization_id=b.organization_id AND project.id=b.project_id
-            AND project.kind='standard' AND project.status='active' AND harness.computer_use_allowed(project.organization_id,project.owner_user_id,$6)) AND EXISTS(SELECT FROM harness.peer_backup_work w WHERE w.kind='drill'
+            AND project.kind='standard' AND project.status='active' AND (project.origin='admin' AND project.owner_user_id IS NULL OR harness.computer_use_allowed(project.organization_id,project.owner_user_id,$6))) AND EXISTS(SELECT FROM harness.peer_backup_work w WHERE w.kind='drill'
             AND w.point_id=q.id AND w.policy_id=p.id AND w.node_id=$6 AND w.revision=p.revision AND w.status='confirmed')
         ON CONFLICT(id) DO NOTHING RETURNING id`,
         [
@@ -185,7 +219,7 @@ export class PeerProjectRecovery {
           input.policyId,
           input.pointId,
           input.targetNode,
-          input.targetVolume,
+          input.targetVolume,mode,this.context.nodeId,
         ],
       ).catch((error: unknown) => {
         // ON CONFLICT covers only the request id; one_project_takeover rejects
@@ -199,14 +233,14 @@ export class PeerProjectRecovery {
         !(
           await tx.query(
             `SELECT FROM harness.project_recovery_operations r WHERE r.organization_id=$1 AND r.id=$2
-        AND r.policy_id=$3 AND r.point_id=$4 AND r.target_node_id=$5 AND r.target_volume_id=$6`,
+        AND r.policy_id=$3 AND r.point_id=$4 AND r.target_node_id=$5 AND r.target_volume_id=$6 AND r.recovery_mode=$7`,
             [
               this.context.organizationId,
               input.requestId,
               input.policyId,
               input.pointId,
               input.targetNode,
-              input.targetVolume,
+              input.targetVolume,mode,
             ],
           )
         ).rowCount
@@ -215,9 +249,25 @@ export class PeerProjectRecovery {
       const identity = (await tx.query<{project_id:string}>('SELECT project_id FROM harness.project_recovery_operations WHERE organization_id=$1 AND id=$2',
         [this.context.organizationId,input.requestId])).rows[0]
       if (!identity) denied('verified-candidate-required')
+      if (mode === 'planned' && inserted.rowCount) await bindRecoveryExecutionTransfer(tx, this.context.organizationId, input.requestId)
       await lockRecoveryOwner(tx,{organizationId:this.context.organizationId,projectId:identity!.project_id,targetNode:input.targetNode})
       await this.audit(tx, actor, 'request', input.requestId)
       return input.requestId
+    })
+  }
+  /** Record physical isolation without claiming to have read or stopped the unreachable source.
+   * @param actor - authenticated administrator candidate.
+   * @param id - immutable recovery operation identifier.
+   * @param input - current coordinates and physical isolation confirmation from Admin.
+   */
+  async confirmIsolation(actor: number, id: string, input: unknown): Promise<void> {
+    const op = await this.get(id)
+    await this.admin(actor, async tx => {
+      await lockRecoveryPolicy(tx,op)
+      await checkPeerBackupNode(tx,op.organizationId,op.targetNode,true)
+      await lockRecoveryOwner(tx,op)
+      await confirmDisasterIsolation(tx,op,actor,this.context.nodeId,input)
+      await this.audit(tx,actor,'isolation-confirmed',id)
     })
   }
   /** Approve permanent source retirement only after an independently verified target is ready. */
@@ -240,11 +290,13 @@ export class PeerProjectRecovery {
   async reapprove(actor: number, id: string, revision: number, phase: string): Promise<void> {
     const op = await this.get(id)
     await this.admin(actor,async tx => {
+      await lockRecoveryTarget(tx,op.organizationId,op.targetNode)
+      if(op.repositoryNode!==op.targetNode)await admittedRecoveryRead(tx,op.organizationId,op.policyId,op.targetNode,undefined,op.pointId)
       const current = await tx.query(`SELECT FROM harness.peer_backup_policies p JOIN harness.project_recovery_operations r ON r.policy_id=p.id
         JOIN harness.peer_backup_points q ON q.id=r.point_id AND q.policy_id=p.id AND q.organization_id=r.organization_id
         WHERE r.organization_id=$1 AND r.id=$2 AND p.organization_id=r.organization_id AND p.enabled AND p.revision=$3 AND r.phase=$4
-        AND r.phase IN('prepared','target-ready','retire-approved','retiring','retreat','old-fenced','published') AND r.target_activated_at IS NULL
-        AND p.source_node_id=r.source_node_id AND p.target_node_id=r.target_node_id AND p.scope_id=r.project_id AND p.scope_kind='project'
+        AND r.phase IN('preparing','prepared','target-ready','retire-approved','retiring','retreat','old-fenced','published','externally-fenced','disaster-ready') AND r.target_activated_at IS NULL
+        AND p.source_node_id=r.source_node_id AND p.target_node_id=r.repository_node_id AND p.scope_id=r.project_id AND p.scope_kind='project'
         AND q.gap_count=0 AND q.manifest_digest=r.manifest_digest AND q.writer_epoch=r.source_epoch AND q.watermark=r.point_revision
         FOR SHARE OF p FOR UPDATE OF r`,[op.organizationId,id,revision,phase])
       if (!current.rowCount) denied('recovery-approval-changed')
@@ -278,7 +330,7 @@ export class PeerProjectRecovery {
         !(
           await tx.query(
             `UPDATE harness.project_recovery_operations SET phase='cancelled',retry_at=clock_timestamp(),last_error=NULL WHERE organization_id=$1 AND id=$2
-        AND phase IN ('prepared','target-ready','retire-approved')`,
+        AND phase IN ('preparing','prepared','target-ready','retire-approved')`,
             [this.context.organizationId, id],
           )
         ).rowCount
@@ -325,7 +377,7 @@ export class PeerProjectRecovery {
     })
   }
   /** A replacement cannot touch an assigned volume or any release belonging to another approval. */
-  async assertUnpublishedDestination(op:PeerRecoveryOperation,phase:'prepared'|'cancelled'):Promise<void>{
+  async assertUnpublishedDestination(op:PeerRecoveryOperation,phase:'preparing'|'prepared'|'cancelled'|'externally-fenced'):Promise<void>{
     if(op.organizationId!==this.context.organizationId || op.targetNode!==this.context.nodeId || !(await this.context.pool.query(
       `SELECT FROM harness.project_recovery_operations r JOIN harness.project_content_placement b ON b.organization_id=r.organization_id
         AND b.project_id=r.project_id AND b.runtime_id=r.runtime_id WHERE r.organization_id=$1 AND r.id=$2 AND r.phase=$3
@@ -348,7 +400,7 @@ export class PeerProjectRecovery {
     )
   }
 
-  private async targetFileProof(tx: PoolClient, op: PeerRecoveryOperation, signal: AbortSignal): Promise<void> {
+  private async targetFileProof(tx: PoolClient, op: PeerRecoveryOperation, signal: AbortSignal): Promise<{suspendedKeys:string[];transferDigest:string|null}> {
     const value = (
       await tx.query(
         `SELECT protected_roots,target_files_digest FROM node_content.recovery_candidates WHERE operation_id=$1
@@ -360,14 +412,18 @@ export class PeerProjectRecovery {
       .array(z.object({ owner: z.string(), kind: z.literal('directory'), path: z.string().min(1) }).strict())
       .length(4)
       .parse(value?.protected_roots)
+    const runtimeRoot = roots.find(root => root.owner === 'runtime')
+    if (!runtimeRoot) return denied('invalid-target-files')
+    const suspendedKeys = await readRecoveryEnvironment(runtimeRoot.path, this.limits.maxBytes)
     if ((await replacementFileDigest(roots, this.limits, signal)) !== value?.target_files_digest)
       denied('target-files-changed')
+    return {suspendedKeys,transferDigest:await verifyRecoveryExecutionTransfer(op,runtimeRoot.path,this.limits)}
   }
 
   /** The target owns a certified local candidate. Its captured schedule receipts must match its real restored Session messages. */
   async confirmTarget(id: string, signal: AbortSignal = new AbortController().signal): Promise<void> {
     const op = await this.get(id)
-    if (!this.volume || this.context.nodeId !== op.targetNode || !['prepared', 'target-ready'].includes(op.phase))
+    if (!this.volume || this.context.nodeId !== op.targetNode || !['preparing','prepared', 'target-ready','externally-fenced','disaster-ready'].includes(op.phase))
       denied('wrong-recovery-node')
     if (!this.fileGate) denied('target-file-fence-unavailable')
     await this.fileGate!.admit(op.publicId, async () => {
@@ -376,8 +432,8 @@ export class PeerProjectRecovery {
       if (!this.instancePortBase) denied('target-port-range-required')
       const proof = await this.volume!.readVolume(async (tx) => {
         const candidate = (
-          await tx.query<{ schedule_digest: string; files_digest: string }>(
-            `SELECT c.schedule_digest,c.files_digest FROM node_content.recovery_candidates c JOIN node_content.spaces s
+          await tx.query<{ schedule_digest: string; files_digest: string; target_files_digest: string }>(
+            `SELECT c.schedule_digest,c.files_digest,c.target_files_digest FROM node_content.recovery_candidates c JOIN node_content.spaces s
         ON s.organization_id=c.organization_id AND s.project_id=c.project_id AND s.runtime_id=c.runtime_id AND s.volume_id=c.destination_volume_id
         AND s.node_id=c.destination_node_id AND s.writer_epoch=c.destination_epoch
         WHERE c.operation_id=$1 AND c.point_id=$2 AND c.manifest_digest=$3 AND c.destination_node_id=$4 AND c.phase='verified'`,
@@ -385,27 +441,34 @@ export class PeerProjectRecovery {
           )
         ).rows[0]
         if (!candidate) denied('verified-candidate-required')
-        await this.targetFileProof(tx, op, signal)
+        const fileProof = await this.targetFileProof(tx, op, signal)
         const actual = await readProjectScheduleWitness(tx, target, this.limits)
         if (candidate!.schedule_digest !== actual) denied('schedule-witness-moved')
-        return { schedule: actual, files: candidate!.files_digest }
+        return { schedule: actual, files: op.recoveryMode==='disaster' ? candidate!.target_files_digest : candidate!.files_digest, ...fileProof }
       })
-      if (op.phase === 'target-ready') {
+      if (op.phase === 'target-ready' || op.phase === 'disaster-ready' || op.phase==='prepared' && op.recoveryMode==='disaster') {
         if (
           op.scheduleDigest !== proof.schedule ||
           op.filesDigest !== proof.files ||
-          op.targetPortBase !== this.instancePortBase
+          op.targetPortBase !== this.instancePortBase ||
+          (op.targetExecutionTransferDigest??null) !== proof.transferDigest ||
+          JSON.stringify(op.suspendedEnvironmentKeys) !== JSON.stringify(proof.suspendedKeys)
         )
           denied('schedule-witness-moved')
         return
       }
+      if(op.phase==='externally-fenced' && op.targetVerifiedAt!==null && (op.scheduleDigest!==proof.schedule || op.filesDigest!==proof.files ||
+        op.targetPortBase!==this.instancePortBase || JSON.stringify(op.suspendedEnvironmentKeys)!==JSON.stringify(proof.suspendedKeys)))denied('target-files-changed')
       const approved = await transaction(this.context.pool, async control => {
         await lockRecoveryPolicy(control,op)
-        return control.query(
-        `UPDATE harness.project_recovery_operations r SET phase='target-ready',target_verified_at=now(),target_schedule_digest=$3,target_files_digest=$4,target_port_base=$5,retry_at=now(),last_error=NULL
-      FROM harness.peer_backup_policies p WHERE r.organization_id=$1 AND r.id=$2 AND r.phase='prepared' AND p.id=r.policy_id AND p.enabled AND p.revision=harness.recovery_policy_revision(r.id,r.policy_revision)`,
-        [op.organizationId, id, proof.schedule, proof.files, this.instancePortBase],
+        await lockRecoveryTarget(control,op.organizationId,op.targetNode)
+        const updated=await control.query(
+        `UPDATE harness.project_recovery_operations r SET phase=CASE WHEN r.recovery_mode='disaster' THEN CASE WHEN r.phase='preparing' THEN 'prepared' ELSE 'disaster-ready' END ELSE 'target-ready' END,target_verified_at=coalesce(r.target_verified_at,now()),target_schedule_digest=$3,target_files_digest=$4,target_port_base=$5,suspended_environment_keys=$6::jsonb,target_execution_transfer_digest=$7,retry_at=now(),last_error=NULL
+      FROM harness.peer_backup_policies p WHERE r.organization_id=$1 AND r.id=$2 AND (r.phase='prepared' AND r.recovery_mode='planned' OR r.phase IN('preparing','externally-fenced') AND r.recovery_mode='disaster') AND p.id=r.policy_id AND p.enabled AND p.revision=harness.recovery_policy_revision(r.id,r.policy_revision)`,
+        [op.organizationId, id, proof.schedule, proof.files, this.instancePortBase, JSON.stringify(proof.suspendedKeys),proof.transferDigest],
         )
+        await checkPeerBackupNode(control,op.organizationId,op.targetNode,true)
+        return updated
       })
       if (!approved.rowCount) denied('recovery-approval-changed')
     })
@@ -602,14 +665,17 @@ export class PeerProjectRecovery {
     const op = await this.get(id)
     await this.admin(actor, async (tx) => {
       await lockRecoveryPolicy(tx,op)
-      await checkPeerBackupNode(tx, op.organizationId, op.targetNode, true)
+      await lockRecoveryTarget(tx, op.organizationId, op.targetNode)
       const held = await tx.query(
         `SELECT FROM harness.project_recovery_operations r JOIN harness.peer_backup_policies p ON p.id=r.policy_id AND p.enabled AND p.revision=harness.recovery_policy_revision(r.id,r.policy_revision)
         JOIN harness.instances i ON i.organization_id=r.organization_id AND i.runtime_id=r.runtime_id AND i.project_id=r.project_id
         JOIN harness.project_content_placement b ON b.organization_id=r.organization_id AND b.project_id=r.project_id
-        WHERE r.organization_id=$1 AND r.id=$2 AND r.phase='old-fenced' AND i.assigned_node_id=r.source_node_id AND i.desired_state='stopped' AND i.observed_state='stopped'
-          AND i.generation=r.stopped_generation AND i.runtime_token_hash IS NULL AND b.writer_epoch=r.source_epoch AND b.volume_id=r.source_volume_id
-          AND r.source_schedule_digest=r.target_schedule_digest AND harness.node_execution_available(r.organization_id,r.target_node_id)
+        WHERE r.organization_id=$1 AND r.id=$2 AND i.assigned_node_id=r.source_node_id AND i.desired_state='stopped' AND i.runtime_token_hash IS NULL
+          AND b.writer_epoch=r.source_epoch AND b.volume_id=r.source_volume_id AND (
+            r.recovery_mode='planned' AND r.phase='old-fenced' AND i.observed_state='stopped' AND i.generation=r.stopped_generation AND r.source_schedule_digest=r.target_schedule_digest
+            OR r.recovery_mode='disaster' AND r.phase='disaster-ready' AND EXISTS(SELECT FROM harness.project_recovery_isolations a
+              JOIN harness.node_recovery_quarantines q ON q.organization_id=a.organization_id AND q.node_id=a.source_node_id
+              WHERE a.operation_id=r.id AND a.source_generation=i.generation AND a.source_epoch=r.source_epoch AND a.point_id=r.point_id)) AND harness.node_execution_available(r.organization_id,r.target_node_id)
           AND NOT EXISTS(SELECT FROM harness.runtime_destructive_operations s WHERE s.organization_id=r.organization_id AND s.runtime_id=r.runtime_id)
           FOR UPDATE OF r,i,b NOWAIT`,
         [op.organizationId, id],
@@ -620,12 +686,15 @@ export class PeerProjectRecovery {
         throw error
       })
       if (!held.rowCount) denied('verified-writer-fence-required')
+      await tx.query(`INSERT INTO harness.project_recovery_execution_holds(operation_id,organization_id,runtime_id)
+        SELECT operation_id,organization_id,runtime_id FROM harness.project_recovery_execution_transfers
+        WHERE organization_id=$1 AND operation_id=$2 ON CONFLICT(operation_id) DO NOTHING`, [op.organizationId,id])
       await tx.query("UPDATE harness.project_recovery_operations SET phase='switching' WHERE id=$1", [id])
       await tx.query("SELECT set_config('hgw.recovery_operation',$1,true)", [id])
       if (!op.targetPortBase) denied('target-port-range-required')
       const [port] = await allocateInstancePorts(tx, op.targetNode, op.targetPortBase!, 1, op.targetNode)
       await tx.query(
-        `UPDATE harness.instances SET assigned_node_id=$3,port=$4,applied_policy_revision=0,node_connection_id=NULL,
+        `UPDATE harness.instances SET assigned_node_id=$3,port=$4,observed_state='stopped',applied_policy_revision=0,node_connection_id=NULL,
         node_connection_epoch=NULL,started_at=NULL,last_heartbeat_at=NULL,last_activity_at=NULL,updated_at=now() WHERE organization_id=$1 AND runtime_id=$2`,
         [op.organizationId, op.runtimeId, op.targetNode, port],
       )
@@ -660,6 +729,7 @@ export class PeerProjectRecovery {
       ])
       await tx.query("UPDATE harness.project_recovery_operations SET phase='published',published_at=now() WHERE id=$1", [id])
       await this.audit(tx, actor, 'activate', id)
+      await checkPeerBackupNode(tx,op.organizationId,op.targetNode,true)
     }, async (tx) => {
       await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['gateway-port:' + op.targetNode])
     })
@@ -699,7 +769,7 @@ export class PeerProjectRecovery {
           held.control=await this.context.pool.connect()
           await held.control.query('BEGIN')
           await lockRecoveryPolicy(held.control,op)
-          await checkPeerBackupNode(held.control,op.organizationId,op.targetNode,true)
+          await lockRecoveryTarget(held.control,op.organizationId,op.targetNode)
           if(!(await held.control.query(binding+' FOR SHARE OF s FOR UPDATE OF r',coordinates)).rowCount) denied('verified-writer-fence-required')
           if(active) return
           const row=await tx.query(`UPDATE node_content.recovery_candidates SET phase='active',activated_at=clock_timestamp()
@@ -708,15 +778,13 @@ export class PeerProjectRecovery {
           await tx.query("UPDATE node_content.spaces SET publication_state='published' WHERE organization_id=$1 AND runtime_id=$2 AND writer_epoch=$3",
             [b.organizationId,b.runtimeId,b.writerEpoch])
           await tx.query('DELETE FROM node_content.desktop_session_confirmations WHERE organization_id=$1 AND runtime_id=$2',[b.organizationId,b.runtimeId])
+          await checkPeerBackupNode(held.control,op.organizationId,op.targetNode,true)
         },signal)
         if(held.control) {
           await held.control.query(`UPDATE harness.project_recovery_operations SET target_activated_at=clock_timestamp(),last_error=NULL
             WHERE organization_id=$1 AND id=$2 AND phase='published' AND target_activated_at IS NULL`,[op.organizationId,id])
-          await held.control.query(`UPDATE harness.peer_backup_policies SET enabled=false,revision=revision+1,updated_at=clock_timestamp()
-            WHERE organization_id=$1 AND id=$2 AND source_node_id=$3 AND target_node_id=$4 AND enabled`,
-            [op.organizationId,op.policyId,op.sourceNode,op.targetNode])
-          await held.control.query(`UPDATE harness.peer_backup_work SET status='failed',error_code='peer-backup/source-replaced',finished_at=clock_timestamp()
-            WHERE organization_id=$1 AND policy_id=$2 AND status IN('running','queued')`,[op.organizationId,op.policyId])
+          await disableReplacedPeerSource(held.control,{organizationId:op.organizationId,scopeKind:'project',scopeId:op.projectId,sourceNodeId:op.sourceNode})
+          await checkPeerBackupNode(held.control,op.organizationId,op.targetNode,true)
           await held.control.query('COMMIT')
           committed=true
         }

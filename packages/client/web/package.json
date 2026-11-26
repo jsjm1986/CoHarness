@@ -18,6 +18,10 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./boot": {
+      "types": "./lib/types/boot.d.ts",
+      "default": "./lib/boot.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
@@ -42,6 +46,8 @@
   },
   "files": [
     "lib/index.js",
+    "lib/boot.js",
+    "lib/seed.js",
     "lib/**/*.css",
     "lib/types/**/*.d.ts"
   ]

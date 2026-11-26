@@ -10,7 +10,7 @@ A shared project runtime hosts many conversations used by several members. Today
 
 ## Decision
 
-Add a **project activity feed**: a `ui-project-activity` client plugin that lists member-authored messages and question answers for the connected project, grouped three ways (time / conversation / member), with jump-to-message navigation. The panel later gained a fourth, default `progress` mode rendering the [human-facing progress journal](2026-10-21-project-progress-journal.md); the three feed groupings remain its raw views.
+The **project activity feed** groups member messages and question answers by time, conversation, or member and links to their conversation events. The same panel offers a [progress journal](2026-10-21-project-progress-journal.md) for reading project decisions and progress.
 
 ### Recorded content
 
@@ -30,13 +30,13 @@ The one durable gap is the `callId` on the claim row: `question/requested` carri
 
 ### Server surface
 
-`GET /account/api/activity?before=<keyset>&limit=<n>` on the Gateway, beside `/account/api/conversations`. The handler requires the caller's resolved account scope to be a project, applies the `listConversations` visibility clause to the owning root conversation, and returns a normalized `ProjectActivityItem` list. Browsers call it with the session cookie like every other collaboration read.
+Gateway serves `GET /account/api/activity?before=<keyset>&limit=<n>` under the project’s root conversation visibility rules. The optional `member` filters messages and question responses before pagination. A first request without a cursor returns the active project roster so the filter can include members absent from the current page.
 
-Cursors are opaque, versioned values containing the full PostgreSQL microsecond timestamp, Session id, log anchor, and individual entry id. Resume comparisons match timestamp descending, Session id ascending, anchor descending, and entry id ascending. The final id distinguishes historical answers that share an absent log anchor. Session ids containing delimiters remain intact. Legacy millisecond cursors remain readable; malformed cursors read the first page. Non-object elements in historical answer arrays contribute no summary text; the original outcome remains available in the response.
+Opaque cursors bind the Runtime, full PostgreSQL microsecond timestamp, Session ID, log anchor, and individual entry ID. Filtered cursors also bind the member ID. Resume uses timestamp descending, Session ID ascending, anchor descending, and entry ID ascending. The entry ID distinguishes historical answers without an anchor. Session IDs can contain delimiters. Invalid or mismatched cursors read the first page. Non-object historical answer elements contribute no summary text. The response retains the original outcome.
 
 ### Client surface
 
-- `packages/client/ui-project-activity` registers a `sidebarRightTabs` type and keyed body/title slots. Registration follows the selected Session’s project Runtime, so opening a project Session from a personal bootstrap page still offers activity. Unqualified standalone Sessions use the page policy. A body captures its Session owner for its lifetime and addresses feed, journal and generation requests with `dshRuntime` and `dshTarget`; another tab’s scope cookie cannot redirect them. The Gateway remains the current access authority. Journal polling has one finite window; a still-generating response does not restart its round budget. A superseded read cannot publish after a newer refresh, including after JSON decoding.
+- `packages/client/ui-project-activity` registers the tab type for the selected project Runtime, including when the page starts in personal scope. An unqualified standalone Session uses the page policy. The panel binds account requests to its owning Runtime through `dshRuntime` and `dshTarget`. The Gateway checks current access. Visible bodies share a finite status watch for the Session. Losing the last visible body cancels HTTP reads and the poll timer. A superseded request cannot publish after decoding.
 - Requests authenticate through same-origin account cookies; explicit Runtime parameters grant no access. The [Runtime-qualified Session decision](../architecture/2026-09-27-runtime-qualified-client-sessions.md) owns shared browser addressing and account-lifetime isolation.
 - Conversation names call `conversationViewport.replaceActive`; anchored rows call `ConversationViewport.reveal(sessionId, seq)`. The owning Chat view loads history through `loadHistoryUntil` and scrolls to that event. Feed Session IDs are Host-local, so `sessions.keyFor` receives the body’s captured Runtime, including its UUID. Project-only keys do not identify an allocation when the browser pools several Runtime connections.
 

@@ -246,7 +246,9 @@ export class PromptRecovery {
   save(id: RpcId, proof: string, zone: string | undefined, node: string | null): void {
     const store = this.storage()
     const prior = parse(store.getItem(this.key))
-    if (prior && (prior.tab !== this.tab || prior.id !== id)) throw new Error('Another submission in this tab is unconfirmed.')
+    if (prior && (prior.tab !== this.tab || prior.document !== this.document || prior.id !== id)) {
+      throw new Error('Another submission in this tab is unconfirmed.')
+    }
     this.write(store, { node, tab: this.tab, document: this.document, id, proof, zone: zone ?? null })
   }
 

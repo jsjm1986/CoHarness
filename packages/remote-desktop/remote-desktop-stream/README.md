@@ -7,7 +7,7 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-**`remote-desktop-stream`** is the Web transport mount for `ctx.remoteDesktop`. It registers one exact-path upgrade route on `ctx.webServer` (`/remote-desktop/stream` by default), completes the WebSocket handshake, adapts the socket into a `Duplex`, and calls `RemoteDesktop.serveStream` with the one-time token carried in `?token=`.
+**`remote-desktop-stream`** is the Web transport mount for `ctx.remoteDesktop`. It registers one exact-path upgrade route on `ctx.webServer` (`/api/remote-desktop/stream` by default), completes the WebSocket handshake, adapts the socket into a `Duplex`, and calls `RemoteDesktop.serveStream` with the one-time token carried in `?token=`.
 
 ## Summary
 
@@ -26,6 +26,8 @@ A browser client opens `wss://<host><stream.path>?token=<token>` after `remoteDe
 ## Composition
 
 Load alongside a `ctx.remoteDesktop` provider (`dsh-remote-desktop-vnc`) and `ctx.webServer`. The plugin uses `ctx.inject(['webServer', 'remoteDesktop'])` and activates only where both exist; the provider's `streamPath` config must match this plugin's so `attach` advertises the mounted path.
+
+Withdrawal refuses and removes new upgrades, cancels accepted provider calls, and destroys both their Duplex adapters and WebSocket transports. Disposal waits for those calls, sockets and the WebSocket server to settle. Each call receives an abort signal covering mount shutdown and client disconnect. Provider failures close the affected connection and are reported while the call remains active.
 
 **Runtime invariant:** No companion is published. The mount owns only per-connection WebSocket plumbing; token and attachment truth stay in `ctx.remoteDesktop`.
 

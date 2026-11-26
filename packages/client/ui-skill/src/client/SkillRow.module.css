@@ -117,10 +117,6 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.errorSummary {
-  color: var(--dsw-alias-state-error-primary);
-}
-
 .bodyWrap {
   display: flex;
   flex-direction: column;
@@ -163,8 +159,9 @@
   --dsh-scrollbar-thumb-border: 1px;
 }
 
+.errorSummary,
 .instructions[data-error] {
-  color: var(--dsw-alias-state-error-primary);
+  color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 80%, var(--dsw-alias-label-primary));
 }
 
 .instructions::-webkit-scrollbar-track {
@@ -185,6 +182,7 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 16px;
+  min-height: 24px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 100ms ease;
@@ -198,6 +196,11 @@
 .inspectButton:hover {
   background: var(--dsw-alias-interactive-bg-hover-solid);
   color: var(--dsw-alias-label-primary);
+}
+
+@media (pointer: coarse) {
+  .row[data-expandable] { height: auto; min-height: var(--dsw-touch-target); }
+  .inspectButton { min-height: var(--dsw-touch-target); opacity: 1; }
 }
 
 .visuallyHidden {

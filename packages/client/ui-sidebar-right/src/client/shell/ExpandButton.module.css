@@ -23,8 +23,10 @@
   height: 15px;
 }
 
-.button:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .button:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 /* The left sidebar's panel icon, mirrored: the divider moves to the right side. */
@@ -32,12 +34,21 @@
   transform: scaleX(-1);
 }
 
-@media (max-width: 767px) {
-  /* Join the compact header row's 36px target family (a 28px ghost reads
-     under-sized beside the tabs). */
+:global([data-viewport='compact']) .button {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+  padding: 0;
+}
+
+:global([data-viewport='compact']) .button svg {
+  width: var(--dsw-mobile-icon-primary);
+  height: var(--dsw-mobile-icon-primary);
+}
+
+@media (pointer: coarse) {
   .button {
-    width: 36px;
-    height: 36px;
-    padding: 10px;
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+    padding: 0;
   }
 }

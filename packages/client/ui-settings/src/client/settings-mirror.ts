@@ -84,10 +84,13 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
    * @param api - settings wire face.
    * @param persistence - `host` reads through the settings wire; `memory` is an
    *   explicit opt-in for callers that must remain process-local.
+   * @param firstSubscription - resolves true when the settings listener has a ready stream, or false if disposed first.
+   * Omission allows reads immediately.
    */
   constructor(
     private readonly api: SettingsFace,
     private readonly persistence: 'host' | 'memory' = 'host',
+    private firstSubscription?: Promise<boolean>,
   ) {
     this.store = createSnapshotStore<SettingsMirrorSnapshot>({
       status: persistence === 'host' ? 'idle' : 'unavailable',
@@ -173,6 +176,10 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
     // returned promise runs one microtask later, and a `load()` landing in
     // that gap would mark a rerun nobody reads, losing the read.
     try {
+      if (this.firstSubscription !== undefined) {
+        if (!await this.firstSubscription) return
+        this.firstSubscription = undefined
+      }
       do {
         const before = this.store.getSnapshot()
         if (before.status === 'idle') this.store.set({ ...before, status: 'loading' })

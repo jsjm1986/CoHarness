@@ -52,11 +52,9 @@ export interface EventRow {
 /** Durable journal modes accepted by the backend. */
 export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
-interface SchemaObjectRow {
-  readonly type: string
-  readonly name: string
-  readonly tbl_name: string
-  readonly sql: string
+interface SchemaIdentity {
+  readonly exact: string
+  readonly normalized: string
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
@@ -214,35 +212,34 @@ function initializeDatabase(db: DatabaseSync): void {
   db.exec(sql('set-user-version-21'))
 }
 
-let canonicalSchema: readonly SchemaObjectRow[] | undefined
+let canonicalSchema: SchemaIdentity | undefined
 
-function expectedSchema(Database: DatabaseSyncConstructor): readonly SchemaObjectRow[] {
+function expectedSchema(Database: DatabaseSyncConstructor): SchemaIdentity {
   if (canonicalSchema !== undefined) return canonicalSchema
   const reference = new Database(':memory:')
   try {
     reference.exec(sql('foreign-keys-on'))
     reference.exec(sql('schema'))
-    canonicalSchema = schemaObjects(reference)
+    const exact = schemaObjects(reference)
+    canonicalSchema = { exact, normalized: normalizeSchema(exact) }
     return canonicalSchema
   } finally {
     reference.close()
   }
 }
 
-function schemaObjects(db: DatabaseSync): SchemaObjectRow[] {
-  return db.prepare(sql('select-schema-objects')).all().map((value) => {
-    const row = record(value, 'schema object')
-    return {
-      type: stringField(row, 'type'),
-      name: stringField(row, 'name'),
-      tbl_name: stringField(row, 'tbl_name'),
-      sql: normalizeSql(stringField(row, 'sql')),
-    }
-  })
+function schemaObjects(db: DatabaseSync): string {
+  return stringField(db.prepare(sql('select-schema-objects')).get(), 'schema_objects')
 }
 
-function normalizeSql(value: string): string {
-  return value.replaceAll(/\s+/gu, ' ').trim()
+function normalizeSchema(value: string): string {
+  const rows = JSON.parse(value) as [string, string, string, string | null][]
+  return JSON.stringify(rows.map(([type, name, table, ddl]) => [
+    type,
+    name,
+    table,
+    ddl?.replaceAll(/\s+/gu, ' ').trim() ?? null,
+  ]))
 }
 
 function validateRequiredSchema(
@@ -250,7 +247,9 @@ function validateRequiredSchema(
   db: DatabaseSync,
   path: string,
 ): void {
-  if (JSON.stringify(schemaObjects(db)) !== JSON.stringify(expectedSchema(Database))) {
+  const actual = schemaObjects(db)
+  const expected = expectedSchema(Database)
+  if (actual !== expected.exact && normalizeSchema(actual) !== expected.normalized) {
     throw new Error(`session database at "${path}" does not contain the required schema objects`)
   }
 }

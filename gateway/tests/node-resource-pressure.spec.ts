@@ -1,5 +1,7 @@
 /** Pressure pacing and completion of owned native observations. @module */
+import type { Pool, PoolClient } from 'pg'
 import { describe, expect, it, vi } from 'vitest'
+import { NodeResourceBudget, type NodeResourceBudgetConfig } from '../src/node-resource-budget.ts'
 import {
   darwinMemoryPressure, NodeResourcePressure, pressureCredits, type NodePressureConfig, type NodePressureSample, type NodePressureObservation,
 } from '../src/node-resource-pressure.ts'
@@ -45,6 +47,65 @@ it('paces starts by current CPU headroom without accumulating credits', () => {
   }
   expect(pressureCredits({ ...healthy, memoryAvailableRatio: 0.15 }, config)).toBe(6)
   expect(pressureCredits({ ...healthy, memoryAvailableRatio: 0.15 }, { ...config, linuxMemoryReserveRatio: 0.2 })).toBe(0)
+})
+
+it('classifies every local queueDiagnostic reason, records observation failures, and resets on configure()', async () => {
+  const budgetConfig: NodeResourceBudgetConfig = {
+    ...config, maxQueued: 16, maxQueuedPerUser: 8, maxQueuedPerProject: 8, maxQueuedBytes: 64 * 1024, maxWaitMs: 30_000,
+  }
+  let applied = true
+  let failObserve = false
+  const client = Object.assign({} as PoolClient, {
+    query: vi.fn(async (sql: string) => {
+      if (sql.includes('lock_node_resources')) return { rows: [{ limits: budgetConfig }] }
+      return { rows: [] }
+    }),
+    release: vi.fn(),
+  })
+  const pool = Object.assign({} as Pool, {
+    query: vi.fn(async () => {
+      if (failObserve) throw Object.assign(new Error('db busy'), { code: '55P03' })
+      return { rows: [{ observed: { applied } }] }
+    }),
+    connect: vi.fn(async () => client),
+  })
+  const budget = new NodeResourceBudget(pool, 'org-1', 'node-1', budgetConfig)
+  expect(budget.queueDiagnostic()).toEqual({ reason: 'no-local-observation' })
+
+  failObserve = true
+  await expect(budget.observe({ ...healthy, capturedAt: performance.now() })).rejects.toThrow(/busy/u)
+  expect(budget.queueDiagnostic()).toMatchObject({ reason: 'observation-failed', lastErrorAgeMs: expect.any(Number) })
+
+  failObserve = false
+  await budget.observe({ ...healthy, memory: 'warning', capturedAt: performance.now() })
+  expect(budget.queueDiagnostic()).toMatchObject({ reason: 'pressure-memory', memory: 'warning', sampleCredits: 0 })
+
+  await budget.observe({ ...healthy, memoryAvailableRatio: 0.05, capturedAt: performance.now() })
+  expect(budget.queueDiagnostic()).toMatchObject({ reason: 'pressure-memory', memoryAvailableRatio: 0.05, sampleCredits: 0 })
+
+  await budget.observe({ ...healthy, cpu: 0.9, capturedAt: performance.now() })
+  expect(budget.queueDiagnostic()).toMatchObject({ reason: 'pressure-cpu', cpu: 0.9, sampleCredits: 0 })
+
+  await budget.observe({ ...healthy, eventLoopMs: 120, capturedAt: performance.now() })
+  expect(budget.queueDiagnostic()).toMatchObject({ reason: 'pressure-event-loop', eventLoopMs: 120, sampleCredits: 0 })
+
+  applied = false
+  await budget.observe({ ...healthy, capturedAt: performance.now() })
+  expect(budget.queueDiagnostic()).toMatchObject({ reason: 'observation-unapplied', sampleApplied: false, sampleCredits: 6 })
+
+  applied = true
+  await budget.observe({ ...healthy, capturedAt: performance.now() })
+  expect(budget.queueDiagnostic()).toMatchObject({ reason: 'credits-or-unregistered', sampleApplied: true, sampleCredits: 6 })
+
+  await budget.observe({ ...healthy, capturedAt: performance.now() - budgetConfig.staleMs - 50 })
+  expect(budget.queueDiagnostic()).toMatchObject({ reason: 'observation-stale' })
+
+  failObserve = true
+  await expect(budget.observe({ ...healthy, capturedAt: performance.now() })).rejects.toThrow(/busy/u)
+  expect(budget.queueDiagnostic()).toMatchObject({ reason: 'observation-failed', lastErrorAgeMs: expect.any(Number) })
+
+  await budget.configure()
+  expect(budget.queueDiagnostic()).toEqual({ reason: 'no-local-observation' })
 })
 
 describe.skipIf(process.platform !== 'darwin' && process.platform !== 'linux')('native node pressure observations', () => {

@@ -49,9 +49,9 @@
 - button "1% of context used": 1%
 - button "Send message" [disabled]
 - group "Session statistics":
-  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+  - "button \"1 turn · 2 steps · {{throughput}} tok/s\"":
     - img
-    - text: "1 turns · 2 steps{{throughput}} tok/s"
+    - text: "1 turn · 2 steps{{throughput}} tok/s"
   - button "17.3K tok · Cache hit 51%":
     - img
     - text: 17.3K tokCache hit 51%

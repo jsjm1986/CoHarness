@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/workbench-computer-permissions/guide.md
 document:
-  en: 31faa3ba8f5f113b0c1980cd11b1250420ea5954
-  zh: 7e8c39a18438e8759e1311f61d4f6c1744e06aaa
+  en: 647336ea5516df5c95aa9be830e198c0f54961df
+  zh: 18e1dfce0c1c58901502a58bd264ea97b359299a
 /:
   en: af25bcd7d275a3df
   zh: 4af925484b2b3c64
@@ -12,8 +12,8 @@ document:
   en: fe9c733b9ef615f5
   zh: 14feb4d151d10524
 /upgrade-workbench-computer-permissions/change:
-  en: 2cae904a9fa9ce4a
-  zh: fc93b813154fa098
+  en: b83567828d886105
+  zh: 521746e0428c176a
 /upgrade-workbench-computer-permissions/migration:
   en: 2e027b2a887c636b
   zh: 1c765d444b735f4c

@@ -1,5 +1,6 @@
 - main:
   - heading "模型治理" [level=1]
+  - text: 0 个组织模型
   - group "模型治理视图":
     - button "组织模型"
     - button "权限与计价"

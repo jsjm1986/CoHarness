@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
@@ -79,6 +79,22 @@ async function setup() {
 }
 
 describe('applyGrantsToUser', () => {
+  it('projects changed grants into the verified retained home without restarting a stopped Runtime',async()=>{
+    const {deps,alice,admin,root}=await setup()
+    await applyGrantsToUser(deps,alice.id,admin.id)
+    const original=join(root,'users','alice','dsh','directory-grants.json'),before=readFileSync(original,'utf8')
+    const retained=join(realpathSync(root),'retained-runtime');mkdirSync(retained)
+    vi.spyOn(deps.instances,'storageOf').mockResolvedValue({dshHome:retained,homePath:alice.homePath,runtimeKey:'owner',retainedData:true})
+    const stop=vi.spyOn(deps.instances,'stop'),start=vi.spyOn(deps.instances,'ensureRunning')
+    expect(await applyGrantsToUser(deps,alice.id,admin.id)).toBe('written')
+    expect(readFileSync(join(retained,'directory-grants.json'),'utf8')).toBe(before)
+    expect(readFileSync(original,'utf8')).toBe(before)
+    expect(stop).not.toHaveBeenCalled();expect(start).not.toHaveBeenCalled()
+    vi.mocked(deps.instances.storageOf).mockRejectedValue(new Error('retained binding changed'))
+    await expect(applyGrantsToUser(deps,alice.id,admin.id)).rejects.toThrow('retained binding changed')
+    expect(readFileSync(original,'utf8')).toBe(before)
+  })
+
   it('reports a deleted account without rewriting its grants or restarting it', async () => {
     const { deps, alice, admin, root } = await setup()
     await applyGrantsToUser(deps, alice.id, admin.id)

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/deployment-modes/guide.md
 document:
-  en: 84483bcede24c7a0a82d44f98272a609e411e8b7
-  zh: 5f723080f5b80c7ac02bfd495830ba7cfafceba5
+  en: 79265eafb33f5799816cd4f85da49de5cd04789c
+  zh: ba50c23885506d622b7a8d5f22a5c704f70bb95a
 /:
   en: 1266a57d71291009
   zh: a9bf5828fa14c12a
@@ -12,8 +12,8 @@ document:
   en: ad8bcdd583cf4f7d
   zh: 0aaddc90115e9243
 /single-computer-mode-and-explicit-primary-setup/change:
-  en: 70c2701dbea4cfc2
-  zh: c218a7f5e54ef61b
+  en: fdc059d1708f0b35
+  zh: fbd79069b1a7db47
 /single-computer-mode-and-explicit-primary-setup/migration:
-  en: a7f13e24731bc3fb
-  zh: 665b59f9d530e004
+  en: a94274a12c65c7c0
+  zh: fc58ca1e7fda1e96

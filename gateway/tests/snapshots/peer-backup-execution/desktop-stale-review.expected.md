@@ -1,0 +1,67 @@
+- main:
+  - region "Recovered execution permissions":
+    - strong: Recovered execution permissions
+    - alert: The takeover or policy changed. Refresh and review it again.
+    - status: New conversations are not enabled yet.
+    - paragraph: Preserving 1 historical conversations for reading. They cannot resume execution.
+    - paragraph: Previous inbox work and schedules remain paused and do not resume with new conversations.
+    - group:
+      - text: Suspended connection and environment settings (5)
+      - paragraph: Reconfigure these settings for the target computer so the Runtime cannot connect to the previous databases or reuse old credentials. Only names appear here; original values remain in the encrypted recovery point.
+      - list:
+        - listitem:
+          - code: DATABASE_URL
+        - listitem:
+          - code: DSH_GATEWAY_CREDENTIAL_FD
+        - listitem:
+          - code: HGW_NODE_TOKEN
+        - listitem:
+          - code: PGHOST
+        - listitem:
+          - code: PGPASSWORD
+    - strong: Plugins and external connections
+    - paragraph: Review supported items individually. Unapproved items remain disabled. Configuration review requires a stopped Runtime and never stops tasks automatically.
+    - strong: "@deepseek-ai/dsh-plugin-package-inventory-deepseek"
+    - text: Ready for review
+    - paragraph: Plugin
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - strong: "@deepseek-ai/dsh-session-telemetry-otel"
+    - text: Ready for review
+    - paragraph: Plugin
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - strong: "@deepseek-ai/dsh-remote-desktop-vnc"
+    - text: Ready for review
+    - paragraph: External connection
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - strong: "@deepseek-ai/dsh-remote-desktop-stream"
+    - text: Ready for review
+    - paragraph: External connection
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - strong: "@deepseek-ai/dsh-api-remote-desktop-controller"
+    - text: Ready for review
+    - paragraph: External connection
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - strong: "@deepseek-ai/dsh-client-ui-remote-desktop"
+    - text: Ready for review
+    - paragraph: External connection
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - strong: "@deepseek-ai/dsh-tool-schedule"
+    - text: Ready for review
+    - paragraph: Plugin
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - group: Items kept disabled (11)
+    - group: Approved or configured inactive components (219)
+    - strong: Review new-conversation permission
+    - paragraph: Allow new conversations in the recovered project. Historical conversations stay read-only, previous inbox work and schedules remain paused, and unapproved plugins and external connections remain disabled.
+    - checkbox "I confirm only new conversations are enabled; previous work stays paused" [checked]
+    - text: I confirm only new conversations are enabled; previous work stays paused
+    - button "Enable new conversations"
+    - button "Back"
+    - button "Refresh execution review"

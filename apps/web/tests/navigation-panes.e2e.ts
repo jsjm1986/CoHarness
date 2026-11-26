@@ -6,19 +6,21 @@
 // under the standard discipline: turn 1 produces a bash call plus two
 // parallel reads in one assistant message (tool-call density for the
 // trajectory ledger/timing lanes), turn 2 a markdown-rich reply.
+import { auditWorkflowState, newWorkflowPage, compareWorkflowGolden, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page, Response } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, expandTurnProcesses, fixtureUserPrompts,
+  assertFixtureInventory, captureStableAria, expandTurnProcesses, fixtureUserPrompts,
   launchWebScaffold, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { saveFailureShot } from './support.ts'
 import { expectSelectableTerminalCommand } from './terminal-command-browser.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/navigation-panes', import.meta.url))
@@ -100,11 +102,11 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
         .toEqual([PROMPT_TURN1, PROMPT_TURN2])
       await seedSession(scaffold, raw, SEED_ID)
     }
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
   }, 120_000)
 
   beforeEach(async () => {
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     slotErrors = []
     page.on('console', (message) => {
@@ -211,7 +213,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     }).toBeGreaterThanOrEqual(1)
     const snapshot = (await captureStableAria(page, '[class*="listArea"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
-    await compareOrRefreshGolden(SEARCH_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(SEARCH_EXPECTED, snapshot, MODE)
 
     await result.click()
     // Search navigation addresses the session, not a specific event: opening a
@@ -228,20 +230,32 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const selector = '.md-code-block:has-text("echo WATERFALL")'
     const block = page.locator(selector)
     await block.waitFor({ timeout: 15_000 })
-    await compareOrRefreshGolden(CODE_CARD_EXPECTED, await captureStableAria(page, selector, scaffold.workspaceCwd), MODE)
+    await compareWorkflowGolden(CODE_CARD_EXPECTED, await captureStableAria(page, selector, scaffold.workspaceCwd), MODE)
     const code = block.locator('pre')
     const source = await code.textContent()
     const copy = block.getByRole('button', { name: 'Copy', exact: true })
-    await copy.hover()
-    await page.getByRole('tooltip', { name: 'Copy', exact: true }).waitFor()
+    if (workflowMatrixEnabled) {
+      await copy.press('Shift+Tab')
+      await page.keyboard.press('Tab')
+    } else await copy.hover()
+    const copyTooltip = page.getByRole('tooltip', { name: 'Copy', exact: true })
+    await copyTooltip.waitFor()
+    if (!workflowMatrixEnabled) await copyTooltip.hover()
+    expect(await copyTooltip.isVisible()).toBe(true)
+    await page.keyboard.press('Escape')
+    await copyTooltip.waitFor({ state: 'detached' })
     const unwrap = block.getByRole('button', { name: 'Wrap lines', exact: true })
-    await unwrap.hover()
+    if (workflowMatrixEnabled) {
+      await unwrap.press('Shift+Tab')
+      await page.keyboard.press('Tab')
+    } else await unwrap.hover()
     await page.getByRole('tooltip', { name: 'Do not wrap lines', exact: true }).waitFor()
     await unwrap.click()
     await expect.poll(() => code.evaluate(element => getComputedStyle(element).whiteSpace)).toBe('pre')
     await block.getByRole('button', { name: 'Wrap lines', exact: true }).click()
     await expect.poll(() => code.evaluate(element => getComputedStyle(element).whiteSpace)).toBe('pre-wrap')
     expect(await code.textContent()).toBe(source)
+    await auditWorkflowState(page, 'markdown', 'code-wrap-copy', block, [copy, unwrap])
   }, 60_000)
 
   it.skipIf(MODE === 'record')('renders the trajectory ledger and opens its local record inspector', async () => {
@@ -291,6 +305,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     expect(darkSummarySurfaces.heading).toBe(darkSummarySurfaces.panel)
     await page.evaluate(() => { document.body.removeAttribute('data-ds-dark-theme') })
     await page.getByRole('tab', { name: 'Result' }).click()
+    await auditWorkflowState(page, 'trajectory', 'tool-output-inspector', page.locator('[data-trajectory-details]'))
     await expect.poll(() => page.getByText('NAVIGATION_OK', { exact: false }).count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(1)
     const assistantSpan = page.locator('[data-timeline-span="message"][data-assistant-timing="true"]').first()
     await assistantSpan.hover()
@@ -311,7 +326,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     expect(assistantTimingStyle.ttft).toMatch(/%$/)
     const snapshot = (await captureStableAria(page, '[class*="viewArea"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
-    await compareOrRefreshGolden(TRAJECTORY_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(TRAJECTORY_EXPECTED, snapshot, MODE)
     await details.getByRole('button', { name: 'Close details' }).click()
   }, 60_000)
 
@@ -444,14 +459,14 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     // confirmation label self-reverts on a timer and would not hold still.
     const snapshot = (await captureStableAria(page, '[data-terminal]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
-    await compareOrRefreshGolden(TERMINAL_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(TERMINAL_EXPECTED, snapshot, MODE)
     // Copy writes the raw output through the browser's own clipboard, which in
     // a real page is the async Clipboard API rather than the jsdom fallback.
-    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    if (responsiveBrowserName === 'chromium') await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
     await card.locator('[class*="_copyButton_"]').first().click()
     await expect.poll(() => card.locator('[class*="_copyButton_"]').first().textContent(), { timeout: 5_000 })
       .toBe('Copied')
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('NAVIGATION_OK')
+    if (responsiveBrowserName === 'chromium') expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('NAVIGATION_OK')
   }, 60_000)
 
   it.skipIf(MODE === 'record')('keeps the recorded fixture inventory exact', async () => {

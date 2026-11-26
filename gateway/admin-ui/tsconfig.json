@@ -14,6 +14,7 @@
     "types": ["vite/client"],
     "paths": {
       "@deepseek-ai/dsh-brand": ["../../packages/util/brand/src/index.ts"],
+      "@deepseek-ai/dsh-managed-data": ["../../packages/util/managed-data/src/index.ts"],
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
       "@deepseek-ai/cosmokit": ["../../vendor/cosmokit/lib/types/index.d.ts"],
       "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],

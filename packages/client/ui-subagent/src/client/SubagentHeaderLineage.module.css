@@ -52,6 +52,14 @@
   font-weight: 400;
 }
 
+.ancestorRoot {
+  gap: 0;
+}
+
+.ancestorMenuTrigger {
+  flex: none;
+}
+
 .switcherTitle {
   flex: 1;
   min-width: 0;

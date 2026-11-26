@@ -7,7 +7,7 @@ import {
   createSnapshotStore, resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
   permissionAvailabilitySource, permissionUnavailableReason, commitSessionNavigation,
   sessionPersistenceKey, parseClientSessionKey, runtimeTargetKey,
-  type ObservableSnapshot, type ProjectUiPolicySnapshot,
+  type NodeDraftOwner, type ObservableSnapshot, type ProjectUiPolicySnapshot,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
@@ -172,6 +172,7 @@ function selectApproval({ interactions }: ComposerChainProps): ApprovalWait | nu
 export function apply(ctx: Context): void {
   const sessions = ctx.sessions
   const workspaces = ctx.workspaces
+  const onFirstEditablePaint = () => { concreteConversation(ctx).markComposerEditable() }
   const lifetime = new AbortController()
   ctx.effect(() => () => { lifetime.abort() }, 'ui-conversation: navigation lifetime')
   const layout = ctx.layout
@@ -204,9 +205,12 @@ export function apply(ctx: Context): void {
   // Apply-time construction keeps store identity bound to this fiber.
   const persistenceListeners = new Set<() => void>()
   const refreshPersistence = (): void => { for (const listener of [...persistenceListeners]) listener() }
+  let accountWithdrawn = false
   ctx.effect(() => {
-    const stops = [connection.hostDescription.subscribe(refreshPersistence), sessions.list.subscribe(refreshPersistence)]
-    return () => { for (const stop of stops) stop() }
+    const stopHost = connection.hostDescription.subscribe(refreshPersistence)
+    const stopSessions = sessions.list.subscribe(refreshPersistence)
+    const stopIdentity = connection.onPrincipalChange?.(() => { accountWithdrawn = true; refreshPersistence() })
+    return () => { stopHost(); stopSessions(); stopIdentity?.() }
   }, 'ui-conversation: chat persistence ownership')
   ctx.inject(['projectUiPolicy'], inner => inner.effect(() => {
     const stop = inner.projectUiPolicy.subscribe(refreshPersistence)
@@ -218,18 +222,55 @@ export function apply(ctx: Context): void {
     refreshPersistence()
     return stop
   }, 'ui-conversation: node draft mode'))
+  const retainDraftOwner = (id: SessionId, owner: NodeDraftOwner): boolean => {
+    if (accountWithdrawn || connection.documentIdentity?.principalId !== owner.accountId) return false
+    const accountId = ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
+    if (accountId !== undefined && accountId !== owner.accountId) return false
+    const address = parseClientSessionKey(id)
+    if (address?.runtime.runtimeId !== owner.target.runtimeId || address?.sessionId !== owner.sessionId) return false
+    const current = sessions.runtimeIdentityFor?.(id)
+    return current === undefined || (current.runtimeId === owner.target.runtimeId
+      && (current.nodeId === undefined || current.nodeId === owner.target.nodeId))
+  }
   const chatStore = createChatStore({
+    pendingEntryOwner: (id) => {
+      const entry = ctx.get('startupDraft')
+      const document = connection.documentIdentity
+      const account = ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
+      const address = parseClientSessionKey(id)
+      const target = sessions.runtimeIdentityFor?.(id)
+      if (accountWithdrawn || entry?.savedSessionId === undefined || entry.scope !== 'personal'
+        || document?.principalId !== entry.principalId || document.runtimeTarget.kind !== 'personal'
+        || document.runtimeTarget.runtimeId !== entry.runtimeId || account !== undefined && account !== entry.principalId
+        || address?.sessionId !== entry.savedSessionId || target?.kind !== 'personal'
+        || target.runtimeId !== entry.runtimeId || target.nodeId !== entry.nodeId) return undefined
+      return { accountId: entry.principalId, target, sessionId: address.sessionId,
+        requestTimeoutMs: connection.metadataTiming.requestTimeoutMs }
+    },
     nodeOwner: (id) => {
       const description = connection.hostDescription.getSnapshot()
       if (description?.executionAuthorityRequired === false) return undefined
       const deployment = ctx.get('deploymentContext')?.getSnapshot().context
-      if (deployment?.mode === 'single') return undefined
-      if (deployment?.mode !== 'multi') return description?.executionAuthorityRequired === true || ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId !== undefined ? 'pending' : undefined
-      const target = sessions.runtimeIdentityFor?.(id)
       const accountId = ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId
+      const target = sessions.runtimeIdentityFor?.(id)
+      if (deployment?.mode === 'single') {
+        return target?.nodeId === deployment.entry.nodeId ? undefined : 'pending'
+      }
+      if (deployment?.mode !== 'multi') {
+        return description?.executionAuthorityRequired === true || accountId !== undefined || connection.documentIdentity !== undefined
+          ? 'pending' : undefined
+      }
       if (description?.executionAuthorityRequired !== true || target?.runtimeId === undefined || accountId === undefined) return 'pending'
       return { accountId, target, sessionId: parseClientSessionKey(id)?.sessionId ?? id,
         requestTimeoutMs: connection.metadataTiming.requestTimeoutMs }
+    },
+    retainDuringRenewal: retainDraftOwner,
+    isEntryDraftOwner: (id, owner) => {
+      const entry = ctx.get('deploymentContext')?.getSnapshot().context?.entry
+      return entry !== undefined && owner.target.nodeId === entry.nodeId
+        && sessions.runtimeIdentityFor?.(id)?.nodeId === entry.nodeId
+        && ctx.get('projectUiPolicy')?.getSnapshot().verifiedAccountId === owner.accountId
+        && retainDraftOwner(id, owner)
     },
     key: (sessionId, intent) => {
       const required = connection.hostDescription.getSnapshot()?.executionAuthorityRequired
@@ -728,13 +769,11 @@ export function apply(ctx: Context): void {
   slots.register({
     name: 'conversation.composer.bar',
     locale: NS,
-    // The two named control seats in the bar's tool row (plan beside the
-    // access control, model right); empty until their owning plugins
-    // register.
     children: {
       'conversation.input.attachments': { kind: 'single', scope: 'session-maybe' },
       'conversation.input.plan': { kind: 'single', scope: 'session' },
       'conversation.input.model': { kind: 'single', scope: 'session' },
+      'conversation.input.status': { kind: 'single', scope: 'session' },
     },
     inject: (sessionId: SessionId | undefined): ComposerBarInjected => {
       if (sessionId === undefined) {
@@ -769,6 +808,7 @@ export function apply(ctx: Context): void {
       )
       return {
         keyboard: shell,
+        ...(conversation.firstEditableComposer.getSnapshot() ? {} : { onFirstEditablePaint }),
         addImages: (files) => {
           try {
             const images = conversation.createDraftImages(files)

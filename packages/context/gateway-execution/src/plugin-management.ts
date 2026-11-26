@@ -5,6 +5,7 @@ import type {
   PluginDesiredState,
   PluginDesiredStatePublish,
   PluginDesiredStateSnapshot,
+  PluginInventoryReport,
   PluginManagementAuthorization,
 } from '@deepseek-ai/dsh-plugin-manager/types'
 import type {} from '@deepseek-ai/dsh-plugin-manager'
@@ -23,6 +24,13 @@ const protectedModules = new Set([
   '@deepseek-ai/dsh-directory-guard',
   '@deepseek-ai/dsh-sandbox-policy',
   '@deepseek-ai/dsh-fs-sandbox',
+  '@deepseek-ai/dsh-sandbox-local',
+  '@deepseek-ai/dsh-bash-sandbox',
+  '@deepseek-ai/dsh-pwsh-sandbox',
+  '@deepseek-ai/dsh-permission-presets',
+  '@deepseek-ai/dsh-user-approval',
+  '@deepseek-ai/dsh-userdoc-gateway',
+  '@deepseek-ai/dsh-steward-tools',
   '@deepseek-ai/dsh-archive-gateway',
 ])
 
@@ -133,6 +141,18 @@ export function gatewayPluginManagementAuthorization(
       }
       discardGatewayRead(response.body)
       throw new Error(`Gateway plugin-state publish failed: ${response.status}`)
+    },
+    async reportInventory(snapshot: PluginInventoryReport): Promise<void> {
+      signal.throwIfAborted()
+      const response = await runtime.request('/internal/runtime/plugin-inventory', {
+        method: 'POST', signal,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ snapshot }),
+      })
+      if (response.status !== 204) {
+        discardGatewayRead(response.body)
+        throw new Error(`Gateway plugin-inventory report failed: ${response.status}`)
+      }
     },
     authorizeInstall(spec: ParsedInstallSpec): Promise<void> {
       return Promise.resolve().then(() => {

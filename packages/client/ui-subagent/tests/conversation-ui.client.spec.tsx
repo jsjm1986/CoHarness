@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type {
@@ -11,10 +11,19 @@ import {
 import { SubagentReadOnlyComposer } from '../src/client/SubagentReadOnlyComposer.tsx'
 import { zh } from '../src/client/locales.ts'
 
+beforeEach(() => {
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+    matches: query === '(hover: hover)', media: query, onchange: null,
+    addListener: vi.fn(), removeListener: vi.fn(),
+    addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+  })))
+})
+
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 const PARENT = 'parent' as SessionId
@@ -237,11 +246,13 @@ describe('SubagentHeaderLineage', () => {
     expect(screen.queryByRole('tree')).toBeNull()
   })
 
-  it('opens only on hover and preserves the portaled-menu crossing grace', async () => {
+  it('opens on activation and preserves the portaled-menu hover crossing grace', async () => {
     vi.useFakeTimers()
     const view = render(<SubagentHeaderLineage {...props(catalog())} />)
     const trigger = screen.getByRole('button', { name: /2 个子智能体/ })
 
+    fireEvent.click(trigger)
+    expect(screen.getByRole('tree')).toBeTruthy()
     fireEvent.click(trigger)
     expect(screen.queryByRole('tree')).toBeNull()
 
@@ -266,6 +277,24 @@ describe('SubagentHeaderLineage', () => {
     fireEvent.mouseLeave(trigger.parentElement!)
     view.unmount()
     await act(() => vi.advanceTimersByTimeAsync(120))
+  })
+
+  it('keeps a touch-opened catalog visible through compatibility hover and viewport changes', async () => {
+    vi.mocked(window.matchMedia).mockReturnValue(Object.assign(window.matchMedia('(hover: hover)'), { matches: false }))
+    vi.useFakeTimers()
+    render(<SubagentHeaderLineage {...props(catalog())} />)
+    const trigger = screen.getByRole('button', { name: /2 个子智能体/ })
+    fireEvent.mouseEnter(trigger.parentElement!)
+    await act(() => vi.advanceTimersByTimeAsync(150))
+    expect(screen.queryByRole('tree')).toBeNull()
+    fireEvent.click(trigger)
+    fireEvent.mouseLeave(trigger.parentElement!)
+    fireEvent.mouseLeave(screen.getByRole('tree'))
+    fireEvent.resize(window)
+    await act(() => vi.advanceTimersByTimeAsync(150))
+    expect(screen.getByRole('tree')).toBeTruthy()
+    fireEvent.click(trigger)
+    expect(screen.queryByRole('tree')).toBeNull()
   })
 
   it('cancels a pending hover when the trigger becomes hidden', async () => {
@@ -730,19 +759,25 @@ describe('SubagentHeaderLineage', () => {
 
     const switcher = screen.getByRole('button', { name: '切换子智能体：worker' })
     expect(switcher.className).toContain('ancestorSwitcherTrigger')
+    const title = screen.getByRole('button', { name: 'worker' })
     expect(screen.queryByRole('button', { name: /1 个子智能体/ })).toBeNull()
     vi.useFakeTimers()
     fireEvent.mouseEnter(switcher.parentElement!)
-    fireEvent.click(switcher)
+    fireEvent.click(title)
     expect(input.openTitle).toHaveBeenCalledOnce()
     act(() => { vi.advanceTimersByTime(150) })
     expect(screen.queryByRole('tree')).toBeNull()
 
     hoverCatalog(switcher)
     expect(screen.getByRole('tree')).toBeTruthy()
-    fireEvent.click(switcher)
+    fireEvent.click(title)
     expect(input.openTitle).toHaveBeenCalledTimes(2)
     expect(screen.queryByRole('tree')).toBeNull()
+    const touchMedia = Object.assign(window.matchMedia('(hover: hover)'), { matches: false })
+    vi.stubGlobal('matchMedia', vi.fn(() => touchMedia))
+    fireEvent.click(switcher)
+    expect(screen.getByRole('tree')).toBeTruthy()
+    expect(input.openTitle).toHaveBeenCalledTimes(2)
   })
 
   it.each([

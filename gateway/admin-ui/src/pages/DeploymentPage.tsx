@@ -1,20 +1,30 @@
 import { useDeploymentContext } from '../deployment-context.tsx'
+import { adminComputerTarget } from '../computer-target.ts'
+import {
+  DeploymentOverviewProvider,
+  unwrapDeploymentOverviewSlice,
+  type DeploymentOverviewState,
+} from '../deployment-overview.tsx'
 import { NodeContentMigrationSection } from './NodeContentMigrationSection.tsx'
 import { NodeContentSection } from './NodeContentSection.tsx'
 import { PeerBackupSection } from './PeerBackupSection.tsx'
+import { LocalRecoveryExecutionSection } from './LocalRecoveryExecutionSection.tsx'
 import { DeploymentTopologySection, NodeConnectionSection } from './DeploymentTopologySection.tsx'
 /** Deployment control: maintenance windows, node convergence, backups, restore requests, and the operation ledger. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RuntimeAllocationPolicyEditor } from '../components/RuntimeAllocationPolicyEditor.tsx'
 import { NodeConfigurationSection } from './NodeConfigurationSection.tsx'
 import { NodeAccessSection } from './NodeAccessSection.tsx'
+import { PerformanceDiagnosticsSection } from './PerformanceDiagnosticsSection.tsx'
 import { TunnelAccessSection } from './TunnelAccessSection.tsx'
 import { NODE_CONFIG_FIELDS } from '../../../src/node-config-fields.ts'
 import { DatabaseBackup, HardDriveDownload, RefreshCw, ShieldCheck, Wrench } from 'lucide-react'
 import {
-  createBackup, getDeployment, listBackups, requestDeploymentRestore, setDeploymentNodeStatus,
-  setMaintenance, verifyBackup, inspectBackupNodeConfiguration, getNodeConfiguration,
-  type BackupNodeConfigurationPreview, type NodeConfigurationView, type DeploymentBackup, type DeploymentNode, type DeploymentState,
+  AdminRequestError, createBackup, getDeployment, getDeploymentOverview, listBackups,
+  requestDeploymentRestore, setDeploymentNodeStatus, setMaintenance, verifyBackup,
+  inspectBackupNodeConfiguration, getNodeConfiguration,
+  type BackupNodeConfigurationPreview, type DeploymentOverviewSectionKey,
+  type NodeConfigurationView, type DeploymentBackupEntry, type DeploymentNode, type DeploymentState,
 } from '../api.ts'
 import {
   Button, ConfirmDialog, Dialog, EmptyState, ErrorBanner, Field, IconButton, LoadingState,
@@ -39,7 +49,7 @@ const NODE_STATUS_LABEL: Record<DeploymentNode['status'], { labelKey: Deployment
   offline: { labelKey: 'nodeOffline', tone: 'neutral' },
 }
 
-const BACKUP_STATUS_LABEL: Record<DeploymentBackup['status'], { labelKey: DeploymentCopyKey; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
+const BACKUP_STATUS_LABEL: Record<DeploymentBackupEntry['status'], { labelKey: DeploymentCopyKey; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
   recording: { labelKey: 'backupRecording', tone: 'info' },
   verified: { labelKey: 'backupVerified', tone: 'success' },
   failed: { labelKey: 'backupFailed', tone: 'danger' },
@@ -54,22 +64,57 @@ function heartbeatText(node: DeploymentNode): string {
   return t('heartbeatMinutesAgo', { value: String(Math.round(node.heartbeatAgeMs / 60_000)) })
 }
 
+/** Longest wait before descendant sections stop waiting for the aggregated first snapshot. */
+const OVERVIEW_SECTION_HEDGE_MS = 1_000
+
 export function DeploymentPage() {
   const deployment = useDeploymentContext()
   const policyReady = deployment.value !== null
+  const computerTarget = adminComputerTarget()
+  const expectedSections = useMemo<ReadonlySet<DeploymentOverviewSectionKey>>(() => {
+    const sections = new Set<DeploymentOverviewSectionKey>(['deployment', 'backups', 'tunnel', 'nodeConfiguration'])
+    const value = deployment.value
+    const selected = computerTarget ?? value?.entry.nodeId
+    if (value?.mode === 'multi' && selected !== value.primary?.nodeId) sections.add('nodeConnection')
+    if (computerTarget === undefined) {
+      sections.add('runtimeAllocationPolicy')
+      if (value === null || value.scope === 'organization') sections.add('nodeAccess')
+    }
+    return sections
+  }, [deployment.value, computerTarget])
+  const initialSections = useMemo<readonly DeploymentOverviewSectionKey[]>(() => [...expectedSections], [expectedSections])
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
   const [state, setState] = useState<DeploymentState | null>(null)
-  const [backups, setBackups] = useState<DeploymentBackup[] | null>(null)
+  const [backups, setBackups] = useState<DeploymentBackupEntry[] | null>(null)
+  const [overview, setOverview] = useState<DeploymentOverviewState>(() => ({
+    status: 'loading',
+    requested: expectedSections,
+    sections: null,
+  }))
   const [error, setError] = useState('')
+  const [deploymentReadError, setDeploymentReadError] = useState('')
+  const [backupReadError, setBackupReadError] = useState('')
   const [notice, setNotice] = useState('')
   const [reason, setReason] = useState('')
   const [acting, setActing] = useState(false)
-  const [restoring, setRestoring] = useState<DeploymentBackup | null>(null)
+  const [restoring, setRestoring] = useState<DeploymentBackupEntry | null>(null)
   const [exiting, setExiting] = useState(false)
   const [configurationPreview, setConfigurationPreview] = useState<{ backup: BackupNodeConfigurationPreview; current: NodeConfigurationView } | null>(null)
   const lifetime = useRef<AbortController | undefined>(undefined)
   const flight = useRef<Promise<void> | undefined>(undefined)
   const queued = useRef<Promise<void> | undefined>(undefined)
+  const lastFetchedAt = useRef(0)
+  const seeded = useRef(false)
+  const overviewSupported = useRef(true)
+  const initialSectionsRef = useRef(initialSections)
+  initialSectionsRef.current = initialSections
+
+  useEffect(() => {
+    if (deployment.error && !seeded.current) {
+      seeded.current = true
+      setOverview({ status: 'fallback', requested: new Set(), sections: null })
+    }
+  }, [deployment.error])
 
   const refresh = useCallback((): Promise<void> => {
     const owner = lifetime.current
@@ -83,22 +128,89 @@ export function DeploymentPage() {
       queued.current = next
       return next
     }
-    const request = Promise.all([getDeployment(owner.signal), listBackups(owner.signal)]).then(([next, list]) => {
-      if (owner.signal.aborted) return
-      setState(next); setBackups(list.backups); setError('')
-    }).catch(cause => {
-      if (!owner.signal.aborted) setError(messageOf(cause))
-    }).finally(() => { if (flight.current === request) flight.current = undefined })
+    const accessDenied = (cause: unknown): boolean => cause instanceof AdminRequestError && (cause.status === 401 || cause.status === 403)
+    const applySection = <T,>(read: Promise<T>, publish: (value: T | null) => void, publishError: (message: string) => void) =>
+      read.then(value => {
+        if (!owner.signal.aborted) { publish(value); publishError('') }
+      }, cause => {
+        if (owner.signal.aborted) return
+        if (accessDenied(cause)) publish(null)
+        publishError(messageOf(cause))
+      })
+    const applyReads = async (stateRead: Promise<DeploymentState>, backupRead: Promise<{ backups: DeploymentBackupEntry[] }>): Promise<void> => {
+      await Promise.all([
+        applySection(stateRead, setState, setDeploymentReadError),
+        applySection(backupRead, list => setBackups(list?.backups ?? null), setBackupReadError),
+      ])
+    }
+    const fetchLegacy = (): Promise<void> => applyReads(getDeployment(owner.signal), listBackups(owner.signal))
+    const sectionsToLoad: readonly DeploymentOverviewSectionKey[] = !seeded.current
+      ? initialSectionsRef.current
+      : ['deployment', 'backups']
+    // A slow slice must not hold every section on its loading state; after the hedge,
+    // sections read independently and the aggregate only refreshes the page's own state.
+    const hedge = overviewSupported.current && !seeded.current ? setTimeout(() => {
+      if (seeded.current || owner.signal.aborted) return
+      seeded.current = true
+      setOverview({ status: 'fallback', requested: new Set(), sections: null })
+    }, OVERVIEW_SECTION_HEDGE_MS) : undefined
+    const request = (overviewSupported.current
+      ? getDeploymentOverview(sectionsToLoad, owner.signal).then(response => {
+        if (owner.signal.aborted) return
+        const sections = response?.sections ?? {}
+        const isInitial = !seeded.current
+        if (isInitial) {
+          seeded.current = true
+          setOverview({ status: 'ready', requested: new Set(sectionsToLoad), sections })
+        }
+        const deploymentSlice = sections.deployment
+        const backupsSlice = sections.backups
+        return applyReads(
+          deploymentSlice === undefined ? getDeployment(owner.signal) : Promise.resolve().then(() => unwrapDeploymentOverviewSlice(deploymentSlice)),
+          backupsSlice === undefined ? listBackups(owner.signal) : Promise.resolve().then(() => unwrapDeploymentOverviewSlice(backupsSlice)),
+        )
+      }, cause => {
+        if (owner.signal.aborted) return
+        if (cause instanceof AdminRequestError && cause.status === 404) {
+          overviewSupported.current = false
+          if (!seeded.current) {
+            seeded.current = true
+            setOverview({ status: 'fallback', requested: new Set(), sections: null })
+          }
+          return fetchLegacy()
+        }
+        if (!seeded.current) {
+          seeded.current = true
+          setOverview({ status: 'fallback', requested: new Set(), sections: null })
+        }
+        if (accessDenied(cause)) { setState(null); setBackups(null) }
+        const message = messageOf(cause)
+        setDeploymentReadError(message); setBackupReadError(message)
+      })
+      : fetchLegacy()
+    ).finally(() => {
+      if (!owner.signal.aborted) lastFetchedAt.current = Date.now()
+      clearTimeout(hedge)
+      if (flight.current === request) flight.current = undefined
+    })
     flight.current = request
     return request
   }, [])
+
+  const overviewValue = useMemo<DeploymentOverviewState>(() => (
+    overview.status === 'loading' ? { status: 'loading', requested: expectedSections, sections: null } : overview
+  ), [overview, expectedSections])
 
   useEffect(() => {
     if (!policyReady) return
     const owner = new AbortController()
     lifetime.current = owner
     void refresh()
-    const whenVisible = () => { if (document.visibilityState !== 'hidden' && flight.current === undefined) void refresh() }
+    const whenVisible = () => {
+      if (document.visibilityState === 'hidden' || flight.current !== undefined) return
+      if (Date.now() - lastFetchedAt.current < 2_000) return
+      void refresh()
+    }
     const timer = setInterval(whenVisible, 10_000)
     document.addEventListener('visibilitychange', whenVisible)
     return () => {
@@ -125,6 +237,7 @@ export function DeploymentPage() {
   const mode = state === null ? null : MODE_LABEL[state.mode]
 
   return (
+    <DeploymentOverviewProvider value={overviewValue}>
     <div>
       <PageHeader
         title={t('pageTitle')}
@@ -135,7 +248,8 @@ export function DeploymentPage() {
       {notice === '' ? null : <p role="status">{notice}</p>}
 
       <Section title={t('clusterTitle')} meta={state === null ? undefined : t('writeEpochMeta', { value: state.writeEpoch })}>
-        {state === null || mode === null ? <LoadingState label={t('loadingCluster')} /> : (
+        <ErrorBanner message={deploymentReadError} />
+        {state === null || mode === null ? deploymentReadError === '' ? <LoadingState label={t('loadingCluster')} /> : null : (
           <div className="deploymentStatus">
             <div className="statusRow">
               <StatusBadge tone={mode.tone}>{t(mode.labelKey)}</StatusBadge>
@@ -144,6 +258,7 @@ export function DeploymentPage() {
               </StatusBadge>
               <span className="sectionMeta">{t('maintenanceEpochMeta', { value: state.maintenanceEpoch })}</span>
             </div>
+            <p>{t('gatewayRelease')} <code className="codeText">{state.releaseId ?? t('releaseUnreported')}</code></p>
             {state.reason === null ? null : <p>{t('maintenanceReasonLine', { reason: state.reason })}</p>}
             {state.mode === 'serving' ? (
               <>
@@ -174,6 +289,7 @@ export function DeploymentPage() {
       {deployment.value?.mode === 'multi' && state && <NodeContentSection entry={deployment.value.entry} nodes={state.nodes}/>}
       {deployment.value?.mode === 'multi' && state && <NodeContentMigrationSection />}
       {deployment.value?.scope === 'organization' && state && <PeerBackupSection nodes={state.nodes}/>}
+      {deployment.value?.mode === 'single' && state && <LocalRecoveryExecutionSection key={deployment.value.entry.nodeId}/>}
       <NodeConnectionSection />
       <Section title={t('runtimeLimits')}><RuntimeAllocationPolicyEditor /></Section>
       {deployment.value?.scope === 'organization' && <NodeAccessSection />}
@@ -181,6 +297,8 @@ export function DeploymentPage() {
       <TunnelAccessSection />
 
       <NodeConfigurationSection />
+
+      <PerformanceDiagnosticsSection />
 
       {deployment.value?.scope === 'organization' && <Section flush title={t('nodesTitle')} meta={t('nodesMeta')}>
         {state === null ? null : state.nodes.length === 0 ? <EmptyState title={t('nodesEmpty')} /> : (
@@ -196,7 +314,7 @@ export function DeploymentPage() {
                     <td>{node.maintenanceAppliedEpoch}</td>
                     <td>{node.inflightWrites < 0 ? t('inflightUnreported') : node.inflightWrites}</td>
                     <td>{node.activeRuntimes}</td>
-                    <td>{node.quiesced ? t('yes') : t('no')}</td>
+                    <td>{node.externallyFenced ? t('externallyFenced') : node.quiesced ? t('yes') : t('no')}</td>
                     <td>
                       {node.status === 'active' ? (
                         <Button variant="ghost" disabled={acting}
@@ -240,7 +358,8 @@ export function DeploymentPage() {
         actions={<Button icon={DatabaseBackup} disabled={acting || state?.mode !== 'maintenance' || !state.writersQuiesced}
           onClick={() => void run(async () => { await createBackup() }, t('noticeBackupDone'))}>{t('backupNow')}</Button>}
       >
-        {backups === null ? <LoadingState label={t('loadingBackups')} /> : backups.length === 0 ? (
+        <ErrorBanner message={backupReadError} />
+        {backups === null ? backupReadError === '' ? <LoadingState label={t('loadingBackups')} /> : null : backups.length === 0 ? (
           <EmptyState title={t('backupsEmptyTitle')} detail={t('backupsEmptyDetail')} />
         ) : (
           <div className="tableWrap" role="region" aria-label={t('backupsTableAria')} tabIndex={0}>
@@ -264,7 +383,8 @@ export function DeploymentPage() {
                       }}>{t('viewBackupConfig')}</Button>
                       <IconButton label={t('verify')} icon={ShieldCheck} disabled={acting}
                         onClick={() => void run(() => verifyBackup(backup.id), t('noticeVerified'))} />
-                      {(backup.status === 'verified' || backup.status === 'restored') && backup.managedSnapshot !== null ? (
+                      {(backup.status === 'verified' || backup.status === 'restored')
+                        && ('hasManagedSnapshot' in backup ? backup.hasManagedSnapshot : backup.managedSnapshot !== null) ? (
                         <Button variant="ghost" icon={HardDriveDownload} disabled={acting || state?.mode === 'restoring'}
                           onClick={() => { setRestoring(backup) }}>{t('requestRestore')}</Button>
                       ) : null}
@@ -343,5 +463,6 @@ export function DeploymentPage() {
         }}
       />
     </div>
+    </DeploymentOverviewProvider>
   )
 }

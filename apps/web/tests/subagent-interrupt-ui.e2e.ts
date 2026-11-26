@@ -10,22 +10,24 @@
 // (claiming the overridden primary) and the parent's one UI prompt — needed
 // so the non-blank parent renders its header catalog — binds to a derived
 // child fixture afterwards.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { queueHostSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import {
-  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { compareWorkflowGolden, auditWorkflowState, newWorkflowPage } from './workflow-responsive-state.ts'
 
 const BASE_FIXTURE = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl', import.meta.url))
 
@@ -133,8 +135,8 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       replayChildFixtures: [join(sidecarRoot, 'child-shell.jsonl')],
       replayChildOverrideFiles: [join(sidecarRoot, 'replay.override.json')],
     })
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     page.on('request', (request) => {
       const path = new URL(request.url()).pathname
       if (path.startsWith('/api/')) apiCalls.push(path)
@@ -218,11 +220,12 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       const send = page.getByRole('button', { name: 'Send message' })
       expect(await send.count()).toBe(1)
       expect(await send.isDisabled()).toBe(true)
-      await compareOrRefreshGolden(
+      await compareWorkflowGolden(
         OFFLINE_COMPOSER_EXPECTED,
         await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd),
         MODE,
       )
+      await auditWorkflowState(page, 'subagent', 'offline-running', page.locator('[class*="centerCol"]'), [stop])
 
       // Keep the continuable Activation resident after this first abort. The
       // direct setup queue does not change the parent-offline UI contract: its
@@ -266,9 +269,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
   it('interrupts through subagents/interruptByParent, parks the follow-up, and resumes it FIFO', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-subagent-interrupt-flow'))
     // Reselect the child with the truthful catalog: parent available again.
-    await page.getByRole('navigation', { name: 'Session hierarchy' })
-      .getByRole('button').first().click()
-    await page.getByRole('button', { name: /1 subagent/ }).click()
+    await page.getByRole('button', { name: `Switch subagent: ${LABEL}`, exact: true }).click()
     await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
     // The parked setup queue keeps the composer in its steer-queue state, so
     // the input's accessible name is the steer hint, not the empty-queue
@@ -307,11 +308,12 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     const thumbnail = page.locator('[data-queue-dock]').getByRole('img', { name: 'Queued message image' })
     await thumbnail.waitFor()
     await expect.poll(() => thumbnail.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
-    await compareOrRefreshGolden(
+    await compareWorkflowGolden(
       IMAGE_QUEUE_EXPECTED,
       await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd),
       MODE,
     )
+    await auditWorkflowState(page, 'subagent', 'running-image-queue', page.locator('[class*="centerCol"]'))
 
     const aborted = waitForAbortedTurn(scaffold, childId)
     const stop = page.getByRole('button', { name: 'Stop generating' })
@@ -334,6 +336,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     expect(child!.inbox.nextTurn).toHaveLength(3)
     expect(child!.session.snapshotEvents().filter(event => event.type === 'turn/start')).toHaveLength(2)
     await page.getByRole('button', { name: 'Send message' }).waitFor({ timeout: 15_000 })
+    await auditWorkflowState(page, 'subagent', 'interrupted-parked', page.locator('[class*="centerCol"]'))
 
     // Only the waking send resumes the parked queue, FIFO, to settlement.
     await input.fill(WAKING)
@@ -365,6 +368,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       .filter(event => event.type === 'turn/end')
       .map(event => event.data.reason.kind)
     expect(turnEndKinds).toEqual(['aborted', 'aborted', 'completed', 'completed', 'completed', 'completed'])
+    await auditWorkflowState(page, 'subagent', 'resumed-completed', page.locator('[class*="centerCol"]'))
     expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
 

@@ -7,11 +7,18 @@ const { RUNTIME_READINESS_PATH, RUNTIME_READINESS_NONCE_HEADER, RUNTIME_READINES
   runtimeReadinessRequestProof, runtimeReadinessResponseProof } = await import(protocolEntry)
 const credential = JSON.parse(readFileSync(3, 'utf8'))
 let observed = false
+let held
 function publish(path, value) {
   const temporary = path + '.' + process.pid
   writeFileSync(temporary, JSON.stringify(value), { flag: 'wx', mode: 0o600 }); renameSync(temporary, path)
 }
 const server = createServer((request, response) => {
+  if (mode === 'retained-work' && request.url === '/hold') {
+    held = response; response.writeHead(200); response.flushHeaders(); return
+  }
+  if (mode === 'retained-work' && request.url === '/finish') {
+    held?.end('completed-after-upgrade'); held = undefined; response.end('finished'); return
+  }
   if (request.url !== RUNTIME_READINESS_PATH) { response.statusCode = 404; response.end(); return }
   const nonce = request.headers[RUNTIME_READINESS_NONCE_HEADER]
   if (typeof nonce !== 'string' || request.headers[RUNTIME_READINESS_REQUEST_HEADER] !== runtimeReadinessRequestProof(credential.token, nonce, credential.runtime)) {

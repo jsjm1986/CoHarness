@@ -203,6 +203,7 @@ flowchart LR
   pkg_agent_default_model["agent-default-model"]
   svc_agentDefaultModel["ctx.agentDefaultModel<br/>Default Agent model selection"]
   pkg_headless["headless"]
+  svc_agentExecutionAdmission["ctx.agentExecutionAdmission<br/>Session execution admission"]
   svc_agentLoop["ctx.agentLoop<br/>Concrete loop driver"]
   pkg_agent_spine_demo["agent-spine-demo"]
   svc_headlessStartup["ctx.headlessStartup<br/>One-shot headless invocation values"]
@@ -334,6 +335,7 @@ flowchart LR
   svc_forgeSession["ctx.forgeSession<br/>Session-bound change-request bindings"]
   svc_forgePanel["ctx.forgePanel<br/>Forge panel Remote"]
   pkg_acp --> svc_approval
+  pkg_agent --> svc_agentExecutionAdmission
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
   pkg_agent_loop --> svc_agentLoop
@@ -512,6 +514,8 @@ flowchart LR
   pkg_workspace_changes --> svc_workspaceChanges
   svc_agentDefaultModel --> pkg_headless
   svc_agentDefaultModel --> pkg_host_apiproxy
+  svc_agentExecutionAdmission --> pkg_agent_loop
+  svc_agentExecutionAdmission --> pkg_host_apiproxy
   svc_agentLoop --> pkg_agent_spine_demo
   svc_agentTeams --> pkg_tool_agent_team
   svc_agents --> pkg_acp
@@ -772,6 +776,7 @@ flowchart LR
 | `ctx.skills` | `seam` | [`skill`](../packages/skill/skill) | [`sandbox-windows-acl`](../packages/sandbox/sandbox-windows-acl), [`skill-badge`](../packages/skill/skill-badge), [`skill-filesystem`](../packages/skill/skill-filesystem), [`skill-office`](../packages/skill/skill-office) | [`tool-skill`](../packages/skill/tool-skill) | - | 合并提供方的 skill（技能）目录；tool-skill 渲染会话前缀目录，并加载完整的 skill 正文。 |
 | `ctx.agents` | `core` | [`agent`](../packages/core/agent) | - | [`agent-loop`](../packages/core/agent-loop), [`acp`](../packages/acp/acp), `subagent-inprocess` | - | 拥有实时 Agent 句柄、创建／恢复工厂 seam，以及进程本地的发起方传播。 |
 | `ctx.agentDefaultModel` | `core` | [`agent-default-model`](../packages/core/agent-default-model) | - | [`headless`](../packages/bundle/headless), [`host-apiproxy`](../packages/host/apiproxy) | - | 通过 settings 分层默认 `ModelSelection`，让直接入口与 Host 支撑的 Agent 入口共享同一个状态所有者。 |
+| `ctx.agentExecutionAdmission` | `core` | [`agent`](../packages/core/agent) | - | [`agent-loop`](../packages/core/agent-loop), [`host-apiproxy`](../packages/host/apiproxy) | - | 启动时安装的限制拒绝恢复后的 Session 执行，同时保留不挂接 Session 的历史读取。 |
 | `ctx.agentLoop` | `bundle` | [`agent-loop`](../packages/core/agent-loop) | - | [`agent-spine-demo`](../packages/examples/agent-spine-demo) | - | 唯一的具体循环插件；扩展包依赖 dsh-agent 的事件和服务，而不依赖此包。 |
 | `ctx.headlessStartup` | `bundle` | [`headless`](../packages/bundle/headless) | - | [`headless`](../packages/bundle/headless) | - | 一次性解析任务、Session 身份、权限选项与输出模式；运行器消费已发布值而不再重读 argv。 |
 | `ctx.goals` | `core` | [`goal`](../packages/goal/goal) | - | - | - | 从会话日志折叠带修订版本的目标状态，并将实时延续激活保留在进程本地。 |

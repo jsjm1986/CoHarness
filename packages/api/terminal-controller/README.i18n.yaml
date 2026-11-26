@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/api/terminal-controller/README.md
 document:
-  en: d3594cc4866e83fb6233d39514b266d3a5bacd76
-  zh: de1f7181d5fe1cce5358dcd2ff321255508a062d
+  en: 14f8f6449bf91f1a4edcebea4123c8fe1d308a46
+  zh: ba675dafbde42d448f33008a723df2dbd791a9d0
 /:
   en: 6a19f6d3fdfe0db2
   zh: a361afe6b8cd3010
@@ -21,8 +21,8 @@ document:
   en: 2d8fe460e6b02575
   zh: c242b8c184d85533
 /deepseek-ai-dsh-api-terminal-controller/understand-the-implementation:
-  en: cbf9e63a4bb7b75a
-  zh: f5438fd84e2a5f8b
+  en: e972e3591a31fe28
+  zh: 7ac00483e3d33ce7
 /deepseek-ai-dsh-api-terminal-controller/further-exploration:
   en: b1b5d2a2bfb8cc6a
   zh: aa0ea568aa63fda5
@@ -31,7 +31,7 @@ document:
   zh: 35a7c88f180f74a1
 /deepseek-ai-dsh-api-terminal-controller/model-experience/kv-cache-effect:
   en: 507d3b3b80596fdc
-  zh: 03058ee7f8d31911
+  zh: 4659007c4671afdc
 /deepseek-ai-dsh-api-terminal-controller/known-limitations-and-deferred-work:
   en: 6af6663b852441db
   zh: 244ed7729cae8d81

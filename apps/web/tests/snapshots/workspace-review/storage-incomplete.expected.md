@@ -1,0 +1,3 @@
+- alert:
+  - strong: This turn’s review did not complete
+  - paragraph: File changes may already have occurred. Resolve the reported problem before trying again; existing reviews are preserved.

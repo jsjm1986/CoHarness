@@ -17,6 +17,8 @@ export interface PdfBodyProps extends PropsLocale<'sidebarPdf'> {
   signal: AbortSignal
   /** Page and zoom preferences belong to the containing tab and survive a hidden body. */
   view: { page: number; zoom?: ZoomPreference }
+  /** Document notice shown before the pages in the reader's scrollport. */
+  readonly notice?: ReactNode
   /** Main-bundle viewport reused by the lazy PDF body. */
   readonly ZoomViewport: ComponentType<ZoomViewportProps>
   /** Main-bundle class implementing fit-width and fixed-size surfaces. */
@@ -27,15 +29,15 @@ type LoadState =
   | { readonly kind: 'loaded'; readonly data: Uint8Array<ArrayBuffer>; readonly document: PdfDocument }
   | { readonly kind: 'failed'; readonly data: Uint8Array<ArrayBuffer>; readonly error: unknown }
 
+const FIT_WIDTH: ZoomPreference = { kind: 'fit-width' }
+
 /**
  * Present a PDF with tab-local viewing preferences and component-owned rendering resources.
  * @param props - complete bytes, tab-owned page/zoom preferences, lifetime, and localized copy.
  * @returns the PDF reader.
  */
-const FIT_WIDTH: ZoomPreference = { kind: 'fit-width' }
-
 export function PdfBody(props: PdfBodyProps): ReactNode {
-  const { data, signal: ownerSignal, t, view, ZoomViewport, zoomSurfaceClass } = props
+  const { data, signal: ownerSignal, t, view, notice, ZoomViewport, zoomSurfaceClass } = props
   const pageVisible = useCallback((page: number) => { view.page = page }, [view])
   const [load, setLoad] = useState<LoadState>()
   const [attempt, setAttempt] = useState(0)
@@ -89,6 +91,7 @@ export function PdfBody(props: PdfBodyProps): ReactNode {
   </section>
   return <ZoomViewport preference={preference} intrinsicWidth={pageWidth} labels={labels}
     signal={ownerSignal} onPreference={setZoomPreference} onRenderZoom={setRenderZoom}>
+    {notice}
     {pages}
   </ZoomViewport>
 }

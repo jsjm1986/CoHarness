@@ -24,7 +24,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, FiberState } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import HttpServer, { bindUrlHost, isLoopbackHost, normalizeBindAddress, renderIndexInjections, type TlsConfig } from '../src/index.ts'
+import HttpServer, { bindUrlHost, isLoopbackHost, normalizeBindAddress, renderIndexInjections, type TlsConfig, type WebRoute } from '../src/index.ts'
 import { materializeTlsFixture, type TlsFixture } from './tls-fixture.ts'
 
 /** One-shot barrier for disposal overlapping a pending PEM read. */
@@ -234,6 +234,56 @@ function tlsUpgrade(port: number | undefined, path: string, ca: string): Promise
 }
 
 describe('real Loader composition', () => {
+  it('runs request guards before named routes and the fallback, and removes the contributing guard on unload', async () => {
+    const context = await loadComposition()
+    const calls: string[] = []
+    context.webServer.register({ kind: 'exact', path: '/guarded', handler: (_req, res) => { calls.push('route'); res.end('route') } })
+    context.webServer.registerFallback((_req, res) => { calls.push('fallback'); res.end('fallback') })
+    const allow = context.webServer.registerRequestGuard(() => { calls.push('first'); return true })
+    context.loader.builtins.requestGuard = {
+      name: 'request-guard',
+      inject: ['webServer'],
+      apply(scope: Context) {
+        scope.effect(() => scope.webServer.registerRequestGuard((_req, res) => {
+          calls.push('deny')
+          res.writeHead(403).end('denied')
+          return false
+        }))
+      },
+    }
+    await context.loader.create({ name: 'cordis:requestGuard' })
+    await context.loader.await()
+    const entry = [...context.loader.entries()].find(candidate => candidate.options.name === 'cordis:requestGuard')
+    if (entry === undefined) throw new Error('Request guard Loader entry is missing')
+    const last = context.webServer.registerRequestGuard(() => { calls.push('last'); return true })
+    for (const path of ['/guarded', '/unmatched']) {
+      calls.length = 0
+      expect(await request(context.webServer.port, path)).toMatchObject({ status: 403, body: 'denied' })
+      expect(calls).toEqual(['first', 'deny'])
+    }
+    await context.loader.update(entry.id, { disabled: true })
+    for (const [path, handler] of [['/guarded', 'route'], ['/unmatched', 'fallback']] as const) {
+      calls.length = 0
+      expect(await request(context.webServer.port, path)).toMatchObject({ status: 200, body: handler })
+      expect(calls).toEqual(['first', 'last', handler])
+    }
+    allow(); last()
+    calls.length = 0
+    await request(context.webServer.port, '/guarded')
+    expect(calls).toEqual(['route'])
+  })
+
+  it('contains a throwing guard without dispatching a route or damaging the next request', async () => {
+    const context = await loadComposition()
+    const route = vi.fn<WebRoute['handler']>((_req, res) => { res.end('route') })
+    context.webServer.register({ kind: 'exact', path: '/guarded', handler: route })
+    const dispose = context.webServer.registerRequestGuard(() => { throw new Error('guard refused') })
+    expect((await request(context.webServer.port, '/guarded')).status).toBe(400)
+    expect(route).not.toHaveBeenCalled()
+    dispose()
+    expect(await request(context.webServer.port, '/guarded')).toMatchObject({ status: 200, body: 'route' })
+  })
+
   it('accepts one concrete IP literal, keeping an IPv6 zone for listen', () => {
     for (const host of ['127.0.0.1', '10.1.2.3', '0.1.2.3', '::1', 'fd00::1', '::ffff:10.1.2.3', '::ffff:0.1.2.3', '0:0:0:0:0:0:0:1', 'fe80::1%lo', '::0.0.0.1', '::0.0.0.1%lo', '::127.0.0.1']) {
       expect(HttpServer.Config({ host, port: 0 }).host).toBe(host)

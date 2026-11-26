@@ -76,7 +76,7 @@ Blast Radius 的 DSH 包装使用当前运行的可执行文件提供 Node 计�
 <a id="the-band-above-the-prompt"></a>
 ### 提示框上方的横幅
 
-横幅每个会话一个实例，由加载顺序中第一个 `ui.render` 钩子返回树的模组绘制；调用 `next(e)` 的钩子把横幅让给下一个模组，因此把只在持有事项时才绘制的模组（Blast Radius、Replay Theater）放在只要有读数就绘制的模组（Token Weather）之前。横幅在 `session.start` 之后、上次绘制读取过的 `$.state` 值被写入时、在 `$.ui.open`、`$.ui.close`、`$.ui.invalidate` 之后、在每条 `tool.call` 链与 `turn.complete` 结束之后以及按钮按下之后重绘。`Button` 的 `onPress` 留在宿主中；Web 横幅把点击连同它看到的代数发回，针对更早绘制的点击会被报告并忽略。`$.ui.open` 回答 `{ isPlaced: false }`：没有面板被放置，降级到横幅的模组就在横幅中绘制。[测试工具包](#test-a-mod)的 `$.ui.mount` 不需要 Client 就能渲染同样的钩子。
+横幅每个会话一个实例，由加载顺序中第一个 `ui.render` 钩子返回树的模组绘制；调用 `next(e)` 的钩子把横幅让给下一个模组，因此把只在持有事项时才绘制的模组（Blast Radius、Replay Theater）放在只要有读数就绘制的模组（Token Weather）之前。横幅在 `session.start` 之后、上次绘制读取过的 `$.state` 值被写入时、在 `$.ui.open`、`$.ui.close`、`$.ui.invalidate` 之后、在每条 `tool.call` 链与 `turn.complete` 结束之后以及按钮按下之后重绘。`Button` 的 `onPress` 留在宿主中；Web 横幅把点击连同它看到的代数发回，针对更早绘制的点击会被报告并忽略。`$.ui.open` 回答 `{ isPlaced: false }`：没有面板被放置，降级到横幅的模组就在横幅中绘制。回调失败会被报告，并在横幅重绘后返回给调用者；失败前的修改会保留，桥接不会重试。[测试工具包](#test-a-mod)的 `$.ui.mount` 不需要 Client 就能渲染同样的钩子。
 
 ### 你的模组可以调用哪些 `$` 成员
 

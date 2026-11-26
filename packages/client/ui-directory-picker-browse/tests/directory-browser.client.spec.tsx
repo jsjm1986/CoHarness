@@ -1350,6 +1350,9 @@ describe('DirectoryBrowser', () => {
     fireEvent.keyDown(pathInput, { key: 'Enter' })
     expect(b.listDirectory.mock.calls.length).toBe(listCalls)
     fireEvent.compositionEnd(pathInput)
+    fireEvent.keyDown(pathInput, { key: 'Enter', isComposing: true })
+    fireEvent.keyDown(pathInput, { key: 'Enter', keyCode: 229 })
+    expect(b.listDirectory.mock.calls.length).toBe(listCalls)
     fireEvent.keyDown(pathInput, { key: 'Enter' })
     await waitFor(() => { expect(b.listDirectory).toHaveBeenLastCalledWith(DOCS, expect.any(AbortSignal)) })
     // Create dialog: same guard.
@@ -1360,6 +1363,9 @@ describe('DirectoryBrowser', () => {
     fireEvent.keyDown(nameInput, { key: 'Enter' })
     expect(b.createDirectory).not.toHaveBeenCalled()
     fireEvent.compositionEnd(nameInput)
+    fireEvent.keyDown(nameInput, { key: 'Enter', isComposing: true })
+    fireEvent.keyDown(nameInput, { key: 'Enter', keyCode: 229 })
+    expect(b.createDirectory).not.toHaveBeenCalled()
     fireEvent.keyDown(nameInput, { key: 'Enter' })
     await waitFor(() => { expect(b.createDirectory).toHaveBeenCalledWith(DOCS, '新建') })
   })
@@ -1497,17 +1503,23 @@ describe('DirectoryBrowser', () => {
   it('makes every parent control inert while the nested create dialog is open', async () => {
     mount()
     await waitFor(() => { expect(screen.getByRole('listitem')).toBeTruthy() })
+    const parent = screen.getByRole('dialog')
+    const parentControls = [
+      screen.getByRole<HTMLButtonElement>('button', { name: 'browser.cancel' }),
+      screen.getByRole<HTMLButtonElement>('button', { name: 'browser.open' }),
+      screen.getByRole<HTMLButtonElement>('button', { name: 'browser.editPath' }),
+      ...screen.getAllByRole('listitem').map(rowButton),
+    ]
     fireEvent.click(screen.getByRole('button', { name: 'browser.newFolder' }))
-    // Modal traps no focus: Shift-Tab/AT reach the parent, so closing,
-    // adopting, and retargeting must all disable underneath the child. Both
-    // dialogs carry a cancel: the parent's disables, the child's stays live.
     const cancels = screen.getAllByRole<HTMLButtonElement>('button', { name: 'browser.cancel' })
-    expect(cancels.map(button => button.disabled).sort()).toEqual([false, true])
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'browser.open' }).disabled).toBe(true)
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'browser.editPath' }).disabled).toBe(true)
-    for (const row of screen.getAllByRole('listitem')) {
-      expect(rowButton(row).disabled).toBe(true)
-    }
+    expect(cancels).toHaveLength(1)
+    expect(cancels[0]?.disabled).toBe(false)
+    expect(parent.closest('[aria-hidden="true"]')).not.toBeNull()
+    expect(parentControls.every(button => button.disabled)).toBe(true)
+    fireEvent.click(cancels[0]!)
+    expect(screen.getByRole('dialog')).toBe(parent)
+    expect(parent.closest('[aria-hidden="true"]')).toBeNull()
+    expect(parentControls.every(button => !button.disabled)).toBe(true)
   })
 
   it('drops a creation failure that lands after the flow closed and reopened', async () => {

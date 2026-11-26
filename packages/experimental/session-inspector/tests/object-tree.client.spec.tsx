@@ -144,7 +144,7 @@ it('expands Node Data inline but keeps its title navigable and cyclic references
   props.index.set(data, reference)
   const ui = render(<InspectorObjectTree {...props} value={{ data }} />)
   const link = ui.getByRole('button', { name: '↗ Node Data · 1' })
-  const branch = link.closest('details')!
+  const branch = link.parentElement!.querySelector('details')!
   expect(branch.open).toBe(false)
   expect(ui.queryByText('"inline node data"')).toBeNull()
   branch.open = true

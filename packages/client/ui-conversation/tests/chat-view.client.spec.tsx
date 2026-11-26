@@ -450,13 +450,13 @@ function installScrollMetrics(element: HTMLElement, initialHeight: number, clien
   Object.defineProperty(element, 'scrollTop', {
     configurable: true,
     get: () => scrollTop,
-    set: (value: number) => { scrollTop = Math.max(0, Math.min(value, scrollHeight - clientHeight)) },
+    set: (value: number) => { scrollTop = Math.max(0, Math.min(value, scrollHeight - element.clientHeight)) },
   })
   return {
     setHeight: (value: number) => { scrollHeight = value },
     setLayout: (height: number, top: number) => {
       scrollHeight = height
-      scrollTop = Math.max(0, Math.min(top, scrollHeight - clientHeight))
+      scrollTop = Math.max(0, Math.min(top, scrollHeight - element.clientHeight))
     },
   }
 }
@@ -1883,7 +1883,7 @@ describe('ChatView', () => {
     }
   })
 
-  it('one ResizeObserver owns pinned dynamic-height follow and ignores growth while away', () => {
+  it('observes content and viewport size to follow the pinned tail while retaining an unpinned reader', () => {
     let notify: (() => void) | undefined
     const observe = vi.fn()
     class ResizeObserverStub {
@@ -1905,11 +1905,15 @@ describe('ChatView', () => {
     Object.defineProperty(scroller, 'scrollHeight', { value: 1_200, writable: true })
     act(() => { notify?.() })
     expect(scroller.scrollTop).toBe(1_200)
+    Object.defineProperty(scroller, 'clientHeight', { value: 240, writable: true })
+    act(() => { notify?.() })
+    expect(scroller.scrollTop).toBe(1_200)
     readerScroll(scroller, 200)
     Object.defineProperty(scroller, 'scrollHeight', { value: 1_400, writable: true })
     act(() => { notify?.() })
     expect(scroller.scrollTop).toBe(200)
-    expect(observe).toHaveBeenCalledTimes(1)
+    expect(observe).toHaveBeenCalledTimes(2)
+    expect(observe).toHaveBeenCalledWith(scroller)
   })
 
   it('entering the at-bottom threshold does not snap the remaining scroll distance', () => {
@@ -1923,6 +1927,175 @@ describe('ChatView', () => {
     readerScroll(scroller, 690) // distance-to-bottom = 10
     expect(view.queryByLabelText('回到底部')).toBeNull()
     expect(scroller.scrollTop).toBe(690)
+  })
+
+  it('opens and follows the start of an oversized composer through viewport and content resizing', () => {
+    let notify: (() => void) | undefined
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        notify = () => { callback([], this) }
+      }
+
+      observe = vi.fn()
+      unobserve = vi.fn()
+      disconnect = vi.fn()
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    const host = document.createElement('div')
+    host.setAttribute('data-conversation-scroll', '')
+    const mount = document.createElement('div')
+    const composer = document.createElement('div')
+    composer.setAttribute('data-composer-seat', '')
+    Object.defineProperty(composer, 'offsetHeight', { value: 180, configurable: true })
+    host.append(mount, composer)
+    document.body.appendChild(host)
+    const metrics = installScrollMetrics(host, 1_000, 100)
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />, { container: mount })
+    try {
+      // The first follow precedes the shell's deferred data-composer-flow update.
+      expect(host.hasAttribute('data-composer-flow')).toBe(false)
+      expect(host.scrollTop).toBe(820)
+      fireEvent.scroll(host)
+      expect(host.scrollTop).toBe(820)
+      expect(view.queryByLabelText('回到底部')).toBeNull()
+      metrics.setHeight(1_200)
+      fireEvent.scroll(host)
+      expect(host.scrollTop).toBe(1_020)
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(1_020)
+      // Opening and dismissing the keyboard changes the available height.
+      Object.defineProperty(host, 'clientHeight', { value: 76, configurable: true })
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(1_020)
+      Object.defineProperty(host, 'clientHeight', { value: 140, configurable: true })
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(1_020)
+      expect(h.chatScroll.read()).toBeNull()
+      Object.defineProperty(composer, 'offsetHeight', { value: 80, configurable: true })
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(1_060)
+    } finally {
+      view.unmount()
+      host.remove()
+    }
+  })
+
+  it('reveals the focused draft when following a short pane without capturing manual history or control scrolling', () => {
+    vi.useFakeTimers()
+    let notify: (() => void) | undefined
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        notify = () => { callback([], this) }
+      }
+
+      observe = vi.fn()
+      unobserve = vi.fn()
+      disconnect = vi.fn()
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    const host = document.createElement('div')
+    host.setAttribute('data-conversation-scroll', '')
+    const mount = document.createElement('div')
+    const composer = document.createElement('div')
+    composer.setAttribute('data-composer-seat', '')
+    Object.defineProperty(composer, 'offsetHeight', { value: 180 })
+    const draft = document.createElement('textarea')
+    const reveal = vi.fn(() => { host.scrollTop += 16 })
+    draft.scrollIntoView = reveal
+    composer.appendChild(draft)
+    host.append(mount, composer)
+    document.body.appendChild(host)
+    installScrollMetrics(host, 1_000, 100)
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />, { container: mount })
+    try {
+      expect(reveal).not.toHaveBeenCalled()
+      draft.focus()
+      Object.defineProperty(host, 'clientHeight', { value: 44, configurable: true })
+      act(() => { notify?.() })
+      expect(reveal).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
+      expect(host.scrollTop).toBe(836)
+      fireEvent.scroll(host)
+      expect(host.scrollTop).toBe(836)
+      expect(h.chatScroll.read()).toBeNull()
+      readerScroll(host, 900)
+      fireEvent.scroll(host)
+      expect(host.scrollTop).toBe(900)
+      expect(reveal).toHaveBeenCalledTimes(1)
+      readerScroll(host, 400)
+      act(() => { vi.runOnlyPendingTimers() })
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(400)
+      expect(h.chatScroll.read()?.scrollTop).toBe(400)
+      expect(reveal).toHaveBeenCalledTimes(1)
+      fireEvent.click(view.getByLabelText('回到底部'))
+      expect(host.scrollTop).toBe(836)
+      expect(reveal).toHaveBeenCalledTimes(2)
+      draft.blur()
+      Object.defineProperty(host, 'clientHeight', { value: 140, configurable: true })
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(820)
+      expect(reveal).toHaveBeenCalledTimes(2)
+      Object.defineProperty(host, 'clientHeight', { value: 300, configurable: true })
+      draft.focus()
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(700)
+      expect(reveal).toHaveBeenCalledTimes(2)
+    } finally {
+      view.unmount()
+      host.remove()
+      vi.useRealTimers()
+    }
+  })
+
+  it('lets a reader reach the lower composer controls, leave the tail, and explicitly return to its start', () => {
+    vi.useFakeTimers()
+    let notify: (() => void) | undefined
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        notify = () => { callback([], this as unknown as ResizeObserver) }
+      }
+
+      observe = vi.fn()
+      disconnect = vi.fn()
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    const host = document.createElement('div')
+    host.setAttribute('data-conversation-scroll', '')
+    const mount = document.createElement('div')
+    const composer = document.createElement('div')
+    composer.setAttribute('data-composer-seat', '')
+    Object.defineProperty(composer, 'offsetHeight', { value: 180 })
+    host.append(mount, composer)
+    document.body.appendChild(host)
+    const metrics = installScrollMetrics(host, 1_000, 100)
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />, { container: mount })
+    try {
+      readerScroll(host, 890)
+      fireEvent.scroll(host)
+      expect(host.scrollTop).toBe(890)
+      expect(view.queryByLabelText('回到底部')).toBeNull()
+      expect(h.chatScroll.read()).toBeNull()
+      readerScroll(host, 400)
+      act(() => { vi.runOnlyPendingTimers() })
+      metrics.setHeight(1_200)
+      act(() => { notify?.() })
+      expect(host.scrollTop).toBe(400)
+      expect(h.chatScroll.read()?.scrollTop).toBe(400)
+      view.rerender(<div />)
+      host.scrollTop = 0
+      view.rerender(<h.ChatView {...h.props} />)
+      expect(host.scrollTop).toBe(400)
+      fireEvent.click(view.getByLabelText('回到底部'))
+      expect(host.scrollTop).toBe(1_020)
+      expect(h.chatScroll.read()).toBeNull()
+    } finally {
+      view.unmount()
+      host.remove()
+      vi.useRealTimers()
+    }
   })
 
   it('under data-conversation-scroll, bottom-follow targets the host scrollport', () => {
@@ -1989,10 +2162,11 @@ describe('ChatView', () => {
     const disconnect = vi.fn()
     class ResizeObserverStub {
       constructor(callback: ResizeObserverCallback) {
-        notify = () => { callback([], this as unknown as ResizeObserver) }
+        notify = () => { callback([], this) }
       }
 
       observe = vi.fn()
+      unobserve = vi.fn()
       disconnect = disconnect
     }
     vi.stubGlobal('ResizeObserver', ResizeObserverStub)
@@ -2257,11 +2431,11 @@ describe('ChatView', () => {
     expect(view.getByText('加载中…')).toBeTruthy()
   })
 
-  it('automatically loads older history near the reader head', () => {
+  it('loads older history once when the reader scrolls up to the head', () => {
     const h = makeHarness({ nodes: [user(5, 'later')], hasMore: true })
     const view = render(<h.ChatView {...h.props} />)
     const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
-    let scrollTop = 100
+    let scrollTop = 700
     Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1_000 })
     Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 300 })
     Object.defineProperty(scroller, 'scrollTop', {
@@ -2270,7 +2444,24 @@ describe('ChatView', () => {
       set: (value: number) => { scrollTop = value },
     })
     fireEvent.scroll(scroller)
+    expect(h.loadOlder).not.toHaveBeenCalled()
+    scrollTop = 100
     fireEvent.scroll(scroller)
+    fireEvent.scroll(scroller)
+    expect(h.loadOlder).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a first page that fits the viewport intact until the reader requests older history', () => {
+    const h = makeHarness({ nodes: [user(5, 'recent')], hasMore: true, openState: 'loading' })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 240 })
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 800 })
+    Object.defineProperty(scroller, 'scrollTop', { configurable: true, get: () => 0, set: () => {} })
+    act(() => { h.set({ openState: 'open' }) })
+    fireEvent.scroll(scroller)
+    expect(h.loadOlder).not.toHaveBeenCalled()
+    fireEvent.click(view.getByRole('button', { name: '加载更早' }))
     expect(h.loadOlder).toHaveBeenCalledOnce()
   })
 

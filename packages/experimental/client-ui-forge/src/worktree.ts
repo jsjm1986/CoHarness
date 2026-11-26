@@ -432,9 +432,9 @@ export class WorktreeCreations {
       signal.throwIfAborted()
       return created
     } finally {
-      // After the service's `plugin:worktree/created` record, so a follower never sees the creation end without its result.
       this.live.delete(session)
-      this.changed(session)
+      // The waiting message's hold publishes its outcome with the next available action.
+      if (!held) this.changed(session)
     }
   }
 
@@ -504,11 +504,10 @@ export class WorktreeCreations {
         signal.throwIfAborted()
         if (stop.signal.aborted) this.failures.delete(session)
         else this.failures.set(session, failureOf(error, state.request.from))
-        this.changed(session)
       } finally {
         hold.stop = undefined
       }
-      while (await this.wait(hold, signal) !== 'retry') {
+      while (await this.wait(hold, signal, () => { this.changed(session) }) !== 'retry') {
         const current = this.states(session)
         if (current.request === null || current.created !== null || current.locked) return
       }
@@ -548,14 +547,17 @@ export class WorktreeCreations {
     }
   }
 
-  /** Wait for the next decision on a hold; rejects with the abort reason once `signal` aborts. */
-  private async wait<T>(hold: { next: PromiseWithResolvers<T> | undefined }, signal: AbortSignal): Promise<T> {
+  /** Admit the next decision on a hold before publishing that it can accept one. */
+  private async wait<T>(
+    hold: { next: PromiseWithResolvers<T> | undefined }, signal: AbortSignal, onWaiting?: () => void,
+  ): Promise<T> {
     signal.throwIfAborted()
     const next = Promise.withResolvers<T>()
     hold.next = next
     const abort = (): void => { next.reject(signal.reason) }
     signal.addEventListener('abort', abort, { once: true })
     try {
+      onWaiting?.()
       return await next.promise
     } finally {
       signal.removeEventListener('abort', abort)

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -141,6 +141,31 @@ describe('ModelsPage', () => {
     vi.mocked(api.setModelAccess).mockResolvedValue(undefined)
   })
 
+  it('prepares the detail chunk once the catalog is ready and requests user choices on entry to a detail tab', async () => {
+    const modelList = Promise.withResolvers<api.ModelGovernanceRow[]>()
+    const usersList = Promise.withResolvers<api.AdminUser[]>()
+    const background = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('scheduler', { postTask: background })
+    vi.mocked(api.listModels).mockReturnValue(modelList.promise)
+    vi.mocked(api.listUsers).mockReturnValue(usersList.promise)
+    const user = userEvent.setup()
+    try {
+      render(<ModelsPage />)
+      await screen.findByText('组织主连接')
+      await waitFor(() => expect(background).toHaveBeenCalledWith(expect.any(Function), expect.objectContaining({ priority: 'background' })))
+      expect(api.listUsers).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: '个人登记' }))
+      expect(await screen.findByText('个人 Provider 与模型登记')).toBeTruthy()
+      expect(screen.getByText('custom')).toBeTruthy()
+      expect(api.listUsers).toHaveBeenCalledExactlyOnceWith('organization', expect.any(AbortSignal))
+      await act(async () => { usersList.resolve(users) })
+      expect(await screen.findByRole('option', { name: /^alice$/u })).toBeTruthy()
+    } finally {
+      await act(async () => { modelList.resolve(models); usersList.resolve(users) })
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('mounts the shared full Provider and model editor for organization settings', async () => {
     const user = userEvent.setup()
     render(<ModelsPage />)
@@ -240,7 +265,7 @@ describe('ModelsPage', () => {
     await user.click(screen.getByRole('button', { name: '个人登记' }))
     expect((await screen.findByRole('alert')).textContent).toContain('Registrations unavailable')
     expect(screen.queryByText('暂无个人登记记录')).toBeNull()
-    expect(api.listModelRegistrations).toHaveBeenCalledExactlyOnceWith({ limit: 200 })
+    expect(api.listModelRegistrations).toHaveBeenCalledExactlyOnceWith({ limit: 200 }, expect.any(AbortSignal))
   })
 
   it('does not claim an empty organization model directory when its query fails', async () => {
@@ -266,7 +291,47 @@ describe('ModelsPage', () => {
     await user.click(screen.getByRole('button', { name: '个人登记' }))
     expect(await screen.findByText('暂无个人登记记录')).toBeTruthy()
     expect(screen.queryByRole('alert')).toBeNull()
-    expect(api.listModelRegistrations).toHaveBeenCalledExactlyOnceWith({ limit: 200 })
+    expect(api.listModelRegistrations).toHaveBeenCalledExactlyOnceWith({ limit: 200 }, expect.any(AbortSignal))
+  })
+
+  it.each(['result', 'error'] as const)('ignores a superseded registration %s after applying a new filter', async (outcome) => {
+    const first = Promise.withResolvers<api.ModelRegistrationReport>()
+    const second = Promise.withResolvers<api.ModelRegistrationReport>()
+    const report = (provider: string): api.ModelRegistrationReport => ({
+      summary: { providerCount: 1, modelCount: 1, eventCount: 1, createdCount: 1, modifiedCount: 0, deletedCount: 0 },
+      rows: [{
+        eventId: 'registration-' + provider, userId: 7, occurredAt: Date.parse('2026-08-24T00:00:00Z'),
+        receivedAt: Date.parse('2026-08-24T00:00:00Z'), provider, model: 'chat',
+        action: 'model-created', scope: 'personal',
+      }],
+    })
+    vi.mocked(api.listModelRegistrations).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const user = userEvent.setup()
+    try {
+      render(<ModelsPage />)
+      await screen.findByText('组织主连接')
+      await user.click(screen.getByRole('button', { name: '个人登记' }))
+      await screen.findByText('个人 Provider 与模型登记')
+      await waitFor(() => expect(api.listModelRegistrations).toHaveBeenCalledOnce())
+      const firstSignal = vi.mocked(api.listModelRegistrations).mock.calls[0]?.[1]
+      const filter = screen.getByLabelText('筛选 Provider') as HTMLInputElement
+      await user.type(filter, 'latest')
+      await user.click(screen.getByRole('button', { name: '应用筛选' }))
+      expect(firstSignal?.aborted).toBe(true)
+      await waitFor(() => expect(api.listModelRegistrations).toHaveBeenLastCalledWith({ provider: 'latest', limit: 200 }, expect.any(AbortSignal)))
+      await act(async () => { second.resolve(report('latest')) })
+      expect((await screen.findAllByText('latest/chat')).length).toBeGreaterThan(0)
+      await act(async () => {
+        if (outcome === 'error') first.reject(new Error('Superseded request failed'))
+        else first.resolve(report('previous'))
+      })
+      expect(screen.getAllByText('latest/chat').length).toBeGreaterThan(0)
+      expect(screen.queryByText('previous/chat')).toBeNull()
+      expect(screen.queryByText('Superseded request failed')).toBeNull()
+      expect(filter.value).toBe('latest')
+    } finally {
+      await act(async () => { first.resolve(report('previous')); second.resolve(report('latest')) })
+    }
   })
 
   it('applies personal registration filters only after explicit submission', async () => {
@@ -284,10 +349,10 @@ describe('ModelsPage', () => {
     expect(api.listModelRegistrations).toHaveBeenCalledTimes(initialCalls)
 
     await user.click(screen.getByRole('button', { name: '应用筛选' }))
-    await waitFor(() => expect(api.listModelRegistrations).toHaveBeenLastCalledWith(expect.objectContaining({ provider: 'custom' })))
+    await waitFor(() => expect(api.listModelRegistrations).toHaveBeenLastCalledWith(expect.objectContaining({ provider: 'custom' }), expect.any(AbortSignal)))
 
     await user.click(screen.getByRole('button', { name: '重置' }))
-    await waitFor(() => expect(api.listModelRegistrations).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 200 })))
+    await waitFor(() => expect(api.listModelRegistrations).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 200 }), expect.any(AbortSignal)))
   })
 
   it('rejects an invalid personal registration date before requesting', async () => {

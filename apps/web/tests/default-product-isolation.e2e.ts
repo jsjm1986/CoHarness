@@ -1,9 +1,10 @@
 /** Chromium acceptance of the shipped Web profile's actual Client plugin and module registries. */
 
+import { responsiveBrowser } from './responsive-browser.ts'
 import { FiberState } from '@deepseek-ai/cordis'
 import type { Context, Plugin, RegistryService } from '@deepseek-ai/cordis'
 import type { ClientModuleLoader, ClientModuleLoaderTarget } from '@deepseek-ai/dsh-client-modules/client'
-import { chromium } from 'playwright'
+
 import { expect, it } from 'vitest'
 import { withDefaultWeb } from '../../cli/tests/profiles/web/tests/default-web-process.ts'
 import { newEnglishPage } from './support.ts'
@@ -49,7 +50,7 @@ function experimentalClientReferences(roster: Awaited<ReturnType<typeof readClie
 
 it('activates the actual default Client registry without experimental packages', async (test) => {
   await withDefaultWeb(test, async ({ url, request }) => {
-    const browser = await chromium.launch({ timeout: test.task.timeout })
+    const browser = await responsiveBrowser.launch({ timeout: test.task.timeout })
     test.onTestFinished(async () => { await browser.close() })
     try {
       const page = await newEnglishPage(browser)

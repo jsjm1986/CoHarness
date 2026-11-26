@@ -271,8 +271,6 @@
   padding-bottom: 0;
 }
 
-/* Chromium keyboard-focuses scrollable containers by default; the ring uses
-   the sheet's link focus color. */
 .tableScroll:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
@@ -517,7 +515,11 @@
 }
 
 .imageButton {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
   max-width: 100%;
   padding: 0;
   border: 0;
@@ -531,6 +533,13 @@
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 3px;
 }
+
+@media (pointer: coarse) {
+  .imageButton {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+}
 .previewName {
   display: block;
   margin-top: 8px;
@@ -540,4 +549,16 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 18px;
+}
+
+@media (forced-colors: active) {
+  .markdown a:focus-visible,
+  .compact a:focus-visible,
+  .fileMention:focus-visible,
+  .compact .fileMention:focus-visible,
+  .tableScroll:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    box-shadow: none;
+  }
 }

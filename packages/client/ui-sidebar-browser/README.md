@@ -7,6 +7,8 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+The address field precedes the navigation controls in reading and focus order. Compact and coarse-pointer layouts put the address on its own row, use 44px action targets and 16px input text, and wrap the loopback notice. Go remains visible when the address field loses focus, so pointer submission also works in browsers that do not focus clicked buttons. Short panes scroll the toolbar, page, and notices together; the iframe retains a readable height bounded by the pane, so browser chrome cannot collapse the visited page. Address refusals and sandbox warnings use the theme’s semantic text colors.
+
 ## Summary
 
 Browse HTTP(S) pages, including loopback services, inside independent right-Sidebar tabs. The current carrier is an iframe with application-managed history in the Web application. The package never injects Electron or Node access into visited content.
@@ -25,7 +27,7 @@ Browse HTTP(S) pages, including loopback services, inside independent right-Side
 <a id="use-this-package"></a>
 ## Use this package
 
-The shipped Web composition mounts this package. Open **Browser** from the right-Sidebar guide, enter an HTTP(S) URL, or select an HTTP(S) link in Assistant Markdown. A host name without a scheme becomes HTTPS. Public and loopback targets use the same default sandbox. Each guide action or message-link activation creates another Browser tab.
+The shipped Web composition includes Browser among its required entries so it can handle the first conversation link when the link-opening preference is set to the sidebar. Open **Browser** from the right-Sidebar guide, enter an HTTP(S) URL, or select an HTTP(S) link in assistant Markdown. A host name without a scheme becomes HTTPS. Public and loopback targets use the same default sandbox. Each guide action or sidebar message-link activation creates another Browser tab.
 
 ### When to choose it
 

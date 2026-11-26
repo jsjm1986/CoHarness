@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-project-activity/README.md
 document:
-  en: b946a506e98c679e28f1ae9ed6f28897da02d757
-  zh: 09bdb8d07e466747e4a42808d9e4d59a956cbf38
+  en: e81a4b7f238692c4797f37dcb22993fed8eafb3d
+  zh: d8c635ee3ac21a330f87391054e1ca95d9baeb3f
 /:
   en: 80ca32472f197831
   zh: 5e47ea4b2df1bda9
 /deepseek-ai-dsh-client-ui-project-activity:
-  en: 299f98436411b489
-  zh: ea35db9874aab542
+  en: 24239beec558752e
+  zh: a56789ede57ccc22
 /deepseek-ai-dsh-client-ui-project-activity/summary:
-  en: 21fe314e1ce4c2a0
-  zh: 81fa2b8cd911d836
+  en: 2e80da97c72246c9
+  zh: 9f58af5b2524cacf
 /deepseek-ai-dsh-client-ui-project-activity/table-of-contents:
   en: b59e55619aaa595f
   zh: c1fe30bc5bfe58ce
 /deepseek-ai-dsh-client-ui-project-activity/invariants:
-  en: a658c33ec8c4d68b
-  zh: 30f16b9adf878cd8
+  en: be48e1b5fbb0b958
+  zh: 7cfa45faefeb66bf
 /deepseek-ai-dsh-client-ui-project-activity/model-experience:
   en: 736fa73af86a573f
   zh: 16f75bd0d0c86916

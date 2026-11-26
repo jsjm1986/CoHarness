@@ -7,17 +7,19 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-Project activity plugin, browser half: a right-Sidebar tab type (`activity`) that answers "what changed in this project" for a returning member. Its default mode renders the human-facing **progress journal** — the Gateway's AI digest over shared-visible member activity, served through `GET /account/api/progress` — as a rolling "current progress" summary plus folded period entries whose `decided` / `done` / `doing` / `blocked` items attribute back to member and conversation; a status line reports undigested activity and offers a manual `POST /account/api/progress/generate` pass whose landing the panel polls. The three raw reading views remain one segment over: `time` folds the `GET /account/api/activity` rows into one collapsible section per day, `conversation` folds each conversation into a digest block whose header line prefers the newest answer, and `member` folds each member into a digest block listing their choices before their messages. The feed itself is newest-first keyset-paginated with a member filter; rows and journal attributions open their conversation through `conversationViewport.reveal(sessionId, seq)` — `replaceActive` when a row carries no anchor — so a member lands on the exact logged event.
+Open Project activity in a project Session to catch up on member messages, answers, and progress. A readable AI journal opens in Progress. The Time view opens when the project has no readable journal. Time, Conversation, and Member group the same activity. The member filter lists current project members even when their events are on older pages. Selecting a member starts a new paginated read for that member.
 
-The tab type follows the selected Session’s owning Runtime; unqualified standalone Sessions use the page’s project policy. The apply body subscribes to Session selection and policy changes, so the guide entry appears for project Sessions and leaves for personal Sessions. Each body captures its owner once: feed pages, journal reads, manual generation and conversation links retain the complete Runtime UUID even when another browser tab changes the scope cookie. The Gateway checks current access for every request. View state remains Session-scoped. A `400`/`404` on the progress route renders as a feature-off page. The Host half is inert; the plugin mounts through the Client loader only.
+The tab follows the selected Session’s Runtime. An unqualified standalone Session uses the page’s project policy. Feed pages, journal reads, and generation requests retain the owning Runtime when another browser tab changes the scope cookie. An attributed item opens its source Session and reveals its event when a log anchor is available. The Gateway checks access for each request. View state belongs to the Session. The Host half is inert.
 
 Conversation markers use the shared theme palette to identify conversations; their colors do not indicate task status.
+
+The toolbar wraps within the Sidebar. Touch targets reserve at least 44 CSS pixels per axis, while timestamps and digest status use the readable secondary text token. Pointer hover feedback applies only on devices with hover support.
 
 The `/client` exports are the plugin body (`apply`/`inject`), the feed wire types, the store factory and state types, and the injected face.
 
 ## Summary
 
-The Web GUI gains a project activity tab that opens on an AI-written progress journal — a rolling summary plus folded weekly entries attributed to members and conversations — with the raw feed of member messages and chosen answers one segment away, grouped by time, conversation, or member, filterable per member, and linked to the exact conversation event. It appears only in the shared-project scope and reads existing Gateway routes — no new data stream is created.
+Use the right Sidebar to read project activity and follow its sources. The AI journal presents current progress and weekly decisions, completions, active work, and blockers. Start with the activity timeline whenever the project has no readable journal.
 
 ## Table of Contents
 
@@ -33,9 +35,9 @@ The Web GUI gains a project activity tab that opens on an AI-written progress jo
 
 **Runtime invariant:** No companion is published. The feed is derived by the Gateway route from durable conversation data; the plugin owns a view-state store only.
 
-Grouping uses Session and member IDs; titles and display names do not select groups. A rename keeps one group, and distinct IDs stay separate. Superseded feed reads cannot overwrite a newer page after decoding.
+Grouping uses Session and member IDs. A rename keeps the same group. Changing the member filter starts at its newest page. A superseded read cannot publish results after decoding.
 
-Day sections and conversation recency use the viewer's local calendar. Yesterday is the previous calendar date, including when a daylight-saving transition changes its elapsed duration.
+Day sections and conversation recency use the viewer’s local calendar. Yesterday is the previous calendar date, including across daylight-saving transitions. The panel observes a running digest while its body is visible. If observation expires or status cannot be confirmed, Refresh status checks the Gateway again. A temporary read failure leaves the last received journal visible.
 
 <a id="model-experience"></a>
 ## Model Experience

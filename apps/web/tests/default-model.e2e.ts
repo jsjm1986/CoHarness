@@ -10,11 +10,12 @@
 // fixture-less scaffold registers no adapter at all, so the routes the
 // picker offers — and the one the composer must start on — have to come from
 // somewhere, and settings profiles are the product's own way to add them.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Locator, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
@@ -82,7 +83,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
         },
       },
     })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -373,17 +374,14 @@ describe('web e2e: the composer model switch is the default for later sessions',
       expect(await search.getAttribute('aria-activedescendant')).toBe(rowIds[(initialHighlight + step) % rowIds.length])
     }
     const searchStyle = await search.evaluate((input) => {
-      const caption = input.ownerDocument.createElement('div')
-      caption.textContent = 'No matching models.'
-      // Placeholder copy rides the muted-label token, like the menu's own
-      // secondary text — a probe element resolves the same token.
-      caption.style.color = 'var(--dsw-alias-label-caption)'
+      const secondary = input.ownerDocument.createElement('div')
+      secondary.style.color = 'var(--dsw-alias-label-secondary)'
       const wrapper = input.parentElement!
-      wrapper.append(caption)
+      wrapper.append(secondary)
       try {
         return {
           placeholderColor: getComputedStyle(input, '::placeholder').color,
-          captionColor: getComputedStyle(caption).color,
+          secondaryColor: getComputedStyle(secondary).color,
           iconCount: wrapper.querySelectorAll('svg').length,
           background: getComputedStyle(wrapper).backgroundColor,
           radius: getComputedStyle(wrapper).borderRadius,
@@ -391,10 +389,10 @@ describe('web e2e: the composer model switch is the default for later sessions',
           fontSize: getComputedStyle(input).fontSize,
         }
       } finally {
-        caption.remove()
+        secondary.remove()
       }
     })
-    expect(searchStyle.placeholderColor).toBe(searchStyle.captionColor)
+    expect(searchStyle.placeholderColor).toBe(searchStyle.secondaryColor)
     expect(searchStyle.iconCount).toBe(0)
     expect(searchStyle.background).toBe('rgba(0, 0, 0, 0)')
     expect(searchStyle.radius).toBe('8px')
@@ -421,7 +419,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
             positions: [...new Set(headings.map(heading => getComputedStyle(heading).position))],
             headingRadii: [...new Set(headings.map(heading => getComputedStyle(heading).borderRadius))],
             optionRadius: getComputedStyle(menu.querySelector('[role="menuitemradio"]')!).borderRadius,
-            searchBorder: getComputedStyle(menu.querySelector('input')!.parentElement!).borderColor,
+            searchBorderWidth: getComputedStyle(menu.querySelector('input')!.parentElement!).borderTopWidth,
           }
         }))
       } finally {
@@ -434,7 +432,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
     for (const palette of headingPalettes) {
       expect(palette.headingFills, `${palette.platform}, dark=${String(palette.dark)}`)
         .toEqual(['rgba(0, 0, 0, 0)'])
-      expect(palette.searchBorder).toBe('rgba(0, 0, 0, 0)')
+      expect(palette.searchBorderWidth).toBe('0px')
       expect(palette.positions).toEqual(['sticky'])
       expect(palette.headingRadii).toEqual([palette.platform === 'darwin' ? '0px' : '8px'])
     }

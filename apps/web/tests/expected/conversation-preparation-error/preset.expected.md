@@ -1,0 +1,5 @@
+- textbox "Message COHARNESS": Retain this draft on Compute
+- status: Preset or plugins unavailable on this computer. Draft kept; ask an administrator to check.
+- button "Retry after checking"
+- button "Back"
+- paragraph: Compute work · Compute computer

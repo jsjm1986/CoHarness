@@ -1,15 +1,26 @@
-/** One Admin document's computer selection, retained by its Router basename. */
+/** Computer ownership encoded in an Admin route and forwarded on scoped requests. */
 import type { RuntimeNodeId } from '../../src/runtime-catalog.ts'
 
 const COMPUTER_BASE = '/admin/computers/'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
+let committedPath: (() => string) | undefined
+
+/**
+ * Use the Admin router's committed path while the browser temporarily visits a blocked history entry.
+ * @param read - path of the route that owns the current document's forms.
+ * @returns the disposer to release this document's route.
+ */
+export function bindAdminPath(read: () => string): () => void {
+  committedPath = read
+  return () => { if (committedPath === read) committedPath = undefined }
+}
 
 /**
  * Resolve the computer encoded in this document's navigation path.
- * @param pathname - browser document path; ordinary Admin paths select the center.
+ * @param pathname - explicit path or the document's committed Admin route.
  * @returns the selected computer, or undefined for the center; malformed selections throw.
  */
-export function adminComputerTarget(pathname: string): RuntimeNodeId | undefined {
+export function adminComputerTarget(pathname = committedPath?.() ?? globalThis.location?.pathname ?? '/admin'): RuntimeNodeId | undefined {
   if (pathname === '/admin/computers') throw new Error('Invalid Admin computer address')
   if (!pathname.startsWith(COMPUTER_BASE)) return undefined
   const id = pathname.slice(COMPUTER_BASE.length).split('/')[0]!
@@ -20,7 +31,7 @@ export function adminComputerTarget(pathname: string): RuntimeNodeId | undefined
 /**
  * Resolve the existing Admin application's navigation root for one computer.
  * @param nodeId - selected registered computer; omission selects the center.
- * @returns a basename used by all existing Router links.
+ * @returns the browser path prefix for the selected computer.
  */
 export function adminComputerBase(nodeId?: RuntimeNodeId): string {
   return nodeId === undefined ? '/admin' : `${COMPUTER_BASE}${nodeId}`
@@ -29,11 +40,11 @@ export function adminComputerBase(nodeId?: RuntimeNodeId): string {
 /**
  * Bind an existing API URL to this document's selected computer.
  * @param value - same-origin Admin API URL or download address.
- * @param pathname - document path; omitted uses the current browser document.
+ * @param pathname - explicit path or the document's committed Admin route.
  * @param ownership - explicit resource ownership; omission retains shared-route defaults.
  * @returns a URL with an explicit target; node enrollment/discovery always stays at the center.
  */
-export function adminComputerRequestUrl(value: string, pathname = globalThis.location?.pathname ?? '/admin', ownership?: 'computer' | 'organization'): string {
+export function adminComputerRequestUrl(value: string, pathname?: string, ownership?: 'computer' | 'organization'): string {
   if (ownership === 'organization') return value
   const nodeId = adminComputerTarget(pathname)
   if (nodeId === undefined) return value

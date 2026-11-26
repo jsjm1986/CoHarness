@@ -11,21 +11,24 @@
 // Geometry is the point of the scenario. The command is unbounded model text,
 // and an uncapped card grows with it until the refuse/allow buttons leave the
 // viewport — an approval the user could see and not answer.
-import { readFile } from 'node:fs/promises'
+import { responsiveBrowser, responsiveBrowserName, responsiveViewports } from './responsive-browser.ts'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+import type { Browser, Locator, Page } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 // Empty type import: carries the approval package's session-event merge, so
 // the decided-outcome assertion below type-checks against the real union.
 import type {} from '@deepseek-ai/dsh-user-approval'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  assertFixtureInventory, captureStableAria, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden as compareOrRefreshGolden, newWorkflowPage as newEnglishPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { auditResponsiveControl } from './responsive-controls.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/approval-composer', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
@@ -46,6 +49,122 @@ const PROMPT = `Write a file named notes.txt in the workspace containing exactly
 /** Draft used to measure the composer's own text cap: enough lines to pass it. */
 const CAP_PROBE = Array.from({ length: 40 }, (_, index) => `line ${index}`).join('\n')
 
+/** Inspect the real pending request and locally held answer receipts without settling the Host's wait. */
+async function auditApprovalContrast(page: Page, panel: Locator): Promise<void> {
+  if (!workflowMatrixEnabled) return
+  const original = page.viewportSize()
+  if (original === null) throw new Error('Approval contrast matrix requires an explicit viewport')
+  const originalTheme = await page.locator('body').getAttribute('data-ds-dark-theme')
+  const output = process.env.DSH_FEATURE_LAYOUT_SCREENSHOTS
+  if (output !== undefined) await mkdir(output, { recursive: true })
+  const records: unknown[] = []
+  const scroll = panel.locator('[data-approval-scroll]')
+  const card = scroll.locator('..')
+  const strip = card.locator(':scope > div').first()
+  const responsePath = /\/api\/respond(?:\?.*)?$/u
+  try {
+    for (const viewport of responsiveViewports) {
+      await page.setViewportSize(viewport)
+      for (const dark of [false, true]) {
+        await page.evaluate(dark => document.body.toggleAttribute('data-ds-dark-theme', dark), dark)
+        await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => { requestAnimationFrame(() => { resolve() }) })))
+        const inspect = async (state: string): Promise<void> => {
+          await auditResponsiveControl(page, scroll, `approval/${state}/details`)
+          const alert = panel.getByRole('alert')
+          if (await alert.count() > 0) await auditResponsiveControl(page, alert, `approval/${state}/failure`)
+          await auditResponsiveControl(page, strip, `approval/${state}/status`)
+          await strip.evaluate(async (element) => {
+            await Promise.all(element.getAnimations().map(animation => animation.finished.catch(() => undefined)))
+          })
+          const contrast = await card.evaluate((element) => {
+            const canvas = document.createElement('canvas')
+            canvas.width = canvas.height = 1
+            const context = canvas.getContext('2d')!
+            const rgba = (color: string): number[] => {
+              context.clearRect(0, 0, 1, 1); context.fillStyle = color; context.fillRect(0, 0, 1, 1)
+              return [...context.getImageData(0, 0, 1, 1).data].map(value => value / 255)
+            }
+            const over = (fg: number[], bg: number[]): number[] => [0, 1, 2].map(i => fg[i]! * fg[3]! + bg[i]! * (1 - fg[3]!))
+            const luminance = (rgb: number[]): number => rgb.map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
+              .reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i]!, 0)
+            const nodes = [element.firstElementChild!, ...element.querySelectorAll('[data-approval-scroll] > *, [role="alert"]')]
+            return nodes.map((node) => {
+              const layers: Element[] = []
+              for (let ancestor: Element | null = node; ancestor !== null; ancestor = ancestor.parentElement) layers.unshift(ancestor)
+              let background = [1, 1, 1]
+              let opacity = 1
+              for (const layer of layers) {
+                const style = getComputedStyle(layer)
+                background = over(rgba(style.backgroundColor), background)
+                opacity *= Number.parseFloat(style.opacity)
+              }
+              const text = rgba(getComputedStyle(node).color)
+              text[3] = text[3]! * opacity
+              const a = luminance(over(text, background)), b = luminance(background)
+              return { text: node.textContent?.slice(0, 80), opacity, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05) }
+            })
+          })
+          for (const item of contrast) {
+            expect(item.opacity, `${state}: ${item.text}`).toBe(1)
+            expect(item.ratio, `${state}: ${item.text}`).toBeGreaterThanOrEqual(4.5)
+          }
+          records.push({ viewport: viewport.name, dark, state, contrast })
+          if (output !== undefined) await page.screenshot({ path: join(output, `${responsiveBrowserName}-approval-${state}-${dark ? 'dark' : 'light'}-${viewport.name}.png`), animations: 'disabled' })
+        }
+        await inspect('waiting-contrast')
+        for (const [name, outcome] of [['Reject', 'rejected'], ['Allow once', 'allowed-once']] as const) {
+          const release = Promise.withResolvers<undefined>()
+          const finished = Promise.withResolvers<undefined>()
+          let entered = false
+          await page.route(responsePath, async (route) => {
+            entered = true
+            await release.promise
+            try {
+              await route.fulfill({ json: { accepted: false, reason: 'bad-response' } })
+              finished.resolve(undefined)
+            } catch (error) { finished.reject(error) }
+          }, { times: 1 })
+          try {
+            await Promise.all([page.waitForRequest(responsePath), panel.getByRole('button', { name, exact: true }).click()])
+            await expect.poll(() => card.getAttribute('data-answered')).toBe(outcome)
+            await inspect(`${outcome}-echo`)
+          } finally {
+            release.resolve(undefined)
+            if (entered) await finished.promise
+            await page.unroute(responsePath)
+          }
+          await panel.getByRole('alert').waitFor()
+          await expect.poll(() => card.getAttribute('data-answered')).toBeNull()
+          await inspect(`${outcome}-failure`)
+        }
+      }
+    }
+  } catch (error) {
+    if (output !== undefined) {
+      await page.screenshot({ path: join(output, 'approval-contrast-failed.png'), animations: 'disabled' })
+      await writeFile(join(output, 'approval-contrast-failed-geometry.json'), JSON.stringify(await scroll.evaluate((element) => {
+        const ancestors = []
+        for (let node: Element | null = element; node !== null; node = node.parentElement) {
+          const style = getComputedStyle(node)
+          const rect = node.getBoundingClientRect()
+          ancestors.push({ className: node.className, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+            clientHeight: node.clientHeight, scrollHeight: node.scrollHeight, scrollTop: node.scrollTop,
+            containerType: style.containerType, overflow: style.overflow, maxHeight: style.maxHeight })
+        }
+        return { viewport: { width: innerWidth, height: innerHeight }, ancestors }
+      }), null, 2) + '\n')
+    }
+    throw error
+  } finally {
+    await page.evaluate((theme) => {
+      if (theme === null) document.body.removeAttribute('data-ds-dark-theme')
+      else document.body.setAttribute('data-ds-dark-theme', theme)
+    }, originalTheme)
+    await page.setViewportSize(original)
+    if (output !== undefined) await writeFile(join(output, `approval-contrast-${responsiveBrowserName}.json`), JSON.stringify(records, null, 2) + '\n')
+  }
+}
+
 describe('web e2e: approval takeover keeps its actions reachable', () => {
   let scaffold: WebScaffold
   let browser: Browser
@@ -56,7 +175,7 @@ describe('web e2e: approval takeover keeps its actions reachable', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold(MODE === 'record' ? {} : { replayFixture: FIXTURE, paceMs: 15 })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -97,7 +216,7 @@ describe('web e2e: approval takeover keeps its actions reachable', () => {
       { timeout: 15_000 },
     ).toBe(1)
 
-    const settled = scaffold.whenTurnSettled(MODE === 'record' ? 240_000 : 60_000)
+    const settled = scaffold.whenTurnSettled(MODE === 'record' || workflowMatrixEnabled ? 240_000 : 60_000)
     await input.fill(PROMPT)
     await input.press('Enter')
 
@@ -152,6 +271,8 @@ describe('web e2e: approval takeover keeps its actions reachable', () => {
       await page.setViewportSize(original)
     }
 
+    await auditWorkflowState(page, 'approval', 'pending-long-command', panel)
+    await auditApprovalContrast(page, panel)
     await panel.getByRole('button', { name: 'Allow once' }).click()
 
     const sessionId = await settled
@@ -172,6 +293,7 @@ describe('web e2e: approval takeover keeps its actions reachable', () => {
     await expect.poll(() => page.getByText('DONE', { exact: true }).count(), { timeout: 20_000 }).toBeGreaterThanOrEqual(1)
     expect(await page.locator('[data-approval-key]').count()).toBe(0)
     await expect.poll(() => page.locator('textarea').first().isEnabled(), { timeout: 10_000 }).toBe(true)
+    await auditWorkflowState(page, 'approval', 'allowed-and-completed', page.locator('[class*="centerCol"]'))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 300_000)

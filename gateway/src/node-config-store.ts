@@ -114,6 +114,7 @@ export function nodeSettingsFromConfig(cfg: GatewayConfig, environment: NodeJS.P
     HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE: cfg.organizationModelCredentialKeyFile,
     HGW_WEBHOOK_SECRET_KEY_FILE: cfg.webhookSecretKeyFile, HGW_DEFAULT_ENV_FILE: cfg.defaultEnvFile,
     HGW_INSTANCE_PORT_BASE: String(cfg.instancePortBase), HGW_IDLE_TIMEOUT_MS: String(cfg.idleTimeoutMs),
+    HGW_REMOTE_DESKTOP: cfg.remoteDesktopEnabled ? 'on' : 'off',
     HGW_RESOURCE_SAMPLE_MS: String(cfg.resourceBudget.sampleMs),
     HGW_RUNTIME_REQUEST_TIMEOUT_MS: String(cfg.runtimeRequestTimeoutMs),
     HGW_RUNTIME_CLEANUP_TIMEOUT_MS: String(cfg.runtimeCleanupTimeoutMs),

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/disaster-recovery-isolation/guide.md
+document:
+  en: 339d72845f539778cd64f0c585d06788f839fcc1
+  zh: 4578052d5551e6ade166217ac3720eb1f3f3cc40
+/:
+  en: 2e45d2742cd3780e
+  zh: daad63e2c36758c5
+/recovery-after-source-loss:
+  en: bd9d5b27afdaf139
+  zh: 04ccb7704619198c
+/recovery-after-source-loss/change:
+  en: 8b33af267556c3e0
+  zh: 4cda787a521211b8
+/recovery-after-source-loss/migration:
+  en: db5c629e54a9c5f4
+  zh: 70e13617a1a953f2

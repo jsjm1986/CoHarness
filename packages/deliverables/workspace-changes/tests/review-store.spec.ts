@@ -1,12 +1,22 @@
 import { createHash } from 'node:crypto'
-import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, parse } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { ReviewStore, type StoredReview } from '../src/review-store.ts'
+import { ReviewStore, type ReviewProbeTiming, type StoredReview } from '../src/review-store.ts'
 
-const faults = vi.hoisted(() => ({ link: false, removeExisting: false, unlink: '' as '' | 'pending' | 'probe', noSpace: false }))
+interface ProbeTrace {
+  synced: string[]
+  open: number
+  peak: number
+  failSync?: string
+}
+
+const faults = vi.hoisted(() => ({
+  link: false, removeExisting: false, unlink: '' as '' | 'pending' | 'probe', noSpace: false,
+  probe: undefined as ProbeTrace | undefined,
+}))
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
@@ -29,12 +39,30 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       if (faults.noSpace) result.bavail = typeof result.bavail === 'bigint' ? 0n : 0
       return result
     },
+    async open(...args: Parameters<typeof actual.open>) {
+      const handle = await actual.open(...args)
+      const trace = faults.probe
+      if (trace === undefined) return handle
+      const path = String(args[0])
+      trace.peak = Math.max(trace.peak, ++trace.open)
+      const sync = handle.sync.bind(handle), close = handle.close.bind(handle)
+      handle.sync = async () => {
+        trace.synced.push(path)
+        if (trace.failSync === path) throw Object.assign(new Error('fixture sync failure'), { code: 'EIO' })
+        await sync()
+      }
+      handle.close = async () => {
+        try { await close() } finally { trace.open-- }
+      }
+      return handle
+    },
   }
 })
 
 const roots: string[] = []
 afterEach(async () => {
   faults.link = false; faults.removeExisting = false; faults.unlink = ''; faults.noSpace = false
+  faults.probe = undefined
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 const sessionId = SessionId('review-session')
@@ -114,8 +142,37 @@ it.skipIf(process.platform === 'win32')('does not follow a Session storage direc
   const outside = join(root, 'outside')
   await mkdir(outside)
   await symlink(outside, directory)
+  await expect(store.probe(sessionId)).rejects.toThrow('symbolic-link')
   await expect(store.save(review)).rejects.toThrow('symbolic-link')
   expect(await readdir(outside)).toEqual([])
+})
+
+it.skipIf(process.platform === 'win32')('syncs the probe file and every directory with a bounded number of handles', async () => {
+  const { store, directory } = await fixture()
+  const trace: ProbeTrace = { synced: [], open: 0, peak: 0 }
+  faults.probe = trace
+  const timing: ReviewProbeTiming = {}
+  await store.probe(sessionId, 0, timing)
+  const owned = await realpath(directory)
+  const ancestors = [owned]
+  for (let current = owned; current !== parse(current).root; current = dirname(current)) ancestors.push(dirname(current))
+  expect(trace.synced.filter(path => !path.endsWith('.probe')).sort()).toEqual(ancestors.sort())
+  expect(trace.synced.at(-2)).toMatch(/\.probe$/u)
+  expect(trace.synced.at(-1)).toBe(owned)
+  expect(trace.open).toBe(0)
+  expect(trace.peak).toBeLessThanOrEqual(4)
+  expect(Object.values(timing)).toHaveLength(8)
+  expect(Object.values(timing).every(value => value >= 0)).toBe(true)
+})
+
+it.skipIf(process.platform === 'win32')('closes the directory batch before reporting a sync failure', async () => {
+  const { root, store, directory } = await fixture()
+  const trace: ProbeTrace = { synced: [], open: 0, peak: 0, failSync: await realpath(root) }
+  faults.probe = trace
+  await expect(store.probe(sessionId)).rejects.toThrow('fixture sync failure')
+  expect(trace.open).toBe(0)
+  expect(trace.synced.filter(path => path.endsWith('.probe'))).toEqual([])
+  expect(await readdir(directory)).toEqual([])
 })
 
 it('refuses publication failures and a concurrently removed matching artifact', async () => {

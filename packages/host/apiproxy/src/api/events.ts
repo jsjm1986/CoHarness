@@ -136,7 +136,8 @@ export type MuxFrame =
   | { type: 'session/event'; sessionId: SessionId; event: SessionEvent; view?: ToolEventView }
   /**
    * Subscription opening for one session. `lastSeq` is the durable cursor the
-   * following `session/event` stream continues from. `assistantStream` is the
+   * following `session/event` stream continues from. A retained title at that
+   * cursor can be replayed after the opening. `assistantStream` is the
    * process-local assistant baseline at this opening — live
    * `session/assistant-stream` frames arriving after it replay cleanly over
    * it; frames the baseline already covers or supersedes are never pushed.

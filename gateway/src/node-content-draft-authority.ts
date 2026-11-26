@@ -3,6 +3,8 @@ import type { Queryable } from './postgres/database.ts'
 import type { NodeContentBinding } from './node-content-store.ts'
 import type { NodeDraftKey } from './node-drafts.ts'
 import { CollaborationDeniedError } from './collaboration.ts'
+import { projectSessionReservation } from './project-session-reservation.ts'
+import type { NodeDraftSessionKey } from './node-drafts.ts'
 
 export interface DraftAuthority { actorId:string;administrator:boolean;mode:'rw'|'ro';projectId:string|null;binding:NodeContentBinding|null;witness:string }
 
@@ -12,7 +14,7 @@ export interface DraftAuthority { actorId:string;administrator:boolean;mode:'rw'
  * @param save - requires write permission. @param lock - retain revocable rows until a short commit finishes.
  * @returns current allocation, owner, account, and rights.
  */
-export async function draftAuthority(db:Queryable,key:NodeDraftKey,digest:Buffer,save:boolean,lock=false):Promise<DraftAuthority>{
+export async function draftAuthority(db:Queryable,key:NodeDraftSessionKey,digest:Buffer,save:boolean,lock=false):Promise<DraftAuthority>{
   const project=key.target!=='personal',target=project&&/^project:[1-9][0-9]*$/u.test(key.target)?Number(key.target.slice(8)):0
   if(digest.length!==32||project&&(!Number.isSafeInteger(target)||target<=0))throw new CollaborationDeniedError('forbidden')
   const args=[key.organizationId,key.nodeId,key.runtimeId,key.userId,digest,...(project?[target]:[])]
@@ -46,14 +48,24 @@ export async function draftAuthority(db:Queryable,key:NodeDraftKey,digest:Buffer
   return authority
 }
 
-/** Read the inherited Session root on its recorded backend, retaining it only for a legacy write on the control transaction. */
-export async function checkDraftSession(db:Queryable,schema:'harness'|'node_content',key:NodeDraftKey,actor:DraftAuthority,lock=false):Promise<void>{
-  if(!actor.projectId||!key.sessionId)return
+/** Authorize a materialized root or the creator's unexpired, unmaterialized reservation on its recorded backend.
+ * @param db - content snapshot or final transaction. @param schema - recorded content database schema.
+ * @param key - exact browser draft owner and Session. @param actor - current account and project authority.
+ * @param lock - retain the root or reservation until final authorization and commit; recheck expiry after any lock wait.
+ * @returns the authorization source; reservation reads require another check on the final local transaction.
+ */
+export async function checkDraftSession(db:Queryable,schema:'harness'|'node_content',key:NodeDraftKey,actor:DraftAuthority,lock=false):Promise<'scope'|'session'|'reservation'>{
+  if(!actor.projectId||!key.sessionId)return 'scope'
   const row=(await db.query<{visible:boolean}>(`SELECT r.visibility='project' OR r.creator_user_id=$5 OR $6 AS visible FROM ${schema}.conversation_sessions c
     JOIN ${schema}.conversation_sessions r ON (r.organization_id,r.runtime_id,r.id)=(c.organization_id,c.runtime_id,c.root_session_id)
     WHERE c.organization_id=$1 AND c.runtime_id=$2 AND c.project_id=$3 AND c.id=$4 AND c.status<>'deleted' AND r.project_id=$3 AND r.status<>'deleted'
     ${lock?'FOR SHARE OF c,r':''}`,[key.organizationId,key.runtimeId,actor.projectId,key.sessionId,actor.actorId,actor.administrator])).rows[0]
-  if(!row||!row.visible)throw new CollaborationDeniedError('forbidden')
+  if(row){
+    if(!row.visible)throw new CollaborationDeniedError('forbidden')
+    return 'session'
+  }
+  if(!await projectSessionReservation(db,schema,{...key,projectId:actor.projectId,actorId:actor.actorId},lock))throw new CollaborationDeniedError('forbidden')
+  return 'reservation'
 }
 
 /** The same actor, placement, access and Runtime generation must survive a delayed draft operation. */

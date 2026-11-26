@@ -10,6 +10,9 @@
 
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { resolve } from 'node:path'
+import { recoveryHookPermitted } from '@deepseek-ai/dsh-app-boot'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision, TurnBoundaryProjection } from '@deepseek-ai/dsh-agent'
@@ -124,9 +127,13 @@ export function apply(ctx: Context, config: Config): void {
   assertPositiveInteger('defaultTimeoutMs', defaultTimeoutMs)
   /* jscpd:ignore-end */
   // Parse once at load. A read or parse failure logs and registers nothing.
+  const configPath = resolve(config.configPath)
+  let configSha256: string
   let parsed: ClaudeCodeHookConfig = {}
   try {
-    const raw: unknown = JSON.parse(readFileSync(config.configPath, 'utf8'))
+    const bytes = readFileSync(configPath)
+    configSha256 = createHash('sha256').update(bytes).digest('hex')
+    const raw: unknown = JSON.parse(bytes.toString('utf8'))
     const result = parseClaudeCodeConfig(raw, {
       ...config.pluginRoot !== undefined ? { pluginRoot: config.pluginRoot } : {},
       ...config.projectDir !== undefined ? { projectDir: config.projectDir } : {},
@@ -165,7 +172,8 @@ export function apply(ctx: Context, config: Config): void {
     payload: Record<string, unknown>,
     opts: { agent?: Agent; turn?: number; directory?: 'committed'; readonly signal: AbortSignal },
   ): Promise<MergedHookOutcome> {
-    const groups = selectHookGroups(parsed[point], matchQuery, 'claude-code')
+    const groups = selectHookGroups(parsed[point], matchQuery, 'claude-code').map(group => ({ ...group, hooks: group.hooks.filter(hook =>
+      recoveryHookPermitted(ctx, { dialect: 'claude-code', configPath, point, command: hook.command, configSha256 })) })).filter(group => group.hooks.length > 0)
     if (groups.length === 0) return mergeHookOutputs([])
     const outputs: HookOutput[] = []
     const workdir = opts.agent === undefined ? undefined
@@ -177,6 +185,7 @@ export function apply(ctx: Context, config: Config): void {
     const hookEnv = projectDir !== undefined ? { CLAUDE_PROJECT_DIR: projectDir } : undefined
     for (const group of groups) {
       for (const hook of group.hooks) {
+        if (!recoveryHookPermitted(ctx, { dialect: 'claude-code', configPath, point, command: hook.command, configSha256 })) continue
         const handlerId = nextHandlerId(point)
         const session = opts.agent?.session
         if (session && opts.turn !== undefined) {

@@ -1,0 +1,3 @@
+{"scenario":"missing-parameter-permission","exit":1,"privacyVerified":false,"projectRows":0,"retainedConnectionParameter":"-1"}
+{"scenario":"transaction-local-parameter-permission","exit":0,"privacyVerified":true,"projectRows":0,"retainedConnectionParameter":"-1"}
+{"scenario":"safe-role-database-defaults","exit":0,"privacyVerified":true,"projectRows":0,"retainedConnectionParameter":"-1"}

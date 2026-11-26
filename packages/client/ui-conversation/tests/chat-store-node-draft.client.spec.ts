@@ -61,6 +61,9 @@ function persistentNodeChat(options: {
   key?: Persistence['key']
   owner?: () => Owner
   restoreDraft?: Persistence['restoreDraft']
+  retainDuringRenewal?: Persistence['retainDuringRenewal']
+  isEntryDraftOwner?: Persistence['isEntryDraftOwner']
+  pendingEntryOwner?: Persistence['pendingEntryOwner']
 }) {
   const listeners = new Set<() => void>()
   let dispose!: () => void
@@ -71,6 +74,9 @@ function persistentNodeChat(options: {
     onDispose: (cleanup) => { dispose = cleanup; disposals.push(cleanup) },
     readDraft: readPersistedDraft,
     ...(options.restoreDraft === undefined ? {} : { restoreDraft: options.restoreDraft }),
+    ...(options.retainDuringRenewal === undefined ? {} : { retainDuringRenewal: options.retainDuringRenewal }),
+    ...(options.isEntryDraftOwner === undefined ? {} : { isEntryDraftOwner: options.isEntryDraftOwner }),
+    ...(options.pendingEntryOwner === undefined ? {} : { pendingEntryOwner: options.pendingEntryOwner }),
   })
   return {
     handle, dispose,
@@ -143,6 +149,21 @@ describe('chat store NodeDraft ownership', () => {
     expect(store.getSnapshot().draft).toBe('memory only')
   })
 
+  it.each([true, false])('early edits join only the confirmed startup owner (same owner: %s)', async (sameOwner) => {
+    const entry = ownerOf(7)
+    let owner: Owner = 'pending'
+    const fixture = persistentNodeChat({ owner: () => owner, key: () => typeof owner === 'object' ? KEY : undefined,
+      pendingEntryOwner: () => entry })
+    const store = fixture.handle.create(SESSION)
+    store.actions.setDraft('Typed before opening the Host stream')
+    expect(fake.FakeNodeDraft.instances).toHaveLength(0)
+    owner = sameOwner ? { ...entry } : ownerOf(8)
+    fixture.refresh()
+    await flush()
+    expect(store.getSnapshot().draft).toBe(sameOwner ? 'Typed before opening the Host stream' : '')
+    expect(fake.FakeNodeDraft.last().written.includes(serialized('Typed before opening the Host stream'))).toBe(sameOwner)
+  })
+
   it('clears the composer when verification revokes the owner to pending', () => {
     const restoreDraft = vi.fn()
     let owner: Owner = ownerOf(7)
@@ -154,6 +175,99 @@ describe('chat store NodeDraft ownership', () => {
     expect(store.getSnapshot().draft).toBe('')
     expect(restoreDraft).toHaveBeenLastCalledWith(SESSION, '')
     expect(fake.FakeNodeDraft.last().disposed).toBe(true)
+  })
+
+  it('shows this tab’s draft through same-owner renewal and carries admission clearing to the replacement writer', async () => {
+    const confirmed = ownerOf(7)
+    let owner: Owner = confirmed
+    const paint = vi.fn()
+    const fixture = persistentNodeChat({ owner: () => owner, key: () => owner === 'pending' ? undefined : KEY,
+      restoreDraft: paint, retainDuringRenewal: (_, prior) => prior === confirmed })
+    const store = fixture.handle.create(SESSION)
+    store.actions.setDraft('Pending input')
+    await flush()
+    const first = fake.FakeNodeDraft.last()
+    owner = 'pending'
+    fixture.refresh()
+    expect(store.getSnapshot().draft).toBe('Pending input')
+    expect(paint).not.toHaveBeenCalled()
+    expect(first.disposed).toBe(true)
+    await expect(fixture.handle.prepareInput(SESSION)).resolves.toBe(false)
+    store.actions.setDraft('')
+    owner = { ...confirmed }
+    fixture.refresh()
+    expect(paint).toHaveBeenLastCalledWith(SESSION, '')
+    expect(fake.FakeNodeDraft.last().written).toContain('')
+  })
+
+  it('keeps restored private text hidden during verification and drops held text on confirmed withdrawal', async () => {
+    const confirmed = ownerOf(7)
+    let owner: Owner = confirmed
+    let retain = true
+    const paint = vi.fn()
+    const fixture = persistentNodeChat({ owner: () => owner, key: () => owner === 'pending' ? undefined : KEY,
+      restoreDraft: paint, retainDuringRenewal: () => retain })
+    const store = fixture.handle.create(SESSION)
+    await flush()
+    fake.FakeNodeDraft.last().restored(serialized('Previously saved'))
+    owner = 'pending'
+    fixture.refresh()
+    expect(store.getSnapshot().draft).toBe('')
+    owner = confirmed
+    fixture.refresh()
+    store.actions.setDraft('Typed here')
+    owner = 'pending'
+    fixture.refresh()
+    expect(store.getSnapshot().draft).toBe('Typed here')
+    retain = false
+    fixture.refresh()
+    expect(store.getSnapshot().draft).toBe('')
+    expect(fixture.handle.hasUnsavedNodeDrafts()).toBe(false)
+  })
+
+  it.each(['saved', 'awaiting confirmation'])('keeps a %s entry-computer draft in this tab through mode changes', async (state) => {
+    const confirmed = ownerOf(7)
+    let owner: Owner = confirmed
+    const paint = vi.fn()
+    const fixture = persistentNodeChat({ owner: () => owner, restoreDraft: paint,
+      isEntryDraftOwner: (_id, prior) => prior === confirmed })
+    const store = fixture.handle.create(SESSION)
+    const writer = fake.FakeNodeDraft.last()
+    if (state === 'saved') writer.restored(serialized('my draft'))
+    else {
+      store.actions.setDraft('my draft')
+      writer.unsynchronized = true
+    }
+    owner = undefined
+    fixture.refresh()
+    expect(writer.disposed).toBe(true)
+    expect(paint).toHaveBeenLastCalledWith(SESSION, 'my draft')
+    expect(store.getSnapshot().draft).toBe('my draft')
+    expect(fixture.handle.canRestoreDraft(SESSION)).toBe(true)
+    expect(fixture.handle.hasUnsavedNodeDrafts()).toBe(false)
+    expect(localStorage.getItem(`${KEY}.shared`)).toBeNull()
+
+    const restored = fixture.handle.create(SESSION)
+    expect(restored.getSnapshot().draft).toBe('my draft')
+    restored.actions.setDraft('')
+    owner = confirmed
+    fixture.refresh()
+    expect(restored.getSnapshot().draft).toBe('')
+    expect(fake.FakeNodeDraft.last().written).toEqual([''])
+    await flush()
+  })
+
+  it('does not place a draft from an unavailable remote computer into browser storage', () => {
+    let owner: Owner = ownerOf(7)
+    const fixture = persistentNodeChat({ owner: () => owner, retainDuringRenewal: () => true, isEntryDraftOwner: () => false })
+    const store = fixture.handle.create(SESSION)
+    store.actions.setDraft('remote text')
+    owner = 'pending'
+    fixture.refresh()
+    expect(store.getSnapshot().draft).toBe('remote text')
+    expect(fixture.handle.canRestoreDraft(SESSION)).toBe(false)
+    expect(sessionStorage.getItem(`${KEY}.shared.tab.v1`)).toBeNull()
+    expect(localStorage.getItem(`${KEY}.shared`)).toBeNull()
   })
 
   it('keeps an unverifiable key local even when an owner is resolved', () => {

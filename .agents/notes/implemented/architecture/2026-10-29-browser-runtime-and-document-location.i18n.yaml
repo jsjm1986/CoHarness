@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-29-browser-runtime-and-document-location.md
 document:
-  en: 0ee10db8a1f49c96c2359428ac760ecf9709597d
-  zh: 62adff17b5dc11e18b405f4955e31900f16dbe30
+  en: 8f5b4fd409a25ee94bbd6bef24e1b28a9a51570a
+  zh: 275a014088c3d2393548d3de3900953f0da7945a
 /agent-note-browser-runtime-identity-and-document-locations:
   en: 34d12bea9ec8e696
   zh: 8ef8bca9f9871942
@@ -12,8 +12,8 @@ document:
   en: d1b80aa559df60c4
   zh: 6613013a7394c2b6
 /agent-note-browser-runtime-identity-and-document-locations/decision:
-  en: 080812b377fe1d2b
-  zh: 7b7513c9b5ed81c7
+  en: 275f262784766952
+  zh: b7efbf806f67ca5c
 /agent-note-browser-runtime-identity-and-document-locations/consequences:
   en: 2d5b9b2d31e9e7c0
   zh: 1cb2f0945298cb8c

@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/dsh-directory-guard/README.md
 document:
-  en: 299ee06a920cdb8733ed78f56909c56b7c7331a9
-  zh: a1212a48e99e9c9f2ad39500d16c77c19b636fa8
+  en: 8e307be52b02707acdc0d396a3eca08b04399eb4
+  zh: f545085c90a535e34d41a4021c13513963c97779
 /deepseek-ai-dsh-directory-guard:
-  en: 388b615962e47ac1
-  zh: 3877bcd0bc25bee1
+  en: 05bdeb3ef1d96693
+  zh: eb3ddbef5aed7d53
 /deepseek-ai-dsh-directory-guard/what-it-does:
   en: c5ec7dec385fd639
   zh: ccf3474da64ece53
 /deepseek-ai-dsh-directory-guard/enforcement-rule:
-  en: fbc24a6970225600
-  zh: 2feb55bd856a451f
+  en: 73fd74cac6ea5e36
+  zh: 857dc2398dbdf705
 /deepseek-ai-dsh-directory-guard/boundary-honest-limits:
   en: efbc0c1c39701472
   zh: f38accbc80f808bd

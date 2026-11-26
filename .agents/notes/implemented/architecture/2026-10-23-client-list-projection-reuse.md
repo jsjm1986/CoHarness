@@ -28,12 +28,14 @@ The [client architecture](2026-07-19-gui-web-client-architecture.md), [multi-ses
 
 ## Consequences
 
-Row identity is stable across unrelated updates without changing list order, Session references, connection ownership, or notification cadence. List construction still traverses the catalog; this change reduces summary reconstruction and selector invalidation rather than making every list operation incremental. The upstream immutable entry and runtime descriptor identities are the cache revision signals.
+Unrelated updates preserve row identity without changing list order, Session references, or connection ownership. List construction still traverses the catalog. The immutable manager entry and runtime descriptor identities determine when the pool can reuse a row.
 
-The list diagnostic measures row projection reuse. [Client interaction work](2026-10-23-client-interaction-work.md) separately owns selective settlement replay, navigation invalidation, and browser verification; projection counters do not measure those operations.
+The workbench does not republish the account and current-scope directories when its cleanup releases no Runtime. Opening a conversation already publishes its selection. When cleanup releases a Runtime, the pool publishes its removal before stopping its connection and resources. The [client interaction decision](2026-10-23-client-interaction-work.md) separately owns selective settlement replay and navigation invalidation.
 
 ## Verification
 
-Runtime and pool regressions cover unrelated row identity, changed status, visibility and project metadata, and renamed runtime labels. The document component suite exercises scope navigation through the required client method; the HTTP-client suite retains the missing-route fallback case.
+Runtime and pool regressions cover unrelated row identity, changed status, visibility and project metadata, and renamed runtime labels. The [pool regression](../../../../packages/client/runtime/tests/session-pool.client.spec.ts) asserts that clearing an empty workbench keeps both directory snapshot references. The document component suite exercises scope navigation through the required client method; the HTTP-client suite retains the missing-route fallback case.
 
 The package-local [source diagnostic](../../../../packages/client/runtime/tests/list-projection.perf.client.ts) creates 1,000 synthetic rows and applies 100 single-row status updates in each of three fresh object graphs. Published runtime and pooled summary replacements are 100 each, compared with 100,000 each without reuse. On the local Node 25.8.1 source run, the three elapsed samples are 276.13, 248.64, and 193.66 ms, compared with 409.36, 272.62, and 297.99 ms without reuse. These timings include source execution and reference counting; they are diagnostic observations, not browser measurements or CI budgets.
+
+A local Chromium fixture compared built browser assets with and without the extra directory publication. With a fixed 50 ms response delay and 50 repetitions per build, the P95 for opening prepared history was 178.4 ms with the extra publication and 155.2 ms without it; prepared creation was 194.7 ms and 169.5 ms respectively. This comparison measures the browser path against fixture responses, not latency across deployed nodes.

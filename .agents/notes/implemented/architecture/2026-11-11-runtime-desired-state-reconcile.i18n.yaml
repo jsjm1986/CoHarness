@@ -3,23 +3,20 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-11-runtime-desired-state-reconcile.md
 document:
-  en: d00ed34572592763246b41ffa9fa9b229eb42382
-  zh: 9441a5575e0dffee0ac99d68cbfbeba818268896
-/agent-note-desired-state-runtime-reconciler-with-bounded-warmup:
-  en: 25f4829e44feb9fc
-  zh: a4d4a9484325d778
-/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/problem:
-  en: 38a006937e46f99c
-  zh: a6dc5d9bf7325ab9
-/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/decision:
-  en: 73e1dcd4fc667e0c
-  zh: f2bfdf0813344d15
-/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/alternatives-considered:
-  en: 135eca75f6e2496b
-  zh: 6256a67f32915dc9
-/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/consequences:
-  en: 1a614b3f4d482756
-  zh: 41fd3bf9dc66c5a5
-/agent-note-desired-state-runtime-reconciler-with-bounded-warmup/verification:
-  en: 49c34a75000061bd
-  zh: 09d136aeb8d44281
+  en: 775226a7082bd07a012fb9b4da771d700ed60753
+  zh: 9b8f57433362fe7a4be0c5d19b6e8e3aadebb2d4
+/agent-note-desired-state-runtime-recovery:
+  en: 64cb3094e540ae88
+  zh: 11d6bdcd9cf9a95e
+/agent-note-desired-state-runtime-recovery/problem:
+  en: 87d0cd55349d4272
+  zh: 34d967195ffc252d
+/agent-note-desired-state-runtime-recovery/decision:
+  en: 117765a9b1ad8712
+  zh: 6cdf808e7f52ef70
+/agent-note-desired-state-runtime-recovery/alternatives-considered:
+  en: 180c7f346aed89c1
+  zh: 80d7e7bbbfe02bae
+/agent-note-desired-state-runtime-recovery/consequences:
+  en: 7bc42ef2f3b57550
+  zh: 9a4238afc5b8588b

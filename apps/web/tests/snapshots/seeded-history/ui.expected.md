@@ -26,16 +26,16 @@
   - img
   - img
   - text: Thinking The user wants me to read a.txt and b.txt, then reply with "DONE". Let me do both reads in parallel.
-- button "Read a.txt":
+- button "Read":
   - img
   - img
-  - text: Read
-  - button "a.txt"
-- button "Read b.txt":
+- text: Read
+- button "a.txt"
+- button "Read":
   - img
   - img
-  - text: Read
-  - button "b.txt"
+- text: Read
+- button "b.txt"
 - button "Thinking Both files have been read. a.txt contains \"alpha\" and b.txt contains \"beta\". I'll now reply with DONE as instructed.":
   - img
   - img
@@ -70,9 +70,9 @@
   - img
 - button "Send message" [disabled]
 - group "Session statistics":
-  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+  - "button \"1 turn · 2 steps · {{throughput}} tok/s\"":
     - img
-    - text: "1 turns · 2 steps{{throughput}} tok/s"
+    - text: "1 turn · 2 steps{{throughput}} tok/s"
   - button "16K tok · Cache hit 98%":
     - img
     - text: 16K tokCache hit 98%

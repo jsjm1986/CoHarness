@@ -35,6 +35,8 @@ Load this plugin in any composition where the agent should start, observe, and s
 
 The three tools return `{ text, job }`, `PublicJobSnapshot[]`, and `{ outcome: 'cancellation-requested' | 'already-finished', job }` respectively. A public snapshot carries id, kind, label, status with the live progress line or the terminal detail, and start/finish times, and omits ownership and ring offsets. All three render through generic UI cards: `read` for output and list, `execute` for kill.
 
+A pending user steer can end a blocking `job_output` wait and return the current status while the producer continues. Passive input uses the next available step. Drivers without live steering support wait for settlement, timeout, or cancellation.
+
 ### Completion notices
 
 When a job finishes, the owning agent receives `background job <id> (<kind>: <label>) finished [status: ...]. Read its output with job_output.` as an in-session message. A busy agent has the notice injected into its next step — the turn cannot close while the inbox holds it, so several jobs settling together cost one step rather than one turn each. An idle agent is instead woken with a follow-up turn, because an unclaimed notice is a completion the model never learns about. Completions the model already collected get no notice: the registry reports a settlement that released a live `wait` as `awaited` — whether a `job_output` wait or a shell tool waiting on its own foreground command — and the plugin remembers the kills the model requested through `job_kill`; a settlement caused by owner or service teardown is skipped because nobody is left to read it.

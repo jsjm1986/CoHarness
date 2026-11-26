@@ -1,6 +1,5 @@
 import { usePendingEdits } from '../pending-edits.tsx'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Context } from '@deepseek-ai/cordis'
 import { ModelsSection } from '../../../../packages/client/ui-settings-models/src/client/ModelsSection.tsx'
 import type { ModelDiscoveryProbe } from '../../../../packages/client/ui-settings-models/src/client/ModelListEditor.tsx'
 import {
@@ -8,8 +7,7 @@ import {
   type ModelsSettingsState,
 } from '../../../../packages/client/ui-settings-models/src/client/store.ts'
 import { en, zh } from '../../../../packages/client/ui-settings-models/src/client/locales.ts'
-import { createSettingsSchemaOperations } from '../../../../packages/client/ui-settings-models/src/client/schema-operations.ts'
-import { SettingsSchemaService } from '../../../../packages/client/ui-settings/src/client/schema.ts'
+import { settingsSchemaOperations as schema } from '../../../../packages/client/ui-settings/src/client/schema-operations.ts'
 import { createOrganizationModelsMirror } from '../model-settings-api.ts'
 import { adminLanguage } from '../language.ts'
 
@@ -65,8 +63,17 @@ function bindSnapshot(controller: ModelsSettingsStore): SnapshotHook {
   }
 }
 
-/** Shared Models settings plugin mounted against the organization REST facade. */
-export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void }) {
+interface OrganizationModelsEditorProps {
+  onChanged: () => void
+  prepareNextView?: () => (() => void) | undefined
+}
+
+/**
+ * Mount the shared Models editor against the organization REST facade.
+ * @param props - change notification and optional preparation for after the catalog renders.
+ * @returns the mounted organization catalog and its editor.
+ */
+export function OrganizationModelsEditor({ onChanged, prepareNextView }: OrganizationModelsEditorProps) {
   const [editing, setEditing] = useState(false)
   usePendingEdits(editing)
   const changed = useRef(onChanged)
@@ -74,31 +81,30 @@ export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void 
   useEffect(() => { changed.current = onChanged }, [onChanged])
   useEffect(() => {
     const lifetime = new AbortController()
-    // The admin surface reuses the shared editor outside the Cordis client
-    // plugin graph, so it must provide the same schema and settings mirror
-    // faces that ui-settings-models receives from its host plugin.
-    const schemaService = new SettingsSchemaService(new Context())
-    const schema = createSettingsSchemaOperations(schemaService)
     const { describeFace, api } = createOrganizationModelsMirror({
       signal: lifetime.signal,
       onChanged: () => { if (!lifetime.signal.aborted) changed.current() },
     })
     const controller = new ModelsSettingsStore(api as never, schema, describeFace)
-    setOwner({ api, controller, schema, onEditingChange: setEditing })
+    setOwner({ api, controller, onEditingChange: setEditing })
     return () => { lifetime.abort() }
   }, [])
-  return owner === null ? null : <MountedOrganizationModelsEditor {...owner} />
+  return owner === null ? null : <MountedOrganizationModelsEditor {...owner} prepareNextView={prepareNextView} />
 }
 
 interface OrganizationModelsOwner {
   api: ReturnType<typeof createOrganizationModelsMirror>['api']
   controller: ModelsSettingsStore
-  schema: ReturnType<typeof createSettingsSchemaOperations>
   onEditingChange: (editing: boolean) => void
 }
 
-function MountedOrganizationModelsEditor({ api, controller, schema, onEditingChange }: OrganizationModelsOwner) {
+function MountedOrganizationModelsEditor({ api, controller, onEditingChange, prepareNextView }:
+  OrganizationModelsOwner & Pick<OrganizationModelsEditorProps, 'prepareNextView'>) {
   const useSnapshot = useMemo(() => bindSnapshot(controller), [controller])
+  const ready = useSnapshot(state => state.status === 'ready')
+  useEffect(() => {
+    if (ready) return prepareNextView?.()
+  }, [ready, prepareNextView])
   const t = useMemo(() => {
     const copy = adminLanguage() === 'en' ? organizationCopyEn : organizationCopyZh
     return (key: keyof typeof copy) => copy[key]

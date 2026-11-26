@@ -109,47 +109,39 @@
   padding: 0;
 }
 
-/* Compact phones carry the seat as an icon-only control on the single
-   toolbar line: the permission glyph alone (its mark already varies by
-   level); the aria-label still names the mode. */
-:global([data-viewport='compact']) .trigger {
+/* Compact and touch toolbars use the mode glyph and its accessible label. */
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trigger {
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
   padding: 0;
 }
 
-:global([data-viewport='compact']) .trigger:hover:not(:disabled) {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trigger:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
 }
 
-:global([data-viewport='compact']) .triggerLabel,
-:global([data-viewport='compact']) .chevron {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .triggerLabel,
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .chevron {
   display: none;
 }
 
-:global([data-viewport='compact']) .triggerIcon {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .triggerIcon {
   display: inline-flex;
   width: auto;
   height: auto;
 }
 
-:global([data-viewport='compact']) .trigger:hover:not(:disabled) .triggerIcon {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .trigger:hover:not(:disabled) .triggerIcon {
   background: transparent;
 }
 
-:global([data-viewport='compact']) .triggerIcon svg {
+:global(:is([data-viewport='compact'], [data-composer-tool-layout='compact'])) .triggerIcon svg {
   width: var(--dsw-mobile-icon-secondary);
   height: var(--dsw-mobile-icon-secondary);
 }
 
-@media (max-width: 359px) {
-  :global([data-viewport='compact']) .trigger {
-    width: 36px;
-    height: 36px;
-  }
-}
 
 .sectionOptions {
   display: flex;
@@ -214,4 +206,8 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 18px;
+}
+
+@media (pointer: coarse) {
+  .trigger { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
 }

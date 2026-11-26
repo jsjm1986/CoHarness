@@ -28,6 +28,7 @@ export async function planPatch(
     const target = await ctx.fs.resolve(path, await sessionResolveOptions(ctx, exec))
     const prior = targets.get(target.targetKey)
     if (prior) return prior
+    await ctx.serial('fs/authorize-target', ctx.fs.processPath(target), 'write')
     targets.set(target.targetKey, target)
     return target
   }

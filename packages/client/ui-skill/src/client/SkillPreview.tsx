@@ -4,6 +4,7 @@ import type { SkillPreview as SkillSource } from '@deepseek-ai/dsh-api-remotes/c
 import { CodeBlock, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import css from './SkillPreview.module.css'
 
 /** Session-scoped source lookup; cancellation belongs to the open preview. */
 export interface SkillPreviewInjected {
@@ -45,6 +46,7 @@ export function SkillPreview({ sessionId, skillName, loadSkill, onClose, t }: Sk
       title={`/${skillName}`}
       onClose={onClose}
       closeLabel={t('close')}
+      pinShortChrome
       {...skill === undefined ? {} : { description: skill.description }}
     >
       {current === undefined
@@ -53,7 +55,7 @@ export function SkillPreview({ sessionId, skillName, loadSkill, onClose, t }: Sk
           ? <p role="alert">{t('preview.failed')}</p>
           : skill === undefined
             ? <p>{t('preview.missing')}</p>
-            : <CodeBlock code={skill.contentMarkdown} lang="markdown" copyLabel={t('copy')} copiedLabel={t('copied')} />}
+            : <CodeBlock className={css.source} code={skill.contentMarkdown} lang="markdown" copyLabel={t('copy')} copiedLabel={t('copied')} />}
     </Modal>
   )
 }

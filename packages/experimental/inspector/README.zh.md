@@ -45,6 +45,8 @@ Host 在相对于应用根目录的 `inspector/devtools/devtools_app.html` 路�
 
 前端在构建时选择浏览器运行时适配器、排除 Node 专用传输，不使用 import map。同源连接 bootstrap 先于应用入口执行。底部面板添加 `disableLocaleInfoBar=true`，bootstrap 设置 DevTools 自己的 `disable-locale-info-bar` 偏好，不改变语言。升级前端时，需要一起调整 npm 版本和源码配置，然后重跑面板和 Worker 检查；不兼容的源码变动会使构建失败。
 
+触屏上的底部面板保留更大的缩放手柄与关闭目标。视口较窄时，标题和操作区换行。
+
 <a id="runtime-layout"></a>
 ## 运行时布局
 

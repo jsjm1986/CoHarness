@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-25-mobile-header-and-trajectory-presenter.md
 document:
-  en: 9835295c5dfc578aa9abe51cf8c652cbd4af3017
-  zh: b2d46df811a0e47eb01f29369b6a518745e2853b
+  en: 26f353d967bb016194e6e04d128ef50f3004675d
+  zh: 904242cde0f5460a7cac9be0cf849001f6ea0595
 /agent-note-share-mobile-chrome-contracts-while-projecting-trajectory-events-for-phones:
   en: e2b1db8a53697f7c
   zh: 30c917c4a42efad6
@@ -12,8 +12,8 @@ document:
   en: 3ea310f4b85382da
   zh: 59b83ae403bab07f
 /agent-note-share-mobile-chrome-contracts-while-projecting-trajectory-events-for-phones/decision:
-  en: 292bddf31281c938
-  zh: 2cfd4a95606c469e
+  en: c973064ee64faf26
+  zh: 211db4d4cf39edb0
 /agent-note-share-mobile-chrome-contracts-while-projecting-trajectory-events-for-phones/alternatives-considered:
   en: fd7b8e0ecce03882
   zh: c092322271660be9

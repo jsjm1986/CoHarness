@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-25-windows-office-cleanup-handle-lag.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-25-windows-office-cleanup-handle-lag.md
+document:
+  en: b43bf0fadd3a8a94454500e1c0a0003c116271a6
+  zh: 3cda5fba0813b29e916c5962c025a1dce367d8ee
+/agent-note-retry-office-smoke-tree-cleanup-through-windows-handle-release-lag:
+  en: 805570734b074cd4
+  zh: 5d95814f486e476d
+/agent-note-retry-office-smoke-tree-cleanup-through-windows-handle-release-lag/problem:
+  en: 3cad0490ef249178
+  zh: 5bbb8f0d0a2944f8
+/agent-note-retry-office-smoke-tree-cleanup-through-windows-handle-release-lag/decision:
+  en: 10f70340952fd635
+  zh: 7d992836342571c8
+/agent-note-retry-office-smoke-tree-cleanup-through-windows-handle-release-lag/alternatives-considered:
+  en: 7e5e746e81a0e99f
+  zh: 97c7d5541b72e09f
+/agent-note-retry-office-smoke-tree-cleanup-through-windows-handle-release-lag/consequences:
+  en: a1c463c708fae5a6
+  zh: d11d85bb7f524de5

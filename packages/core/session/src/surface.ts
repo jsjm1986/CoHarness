@@ -164,16 +164,38 @@ export function hasConversationContent(event: SessionEvent): boolean {
   return message !== null && message.content.length > 0
 }
 
+const promptReceiptDigest = /^[0-9a-f]{64}$/u
+
+/**
+ * Read the submission keys and content digests from a durable inbox insertion.
+ * @param event - one logical Session event.
+ * @returns the validated receipt digests carried by inserted user inputs.
+ */
+export function admittedPrompts(event: SessionEvent): Array<{ key: string; digest: string }> {
+  const data: unknown = event.data
+  if ((event.type as string) !== 'agent/inbox/spliced' || !isRecord(data)
+    || !Array.isArray(data.inserted)) return []
+  return data.inserted.flatMap((message: unknown) => {
+    if (!isRecord(message) || !isRecord(message.source) || message.source.kind !== 'user'
+      || !isRecord(message.source.admission)) return []
+    const { key, digest } = message.source.admission
+    return typeof key === 'string' && promptReceiptDigest.test(key)
+      && typeof digest === 'string' && promptReceiptDigest.test(digest) ? [{ key, digest }] : []
+  })
+}
+
 /**
  * Whether an event gives a newly created draft a durable reason to exist.
  * Policy and runtime-context seed events stay in memory; command and durable
- * state events remain recoverable even when no chat message exists.
+ * state, including accepted inbox input, can be stored before chat content.
  * @param event - session event to inspect.
  * @returns true when the draft must be materialized.
  */
 export function materializesSession(event: SessionEvent): boolean {
   if (hasConversationContent(event)) return true
   switch (event.type as string) {
+    case 'agent/inbox/spliced':
+      return admittedPrompts(event).length > 0
     case 'command/run':
     case 'command/done':
     case 'goal/change':

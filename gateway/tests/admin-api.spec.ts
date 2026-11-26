@@ -16,7 +16,7 @@ import { CollaborationDeniedError } from '../src/collaboration.ts'
 import { BackupError } from '../src/postgres/backup-service.ts'
 import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
-import { InstanceManager, RuntimeStartBlockedError, type RuntimeTargetInput } from '../src/instances.ts'
+import { InstanceManager, RuntimeStartBlockedError, type RuntimeStopLease, type RuntimeStopReceipt, type RuntimeTargetInput } from '../src/instances.ts'
 import { RuntimeCapacityError } from '../src/runtime-capacity.ts'
 import { RuntimeAccountError } from '../src/launcher.ts'
 import { NodeResourceBudgetError } from '../src/node-resource-budget.ts'
@@ -26,6 +26,8 @@ import { ProjectService } from '../src/projects.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
 import type { GatewayPrincipalClaims } from '../src/principal.ts'
+import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
+import type { DeploymentContext } from '../src/deployment-protocol.ts'
 import type { ConversationArchiveDetail, ConversationArchiveRow } from '../src/postgres/conversation-archive-service.ts'
 
 let closer: (() => Promise<void>) | undefined
@@ -68,13 +70,14 @@ async function setup(
   const stop = instances.stop.bind(instances)
   instances.stop = async (target, reason, administratorUserId) => {
     stoppedTargets.push(target)
-    if (typeof target !== 'number' && target.kind === 'project') return
-    await stop(target, reason, administratorUserId)
+    if (typeof target !== 'number' && target.kind === 'project') return { generation: 1, shutdownOutcome: 'unconfirmed' }
+    return stop(target, reason, administratorUserId)
   }
   const withStopped = instances.withStopped.bind(instances)
-  instances.withStopped = async <T>(target: RuntimeTargetInput, operation: () => Promise<T>, projectActorUserId?: number): Promise<T> => {
+  instances.withStopped = async <T>(target: RuntimeTargetInput,
+    operation: (lease: RuntimeStopLease | undefined, receipt: RuntimeStopReceipt) => Promise<T>, projectActorUserId?: number): Promise<T> => {
     stoppedTargets.push(target)
-    if (typeof target !== 'number' && target.kind === 'project') return operation()
+    if (typeof target !== 'number' && target.kind === 'project') return operation(undefined, { generation: 1, shutdownOutcome: 'unconfirmed' })
     return withStopped(target, operation, projectActorUserId)
   }
   let now = Date.now()
@@ -123,6 +126,49 @@ async function setup(
 }
 
 describe('admin JSON API', () => {
+  it('identifies a project generation from its exact catalog row and starts only that project allocation', async () => {
+    const { deps, base, cookie, admin } = await setup()
+    const project = await deps.projects.create({ name: 'Reviewed', createdBy: admin.id })
+    const node = '10000000-0000-4000-8000-000000000001' as RuntimeNodeId
+    const id = '10000000-0000-4000-8000-000000000002' as RuntimeId
+    const row: RuntimeCatalogEntry = { id, owner: { kind: 'project', id: project.id, name: project.name },
+      node: { id: node, name: 'Computer', status: 'active', lastHeartbeatAt: null },
+      generation: 4, observedState: 'stopped', routing: 'local' }
+    deps.nodeServiceIdentity = { nodeId: node, organizationId: 'test', authorize: vi.fn() }
+    deps.instances.resolveTarget = vi.fn(async () => ({ kind: 'project' as const, id: project.id, runtimeId: id }))
+    const resolveForAdministrator = vi.fn(async () => row)
+    deps.runtimeCatalog = { pageForAdministrator: vi.fn(), pageForAccount: vi.fn(), resolveForAccount: vi.fn(), resolveForAdministrator }
+    const start = vi.spyOn(deps.instances, 'ensureRunning').mockResolvedValue({ port: 17171, generation: 5, runtimeId: id })
+    const detail = await fetch(`${base}/admin/api/projects/${project.id}?display=directory`, { headers: { cookie } })
+    expect(detail.status).toBe(200)
+    expect(await detail.json()).toMatchObject({ configurationSummary: { runtimeId: id, nodeId: node,
+      runtimeGeneration: 4, runtimeState: 'stopped' } })
+    const post = () => fetch(`${base}/admin/api/projects/${project.id}/instance/start?dshNode=${node}&dshRuntime=${id}`,
+      { method: 'POST', headers: { cookie, origin: base } })
+    const authorized = await post()
+    expect(authorized.status).toBe(204)
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ kind: 'project', id: project.id, runtimeId: id }), 'explicit', admin.id)
+    resolveForAdministrator.mockResolvedValueOnce({ ...row, owner: { kind: 'personal', id: project.id, name: 'Another owner' } })
+    expect((await post()).status).toBe(400)
+    resolveForAdministrator.mockResolvedValueOnce({ ...row, node: { ...row.node, id: '10000000-0000-4000-8000-000000000003' as RuntimeNodeId } })
+    expect((await post()).status).toBe(503)
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(await deps.audit.query({ action: 'admin.project-instances.start' })).toHaveLength(1)
+  })
+
+  it('reports the current computer and forwarding scope from one authorized deployment revision', async () => {
+    const { deps, base, cookie } = await setup()
+    const entry = { nodeId: '10000000-0000-4000-8000-000000000001' as DeploymentContext['entry']['nodeId'], name: deps.cfg.computeNodeName }
+    const policy: DeploymentContext = { mode: 'multi', revision: '7', entry, primary: { ...entry, origin: base },
+      scope: 'organization', role: 'primary', refreshAfterMs: 30000, legacyMigrationRequired: false }
+    const adminRead = vi.fn(async () => policy)
+    deps.nodeServiceIdentity = { nodeId: entry.nodeId, organizationId: 'test', authorize: vi.fn() }
+    deps.topology = { adminRead, read: vi.fn(), save: vi.fn(), preflight: vi.fn(), candidates: vi.fn(), assertNode: vi.fn() }
+    const response = await fetch(`${base}/admin/api/deployment/current-node`, { headers: { cookie } })
+    expect(await response.json()).toEqual({ ...entry, forwardingEnabled: true, deployment: policy })
+    expect(adminRead).toHaveBeenCalledTimes(1)
+  })
+
   it('applies accepted numeric quota subjects to the same account used by quota reads', async () => {
     const { base, cookie, member } = await setup()
     const response = await fetch(`${base}/admin/api/quotas`, { method: 'PUT',
@@ -1289,7 +1335,7 @@ it('admin plugin routes preserve target identity, stream bytes and deny ordinary
   deps.pluginManagement = { target, async *invoke(admin, input, signal) {
     expect(admin.role).toBe('admin'); expect(signal.aborted).toBe(false); invoked.push(input)
     yield bytes
-  }, async state() { throw new Error('not wired in this test') }, async overview() { throw new Error('not wired in this test') }, async saveState() { throw new Error('not wired in this test') } }
+  }, async state() { throw new Error('not wired in this test') }, async overview() { throw new Error('not wired in this test') }, async inventory() { throw new Error('not wired in this test') }, async saveState() { throw new Error('not wired in this test') } }
   const bound = await fetch(`${base}/admin/api/plugins/target?kind=user&id=3`, { headers: { cookie } })
   expect(await bound.json()).toEqual(binding)
   const response = await fetch(`${base}/admin/api/plugins/invoke`, { method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify(invocation) })
@@ -1322,4 +1368,64 @@ it.each(['verify', 'node-configuration'])('refuses malformed %s backup selection
   const administrator = (await deps.users.list()).find(user => user.username === 'boss')!
   if (operation === 'verify') expect(lookup).toHaveBeenCalledExactlyOnceWith(id, undefined, administrator.id)
   else expect(lookup).toHaveBeenCalledExactlyOnceWith(id, administrator.id)
+})
+
+it('aggregates requested deployment sections in one /admin/api/deployment/overview read with per-slice error isolation', async () => {
+  const { deps, base, cookie } = await setup()
+  deps.cfg.releaseId = 'coharness-fixture-release'
+  deps.maintenance = {
+    administration: async () => ({
+      mode: 'serving', maintenanceEpoch: '1', writeEpoch: '2', reason: null,
+      enteredAt: null, updatedAt: '2026-11-23T00:00:00Z', nodes: [], writersQuiesced: true, operations: [],
+    }),
+    state: vi.fn(),
+    enterMaintenance: vi.fn(),
+    exitMaintenance: vi.fn(),
+    setNodeStatus: vi.fn(),
+    listOperations: vi.fn(),
+    requestRestore: vi.fn(),
+    logOperation: vi.fn(),
+  }
+  deps.backups = {
+    list: async () => [],
+    get: async () => { throw new Error('unused') },
+    record: async () => { throw new Error('unused') },
+    setVerified: async () => { throw new Error('unused') },
+  }
+  deps.tunnelAccess = {
+    view: async () => ({
+      supported: true, binary: null, mode: 'off', desired: 'stopped', state: 'stopped',
+      publicUrl: null, hostname: null, domain: null, apiTokenConfigured: false,
+      lastError: null, revision: 1, startedAt: null, updatedAt: '2026-11-23T00:00:00Z',
+    }),
+    install: vi.fn(),
+    startQuick: vi.fn(),
+    startNamed: vi.fn(),
+    stop: vi.fn(),
+    clear: vi.fn(),
+  }
+
+  const invalid = await fetch(`${base}/admin/api/deployment/overview?sections=deployment,bogus`, { headers: { cookie } })
+  expect(invalid.status).toBe(400)
+  expect(await invalid.json()).toEqual({ error: 'invalid-deployment-overview-sections' })
+
+  const response = await fetch(`${base}/admin/api/deployment/overview?sections=deployment,backups,tunnel,nodeConfiguration`, {
+    headers: { cookie },
+  })
+  expect(response.status).toBe(200)
+  const payload = await response.json() as { sections: Record<string, { ok: boolean; status?: number; error?: string; value?: unknown }> }
+  expect(payload.sections.deployment).toMatchObject({ ok: true, value: { mode: 'serving', releaseId: 'coharness-fixture-release', migrations: null } })
+  const individual = await fetch(`${base}/admin/api/deployment`, { headers: { cookie } })
+  expect(await individual.json()).toEqual(payload.sections.deployment!.value)
+  delete deps.cfg.releaseId
+  const unconfigured = await fetch(`${base}/admin/api/deployment`, { headers: { cookie } })
+  expect(await unconfigured.json()).not.toHaveProperty('releaseId')
+  expect(payload.sections.backups).toEqual({ ok: true, value: { backups: [] } })
+  expect(payload.sections.tunnel).toMatchObject({ ok: true, value: { mode: 'off', revision: 1 } })
+  expect(payload.sections.nodeConfiguration).toEqual({ ok: false, status: 503, error: 'node-configuration-unavailable' })
+  expect(payload.sections.nodeAccess).toBeUndefined()
+
+  const memberCookie = await login(base, 'worker', 'pw-12345678')
+  const denied = await fetch(`${base}/admin/api/deployment/overview?sections=deployment`, { headers: { cookie: memberCookie } })
+  expect(denied.status).toBe(403)
 })

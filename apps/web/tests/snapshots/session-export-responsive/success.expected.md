@@ -1,0 +1,6 @@
+- dialog "Session download started":
+  - heading "Session download started" [level=2]
+  - button "Close":
+    - img
+  - paragraph: The browser is downloading the Session ZIP.
+  - button "Close"

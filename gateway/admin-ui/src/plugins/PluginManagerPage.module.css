@@ -21,6 +21,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
@@ -51,6 +52,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
@@ -354,6 +356,7 @@
   font: inherit;
   font-size: 13px;
 }
+
 
 .startupCheck {
   width: 15px;
@@ -694,6 +697,9 @@
   gap: 16px;
   min-height: 0;
   overflow-y: auto;
+  /* Overlay/classic scrollbars capture the scrollport's right ~16px in WebKit
+     hit tests; keep edge controls (the terminal's copy button) clear of it. */
+  padding-right: var(--dsw-space-4);
 }
 
 .wizardHead {
@@ -1504,4 +1510,34 @@ label.registryOption {
   font-size: 11px;
   line-height: 18px;
   color: var(--dsw-alias-label-secondary);
+}
+@media (pointer: coarse) {
+  /* WebKit menulists ignore min-height; the select needs an explicit height. */
+  .statusFilter {
+    height: 44px;
+  }
+
+  .statusFilter,
+  .entityControl,
+  .installField input[type='text'],
+  .registryCustomField,
+  .cardOpen,
+  .rowOpen,
+  .crumb,
+  .guideToggle,
+  .registryToggle,
+  .registryOption,
+  .registryCustomPick,
+  .detailsToggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .iconButton,
+  .deleteButton,
+  .wizardBack,
+  .wizardClose {
+    width: 44px;
+    height: 44px;
+  }
 }

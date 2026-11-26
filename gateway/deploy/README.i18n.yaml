@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/README.md
 document:
-  en: 7452fcb04d3e840f0c0f46c42812b512b1a49d26
-  zh: e095e888c245d09397a9bb3b6ed8d79d0d00da86
+  en: 4f9a125f7be889983f83685570b53373ab3203bc
+  zh: 89ef621787ee2c15ba4ee3de1c40521714eb6e09
 /production-deployment-runbook:
   en: bab9204fe333e354
   zh: dda096b4b8c30c4b
@@ -12,8 +12,8 @@ document:
   en: 2d51a5fadb66766e
   zh: 99955f92a7d497d9
 /production-deployment-runbook/install:
-  en: 1415de7d65588d83
-  zh: 8c5acd0f18a1cee6
+  en: bad139e96fcdb268
+  zh: 4dba1ffe51ad49f8
 /production-deployment-runbook/per-user-provisioning:
   en: eac189a38d8c6d23
   zh: f8177e5741daaa1b
@@ -24,14 +24,14 @@ document:
   en: 27bfd905af326534
   zh: e27e57ea234c3657
 /production-deployment-runbook/tls-entry-and-cutover:
-  en: c8abef4aff4f6abe
-  zh: ea17d55cf37b54fb
+  en: 5716f70c79602150
+  zh: 5785e144d8da5ee9
 /production-deployment-runbook/acceptance:
   en: 6381007832bdb568
   zh: 6e4727e1fad60137
 /production-deployment-runbook/macos-variant-launchd-tunnel-entry:
-  en: b5cb53b47020b9d0
-  zh: 93cf79f582399a55
+  en: d73e31a238b2ea16
+  zh: b10e42d8da2f630d
 /production-deployment-runbook/upgrades-and-backup:
   en: 4c6a963ec9d3a868
   zh: eb865d6939e8d8ba

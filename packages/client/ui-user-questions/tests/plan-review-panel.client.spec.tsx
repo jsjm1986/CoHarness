@@ -13,7 +13,7 @@ import { en, zh } from '../src/client/locales.ts'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 
 const SID = 's1' as SessionId
@@ -304,28 +304,53 @@ describe('PlanReviewPanel', () => {
   })
 
   it('re-arms the actions and says why when the decision does not land', async () => {
+    const diagnostics = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { carrier, answer } = wait()
     answer.mockRejectedValue(new Error('question response rejected: not-pending'))
     render(<QuestionComposer matched={carrier} {...kit} />)
 
     fireEvent.click(screen.getByRole('button', { name: zh['plan.approve'] }))
-    const failure = await screen.findByText('question response rejected: not-pending')
+    const failure = await screen.findByText(zh['error.decision'])
     expect(failure.getAttribute('role')).toBe('status')
+    expect(screen.queryByText('question response rejected: not-pending')).toBeNull()
+    expect(diagnostics).toHaveBeenCalledWith('[ui-user-questions] Plan decision was not confirmed.', expect.objectContaining({ message: 'question response rejected: not-pending' }))
     // Re-armed for the retry: a lost click must not leave a dead card.
     expect(screen.getByRole('button', { name: zh['plan.approve'] }).hasAttribute('disabled')).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: zh['plan.approve'] }))
     expect(answer).toHaveBeenCalledTimes(2)
+    await screen.findByText(zh['error.decision'])
+    expect(diagnostics).toHaveBeenCalledTimes(2)
   })
 
-  it('reports a non-Error transport failure as its stringified value', async () => {
-    // A non-Error rejection is the case under test: a carrier can reject with
-    // anything, and the panel must still show the user something.
+  it('keeps non-Error diagnostics out of the localized decision failure', async () => {
+    const diagnostics = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { carrier, cancel } = wait()
     cancel.mockRejectedValue('socket gone')
     render(<QuestionComposer matched={carrier} {...kit} />)
 
     fireEvent.click(screen.getByRole('button', { name: zh['plan.discuss'] }))
-    expect(await screen.findByText('socket gone')).toBeTruthy()
+    expect(await screen.findByText(zh['error.decision'])).toBeTruthy()
+    expect(screen.queryByText('socket gone')).toBeNull()
+    expect(diagnostics).toHaveBeenCalledWith('[ui-user-questions] Plan decision was not confirmed.', 'socket gone')
+  })
+
+  it('distinguishes an accepted Remote decision from a failed local panel withdrawal', async () => {
+    const diagnostics = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const carrier = new PendingQuestion(SID, questions(), 'plan-review-rpc-defense' as ToolCallId)
+    const answer = vi.fn(async () => true)
+    const hide = vi.fn(() => { throw new Error('local seat withdrawal failed') })
+    carrier.attachRpc({ answer })
+    carrier.attachSeat({ hide })
+    carrier.setState('continued')
+    render(<QuestionComposer matched={carrier} {...kit} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['plan.approve'] }))
+    const feedback = await screen.findByText(zh['status.sent'])
+    expect(feedback.getAttribute('role')).toBe('status')
+    expect(answer).toHaveBeenCalledExactlyOnceWith(decision('Approve'))
+    expect(hide).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: zh['plan.approve'] }).hasAttribute('disabled')).toBe(false)
+    expect(screen.queryByText('local seat withdrawal failed')).toBeNull()
+    expect(diagnostics).toHaveBeenCalledWith('[ui-user-questions] The accepted plan review panel could not close.', expect.objectContaining({ message: 'local seat withdrawal failed' }))
   })
 
   it('carries the same decision surface in English', () => {

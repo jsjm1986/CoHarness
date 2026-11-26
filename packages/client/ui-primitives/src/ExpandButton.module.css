@@ -1,0 +1,17 @@
+.button:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color);
+  outline-offset: -2px;
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .button {
+    min-height: var(--dsw-touch-target);
+    min-width: var(--dsw-touch-target);
+  }
+}
+
+@media (forced-colors: active) {
+  .button:focus-visible {
+    outline-color: Highlight;
+  }
+}

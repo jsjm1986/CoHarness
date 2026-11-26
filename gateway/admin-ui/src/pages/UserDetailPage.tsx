@@ -3,7 +3,8 @@ import { useProjectChoices } from '../components/project-choices.tsx'
 import { usePendingEdits } from '../pending-edits.tsx'
 import { ArrowLeft, KeyRound, Pencil, Power, Trash2, UserRound } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { AdminLink, useAdminPath } from '../admin-navigation.tsx'
 import {
   AdminRequestError,
   deleteUser,
@@ -80,7 +81,7 @@ export function UserDetailPage() {
   if (!Number.isSafeInteger(userId) || userId <= 0) {
     return (
       <div className="page">
-        <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
+        <AdminLink className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</AdminLink>
         <EmptyState icon={UserRound} title={t('notFoundTitle')} detail={t('notFoundDetail')} />
       </div>
     )
@@ -111,8 +112,10 @@ function UserComputerProfile({ userId, reload }: { userId: number; reload: numbe
 }
 
 function UserDetail({ userId }: { userId: number }) {
+  const { nodeId } = useParams()
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const navigate = useNavigate()
+  const adminPath = useAdminPath()
   const [profileRevision, setProfileRevision] = useState(0)
   const alive = useRef(true)
   useEffect(() => {
@@ -180,13 +183,13 @@ function UserDetail({ userId }: { userId: number }) {
   async function onDelete() {
     const saved = await run(`delete:${userId}`, () => deleteUser(userId))
     // A stale instance's delete cannot navigate away from a remounted detail.
-    if (saved && alive.current) { setDeleteOpen(false); navigate('/') }
+    if (saved && alive.current) { setDeleteOpen(false); navigate(adminPath('/')) }
   }
 
   if (notFound) {
     return (
       <div className="page">
-        <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
+        <AdminLink className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</AdminLink>
         <EmptyState icon={UserRound} title={t('notFoundTitle')} detail={t('notFoundDetail')} />
       </div>
     )
@@ -194,7 +197,7 @@ function UserDetail({ userId }: { userId: number }) {
 
   return (
     <div className="page">
-      <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
+      <AdminLink className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</AdminLink>
       <PageHeader
         title={user === null ? t('pageTitle') : t('pageTitleUser', { name: user.displayName || user.username })}
         description={user === null ? undefined : t('pageDescription', { username: user.username, id: String(user.id) })}
@@ -234,7 +237,7 @@ function UserDetail({ userId }: { userId: number }) {
           </Section>
 
           <UserComputerPermissions userId={user.id} />
-          <UserRuntimePanel userId={user.id} onChanged={() => setProfileRevision(value => value + 1)} />
+          <UserRuntimePanel key={nodeId} userId={user.id} onChanged={() => setProfileRevision(value => value + 1)} />
           <Section title={t('sectionQualifications')} className="responsiveSection">
               <p className="muted">{t('qualificationsHint')}</p>
               <div className="qualificationGrid">
@@ -363,7 +366,7 @@ function UserModelAccess({ userId, role }: { userId: number; role: UserRole }) {
         <EmptyState title={t('modelsEmptyTitle')} detail={t('modelsEmptyDetail')} />
       ) : (
         <>
-          <div className="tableWrap desktopOnly">
+          <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionModels')} tabIndex={0}>
             <table className="dataTable">
               <thead>
                 <tr><th>{t('colModel')}</th><th>{t('colRoleDefault')}</th><th>{t('userOverride')}</th><th>{t('colEffective')}</th></tr>
@@ -476,6 +479,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
 
   async function onRemove() {
     if (removeTarget === null) return
+    setError('')
     setPendingKey(`member:${removeTarget.projectId}`)
     try {
       await removeMember(removeTarget.projectId, userId)
@@ -520,7 +524,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
             ? t('membershipsHintAdmin')
             : t('membershipsHintUser')}
         </p>
-        <ErrorBanner message={error} />
+        <ErrorBanner message={removeTarget === null ? error : ''} />
       </div>
       {loading ? <LoadingState label={t('loadingMemberships')} /> : (
         <>
@@ -528,14 +532,14 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
             <EmptyState title={t('membershipsEmptyTitle')} detail={t('membershipsEmptyDetail')} />
           ) : (
             <>
-              <div className="tableWrap desktopOnly">
+              <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionMemberships')} tabIndex={0}>
                 <table className="dataTable">
                   <thead><tr><th>{t('colProject')}</th><th>{t('colPath')}</th><th>{t('permission')}</th><th aria-label={t('colActions')} /></tr></thead>
                   <tbody>
                     {memberships.map(row => (
                       <tr key={row.projectId}>
-                        <td><Link className="projectLink" to={`/projects/${row.projectId}`}>{row.name}</Link></td>
-                        <td><span className="codeText">{row.path}</span></td>
+                        <td><AdminLink className="projectLink" to={`/projects/${row.projectId}`}>{row.name}</AdminLink></td>
+                        <td><span className="pathText">{row.path}</span></td>
                         <td>
                           <select
                             className="select selectCompact"
@@ -548,7 +552,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
                             <option value="ro">{t('modeReadOnly')}</option>
                           </select>
                         </td>
-                        <td><div className="rowActions"><IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => setRemoveTarget(row)} /></div></td>
+                        <td><div className="rowActions"><IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => { setError(''); setRemoveTarget(row) }} /></div></td>
                       </tr>
                     ))}
                   </tbody>
@@ -558,8 +562,8 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
                 {memberships.map(row => (
                   <article className="mobileItem" key={row.projectId}>
                     <div className="mobileItemHeader">
-                      <Link className="projectLink" to={`/projects/${row.projectId}`}><strong>{row.name}</strong></Link>
-                      <IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => setRemoveTarget(row)} />
+                      <AdminLink className="projectLink" to={`/projects/${row.projectId}`}><strong>{row.name}</strong></AdminLink>
+                      <IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => { setError(''); setRemoveTarget(row) }} />
                     </div>
                     <div className="mobileItemBody">
                       <span className="codeText">{row.path}</span>
@@ -603,6 +607,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
         title={t('removeTitle')}
         description={t('removeDescription', { name: removeTarget?.name ?? '' })}
         confirmLabel={t('removeConfirm')}
+        error={error}
         pending={pendingKey.startsWith('member:')}
         onClose={() => { if (!pendingKey.startsWith('member:')) setRemoveTarget(null) }}
         onConfirm={() => void onRemove()}

@@ -4,6 +4,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  overflow-y: auto;
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-bg-base);
 }
@@ -71,13 +72,6 @@
   position: absolute;
   top: 0;
   right: 0;
-  visibility: hidden;
-  opacity: 0;
-}
-
-.addressBox:focus-within .addressGo {
-  visibility: visible;
-  opacity: 1;
 }
 
 .addressUnknown {
@@ -96,7 +90,11 @@
 .addressChanged {
   position: absolute;
   top: 6px;
-  right: 8px;
+  right: 34px;
+  max-width: calc(100% - 42px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding-left: 8px;
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xxxs-11);
@@ -117,9 +115,9 @@
 
 .frame {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 0 0;
   width: 100%;
-  min-height: 0;
+  min-height: min(240px, 100%);
   border: 0;
   background: var(--dsw-alias-bg-base);
 }
@@ -174,7 +172,7 @@
 .failure {
   flex: 0 0 auto;
   padding: 6px 12px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font: var(--dsw-font-xxxs-11);
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
 }
@@ -182,7 +180,7 @@
 .sandboxWarning {
   flex: 0 0 auto;
   padding: 6px 12px;
-  color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-state-business-label);
   font: var(--dsw-font-xxxs-11);
   background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
 }
@@ -202,4 +200,35 @@
 .titleIcon {
   flex: 0 0 auto;
   margin-right: 4px;
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .toolbar {
+    height: auto;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: var(--dsw-space-2);
+    gap: var(--dsw-space-1);
+  }
+
+  .addressBox { flex-basis: 100%; }
+
+  .address {
+    min-height: var(--dsw-touch-target);
+    height: auto;
+    padding-block: var(--dsw-space-2);
+    padding-right: calc(var(--dsw-touch-target) + var(--dsw-space-1));
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .tool {
+    width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    height: auto;
+  }
+
+  .addressGo { bottom: 0; }
+  .addressChanged { top: 50%; right: var(--dsw-touch-target); transform: translateY(-50%); }
+  .limit { white-space: normal; font-size: 12px; line-height: 1.5; }
 }

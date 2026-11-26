@@ -112,6 +112,16 @@ function service(
 
 const registration: PushDeviceRegistration = { token: 'device-token', platform: 'android' }
 
+it('posts UnifiedPush notifications only to an allowlisted HTTPS endpoint without redirects', async () => {
+  const transport = vi.fn<typeof fetch>(async () => Response.json({ id: 'provider-message' }))
+  const sender = new UnifiedPushEndpointSender(['notify.example.test'], transport)
+  const delivery = { runtimeId: RUNTIME_ID, sessionId: SESSION_ID, eventSeq: 17 }
+  await expect(sender.send({ ...delivery, token: 'https://notify.example.test.invalid/topic' })).rejects.toThrow('allowlist')
+  expect(transport).not.toHaveBeenCalled()
+  await expect(sender.send({ ...delivery, token: 'https://notify.example.test/topic' })).resolves.toEqual({ messageId: 'provider-message' })
+  expect(transport).toHaveBeenCalledWith('https://notify.example.test/topic', expect.objectContaining({ redirect: 'error' }))
+})
+
 describe('PostgresPushService', () => {
   it('registers a device and only removes it for its owning user', async () => {
     const fixture = poolFixture()

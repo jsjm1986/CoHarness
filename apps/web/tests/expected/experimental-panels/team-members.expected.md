@@ -1,0 +1,13 @@
+- dialog "Agent Team":
+  - strong: Agent Team
+  - button "Refresh members":
+    - img
+  - button "Close":
+    - img
+  - text: Enable agent teamwork
+  - switch "Enable agent teamwork" [checked]
+  - heading "Members 3" [level=3]
+  - button "Lead Current Running" [disabled]
+  - button "Review shared controls and responsive navigation across narrow screens Inactive"
+  - button "Inspect plugin pages and preserve the complete mobile interaction history Running"
+  - text: No shared tasks yet

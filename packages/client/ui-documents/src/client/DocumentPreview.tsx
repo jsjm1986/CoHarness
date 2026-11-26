@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type FC, type ReactNode } from 'react'
 import { Button, IconChevronLeftOutline14, IconCloseOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ApiResponseTooLargeError, readApiResponseText } from '@deepseek-ai/dsh-client-runtime/client'
+import type { PropsRenderFactories } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-workbench/client'
 import { createUserDocClient, type UserDocRef, type UserDocScope } from './documents-client.ts'
-import { FileTypeIcon } from './FileTypeIcon.tsx'
+import { useFileTypeIcon } from './use-file-type-icon.tsx'
 import { formatBytes, getDateGroup } from './format.ts'
 import type { DocumentsKey } from './locales.ts'
 import css from './DocumentPreview.module.css'
 
-export interface DocumentPreviewProps {
+export interface DocumentPreviewProps extends Partial<PropsRenderFactories> {
   /** Bind authenticated image, iframe and download navigations to their current account. */
   privateResourceUrl?: ((url: string) => string) | undefined
   doc: UserDocRef
@@ -53,8 +55,9 @@ function classifyMediaType(mediaType: string): 'image' | 'pdf' | 'text' | 'unsup
  * @returns an inline reading region or media dialog, with a download fallback.
  */
 export const DocumentPreview: FC<DocumentPreviewProps> = ({
-  doc, scope, maxTextBytes, onClose, t, privateResourceUrl, embedded = false, sourceLabel, actions,
+  doc, scope, maxTextBytes, onClose, t, privateResourceUrl, embedded = false, sourceLabel, actions, renderFactorySlot,
 }) => {
+  const FileTypeIcon = useFileTypeIcon(true)
   const readingPosition = useRef({ id: doc.docId, top: 0 })
   const [state, setState] = useState<PreviewState>('loading')
   const [textContent, setTextContent] = useState('')
@@ -101,6 +104,13 @@ export const DocumentPreview: FC<DocumentPreviewProps> = ({
   }, [doc.docId, doc.bytes, doc.mediaType, maxTextBytes, scope, userDocs, privateResourceUrl])
 
   const contentUrl = scopedUrl(true)
+  const downloadFallback = <>
+    <p className={css.status}>{t('preview.not.supported')}</p>
+    <a className={css.download} href={scopedUrl(false)} target="_blank" rel="noopener noreferrer">{t('preview.download')}</a>
+  </>
+  const pdfFallback = navigator.pdfViewerEnabled
+    ? <iframe className={css.frame} src={contentUrl} title={doc.name} />
+    : downloadFallback
 
   const surface = <section className={css.surface} data-document-preview="">
     <header className={css.header}>
@@ -118,15 +128,18 @@ export const DocumentPreview: FC<DocumentPreviewProps> = ({
         <p className={css.status}>{t('preview.too.large')}</p>
         <a className={css.download} href={scopedUrl(false)} target="_blank" rel="noopener noreferrer">{t('preview.download')}</a>
       </>}
-      {state === 'unsupported' && <>
-        <p className={css.status}>{t('preview.not.supported')}</p>
-        <a className={css.download} href={scopedUrl(false)} target="_blank" rel="noopener noreferrer">{t('preview.download')}</a>
-      </>}
+      {state === 'unsupported' && downloadFallback}
       {state === 'ready' && classifyMediaType(doc.mediaType) === 'image' && (
         <img className={css.image} src={contentUrl} alt={doc.name} />
       )}
       {state === 'ready' && classifyMediaType(doc.mediaType) === 'pdf' && (
-        <iframe className={css.frame} src={contentUrl} title={doc.name} />
+        <div className={css.pdf} data-document-pdf-host role="region" aria-label={doc.name}>
+          {renderFactorySlot?.('document.pdf.preview', {
+            sourceUrl: contentUrl,
+            documentKey: JSON.stringify([scope ?? null, doc.docId, doc.modifiedAt, doc.bytes]),
+            maxBytes: doc.bytes,
+          }, { fallback: pdfFallback }) ?? pdfFallback}
+        </div>
       )}
       {state === 'ready' && classifyMediaType(doc.mediaType) === 'text' && (
         <pre className={css.text}>{textContent}</pre>
@@ -135,5 +148,5 @@ export const DocumentPreview: FC<DocumentPreviewProps> = ({
     {actions !== undefined && <footer className={css.actions}>{actions}</footer>}
   </section>
   if (embedded) return <aside className={css.inline} aria-label={t('preview.title', { name: doc.name })}>{surface}</aside>
-  return <Modal open onClose={onClose} title={t('preview.title', { name: doc.name })} headless className={css.dialog as string}>{surface}</Modal>
+  return <Modal open onClose={onClose} title={t('preview.title', { name: doc.name })} headless mobilePresentation="page" className={css.dialog as string} overlayClassName={css.overlay as string}>{surface}</Modal>
 }

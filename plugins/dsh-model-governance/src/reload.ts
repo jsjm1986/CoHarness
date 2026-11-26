@@ -1,6 +1,5 @@
 import { watch, type FSWatcher } from 'node:fs'
 import { basename, dirname } from 'node:path'
-import { loadPolicy, type GovernancePolicyFile } from './policy.ts'
 
 /** Directory watcher signature used by the policy reloader and its tests. */
 export type WatchDirectory = (
@@ -13,10 +12,8 @@ export type WatchDirectory = (
 export interface PolicyReloaderOptions {
   /** Absolute or process-resolvable policy filename. */
   filename: string
-  /** Publish one validated policy snapshot. */
-  onValid: (policy: GovernancePolicyFile) => void
-  /** Enter the consumer's fail-closed state after a reload failure. */
-  onInvalid: (error: unknown) => void
+  /** Refresh through the same reader and publisher used for request admission. */
+  refresh: () => Promise<void>
   /** Surface watcher backend failures without throwing from an event callback. */
   onWatcherError: (error: unknown) => void
   /** Injectable watcher factory for deterministic lifecycle tests. */
@@ -29,10 +26,8 @@ export interface PolicyReloaderOptions {
  * working after the policy inode changes.
  */
 export class PolicyReloader {
-  private readonly filename: string
+  private readonly refresh: () => Promise<void>
   private readonly target: string
-  private readonly onValid: (policy: GovernancePolicyFile) => void
-  private readonly onInvalid: (error: unknown) => void
   private readonly onWatcherError: (error: unknown) => void
   private readonly watcher: FSWatcher
   private operations: Promise<void> = Promise.resolve()
@@ -43,10 +38,8 @@ export class PolicyReloader {
    * @param options - policy path, lifecycle callbacks, and optional watcher factory.
    */
   constructor(options: PolicyReloaderOptions) {
-    this.filename = options.filename
+    this.refresh = options.refresh
     this.target = basename(options.filename)
-    this.onValid = options.onValid
-    this.onInvalid = options.onInvalid
     this.onWatcherError = options.onWatcherError
     const watchDirectory = options.watchDirectory ?? watch
     this.watcher = watchDirectory(dirname(options.filename), { persistent: false }, (_eventType, filename) => {
@@ -73,18 +66,9 @@ export class PolicyReloader {
     this.reloadQueued = true
     const task = this.operations.then(() => {
       this.reloadQueued = false
-      return this.reload()
+      return this.closed ? undefined : this.refresh()
     })
     this.operations = task.then(() => undefined, () => undefined)
     void task.catch(error => { this.onWatcherError(error) })
-  }
-
-  private reload(): void {
-    if (this.closed) return
-    try {
-      this.onValid(loadPolicy(this.filename))
-    } catch (error) {
-      this.onInvalid(error)
-    }
   }
 }

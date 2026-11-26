@@ -1,6 +1,8 @@
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage } from './workflow-responsive-state.ts'
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { createMessage, createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -8,14 +10,14 @@ import type {} from '@deepseek-ai/dsh-session-title'
 import {
   assertFixtureInventory,
   captureStableAria,
-  compareOrRefreshGolden,
+
   launchWebScaffold,
   seedSession,
   watchConsole,
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/math-rendering', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/math-rendering/ui.expected.md', import.meta.url))
@@ -102,8 +104,8 @@ describe('web e2e: settled Markdown math rendering', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
     await seedSession(scaffold, mathFixture(), SEED_ID)
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -127,15 +129,19 @@ describe('web e2e: settled Markdown math rendering', () => {
     await expect.poll(() => page.locator('.katex').count(), { timeout: 10_000 }).toBe(6)
     await expect.poll(() => page.locator('.katex-display').count(), { timeout: 10_000 }).toBe(2)
     expect(await page.locator('.katex-error').count()).toBe(0)
+    await auditWorkflowState(page, 'markdown', 'inline-display-and-table-math', page.locator('[data-conversation-scroll]'))
+    for (const [index, formula] of (await page.locator('.katex').all()).entries()) {
+      await auditWorkflowState(page, 'markdown', `math-formula-${index}`, formula, [], () => formula.scrollIntoViewIfNeeded())
+    }
     await expect.poll(
-      () => page.getByText('1 turns · 1 steps', { exact: false }).count(),
+      () => page.getByText('1 turn · 1 step', { exact: false }).count(),
       { timeout: 10_000 },
     ).toBe(1)
     await page.getByRole('button', { name: /^Select model, current / }).waitFor({ timeout: 10_000 })
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
-    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(UI_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])

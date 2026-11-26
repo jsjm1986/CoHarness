@@ -8,6 +8,18 @@ const noop = (): void => {}
 /** Fixed operation categories keep long-lived streams separate from ordinary HTTP response times. */
 export type GatewayOperationClass = 'http' | 'websocket' | 'internal'
 
+const READY_SESSION_OUTCOMES = {
+  ready: 0, delegated: 0, fallbackUnavailable: 0, fallbackNotRetained: 0,
+  fallbackMaintenance: 0, fallbackCandidate: 0, fallbackDelegation: 0,
+  refused: 0, cancelled: 0, failed: 0,
+}
+
+/** Outcome of one attempt to forward directly to a retained Runtime generation. */
+export type ReadySessionOutcome = keyof typeof READY_SESSION_OUTCOMES
+
+/** Exact admission using an eligible node assertion or the ordinary account path. */
+export type ReadySessionRoute = 'forwarded' | 'ordinary'
+
 /** Explicit process-observation settings supplied by the Gateway entry. */
 export interface GatewayPerformanceOptions {
   readonly enabled: boolean
@@ -112,6 +124,7 @@ export interface GatewayPerformanceSnapshot<Capacity> {
   }
   readonly requests: GatewayRequestMetrics
   readonly operationClasses: Readonly<Record<GatewayOperationClass, GatewayRequestMetrics>>
+  readonly readySession: Readonly<Record<ReadySessionRoute, Readonly<Record<ReadySessionOutcome, number>>>>
   readonly eventLoop: {
     /** Delay samples since construction; zero until Node collects its first sample. */
     readonly samples: number
@@ -137,6 +150,7 @@ export class GatewayPerformanceObserver {
   private readonly operationClasses: Record<GatewayOperationClass, RequestMetrics> = {
     http: new RequestMetrics(), websocket: new RequestMetrics(), internal: new RequestMetrics(),
   }
+  private readonly readySession = { forwarded: { ...READY_SESSION_OUTCOMES }, ordinary: { ...READY_SESSION_OUTCOMES } }
   private readonly responseCleanups = new Set<() => void>()
   private endedAt: number | undefined
   private endedUtilization: number | undefined
@@ -200,6 +214,15 @@ export class GatewayPerformanceObserver {
   }
 
   /**
+   * Count a ready-Session forwarding decision without retaining request or Runtime identity.
+   * @param route - whether the attempt used the node assertion or ordinary account path.
+   * @param outcome - the decision for this attempt, independent of the HTTP result.
+   */
+  recordReadySession(route: ReadySessionRoute, outcome: ReadySessionOutcome): void {
+    if (this.options.enabled && this.endedAt === undefined) this.readySession[route][outcome] += 1
+  }
+
+  /**
    * Read cumulative diagnostics without resetting the histogram or retaining the supplied capacity value.
    * @param runtimeCapacity - Snapshot supplied by the runtime-capacity owner; no identifiers are added here.
    * @returns Request, process and externally supplied capacity measurements.
@@ -222,6 +245,7 @@ export class GatewayPerformanceObserver {
         http: this.operationClasses.http.snapshot(), websocket: this.operationClasses.websocket.snapshot(),
         internal: this.operationClasses.internal.snapshot(),
       },
+      readySession: { forwarded: { ...this.readySession.forwarded }, ordinary: { ...this.readySession.ordinary } },
       eventLoop: {
         samples, meanMs: measured ? delay.mean / 1e6 : 0, maxMs: measured ? delay.max / 1e6 : 0,
         p50Ms: measured ? delay.percentile(50) / 1e6 : 0,

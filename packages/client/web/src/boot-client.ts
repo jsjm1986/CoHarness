@@ -1,6 +1,6 @@
 /**
  * Production client composition without the page: mount the Loader over a
- * module system, create every manifest row, wait for quiescence, and audit
+ * module system, create the required manifest rows, wait for quiescence, and audit
  * activation. `AppWebEntry` and the whole-client test carrier both call it.
  * @module @deepseek-ai/dsh-client-web/src/boot-client
  */
@@ -26,11 +26,11 @@ export interface ClientBootOptions {
 
 /**
  * Compose the client: `ctx.plugin(Loader)`, `loader.internal = modules`, one
- * `loader.create({ name })` per manifest row, `loader.await()`, then
+ * `loader.create({ name })` per required manifest row, `loader.await()`, then
  * {@link assertEntriesActive}. A row whose module cannot be imported is marked
  * failed; the Loader logs its import error and the audit rejects startup.
  * @param options - context, module system, manifest, optional progress sink.
- * @returns resolves after every entry is active; rejects with the audit report otherwise.
+ * @returns resolves after required entries are active; rejects with the audit report otherwise.
  */
 export async function bootClient(options: ClientBootOptions): Promise<void> {
   const { ctx, manifest, onEntryState } = options
@@ -38,17 +38,17 @@ export async function bootClient(options: ClientBootOptions): Promise<void> {
   const loader = ctx.loader
   loader.internal = options.modules as never
 
+  const required = new Set(manifest.plugins.filter(row => row.optional !== true).map(row => row.id))
   ctx.on('internal/status', (fiber) => {
     const entry = fiber.entry
-    if (entry === undefined || entry.fiber === undefined) return
+    if (entry === undefined || entry.fiber === undefined || !required.has(entry.options.name)) return
     onEntryState?.(entry.options.name, STATE_LABELS[entry.fiber.state])
   })
 
-  const rows = manifest.plugins.map(row => row.id)
-  for (const name of rows) onEntryState?.(name, 'loading')
+  for (const name of required) onEntryState?.(name, 'loading')
   await options.modules.entries.start(loader, manifest)
   for (const entry of loader.entries()) {
-    if (entry.fiber === undefined) onEntryState?.(entry.options.name, 'failed')
+    if (entry.fiber === undefined && required.has(entry.options.name)) onEntryState?.(entry.options.name, 'failed')
   }
 
   await loader.await()

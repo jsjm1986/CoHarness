@@ -12,8 +12,8 @@
   border-radius: var(--dsw-radius-xl);
   background: transparent;
   color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -96,6 +96,12 @@
   color: var(--dsw-alias-label-caption);
 }
 
+@media (pointer: coarse) {
+  .seat {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
 :global([data-viewport='compact']) .seat {
   max-width: 100%;
   min-height: var(--dsw-touch-target);
@@ -115,14 +121,14 @@
 }
 
 .itemName {
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   color: var(--dsw-alias-label-primary);
 }
 
 .itemDesc {
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 0.75rem;
+  line-height: 1rem;
   color: var(--dsw-alias-label-caption);
   white-space: normal;
 }

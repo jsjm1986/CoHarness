@@ -20,7 +20,11 @@
 .triggerLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .triggerChevron { flex: none; }
 @media (hover: hover) { .row:hover, .trigger:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); } }
-@media (pointer: coarse) { .row { min-height: 44px; } .search input { font-size: 16px; } }
+@media (pointer: coarse) {
+  .row, .trigger { min-height: var(--dsw-touch-target); }
+  .trigger { min-width: var(--dsw-touch-target); }
+  .search input { font-size: 16px; }
+}
 
 .searchInput { box-sizing: border-box; width: 100%; max-width: 100%; }
 .searchInput input::placeholder { color: var(--dsw-alias-label-secondary); }

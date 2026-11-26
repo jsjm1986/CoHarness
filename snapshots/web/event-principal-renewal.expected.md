@@ -4,8 +4,10 @@
   "enabled": true,
   "eventSockets": 2,
   "initialHttpStatus": 200,
-  "renewalBatches": 3,
+  "renewalBatches": 4,
+  "unavailableBatches": 1,
   "batchSizes": [
+    2,
     2,
     2,
     2
@@ -21,6 +23,7 @@
   "eventSockets": 2,
   "initialHttpStatus": 200,
   "renewalBatches": 0,
+  "unavailableBatches": 0,
   "batchSizes": [],
   "passedOriginalDeadline": false,
   "retainedAuthority": false,

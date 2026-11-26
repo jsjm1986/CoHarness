@@ -12,6 +12,19 @@ const open: readonly InspectorRow[] = [
 ]
 const closed = open.map(row => row.key === 'block' ? { ...row, disclosure: 'closed' as const } : row)
 const hierarchy = (rows: readonly InspectorRow[]) => new InspectorTableHierarchy(rows, new Map())
+it('uses rendered touch row heights for sticky ancestors and manual disclosure anchoring', () => {
+  const rows: InspectorRow[] = [
+    { key: 'previous', depth: 0 }, { key: 'previous-tail', parent: 'previous', depth: 1 },
+    { key: 'current', depth: 0 }, { key: 'current-body', parent: 'current', depth: 1 },
+  ]
+  const touch = new InspectorTableLayout(hierarchy(rows), undefined, { offset: 0, height: 300 }, undefined, 44)
+  expect(touch.stickyIndexesAtOffset(88)).toEqual([2])
+  expect(touch.stickyIndexesAtOffset(87)).toEqual([0])
+  const anchored = new InspectorTableLayout(hierarchy(rows), undefined, { offset: 88, height: 300 },
+    { key: 'current', top: 44 }, 44)
+  expect(anchored.scrollOffset).toBe(88)
+  expect(anchored.bottomPadding).toBe(168)
+})
 it('keeps rows contiguous, anchors their parent, and fills trailing blank space with new rows', () => {
   const before = new InspectorTableLayout(hierarchy(open))
   const after = new InspectorTableLayout(hierarchy(closed), before, { offset: 90, height: 300 })

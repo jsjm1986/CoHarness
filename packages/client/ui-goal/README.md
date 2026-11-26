@@ -29,7 +29,9 @@ Use this plugin with the conversation composer and the Host goal service. The st
 
 The goal bar sits after Todo and before Queue. Loading, absent, completed, and successfully cleared goals render nothing. Armed active goals offer Pause; disarmed active goals and paused goals offer Resume. When an active goal's activation is unknown, Pause remains available because the Host can pause either activation state using the current goal revision.
 
-Editing uses a growing text box: Enter saves, Shift+Enter inserts a newline, and Escape cancels. Only one mutation runs at a time. Rejected mutations appear inline, and a successful clear hides that goal immediately while the durable projection catches up.
+Editing uses a growing text box: Enter saves, Shift+Enter inserts a newline, and Escape cancels. Only one mutation runs at a time. Rejected mutations wrap in full below the objective, and a successful clear hides that goal immediately while the durable projection catches up.
+
+A blocked goal with a reason provides a disclosure below its controls. Tap, click, or focus its summary and press Enter or Space to read the full reason; long explanations scroll within the composer dock.
 
 Recorded `/goal` commands appear as right-aligned `Command input` bubbles without timestamp, copy, or branch actions. The command token uses reference styling; its objective stays plain text. Replaying these entries neither submits another user message nor starts a model turn.
 

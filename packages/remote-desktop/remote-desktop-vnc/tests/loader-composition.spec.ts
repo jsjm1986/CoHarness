@@ -60,6 +60,7 @@ afterEach(async () => {
   for (const server of servers.splice(0)) await new Promise<void>(resolve => server.close(() => { resolve() }))
   if (root !== undefined) await rm(root, { recursive: true, force: true })
   root = undefined
+  vi.restoreAllMocks()
 })
 
 /** A real TCP listener standing in for a VNC endpoint; returns its port and received-byte log. */
@@ -107,6 +108,57 @@ async function loadComposition(): Promise<{ ctx: Context; grantsFile: string; en
 }
 
 describe('remote-desktop-vnc real composition', () => {
+  it('reports private-store EACCES through Loader startup without publishing the service', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-remote-desktop-composition-'))
+    const denied = Object.assign(new Error('private grants cannot be read'), { code: 'EACCES' })
+    vi.spyOn(VncGrantStore, 'open').mockRejectedValueOnce(denied)
+    await writeFile(join(root, 'cordis.yml'), [
+      '- id: remote-desktop-vnc', "  name: '@deepseek-ai/dsh-remote-desktop-vnc'", '  config:',
+      `    grantsFile: ${JSON.stringify(join(root, 'grants.jsonl'))}`,
+    ].join('\n'))
+    const { ctx } = await loadComposition()
+    const entry = [...ctx.loader.entries()].find(candidate => candidate.options.id === 'remote-desktop-vnc')
+    expect(entry?.fiber).toBeDefined()
+    await expect(entry!.fiber!.await()).rejects.toBe(denied)
+    expect(ctx.get('remoteDesktop')).toBeUndefined()
+  })
+
+  it('does not open desktop stores when the provider is explicitly disabled', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-remote-desktop-composition-'))
+    const open = vi.spyOn(VncGrantStore, 'open').mockClear()
+    await writeFile(join(root, 'cordis.yml'), [
+      '- id: remote-desktop-vnc', "  name: '@deepseek-ai/dsh-remote-desktop-vnc'", '  disabled: true', '  config:',
+      `    grantsFile: ${JSON.stringify(join(root, 'private/grants.jsonl'))}`,
+    ].join('\n'))
+    const { ctx } = await loadComposition()
+    expect(ctx.get('remoteDesktop')).toBeUndefined()
+    expect(open).not.toHaveBeenCalled()
+  })
+
+  it('keeps initialization owned until disposal settles and never publishes a stopped provider', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-remote-desktop-composition-'))
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    const open = VncGrantStore.open.bind(VncGrantStore)
+    vi.spyOn(VncGrantStore, 'open').mockImplementationOnce(async (file) => {
+      entered.resolve(undefined)
+      await release.promise
+      return open(file)
+    })
+    await writeFile(join(root, 'cordis.yml'), '- id: remote-desktop-vnc\n  name: "@deepseek-ai/dsh-remote-desktop-vnc"\n')
+    const loading = loadComposition()
+    await entered.promise
+    const ctx = context!
+    expect(ctx.get('remoteDesktop')).toBeUndefined()
+    let disposed = false
+    const closing = ctx.fiber.dispose().then(() => { disposed = true })
+    try {
+      await new Promise<void>(resolve => setImmediate(resolve))
+      expect(disposed).toBe(false)
+    } finally { release.resolve(undefined) }
+    await Promise.all([loading, closing])
+    expect(ctx.get('remoteDesktop')).toBeUndefined()
+  })
+
   it('reloads removed endpoints when atomic replacement preserves the modification timestamp', async () => {
     root = await mkdtemp(join(tmpdir(), 'dsh-remote-desktop-composition-'))
     const upstream = await fakeVnc()

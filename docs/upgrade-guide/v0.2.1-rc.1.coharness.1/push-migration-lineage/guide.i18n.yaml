@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/push-migration-lineage/guide.md
+document:
+  en: 72b9d9237122f806fe41909374ceb0621946cd07
+  zh: 448fb727dddbdf5134b63dfa6a51b15d191a4d57
+/:
+  en: 2ba6f33bb11e3e3b
+  zh: 987e7cf474f019ce
+/postgresql-push-ledger-upgrade:
+  en: 8cadc7d7dd68c5ea
+  zh: 024c3ad0267c0129
+/postgresql-push-ledger-upgrade/change:
+  en: 5ad31d17dc512b5f
+  zh: cbfdd6ea807697c4
+/postgresql-push-ledger-upgrade/migration:
+  en: 024a91347135b048
+  zh: 5034ee225e666a8f

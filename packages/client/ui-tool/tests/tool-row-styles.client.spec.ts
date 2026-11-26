@@ -48,4 +48,10 @@ describe('ToolRow.module.css summary line', () => {
     expect(css).toContain('.fileLink')
     expect(css).toContain('white-space: normal')
   })
+
+  it('re-declares the touch floor over the plain 28px row', () => {
+    // A plain `.row` class outranks DisclosureRow's coarse media on injection
+    // order, so the row restates the floor inside the same media here.
+    expect(css).toMatch(/@media \(pointer: coarse\)\s*\{[^}]*\.row\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/)
+  })
 })

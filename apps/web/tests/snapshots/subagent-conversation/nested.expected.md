@@ -5,7 +5,8 @@
       - text: 3 subagents
       - img
     - text: /
-    - 'button "Switch subagent: event-sourcing researcher"': event-sourcing researcher
+    - button "event-sourcing researcher"
+    - 'button "Switch subagent: event-sourcing researcher"'
     - text: /
     - 'button "Switch subagent: example editor"': example editor
   - tablist:

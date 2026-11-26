@@ -66,7 +66,7 @@ it('saves and rereads the current node while rejecting members, wrong nodes, sta
 
 it('lets admins stop project runtimes during maintenance but refuses starts and all stale-epoch mutations', async () => {
   const f = await fixture(), project = await f.deps.projects.create({ name: 'fixture-project', createdBy: f.admin.id })
-  const stop = vi.spyOn(f.deps.instances, 'stop').mockResolvedValue(undefined)
+  const stop = vi.spyOn(f.deps.instances, 'stop').mockResolvedValue({ generation: 1, shutdownOutcome: 'unconfirmed' })
   const start = vi.spyOn(f.deps.instances, 'ensureRunning').mockResolvedValue({ port: 44001, generation: 1 })
   f.deps.maintenanceGate = async () => 'maintenance'
   const path = `/admin/api/projects/${project.id}/instance`

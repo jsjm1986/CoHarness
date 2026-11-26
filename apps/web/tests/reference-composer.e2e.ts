@@ -1,11 +1,12 @@
 // Web e2e scenario: the shipped composition discovers local files and cold
 // sessions through the real Host, groups both domains in the shared @ menu,
 // and projects each pick as a complete inline range without issuing a model call.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
@@ -16,17 +17,18 @@ import {
 } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-reference/types'
 import type {} from '@deepseek-ai/dsh-session-title'
+import type {} from '@deepseek-ai/dsh-host-apiproxy'
 import {
   assertFixtureInventory,
   captureStableAria,
-  compareOrRefreshGolden,
   launchWebScaffold,
   seedSession,
   watchConsole,
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden as compareOrRefreshGolden, newWorkflowPage as newEnglishPage } from './workflow-responsive-state.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/reference-composer', import.meta.url))
 const MENU_EXPECTED = join(SNAPSHOT_DIR, 'menu.expected.md')
@@ -140,7 +142,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await writeFile(join(scaffold.workspaceCwd, 'preview.txt'), 'Sent file reference preview.\n')
     await seedSession(scaffold, sourceSessionFixture(), SOURCE_SESSION_ID)
     await seedSession(scaffold, targetSessionFixture(), TARGET_SESSION_ID)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -179,13 +181,28 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     expect(snapshot).toContain(SOURCE_SESSION_ID)
     expect(snapshot).not.toContain('Research notes')
     expect(snapshot).not.toContain('text: Subagents')
+    await auditWorkflowState(page, 'reference', 'grouped-files-and-sessions', page.locator('[data-trigger-menu]'))
 
     await input.fill('@reference')
+    await menu.getByRole('option', { name: /reference\.txt/ }).waitFor()
+    await auditWorkflowState(page, 'reference', 'filtered-file', page.locator('[data-trigger-menu]'), [], undefined, async () => {
+      if ((page.viewportSize()?.width ?? 0) >= 768) return
+      for (const title of [SOURCE_SESSION_ID, TARGET_SESSION_ID]) {
+        const label = menu.getByRole('option', { name: new RegExp(title) }).getByText(title, { exact: true })
+        const overflow = await label.evaluate(node => ({
+          horizontal: node.scrollWidth - node.clientWidth,
+          vertical: node.scrollHeight - node.clientHeight,
+        }))
+        expect(overflow.horizontal, `${title} remains readable at compact widths`).toBeLessThanOrEqual(1)
+        expect(overflow.vertical, `${title} remains readable at compact heights`).toBeLessThanOrEqual(1)
+      }
+    })
     await menu.getByRole('option', { name: /reference\.txt/ }).click()
     const fileReference = page.locator('[data-reference-appearance="file"]')
     await expect.poll(() => fileReference.textContent()).toBe('@reference.txt')
     await expect.poll(() => fileReference.locator('svg').count()).toBe(1)
     await expect.poll(() => input.inputValue()).toBe('@reference.txt ')
+    await auditWorkflowState(page, 'reference', 'file-inline-range', page.locator('[data-composer-card]'))
 
     await input.fill('@reference-source')
     await menu.getByRole('option', { name: new RegExp(SOURCE_SESSION_ID) }).click()
@@ -193,6 +210,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await expect.poll(() => sessionReference.textContent()).toBe(`@${SOURCE_SESSION_ID}`)
     await expect.poll(() => sessionReference.locator('svg').count()).toBe(1)
     await expect.poll(() => input.inputValue()).toBe(`@${SOURCE_SESSION_ID} `)
+    await auditWorkflowState(page, 'reference', 'session-inline-range', page.locator('[data-composer-card]'))
 
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
@@ -215,6 +233,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await compareOrRefreshGolden(ORDER_EXPECTED, snapshot, MODE)
     expect(snapshot).toContain('Research notes what changed?')
     expect(snapshot).toContain('Referenced session · Research notes')
+    await auditWorkflowState(page, 'reference', 'sent-references-and-recall', page.locator('[class*="centerCol"]'))
     const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
       .mockImplementation(async (request, _signal) => ({
         rpcId: request.rpcId,

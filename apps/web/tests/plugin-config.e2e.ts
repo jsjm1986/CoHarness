@@ -4,10 +4,11 @@
 // that layering produces. Zero model calls: everything is client state plus
 // the settings document on a blank frame, so there is no fixture and a stray
 // stream would fail loud on the open llm seam.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { join } from 'node:path'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
@@ -42,7 +43,7 @@ describe('web e2e: plugin configuration section', () => {
       deepSeekSearch: { apiKeyEnv: WEB_CREDENTIAL_REF },
       deepSeekWebApi: { apiKeyEnv: WEB_CREDENTIAL_REF },
     })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     // Chinese browser: the panel asserts the localized copy the client
     // derives from it, as the rest of the settings surface does.
     page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })

@@ -8,18 +8,33 @@ import { localKernelBootId } from './local-runtime-protocol.ts'
 import { localLinuxRuntimeEmpty, stopLocalLinuxRuntime } from './local-runtime-linux.ts'
 import { isDeadlineKilledCommand } from './child-command.ts'
 import { win32ProcessCreationMatches, win32ProcessCreationMs } from './local-runtime-win32-job.ts'
+import { readRuntimeShutdownReceipt, type RuntimeShutdownOutcome } from './runtime-shutdown.ts'
 
 const POLL_MS = 25
 
 /** Authenticated controller; unconfirmed cleanup remains a failed operation for capacity accounting. */
 export class LocalRuntimeControl implements InstanceProc {
   private confirmedStopped = false
-  private stopping: Promise<void> | undefined
+  private stopping: Promise<RuntimeShutdownOutcome> | undefined
   private bootIdentity: string | undefined
 
   constructor(readonly store: LocalRuntimeOwnerStore, private readonly timeoutMs: number) {}
 
   hasExited(): boolean { return this.confirmedStopped }
+
+  /** Prove an existing generation stopped without cancelling, publishing, signalling or reaping it.
+   * @returns after its allocation lease is free and a stopped or prior-boot record proves no current writer.
+   */
+  async assertQuiescent():Promise<void>{
+    const bootId=await this.kernelBoot(),lease=await this.store.acquireExisting(bootId)
+    try{
+      const record=await this.requiredRecord(bootId)
+      if(record.bootId!==bootId)return
+      if(record.phase!=='stopped')throw new Error('Local runtime has no confirmed stopped receipt')
+      if(record.groupPid!==undefined&&this.groupExists(record.groupPid))throw new Error('Local runtime process range is still occupied')
+      if(record.nativeRange==='linux-slice'&&!await localLinuxRuntimeEmpty(record,this.timeoutMs))throw new Error('Local runtime native scope is still occupied')
+    }finally{await lease.close()}
+  }
 
   async isAlive(): Promise<boolean> {
     if (this.confirmedStopped) return false
@@ -38,7 +53,7 @@ export class LocalRuntimeControl implements InstanceProc {
     }
   }
 
-  terminate(graceMs: number): Promise<void> {
+  terminate(graceMs: number): Promise<RuntimeShutdownOutcome> {
     return this.stopping ??= this.stop(graceMs).catch(error => { this.stopping = undefined; throw error })
   }
 
@@ -52,7 +67,7 @@ export class LocalRuntimeControl implements InstanceProc {
     return record
   }
 
-  private async stop(graceMs: number): Promise<void> {
+  private async stop(graceMs: number): Promise<RuntimeShutdownOutcome> {
     if (!Number.isSafeInteger(graceMs) || graceMs < 0 || graceMs > 86_400_000) throw new Error('Invalid local runtime termination grace')
     await this.store.cancel()
     const bootId = await this.kernelBoot()
@@ -61,7 +76,7 @@ export class LocalRuntimeControl implements InstanceProc {
     let requested = false
     for (;;) {
       const record = await this.requiredRecord(bootId)
-      if (await this.confirmStopped(bootId)) return
+      if (await this.confirmStopped(bootId)) return readRuntimeShutdownReceipt(this.store.shutdownReceiptPath)
       const remaining = deadline - performance.now()
       if (remaining <= 0) throw new Error('Local runtime termination could not be confirmed; capacity remains occupied')
       if (!requested && record.bootId === bootId && record.url !== undefined) {
@@ -113,10 +128,7 @@ export class LocalRuntimeControl implements InstanceProc {
         // record-bound spawn allocation, so leader death proves the survivors
         // belong to this generation — reap them instead of reporting
         // 'occupied' forever. Windows sweeps orphans by parent link below.
-        if (process.platform !== 'win32' && this.leaderDead(current.groupPid)) {
-          try { process.kill(-current.groupPid, 'SIGKILL') } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
-          }
+        if (process.platform !== 'win32' && this.leaderDead(current.groupPid) && this.signalGroup(current.groupPid)) {
           await new Promise(resolve => setTimeout(resolve, POLL_MS))
         }
         if (this.groupExists(current.groupPid)) return false
@@ -217,10 +229,15 @@ export class LocalRuntimeControl implements InstanceProc {
     // PID reuse.
     if (record === undefined || record.bootId !== bootId || record.groupPid === undefined
       || !this.leaderDead(record.groupPid) || !this.groupExists(record.groupPid)) return false
-    try { process.kill(-record.groupPid, 'SIGKILL') } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
+    return this.signalGroup(record.groupPid)
+  }
+
+  private signalGroup(pid: number): boolean {
+    try { process.kill(-pid, 'SIGKILL'); return true } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code === 'ESRCH' || code === 'EPERM') return false
+      throw error
     }
-    return true
   }
 
   /** Whether the process-group leader itself is gone while members may remain. */

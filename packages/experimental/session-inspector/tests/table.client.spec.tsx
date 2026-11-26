@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /** Virtual Inspector rows expose raw data and flash on updates. */
 
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { bindSnapshotSelector, makeTranslate, conversationSnapshot } from '@deepseek-ai/dsh-client-test-runtime'
@@ -143,7 +143,7 @@ it('opens cyclic raw nodes, contains formatter errors, and permits closing and r
   expect(reopened.getByText('$:').closest('ul')!.textContent).toContain('[Circular]')
 })
 
-it('shows the complete row identity in a tooltip outside the table clipping area', () => {
+it('shows the complete row identity in a tooltip outside the table clipping area', async () => {
   vi.stubGlobal('ResizeObserver', class {
     observe() {}
     unobserve() {}
@@ -168,7 +168,7 @@ it('shows the complete row identity in a tooltip outside the table clipping area
   expect(tooltip.parentElement).toBe(document.body)
   expect(ui.container.contains(tooltip)).toBe(false)
   fireEvent.mouseLeave(id)
-  expect(ui.queryByRole('tooltip', { hidden: true })).toBeNull()
+  await waitFor(() => { expect(ui.queryByRole('tooltip', { hidden: true })).toBeNull() })
 })
 
 it('handles empty history, pagination retry, loading state, and removal of the selected record', async () => {

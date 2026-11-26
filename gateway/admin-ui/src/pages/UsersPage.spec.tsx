@@ -91,7 +91,7 @@ describe('UsersPage', () => {
     const user = userEvent.setup()
     render(<MemoryRouter><UsersPage /></MemoryRouter>)
     await screen.findAllByText('@alice · ID 1')
-    await user.click(screen.getByRole('button', { name: '新建用户' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: '新建用户' }))
     const dialog = within(screen.getByRole('dialog', { name: '新建用户' }))
     await user.type(dialog.getByLabelText(/^用户名/), 'bob')
     await user.type(dialog.getByLabelText('显示名'), 'Bob')

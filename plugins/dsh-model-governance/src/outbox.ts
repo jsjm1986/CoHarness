@@ -42,7 +42,8 @@ export class UsageOutbox {
   private timer: NodeJS.Timeout
   private closed = false
 
-  constructor(private readonly dir: string, private url: string, private token: string) {
+  constructor(private readonly dir: string, private url: string, private token: string,
+    private readonly warn: (message: string) => void) {
     mkdirSync(dir, { recursive: true, mode: 0o700 })
     this.timer = setInterval(() => this.kick(), 5_000)
     this.timer.unref()
@@ -103,13 +104,25 @@ export class UsageOutbox {
         }
       }
       if (!response.ok) {
-        // A rejected record remains retryable without blocking independent bills.
-        // Authentication, throttling, and server failures stop this delivery pass.
-        if (response.status === 400) continue
-        return
+        if (response.status !== 400) return
+        this.parkRejected(path, name)
+      } else {
+        rmSync(path, { force: true })
       }
-      rmSync(path, { force: true })
     }
+  }
+
+  private parkRejected(path: string, name: string): void {
+    const rejected = join(this.dir, 'rejected')
+    const parked = `${randomBytes(5).toString('hex')}-${name}`
+    try {
+      mkdirSync(rejected, { recursive: true, mode: 0o700 })
+      renameSync(path, join(rejected, parked))
+    } catch {
+      this.warn('Could not move a rejected model usage record. Check the Runtime outbox storage.')
+      return
+    }
+    this.warn(`Model usage intake rejected a record (HTTP 400). Review outbox rejected/${parked}.`)
   }
 
   async close(): Promise<void> {

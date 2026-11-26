@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/atomic-write/README.md
 document:
-  en: cd434dfd58845bc3c28e643156e252dd3176af61
-  zh: 9bfa9a4e97e42f3795e05bf750748de1a1090523
+  en: 4c122465ea1f592e82d9269c1e068b469458b746
+  zh: bc3f82428bc8af6a248880c685cfbdcdeaf2fd2c
 /:
   en: 1065a4fcafd0430d
   zh: 40bc911b6d01288b
@@ -36,8 +36,8 @@ document:
   en: aee5320dc8746377
   zh: f35dbbf350f7b5cf
 /deepseek-ai-dsh-atomic-write/understand-the-implementation/write-path:
-  en: 9324ed2f10bd6fac
-  zh: 62faa436ffbf2c47
+  en: dd1627461c846e03
+  zh: a8213afdf86235f3
 /deepseek-ai-dsh-atomic-write/understand-the-implementation/why-the-swap-stays-safe:
   en: 784e985c1fb3a25e
   zh: 4afda1b9bf5f29cc

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-25-ptc-cancel-probe-must-yield.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-11-25-ptc-cancel-probe-must-yield.md
+document:
+  en: 4b6c2af49acd380ff795d17304091c7436e2861d
+  zh: d441d7cf430c264797e4392a352fa5a199aa1b97
+/agent-note-probe-ptc-cancellation-readiness-through-a-yielding-write-not-a-fire-and-forget-binding:
+  en: ddccf3cbedefd162
+  zh: 7138769bfd00b5cd
+/agent-note-probe-ptc-cancellation-readiness-through-a-yielding-write-not-a-fire-and-forget-binding/problem:
+  en: 95086bcd7017b33b
+  zh: be52e95e7285425f
+/agent-note-probe-ptc-cancellation-readiness-through-a-yielding-write-not-a-fire-and-forget-binding/decision:
+  en: ca1435ba149a314b
+  zh: f766d76b482b011c
+/agent-note-probe-ptc-cancellation-readiness-through-a-yielding-write-not-a-fire-and-forget-binding/alternatives-considered:
+  en: df287faa465e5bbf
+  zh: d5e9870c7037d4bd
+/agent-note-probe-ptc-cancellation-readiness-through-a-yielding-write-not-a-fire-and-forget-binding/consequences:
+  en: f751415b8568fcad
+  zh: 1a392579605bf8c4

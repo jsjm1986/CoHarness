@@ -27,7 +27,7 @@ try {
   organizationId = (await pool.query("INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Runtime usage') RETURNING id", [slug])).rows[0].id
   for (const name of ['computer-a', 'computer-b']) await pool.query('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2)', [organizationId, name])
   const a = await resolvePostgresRuntimeContext(pool, slug, 'computer-a'), b = await resolvePostgresRuntimeContext(pool, slug, 'computer-b')
-  const configuration = name => loadConfig({ HGW_USERS_ROOT: join(root, name, 'users'), HGW_STATE_ROOT: join(root, name, 'state'),
+  const configuration = name => loadConfig({ HGW_PERFORMANCE_ENABLED: 'false', HGW_USERS_ROOT: join(root, name, 'users'), HGW_STATE_ROOT: join(root, name, 'state'),
     HGW_PROJECTS_ROOT: join(root, name, 'projects'), HGW_USER_PROJECTS_ROOT: join(root, name, 'user-projects'),
     HGW_PROJECT_RUNTIMES_ROOT: join(root, name, 'runtimes'), HGW_SYSTEMD_UNIT_DIR: join(root, name, 'units'), HGW_DEFAULT_ENV_FILE: '',
     HGW_ORGANIZATION_SLUG: slug, HGW_COMPUTE_NODE_NAME: name,

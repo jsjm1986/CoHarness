@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/claude-code-mods/README.md
 document:
-  en: bc78f9561c6ea0dc24c15ec1364436d6da958bf6
-  zh: d15308fc28369ef060f24f964d43f6d3f7870819
+  en: 9e25b2445d7a282f2d32b4491abd6a5a4ac48247
+  zh: 7956b073050fc96bdf6d6661e055de2488ef0535
 /:
   en: 2330eeb4e52d6577
   zh: bcd3e315c445acb6
@@ -24,8 +24,8 @@ document:
   en: d2d735b07524c08a
   zh: 6b90dc578d61ab22
 /deepseek-ai-dsh-experimental-claude-code-mods/use-this-package/the-band-above-the-prompt:
-  en: 2b04be6b58e61a74
-  zh: f4854198d8999d11
+  en: 638604b4ffe31d6f
+  zh: d4a046558e036369
 /deepseek-ai-dsh-experimental-claude-code-mods/use-this-package/which-members-your-mod-can-call:
   en: bf4f9f971aeb1d17
   zh: 83804163ca9039d5

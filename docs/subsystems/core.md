@@ -115,6 +115,11 @@ interface Agent {
      */
   send(message: UserMessage, target: InboxTarget, wakeup: boolean): void
   /**
+     * True while user-authored input submitted with a wake at the next-step
+     * boundary remains pending. Drivers without this live capability omit it.
+     */
+  readonly hasPendingUserSteer?: boolean
+  /**
      * Queue an ordinary follow-up turn and wake the driver. The item becomes the
      * sole ordinary message of its own turn.
      * @param message - identified prompt content and the source that supplied it.
@@ -466,6 +471,23 @@ async saveSelection(next: ModelSelection): Promise<void>
 
 Source: [`packages/core/agent-default-model/src/index.ts`](../../packages/core/agent-default-model/src/index.ts)
 
+<a id="ctxagentexecutionadmission--agentexecutionadmission"></a>
+
+### `ctx.agentExecutionAdmission` — `AgentExecutionAdmission`
+
+Admission supplied before plugin composition and retained for the root Context lifetime.
+
+```ts cordis-catalog
+/**
+ * Inspect execution eligibility without loading or attaching the Session.
+ * @param sessionId - exact durable identity.
+ * @returns the reason execution is prohibited, or undefined when it is allowed.
+ */
+restriction(sessionId: SessionId): AgentExecutionRestriction | undefined
+```
+
+Source: [`packages/core/agent/src/execution-admission.ts`](../../packages/core/agent/src/execution-admission.ts)
+
 <a id="ctxagentloop--agentloop"></a>
 
 ### `ctx.agentLoop` — `AgentLoop`
@@ -473,6 +495,14 @@ Source: [`packages/core/agent-default-model/src/index.ts`](../../packages/core/a
 Concrete agent factory and driver service.
 
 ```ts cordis-catalog
+/**
+ * Stop Agent work while Session persistence is still mounted. Close every
+ * inbox and factory entry point, abort active activities, and retain accepted
+ * pending input. A failed durability checkpoint rejects the stop.
+ * @returns the completion of all Agent teardowns and Session checkpoints.
+ */
+stopForShutdown(): Promise<void>
+
 /**
  * Create an agent and session under one caller-supplied identity, owned by
  * the accessing fiber. Constructor-driven config calls mint a fresh combined
@@ -878,7 +908,7 @@ setFactory(factory: AgentFactory): () => void
 
 /**
  * Hold Session identities while an owner releases resources and removes durable data.
- * Existing factory work and overlapping removals refuse the reservation.
+ * Planned shutdown, existing factory work, and overlapping removals refuse the reservation.
  * @param ids - exact identities whose creation and resource admission must remain closed.
  * @returns a caller-owned reservation, released after the whole removal operation settles.
  */

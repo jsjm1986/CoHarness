@@ -119,6 +119,14 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+@media (pointer: coarse) {
+  .header,
+  .copyButton,
+  .fileHeader { min-height: var(--dsw-touch-target); }
+
+  .copyButton { min-width: var(--dsw-touch-target); }
+}
+
 @media (max-width: 767px) {
   .block {
     --dsl-search-line-height: 20px;

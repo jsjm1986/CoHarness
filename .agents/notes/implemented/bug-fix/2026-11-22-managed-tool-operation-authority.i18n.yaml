@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-22-managed-tool-operation-authority.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-22-managed-tool-operation-authority.md
+document:
+  en: 9b84db38eefaf4f9a4fea51e70fed3f5f06da653
+  zh: 364ef5153eee8f074b6f6c92cadaa5d99691b80f
+/agent-note-managed-tool-authority-at-the-point-of-use:
+  en: ba99567a2eefdc5b
+  zh: b98f471a87c03786
+/agent-note-managed-tool-authority-at-the-point-of-use/problem:
+  en: cf29eec39a2f4262
+  zh: 71185a57be4a72e0
+/agent-note-managed-tool-authority-at-the-point-of-use/decision:
+  en: 3a67708e394bc723
+  zh: 2ff230fea4812b25
+/agent-note-managed-tool-authority-at-the-point-of-use/alternatives-considered:
+  en: 7144e23ac755c32e
+  zh: 4c5f1bf4a839aac7
+/agent-note-managed-tool-authority-at-the-point-of-use/consequences:
+  en: 765fb474f78c3e4b
+  zh: ab74b49cf3c436d7

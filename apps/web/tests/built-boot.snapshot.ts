@@ -33,6 +33,7 @@ if (typeof clientBuildEnvironment !== 'object' || clientBuildEnvironment === nul
   throw new TypeError('client build record environment must be an object')
 }
 const officialBuild = Reflect.get(clientBuildEnvironment, 'DSH_CLIENT_BUILD_PROFILE') === 'official'
+const closedDisclosure = '[data-disclosure-row][aria-expanded="false"], [data-disclosure-row] > button[aria-expanded="false"]'
 
 function isBuildRecordReader(value: unknown): value is (root: string) => unknown {
   return typeof value === 'function'
@@ -103,7 +104,7 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   const mutationRows = [...document.querySelectorAll('[data-variant="write"],[data-variant="edit"]')]
   expect(mutationRows.length).toBeGreaterThan(0)
   for (const row of mutationRows) {
-    const toggle = row.querySelector('[data-expandable]')
+    const toggle = row.querySelector(closedDisclosure)
     if (toggle !== null) act(() => { fireEvent.click(toggle) })
   }
   const diffCards = [...document.querySelectorAll('[data-diff]')]
@@ -124,10 +125,11 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
     return row!
   }, { timeout: 10_000 })
   // Expand the web_search row to prove its WebBlock card renders end to end.
-  const webToggle = webSearchRow.querySelector('[data-expandable]')
+  const webToggle = webSearchRow.querySelector(closedDisclosure)
   if (webToggle !== null) act(() => { fireEvent.click(webToggle) })
   await waitFor(() => {
-    expect(webSearchRow.querySelector('[data-web]')).not.toBeNull()
+    const row = document.querySelector('[data-tool="web_search"]')
+    expect(row?.querySelector('[data-web="search"]') ?? null).not.toBeNull()
   }, { timeout: 10_000 })
 
   // Every bundle injected its plugin-owned style tag (the loader's CSS path).

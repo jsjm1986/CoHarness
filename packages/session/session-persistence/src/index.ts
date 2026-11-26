@@ -93,10 +93,26 @@ export interface SessionDraftReservationRequest {
   readonly sshTarget?: number
 }
 
-/** Canonical identity returned by a draft reservation provider. */
+/** Provider route, model, and optional reasoning effort stored with an unmaterialized project draft. */
+export interface SessionDraftModelSelection {
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort?: string
+}
+
+/** Canonical identity and any saved project model selection returned by a draft reservation provider. */
 export interface SessionDraftReservation {
   readonly sessionId: SessionId
   readonly leaseExpiresAt: number
+  readonly modelSelection?: SessionDraftModelSelection
+}
+
+/** Unmaterialized project draft recovered from the current owner's reservation. */
+export interface ReservedProjectDraft {
+  readonly request: SessionDraftReservationRequest & { readonly visibility: 'project' | 'private' }
+  readonly modelSelection?: SessionDraftModelSelection
+  /** Track the reservation for release after the Host has reconstructed its Session. */
+  adopt(): void
 }
 
 /** Lightweight immutable source identity returned without loading a full log. */
@@ -841,6 +857,26 @@ export abstract class SessionPersistence extends Service {
   }
 
   /**
+   * Read one exact event from the validated committed prefix.
+   * @param id - stored Session identity.
+   * @param seq - logical sequence to verify.
+   * @param signal - optional cancellation for the storage read.
+   * @returns the detached event, or undefined if that sequence is absent.
+   */
+  async readCommittedEvent(id: SessionId, seq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEvent | undefined> {
+    const options = signal === undefined ? undefined : { signal }
+    const handle = await this.open(id, 'read', options)
+    try {
+      if (handle.id !== id || handle.header.id !== id) return
+      const { events } = await handle.read(seq, 1, options)
+      const [event] = events
+      if (events.length === 1 && event?.seq === Number(seq)) return event
+    } finally {
+      await handle.close()
+    }
+  }
+
+  /**
    * Read one session header without loading its event log. First-party
    * providers override this with an indexed lookup; the default filters the
    * lightweight snapshot list for third-party compatibility.
@@ -1026,6 +1062,26 @@ export abstract class SessionPersistence extends Service {
    */
   reserveDraft(_request: SessionDraftReservationRequest): Promise<SessionDraftReservation | undefined> {
     return Promise.resolve(undefined)
+  }
+
+  /**
+   * Read the current project writer's unmaterialized draft without acquiring an Agent or renewing its lease.
+   * @param _id - Session identity from the original submission.
+   * @param _signal - caller cancellation.
+   * @returns the live reservation for the current creator, or undefined when absent or unsupported.
+   */
+  reservedProjectDraft(_id: SessionId, _signal?: AbortSignal): Promise<ReservedProjectDraft | undefined> {
+    return Promise.resolve(undefined)
+  }
+
+  /**
+   * Save a model choice before acknowledging it on a provider-owned, unmaterialized project draft.
+   * @param _id - Session identity of the draft being edited.
+   * @param _selection - validated model choice. Authorization is checked again when starting a turn.
+   * @returns after the choice commits, or immediately when no project reservation is tracked.
+   */
+  saveDraftModelSelection(_id: SessionId, _selection: SessionDraftModelSelection): Promise<void> {
+    return Promise.resolve()
   }
 
   /**

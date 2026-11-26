@@ -19,9 +19,24 @@ export interface ActivityItem {
 export interface ActivityPage {
   readonly items: readonly ActivityItem[]
   readonly nextBefore?: string
+  /** Current project members on an initial request, including members with no visible rows. */
+  readonly members?: readonly ActivityMember[]
+}
+
+/** Display identity used by the activity filter. */
+export interface ActivityMember {
+  readonly userId: number
+  readonly label: string
 }
 
 const PAGE_SIZE = 50
+
+/** Account route status used to distinguish lost access from a failed refresh. */
+export class ActivityRequestError extends Error {
+  constructor(readonly status: number, operation: string) {
+    super(`project ${operation} failed: ${String(status)}`)
+  }
+}
 
 /** Keep account routes on their Session's allocation independently of the scope cookie. */
 function activityUrl(path: string, target: SessionRuntimeTarget | undefined): string {
@@ -31,25 +46,36 @@ function activityUrl(path: string, target: SessionRuntimeTarget | undefined): st
   return url.pathname + url.search
 }
 
+function isActivityMember(value: unknown): value is ActivityMember {
+  if (typeof value !== 'object' || value === null) return false
+  const member = value as Partial<ActivityMember>
+  return typeof member.userId === 'number' && Number.isSafeInteger(member.userId) && member.userId > 0 && typeof member.label === 'string'
+}
+
 /**
  * Read one page of the project activity feed through the account session.
- * @param before - opaque cursor from the previous page.
+ * @param before - cursor for the same filter, or undefined for the newest rows and roster.
  * @param signal - abort for superseded or disposed reads.
  * @param target - owning Session's Runtime; absence preserves standalone account routing.
+ * @param member - contributor's public id, or null for all visible contributors.
  * @returns the normalized page; transport and payload failures reject.
  */
 export async function fetchActivity(
-  before: string | undefined, signal: AbortSignal, target: SessionRuntimeTarget | undefined,
+  before: string | undefined, signal: AbortSignal, target: SessionRuntimeTarget | undefined, member: number | null = null,
 ): Promise<ActivityPage> {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
   if (before !== undefined) params.set('before', before)
+  if (member !== null) params.set('member', String(member))
   const response = await fetch(activityUrl(`/account/api/activity?${params.toString()}`, target), { credentials: 'same-origin', signal })
-  if (!response.ok) throw new Error(`project activity request failed: ${String(response.status)}`)
-  const body = await response.json() as { items?: unknown; nextBefore?: unknown }
+  if (!response.ok) throw new ActivityRequestError(response.status, 'activity request')
+  const body = await response.json() as { items?: unknown; nextBefore?: unknown; members?: unknown }
   if (!Array.isArray(body.items)) throw new TypeError('project activity returned an invalid page')
+  const roster = body.members
+  if (roster !== undefined && (!Array.isArray(roster) || !roster.every(isActivityMember))) throw new TypeError('project activity returned an invalid roster')
   return {
     items: body.items as readonly ActivityItem[],
     ...(typeof body.nextBefore === 'string' ? { nextBefore: body.nextBefore } : {}),
+    ...(roster === undefined ? {} : { members: roster }),
   }
 }
 
@@ -58,6 +84,8 @@ export interface ProgressItem {
   readonly text: string
   readonly actor?: string
   readonly sessionId?: string
+  /** Exact source Runtime when the stored citation has one. */
+  readonly runtimeId?: NonNullable<SessionRuntimeTarget['runtimeId']>
   readonly sessionTitle?: string
   readonly seq?: number
 }
@@ -78,6 +106,8 @@ export interface ProgressEntry {
   readonly id: string
   readonly kind: 'current' | 'period'
   readonly periodKey?: string
+  /** The stored coverage includes dates outside the named ISO week. */
+  readonly spansWeeks?: true
   readonly content: ProgressContent
   readonly activityCount: number
   readonly periodStart?: string
@@ -105,8 +135,17 @@ export interface ProgressPage {
 }
 
 /**
+ * Test whether the page can act as the panel's initial reading view.
+ * @param page - the loaded project journal.
+ * @returns whether the page has a rolling summary or a published period.
+ */
+export function hasReadableProgress(page: ProgressPage): boolean {
+  return page.current?.content.summary !== undefined || page.periods.length > 0
+}
+
+/**
  * Read the human-facing progress journal through the account session.
- * @param signal - abort for superseded or disposed reads.
+ * @param signal - abort for superseded or disposed reads, or an expired observation window.
  * @param target - owning Session's Runtime; absence preserves standalone account routing.
  * @returns the normalized page; transport and payload failures reject.
  */
@@ -120,25 +159,29 @@ export async function fetchProgress(signal: AbortSignal, target: SessionRuntimeT
       status: { enabled: false, pending: 0, generating: false, canGenerate: false },
     }
   }
-  if (!response.ok) throw new Error(`project progress request failed: ${String(response.status)}`)
+  if (!response.ok) throw new ActivityRequestError(response.status, 'progress request')
   return await response.json() as ProgressPage
 }
 
 /** Result of a member-forced digest request. */
-export interface ProgressGenerateResult {
-  readonly started: boolean
-  readonly reason?: string
-}
+export type ProgressGenerateResult = { readonly started: true }
+  | { readonly started: false; readonly reason: 'generating' | 'unavailable' }
 
 /**
  * Ask the gateway to run one digest pass now, overriding the idle gates.
  * @param target - owning Session's Runtime; absence preserves standalone account routing.
+ * @param signal - cancel the browser request when the view closes or its wait expires.
  * @returns whether a pass was admitted; refusals arrive in `reason`.
  */
-export async function generateProgress(target: SessionRuntimeTarget | undefined): Promise<ProgressGenerateResult> {
-  const response = await fetch(activityUrl('/account/api/progress/generate', target), { method: 'POST', credentials: 'same-origin' })
-  if (!response.ok) throw new Error(`project progress generate failed: ${String(response.status)}`)
-  return await response.json() as ProgressGenerateResult
+export async function generateProgress(target: SessionRuntimeTarget | undefined, signal: AbortSignal): Promise<ProgressGenerateResult> {
+  const response = await fetch(activityUrl('/account/api/progress/generate', target), { method: 'POST', credentials: 'same-origin', signal })
+  if (!response.ok) throw new ActivityRequestError(response.status, 'progress generate')
+  const result = await response.json() as { started?: unknown; reason?: unknown }
+  if (result.started === true) return { started: true }
+  if (result.started === false && (result.reason === 'generating' || result.reason === 'unavailable')) {
+    return { started: false, reason: result.reason }
+  }
+  throw new TypeError('project progress returned an invalid generation result')
 }
 
 /** Grouping modes offered by the panel toolbar. */
@@ -315,12 +358,13 @@ export function agoLabel(iso: string, yesterdayLabel: string): string {
 }
 
 /**
- * Distinct members present in the feed, for the member filter menu.
+ * Extend the roster with contributors from visible historical activity.
  * @param items Feed rows to scan.
- * @returns First-seen member identities in feed order.
+ * @param roster Known member identities. Omission starts with an empty list.
+ * @returns Roster identities followed by new contributors in feed order.
  */
-export function feedMembers(items: readonly ActivityItem[]): readonly { userId: number; label: string }[] {
-  const seen = new Map<number, string>()
+export function feedMembers(items: readonly ActivityItem[], roster: readonly ActivityMember[] = []): readonly ActivityMember[] {
+  const seen = new Map(roster.map(member => [member.userId, member.label]))
   for (const item of items) if (!seen.has(item.actorUserId)) seen.set(item.actorUserId, item.actorLabel)
   return [...seen.entries()].map(([userId, label]) => ({ userId, label }))
 }

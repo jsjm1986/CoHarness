@@ -1,0 +1,7 @@
+- dialog "移出项目":
+  - heading "移出项目" [level=2]
+  - paragraph: 将 QA project membership with retained long name 的成员关系移除此用户；该用户在该项目的私有会话保留但不再可访问。
+  - button "关闭"
+  - alert: QA write refused. The reviewed record remains unchanged.
+  - button "取消"
+  - button "确认移出"

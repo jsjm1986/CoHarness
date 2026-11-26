@@ -271,6 +271,7 @@ body {
   --dsw-alias-scrollbar-hover-l1: var(--dsw-static-neutral-300);
   --dsw-alias-scrollbar-hover-l2: var(--dsw-static-neutral-300);
   --dsw-alias-state-business-primary: var(--dsw-static-deepseek-600);
+  --dsw-alias-state-business-label: color-mix(in srgb, var(--dsw-alias-state-business-primary) 74%, var(--dsw-alias-label-primary));
   --dsw-alias-state-business-tertiary: var(--dsw-static-deepseek-100);
   --dsw-alias-file-diff-added-bg: rgb(230, 244, 231);
   --dsw-alias-file-diff-added-gutter: rgb(237, 247, 237);
@@ -282,11 +283,13 @@ body {
   --dsw-alias-code-diff-deleted: var(--dsw-static-red-600-a08);
   --dsw-alias-state-done-primary: var(--dsw-static-violet-600);
   --dsw-alias-state-error-primary: var(--dsw-static-red-600);
+  --dsw-alias-state-error-label: color-mix(in srgb, var(--dsw-alias-state-error-primary) 72%, var(--dsw-alias-label-primary));
   --dsw-alias-state-error-secondary: var(--dsw-static-red-400);
   --dsw-alias-state-success-primary: var(--dsw-static-green-500);
+  --dsw-alias-state-success-label: color-mix(in srgb, var(--dsw-alias-state-success-primary) 48%, var(--dsw-alias-label-primary));
   --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
   --dsw-alias-state-success-tertiary: var(--dsw-static-green-100);
-  --dsw-alias-state-warn-label: var(--dsw-static-amber-600);
+  --dsw-alias-state-warn-label: color-mix(in srgb, var(--dsw-static-amber-600) 60%, var(--dsw-static-amber-900));
   --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
   --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-100);
@@ -412,7 +415,7 @@ body[data-ds-dark-theme] {
   --dsw-alias-state-success-primary: var(--dsw-static-green-500);
   --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
   --dsw-alias-state-success-tertiary: var(--dsw-static-green-900);
-  --dsw-alias-state-warn-label: var(--dsw-static-amber-600);
+  --dsw-alias-state-warn-label: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
   --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-900);

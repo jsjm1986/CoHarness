@@ -11,6 +11,7 @@ import type { LayoutState, NodeId, SplitId } from '../contract/types.ts'
 import { getNode } from '../engine/tree.ts'
 import type { PaneCallbacks } from './render.ts'
 import { TabPanel } from './TabPanel.tsx'
+import { SplitDivider } from './SplitDivider.tsx'
 import css from './dockkit.module.css'
 
 /** Fractions a live divider drag is previewing for one split. */
@@ -40,11 +41,7 @@ export function PaneTree({ state, nodeId, callbacks, preview }: PaneTreeProps): 
       {node.children.map((childId, index) => (
         <Fragment key={childId}>
           {index > 0 && (
-            <div
-              className={css.divider}
-              data-dockkit-divider={`${node.id}:${index - 1}`}
-              onPointerDown={(event) => { callbacks.onDividerPressed(node.id, index - 1, event) }}
-            />
+            <SplitDivider split={node} sizes={sizes} index={index - 1} callbacks={callbacks} />
           )}
           <div
             className={css.splitCell}

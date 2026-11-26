@@ -21,20 +21,22 @@
 // actionability check: clicking the chip fails in a real engine when the
 // element center does not receive pointer events. jsdom resolves no layout,
 // so only a real engine can answer any of these facts.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 // Type-only: pulls the plan/mode SessionEventMap merge so the discriminant
 // filter below types as the plan-mode event in the host aggregate.
 import type {} from '@deepseek-ai/dsh-plan-mode'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
-  assertFixtureInventory, compareOrRefreshGolden,
+  assertFixtureInventory,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { compareWorkflowGolden, auditWorkflowState, newWorkflowPage } from './workflow-responsive-state.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/plan-narrow-viewport', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
@@ -61,8 +63,8 @@ describe('web e2e: plan chip click area at the narrow viewport', () => {
     // which is what made the reported overlap measurable.
     scaffold = await launchWebScaffold({ replayFixture: FIXTURE, replayProvidersOnly: true })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser, VIEWPORT.height)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser, VIEWPORT.height)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -80,7 +82,11 @@ describe('web e2e: plan chip click area at the narrow viewport', () => {
     const input = page.locator('textarea').first()
     await input.waitFor({ timeout: 10_000 })
     await input.fill('/plan ')
-    await input.press('Enter')
+    // Firefox fill() inserts through the IME composition pipeline; its compositionend
+    // clears the composer's composing guard one tick late, so a racing Enter keydown is
+    // swallowed as a newline. The Send button resolves the same 'enter' submit mode
+    // without going through the keydown IME guard.
+    await page.getByRole('button', { name: 'Send message' }).click()
 
     // The command handler commits plan/mode active immediately (no model
     // round), so the chip renders and the composer control row — the surface
@@ -118,10 +124,11 @@ describe('web e2e: plan chip click area at the narrow viewport', () => {
       '- Model trigger fully in viewport: ' + (triggerInViewport ? 'true' : 'false'),
       '- Click areas disjoint: ' + (overlapArea === 0 ? 'true' : 'false'),
     ].join('\n').trimEnd()
-    await compareOrRefreshGolden(LAYOUT_EXPECTED, golden, MODE)
+    await compareWorkflowGolden(LAYOUT_EXPECTED, golden, MODE)
     expect(overlapArea).toBe(0)
     expect(chipInViewport).toBe(true)
     expect(triggerInViewport).toBe(true)
+    await auditWorkflowState(page, 'plan', 'active-mode', page.locator('[class*="centerCol"]'), [chip, trigger])
 
     // Exit through the real command channel: the click at the chip's center
     // executes /plan off and the folded projection flips inactive, so the chip

@@ -14,7 +14,7 @@ kind: "package-library"
 
 `DirectoryHandle.open(path)` 拥有目录描述符；`openChild(name)` 打开一个真实子目录而不跟随链接，`read(count)` 以每批至多65,536项的方式流式读取，`createDirectory(name)` 使用保留的父目录。绝对路径打开仅拒绝末段链接；需要排除祖先替换的调用方应从文件系统根句柄开始逐段遍历。调用按顺序执行，`close()` 等待先前已接收的工作。子目录拥有独立描述符；调用方必须关闭每个句柄。参见[目录行为约定](../../docs/directory-contract.md)。
 
-`volumeIdentity()` 在 macOS 上读取保留描述符所属文件系统的 UUID。其他 POSIX 平台及全零 UUID 返回缺失；原生调用失败会拒绝。持久化调用方仍须核验 inode 及目录归属。此操作要求同时使用匹配的 0.1.4 或更新版本 JavaScript 与原生载荷。
+`volumeIdentity()` 读取保留描述符对应的 macOS 文件系统 UUID 或 Linux Btrfs 子卷 UUID。不支持的文件系统、较旧的 Btrfs 内核和全零 UUID 返回缺失。其他原生调用失败会拒绝。持久化调用方仍须核验 inode 及目录归属。
 
 可选操作系统/CPU 平台包携带二进制。Linux 包含 `bin/landlock-run` 和分别用于两种 libc 的 `bin/glibc/system.node` / `bin/musl/system.node`；macOS 包含 `bin/system.node`。绑定缺失或无法加载时，锁获取或目录访问会被拒绝，不在安装时编译。Landlock 仍是遵循既有失败关闭协议的独立可执行文件；不支持的内核或平台探测结果为不可用。
 

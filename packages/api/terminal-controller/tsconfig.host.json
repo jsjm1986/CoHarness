@@ -12,7 +12,9 @@
     "src/retention.ts",
     "src/stream.ts",
     "src/shells.ts",
-    "src/authorization.ts"
+    "src/authorization.ts",
+    "src/input-protocol.ts",
+    "src/input-channel.ts"
   ],
   "references": [
     {

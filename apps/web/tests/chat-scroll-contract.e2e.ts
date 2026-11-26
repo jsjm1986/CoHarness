@@ -2,12 +2,14 @@
 // deliberately virtualizer-neutral: they assert semantic-row position,
 // bottom ownership, interaction state, and the real outer scroll host rather
 // than DOM cardinality or implementation-specific spacer markup.
+import { responsiveBrowser } from './responsive-browser.ts'
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 import { access, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -17,7 +19,6 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { createChatScrollFixture, type ChatScrollFixture } from './chat-scroll-fixture.ts'
 import {
   captureStableAria,
-  compareOrRefreshGolden,
   expandTurnProcesses,
   launchWebScaffold,
   seedSession,
@@ -25,7 +26,7 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { saveFailureShot } from './support.ts'
 
 const MODE = webSnapshotMode()
 const LIVE_HISTORY_EXPECTED = fileURLToPath(new URL('./snapshots/chat-scroll-contract/live-history.expected.md', import.meta.url))
@@ -174,7 +175,7 @@ async function launchScrollWorld(options: ScrollWorldOptions): Promise<ScrollWor
     const assistantFrames: AssistantStreamFrame[] = []
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { events.push(event) })
     scaffold.ctx.on('agent/assistant-stream', ({ frame }) => { assistantFrames.push(frame) })
-    page = await newEnglishPage(browser, 900)
+    page = await newWorkflowPage(browser, 900)
     const tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -229,6 +230,17 @@ async function withScrollWorld(
     runFailure = error
     try {
       await saveFailureShot(world.page, options.failureShot)
+      await writeFile(join('.artifacts', `${options.failureShot}.json`), JSON.stringify(await world.page.evaluate(() => ({
+        viewport: { width: innerWidth, height: innerHeight, coarse: matchMedia('(pointer: coarse)').matches,
+          layout: document.querySelector('[data-viewport]')?.getAttribute('data-viewport') },
+        elements: [...document.querySelectorAll<HTMLElement>('[data-conversation-scroll], [data-chat-flow], [data-composer-seat], [data-streaming]')].map((node) => {
+          const style = getComputedStyle(node)
+          return { class: node.className, rect: node.getBoundingClientRect().toJSON() as DOMRectInit, scrollTop: node.scrollTop,
+            scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, paddingTop: style.paddingTop,
+            paddingBottom: style.paddingBottom, marginTop: style.marginTop, marginBottom: style.marginBottom,
+            composerHeight: style.getPropertyValue('--dsh-composer-height') }
+        }),
+      })), null, 2) + '\n')
     } catch {
       // Best-effort evidence must never prevent cleanup of the owned world.
     }
@@ -422,9 +434,22 @@ async function expectSameFlowTop(page: Page, anchor: FlowAnchor): Promise<void> 
 }
 
 async function expectBottom(page: Page): Promise<void> {
-  await expect.poll(async () => Math.abs((await scrollGeometry(page)).distanceFromBottom), {
-    timeout: 10_000,
-  }).toBeLessThanOrEqual(1)
+  try {
+    await expect.poll(async () => Math.abs((await scrollGeometry(page)).distanceFromBottom), {
+      timeout: 10_000,
+    }).toBeLessThanOrEqual(1)
+  } catch (error) {
+    console.error('[unfollowed-scroll]', JSON.stringify(await page.locator('[data-conversation-scroll]').evaluate(node => ({
+      top: node.scrollTop, height: node.scrollHeight, clientHeight: node.clientHeight,
+      active: document.activeElement?.outerHTML.slice(0, 400),
+      children: [...node.querySelectorAll<HTMLElement>('[data-chat-flow], [data-composer-seat]')].map(child => ({
+        class: child.className, rect: child.getBoundingClientRect().toJSON() as DOMRectInit,
+        paddingBottom: getComputedStyle(child).paddingBottom,
+      })),
+    }))))
+    await saveFailureShot(page, 'chat-scroll-unfollowed')
+    throw error
+  }
 }
 
 async function expectMarkerAboveComposer(page: Page, marker: string): Promise<void> {
@@ -489,7 +514,7 @@ let browser: Browser
 
 describe('web e2e: long Chat scroll contract', () => {
   beforeAll(async () => {
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
   })
 
   afterAll(async () => {
@@ -541,11 +566,14 @@ describe('web e2e: long Chat scroll contract', () => {
         // The active stage expands its history in the background; the old-page
         // control must not replace the transcript while the model is running.
         expect(await world.page.getByRole('button', { name: 'Load earlier', exact: true }).count()).toBe(0)
-        await compareOrRefreshGolden(
+        await compareWorkflowGolden(
           LIVE_HISTORY_EXPECTED,
           await captureStableAria(world.page, '[data-history-expanding]', world.scaffold.workspaceCwd),
           MODE,
         )
+        await auditWorkflowState(world.page, 'conversation', 'streaming-while-history-loads',
+          world.page.locator('[data-streaming="true"]').first(),
+          [world.page.getByRole('button', { name: 'Stop generating', exact: true })])
 
         await wheelToHistoryStart(world.page)
         await wheelTranscript(world.page, 420)
@@ -585,6 +613,8 @@ describe('web e2e: long Chat scroll contract', () => {
       expect(await world.page.locator('[data-conversation-scroll]')
         .getByText(HISTORY_FIXTURE.markers.user(1), { exact: false }).count()).toBe(1)
       expect(await world.page.getByRole('button', { name: 'Load earlier', exact: true }).count()).toBe(0)
+      await auditWorkflowState(world.page, 'conversation', 'long-history-after-stream',
+        world.page.locator('[data-conversation-scroll]'))
       assertClean(world)
     })
   }, 180_000)
@@ -610,7 +640,9 @@ describe('web e2e: long Chat scroll contract', () => {
       try {
         const composer = world.page.locator('textarea:enabled').last()
         await composer.fill(LIVE_TOOL_PROMPT)
-        await world.page.getByRole('button', { name: 'Send message', exact: true }).click()
+        const send = world.page.getByRole('button', { name: 'Send message', exact: true })
+        if (workflowMatrixEnabled) await send.tap()
+        else await send.click()
         await expect.poll(() => fileExists(readyPath), { timeout: 15_000 }).toBe(true)
         const liveRow = world.page.locator(`[data-chat-call-id="${LIVE_TOOL_CALL_ID}"] [data-sample="bash"]`)
         await liveRow.waitFor({ timeout: 15_000 })
@@ -851,6 +883,20 @@ describe('web e2e: long Chat scroll contract', () => {
       await backToBottom.waitFor({ timeout: 10_000 })
       await expect.poll(async () => (await scrollGeometry(world.page)).distanceFromBottom, { timeout: 10_000 })
         .toBeGreaterThan(100)
+      // Wait for the native PageUp scroll to settle. WebKit can discard End while a page scroll is in progress.
+      await world.page.locator('[data-conversation-scroll]').evaluate(element => new Promise<void>((resolve) => {
+        let top = element.scrollTop
+        let lastMovement = performance.now()
+        const check = (now: number): void => {
+          if (top !== element.scrollTop) {
+            top = element.scrollTop
+            lastMovement = now
+          }
+          if (now - lastMovement >= 100) resolve()
+          else requestAnimationFrame(check)
+        }
+        requestAnimationFrame(check)
+      }))
       await world.page.keyboard.press('End')
       await expectBottom(world.page)
       await expect.poll(() => backToBottom.count(), { timeout: 10_000 }).toBe(0)

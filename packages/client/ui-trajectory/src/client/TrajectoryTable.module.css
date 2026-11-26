@@ -133,6 +133,11 @@
   font: var(--dsw-font-xxs-12);
 }
 
+.table[data-virtualized] {
+  position: absolute;
+  inset-block-start: 0;
+}
+
 .eventColumn {
   width: 122px;
 }
@@ -188,13 +193,17 @@
 .table tbody tr:not([data-collapsed-summary]):not([data-virtual-spacer]):not([data-history-load]) {
   cursor: default;
   outline: none;
-  transition:
-    background-color 120ms var(--ds-ease-in-out),
-    opacity 120ms var(--ds-ease-in-out);
+  transition: background-color 120ms var(--ds-ease-in-out);
 }
 
-.table tbody tr[data-timeline-focus='outside'] {
-  opacity: 0.24;
+.table tbody tr[data-timeline-focus='inside']:not([data-request-only='true']) > td:first-child {
+  box-shadow: inset 2px 0 var(--dsw-alias-state-business-primary);
+}
+
+@media (forced-colors: active) {
+  .table tbody tr[data-timeline-focus='inside']:not([data-request-only='true']) > td:first-child {
+    border-inline-start: 2px solid Highlight;
+  }
 }
 
 .table tbody tr:not([data-collapsed-summary]):not([data-virtual-spacer]):not([data-history-load]):not([data-selected='true']):hover {
@@ -593,7 +602,7 @@
 }
 
 .user {
-  color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-state-business-label);
   background: var(--dsw-alias-state-business-tertiary);
 }
 
@@ -602,12 +611,9 @@
   background: var(--dsw-alias-bg-module-platform);
 }
 
-.contextGreen {
-  color: color-mix(
-    in srgb,
-    var(--dsw-alias-state-success-primary) 68%,
-    var(--dsw-alias-label-secondary)
-  );
+.contextGreen,
+.promptDiffLineadded {
+  color: var(--dsw-alias-state-success-label);
   background: var(--dsw-alias-state-success-tertiary);
 }
 
@@ -667,17 +673,8 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-.promptDiffLineadded {
-  color: color-mix(
-    in srgb,
-    var(--dsw-alias-state-success-primary) 72%,
-    var(--dsw-alias-label-primary)
-  );
-  background: var(--dsw-alias-state-success-tertiary);
-}
-
 .promptDiffLineremoved {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   background: color-mix(
     in srgb,
     var(--dsw-alias-state-error-primary) 12%,
@@ -686,11 +683,7 @@
 }
 
 .assistantVioletBright {
-  color: color-mix(
-    in srgb,
-    var(--dsw-alias-brand-primary-new-colorprimary-new-color) 60%,
-    var(--dsw-alias-state-error-secondary)
-  );
+  color: color-mix(in srgb, var(--dsw-static-violet-600) 55%, var(--dsw-alias-label-primary));
   background: color-mix(
     in srgb,
     color-mix(
@@ -944,7 +937,7 @@
 }
 
 .programError::first-line {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font-weight: 600;
 }
 
@@ -986,7 +979,7 @@
 }
 
 .details .errorPayload {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .details .errorPayload .resultBlockText {
@@ -1130,7 +1123,7 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  height: 34px;
+  min-height: 34px;
   padding: 0 var(--dsw-space-2);
   overflow-x: auto;
   overflow-y: hidden;
@@ -1159,6 +1152,23 @@
 .detailTab:hover {
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+@media (pointer: coarse) {
+  .detailsHeader {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+  }
+
+  .close {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+
+  .detailTab {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
 }
 
 .detailTabActive {
@@ -1192,42 +1202,22 @@
 }
 
 .detailBodySummary {
-  display: flex;
   box-sizing: border-box;
-  flex-direction: column;
   padding-bottom: calc(12px + var(--dsh-trajectory-bottom-clearance, 0px));
-  overflow: hidden;
 }
 
-.detailBodySummary > .overview {
-  flex: 0 1 auto;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
-.detailBodySummary > .compactedSummary {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-@media (max-width: 767px) {
-  /* The compact summary is one reading column, not two nested scrollports.
-     Keeping the overview and section previews in normal flow prevents the
-     short 320px sheet from shrinking the actual status/value rows to a few
-     pixels. The outer detail body owns the only scroll position. */
-  .detailBodySummary {
+@container (max-height: 320px) {
+  .details {
     display: block;
     overflow-y: auto;
-    overflow-x: hidden;
+    --json-tree-inline-size: 100%;
+    --json-tree-white-space: pre-wrap;
+    --json-tree-overflow-wrap: anywhere;
   }
 
-  .detailBodySummary > .overview,
-  .detailBodySummary > .compactedSummary {
+  .detailBody {
     display: block;
     min-height: auto;
-    max-height: none;
     overflow: visible;
   }
 }
@@ -1336,33 +1326,19 @@
 
 .timestampToggle {
   all: unset;
+  display: inline-block;
+  max-inline-size: 100%;
   color: inherit;
   cursor: pointer;
   font: inherit;
+  overflow-wrap: anywhere;
+  white-space: normal;
   user-select: text;
 }
 
 .timestampToggle:focus-visible {
   outline: 1px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-  outline-offset: 2px;
-}
-
-.overviewSections {
-  display: flex;
-  flex: 1;
-  min-height: min-content;
-  flex-direction: column;
-  overflow: hidden;
-  border-top: 0;
-}
-
-.overviewSection {
-  display: flex;
-  flex: 1 1 0;
-  max-height: max-content;
-  min-height: 28px;
-  flex-direction: column;
-  overflow: hidden;
+  outline-offset: -1px;
 }
 
 .overviewSection + .overviewSection {
@@ -1419,11 +1395,24 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
+@media (max-width: 767px), (pointer: coarse) {
+  .details .overviewHeading {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+    align-items: center;
+  }
+
+  .overviewTitle,
+  .overviewHierarchyNavLink,
+  .timestampToggle {
+    display: inline-flex;
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    align-items: center;
+  }
+}
+
 .overviewPreview {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
   background: var(--dsw-alias-bg-layer-1);
 }
 
@@ -1602,6 +1591,10 @@
 }
 
 .jsonPreview {
+  --json-tree-inline-size: 100%;
+  --json-tree-white-space: pre-wrap;
+  --json-tree-overflow-wrap: anywhere;
+
   min-height: 0;
 }
 
@@ -1965,6 +1958,7 @@
     bottom: 0;
     left: 0;
     height: min(70vh, calc(var(--dsw-viewport-height, 100vh) - 96px));
+    max-height: 100%;
     width: 100%;
     max-width: none;
     border-left: none;
@@ -2003,6 +1997,7 @@
   }
 
   .detailTab {
+    min-width: var(--dsw-touch-target);
     min-height: var(--dsw-touch-target);
     padding-inline: var(--dsw-space-2);
     font: var(--dsw-mobile-font-secondary);

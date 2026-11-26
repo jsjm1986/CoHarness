@@ -60,6 +60,11 @@ export class ClientAssistantStream {
   private durableCursor = -1
   private transientInGap = 0
 
+  /** Whether a new stream baseline must reconcile a visible or staged attempt. */
+  get hasTransientState(): boolean {
+    return this.activeAttempt !== undefined || this.retainedAttempt !== undefined || this.pending.size > 0
+  }
+
   /**
    * Replace the durable window and adopt an optional reconnect baseline.
    * @param events - durable events in the replacement window.

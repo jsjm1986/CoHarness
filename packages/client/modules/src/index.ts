@@ -36,8 +36,13 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Entry } from '@deepseek-ai/cordis-plugin-loader'
 import { precompressBody, selectVariant } from '@deepseek-ai/dsh-host-webserver'
 import type { IndexInjection, PrecompressedBody } from '@deepseek-ai/dsh-host-webserver'
-import { exactPackageSpecifier, parseDshClient, stripClientSuffix } from './client/manifest.ts'
+import { exactPackageSpecifier, parseDshClient, requiredBootIds, stripClientSuffix } from './client/manifest.ts'
 import type { WebBootBatch, WebBootBatchPhase, WebBootEntry, WebBootGraph, WebBootRelease } from './client/manifest.ts'
+import { comboRevision, framedHash, renderComboScript } from './combo-script.ts'
+import { RELEASE_COMBO_DIGEST_HEADER } from './release-combos.ts'
+
+export { openReleaseComboReader, RELEASE_COMBO_DIGEST_HEADER } from './release-combos.ts'
+export type { ReleaseComboCandidate } from './release-combos.ts'
 
 export { stripClientSuffix } from './client/manifest.ts'
 export type {
@@ -47,9 +52,9 @@ export type {
 /** Startup transport grouping; module application keeps the declared graph order. */
 export interface Config {
   /**
-   * Package sets transported separately from ungrouped application entries.
-   * Omission keeps one URL-bounded application sequence. Inactive packages contribute nothing;
-   * active members retain their graph order, and bootstrap packages cannot be grouped here.
+   * Groups of required application packages delivered in their own URL-bounded sequences.
+   * Ungrouped required packages share a sequence. Active members retain graph order.
+   * Bootstrap packages cannot be listed. Each optional package has its own response.
    */
   applicationBatchGroups?: string[][]
 }
@@ -67,6 +72,7 @@ interface WebBootRowFields {
   /** Module specifiers the package requests from the module table. */
   external: string[]
   immediately: boolean
+  optional: boolean
 }
 
 /** Filesystem baseline captured before a client artifact snapshot is read. */
@@ -169,6 +175,8 @@ interface ComboResource {
 interface LazyResponse {
   contentType: string
   body: PrecompressedBody
+  scriptBody?: () => Promise<Buffer>
+  sha256?: string
 }
 
 /** Fields shared by every generated combo plan. */
@@ -213,13 +221,6 @@ function clientExportOf(pkgName: string, exportsField: unknown): string | undefi
 /** sha1 metadata hash shortened to 12 hex chars. */
 function shortHash(input: string): string {
   return createHash('sha1').update(input).digest('hex').slice(0, HASH_REVISION_LENGTH)
-}
-
-/** Hash several response fields without allowing bytes to move across field boundaries. */
-function framedHash(domain: string, parts: readonly (string | Buffer)[]): string {
-  const hash = createHash('sha1').update(domain).update('\0')
-  for (const part of parts) hash.update(`${String(Buffer.byteLength(part))}:`).update(part)
-  return hash.digest('hex').slice(0, HASH_REVISION_LENGTH)
 }
 
 /** Marked compiler output uses content identity; unmarked packages retain filesystem revisions. */
@@ -358,11 +359,6 @@ function prepareSource(resource: ComboResource): PreparedSource {
   return { source, fallbackSource }
 }
 
-/** Stamp a combo script's absolute indexed-map URL onto its executable bytes. */
-function comboScript(input: string, sourceMapUrl?: string): Buffer {
-  return Buffer.from(sourceMapUrl === undefined ? input : `${input}//# sourceMappingURL=${sourceMapUrl}\n`)
-}
-
 /** Read and parse an optional source map when its combo-map endpoint is requested. */
 function readSourceMap(clientPath: string): Record<string, unknown> | undefined {
   let body: Buffer
@@ -434,19 +430,9 @@ function lazyBody(produce: () => Buffer): () => Promise<Buffer> {
   }
 }
 
-/** Derive one combo revision from the ordered immutable row revisions. */
-function comboRevision(resources: readonly ComboResource[]): string {
-  return framedHash('combo', resources.flatMap(resource => [
-    resource.id,
-    resource.rev,
-  ]))
-}
-
 /** Concatenate one or more factory registrations without reading or composing source maps. */
 function buildComboScript(resources: readonly ComboResource[], sourceMapUrl: string): Buffer {
-  let source = ''
-  for (const resource of resources) source += `${prepareSource(resource).source};\n`
-  return comboScript(source, sourceMapUrl)
+  return renderComboScript(resources.map(resource => resource.bundle), sourceMapUrl)
 }
 
 /** Compose one indexed map from source-map files read only for this request. */
@@ -526,6 +512,7 @@ function graphRow(id: string, rev: string, fields: WebBootRowFields, chunks?: Re
     ...(chunks === undefined ? {} : { chunks }),
     ...(fields.inject !== undefined ? { inject: fields.inject } : {}),
     ...(fields.immediately ? { immediately: true } : {}),
+    ...(fields.optional ? { optional: true } : {}),
     ...(fields.external.length > 0 ? { external: fields.external } : {}),
   }
 }
@@ -582,7 +569,7 @@ const PARSER_PRELOAD_IDS = [CLIENT_MODULES_ID, '@deepseek-ai/dsh-client-runtime'
 
 /**
  * The boot protocol as index injection rows. The inline registration queue
- * precedes the application-batch preload and the blocking bootstrap batch. Its
+ * precedes required application preloads and the blocking bootstrap batch. Its
  * `create()` method materializes the modules
  * bundle, delegates construction to that bundle, and leaves the same facade
  * in live-registration mode. The graph global follows before the shell reads
@@ -616,7 +603,8 @@ window.__ModuleLoader__={
 }
 })()`
   const bootstrap = graph.batches.filter(batch => batch.phase === 'bootstrap')
-  const application = graph.batches.filter(batch => batch.phase === 'application')
+  const optional = new Set(graph.entries.filter(row => row.optional === true).map(row => row.id))
+  const application = graph.batches.filter(batch => batch.phase === 'application' && !batch.entries.some(id => optional.has(id)))
   const rows: IndexInjection[] = [{ kind: 'script', placement: 'head', text: queue }]
   for (const batch of application) {
     rows.push({ kind: 'script-preload', src: batch.url })
@@ -697,9 +685,7 @@ export class ClientModuleRegistry extends Service {
     this.composed = this.compose()
     const failures: Error[] = []
     this.flush(err => failures.push(err))
-    if (failures.length > 0) {
-      throw new ClientPackageCompositionError(failures)
-    }
+    if (failures.length > 0) this.reportCompositionFailures(failures)
 
     const registerWebCarrier = (webCtx: Context): void => {
       webCtx.effect(
@@ -711,6 +697,18 @@ export class ClientModuleRegistry extends Service {
     ctx.on('webserver/index-inject', (table) => {
       table.push(...bootInjections(this.composed))
     })
+  }
+
+  /** Keep a missing optional artifact out of the graph while retaining the Host's startup audit for required packages. */
+  private reportCompositionFailures(failures: Error[]): void {
+    const declarations = [...this.sources.values()].map(({ packageName, meta }) => ({ id: packageName, ...meta }))
+    const required = requiredBootIds(declarations, PARSER_PRELOAD_IDS)
+    const blocking = failures.filter((error) => {
+      if (!(error instanceof MissingClientBundleError) || required.has(error.packageName)) return true
+      this.ctx.logger.warn(error)
+      return false
+    })
+    if (blocking.length > 0) throw new ClientPackageCompositionError(blocking)
   }
 
   /**
@@ -816,7 +814,13 @@ export class ClientModuleRegistry extends Service {
   }
 
   private compose(): WebBootGraph {
-    const entries = orderByModuleGraph([...this.table.values()].map(record => record.entry))
+    const declared = orderByModuleGraph([...this.table.values()].map(record => record.entry))
+    const required = requiredBootIds(declared, PARSER_PRELOAD_IDS)
+    const entries = declared.map((row) => {
+      if (row.optional !== true || !required.has(row.id)) return row
+      const { optional: _declared, ...promoted } = row
+      return promoted
+    })
     const bootstrap = PARSER_PRELOAD_IDS
       .map(id => this.table.get(id))
       .filter((record): record is WebPluginRecord => record !== undefined)
@@ -829,8 +833,14 @@ export class ClientModuleRegistry extends Service {
     for (const records of partitionComboRecords(bootstrap)) {
       artifacts.push(buildBatch('bootstrap', records, this.readSourceMap))
     }
-    for (const group of applicationRecordGroups(application, this.applicationBatchGroups)) {
+    for (const group of applicationRecordGroups(application.filter(record => required.has(record.entry.id)), this.applicationBatchGroups)) {
       for (const records of partitionComboRecords(group)) {
+        artifacts.push(buildBatch('application', records, this.readSourceMap))
+      }
+    }
+    for (const record of application) {
+      if (required.has(record.entry.id)) continue
+      for (const records of partitionComboRecords([record])) {
         artifacts.push(buildBatch('application', records, this.readSourceMap))
       }
     }
@@ -839,6 +849,7 @@ export class ClientModuleRegistry extends Service {
     for (const artifact of artifacts) {
       batchResponses.set(`/${artifact.descriptor.url}`, this.responses.get(`/${artifact.descriptor.url}`) ?? {
         body: precompressBody(artifact.scriptBody, this.precompressError),
+        scriptBody: artifact.scriptBody,
         contentType: 'text/javascript; charset=utf-8',
       })
       batchResponses.set(artifact.sourceMapUrl, this.responses.get(artifact.sourceMapUrl) ?? {
@@ -851,6 +862,7 @@ export class ClientModuleRegistry extends Service {
       const artifact = buildCombo([record], this.readSourceMap, record.entry.rev)
       responses.set(`/${artifact.url}`, responses.get(`/${artifact.url}`) ?? this.responses.get(`/${artifact.url}`) ?? {
         body: precompressBody(artifact.scriptBody, this.precompressError),
+        scriptBody: artifact.scriptBody,
         contentType: 'text/javascript; charset=utf-8',
       })
       responses.set(artifact.sourceMapUrl, responses.get(artifact.sourceMapUrl) ?? this.responses.get(artifact.sourceMapUrl) ?? {
@@ -916,6 +928,7 @@ export class ClientModuleRegistry extends Service {
       ...(decl.inject !== undefined ? { inject: decl.inject } : {}),
       external: decl.external ?? [],
       immediately: decl.immediately === true,
+      optional: decl.optional === true,
     }
     const resolved = { packageName, meta }
     this.pkgMeta.set(sourceKey, resolved)
@@ -1216,6 +1229,7 @@ export class ClientModuleRegistry extends Service {
 
   private async bundleResource(
     method: string | undefined, url: string, acceptEncoding: string | string[] | undefined,
+    releaseDigest?: string | string[],
   ): Promise<{
     status: number
     headers?: Record<string, string>
@@ -1228,6 +1242,11 @@ export class ClientModuleRegistry extends Service {
       ?? this.previousBatchResponses.get(resourceUrl)
       ?? this.chunkResponse(requestUrl)
     if (response !== undefined) {
+      if (method === 'GET' && response.scriptBody !== undefined && typeof releaseDigest === 'string' && /^[0-9a-f]{64}$/u.test(releaseDigest)) {
+        const bytes = await response.scriptBody()
+        response.sha256 ??= createHash('sha256').update(bytes).digest('hex')
+        if (response.sha256 === releaseDigest) return { status: 204, headers: { [RELEASE_COMBO_DIGEST_HEADER]: releaseDigest } }
+      }
       const variant = selectVariant(response.body, acceptEncoding)
       return {
         status: 200,
@@ -1247,7 +1266,8 @@ export class ClientModuleRegistry extends Service {
 
   private readonly serveBundle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server requests. */
-    const response = await this.bundleResource(req.method, req.url ?? '/', req.headers['accept-encoding'])
+    const challenge = typeof req.headers['x-dsh-gateway-principal'] === 'string' ? req.headers[RELEASE_COMBO_DIGEST_HEADER] : undefined
+    const response = await this.bundleResource(req.method, req.url ?? '/', req.headers['accept-encoding'], challenge)
     res.writeHead(response.status, response.headers)
     res.end(response.body)
   }

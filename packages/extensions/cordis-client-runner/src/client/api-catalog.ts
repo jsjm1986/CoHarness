@@ -185,9 +185,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'completion of the current or newly started refresh.',
       },
       {
-        signature: 'search( query: string, signal: AbortSignal, ): Promise<RpcResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>>',
+        signature: 'search( query: string, signal: AbortSignal, progress?: (value: SessionSearchProgress) => void, ): Promise<RpcResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>>',
         description: 'Search the Host\'s visible message-content index. Results stay request-local; the list snapshot remains the metadata authority.',
-        parameters: [{ name: 'query', description: 'non-blank literal phrase.' }, { name: 'signal', description: 'cancellation for a superseded search.' }],
+        parameters: [{ name: 'query', description: 'non-blank literal phrase.' }, { name: 'signal', description: 'cancellation for a superseded search.' }, { name: 'progress', description: 'receives each connected Runtime\'s outcome without waiting for other computers; omitted keeps one final result.' }],
         returns: 'bounded results, or a business/transport error.',
       },
       {
@@ -972,6 +972,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionRuntimeTarget',
     declaration: 'export type SessionRuntimeTarget = ConnectionRuntimeTarget;',
+  },
+  {
+    name: 'SessionSearchProgress',
+    declaration: 'export interface SessionSearchProgress {\n    readonly items: readonly SessionSearchResultItem[];\n    readonly hasMore: boolean;\n    readonly targets: readonly {\n        runtime: SessionRuntimeTarget;\n        status: \'pending\' | \'ready\' | \'error\';\n    }[];\n}',
   },
   {
     name: 'SessionSearchResultItem',

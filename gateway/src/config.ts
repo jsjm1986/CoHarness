@@ -70,12 +70,22 @@ export interface GatewayConfig {
   runtimeBrowserStreamTimeoutMs: number
   /** Deadline for bounded browser RPC calls to managed Runtimes. */
   runtimeBrowserRpcTimeoutMs: number
+  /** Optional limit on append-origin messages in prepared first history pages. */
+  runtimePreparedHistoryMessages: number | undefined
   /** Idle keep-alive lifetime of the public HTTP listener; must outlive the front proxy's origin pool. */
   keepAliveTimeoutMs: number
   /** Maximum interval between durable access-revocation reads and listener reconnects. */
   accessInvalidationPollMs: number
+  /** Reconciliation interval while PostgreSQL LISTEN is live and caught up (HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS). */
+  accessInvalidationHealthyPollMs: number
   /** Memoization window for runtime-credential resolution; access invalidations flush early. */
   runtimeTokenCacheMs: number
+  /** Memoization window for local node-service identity attestations when LISTEN is healthy (HGW_NODE_SERVICE_IDENTITY_CACHE_MS). */
+  nodeServiceIdentityCacheMs: number
+  /** Maximum byte budget for Center-side caching of remote immutable `/plugins/*` bundles (HGW_RUNTIME_ASSET_CACHE_MAX_BYTES; 0 disables). */
+  runtimeAssetCacheMaxBytes: number
+  /** Bounded server-side short-wait during cold `/api/prepare/v1/*` requests before returning 503 pending (HGW_RUNTIME_PREPARE_WAIT_MS; 0 disables). */
+  runtimePrepareWaitMs: number
   /** Heartbeat interval for a managed runtime's execution revocation stream. */
   executionWatchHeartbeatMs: number
   /** Maximum bytes retained or streamed from one runtime upstream response. */
@@ -114,6 +124,8 @@ export interface GatewayConfig {
   backupDir: string
   /** Remote-desktop administration directory shared with runtime providers. */
   remoteDesktopDir: string
+  /** Mount the managed VNC provider in newly launched Runtimes (HGW_REMOTE_DESKTOP=on|off). */
+  remoteDesktopEnabled: boolean
   /** Stable private node-configuration file selected by the launcher. */
   nodeConfigFile: string
   /** Private database connection file; its location is backed up without exposing its contents. */
@@ -150,6 +162,8 @@ export interface GatewayConfig {
   /** Row and complete-response limits for environment-directory reads. */
   draftHistory: DraftHistoryLimits
   runtimeCatalog: import('./runtime-catalog.ts').RuntimeCatalogLimits
+  /** Bounded node-local recovery inspection and administrator review pages. */
+  recoveryInspection: { maxRows: number; maxBytes: number; pageSize: number }
   /** Outbound node enrollment and control leases; connectivity does not grant execution. */
   nodeAccess: import('./node-access.ts').NodeAccessConfig
   nodeChannel: import('./node-channel-protocol.ts').NodeChannelConfig
@@ -165,7 +179,7 @@ export interface GatewayConfig {
   performanceOperationSamples: number
   /** Event-loop histogram sampling interval, in milliseconds. */
   performanceEventLoopResolutionMs: number
-  /** Maximum PostgreSQL connections owned by this Gateway, including dedicated listeners. */
+  /** Maximum PostgreSQL connections for Gateway business operations. */
   databaseMaxConnections: number
   /** Maximum Gateway callers waiting for a PostgreSQL connection. */
   databaseMaxCheckoutQueue: number
@@ -173,10 +187,18 @@ export interface GatewayConfig {
   databaseConnectionTimeoutMs: number
   /** Connections kept open between bursts; remote nodes avoid a multi-RTT handshake per new client. */
   databaseMinConnections: number
+  /** Independent PostgreSQL capacity for readiness, current epoch checks and node control leases. */
+  databaseControlMaxConnections: number
+  /** Maximum unresolved PostgreSQL checkouts on the control pool. */
+  databaseControlMaxCheckoutQueue: number
   idleTimeoutMs: number
   readinessTimeoutMs: number
   /** Graceful shutdown stops every local Runtime instead of retaining survivors for the next boot (HGW_DRAIN_RUNTIMES_ON_SHUTDOWN). */
   drainRuntimesOnShutdown: boolean
+  /** Wall-clock budget for all batches of an opted-in node Runtime drain. */
+  runtimeDrainTimeoutMs: number
+  /** Time a local Runtime has to checkpoint during a planned stop (HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS). */
+  localRuntimeShutdownGraceMs: number
   /**
    * Periodic desired-state reconciliation on this node (HGW_RECONCILE_*).
    * Crashed ready runtimes are published failed and recently used stopped
@@ -186,7 +208,7 @@ export interface GatewayConfig {
   reconcile: {
     /** Standing sweep toggle; disabled only for incident containment (HGW_RECONCILE). */
     enabled: boolean
-    /** Maximum age of last activity that still qualifies a stopped Runtime for warmup (HGW_RECONCILE_WARM_WINDOW_MS). */
+    /** Activity window for legacy infrastructure stops without preserved running intent (HGW_RECONCILE_WARM_WINDOW_MS). */
     warmWindowMs: number
     /** Delay after the first consecutive failure before another automatic retry; doubles per failure (HGW_RECONCILE_BACKOFF_BASE_MS). */
     backoffBaseMs: number
@@ -739,6 +761,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   const runtimeBrowserReadyTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS, 15000, 'HGW_RUNTIME_BROWSER_READY_TIMEOUT_MS')
   const runtimeBrowserStreamTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS, 3000, 'HGW_RUNTIME_BROWSER_STREAM_TIMEOUT_MS')
   const runtimeBrowserRpcTimeoutMs = timerDelay(env.HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS, 30000, 'HGW_RUNTIME_BROWSER_RPC_TIMEOUT_MS')
+  const historyMessages = env.HGW_RUNTIME_PREPARED_HISTORY_MESSAGES
+  const runtimePreparedHistoryMessages = historyMessages === undefined ? undefined
+    : positiveSafeInteger(historyMessages, 1, 'HGW_RUNTIME_PREPARED_HISTORY_MESSAGES')
   const upstreamResponseLimitBytes = positiveSafeInteger(
     env.HGW_UPSTREAM_RESPONSE_LIMIT_BYTES,
     DEFAULT_UPSTREAM_RESPONSE_LIMIT_BYTES,
@@ -767,6 +792,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (runtimeCatalog.pageSize > 200 || runtimeCatalog.maxBytes < 512) {
     throw new Error('Runtime catalog page size must be within 1..200 and its byte budget must be at least 512')
   }
+  const recoveryInspection = {
+    maxRows: positiveSafeInteger(env.HGW_RECOVERY_INSPECTION_MAX_ROWS, 100000, 'HGW_RECOVERY_INSPECTION_MAX_ROWS'),
+    maxBytes: positiveSafeInteger(env.HGW_RECOVERY_INSPECTION_MAX_BYTES, 64 << 20, 'HGW_RECOVERY_INSPECTION_MAX_BYTES'),
+    pageSize: positiveSafeInteger(env.HGW_RECOVERY_REVIEW_PAGE_SIZE, 50, 'HGW_RECOVERY_REVIEW_PAGE_SIZE'),
+  }
+  if (recoveryInspection.pageSize > 200) throw new Error('HGW_RECOVERY_REVIEW_PAGE_SIZE must not exceed 200')
   const nodeAccess = {
     enrollmentTtlMs: timerDelay(env.HGW_NODE_ENROLLMENT_TTL_MS, 600_000, 'HGW_NODE_ENROLLMENT_TTL_MS'),
     leaseMs: timerDelay(env.HGW_NODE_AGENT_LEASE_MS, 30_000, 'HGW_NODE_AGENT_LEASE_MS'),
@@ -805,6 +836,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     if (value !== 'true' && value !== 'false') throw new Error('HGW_DRAIN_RUNTIMES_ON_SHUTDOWN must be true or false')
     return value === 'true'
   })()
+  const runtimeDrainTimeoutMs = timerDelay(env.HGW_RUNTIME_DRAIN_TIMEOUT_MS, 60_000, 'HGW_RUNTIME_DRAIN_TIMEOUT_MS')
+  const localRuntimeShutdownGraceMs = timerDelay(env.HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS, 15_000, 'HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS')
+  if (localRuntimeShutdownGraceMs > 86_400_000) throw new Error('HGW_LOCAL_RUNTIME_SHUTDOWN_GRACE_MS must not exceed 86400000')
   const reconcile = {
     enabled: (() => {
       const value = env.HGW_RECONCILE ?? 'on'
@@ -962,6 +996,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     runtimeBrowserReadyTimeoutMs,
     runtimeBrowserStreamTimeoutMs,
     runtimeBrowserRpcTimeoutMs,
+    runtimePreparedHistoryMessages,
     keepAliveTimeoutMs,
     upstreamResponseLimitBytes,
     runtimeLogCapBytes,
@@ -970,7 +1005,25 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     databaseStartupRetryInitialMs,
     databaseStartupRetryMaxMs,
     accessInvalidationPollMs: timerDelay(env.HGW_ACCESS_INVALIDATION_POLL_MS, 1_000, 'HGW_ACCESS_INVALIDATION_POLL_MS'),
+    accessInvalidationHealthyPollMs: timerDelay(env.HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS, 15_000, 'HGW_ACCESS_INVALIDATION_HEALTHY_POLL_MS'),
     runtimeTokenCacheMs: timerDelay(env.HGW_RUNTIME_TOKEN_CACHE_MS, 2_000, 'HGW_RUNTIME_TOKEN_CACHE_MS'),
+    nodeServiceIdentityCacheMs: timerDelay(env.HGW_NODE_SERVICE_IDENTITY_CACHE_MS, 5_000, 'HGW_NODE_SERVICE_IDENTITY_CACHE_MS'),
+    runtimeAssetCacheMaxBytes: (() => {
+      const raw = env.HGW_RUNTIME_ASSET_CACHE_MAX_BYTES
+      if (raw === undefined) return 32 * 1024 * 1024
+      const resolved = Number(raw)
+      if (!Number.isSafeInteger(resolved) || resolved < 0) throw new Error('HGW_RUNTIME_ASSET_CACHE_MAX_BYTES must be a non-negative safe integer')
+      return resolved
+    })(),
+    runtimePrepareWaitMs: (() => {
+      const raw = env.HGW_RUNTIME_PREPARE_WAIT_MS
+      if (raw === undefined) return 1_500
+      const resolved = Number(raw)
+      if (!Number.isSafeInteger(resolved) || resolved < 0 || resolved > 2_147_483_647) {
+        throw new Error('HGW_RUNTIME_PREPARE_WAIT_MS must be a non-negative safe integer within timer range')
+      }
+      return resolved
+    })(),
     executionWatchHeartbeatMs: timerDelay(env.HGW_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, 'HGW_EXECUTION_WATCH_HEARTBEAT_MS'),
     runtimeCredentialDir,
     organizationModelCredentialKeyFile,
@@ -984,6 +1037,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     bootstrapAdminPasswordFile,
     backupDir: env.HGW_BACKUP_DIR ?? join(stateRoot, 'backups'),
     remoteDesktopDir: env.HGW_REMOTE_DESKTOP_DIR ?? join(stateRoot, 'remote-desktop'),
+    remoteDesktopEnabled: (() => {
+      const value = env.HGW_REMOTE_DESKTOP ?? 'on'
+      if (value !== 'on' && value !== 'off') throw new Error('HGW_REMOTE_DESKTOP must be on or off')
+      return value === 'on'
+    })(),
     nodeConfigFile: resolve(env.HGW_NODE_CONFIG_FILE ?? join(stateRoot, 'node-config.json')),
     ...(env.HGW_DATABASE_URL_FILE === undefined || env.HGW_DATABASE_URL_FILE.trim() === '' ? {} : { databaseUrlFile: resolve(env.HGW_DATABASE_URL_FILE) }),
     configurationRevision,
@@ -1008,6 +1066,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       bytes: positiveSafeInteger(env.HGW_DRAFT_HISTORY_BYTES,defaultDraftHistoryLimits.bytes,'HGW_DRAFT_HISTORY_BYTES'),
     },
     runtimeCatalog,
+    recoveryInspection,
     nodeAccess,
     nodeChannel: loadNodeChannelConfig(env),
     nodeService: loadNodeServiceConfig(env),
@@ -1019,9 +1078,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     databaseMaxCheckoutQueue: positiveSafeInteger(env.HGW_DATABASE_MAX_CHECKOUT_QUEUE, 256, 'HGW_DATABASE_MAX_CHECKOUT_QUEUE'),
     databaseConnectionTimeoutMs: timerDelay(env.HGW_DATABASE_CONNECTION_TIMEOUT_MS, 5_000, 'HGW_DATABASE_CONNECTION_TIMEOUT_MS'),
     databaseMinConnections,
+    databaseControlMaxConnections: positiveSafeInteger(env.HGW_DATABASE_CONTROL_MAX_CONNECTIONS, 2, 'HGW_DATABASE_CONTROL_MAX_CONNECTIONS'),
+    databaseControlMaxCheckoutQueue: positiveSafeInteger(env.HGW_DATABASE_CONTROL_MAX_CHECKOUT_QUEUE, 32, 'HGW_DATABASE_CONTROL_MAX_CHECKOUT_QUEUE'),
     idleTimeoutMs,
     readinessTimeoutMs,
     drainRuntimesOnShutdown,
+    runtimeDrainTimeoutMs,
+    localRuntimeShutdownGraceMs,
     reconcile,
     sessionTtlMs,
     sessionAbsoluteTtlMs,

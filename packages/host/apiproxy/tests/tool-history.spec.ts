@@ -4,7 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { installAgentExecutionAdmission } from '@deepseek-ai/dsh-agent'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import { CollaborationError } from '@deepseek-ai/dsh-collaboration'
 import { createApiProxy } from '../src/api-proxy.ts'
@@ -114,6 +114,26 @@ describe('Tool history selection', () => {
       observe.mockClear()
       expect((await api.subagents.history({ rpcId: RpcId('denied-child-read'), payload })).result.ok).toBe(false)
       expect(observe).not.toHaveBeenCalled()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('retains recovery read-only state in parent and child tool-detail reads without activating an Agent', async () => {
+    const parent = SessionId('parent')
+    const { ctx, api, observe } = await harness(parent)
+    installAgentExecutionAdmission(ctx, [SID])
+    ctx.provide('subagents', { listChildren: async () => [{ kind: 'child', id: SID, mode: 'continuable' }] } as never)
+    try {
+      for (const result of [
+        await api.sessions.history(request()),
+        await api.subagents.history({ rpcId: RpcId('recovered-tool'), payload: {
+          parentSessionId: parent, childSessionId: SID, mode: 'continuable', toolCallId: CALL,
+        } }),
+      ]) {
+        expect(result.result).toMatchObject({ ok: true, value: { executionRestriction: 'recovery-read-only', hasMore: false } })
+      }
+      expect(observe).toHaveBeenCalledTimes(2)
+      expect(ctx.agents.get(SID)).toBeUndefined()
+      expect(ctx.sessions.get(SID)).toBeUndefined()
     } finally { await ctx.fiber.dispose() }
   })
 

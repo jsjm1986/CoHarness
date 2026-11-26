@@ -1,0 +1,25 @@
+- tablist:
+  - tab "job_kill Close" [selected]:
+    - text: job_kill
+    - button "Close":
+      - img
+  - button "New tab":
+    - img
+  - button "Tab actions":
+    - img
+  - button "Split"
+  - button "Fullscreen"
+  - button "Collapse right sidebar":
+    - img
+- text: job_kill
+- button "Close details"
+- text: Input json
+- button "Wrap lines" [pressed]
+- button "Copy":
+  - img
+- code: "{ \"job_id\": \"b824aa9f-0adf-4e55-a6e1-0d86dff0cb8b\", \"reason\": \"free the bounded task slot\" }"
+- text: Output Recorded result
+- list:
+  - listitem:
+    - text: b824aa9f-0adf-4e55-a6e1-0d86dff0cb8b Cancellation requested
+    - paragraph: free the bounded task slot

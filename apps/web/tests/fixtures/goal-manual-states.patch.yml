@@ -1,0 +1,3 @@
+# Goal presentation scenarios drive the real service without starting model rounds.
+- id: goal-round-driver
+  disabled: true

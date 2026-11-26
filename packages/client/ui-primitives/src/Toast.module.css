@@ -53,10 +53,10 @@
   padding: 0;
   border: 0;
   background: none;
-  /* deepseek-400, brightened at the designer's request, reads as the action
-     against the always-dark toast surface without an underline. */
-  color: var(--dsw-static-deepseek-400);
+  color: inherit;
   font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
   cursor: pointer;
   /* Breathing room where the action text meets the surrounding copy. */
   margin-inline: 3px;
@@ -66,7 +66,7 @@
 }
 
 .action:hover {
-  opacity: 0.8;
+  text-decoration-thickness: 2px;
 }
 
 @keyframes dsh-toast-in {
@@ -102,4 +102,9 @@
     top: calc(var(--dsw-safe-top, 0px) + var(--dsw-space-6));
     max-width: calc(100vw - 24px);
   }
+}
+
+@media (forced-colors: active) {
+  .toast { border: 1px solid CanvasText; }
+  .action { text-decoration: underline; }
 }

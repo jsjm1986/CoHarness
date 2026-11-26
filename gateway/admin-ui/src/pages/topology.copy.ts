@@ -11,9 +11,10 @@ export const zh = {
   openPrimary: '在新标签页打开主入口管理', save: '保存部署模式', refresh: '重新读取', saved: '部署模式已保存',
   readFailed: '未能读取部署设置，请重新读取', failed: '操作未完成，请读取当前状态后再操作',
   conflict: '部署设置已变化，未保存的输入仍保留，请重新读取后核对',
+  quarantined: '当前电脑因灾难恢复已隔离，不能作为主入口。请在未被隔离的电脑上配置。',
   attached: '还有电脑处于接入状态，请先停止相关 Runtime 和传输，再逐台退出接入',
   legacy: '检测到旧的服务转发配置，请在这里明确确认主入口和部署模式。旧变量不会覆盖已保存的设置。',
-  disableTitle: '关闭多电脑模式', disableBody: '接入已全部退出。关闭后各入口仅使用本机资源，保留用户、项目、Runtime 和文件。',
+  disableTitle: '关闭多电脑模式', disableBody: '接入已退出或完成灾难隔离。关闭后，未被隔离的电脑仅使用本机资源，保留用户、项目、Runtime 和文件。已隔离电脑不会因此恢复运行。',
   confirmDisable: '确认关闭', cancel: '取消', blockers: '仍有 {count} 台电脑需要处理',
   node: '电脑', state: '接入状态', runtimes: '未停止的 Runtime',
   connectionTitle: '连接到主入口', connectionHint: '先在主入口选择这台已部署的电脑并签发接入码。连接不替代用户权限和 Runtime 分配。',
@@ -26,6 +27,7 @@ export const zh = {
   serviceFailed: '未能启动接入服务，请检查已安装的服务和本机日志',
   identityFailed: '中心地址或接入码与这台电脑不匹配，请到主入口重新核对',
   connected: '这台电脑已有活动接入，请先退出原接入再更换配置',
+  listSeparator: '、',
 } as const
 
 export const en: Record<keyof typeof zh, string> = {
@@ -40,9 +42,10 @@ export const en: Record<keyof typeof zh, string> = {
   openPrimary: 'Open primary administration in a new tab', save: 'Save deployment mode', refresh: 'Reload', saved: 'Deployment mode saved',
   readFailed: 'Could not read deployment settings. Reload to try again.', failed: 'The operation did not finish. Read current state before trying again.',
   conflict: 'Deployment settings changed. Your input is retained; reload and review it.',
+  quarantined: 'This computer is quarantined after disaster recovery and cannot become the primary. Configure an eligible computer instead.',
   attached: 'Computers are still attached. Stop their Runtimes and transfers, then detach each computer.',
   legacy: 'Legacy service forwarding is configured. Confirm the primary entry and mode here. The old variable cannot override saved settings.',
-  disableTitle: 'Disable multiple computers', disableBody: 'All attachments have ended. Each entry will use local resources; users, projects, Runtimes and files are retained.',
+  disableTitle: 'Disable multiple computers', disableBody: 'Computers have detached or completed disaster isolation. Eligible computers will use local resources; users, projects, Runtimes and files are retained. Quarantined computers remain unable to run.',
   confirmDisable: 'Disable', cancel: 'Cancel', blockers: '{count} computers still need attention',
   node: 'Computer', state: 'Attachment', runtimes: 'Runtimes not stopped',
   connectionTitle: 'Connect to primary', connectionHint: 'Select this deployed computer and issue a code at the primary entry. Connection does not replace user permissions or Runtime allocation.',
@@ -55,4 +58,5 @@ export const en: Record<keyof typeof zh, string> = {
   serviceFailed: 'Could not start the agent. Check the installed service and local logs.',
   identityFailed: 'The center address or enrollment code does not match this computer. Check it at the primary entry.',
   connected: 'This computer already has an active connection. Detach it before replacing setup.',
+  listSeparator: ', ',
 }

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs-observation-policy/README.md
 document:
-  en: 38c8f53827dee89f7fe88a0e7e9d14c29dd57a06
-  zh: 32f3b155c987a3f6c2b418161d60c197a3efea1a
+  en: 4d3190e5d3eaea01ea70ed4dc59ab7d59551f3cd
+  zh: 4963f3b6a6bb89c78c291742cfb2794a6ba48f67
 /:
   en: f8283c0673f80721
   zh: 61495d48365178df
@@ -12,8 +12,8 @@ document:
   en: 8ac0a946e1479d5a
   zh: 3bd44d1d3c5173f7
 /deepseek-ai-dsh-fs-observation-policy/summary:
-  en: e74517566c1827b2
-  zh: 803c6ddf5cbd3842
+  en: 0f700bf42a4590dd
+  zh: 2cb5c90b41a079ed
 /deepseek-ai-dsh-fs-observation-policy/table-of-contents:
   en: 8e1bb7de0029622d
   zh: 5a53a8e16993e0ce
@@ -21,14 +21,14 @@ document:
   en: 5324dee004f36e04
   zh: 3ce97a51073123dc
 /deepseek-ai-dsh-fs-observation-policy/how-the-gate-participates:
-  en: fe95ddbfa428a5a3
-  zh: 9d397213137f4443
+  en: a0e4c24ff74279ae
+  zh: 84277b33487fc1c6
 /deepseek-ai-dsh-fs-observation-policy/observed-state-is-the-prior-observation-record-freshness-is-provider-cas:
   en: 6b5915453150b9ea
   zh: 32d6405a132a3a8a
 /deepseek-ai-dsh-fs-observation-policy/single-slot-first-wins:
-  en: 1906c4f7513a3919
-  zh: 651defa389c4ad56
+  en: c133da8346772741
+  zh: 5fd0d9da1c0dc1b2
 /deepseek-ai-dsh-fs-observation-policy/no-method-coupling:
   en: 411907804abd92cc
   zh: f4e522ee01d8d0f1

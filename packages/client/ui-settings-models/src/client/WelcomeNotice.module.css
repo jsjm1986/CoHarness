@@ -1,6 +1,6 @@
 .copy {
-  font-size: 14px;
-  line-height: 24px;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
   color: var(--dsw-alias-label-secondary);
 }
 
@@ -14,8 +14,8 @@
 
 .error {
   margin: 16px 0 0;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   color: var(--dsw-alias-state-error-primary);
 }
 

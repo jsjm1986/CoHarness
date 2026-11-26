@@ -10,6 +10,7 @@
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--dsw-space-2);
   padding: var(--dsw-space-2) var(--dsw-space-3);
@@ -19,6 +20,9 @@
 
 .segmented {
   display: inline-flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
   padding: 2px;
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-inset);
@@ -66,11 +70,6 @@
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
-}
-
-.iconButton:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-secondary);
 }
 
 .feed {
@@ -168,10 +167,6 @@
   cursor: pointer;
 }
 
-.chip:hover {
-  color: var(--dsw-alias-link);
-}
-
 .chipLabel {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -193,12 +188,12 @@
   user-select: none;
 }
 
-.dayHead:hover {
-  background: var(--dsw-alias-bg-inset);
-}
-
 .dayTitle {
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 11.5px;
   font-weight: 700;
 }
@@ -210,27 +205,32 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 9.5px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .dayCnt {
   flex-shrink: 0;
   font-size: 9.5px;
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
   font-variant-numeric: tabular-nums;
 }
 
-.tLine {
+.tRow {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 4px var(--dsw-space-3);
-  cursor: pointer;
-  font-size: 11.5px;
+  padding: 0 var(--dsw-space-3);
 }
 
-.tLine:hover {
-  background: var(--dsw-alias-bg-inset);
+.tLine {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 11.5px;
 }
 
 .tEntry > .tDetail {
@@ -264,7 +264,7 @@
 .tTime {
   flex-shrink: 0;
   font-size: 9.5px;
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -336,10 +336,6 @@
   cursor: pointer;
 }
 
-.blockHead:hover {
-  background: var(--dsw-alias-bg-inset);
-}
-
 .blockTop {
   display: flex;
   align-items: center;
@@ -360,7 +356,7 @@
 .ago {
   flex-shrink: 0;
   font-size: 10px;
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -430,7 +426,7 @@
   align-items: center;
   gap: 3px;
   font-size: 9.5px;
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .ex > svg {
@@ -474,7 +470,7 @@
   align-items: center;
   gap: 8px;
   font-size: 10px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .kpiAns {
@@ -518,20 +514,25 @@
   border-top: 0.5px solid var(--dsw-alias-border-l1);
 }
 
-.xRow {
+.xItem {
   display: flex;
-  align-items: flex-start;
-  gap: var(--dsw-space-2);
-  padding: 7px var(--dsw-space-3);
-  cursor: pointer;
+  align-items: center;
+  gap: 7px;
+  padding-right: var(--dsw-space-3);
 }
 
-.xRow + .xRow {
+.xItem + .xItem {
   border-top: 0.5px solid var(--dsw-alias-border-l1);
 }
 
-.xRow:hover {
-  background: var(--dsw-alias-bg-inset);
+.xRow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dsw-space-2);
+  padding: 7px 0 7px var(--dsw-space-3);
+  cursor: pointer;
 }
 
 .xMain {
@@ -554,7 +555,7 @@
   margin-left: auto;
   flex-shrink: 0;
   font-size: 9.5px;
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -600,7 +601,7 @@
   opacity: 0;
 }
 
-.xRow:hover .jump {
+.xRow:focus-visible .jump {
   opacity: 1;
 }
 
@@ -620,6 +621,7 @@
 
 .pCurrentHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--dsw-space-2);
   margin-bottom: 3px;
@@ -633,7 +635,7 @@
 
 .pCurrentTime {
   font-size: 9.5px;
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -700,11 +702,12 @@
 .pFoot {
   padding: var(--dsw-space-2) var(--dsw-space-3) 0;
   font-size: 9.5px;
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .pStatus {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--dsw-space-2);
   padding: var(--dsw-space-2) var(--dsw-space-3);
@@ -716,15 +719,16 @@
   flex: 1;
   min-width: 0;
   font-size: 10px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .pError {
+  min-width: 0;
   font-size: 10px;
-  color: var(--dsw-alias-state-error-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* state-error-primary measures ~4.49 on white — tint toward the label color
+     like GoalBar's .error so small error text stays AA. */
+  color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 80%, var(--dsw-alias-label-primary));
+  overflow-wrap: anywhere;
 }
 
 .pGenerate {
@@ -740,11 +744,7 @@
   cursor: pointer;
 }
 
-.pGenerate:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.pGenerate:disabled {
+.pGenerate[aria-disabled='true'] {
   opacity: 0.45;
   cursor: default;
 }
@@ -771,6 +771,86 @@
   text-align: center;
 }
 
-.more:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+.segment,
+.segmentActive,
+.chip,
+.goLink,
+.dayHead,
+.tLine,
+.blockHead,
+.xRow,
+.pGenerate,
+.more {
+  min-width: 24px;
+  min-height: 24px;
+}
+
+@media (pointer: coarse) {
+  .segment,
+  .segmentActive,
+  .member,
+  .iconButton,
+  .chip,
+  .goLink,
+  .dayHead,
+  .tLine,
+  .blockHead,
+  .xRow,
+  .pGenerate,
+  .more {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .member {
+    height: 44px;
+  }
+
+  .iconButton {
+    flex-shrink: 0;
+  }
+}
+
+/* Short panes cannot spare a pinned toolbar: the two wrapped toolbar rows
+   would squeeze `.feed` into a sliver smaller than one control. Below this
+   height the whole panel scrolls instead, so the toolbar scrolls away with
+   the content and every control still reaches the scrollport. */
+@media (max-height: 480px) {
+  .root {
+    overflow-y: auto;
+    overflow-x: clip;
+  }
+
+  .feed {
+    flex: none;
+    overflow-y: visible;
+    overflow-x: clip;
+  }
+}
+
+@media (hover: hover) {
+  .iconButton:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-secondary);
+  }
+
+  .chip:hover {
+    color: var(--dsw-alias-link);
+  }
+
+  .dayHead:hover,
+  .tLine:hover,
+  .blockHead:hover,
+  .xRow:hover {
+    background: var(--dsw-alias-bg-inset);
+  }
+
+  .xRow:hover .jump {
+    opacity: 1;
+  }
+
+  .pGenerate:hover:not([aria-disabled='true']),
+  .more:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }

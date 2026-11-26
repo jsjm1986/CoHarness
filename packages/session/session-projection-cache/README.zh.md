@@ -14,7 +14,7 @@ kind: "package-reference"
 - **每次后台写入都 fail-soft。** 持久写失败只记一条警告并保持缓存陈旧；下一次写入或冷读自愈。两次写之间崩溃的代价是更长的尾部回放，绝不是错误的值。
 - **`ver` 与当前运行单元的 `stateVersion` 不匹配即丢弃，绝不迁移。** 单元递增版本会在读取时使其行失效；该 key 从日志重新折叠。
 - **存储行必须通过当前单元的 `stateSchema`。** 畸形行从零 I/O view 中省略，并被 restore 拒绝，使冷读阶梯从日志重新折叠。
-- **整记录写入。** 每次写入替换该会话的完整检查点（注册表切面始终是完整的），并经无损 JSON 边界快照——违反纯 JSON 约定的单元状态会显式失败并报错。
+- **整记录写入。** 每次写入替换会话的完整检查点，并校验其可无损保存为 JSON。实时写入使用注册表已分离的检查点。冷读回写在加入存储队列前单独复制。
 - **不透明状态读取。** 域验证使用相同的无损 JSON 规则，保留状态的每个属性，包括自有的 `__proto__` 键。各单元仍由自己的 `stateSchema` 决定接受哪些状态。
 - **记录绑定到日志生命周期，而不只是 id。** 每条记录存储其折叠来源的完整生命周期身份（`formatVersion`、`createdAt`、`cwd`、`isSeeded` 与精确的 `inheritedEventCount`），因此来自另一 Session 格式世代或 fork 切点的行不能为调用方播种；每次读取先以活 header 或存储 header 为证验证它，再接受任何行——被删后重建的 id、或缓存幸存而持久化存储被换掉时，无关记录被整体丢弃，绝不播种幻影值。
 - **日志领先，缓存跟随。** 活会话检查点先把缓冲事件持久 flush，缓存行才落地，因此崩溃只会让缓存落后于日志（更长的尾部回放），绝不领先于它。
@@ -49,7 +49,7 @@ kind: "package-reference"
 | 累计 `writeEveryEvents` 个已提交事件 | 配置节流（条数）。 |
 | 距首个脏事件 `writeIntervalMs` 毫秒 | 配置节流（间隔）。 |
 
-两个 `Config` 字段均必填（无默认值）：写入节奏是部署选择，没有普适正确值，由 cordis.yml 明示。
+在 cordis.yml 中填写这两个必填字段。装有 Agent 服务时，间隔回调在没有发起 Agent 的上下文中执行。检查点仍绑定到已提交事件指定的会话。
 
 <a id="listing-read-cachedsnapshotmeta-inheritedeventcount-keys"></a>
 ## 列表读（`cachedSnapshot(meta, inheritedEventCount, keys?)`）

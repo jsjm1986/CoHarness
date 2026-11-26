@@ -1,0 +1,30 @@
+- tablist:
+  - tab "job_output Close" [selected]:
+    - text: job_output
+    - button "Close":
+      - img
+  - button "New tab":
+    - img
+  - button "Tab actions":
+    - img
+  - button "Split"
+  - button "Fullscreen"
+  - button "Collapse right sidebar":
+    - img
+- text: job_output
+- button "Close details"
+- text: Input json
+- button "Wrap lines" [pressed]
+- button "Copy":
+  - img
+- code: "{ \"job_id\": \"a3a14aae-b8f1-4068-93ce-16ea38595a07\", \"wait\": true }"
+- text: Output Recorded result
+- list:
+  - listitem:
+    - text: a3a14aae-b8f1-4068-93ce-16ea38595a07 Failed
+    - paragraph: "error; diagnostic: Product subagent failure (product: Claude Code; stage: query-run; category: error_max_budget_usd)"
+    - text: Code block
+    - button "Wrap lines" [pressed]
+    - button "Copy":
+      - img
+    - code: (no new output)

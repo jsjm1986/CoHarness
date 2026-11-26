@@ -1,19 +1,21 @@
 /** Project collaboration controls through the shipped Web composition. */
 
-import { readFile } from 'node:fs/promises'
+import { responsiveBrowser, responsiveBrowserName, responsiveMobileEmulation } from './responsive-browser.ts'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, BrowserContext, Page, Route } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { SESSION_FORMAT_VERSION, SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  assertFixtureInventory, captureStableAria,
   launchWebScaffold, seedBlankSession, seedSession, watchConsole, webSnapshotMode, acknowledgeReloadConnectionLoss,
   fixtureUserPrompts, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage, workflowMatrixEnabled, workflowTouchOptions } from './workflow-responsive-state.ts'
 
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/project-collaboration', import.meta.url))
@@ -131,7 +133,13 @@ async function mockGateway(page: Page | BrowserContext, mode: ProjectMode, optio
       result: { ok: true; value: { runtimeTarget?: unknown; executionAuthorityRequired?: boolean } } | { ok: false }
     }
     if (body.result.ok) {
-      body.result.value.runtimeTarget = options.runtimeDirectory ? navigationTarget(route) : { kind: 'project', projectId: 9 }
+      if (options.runtimeDirectory) {
+        body.result.value.runtimeTarget = navigationTarget(route)
+      } else if (options.accountId !== undefined) {
+        body.result.value.runtimeTarget = { ...navigationRuntime(NAV_RUNTIME_A), kind: 'project', projectId: 9 }
+      } else {
+        body.result.value.runtimeTarget = { kind: 'project', projectId: 9 }
+      }
       if (options.accountId !== undefined) body.result.value.executionAuthorityRequired = true
     }
     await route.fulfill({ response, json: body })
@@ -229,21 +237,37 @@ async function mockGateway(page: Page | BrowserContext, mode: ProjectMode, optio
 
 /**
  * Drive the pushed scope page: open it, stage `Only me` through the second
- * visibility level, and close it again through the trigger.
+ * visibility level, then return to the root and close its page.
  */
 async function stagePrivateVisibility(page: Page): Promise<void> {
-  const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
-  const scopePage = page.getByRole('dialog', { name: 'Switch personal or project scope' })
-  await scopePage.waitFor({ timeout: 10_000 })
+  const scopePage = await openScopePage(page)
   await scopePage.getByRole('tab', { name: 'Manage spaces' }).click()
   await scopePage.getByRole('button', { name: 'New conversation visibility' }).click()
   await scopePage.getByRole('radio', { name: /Only me/ }).click()
-  await scope.click()
+  await scopePage.getByRole('button', { name: 'Back to space management', exact: true }).click()
+  await scopePage.getByRole('button', { name: 'Close', exact: true }).click()
+}
+
+async function openScopePage(page: Page) {
+  const openSidebar = page.getByRole('button', { name: 'Open sidebar', exact: true })
+  if (await openSidebar.isVisible()) {
+    if (workflowMatrixEnabled) await openSidebar.tap(); else await openSidebar.click()
+  }
+  const scopePage = page.getByRole('dialog', { name: 'Switch personal or project scope' })
+  if (!await scopePage.isVisible()) {
+    const trigger = page.getByRole('button', { name: 'Switch personal or project scope' })
+    if (workflowMatrixEnabled) await trigger.tap(); else await trigger.click()
+  }
+  await scopePage.waitFor({ timeout: 10_000 })
+  return scopePage
 }
 
 async function openSeededSession(page: Page, scaffold: WebScaffold, runtimeId?: string): Promise<void> {
-  await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-  if (runtimeId !== undefined) {
+  if (runtimeId === undefined) {
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  } else {
+    const auth = await page.request.get(scaffold.authenticatedUrl, { maxRedirects: 0 })
+    expect(auth.status()).toBe(303)
     const destination = new URL(scaffold.baseUrl)
     destination.searchParams.set('dshRuntime', runtimeId)
     await page.goto(destination.href, { waitUntil: 'load' })
@@ -338,11 +362,18 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
     await workspace.attachSession(seeded)
     await workspace.attachSession(blank)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
   }, 120_000)
 
-  afterEach(async () => {
+  afterEach(async ({ task }) => {
     try {
+      const directory = process.env.DSH_FEATURE_LAYOUT_SCREENSHOTS
+      if (task.result?.state === 'fail' && directory !== undefined && page !== undefined && !page.isClosed()) {
+        await mkdir(directory, { recursive: true })
+        const prefix = join(directory, `${responsiveBrowserName}-collaboration-${task.name.replaceAll(/[^a-z0-9]+/giu, '-').slice(0, 100)}`)
+        await page.screenshot({ path: `${prefix}-failed.png` })
+        await writeFile(`${prefix}-failed.html`, await page.content())
+      }
       expect(tripwire?.warnings ?? []).toEqual([])
       expect(tripwire?.pageErrors ?? []).toEqual([])
     } finally {
@@ -361,7 +392,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
   })
 
   it('accepts an incoming invitation while viewing another read-only project without changing its Runtime', async () => {
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await mockGateway(page, 'ro')
     let accepted = false, protectedReads = 0, scopeChanges = 0
@@ -385,20 +416,22 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await page.getByRole('button', { name: /Invitations/ }).click()
     const dialog = page.getByRole('dialog', { name: 'Project members and invitations' })
     await dialog.getByText('Compute release room', { exact: true }).waitFor()
+    await auditWorkflowState(page, 'collaboration', 'incoming-invitation', dialog)
     expect(protectedReads).toBe(0)
     expect(await dialog.getByRole('alert').count()).toBe(0)
-    await compareOrRefreshGolden(INCOMING_INVITATION_EXPECTED,
+    await compareWorkflowGolden(INCOMING_INVITATION_EXPECTED,
       await captureStableAria(page, '[role="dialog"]:not([aria-hidden="true"])', scaffold.workspaceCwd), MODE)
     await dialog.getByRole('button', { name: 'Accept', exact: true }).click()
     await expect.poll(() => accepted).toBe(true)
     await dialog.getByText('No pending invitations', { exact: true }).waitFor()
+    await auditWorkflowState(page, 'collaboration', 'invitations-empty', dialog)
     expect(page.url()).toBe(originalUrl)
     expect(scopeChanges).toBe(0)
     expect(protectedReads).toBe(0)
   })
 
   it('keeps unsent shared-session drafts private to the verified account across reloads', async () => {
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     let accountId = 7
     const phases: string[] = []
@@ -432,11 +465,11 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await open()
     expect(await page.locator('textarea').inputValue()).toBe('Private release note from Zhou')
     await capture('Zhou returns to the shared Session')
-    await compareOrRefreshGolden(PRIVATE_DRAFTS_EXPECTED, phases.join('\n'), MODE)
+    await compareWorkflowGolden(PRIVATE_DRAFTS_EXPECTED, phases.join('\n'), MODE)
   })
 
   it('restores the composer after account ownership is verified later than the Session', async () => {
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     let blocked = false
     let release!: () => void
@@ -455,7 +488,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       await expect.poll(() => input.inputValue()).toBe('')
       release()
       await expect.poll(() => input.inputValue(), { timeout: 15_000 }).toBe('Private draft restored after account verification')
-      await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'ownership-draft.expected.md'),
+      await compareWorkflowGolden(join(SNAPSHOT_DIR, 'ownership-draft.expected.md'),
         await captureStableAria(page, '[data-composer-card] textarea', scaffold.workspaceCwd), MODE)
       acknowledgeReloadConnectionLoss(tripwire, warnings)
     } finally {
@@ -464,7 +497,8 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
   })
 
   it('shows project scope, staged visibility, participants, and creator sharing controls', async () => {
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
+    page.setDefaultTimeout(10_000)
     tripwire = watchConsole(page)
     const gateway = await mockGateway(page, 'rw')
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-sharing'))
@@ -501,8 +535,10 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       const colors = await scopePage.getByRole('searchbox', { name: 'Search spaces', exact: true }).evaluate((input) => {
         let surface: Element = input
         while (surface.parentElement !== null && getComputedStyle(surface).backgroundColor === 'rgba(0, 0, 0, 0)') surface = surface.parentElement
-        return { foreground: getComputedStyle(input, '::placeholder').color, background: getComputedStyle(surface).backgroundColor }
+        const placeholder = getComputedStyle(input, '::placeholder')
+        return { foreground: placeholder.color, opacity: placeholder.opacity, background: getComputedStyle(surface).backgroundColor }
       })
+      expect(colors.opacity).toBe('1')
       const luminance = (color: string): number => {
         const channels = color.match(/[0-9.]+/gu)?.slice(0, 3).map(Number)
         if (channels === undefined || channels.length !== 3) throw new Error(`Expected computed RGB color: ${color}`)
@@ -515,7 +551,10 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     }
     await page.emulateMedia({ colorScheme: 'light' })
     const scopeSnapshot = await captureStableAria(page, '[class*="scopePage"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(SCOPE_PICKER_EXPECTED, scopeSnapshot, MODE)
+    await compareWorkflowGolden(SCOPE_PICKER_EXPECTED, scopeSnapshot, MODE)
+    await auditWorkflowState(page, 'collaboration', 'scope-picker', scopePage, [], async () => {
+      await openScopePage(scopePage.page())
+    })
     await stagePrivateVisibility(page)
 
     const sharing = page.getByRole('button', { name: 'Manage conversation sharing' })
@@ -526,7 +565,8 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     expect(await page.getByText('3 contributions', { exact: true }).count()).toBe(1)
     expect(await page.getByText('1 contributions', { exact: true }).count()).toBe(1)
     const snapshot = await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(SHARING_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(SHARING_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'collaboration', 'sharing-members', page.getByRole('menu'))
 
     await page.getByRole('menuitem', { name: /Only me/ }).click()
     await expect.poll(() => gateway.visibilityBodies, { timeout: 10_000 })
@@ -535,7 +575,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
   }, 60_000)
 
   it('keeps sharing reads and visibility changes on the exact project Runtime', async () => {
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     const gateway = await mockGateway(page, 'rw', { runtimeDirectory: true })
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-runtime-sharing'))
@@ -545,7 +585,8 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await sharing.click()
     await page.getByText('Created by Lin', { exact: true }).waitFor()
     const snapshot = await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(SHARING_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(SHARING_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'collaboration', 'sharing-members', page.getByRole('menu'))
     await page.getByRole('menuitem', { name: /Only me/ }).click()
     await expect.poll(() => gateway.visibilityBodies).toEqual(['{"visibility":"private"}'])
     expect(gateway.conversationUrls.length).toBeGreaterThanOrEqual(2)
@@ -558,7 +599,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
   })
 
   it('shows the target and live startup status while a scope switch waits', async () => {
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     let releaseScope!: () => void
     const scopeReady = new Promise<void>((resolve) => { releaseScope = resolve })
@@ -583,7 +624,8 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       expect(await dialog.isVisible()).toBe(true)
 
       const snapshot = await captureStableAria(page, '[role="dialog"][aria-label="Switching scope"]', scaffold.workspaceCwd)
-      await compareOrRefreshGolden(SWITCHING_EXPECTED, snapshot, MODE)
+      await compareWorkflowGolden(SWITCHING_EXPECTED, snapshot, MODE)
+      await auditWorkflowState(page, 'collaboration', 'scope-starting', dialog)
     } finally {
       releaseScope()
     }
@@ -592,9 +634,9 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
   it('pushes the scope picker over the phone drawer', async () => {
     page = await browser.newPage({
       viewport: { width: 390, height: 844 },
-      locale: 'en-US',
+      locale: 'en-US', ...workflowTouchOptions,
       hasTouch: true,
-      isMobile: true,
+      isMobile: responsiveMobileEmulation,
     })
     tripwire = watchConsole(page)
     await mockGateway(page, 'rw', { extraProjects: 4 })
@@ -616,7 +658,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     expect(await search.count()).toBe(1)
     expect(await search.evaluate(element => getComputedStyle(element.parentElement!).minHeight)).toBe('44px')
     const snapshot = await captureStableAria(page, '[class*="scopePage"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(SCOPE_PICKER_MOBILE_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(SCOPE_PICKER_MOBILE_EXPECTED, snapshot, MODE)
     await search.fill('pay')
     expect(await scopePage.getByRole('button', { name: 'Clear space search' }).evaluate(element => getComputedStyle(element).width)).toBe('44px')
     expect(await scopePage.getByRole('button', { name: /Audit platform/ }).count()).toBe(0)
@@ -625,7 +667,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
 
   it.each([390, 1280])('keeps project configuration and invitation operations intact at %ipx', async (width) => {
     const phone = width < 768
-    page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'en-US', hasTouch: phone, isMobile: phone })
+    page = await browser.newPage({ viewport: { width, height: 844 }, locale: 'en-US', hasTouch: phone || workflowMatrixEnabled, isMobile: responsiveMobileEmulation && (phone || workflowMatrixEnabled) })
     tripwire = watchConsole(page)
     await mockGateway(page, 'rw')
     const context = collaborationContext('rw')
@@ -675,13 +717,15 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await scopePage.getByRole('button', { name: 'Project settings', exact: true }).click()
     let dialog = page.getByRole('dialog', { name: 'Project settings', exact: true })
     await dialog.getByText('Can manage project settings', { exact: true }).waitFor()
+    await auditWorkflowState(page, 'collaboration', 'project-settings', dialog)
     const settingsSnapshot = await captureStableAria(page, '[role="dialog"][aria-label="Project settings"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(join(SNAPSHOT_DIR, phone ? 'configuration-phone.expected.md' : 'configuration.expected.md'), settingsSnapshot, MODE)
+    await compareWorkflowGolden(join(SNAPSHOT_DIR, phone ? 'configuration-phone.expected.md' : 'configuration.expected.md'), settingsSnapshot, MODE)
     const bounds = await dialog.boundingBox()
     expect(bounds?.width).toBeLessThanOrEqual(width)
     if (phone) expect(bounds?.height).toBeCloseTo(844, 0)
     await dialog.getByRole('button', { name: phone ? /Appearance.*default follows/ : 'Appearance', exact: !phone }).click()
     dialog = page.getByRole('dialog', { name: phone ? 'Appearance' : 'Project settings', exact: true })
+    await auditWorkflowState(page, 'collaboration', 'project-appearance', page.getByRole('dialog', { name: /^(Appearance|Project settings)$/ }))
     await dialog.getByRole('radio', { name: /Force light/ }).click()
     await expect.poll(() => themeBodies).toEqual(['{"themePolicy":"light"}'])
     await expect.poll(() => dialog.getByRole('radio', { name: /Force light/ }).isChecked()).toBe(true)
@@ -691,17 +735,20 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       await expect.poll(() => dialog.getByRole('button', { name: /Appearance.*default follows/ }).evaluate(element => element === document.activeElement)).toBe(true)
     }
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await openScopePage(page)
     await scopePage.getByRole('tab', { name: 'Manage spaces' }).click()
     await scopePage.getByRole('button', { name: /Invitation center/ }).click()
     dialog = page.getByRole('dialog', { name: 'Invitation center' })
     await dialog.getByRole('button', { name: 'Accept', exact: true }).waitFor()
+    await auditWorkflowState(page, 'collaboration', 'invitation-center', dialog)
     const invitationSnapshot = await captureStableAria(page, '[role="dialog"][aria-label="Invitation center"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(join(SNAPSHOT_DIR, phone ? 'invitations-phone.expected.md' : 'invitations.expected.md'), invitationSnapshot, MODE)
+    await compareWorkflowGolden(join(SNAPSHOT_DIR, phone ? 'invitations-phone.expected.md' : 'invitations.expected.md'), invitationSnapshot, MODE)
     await dialog.getByRole('button', { name: 'Accept', exact: true }).click()
     await expect.poll(() => accepted).toBe(true)
     await expect.poll(() => dialog.getByRole('button', { name: 'Accept', exact: true }).count()).toBe(0)
     await dialog.getByRole('button', { name: 'Invite a member', exact: true }).click()
     dialog = page.getByRole('dialog', { name: 'Invite a member' })
+    await auditWorkflowState(page, 'collaboration', 'invite-member', dialog)
     const memberPicker = dialog.getByRole('button', { name: /Select member/ })
     await expect.poll(() => memberPicker.isEnabled()).toBe(true)
     if (phone) await memberPicker.click()
@@ -719,10 +766,13 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     dialog = page.getByRole('dialog', { name: 'Invitation center' })
     await dialog.getByText('Kai', { exact: true }).waitFor()
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await openScopePage(page)
+    await scopePage.getByRole('tab', { name: 'Manage spaces' }).click()
     await scopePage.getByRole('button', { name: 'New project space', exact: true }).click()
     const createDialog = page.getByRole('dialog', { name: 'New project space', exact: true })
     const projectName = createDialog.getByRole('textbox', { name: 'Project name', exact: true })
     await projectName.waitFor()
+    await auditWorkflowState(page, 'collaboration', 'create-project', createDialog)
     if (phone) {
       const fieldHeight = await projectName.evaluate(element => element.parentElement?.getBoundingClientRect().height ?? 0)
       expect(fieldHeight).toBeGreaterThanOrEqual(44)
@@ -779,11 +829,11 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       participantsMenuOnly: true,
       subagentsNoWrap: true,
     })
-    await compareOrRefreshGolden(HEADER_GEOMETRY_EXPECTED, renderHeaderGeometry(metrics), MODE)
+    await compareWorkflowGolden(HEADER_GEOMETRY_EXPECTED, renderHeaderGeometry(metrics), MODE)
   }, 60_000)
 
   it('mints a fresh Session for every bare New Session without probing project blanks', async () => {
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     const gateway = await mockGateway(page, 'rw')
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-private-create'))
@@ -796,7 +846,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await stagePrivateVisibility(page)
 
     const before = new Set(scaffold.ctx.agents.list().map(agent => String(agent.session.id)))
-    const newSession = page.getByRole('button', { name: 'New session' }).last()
+    const newSession = page.getByRole('button', { name: 'New session', exact: true }).last()
     await newSession.click()
     let privateSessionId = ''
     await expect.poll(() => {
@@ -828,7 +878,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
   }, 60_000)
 
   it('replaces the complete composer for read-only project members', async () => {
-    page = await newEnglishPage(browser)
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await mockGateway(page, 'ro')
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-read-only'))
@@ -851,7 +901,8 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     // The only other live status is the seeded turn's process announcement.
     expect(await page.getByRole('status').count()).toBe(2)
     const snapshot = await captureStableAria(page, '[role="status"]:has-text("Read-only project")', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(READ_ONLY_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(READ_ONLY_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'collaboration', 'readonly-project', readOnly)
   }, 60_000)
 
   it('keeps its snapshot inventory closed', async () => {
@@ -880,8 +931,8 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
     if (failures.length > 0) throw new AggregateError(failures, 'space navigation cleanup failed')
   })
   await seedSession(world, await readFile(SEED, 'utf8'), SESSION_ID)
-  const browser = await chromium.launch(); acquired.browser = browser
-  const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', colorScheme: 'dark' })
+  const browser = await responsiveBrowser.launch(); acquired.browser = browser
+  const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', ...workflowTouchOptions, colorScheme: 'dark' })
   acquired.context = context
   // Directory aliases exercise browser navigation over one real Host. The
   // separate runtime-identity scenarios own cross-process data isolation.
@@ -905,7 +956,8 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
   const openSpaces = async () => {
     await page.getByRole('button', { name: 'Switch personal or project scope', exact: true }).click()
     const picker = page.getByRole('dialog', { name: 'Switch personal or project scope', exact: true })
-    await picker.getByRole('button', { name: /Payments migration/ }).waitFor()
+    await picker.getByRole('searchbox', { name: 'Search spaces or computers', exact: true }).waitFor()
+    await picker.getByRole('button', { name: /Payments migration.*Compute computer/ }).waitFor()
     return picker
   }
   const switchTo = async (name: RegExp, id: string) => {
@@ -917,7 +969,7 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
   }
   let picker = await openSpaces()
-  await compareOrRefreshGolden(join(NAV_SNAPSHOT_DIR, 'directory.expected.md'),
+  await compareWorkflowGolden(join(NAV_SNAPSHOT_DIR, 'directory.expected.md'),
     await captureStableAria(page, '[role="dialog"][aria-label="Switch personal or project scope"]', world.workspaceCwd), MODE)
   await picker.getByRole('button', { name: 'Favorite this space', exact: true }).click()
   await picker.getByRole('button', { name: 'Remove favorite', exact: true }).waitFor()
@@ -944,7 +996,7 @@ it.skipIf(MODE === 'record')('keeps space navigation, tab drafts and a running t
   await offer.waitFor()
   expect(new URL(page.url()).searchParams.get('dshRuntime')).toBe(NAV_RUNTIME_A)
   expect(await composer().inputValue()).toBe('First tab draft')
-  await compareOrRefreshGolden(join(NAV_SNAPSHOT_DIR, 'draft-guard.expected.md'),
+  await compareWorkflowGolden(join(NAV_SNAPSHOT_DIR, 'draft-guard.expected.md'),
     await captureStableAria(page, '[role="dialog"]', world.workspaceCwd), MODE)
   const opened = context.waitForEvent('page')
   await offer.getByRole('button', { name: 'Open in a new tab', exact: true }).click()

@@ -18,6 +18,8 @@ export interface TitledSessionSummary extends SessionSummary {
 /** One flattened session-list row with lineage depth and live pending interaction. */
 export interface SessionListEntry {
   sessionId: SessionId
+  /** Exact historical target cannot resume execution after recovery. */
+  executionRestriction?: 'recovery-read-only'
   title?: string
   updatedAt: number
   running: boolean

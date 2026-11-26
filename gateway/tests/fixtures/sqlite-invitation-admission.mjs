@@ -15,7 +15,7 @@ const { loadConfig } = await load('config')
 const root = mkdtempSync(join(tmpdir(), 'sqlite-invitation-admission-'))
 let db, writer, restore
 try {
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state'),
+  const cfg = loadConfig({ HGW_PERFORMANCE_ENABLED: 'false', HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state'),
     HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'), HGW_PROJECTS_ROOT: join(root, 'projects'),
     HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'), HGW_SYSTEMD_UNIT_DIR: join(root, 'units'), HGW_DEFAULT_ENV_FILE: '' })
   db = openDb(join(root, 'gateway.sqlite')); writer = openDb(join(root, 'gateway.sqlite'))

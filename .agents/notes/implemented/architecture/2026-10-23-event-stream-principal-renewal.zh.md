@@ -12,9 +12,11 @@ Status: implemented
 
 Gateway 为每个已准入的 mux/host 事件 socket 持有一份登记。原始 nonce 标识该登记；原登录会话、用户身份与权限、所选 scope、Runtime 目标及 generation 由服务端持有。Runtime 请求只包含有界的现有登记 ID 列表，并经既有私有运行时 bearer HTTP 通道传输。请求不能选择用户、scope、期限或新增登记。HTTP 操作和受限用途断言不能续租。
 
+明确指定已受监督的个人 Runtime 的事件 URL 使用就绪 Session 活动语句。该语句同时核对登录、目标、服务期和当前电脑授权并记录活动。转发 URL 核验实际入口电脑。进程引用持续到连接结束，Gateway 在签发前核对该语句返回的访问修订号。项目、旧版 URL 和冷启动连接沿用普通 Runtime 准备流程。
+
 续租同步[持久访问监控](2026-09-22-cross-gateway-access-invalidation.zh.md)，无锁且不写入地读取当前登录资格，检查当前项目权限，复核 Runtime bearer generation，再次同步后才签发。同批次内，具有相同登录会话与目标的两个 socket 共用资格读取；结果不保留到请求之外。身份、角色或 scope 权限变化会拒绝续租，而不是静默修改保留的权限。新期限受现有登录期限、配置的 principal TTL 和固定 30 秒上限约束。普通登录验证器仍单独维护活动与滑动过期行为。
 
-Runtime 本地池只持有一份有界在途批次，并向保留的协作权限暴露经过验证的 principal 句柄。每份替代签名都必须保持相同身份、权限、scope 和 generation，具有有效签名、更晚的到期时间及新 nonce。验证完成前，上一份签名的到期计时器始终保持活动。Gateway 与 Runtime 都持有到期计时器；socket 关闭、监控中断、服务销毁、拒绝、到期和 generation 替换都不能被晚到响应逆转。丢失响应不会增加 Runtime 有效期。 取消会立即退役权限，但池必须等待实际传输和响应 body reader 结束，才能接纳另一批或完成销毁。[Connection 认证决策](2026-10-01-browser-auth-web-transport.zh.md) 仍拥有初始浏览器准入；续租既不授予执行权限，也不扩大 Inspector 访问。
+Runtime 本地池只持有一份有界在途批次，并向保留的协作权限暴露经过验证的 principal 句柄。每份替代签名都必须保持相同身份、权限、scope 和 generation，具有有效签名、更晚的到期时间及新 nonce。验证完成前，上一份签名的到期计时器始终保持活动。Gateway 与 Runtime 都持有到期计时器；socket 关闭、监控中断、服务销毁、拒绝、到期和 generation 替换都不能被晚到响应逆转。续租暂时不可用时，仅在最近一次签名仍有效时重试。bearer 校验暂时失败返回 HTTP 503，确定拒绝则结束登记。取消会立即退役权限，但池必须等待实际传输和响应 body reader 结束，才能接纳另一批或完成销毁。[Connection 认证决策](2026-10-01-browser-auth-web-transport.zh.md) 仍拥有初始浏览器准入；续租既不授予执行权限，也不扩大 Inspector 访问。
 
 ## 已考虑的替代方案
 
@@ -34,10 +36,12 @@ Runtime 本地池只持有一份有界在途批次，并向保留的协作权限
 
 [真实代理测试](../../../../gateway/tests/proxy.spec.ts)把首次事件签名限制在登录剩余的五秒期限内，验证不续租时关闭连接，并保留普通 HTTP 签名行为。
 
+[PostgreSQL Gateway 夹具](../../../../gateway/tests/runtime-asset-admission-postgres.spec.ts)打开指向已受监督代次的实际事件连接，并验证修订号不一致时拒绝升级。
+
 [Gateway 登记表测试](../../../../gateway/tests/stream-principal-leases.spec.ts) 覆盖同批复用、原登录期限、未知 ID、目标与 generation 隔离、角色与登录变化、有界无效请求及关闭、到期和监控竞态。[私有路由测试](../../../../gateway/tests/runtime-api.spec.ts) 要求运行时 bearer 认证，并在资格检查后复核 generation。[Runtime 池测试](../../../../packages/context/gateway-runtime/tests/stream-principal-leases.spec.ts) 使用签名的合成断言和受控时钟，覆盖拒绝、伪造签名、权限变化、重放、不前进或已到期授权、响应丢失、并发批次，以及关闭或销毁后的晚到完成。
 
 [真实 Loader 测试](../../../../packages/context/gateway-runtime/tests/stream-principal-admission.host.spec.ts) 在私有临时端口启动 Connection、Web server、frontend-static 和 GatewayRuntime，开启两条实际 WebSocket 载体，并经私有 HTTP 传输续租至初始签名期限之后，同时原 HTTP 断言收到 401。禁用用例不发送续租。既有 [API Proxy 到期测试](../../../../packages/host/apiproxy/tests/api-proxy-collaboration.spec.ts) 保留，并增加两条流的当前期限测试。这些是确定性的协议与生命周期检查，不能证明部署容量或实测端到端加速。
 
-同一可运行 Loader 流程由[无密钥应用快照](../../../../scripts/event-principal-renewal.snapshot.ts)重放；其记录包含启用与禁用载体，不包含令牌、断言字节或时钟值。
+[无密钥应用快照](../../../../scripts/event-principal-renewal.snapshot.ts)重放 Loader 流程。它记录两种启用的传输在私有续租返回 HTTP 503 后恢复，以及 HTTP 和禁用续租的传输按固定期限到期。
 
 [原生 HTTP 销毁回归](../../../../packages/context/gateway-runtime/tests/stream-principal-io.host.spec.ts)观察生产续租闭包读取不完整的分块 JSON 响应。池销毁只有在真实续租和 reader 取消都完成后才返回；恢复仅等待竞速结果的实现会使该断言失败。Node 25 上 reader 取消已在续租 Promise 前完成，因此共享 body reader helper 保持不变。

@@ -5,7 +5,7 @@ import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, type Fiber } from '@deepseek-ai/cordis'
 import type { Entry, EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import z from '@deepseek-ai/schemastery'
@@ -275,8 +275,15 @@ export class PluginManager extends TypertRemoteService {
     }
     ctx.effect(() => async () => {
       this.abort.abort()
+      if (this.inventoryTimer !== undefined) clearTimeout(this.inventoryTimer)
       await Promise.allSettled([...this.packageOperations])
     }, 'plugin-manager: package cancellation')
+    // Startup and every burst of loader-entry transitions report one settled
+    // inventory, so spaces that never open the manager still become visible.
+    ctx.on('internal/status', (fiber) => {
+      if (this.isLoaderFiber(fiber)) this.scheduleInventoryReport()
+    }, { global: true })
+    this.scheduleInventoryReport()
   }
 
   /** Check deployment authority independently of tool approval or sandbox mode.
@@ -346,8 +353,13 @@ export class PluginManager extends TypertRemoteService {
   @Remote
   async listPlugins(includeMetadata?: boolean): Promise<PluginInfo[]> {
     await this.authorize('read')
+    return this.readPlugins(includeMetadata !== false)
+  }
+
+  /** Read runtime entries with persistent patch targets; the caller checked authorization already. */
+  private readPlugins(includeMetadata = true): PluginInfo[] {
     const rows = flatten(composeEntries([readProfilePatches('dsh', this.profile)]))
-    return readRuntimePluginEntries(this.ctx, includeMetadata !== false).map((entry) => {
+    return readRuntimePluginEntries(this.ctx, includeMetadata).map((entry) => {
       const actual = [...this.ctx.loader.entries()].find(row => row.id === entry.entryId)
       const candidates = rows.filter(row => row.id === actual?.options.id)
       const candidate = candidates[0]
@@ -370,6 +382,11 @@ export class PluginManager extends TypertRemoteService {
   @Remote
   async listBundles(): Promise<BundleInfo[]> {
     await this.authorize('read')
+    return this.readBundles()
+  }
+
+  /** Read the profile's bundle composition; the caller checked authorization already. */
+  private async readBundles(): Promise<BundleInfo[]> {
     const manifest = readProfileManifest('dsh', this.profile.dir)
     const exemptions = readProfileVersionExemptions(this.profile.dir)
     const selected = manifest.dsh?.profile?.bundles ?? []
@@ -1070,8 +1087,43 @@ export class PluginManager extends TypertRemoteService {
 
   /** The state-store revision this profile last observed; undefined until the first publish. */
   private stateRevision: string | undefined
-  /** Serializes desired-state publishes so they commit in file-change order. */
+  /** Serializes desired-state publishes and inventory reports so they commit in change order. */
   private syncTail: Promise<void> = Promise.resolve()
+  /** Quiet period after which a burst of loader-entry transitions reports one inventory. */
+  private static readonly INVENTORY_REPORT_DEBOUNCE_MS = 1000
+  /** Pending debounced inventory report; undefined while no report is due. */
+  private inventoryTimer: ReturnType<typeof setTimeout> | undefined
+
+  /** Whether the transitioning fiber runs a loader entry the reported inventory describes. */
+  private isLoaderFiber(fiber: Fiber): boolean {
+    for (const entry of this.ctx.loader.entries()) if (entry.fiber === fiber) return true
+    return false
+  }
+
+  /** Defer the inventory report until startup or a transition burst settles. */
+  private scheduleInventoryReport(): void {
+    if (this.inventoryTimer !== undefined || this.abort.signal.aborted) return
+    this.inventoryTimer = setTimeout(() => {
+      this.inventoryTimer = undefined
+      this.syncTail = this.syncTail.then(() => this.reportInventory())
+    }, PluginManager.INVENTORY_REPORT_DEBOUNCE_MS)
+  }
+
+  /** Publish the observed catalog to the deployment's inventory store; failures warn without failing callers. */
+  private async reportInventory(): Promise<void> {
+    const aborted = () => this.abort.signal.aborted
+    if (aborted()) return
+    const policy = this.ownerContext.get('pluginManagementAuthorization')
+    if (policy?.reportInventory === undefined) return
+    try {
+      const bundles = await this.readBundles()
+      if (aborted()) return
+      const plugins = this.readPlugins()
+      await policy.reportInventory({ bundles, plugins })
+    } catch (error) {
+      if (!aborted()) this.ownerContext.logger.warn('Could not report the plugin inventory', error)
+    }
+  }
 
   private async change(
     operation: (result: ChangeResult) => Promise<ChangeResult['application'] | void>,
@@ -1104,7 +1156,7 @@ export class PluginManager extends TypertRemoteService {
     }, { waitMs: this.lockWaitMs })
     if (result.changed && result.application !== 'failed' && result.application !== 'cancelled') {
       const sync = this.syncTail.then(() => this.syncDesiredState(result))
-      this.syncTail = sync.then(() => undefined, () => undefined)
+      this.syncTail = sync.then(() => this.reportInventory())
       await sync
     }
     return result

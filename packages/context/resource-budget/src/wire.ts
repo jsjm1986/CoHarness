@@ -12,6 +12,30 @@ const sessionId = z.string().min(1).max(512).transform(value => value as Branded
 export const RESOURCE_MESSAGE_MAX_BYTES = 64 * 1024
 /** Maximum exact operation references in one status poll. */
 export const RESOURCE_POLL_MAX_OPERATIONS = 512
+/** Optional internal JSON tuple of handler bearer, authority and transaction durations in milliseconds. */
+export const RESOURCE_PHASE_TIMING_HEADER = 'x-dsh-resource-phases-ms'
+/** Optional internal JSON tuple of initial bearer and write admission durations in milliseconds. */
+export const RESOURCE_INGRESS_TIMING_HEADER = 'x-dsh-resource-ingress-ms'
+/** A status caller requests qualification of one exact model reservation. */
+export const RESOURCE_ACTIVE_MODEL_CHECK_HEADER = 'x-dsh-active-model-check'
+/** Value "1" marks an active personal model grant whose scope was checked after reservation in the same transaction. */
+export const RESOURCE_QUALIFIED_GRANT_HEADER = 'x-dsh-resource-qualified-grant'
+/** An opaque coordinator revision for one exact, queued personal model status exchange. */
+export const RESOURCE_CHANGE_CURSOR_HEADER = 'x-dsh-resource-change-cursor'
+/** Optional observed time from durable queue insertion to grant, in milliseconds. */
+export const RESOURCE_GRANT_AGE_HEADER = 'x-dsh-resource-grant-queue-ms'
+/** Optional duration in milliseconds spent waiting for a change inside a status exchange. */
+export const RESOURCE_CHANGE_WAIT_TIMING_HEADER = 'x-dsh-resource-change-wait-ms'
+
+/**
+ * Identify the two remote admission exchanges sampled by managed model diagnostics.
+ * @param pathname - parsed internal request pathname.
+ * @param method - HTTP request method.
+ * @returns whether the exchange can submit or observe a resource reservation.
+ */
+export function isResourceAdmissionRequest(pathname: string, method: string | undefined): boolean {
+  return method === 'POST' && (pathname === '/internal/runtime/resources/request' || pathname === '/internal/runtime/resources/statuses')
+}
 
 /** Durable deployment limits, read under the coordinator's node lock. */
 export const resourcePolicySchema = z.object({

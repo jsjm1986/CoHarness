@@ -4,7 +4,7 @@ import type { IncomingHttpHeaders } from 'node:http'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-attachment'
 // Activates the webServer Context merge used below.
-import type { IndexInjection, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
+import type { IndexInjection, WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
   DEFAULT_HISTORY_PAGE_TARGET_BYTES,
   toFetchHandler,
@@ -17,7 +17,8 @@ import { bindRequestInteractions } from '@deepseek-ai/dsh-host-apiproxy/api/requ
 import { BrowserAuth } from './browser-auth.ts'
 import { DEFAULT_BROWSER_RPC_TIMEOUT_MS, DEFAULT_ENTRY_REQUEST_LIMIT } from './browser-timing.ts'
 import { HostConnectionService } from './rpc-host.ts'
-import { rejectWebSocketUpgrade, WebSocketDownlinks } from './websocket-downlink.ts'
+import { WebSocketDownlinks } from './websocket-downlink.ts'
+import { buildConnectionRequestBoundary, createUpgradeRouteHandler } from './ws-upgrade.ts'
 
 export type {
   ConnectionAuthenticationRequest,
@@ -36,6 +37,12 @@ export type {
   HostConnectionHandle,
   HostConnectionHttp,
 } from './rpc-host.ts'
+export type {
+  ConnectionWebSocket,
+  ConnectionWebSocketHandler,
+  ConnectionWebSocketOptions,
+  HostConnectionWebSocket,
+} from './websocket-channel.ts'
 export { HostConnectionService } from './rpc-host.ts'
 
 export { API_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from './api-path.ts'
@@ -149,6 +156,8 @@ export interface ConnectionConfig {
    * message group may exceed it.
    */
   historyPageTargetBytes?: number
+  /** Cap the first prepared conversation page. Omission uses the request's existing size. */
+  preparedHistoryMessages?: number
   /** Interval between host-side WebSocket Ping control frames. */
   websocketHeartbeatIntervalMs?: number
 }
@@ -177,6 +186,7 @@ export const Config: z<ConnectionConfig> = z.object({
   cookieMaxAgeDays: z.natural().min(1).default(30),
   maxRequestBodyBytes: z.natural().min(1).default(DEFAULT_MAX_REQUEST_BODY_BYTES),
   historyPageTargetBytes: z.natural().min(1).default(DEFAULT_HISTORY_PAGE_TARGET_BYTES),
+  preparedHistoryMessages: z.natural().min(1).max(Number.MAX_SAFE_INTEGER),
   websocketHeartbeatIntervalMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(30_000),
 })
 
@@ -257,6 +267,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   const serverTiming = config?.serverTiming ?? false
   const historyPageTargetBytes =
     config?.historyPageTargetBytes ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
+  const preparedHistoryMessages = config?.preparedHistoryMessages
   const websocketHeartbeatIntervalMs = config?.websocketHeartbeatIntervalMs ?? 30_000
   const recovery = config?.recovery ?? {}
   const rpcTimeoutMs = config?.rpcTimeoutMs ?? DEFAULT_BROWSER_RPC_TIMEOUT_MS
@@ -268,6 +279,9 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   }
   if (!Number.isSafeInteger(historyPageTargetBytes) || historyPageTargetBytes < 1) {
     throw new Error('client-connection historyPageTargetBytes must be a positive safe integer')
+  }
+  if (preparedHistoryMessages !== undefined && (!Number.isSafeInteger(preparedHistoryMessages) || preparedHistoryMessages < 1)) {
+    throw new Error('client-connection preparedHistoryMessages must be a positive safe integer')
   }
   if (!Number.isSafeInteger(websocketHeartbeatIntervalMs)
     || websocketHeartbeatIntervalMs < 1
@@ -283,6 +297,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     ctx,
     trustedHosts,
     browserAuth,
+    websocketHeartbeatIntervalMs,
   )
   // Bind each accepted request's interaction scope before any downstream
   // waterfall listener or dispatch runs: the same propagation point
@@ -319,6 +334,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           carrier = toFetchHandler(apiProxy, {
             serverTiming,
             historyPageTargetBytes,
+            ...(preparedHistoryMessages === undefined ? {} : { preparedHistoryMessages }),
             requestBodyMaxBytes: maxRequestBodyBytes,
           })
           fetchHandlers.set(apiProxy, carrier)
@@ -337,13 +353,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           return
         }
         const startedAt = serverTiming && req.method === 'POST' ? performance.now() : undefined
-        await webCtx.waterfall('connection/request', {
-          kind: 'http',
-          headers: req.headers,
-          ...(req.method === undefined ? {} : { method: req.method }),
-          pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
-          ...(req.url === undefined ? {} : { url: req.url }),
-        }, async () => {
+        await webCtx.waterfall('connection/request', buildConnectionRequestBoundary('http', req), async () => {
           if (await connection.dispatchHttp(req, res)) return
           const handler = startedAt === undefined ? fetchHandler : {
             async fetch(request: Request): Promise<Response> {
@@ -361,42 +371,43 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
   ctx.inject(['apiProxy', 'webServer'], (apiCtx) => {
     assertImageBodyCapacity(apiCtx, maxRequestBodyBytes)
     const downlinks = new WebSocketDownlinks(apiCtx.apiProxy, websocketHeartbeatIntervalMs)
-    const registerDownlink = (
-      path: string,
-      handle: WebUpgradeRoute['handler'],
-    ): void => {
-      apiCtx.effect(() => apiCtx.webServer.registerUpgrade({
-        path,
-        handler: (req, socket, head) => {
-          if (connection.requestRejection(req, 'upgrade') !== undefined) {
-            rejectWebSocketUpgrade(socket)
-            return
-          }
-          const lifetime = new AbortController()
-          const close = (): void => {
-            socket.removeListener('close', close)
-            socket.removeListener('error', close)
-            lifetime.abort()
-          }
-          socket.once('close', close)
-          socket.once('error', close)
-          if (socket.destroyed) close()
-          return apiCtx.waterfall('connection/request', {
-            kind: 'upgrade',
-            signal: lifetime.signal,
-            headers: req.headers,
-            ...(req.method === undefined ? {} : { method: req.method }),
-            pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
-            ...(req.url === undefined ? {} : { url: req.url }),
-          }, async () => {
-            await handle(req, socket, head)
-          }).catch((error: unknown) => { close(); throw error })
-        },
-      }), `client-connection: ${path} WebSocket`)
-    }
-    apiCtx.effect(() => () => downlinks.close(), 'client-connection: WebSocket downlinks')
-    registerDownlink(MUX_EVENTS_PATH, (req, socket, head) => { downlinks.handleMux(req, socket, head) })
-    registerDownlink(HOST_EVENTS_PATH, (req, socket, head) => { downlinks.handleHost(req, socket, head) })
+    apiCtx.effect(() => {
+      const routeLifetime = new AbortController()
+      const inFlight = new Set<Promise<void>>()
+      const unregisterMux = apiCtx.webServer.registerUpgrade({
+        path: MUX_EVENTS_PATH,
+        handler: createUpgradeRouteHandler({
+          owner: apiCtx,
+          isRejected: req => connection.requestRejection(req, 'upgrade') !== undefined,
+          routeSignal: routeLifetime.signal,
+          inFlight,
+          onAccepted: (req, socket, head) => {
+            downlinks.handleMux(req, socket, head)
+            return Promise.resolve()
+          },
+        }),
+      })
+      const unregisterHost = apiCtx.webServer.registerUpgrade({
+        path: HOST_EVENTS_PATH,
+        handler: createUpgradeRouteHandler({
+          owner: apiCtx,
+          isRejected: req => connection.requestRejection(req, 'upgrade') !== undefined,
+          routeSignal: routeLifetime.signal,
+          inFlight,
+          onAccepted: (req, socket, head) => {
+            downlinks.handleHost(req, socket, head)
+            return Promise.resolve()
+          },
+        }),
+      })
+      return async () => {
+        unregisterMux()
+        unregisterHost()
+        routeLifetime.abort()
+        await Promise.allSettled([...inFlight])
+        await downlinks.close()
+      }
+    }, 'client-connection: WebSocket downlinks')
   })
   ctx.inject(['attachments'], (attachmentCtx) => {
     assertImageBodyCapacity(attachmentCtx, maxRequestBodyBytes)

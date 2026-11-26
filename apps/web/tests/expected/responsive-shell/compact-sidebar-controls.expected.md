@@ -1,0 +1,5 @@
+- button "Open sidebar":
+  - img
+- text: COHARNESS
+- button "Open right sidebar":
+  - img

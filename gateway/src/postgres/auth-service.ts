@@ -3,7 +3,7 @@ import type { GatewayConfig } from '../config.ts'
 import type { StreamSessionQualification, UserRow } from '../auth.ts'
 import { verifyPassword } from '../password.ts'
 import { LOGIN_LOCK_WINDOW_MS, LOGIN_SOURCE_THRESHOLD, LOGIN_SOURCE_USERNAME_THRESHOLD, loginSource } from '../login-source.ts'
-import { transaction } from './database.ts'
+import { transaction, type Queryable } from './database.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 /** Matches attempts in source bucket `$3` (a CIDR), or attempts without an address when `$3` is null. */
@@ -227,7 +227,21 @@ export class PostgresAuthService {
    * @returns the active user and existing earliest login deadline, or null when ineligible.
    */
   async qualifyForStream(token: string): Promise<StreamSessionQualification | null> {
-    const result = await this.context.pool.query<Omit<PostgresAuthUser, 'password_hash'> & { expires_at: Date; absolute_expires_at: Date }>(
+    return this.readStreamQualification(token, this.context.pool, false)
+  }
+
+  /**
+   * Qualify an existing event socket against the current login and its owning computer.
+   * @param token - the socket's original login token.
+   * @param control - reserved PostgreSQL connection source for stream renewal.
+   * @returns current account authority and the existing login deadline.
+   */
+  async qualifyForStreamOnComputer(token: string, control: Queryable): Promise<StreamSessionQualification | null> {
+    return this.readStreamQualification(token, control, true)
+  }
+
+  private async readStreamQualification(token: string, queryable: Queryable, requireComputer: boolean): Promise<StreamSessionQualification | null> {
+    const result = await queryable.query<Omit<PostgresAuthUser, 'password_hash'> & { expires_at: Date; absolute_expires_at: Date }>(
       `SELECT s.expires_at,s.absolute_expires_at,u.public_id::text,u.username::text,
         u.display_name,u.status,u.deleted_at,u.home_path,m.role,m.status membership_status,
         c.must_change_password,u.auto_review_eligible
@@ -236,8 +250,10 @@ export class PostgresAuthService {
        JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
        JOIN harness.password_credentials c ON c.user_id=u.id
        WHERE s.organization_id=$1 AND s.token_hash=$2 AND s.revoked_at IS NULL
-         AND s.expires_at>now() AND s.absolute_expires_at>now()`,
-      [this.context.organizationId, tokenHash(token)],
+         AND s.expires_at>now() AND s.absolute_expires_at>now()
+         AND EXISTS (SELECT 1 FROM harness.organizations o WHERE o.id=$1 AND o.status='active')
+         AND (NOT $3::boolean OR harness.computer_use_allowed($1,u.id,$4) AND harness.entry_node_visible($1,$4,$4))`,
+      [this.context.organizationId, tokenHash(token), requireComputer, this.context.nodeId],
     )
     const row = result.rows[0]
     if (row === undefined || row.status !== 'active' || row.membership_status !== 'active'

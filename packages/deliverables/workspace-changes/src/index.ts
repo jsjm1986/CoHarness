@@ -25,7 +25,7 @@ import { SessionPersistenceReadError, type SessionPersistencePage } from '@deeps
 import type { ProjectionDefinition, SessionProjectionStateMap } from '@deepseek-ai/dsh-session-projection'
 import { GitRunner } from './git.ts'
 import { TurnRecorder } from './recorder.ts'
-import { ReviewStore, type StoredReview } from './review-store.ts'
+import { ReviewStore, type ReviewProbeTiming, type StoredReview } from './review-store.ts'
 import type { WorkspaceChanges } from './types.ts'
 
 export type {
@@ -257,17 +257,58 @@ export function apply(ctx: Context, config: Config): void {
       agent.session.append('workspace/changes', { turn, incomplete: true })
       throw new Error('Historical review recording was interrupted. Start a new request after restoring the recorder.')
     }
-    await recorder.settled()
     lifetime.signal.throwIfAborted()
-    const storageState = ctx.sessionProjections.stateOf(agent.session, 'workspace-review-storage') as
+    const timing = ctx.get('agentPreStepTiming') === undefined
+      ? undefined
+      : { startedAt: Date.now(), started: performance.now(), baselineWaitMs: 0, storageProbeMs: 0, storage: {} as ReviewProbeTiming }
+    const reviewState = () => ctx.sessionProjections.stateOf(agent.session, 'workspace-review-storage') as
       SessionProjectionStateMap['workspace-review-storage']
+    const initial = turn === 1 && !storageRechecked.has(agent.session) ? reviewState() : undefined
+    const probeStorage = async (requiredBytes: number): Promise<void> => {
+      if (timing === undefined) return store.probe(agent.id, requiredBytes)
+      const started = performance.now()
+      try { await store.probe(agent.id, requiredBytes, timing.storage) }
+      finally { timing.storageProbeMs += performance.now() - started }
+    }
+    const ready = recorder.settled()
+    const baseline = timing === undefined ? ready : ready.finally(() => {
+      timing.baselineWaitMs = performance.now() - timing.started
+    })
+    let firstProbe: PromiseSettledResult<void> | undefined
+    // The first healthy turn has no prior review publication whose capacity must be resolved.
+    if (initial?.failedTurn === 0 && initial.requiredBytes === 0) {
+      const [recording, storage] = await Promise.allSettled([baseline, probeStorage(0)])
+      if (recording.status === 'rejected') throw recording.reason
+      firstProbe = storage
+    } else {
+      await baseline
+    }
+    lifetime.signal.throwIfAborted()
     if (!storageRechecked.has(agent.session)) {
-      try { await store.probe(agent.id, storageState.requiredBytes) } catch (error) {
+      const current = reviewState()
+      try {
+        if (firstProbe === undefined || current.failedTurn !== 0 || current.requiredBytes !== 0) {
+          await probeStorage(current.requiredBytes)
+        } else if (firstProbe.status === 'rejected') {
+          throw firstProbe.reason
+        }
+      } catch (error) {
         recorder.failStorage(turn, error)
         throw new Error('Historical review storage is not ready. Resolve its capacity or access problem before continuing.', { cause: error })
       }
       lifetime.signal.throwIfAborted()
       storageRechecked.add(agent.session)
+    }
+    if (timing !== undefined) {
+      try {
+        console.info(`[workspace-review-ready-timing] ${JSON.stringify({
+          startedAt: timing.startedAt,
+          baselineWaitMs: timing.baselineWaitMs,
+          storageProbeMs: timing.storageProbeMs,
+          storage: timing.storage,
+          preflightMs: performance.now() - timing.started,
+        })}`)
+      } catch { /* Diagnostic output cannot change edit and review admission. */ }
     }
     return next()
   })

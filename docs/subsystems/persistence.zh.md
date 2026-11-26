@@ -376,6 +376,29 @@ interface SessionPersistenceSnapshot {
 }
 ```
 
+## 项目草稿预留
+
+项目 Session 尚未落盘时，Host 可以读取当前草稿创建者的预留。恢复同一个 Session 后，Host 才会接管预留。模型选择写入该预留后，选择器才确认成功。恢复时 Host 应用原选择，并在启动轮次前核对当前模型权限。
+
+```ts type-equiv
+/** Provider route, model, and optional reasoning effort stored with an unmaterialized project draft. */
+interface SessionDraftModelSelection {
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort?: string
+}
+```
+
+```ts type-equiv
+/** Unmaterialized project draft recovered from the current owner's reservation. */
+interface ReservedProjectDraft {
+  readonly request: SessionDraftReservationRequest & { readonly visibility: 'project' | 'private' }
+  readonly modelSelection?: SessionDraftModelSelection
+  /** Track the reservation for release after the Host has reconstructed its Session. */
+  adopt(): void
+}
+```
+
 ## 后端
 
 两者都实现同一个抽象 `SessionPersistence`（在 `SessionEvent` 上执行 locate/create/append/prepare/load/inspect/readFrom/list/listSnapshots，观察方法可选支持取消），并通过共享的 `runPersistenceContract` 套件：
@@ -676,6 +699,15 @@ async inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection>
 async readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEventSuffix>
 
 /**
+ * Read one exact event from the validated committed prefix.
+ * @param id - stored Session identity.
+ * @param seq - logical sequence to verify.
+ * @param signal - optional cancellation for the storage read.
+ * @returns the detached event, or undefined if that sequence is absent.
+ */
+async readCommittedEvent(id: SessionId, seq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEvent | undefined>
+
+/**
  * Read one session header without loading its event log. First-party
  * providers override this with an indexed lookup; the default filters the
  * lightweight snapshot list for third-party compatibility.
@@ -746,6 +778,22 @@ async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>
  * @returns the provider's canonical identity, or undefined when reservations are local-only.
  */
 reserveDraft(_request: SessionDraftReservationRequest): Promise<SessionDraftReservation | undefined>
+
+/**
+ * Read the current project writer's unmaterialized draft without acquiring an Agent or renewing its lease.
+ * @param _id - Session identity from the original submission.
+ * @param _signal - caller cancellation.
+ * @returns the live reservation for the current creator, or undefined when absent or unsupported.
+ */
+reservedProjectDraft(_id: SessionId, _signal?: AbortSignal): Promise<ReservedProjectDraft | undefined>
+
+/**
+ * Save a model choice before acknowledging it on a provider-owned, unmaterialized project draft.
+ * @param _id - Session identity of the draft being edited.
+ * @param _selection - validated model choice. Authorization is checked again when starting a turn.
+ * @returns after the choice commits, or immediately when no project reservation is tracked.
+ */
+saveDraftModelSelection(_id: SessionId, _selection: SessionDraftModelSelection): Promise<void>
 
 /**
  * Renew a provider-owned draft lease. Missing leases are intentionally no-op.

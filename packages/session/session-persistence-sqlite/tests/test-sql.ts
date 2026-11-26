@@ -9,6 +9,7 @@ export type TestSqlName =
   | 'count-packed-events'
   | 'count-physical-types'
   | 'create-loose-schema'
+  | 'create-spaced-schema'
   | 'create-unrelated-table'
   | 'delete-event'
   | 'delete-persistence-state'

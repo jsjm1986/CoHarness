@@ -7,7 +7,7 @@ kind: "package-library"
 
 English | [中文](README.zh.md)
 
-Web boot kernel: `new AppWebEntry(el, seams?).run()` waits for any Host bootstrap readiness signal and mounts the client through two stages. The module stage calls the Host-installed `window.__ModuleLoader__.create()` with `window.__DSH_BOOT__`, the shell's static modules, and any test transport override; the facade returns the constructed module system and parsed manifest after adopting parser-preloaded registrations. This package then prefetches the `immediately` tier. The plugin stage mounts the vendored Cordis Loader, injects that module system through the Loader's `internal` interface, hands entry creation to the shared `ClientEntries` controller, and waits for every fiber to become ACTIVE. It then hands the marked boot DOM to the dynamic UI renderer's `ctx.uiRenderer.mount(el)` operation; the renderer hydrates that DOM before switching to the complete UI. The Host owns the graph, parser preloads, and facade; AppWebEntry does not know the bootstrap package id or parse the wire format.
+The Web boot kernel waits for any Host bootstrap readiness signal and mounts the client through `new AppWebEntry(el, seams?).run()`. The Host's `window.__ModuleLoader__.create()` accepts `window.__DSH_BOOT__`, the shell's static modules, and any test transport override. It adopts parser-preloaded registrations and returns the module system and parsed manifest. The kernel prefetches required `immediately` entries, installs the module system as the Cordis Loader's `internal`, and lets `ClientEntries` activate the required roster. It hands the marked boot DOM to `ctx.uiRenderer.mount(el)` after all required fibers activate. The renderer hydrates that DOM before rendering the application. A later browser task releases optional entries through the same controller. The Host owns the graph, parser preloads, and facade.
 
 The boot page uses plain DOM and local CSS, so client-bundle and plugin-activation failures remain visible. Its fallback fonts and colors match the theme tokens that arrive during loading. Fiber updates retain one spinner node and grow its CSS arc as entries first become active; hydration preserves that node and its animation phase until the application commit. React mounting, slot rendering, application assembly, and browser-title projection live in [`ui-renderer`](../ui-renderer/README.md). The modules bundle caches its own materialized exports and publishes its Loader’s module system when its ordinary graph entry activates; Cordis service waiting makes graph-row creation order independent from that activation.
 
@@ -17,13 +17,19 @@ The optional override parameter `seams` forwards the module system's `loadBundle
 
 Before prefetching or activating dynamic entries, the boot kernel installs compatibility implementations for missing `AbortSignal.any`, `AbortSignal.timeout`, and `AbortSignal.abort` factories. This keeps the browser client usable in Android WebViews that provide `AbortController` but not the newer static factories, while preserving native implementations when they exist.
 
-The shell base styles apply automatic CJK/Latin spacing to ordinary content in supporting browsers. Code, terminal, diff, read, and search output retain literal source spacing and column alignment; engines without `text-autospace` support ignore the declarations.
+The shell base styles apply automatic CJK/Latin spacing to ordinary content in supporting browsers. Code, terminal, diff, read, and search output retain literal source spacing and column alignment; engines without `text-autospace` support ignore the declarations. Boot failure reports wrap long paths and scroll within the viewport. The loading indicator retains a slow rotation under reduced motion and uses system colors in forced-colors mode, independently of theme loading.
 
 `ClientEntries` owns both initial Loader entry creation and subsequent page-local graph reconciliation, retries, and rebuilt-code replacement. The Host emits bootstrap and application batches; `applyIndexInjections` executes the same structured table for an explicit page-owned carrier. CoHarness retains its runtime preload, static platform modules, authentication, and AbortSignal compatibility.
 
+The primary Gateway can render the release shell for an authenticated remote Runtime before contacting that computer. The frontend's `@deepseek-ai/dsh-client-web/boot` entry shows tab-local, unsent input while it loads the renderer's shared modules and reads the Runtime's authenticated index rows. During startup and after a required plugin fails, the draft stays editable and the full-workspace link opens the selected account, computer, scope and Runtime in a new tab. The browser transfers the text only when the exact saved Session and Gateway account qualify for a draft writer. When a saved Session cannot qualify, the original document keeps the text available to copy.
+
+The deferred entry sends `x-dsh-bootstrap-preload: 1` to request application preload rows. With the registration queue installed, the page runs bootstrap scripts at high priority in order and retries a failed revision-pinned bootstrap download once at the same URL. It can execute one same-origin, revision-pinned application combo at low priority in parallel. The [module system](../modules/README.md) receives the actual script outcome, not an assumption that a download hint was reused. The complete renderer waits for required plugin activation.
+
+A full-index response is an ordinary continuation, not a plugin failure. With an empty draft, the browser replaces the current page with the full index for the exact selected target. With a nonempty draft, the editor retains focus and stays editable in the original page, and its full-workspace link opens that same target separately.
+
 ## Summary
 
-`dsh-client-web` boots the web GUI: it loads the client module system from the Host-provided boot graph, then activates every client plugin before the application mounts, so the full UI appears only when every plugin is up. A framework-free boot page reports per-entry status, so a failing bundle or plugin stays visible instead of a blank screen. It also defines the shared module table (`PLATFORM_MODULES`) that every dynamic bundle resolves its externals against. The model never sees this package.
+`dsh-client-web` boots the web GUI from the Host-provided graph. A framework-free page reports required entry activation. Optional plugins load after the renderer mounts, and their errors appear in the sidebar Plugins page. Dynamic bundles resolve shared dependencies against `PLATFORM_MODULES`. The model never sees this package.
 
 ## Table of Contents
 
@@ -44,7 +50,9 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **The application waits for the full roster** — one failed entry keeps the framework-free boot page visible with a per-entry report; partial UI availability is not supported.
+<a id="known-limitations-and-deferred-work"></a>
+
+- A failed required entry keeps the framework-free boot page visible with a per-entry report.
 
 <a id="dev-note"></a>
 ### Dev Note

@@ -106,8 +106,8 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
   const db = new Database(options.sqliteFile, { readonly: true, fileMustExist: true })
   try {
     const sourceVersion = (db.prepare('SELECT version FROM schema_meta LIMIT 1').get() as { version?: number } | undefined)?.version
-    if (sourceVersion !== 7 && sourceVersion !== SCHEMA_VERSION) {
-      throw new Error(`SQLite source schema ${String(sourceVersion)} is unsupported; expected 7 or ${String(SCHEMA_VERSION)}`)
+    if (sourceVersion !== 7 && sourceVersion !== 10 && sourceVersion !== SCHEMA_VERSION) {
+      throw new Error(`SQLite source schema ${String(sourceVersion)} is unsupported; expected 7, 10 or ${String(SCHEMA_VERSION)}`)
     }
     return await transaction(pool, async (client) => {
       const slug = options.organizationSlug ?? 'default'

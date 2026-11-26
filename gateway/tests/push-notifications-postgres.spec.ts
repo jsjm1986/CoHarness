@@ -336,6 +336,12 @@ describePg('PostgreSQL push ownership', () => {
       expect(f.sender.send.mock.calls.map(([input]) => input.runtimeId).sort()).toEqual([f.runtimeId, sibling].sort())
       const rows = (await pool.query<{ runtime_id: RuntimeId; status: string }>('SELECT runtime_id,status FROM harness.push_deliveries WHERE organization_id=$1 AND session_id=$2 ORDER BY runtime_id', [f.context.organizationId, f.sessionId])).rows
       expect(rows).toEqual([f.runtimeId, sibling].sort().map(runtime_id => ({ runtime_id, status: 'sent' })))
+      const receipt = { provider: f.provider, token: f.token, sessionId: f.sessionId, eventSeq: 33, kind: 'opened' as const }
+      expect(await f.service.recordReceipt(f.creator.publicId, receipt)).toBe('missing')
+      expect(await f.service.recordReceipt(f.creator.publicId, { ...receipt, runtimeId: sibling })).toBe('recorded')
+      expect(await f.service.recordReceipt(f.creator.publicId, { ...receipt, runtimeId: sibling })).toBe('recorded')
+      expect((await pool.query('SELECT runtime_id FROM harness.push_deliveries WHERE organization_id=$1 AND opened_at IS NOT NULL', [f.context.organizationId])).rows)
+        .toEqual([{ runtime_id: sibling }])
       await Promise.all([f.service.notifyCompleted(f.runtimeId, f.sessionId, 33), f.service.notifyCompleted(sibling, f.sessionId, 33)])
       expect(f.sender.send).toHaveBeenCalledTimes(2)
       await pool.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE organization_id=$1 AND node_id=$2 AND user_id=$3', [f.context.organizationId, f.personalNode, f.creator.id])
@@ -393,6 +399,21 @@ describePg('PostgreSQL push ownership', () => {
       expect(await f.service.recordReceipt(f.creator.publicId, {
         provider: 'jpush', token: f.token, sessionId: `unknown-${f.sessionId}`, eventSeq: 41, kind: 'arrived',
       })).toBe('missing')
+    } finally { await f.close() }
+  })
+
+  it('keeps a transferred registration from exposing or acknowledging its former owner’s deliveries', async () => {
+    const f = await fixture('unifiedpush')
+    try {
+      await f.service.notifyCompleted(f.runtimeId, f.sessionId, 35)
+      const receipt = { provider: f.provider, token: f.token, sessionId: f.sessionId, eventSeq: 35, kind: 'arrived' as const }
+      expect(await f.service.recordReceipt(f.creator.publicId, receipt)).toBe('recorded')
+      expect((await f.service.listDevices(f.creator.publicId)).devices[0]?.lastDelivery?.sessionId).toBe(f.sessionId)
+      expect(await f.service.registerDevice(f.other.publicId, { token: f.token, platform: 'android', provider: f.provider })).toEqual(f.device)
+      expect((await f.service.listDevices(f.other.publicId)).devices[0]?.lastDelivery).toBeNull()
+      expect(await f.service.recordReceipt(f.other.publicId, { ...receipt, runtimeId: f.runtimeId, kind: 'opened' })).toBe('missing')
+      expect((await pool.query('SELECT opened_at FROM harness.push_deliveries WHERE organization_id=$1', [f.context.organizationId])).rows)
+        .toEqual([{ opened_at: null }])
     } finally { await f.close() }
   })
 

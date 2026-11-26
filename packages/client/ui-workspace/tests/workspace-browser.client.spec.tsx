@@ -1084,7 +1084,7 @@ describe('WorkspaceBrowser', () => {
 
       await act(async () => { await vi.advanceTimersByTimeAsync(250) })
 
-      expect(searchSessions).toHaveBeenCalledWith('waterfall token', expect.any(AbortSignal))
+      expect(searchSessions).toHaveBeenCalledWith('waterfall token', expect.any(AbortSignal), expect.any(Function))
       expect(screen.getByText('Research notes')).toBeTruthy()
       expect(screen.getByText('Research Workspace')).toBeTruthy()
       expect(screen.getByText('…the waterfall token appears here…')).toBeTruthy()
@@ -1116,7 +1116,7 @@ describe('WorkspaceBrowser', () => {
       expect(input.value).not.toContain('\0')
       await act(async () => { await vi.advanceTimersByTimeAsync(250) })
       expect(searchSessions).toHaveBeenCalledOnce()
-      expect(searchSessions).toHaveBeenCalledWith(expected, expect.any(AbortSignal))
+      expect(searchSessions).toHaveBeenCalledWith(expected, expect.any(AbortSignal), expect.any(Function))
     } finally {
       vi.useRealTimers()
     }
@@ -1796,6 +1796,13 @@ describe('WorkspaceBrowser', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(renameWorkspace).not.toHaveBeenCalled()
     fireEvent.change(input, { target: { value: 'Renamed' } })
+    fireEvent.compositionStart(input)
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(renameWorkspace).not.toHaveBeenCalled()
+    fireEvent.compositionEnd(input)
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    expect(renameWorkspace).not.toHaveBeenCalled()
     fireEvent.keyDown(input, { key: 'a' })
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(renameWorkspace).toHaveBeenCalledWith(wid('alpha'), 'Renamed')
@@ -1927,9 +1934,42 @@ describe('personal computer groups', () => {
     expect(screen.getAllByRole('region')).toHaveLength(5)
     fireEvent.click(screen.getByRole('button', { name: '搜索会话' }))
     fireEvent.change(screen.getByPlaceholderText('搜索电脑、工作区或对话…'), { target: { value: '电脑 20' } })
-    expect(screen.getAllByRole('region')).toHaveLength(1)
+    expect(screen.queryAllByRole('region')).toHaveLength(0)
     expect(screen.getByRole('button', { name: '电脑 20' })).toBeTruthy()
     expect(start).not.toHaveBeenCalled()
+  })
+
+  it('shows matching computers beside another computer’s matching conversations', () => {
+    const open = vi.fn(), start = vi.fn(async () => {})
+    mount({ useWorkspaces: hook(directory(2)), startRuntimeSession: start, open,
+      useSessions: hook(sessionState([summary('remote-result', 1, { displayTitle: '电脑 1 部署记录', runtime: target(2) })])) })
+    fireEvent.change(screen.getByPlaceholderText('搜索电脑、工作区或对话…'), { target: { value: '电脑 1' } })
+    expect(screen.getByRole('button', { name: '电脑 1' })).toBeTruthy()
+    expect(screen.getByRole('treeitem', { name: /电脑 1 部署记录/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('treeitem', { name: /电脑 1 部署记录/ }))
+    expect(open).toHaveBeenCalledWith(sid('remote-result'))
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('keeps returned content hits usable while another computer is pending or failed', async () => {
+    vi.useFakeTimers()
+    const held = Promise.withResolvers<{ items: []; hasMore: false }>()
+    let publish: Parameters<WorkspaceBrowserProps['searchSessions']>[2]
+    let mounted: ReturnType<typeof mount> | undefined
+    try {
+      const searchSessions: WorkspaceBrowserProps['searchSessions'] = (_query, _signal, progress) => { publish = progress; return held.promise }
+      mounted = mount({ useWorkspaces: hook(directory(2)), searchSessions,
+        useSessions: hook(sessionState([summary('body-hit', 1, { displayTitle: '快速结果', runtime: target(1) })])) })
+      fireEvent.change(screen.getByPlaceholderText('搜索电脑、工作区或对话…'), { target: { value: 'query token' } })
+      await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+      const items = [{ sessionId: sid('body-hit'), snippet: 'query token' }]
+      act(() => { publish?.({ items, hasMore: false, targets: [{ runtime: target(1), status: 'ready' }, { runtime: target(2), status: 'pending' }] }) })
+      expect(screen.getByRole('treeitem', { name: /快速结果/ })).toBeTruthy()
+      expect(screen.getByText('仍在搜索：电脑 2')).toBeTruthy()
+      act(() => { publish?.({ items, hasMore: false, targets: [{ runtime: target(1), status: 'ready' }, { runtime: target(2), status: 'error' }] }) })
+      expect(screen.getByRole('treeitem', { name: /快速结果/ })).toBeTruthy()
+      expect(screen.getByText('暂时无法搜索：电脑 2，已返回的结果仍可使用')).toBeTruthy()
+    } finally { mounted?.view.unmount(); held.resolve({ items: [], hasMore: false }); await held.promise; vi.useRealTimers() }
   })
 
   it('disables a pending new-conversation action and sends it to only the chosen Runtime', async () => {

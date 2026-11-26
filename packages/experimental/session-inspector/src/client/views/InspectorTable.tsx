@@ -54,6 +54,7 @@ interface RowProps extends Pick<InspectorTableProps, 'useRecord' | 't' | 'flash'
   readonly stickyLevel: number | undefined
   readonly pulse: number
   readonly context: boolean
+  readonly rowHeight: number
   readonly select: (key: string) => void
   readonly toggle: (row: InspectorRow, element: HTMLTableRowElement) => void
 }
@@ -65,7 +66,7 @@ interface ObjectHistory {
 }
 
 const DataRow = memo(function DataRow({ row, selected, branch, collapsed, added, stickyLevel, pulse,
-  context, select, toggle, useRecord, flash, showTime, t }: RowProps) {
+  context, select, toggle, useRecord, flash, showTime, t, rowHeight }: RowProps) {
   const record = useRecord(row.key)
   const element = useRef<HTMLTableRowElement>(null)
   const previous = useRef(record)
@@ -86,7 +87,7 @@ const DataRow = memo(function DataRow({ row, selected, branch, collapsed, added,
   return <tr ref={element} aria-selected={selected} data-inspector-context={context ? '' : undefined}
     title={context ? t('filter.context') : undefined}
     className={[selected && css.selected, stickyLevel !== undefined && css.sticky, context && css.contextRow].filter(Boolean).join(' ')}
-    style={stickyLevel === undefined ? undefined : { top: (stickyLevel + 1) * INSPECTOR_ROW_HEIGHT, zIndex: 9 - stickyLevel }}>
+    style={stickyLevel === undefined ? undefined : { top: (stickyLevel + 1) * rowHeight, zIndex: 9 - stickyLevel }}>
     <td className={css.identity}><Tooltip label={record?.identity ?? ''} side="right" portal>
       <span className={css.identityText} tabIndex={0}>{record?.identity}</span>
     </Tooltip></td>
@@ -130,6 +131,20 @@ export function InspectorTable({ title, flash, showTime, modeSelector, objects, 
   const filtered = useMemo(() => typeFilter.apply(allRows, typeOf), [allRows, typeOf, typeFilter])
   const suggestTypes = useCallback((query: string) => new InspectorTypeFilter(query).suggest(allRows, typeOf), [allRows, typeOf])
   const scroller = useRef<HTMLDivElement>(null)
+  const header = useRef<HTMLTableSectionElement>(null)
+  const [rowHeight, setRowHeight] = useState(INSPECTOR_ROW_HEIGHT)
+  useLayoutEffect(() => {
+    const element = header.current
+    if (element === null || typeof ResizeObserver === 'undefined') return
+    const measure = (): void => {
+      const height = element.getBoundingClientRect().height
+      if (height > 0) setRowHeight(height)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => { observer.disconnect() }
+  }, [])
   const followMode = useRef<'tail' | 'scroll' | 'manual'>('tail')
   const viewport = useRef({ offset: 0, height: 600 })
   const disclosureAnchor = useRef<InspectorRowAnchor>(undefined)
@@ -206,7 +221,8 @@ export function InspectorTable({ title, flash, showTime, modeSelector, objects, 
   const committed = useRef<{ layout: InspectorTableLayout; disclosures: typeof disclosures; spacingGeneration: number }>(undefined)
   const layout = useMemo(() => new InspectorTableLayout(hierarchy,
     committed.current?.disclosures === disclosures && committed.current.spacingGeneration === spacingGeneration
-      ? committed.current.layout : undefined, viewport.current, disclosureAnchor.current), [hierarchy, disclosures, spacingGeneration])
+      ? committed.current.layout : undefined, viewport.current, disclosureAnchor.current, rowHeight),
+  [hierarchy, disclosures, spacingGeneration, rowHeight])
   const anchoredOffset = committed.current?.layout !== layout ? layout.scrollOffset : undefined
   const seen = useRef(new Map<string, number>())
   const initialized = useRef(false)
@@ -227,18 +243,18 @@ export function InspectorTable({ title, flash, showTime, modeSelector, objects, 
     const offset = anchoredOffset ?? virtualRef.current!.scrollOffset!
     // Render the anchored viewport before the layout effect moves the scrollport.
     const visible = anchoredOffset === undefined ? range : { ...range,
-      startIndex: Math.max(0, Math.floor(offset / INSPECTOR_ROW_HEIGHT) - 1),
-      endIndex: Math.min(range.count - 1, Math.ceil((offset + viewport.current.height) / INSPECTOR_ROW_HEIGHT) - 1),
+      startIndex: Math.max(0, Math.floor(offset / rowHeight) - 1),
+      endIndex: Math.min(range.count - 1, Math.ceil((offset + viewport.current.height) / rowHeight) - 1),
     }
     return [...new Set([...layout.stickyIndexesAtOffset(offset), ...defaultRangeExtractor(visible)])]
       .sort((left, right) => left - right)
-  }, [layout, anchoredOffset])
+  }, [layout, anchoredOffset, rowHeight])
   const virtual = useVirtualizer<HTMLDivElement, HTMLTableRowElement>({
     count: layout.items.length, getScrollElement: () => scroller.current,
     estimateSize: sizeOf, getItemKey: keyOf, overscan: 12,
     initialRect: { width: 0, height: 600 },
     anchorTo: layout.scrollOffset !== undefined || followMode.current === 'manual' ? 'start' : 'end', scrollEndThreshold: 40,
-    paddingStart: INSPECTOR_ROW_HEIGHT, scrollPaddingStart: INSPECTOR_ROW_HEIGHT, rangeExtractor: extractRange,
+    paddingStart: rowHeight, scrollPaddingStart: rowHeight, rangeExtractor: extractRange,
     paddingEnd: layout.bottomPadding,
   })
   virtualRef.current = virtual
@@ -289,28 +305,28 @@ export function InspectorTable({ title, flash, showTime, modeSelector, objects, 
     </div>
     {notice !== undefined && <div className={css.pickNotice} role="status">{notice}</div>}
     {(failure !== null || openError !== null) && <p role="alert">{failure ?? openError?.message}</p>}
-    <div ref={scroller} className={css.scroller} onScroll={({ currentTarget }) => {
+    <div ref={scroller} className={css.scroller} role="region" aria-label={title} tabIndex={0} onScroll={({ currentTarget }) => {
       viewport.current.offset = currentTarget.scrollTop
       if (followMode.current !== 'manual') {
         followMode.current = currentTarget.scrollHeight - currentTarget.clientHeight - currentTarget.scrollTop <= 40 ? 'tail' : 'scroll'
       }
     }}>
       <table className={css.table} aria-label={title} aria-rowcount={rows.length + 1}>
-        <thead><tr><th className={css.idColumn}>{t('table.id')}</th><th className={css.typeColumn}>
+        <thead ref={header}><tr><th className={css.idColumn}>{t('table.id')}</th><th className={css.typeColumn}>
           <span className={css.typeHeader}>{t('table.type')}<TypeFilter value={typeQuery} suggest={suggestTypes} apply={applyTypeFilter} t={t} /></span>
         </th>
         <th className={css.locationColumn}>{t('table.location')}</th>
         {showTime && <th className={css.timeColumn}>{t('table.time')}</th>}<th>{t('table.data')}</th></tr></thead>
         <tbody>
           {items.map((item, position) => {
-            const gap = item.start - (items[position - 1]?.end ?? INSPECTOR_ROW_HEIGHT)
+            const gap = item.start - (items[position - 1]?.end ?? rowHeight)
             // oxlint-disable-next-line typescript/no-non-null-assertion -- The virtual item comes from this layout's count.
             const entry = layout.items[item.index]!
             // oxlint-disable-next-line typescript/no-non-null-assertion -- Every layout row belongs to the arrival map's allRows input.
             const arrival = arrivals.get(entry.row.key)!
             return <Fragment key={item.key}>
               {gap > 0 && <tr aria-hidden="true"><td colSpan={columns} style={{ height: gap, padding: 0 }} /></tr>}
-              <DataRow row={entry.row} selected={entry.row.key === selected}
+              <DataRow row={entry.row} selected={entry.row.key === selected} rowHeight={rowHeight}
                 context={typeFilter.active && !filtered.matches.has(entry.row.key)}
                 branch={hierarchy.isBranch(entry.row.key)} collapsed={inspectorRowCollapsed(entry.row, disclosures)}
                 stickyLevel={sticky.get(item.index)}

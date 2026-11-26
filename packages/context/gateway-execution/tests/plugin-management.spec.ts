@@ -1,6 +1,8 @@
 /** Management authority is checked independently of profile and tool permissions. */
 import { expect, it, vi } from 'vitest'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import type { GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
+import type { PluginEntryId, PluginInventoryReport } from '@deepseek-ai/dsh-plugin-manager/types'
 import { gatewayPluginManagementAuthorization, parseInstallSourcePolicy, verifyGatewayProjectProfile } from '../src/plugin-management.ts'
 
 function fixture() {
@@ -29,8 +31,10 @@ it('requires a fresh Gateway decision for every profile operation', async () => 
   request.mockResolvedValue(new Response('{}', { status: 403 }))
   await expect(policy.authorize()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
   expect(request).toHaveBeenCalledTimes(2)
-  expect(policy.protectedModules).toContain('@deepseek-ai/dsh-model-governance')
-  expect(policy.protectedModules).toContain('@deepseek-ai/dsh-directory-guard')
+  for (const module of ['model-governance', 'directory-guard', 'fs-sandbox', 'sandbox-local', 'bash-sandbox', 'pwsh-sandbox',
+    'permission-presets', 'user-approval', 'userdoc-gateway', 'steward-tools']) {
+    expect(policy.protectedModules).toContain(`@deepseek-ai/dsh-${module}`)
+  }
 })
 
 it.each(['absent', 'expired', 'scoped'] as const)('refuses %s authority before contacting the Gateway', async (reason) => {
@@ -65,6 +69,22 @@ it('reads and publishes the runtime desired state through the plugin-state path'
   expect(await policy.publishDesiredState!({ entries: [], bundles: ['core'] }, '5')).toEqual({ status: 'conflict', current })
   request.mockResolvedValueOnce(new Response('{}', { status: 503 }))
   await expect(policy.publishDesiredState!({ entries: [], bundles: ['core'] }, '7')).rejects.toThrow('503')
+})
+
+it('posts the observed inventory through the plugin-inventory path', async () => {
+  const { request, lifetime, policy } = fixture()
+  const snapshot: PluginInventoryReport = {
+    bundles: [{ name: '@team/collab', enabled: true, installed: true, optional: false, removable: true, rows: [], overrides: [] }],
+    plugins: [{ entryId: brandString<PluginEntryId>('e1'), moduleName: '@team/collab/rows', enabled: true, fiberPhase: 'active', patchId: 'p1' }],
+  }
+  await policy.reportInventory!(snapshot)
+  expect(request).toHaveBeenLastCalledWith('/internal/runtime/plugin-inventory', {
+    method: 'POST', signal: lifetime.signal,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ snapshot }),
+  })
+  request.mockResolvedValueOnce(new Response('{}', { status: 503 }))
+  await expect(policy.reportInventory!(snapshot)).rejects.toThrow('503')
 })
 
 it('lets the Gateway judge a member principal, grant or not', async () => {

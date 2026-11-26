@@ -1,14 +1,19 @@
 /** Center-owned node credentials and exclusive control leases, without remote database access. */
 import { createHash, randomBytes } from 'node:crypto'
 import { z } from 'zod'
+import type { Pool } from 'pg'
+import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { UserRow } from '../auth.ts'
 import {
   NodeAccessError, nodeCredentialSchema, nodeEnrollmentTokenSchema, nodeUuidSchema,
-  type NodeAccessConfig, type NodeAccessEntry, type NodeAccessPage,
-  type NodeEnrollment, type NodeEnrollmentId, type NodeEnrollmentToken, type NodeIdentity, type NodeLease,
+  type NodeAccessConfig, type NodeAccessEntry, type NodeAccessPage, type NodeControlOperation,
+  type NodeEnrollment, type NodeEnrollmentId, type NodeEnrollmentToken, type NodeIdentity, type NodeLease, type NodeServiceIdentityLease,
+  type NodeRemovalBlocker, type NodeRemovalCheck, type NodeRemovalReceipt,
 } from '../node-access.ts'
 import type { RuntimeCatalogLimits, RuntimeNodeId } from '../runtime-catalog.ts'
 import { transaction, type Queryable } from './database.ts'
+import { PostgresAuditService } from './audit-service.ts'
+import { nodeRemovalBindings } from './node-removal-bindings.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 const issueSchema = z.object({
@@ -21,6 +26,7 @@ const mutationSchema = z.object({
   revision: z.number().int().positive().safe(),
   requestId: nodeUuidSchema.optional(),
 }).strict()
+const removalSchema = z.object({ revision: z.number().int().positive().safe() }).strict()
 const enrollmentSchema = z.object({
   protocolVersion: z.literal(1), credential: nodeCredentialSchema,
   platform: z.enum(['darwin', 'linux', 'win32']), architecture: z.enum(['x64', 'arm64']),
@@ -67,9 +73,12 @@ export class PostgresNodeAccessService {
    * @param context - center organization and its PostgreSQL pool.
    * @param config - validated enrollment lifetime, lease timing and control admission.
    * @param directoryLimits - shared metadata page row and complete-response limits.
+   * @param controlPool - bounded pool for connection lease and channel work. Omission uses the ordinary context pool.
+   * @param baselineWriteEpoch - current serving data generation. Standalone callers may omit the additional serving check.
    */
   constructor(private readonly context: PostgresRuntimeContext, private readonly config: NodeAccessConfig,
-    private readonly directoryLimits: RuntimeCatalogLimits) {}
+    private readonly directoryLimits: RuntimeCatalogLimits, private readonly controlPool: Pool = context.pool,
+    private readonly baselineWriteEpoch?: bigint) {}
 
   private async administrator(tx: Queryable, actor: UserRow): Promise<string> {
     const result = await tx.query<{ id: string }>(`SELECT u.id FROM harness.users u
@@ -82,11 +91,11 @@ export class PostgresNodeAccessService {
     return id
   }
 
-  private async primary(tx: Queryable, write = true): Promise<void> {
+  private async primary(tx: Queryable, mode: 'write' | 'read' | 'strict-read' = 'write'): Promise<void> {
     const row = await tx.query(`SELECT 1 FROM harness.deployment_topology
       WHERE organization_id=$1 AND ((enabled AND primary_node_id=$2)
         OR ($3 AND legacy_initialization_required AND NOT EXISTS(SELECT 1 FROM harness.node_agents a
-          WHERE a.organization_id=$1 AND a.node_id=$2))) FOR ${write ? 'UPDATE' : 'SHARE'}`, [this.context.organizationId, this.context.nodeId, !write])
+          WHERE a.organization_id=$1 AND a.node_id=$2))) FOR ${mode === 'write' ? 'UPDATE' : 'SHARE'}`, [this.context.organizationId, this.context.nodeId, mode === 'read'])
     if (row.rowCount !== 1) throw new NodeAccessError(409, 'node-access/mode-disabled')
   }
 
@@ -156,6 +165,7 @@ export class PostgresNodeAccessService {
       const row = result.rows[0]
       if (row === undefined) throw new NodeAccessError(404, 'node-access/not-found')
       if (publicNumber(row.revision, 'Node credential revision') !== request.revision) throw new NodeAccessError(409, 'node-access/revision-conflict')
+      if ((await tx.query('SELECT FROM harness.node_recovery_quarantines WHERE organization_id=$1 AND node_id=$2',[this.context.organizationId,nodeId])).rowCount) throw new NodeAccessError(409,'node-access/quarantined')
       const revision = request.revision + 1
       if (!Number.isSafeInteger(revision)) throw new NodeAccessError(409, 'node-access/revision-conflict')
       if (request.action === 'detach') {
@@ -183,6 +193,93 @@ export class PostgresNodeAccessService {
     })
   }
 
+  private async removalTarget(tx: Queryable, nodeId: RuntimeNodeId, lock: boolean) {
+    if (nodeId === this.context.nodeId) throw new NodeAccessError(409, 'node-access/removal-attached')
+    const result = await tx.query<{
+      revision: string; attachment_state: AgentRow['attachment_state']; unclaimed: boolean; connected: boolean;
+    }>(`SELECT a.revision::text,a.attachment_state,a.connection_id IS NOT NULL AS connected,
+      a.credential_hash IS NULL AND NOT EXISTS (SELECT FROM harness.node_agent_enrollments e
+        WHERE e.node_id=a.node_id AND e.organization_id=a.organization_id AND e.consumed_at IS NOT NULL) AS unclaimed
+      FROM harness.node_agents a WHERE a.organization_id=$1 AND a.node_id=$2${lock ? ' FOR UPDATE' : ''}`,
+    [this.context.organizationId, nodeId])
+    const agent = result.rows[0]
+    if (agent === undefined) throw new NodeAccessError(404, 'node-access/not-found')
+    const resultNode = await tx.query<{ name: string; busy: boolean }>(`SELECT name::text,
+      status<>'offline' OR inflight_writes>0 OR (last_heartbeat_at IS NOT NULL AND inflight_writes<0) AS busy
+      FROM harness.compute_nodes WHERE organization_id=$1 AND id=$2${lock ? ' FOR UPDATE' : ''}`,
+    [this.context.organizationId, nodeId])
+    const node = resultNode.rows[0]
+    if (node === undefined) throw new NodeAccessError(404, 'node-access/not-found')
+    const quarantine = await tx.query('SELECT FROM harness.node_recovery_quarantines WHERE organization_id=$1 AND node_id=$2',
+      [this.context.organizationId, nodeId])
+    if (quarantine.rowCount !== 0) throw new NodeAccessError(409, 'node-access/quarantined')
+    return { ...agent, ...node, revision: publicNumber(agent.revision, 'Node credential revision') }
+  }
+
+  private async removalBlockers(tx: Queryable, nodeId: RuntimeNodeId, agent: Awaited<ReturnType<PostgresNodeAccessService['removalTarget']>>,
+    lock: boolean): Promise<NodeRemovalBlocker[]> {
+    const blockers: NodeRemovalBlocker[] = []
+    if (agent.connected || agent.busy) blockers.push('node-access/removal-in-use')
+    else if (agent.attachment_state !== 'detached' && !(agent.attachment_state === 'pending' && agent.unclaimed)) {
+      blockers.push('node-access/removal-attached')
+    }
+    const references = await nodeRemovalBindings(tx, this.context.organizationId, nodeId, agent.name, lock)
+    return [...new Set([...blockers, ...references])]
+  }
+
+  /**
+   * Explain which current associations prevent removing a computer.
+   * @param actor - administrator rechecked at the primary.
+   * @param rawId - UUID from the requested registry entry.
+   * @returns node revision and current blockers. Confirmation requires a second, locked check.
+   */
+  async checkRemoval(actor: UserRow, rawId: string): Promise<NodeRemovalCheck> {
+    const nodeId = parse(nodeUuidSchema, rawId) as RuntimeNodeId
+    return transaction(this.context.pool, async tx => {
+      await this.administrator(tx, actor)
+      await this.primary(tx, 'strict-read')
+      const node = await this.removalTarget(tx, nodeId, false)
+      return { nodeId, revision: node.revision, blockers: await this.removalBlockers(tx, nodeId, node, false) }
+    })
+  }
+
+  /**
+   * Remove an unbound detached computer or an unclaimed enrollment reservation.
+   * @param actor - administrator rechecked in the removal transaction.
+   * @param rawId - exact computer UUID from the request path.
+   * @param input - untrusted confirmation containing the reviewed revision.
+   * @param ip - audit source address observed by the Gateway.
+   * @returns a committed removal receipt. No command is sent to the computer.
+   */
+  async remove(actor: UserRow, rawId: string, input: unknown, ip: string): Promise<NodeRemovalReceipt> {
+    const nodeId = parse(nodeUuidSchema, rawId) as RuntimeNodeId
+    const { revision } = parse(removalSchema, input)
+    try {
+      return await transaction(this.context.pool, async tx => {
+        await this.administrator(tx, actor)
+        await this.retainServingEpoch(tx)
+        await this.primary(tx)
+        const node = await this.removalTarget(tx, nodeId, true)
+        if (node.revision !== revision || !Number.isSafeInteger(revision + 1)) throw new NodeAccessError(409, 'node-access/revision-conflict')
+        const [blocker] = await this.removalBlockers(tx, nodeId, node, true)
+        if (blocker !== undefined) throw new NodeAccessError(409, blocker)
+        await tx.query('DELETE FROM harness.compute_nodes WHERE organization_id=$1 AND id=$2', [this.context.organizationId, nodeId])
+        const topology = await tx.query<{ revision: string }>(
+          'UPDATE harness.deployment_topology SET revision=revision+1 WHERE organization_id=$1 RETURNING revision::text', [this.context.organizationId])
+        await new PostgresAuditService(this.context).write({
+          userId: actor.id, action: 'admin.deployment.nodes.remove', status: 200, ip,
+          detail: JSON.stringify({ nodeId, name: node.name, revision: revision + 1 }),
+        }, tx)
+        return { nodeId, revision: revision + 1, status: 'removed', topologyRevision: topology.rows[0]!.revision }
+      })
+    } catch (error) {
+      if (error !== null && typeof error === 'object' && 'code' in error && ['55P03', '40P01', '23503'].includes(String(error.code))) {
+        throw new NodeAccessError(409, 'node-access/removal-changing')
+      }
+      throw error
+    }
+  }
+
   /**
    * Read cached connection metadata with current administrator authority and bounded keyset pages.
    * @param actor - administrator candidate.
@@ -196,14 +293,15 @@ export class PostgresNodeAccessService {
       || limit < 1 || limit > this.directoryLimits.pageSize) throw new NodeAccessError(400, 'node-access/invalid-request')
     return transaction(this.context.pool, async tx => {
       await this.administrator(tx, actor)
-      await this.primary(tx, false)
+      await this.primary(tx, 'read')
       const result = await tx.query<{ node_id: RuntimeNodeId; name: string; revision: string;
         status: NodeAccessEntry['status']; platform: NodeAccessEntry['platform']; architecture: NodeAccessEntry['architecture'];
         last_seen_at: Date | null; lease_expires_at: Date | null; execution_ready: boolean }>(`SELECT a.node_id,n.name::text,a.revision::text,
-          CASE WHEN a.attachment_state='detached' THEN 'detached' WHEN a.revoked_at IS NOT NULL THEN 'revoked' WHEN a.attachment_state='pending' OR a.credential_hash IS NULL THEN 'pending'
+          CASE WHEN q.node_id IS NOT NULL THEN 'quarantined' WHEN a.attachment_state='detached' THEN 'detached' WHEN a.revoked_at IS NOT NULL THEN 'revoked' WHEN a.attachment_state='pending' OR a.credential_hash IS NULL THEN 'pending'
             WHEN a.lease_expires_at>clock_timestamp() THEN 'connected' ELSE 'disconnected' END status,
-          a.platform,a.architecture,a.last_seen_at,a.lease_expires_at,a.execution_ready
+          a.platform,a.architecture,a.last_seen_at,a.lease_expires_at,(q.node_id IS NULL AND a.execution_ready) execution_ready
         FROM harness.node_agents a JOIN harness.compute_nodes n ON n.id=a.node_id AND n.organization_id=a.organization_id
+        LEFT JOIN harness.node_recovery_quarantines q ON q.organization_id=a.organization_id AND q.node_id=a.node_id
         WHERE a.organization_id=$1 AND ($2::uuid IS NULL OR a.node_id>$2) ORDER BY a.node_id LIMIT $3`,
       [this.context.organizationId, after, limit + 1])
       const items: NodeAccessEntry[] = []
@@ -246,7 +344,7 @@ export class PostgresNodeAccessService {
     return transaction(this.context.pool, async tx => {
       await this.primary(tx)
       const target = await tx.query<{ node_id: string }>(`SELECT node_id FROM harness.node_agent_enrollments
-        WHERE organization_id=$1 AND token_hash=$2`, [this.context.organizationId, digest(ticket)])
+        WHERE organization_id=$1 AND token_hash=$2 AND node_id IS NOT NULL`, [this.context.organizationId, digest(ticket)])
       const nodeId = target.rows[0]?.node_id
       if (nodeId === undefined) throw new NodeAccessError(401, 'node-access/unauthorized')
       const row = await this.lockAgent(tx, { kind: 'node', id: nodeId })
@@ -314,15 +412,79 @@ export class PostgresNodeAccessService {
       epoch: row.connection_epoch as NodeLease['epoch'], expiresAt: result.rows[0]!.lease_expires_at.toISOString(), heartbeatMs: this.config.heartbeatMs }
   }
 
+  private async connectLease(tx: Queryable, row: AgentRow, request: z.infer<typeof connectionSchema>): Promise<NodeLease> {
+    if (row.live && row.connection_id !== request.connectionId) throw new NodeAccessError(409, 'node-access/already-connected')
+    if (!row.live) {
+      row.connection_epoch = (BigInt(row.connection_epoch) + 1n).toString()
+      row.connection_id = request.connectionId
+      row.execution_ready = request.executionReady ?? false
+      await tx.query('UPDATE harness.node_agents SET connection_id=$3,connection_epoch=$4,lease_expires_at=clock_timestamp(),execution_ready=$5 WHERE organization_id=$1 AND node_id=$2',
+        [this.context.organizationId, row.node_id, row.connection_id, row.connection_epoch, row.execution_ready])
+    }
+    return this.renew(tx, row, row.live)
+  }
+
+  private async releaseLease(tx: Queryable, row: AgentRow, request: z.infer<typeof leaseRequestSchema>): Promise<void> {
+    if (row.connection_id !== request.connectionId || row.connection_epoch !== request.epoch) throw new NodeAccessError(409, 'node-access/lease-lost')
+    await tx.query(`UPDATE harness.node_agents SET lease_expires_at=LEAST(lease_expires_at,clock_timestamp())
+      WHERE organization_id=$1 AND node_id=$2`, [this.context.organizationId, row.node_id])
+  }
+
+  private async retainServingEpoch(tx: Queryable): Promise<void> {
+    const control = await tx.query(`SELECT 1 FROM harness.cluster_control
+      WHERE organization_id=$1 AND mode='serving' AND ($2::bigint IS NULL OR write_epoch=$2) FOR SHARE`,
+    [this.context.organizationId, this.baselineWriteEpoch?.toString() ?? null])
+    if (control.rowCount !== 1) throw new NodeAccessError(503, 'node-access/unavailable')
+  }
+
+  /**
+   * Retain an already managed node's control connection during ordinary maintenance.
+   * The control-row lock fences restore and write-epoch changes through lease commit;
+   * connectivity never promotes attachment state or acknowledges stopped writers.
+   * @param operation - existing lease operation; enrollment is excluded.
+   * @param token - current node credential, checked under the node lock.
+   * @param input - untrusted connection UUID and, for renewal/release, exact epoch.
+   * @param baselineWriteEpoch - write epoch captured when the calling Gateway started.
+   * @returns a connection lease, or no value after an exact-generation release.
+   */
+  async maintainConnection(operation: NodeControlOperation, token: string, input: unknown, baselineWriteEpoch: bigint): Promise<NodeLease | void> {
+    return transaction(this.controlPool, async tx => {
+      // Governance release locks its operation before the control row; use the same order.
+      const recovery = await tx.query<{ state: string }>(`SELECT state FROM harness.governance_rebuild_operations
+        WHERE organization_id=$1 ORDER BY recovery_epoch DESC LIMIT 1 FOR SHARE`, [this.context.organizationId])
+      if (recovery.rows[0] !== undefined && recovery.rows[0].state !== 'released') throw new NodeAccessError(503, 'node-access/unavailable')
+      const control = await tx.query<{ mode: string; write_epoch: string }>(`SELECT mode,write_epoch::text
+        FROM harness.cluster_control WHERE organization_id=$1 FOR SHARE`, [this.context.organizationId])
+      const row = control.rows[0]
+      if (row?.mode !== 'maintenance' || row.write_epoch !== String(baselineWriteEpoch)) throw new NodeAccessError(503, 'node-access/unavailable')
+      await this.primary(tx)
+      const agent = await this.authenticate(tx, token)
+      if (agent.attachment_state !== 'managed') throw new NodeAccessError(503, 'node-access/unavailable')
+      switch (operation) {
+        case 'connect': return this.connectLease(tx, agent, parse(connectionSchema, input))
+        case 'heartbeat': {
+          const request = parse(leaseRequestSchema, input)
+          if (!agent.live || agent.connection_id !== request.connectionId || agent.connection_epoch !== request.epoch) throw new NodeAccessError(409, 'node-access/lease-lost')
+          return this.renew(tx, agent, true)
+        }
+        case 'disconnect': return this.releaseLease(tx, agent, parse(leaseRequestSchema, input))
+        default: return assertNever(operation)
+      }
+    })
+  }
+
   /**
    * Acquire an exclusive connection lease, or recover the same acquisition after a lost response.
+   * Serving admission locks cluster control through commit, so attachment promotion cannot outlive maintenance entry.
    * @param token - node bearer credential.
    * @param input - connection UUID generated once per node-agent process.
    * @returns a new epoch after expiry/release; a live distinct connection is refused.
    */
   async connect(token: string, input: unknown): Promise<NodeLease> {
     const request = parse(connectionSchema, input)
-    return transaction(this.context.pool, async tx => {
+    return transaction(this.controlPool, async tx => {
+      const admission = await tx.query<{ mode: string }>('SELECT mode FROM harness.cluster_control WHERE organization_id=$1', [this.context.organizationId])
+      if (admission.rows[0] !== undefined && admission.rows[0].mode !== 'serving') throw new NodeAccessError(503, 'node-access/unavailable')
       await this.primary(tx)
       const row = await this.authenticate(tx, token)
       if (row.live && row.connection_id !== request.connectionId) throw new NodeAccessError(409, 'node-access/already-connected')
@@ -338,14 +500,12 @@ export class PostgresNodeAccessService {
           throw error
         }
       }
-      if (!row.live) {
-        row.connection_epoch = (BigInt(row.connection_epoch) + 1n).toString()
-        row.connection_id = request.connectionId
-        row.execution_ready = request.executionReady ?? false
-        await tx.query('UPDATE harness.node_agents SET connection_id=$3,connection_epoch=$4,lease_expires_at=clock_timestamp(),execution_ready=$5 WHERE organization_id=$1 AND node_id=$2',
-          [this.context.organizationId, row.node_id, row.connection_id, row.connection_epoch, row.execution_ready])
-      }
-      return this.renew(tx, row, row.live)
+      const lease = await this.connectLease(tx, row, request)
+      // Promotion's access invalidation must finish before taking the control lock: maintenance retains
+      // organization authority first. The serving predicate rejects a completed transition without locking its mode.
+      await tx.query('INSERT INTO harness.cluster_control(organization_id) VALUES($1) ON CONFLICT (organization_id) DO NOTHING', [this.context.organizationId])
+      await this.retainServingEpoch(tx)
+      return lease
     })
   }
 
@@ -361,10 +521,18 @@ export class PostgresNodeAccessService {
     const request = parse(leaseRequestSchema, input)
     const credential = nodeCredentialSchema.safeParse(token)
     if (!credential.success) throw new NodeAccessError(401, 'node-access/unauthorized')
-    const result = await this.context.pool.query<{ lease: unknown }>(
-      'SELECT harness.node_heartbeat($1,$2,$3,$4,$5,$6) lease',
-      [this.context.organizationId, digest(credential.data), request.connectionId, request.epoch,
-        this.config.leaseMs, this.context.nodeId])
+    const params = [this.context.organizationId, digest(credential.data), request.connectionId, request.epoch,
+      this.config.leaseMs, this.context.nodeId]
+    // Retain the serving write epoch through the same statement that renews the exact connection lease.
+    const result = this.baselineWriteEpoch === undefined
+      ? await this.controlPool.query<{ lease: unknown }>('SELECT harness.node_heartbeat($1,$2,$3,$4,$5,$6) lease', params)
+      : await this.controlPool.query<{ lease: unknown }>(
+        `WITH serving AS MATERIALIZED (SELECT organization_id FROM harness.cluster_control
+          WHERE organization_id=$1 AND mode='serving' AND write_epoch=$7 FOR SHARE)
+         SELECT harness.node_heartbeat($1,$2,$3,$4,$5,$6) lease FROM serving`,
+        [...params, this.baselineWriteEpoch.toString()],
+      )
+    if (this.baselineWriteEpoch !== undefined && result.rowCount !== 1) throw new NodeAccessError(503, 'node-access/unavailable')
     return this.acceptedLease(result.rows[0]?.lease)
   }
 
@@ -376,14 +544,41 @@ export class PostgresNodeAccessService {
    * @returns the authenticated lease; this read changes neither connectivity nor writer acknowledgements.
    */
   async authorizeChannel(token: string, input: unknown): Promise<NodeLease> {
+    return this.readChannelLease(token, input, false)
+  }
+
+  /**
+   * Attest the node service with the managed primary and access revision from the lease statement's snapshot.
+   * @param token - node bearer credential.
+   * @param input - exact connection UUID and epoch.
+   * @returns current lease and the optional primary that can use prepared reads on this computer.
+   */
+  async authorizeServiceIdentity(token: string, input: unknown): Promise<NodeServiceIdentityLease> {
+    return this.readChannelLease(token, input, true)
+  }
+
+  private async readChannelLease(token: string, input: unknown, includePrimary: boolean): Promise<NodeServiceIdentityLease> {
     const request = parse(leaseRequestSchema, input)
     const credential = nodeCredentialSchema.safeParse(token)
     if (!credential.success) throw new NodeAccessError(401, 'node-access/unauthorized')
-    const result = await this.context.pool.query<{ lease: unknown }>(
-      'SELECT harness.node_channel_lease($1,$2,$3,$4,$5) lease',
+    const primaryProjection = includePrimary ? `, (
+      SELECT jsonb_build_object('nodeId', topology.primary_node_id, 'accessRevision', organization.access_revision::text)
+      FROM harness.deployment_topology topology
+      JOIN harness.organizations organization ON organization.id=topology.organization_id
+      JOIN harness.node_agents agent ON agent.organization_id=topology.organization_id AND agent.node_id=$5
+      WHERE topology.organization_id=$1 AND topology.enabled AND topology.primary_node_id<>$5
+        AND agent.attachment_state='managed'
+    ) managed_primary` : ''
+    const result = await this.controlPool.query<{ lease: unknown; managed_primary?: { nodeId: RuntimeNodeId; accessRevision: string } | null }>(
+      `SELECT harness.node_channel_lease($1,$2,$3,$4,$5) lease${primaryProjection}
+       WHERE $6::bigint IS NULL OR COALESCE((SELECT write_epoch FROM harness.cluster_control WHERE organization_id=$1),1)=$6`,
       [this.context.organizationId, digest(credential.data), request.connectionId, request.epoch,
-        this.context.nodeId])
-    return this.acceptedLease(result.rows[0]?.lease)
+        this.context.nodeId, this.baselineWriteEpoch?.toString() ?? null])
+    if (this.baselineWriteEpoch !== undefined && result.rowCount !== 1) throw new NodeAccessError(503, 'node-access/unavailable')
+    const row = result.rows[0]
+    const lease = this.acceptedLease(row?.lease)
+    const primary = row?.managed_primary
+    return primary == null ? lease : { ...lease, managedPrimary: { nodeId: primary.nodeId, accessRevision: BigInt(primary.accessRevision) } }
   }
 
   /** Map the lease function's validated payload back onto the service's typed error contract. */
@@ -427,11 +622,10 @@ export class PostgresNodeAccessService {
    */
   async disconnect(token: string, input: unknown): Promise<void> {
     const request = parse(leaseRequestSchema, input)
-    await transaction(this.context.pool, async tx => {
+    await transaction(this.controlPool, async tx => {
       const row = await this.authenticate(tx, token)
-      if (row.connection_id !== request.connectionId || row.connection_epoch !== request.epoch) throw new NodeAccessError(409, 'node-access/lease-lost')
-      await tx.query(`UPDATE harness.node_agents SET lease_expires_at=LEAST(lease_expires_at,clock_timestamp())
-        WHERE organization_id=$1 AND node_id=$2`, [this.context.organizationId, row.node_id])
+      await this.releaseLease(tx, row, request)
+      if (this.baselineWriteEpoch !== undefined) await this.retainServingEpoch(tx)
     })
   }
 }

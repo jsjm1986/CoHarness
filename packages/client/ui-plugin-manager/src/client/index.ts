@@ -19,7 +19,8 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: the forwarded events' own declaration (`$on`'s key face resolves
 // through the owning package's client-safe types subpath).
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
-import { PluginManagerPage } from './PluginManagerPage.tsx'
+import { createDeferredPluginManagerPage } from './DeferredPluginManagerPage.tsx'
+import { PluginManagerTitle } from './PluginManagerTitle.tsx'
 import { PluginRefreshToast, type PluginRefreshToastFace } from './PluginRefreshToast.tsx'
 import { PluginsPanelIcon } from './PluginsPanelIcon.tsx'
 import { configLedgerSource } from './config-ledger.ts'
@@ -134,7 +135,10 @@ export function apply(ctx: ClientContext): void {
         'plugins.detail.badge': { kind: 'list', scope: 'root' },
         'plugins.detail.section': { kind: 'list', scope: 'root' },
       },
-    }, PluginManagerPage)
+    }, createDeferredPluginManagerPage())
+    yield ctx.slots.inject('shell.mobile.header.title', () => ctx.slots.register({
+      name: 'shell.mobile.header.title', key: PANEL_ID, locale: NS, store, inject: () => face,
+    }, PluginManagerTitle))
     yield ctx.layout.panelInfo.subscribe(() => {
       if (ctx.layout.panelInfo.getSnapshot().activePanelId !== PANEL_ID) instance.actions.setView({ kind: 'list' })
     })

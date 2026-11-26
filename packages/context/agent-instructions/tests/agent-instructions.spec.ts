@@ -403,6 +403,52 @@ function expectNoDerivedMessages(agent: Agent): void {
 }
 
 describe('workspace context instruction discovery', () => {
+  it('loads independent baseline files in bounded groups and retains configured precedence', async () => {
+    const ctx = new Context()
+    await ctx.plugin(RecordingFileSystem)
+    try {
+      const fs = ctx.fs as RecordingFileSystem
+      const cwd = resolve(tmpdir(), 'instruction-read-order')
+      const candidates = Array.from({ length: 7 }, (_, index) => `rules-${index}.md`)
+      const signal = new AbortController().signal
+      for (const candidate of candidates) {
+        fs.entries.set(join(cwd, candidate), { type: 'file', content: `instructions for ${candidate}` })
+      }
+      const stat = fs.stat.bind(fs)
+      const streamText = fs.streamText.bind(fs)
+      let pendingStats = 0
+      let pendingReads = 0
+      let peakStats = 0
+      let peakReads = 0
+      vi.spyOn(fs, 'stat').mockImplementation(async (target, requestSignal) => {
+        peakStats = Math.max(peakStats, ++pendingStats)
+        try {
+          await new Promise<void>(settled => setImmediate(settled))
+          return await stat(target, requestSignal)
+        } finally { pendingStats -= 1 }
+      })
+      vi.spyOn(fs, 'streamText').mockImplementation(async (target, requestSignal) => {
+        peakReads = Math.max(peakReads, ++pendingReads)
+        try {
+          await new Promise<void>(settled => setImmediate(settled))
+          return await streamText(target, requestSignal)
+        } finally { pendingReads -= 1 }
+      })
+
+      const result = await loadBaselineInstructions({
+        cwd, projectRoot: cwd, dshHome: join(cwd, 'absent-dsh'), agentsHome: join(cwd, 'absent-agents'),
+        instructionFileCandidates: candidates, localInstructionFileCandidates: [], maxBytes: 65536, signal,
+      }, fs)
+      expect(result?.text.match(/instructions for rules-\d+\.md/gu)).toEqual(
+        candidates.map(candidate => `instructions for ${candidate}`),
+      )
+      expect(peakStats).toBeGreaterThan(1)
+      expect(peakReads).toBeGreaterThan(1)
+      expect(Math.max(peakReads, peakStats)).toBeLessThanOrEqual(4)
+      expect(fs.signals.every(observed => observed === signal)).toBe(true)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('treats ENOTDIR while probing a host candidate as confirmed absence', async () => {
     const root = await tempRepo()
     const homeFile = join(root, 'not-a-directory')

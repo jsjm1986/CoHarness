@@ -1,0 +1,9 @@
+- heading "More actions" [level=2]
+- button "Close":
+  - img
+- strong: notes.txt
+- text: Personal documents · 30.0 KB · Alice
+- button "View"
+- button "Copy to…":
+  - img
+  - text: Copy to…

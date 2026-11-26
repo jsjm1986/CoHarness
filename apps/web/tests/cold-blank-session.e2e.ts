@@ -1,10 +1,11 @@
 /** Cold Session list visibility through the shipped compressed JSONL backend. */
 
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, stat } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
   captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedBlankSession, seedEmptyTurnSession,
@@ -44,7 +45,7 @@ describe('web e2e: cold blank Session visibility', () => {
     if (emptyTurnLocation === undefined) throw new Error('empty-turn fixture has no physical artifact')
     expect((await stat(emptyTurnLocation.path)).size).toBeLessThanOrEqual(1024)
 
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     const settled = await Promise.allSettled([

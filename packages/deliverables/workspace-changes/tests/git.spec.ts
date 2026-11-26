@@ -1,10 +1,10 @@
 /** Git command bounds, snapshot recovery, and diff failure reporting. */
-import { chmod, mkdir, readdir, readFile, realpath, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import { GitRunner, blobText, diffTrees, ignoredPaths, locateGitWorkspace, snapshotTree, treeBlob } from '../src/git.ts'
+import { GitRunner, blobText, canSkipLocalGitDiscovery, diffTrees, ignoredPaths, locateGitWorkspace, snapshotTree, treeBlob } from '../src/git.ts'
 import { TurnRecorder } from '../src/recorder.ts'
 import { ReviewStore } from '../src/review-store.ts'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
@@ -28,6 +28,32 @@ async function runner(limits = { timeoutMs: 30_000, outputMaxBytes: 1024 * 1024 
 }
 
 const signal = new AbortController().signal
+
+it('defers local discovery to Git for markers, discovery overrides or unverified paths', async () => {
+  for (const key of Object.keys(process.env)) {
+    if (key.toUpperCase().startsWith('GIT_')) vi.stubEnv(key, undefined)
+  }
+  try {
+    const root = await scratchDir('dsh-git-discovery-', cleanups)
+    const cwd = join(root, 'workspace')
+    await mkdir(cwd)
+    expect(await canSkipLocalGitDiscovery(cwd, signal)).toBe(true)
+    for (const marker of ['.git', 'HEAD']) {
+      const path = join(root, marker)
+      await writeFile(path, 'Git metadata')
+      expect(await canSkipLocalGitDiscovery(cwd, signal)).toBe(false)
+      expect(await canSkipLocalGitDiscovery(path, signal)).toBe(false)
+      await rm(path)
+      expect(await canSkipLocalGitDiscovery(path, signal)).toBe(false)
+    }
+    const cancelled = new Error('recorder disposed')
+    await expect(canSkipLocalGitDiscovery(cwd, AbortSignal.abort(cancelled))).rejects.toBe(cancelled)
+    vi.stubEnv(process.platform === 'win32' ? 'Git_Dir' : 'GIT_DIR', join(root, 'separate-git-dir'))
+    expect(await canSkipLocalGitDiscovery(cwd, signal)).toBe(false)
+  } finally {
+    vi.unstubAllEnvs()
+  }
+})
 
 describe('GitRunner', () => {
   it('ignores ambient indexed Git configuration after the credential scrub', async () => {
@@ -170,18 +196,27 @@ describe('treeBlob and blobText', () => {
 describe('TurnRecorder', () => {
   it('stays silent when disposed while git work is pending, and warns on failures otherwise', async () => {
     const cwd = await scratchDir('dsh-recorder-', cleanups)
+    git(cwd, 'init', '-q', '-b', 'main')
     const { ctx, git: runnerGit } = await runner()
     const session = ctx.sessions.create(SessionId('recorder'), { meta: { cwd } })
     const warnings: string[] = []
-    let release!: (runner: GitRunner | null) => void
-    const gate = new Promise<GitRunner | null>((resolve) => { release = resolve })
+    const started = Promise.withResolvers<undefined>()
+    const gate = Promise.withResolvers<GitRunner | null>()
     const tempRoot = await scratchDir('dsh-git-store-', cleanups)
-    const env = { reviewStore: new ReviewStore(join(tempRoot, 'reviews'), 1_000_000), git: () => gate, tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100, warn: (m: string) => { warnings.push(m) } }
+    const env = {
+      reviewStore: new ReviewStore(join(tempRoot, 'reviews'), 1_000_000),
+      git: () => {
+        started.resolve(undefined)
+        return gate.promise
+      },
+      tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100,
+      warn: (message: string) => { warnings.push(message) },
+    }
     const disposed = new TurnRecorder(session, cwd, env)
     disposed.start(1)
-    await new Promise(resolve => setTimeout(resolve, 5))
+    await started.promise
     const disposal = disposed.dispose()
-    release(runnerGit)
+    gate.resolve(runnerGit)
     await disposal
     disposed.start(2)
     await disposed.settled()

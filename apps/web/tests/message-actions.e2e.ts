@@ -2,19 +2,21 @@
 // completed-turn-tail fork case (zero model calls) and pins the settled
 // conversation aria after the footers are focus-revealed — the surface package
 // jsdom tests cannot substitute for (docs/testing.md snapshot rule).
+import { auditWorkflowState, newWorkflowPage, compareWorkflowGolden, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { nativeTabKey, responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  assertFixtureInventory, captureStableAria, fixtureUserPrompts,
   launchWebScaffold, rewriteSeedEvents, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/message-actions', import.meta.url))
 // Borrowed read-only: this scenario needs any settled user+assistant pair, not
@@ -157,8 +159,8 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     const raw = completedTailFixture(await readFile(SEED, 'utf8'))
     expect(fixtureUserPrompts(raw), 'adapted seed must carry both prompts').toEqual([PROMPT, SECOND_PROMPT])
     await seedSession(scaffold, raw, SEED_ID)
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -194,11 +196,26 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     ).toEqual(['true', null])
     // Keyboard focus raises the availability tooltip; a programmatic focus in
     // pointer modality never does (Tooltip suppresses focus after pointer input).
-    await branchButtons.first().press('Shift+Tab')
-    await page.keyboard.press('Tab')
+    await branchButtons.first().press(nativeTabKey('backward'))
+    await page.keyboard.press(nativeTabKey())
     await expect.poll(() => page.getByRole('tooltip').allTextContents(), { timeout: 5_000 })
       .toEqual(['Available only on the last message of a completed turn'])
     await expect.poll(() => page.getByRole('button', { name: 'Edit' }).count(), { timeout: 5_000 }).toBe(0)
+    await page.keyboard.press('Escape')
+    await auditWorkflowState(page, 'conversation', 'interrupted-and-settled-message-actions', page.locator('[data-conversation-scroll]'))
+    if (workflowMatrixEnabled) {
+      const process = page.locator('[data-turn-process="1"]')
+      const wasOpen = await process.getAttribute('aria-expanded') === 'true'
+      if (!wasOpen) await process.click()
+      const reasoning = page.locator('[data-variant="think"]').filter({ hasText: 'The user wants me to read a.txt and b.txt' })
+      const disclosure = reasoning.getByRole('button').first()
+      await auditWorkflowState(page, 'conversation', 'settled-reasoning-collapsed', reasoning, [disclosure])
+      await disclosure.click()
+      await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('true')
+      await auditWorkflowState(page, 'conversation', 'settled-reasoning-expanded', reasoning, [disclosure])
+      await disclosure.click()
+      if (!wasOpen) await process.click()
+    }
   }, 60_000)
 
   it.skipIf(MODE === 'record')('keeps an action tooltip above the sticky composer', async () => {
@@ -221,7 +238,10 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
         const composerTop = composer.getBoundingClientRect().top
         scrollport.scrollTop += buttonRect.bottom - (composerTop - 8)
       })
-      await copy.hover()
+      if (workflowMatrixEnabled) {
+        await copy.press('Shift+Tab')
+        await page.keyboard.press('Tab')
+      } else await copy.hover()
       await tooltip.waitFor({ state: 'visible', timeout: 5_000 })
       // Tooltip is intentionally pointer-transparent. Enable hit testing only
       // for this stacking probe; paint order is unchanged.
@@ -270,7 +290,7 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     await page.getByRole('button', { name: 'Copy' }).first().focus()
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
-    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(UI_EXPECTED, snapshot, MODE)
   })
 
   it.skipIf(MODE === 'record')('forks through the settled-message and session-row actions', async () => {
@@ -324,7 +344,7 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
       '[role="tree"][aria-label="Sessions"]',
       scaffold.workspaceCwd,
     )
-    await compareOrRefreshGolden(FORK_EXPECTED, tree, MODE)
+    await compareWorkflowGolden(FORK_EXPECTED, tree, MODE)
   })
 
   it.skipIf(MODE === 'record')('issued zero model calls and kept a closed inventory', async () => {

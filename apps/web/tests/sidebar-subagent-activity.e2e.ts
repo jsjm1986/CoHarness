@@ -1,8 +1,9 @@
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { AgentHandle } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, LlmAdapter } from '@deepseek-ai/dsh-llm'
@@ -13,13 +14,13 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import {
   assertFixtureInventory,
   captureStableAria,
-  compareOrRefreshGolden,
   launchWebScaffold,
   watchConsole,
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage } from './workflow-responsive-state.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/sidebar-subagent-activity', import.meta.url))
 const RUNNING_OWNER_EXPECTED = join(SNAPSHOT_DIR, 'owner-running.expected.md')
@@ -108,8 +109,8 @@ describe('web e2e: sidebar subagent activity', () => {
     childId = started.childId
     await waitForRunningChild(scaffold, adapter, childId)
 
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -139,12 +140,16 @@ describe('web e2e: sidebar subagent activity', () => {
     const ownerRow = sidebar.getByRole('treeitem', { name: /1 subagent running Delegate a background job/ })
     await ownerRow.waitFor({ timeout: 10_000 })
     expect(parentHandle.agent.status).toBe('idle')
-    await compareOrRefreshGolden(
+    await compareWorkflowGolden(
       RUNNING_OWNER_EXPECTED,
       await captureStableAria(page, '[role="tree"][aria-label="Sessions"]', scaffold.workspaceCwd),
       MODE,
     )
     expect(await ownerRow.locator('[data-state="ongoing"]').count()).toBe(1)
+    await auditWorkflowState(page, 'subagent', 'sidebar-running-descendant', sidebar, [], async () => {
+      const open = page.getByRole('button', { name: 'Open sidebar', exact: true })
+      if (await open.isVisible()) await open.tap()
+    })
     await ownerRow.click()
     const runningTrigger = page.getByRole('button', { name: '1 subagent running' })
     await runningTrigger.waitFor({ timeout: 10_000 })
@@ -152,5 +157,5 @@ describe('web e2e: sidebar subagent activity', () => {
     await assertFixtureInventory(SNAPSHOT_DIR, ['owner-running.expected.md'])
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-  })
+  }, 180_000)
 })

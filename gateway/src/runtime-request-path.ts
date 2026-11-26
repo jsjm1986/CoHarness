@@ -1,7 +1,88 @@
 /** Gateway selectors are removed only after authorization, preserving opaque Runtime query bytes. */
 import type { RuntimeId } from './runtime-catalog.ts'
 
-const SELECTORS = new Set(['dshRuntime', 'dshTarget', 'dshNode', 'dshPrincipal'])
+const SELECTORS = new Set(['dshRuntime', 'dshTarget', 'dshNode', 'dshPrincipal', 'dshRestore'])
+const IMMUTABLE_ASSET = /^\/assets\/[^/?%\\]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9.]+$/u
+const PLUGIN_PACKAGE = '(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*'
+const COMBO_RESOURCE = new RegExp(`^${PLUGIN_PACKAGE}/client\\.js(\\.map)?$`, 'u')
+const PLUGIN_CHUNK = new RegExp(`^/plugins/${PLUGIN_PACKAGE}/client\\.[A-Za-z0-9][A-Za-z0-9._-]*\\.js(?:\\.map)?$`, 'u')
+const IMMUTABLE_REVISION = /^[a-f0-9]{12}(?:[a-f0-9]{52})?$/u
+const COMBO_PATH = '/plugins/combo.js'
+const COMBO_QUERY = /^\?([^&]+)&rev=([^&]+)$/u
+const ASSET_PRELOAD = 'dshAssetPreload=1'
+const WORKSPACE_FILE_LIST_PATH = '/api/workspaceFiles.list'
+
+function comboResources(query: string): string[] | undefined {
+  const match = COMBO_QUERY.exec(query)
+  if (match === null || !IMMUTABLE_REVISION.test(match[2]!)) return undefined
+  return match[1]!.split(',')
+}
+
+/**
+ * Strip the scheduling hint only from a revisioned multi-script GET combination.
+ * @param method - original HTTP method.
+ * @param path - original target, including any routing selectors.
+ * @returns the target without the hint, or the original target if it was not a valid preload.
+ */
+export function withoutRuntimeAssetPreload(method: string | undefined, path: string): string {
+  if (method !== 'GET' || !path.startsWith(`${COMBO_PATH}??`) || !path.includes(`&${ASSET_PRELOAD}`)) return path
+  const parts = path.split('&')
+  const index = parts.indexOf(ASSET_PRELOAD)
+  if (index < 1 || parts.lastIndexOf(ASSET_PRELOAD) !== index) return path
+  parts.splice(index, 1)
+  const target = parts.join('&')
+  const resources = comboResources(stripRoutingSelectors(target).slice(COMBO_PATH.length + 1))
+  return resources !== undefined && resources.length > 1
+    && resources.every(entry => entry.endsWith('/client.js') && COMBO_RESOURCE.test(entry)) ? target : path
+}
+
+/** Runtime endpoint for retrieving a managed model credential. */
+export const RUNTIME_MODEL_CREDENTIAL_PATH = '/internal/runtime/model-credential'
+
+/** Runtime assets use an authenticated Gateway cache and must reach it on each browser request. */
+export const BROWSER_RUNTIME_ASSET_CACHE_CONTROL = 'private, no-store'
+
+/**
+ * Qualify only versioned plugin modules and hashed release assets for read-only admission.
+ * @param method - original HTTP method.
+ * @param path - request target; Gateway selectors are removed without reserializing module queries.
+ * @returns whether an exact GET or HEAD resource can bypass execution activity admission.
+ */
+export function isImmutableRuntimeAssetRequest(method: string | undefined, path: string): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false
+  const resource = runtimeRequestPath(path, method)
+  const question = resource.indexOf('?')
+  const pathname = question < 0 ? resource : resource.slice(0, question)
+  const query = question < 0 ? '' : resource.slice(question + 1)
+  if (IMMUTABLE_ASSET.test(pathname)) return query === ''
+  if (pathname === COMBO_PATH) {
+    const resources = comboResources(query)
+    if (resources === undefined) return false
+    const sourceMap = resources[0]!.endsWith('.map')
+    return resources.every(entry => COMBO_RESOURCE.test(entry) && entry.endsWith('.map') === sourceMap)
+  }
+  return PLUGIN_CHUNK.test(pathname) && query.startsWith('rev=') && IMMUTABLE_REVISION.test(query.slice(4))
+}
+
+/**
+ * Identify browser resources that must not start or replace a Runtime.
+ * @param method - original HTTP method.
+ * @param pathname - request pathname without query parameters.
+ * @returns whether the request may use only an already-ready Runtime generation.
+ */
+export function isRuntimeAssetRequest(method: string | undefined, pathname: string): boolean {
+  return (method === 'GET' || method === 'HEAD') && (pathname.startsWith('/assets/')
+    || pathname === '/favicon.svg' || /^\/plugins\/.+\.(?:js|css)(?:\.map)?$/u.test(pathname))
+}
+
+/**
+ * @param method - original HTTP method.
+ * @param pathname - path without query parameters.
+ * @returns whether the request prepares a new Session or reads the history of an active Session.
+ */
+export function isPreparedSessionRequest(method: string | undefined, pathname: string): boolean {
+  return method === 'POST' && (pathname === '/api/prepare/v1/session.create' || pathname === '/api/prepare/v1/session.history')
+}
 
 /**
  * @param method - original HTTP method.
@@ -9,7 +90,49 @@ const SELECTORS = new Set(['dshRuntime', 'dshTarget', 'dshNode', 'dshPrincipal']
  * @returns whether this request requires an exact authorized conversation allocation.
  */
 export function isExplicitSessionRequest(method: string | undefined, pathname: string): boolean {
-  return method === 'POST' && /^\/api\/(?:prepare\/v1\/session\.(?:create|history)|admit\/v1\/session\.(?:prompt|status))$/u.test(pathname)
+  return isPreparedSessionRequest(method, pathname)
+    || method === 'POST' && (pathname === '/api/admit/v1/session.prompt' || pathname === '/api/admit/v1/session.status')
+}
+
+/**
+ * @param method - original HTTP method.
+ * @param url - browser request coordinates.
+ * @returns whether a Runtime read may share prepared admission for a ready generation.
+ */
+export function isReadyRuntimeRead(method: string | undefined, url: URL): boolean {
+  if (method === 'POST') {
+    return url.pathname === '/api/host.describe' || url.pathname === '/api/session.list'
+      || url.pathname === '/api/workspace.list' || url.pathname === '/api/session.history'
+      || url.pathname === WORKSPACE_FILE_LIST_PATH
+  }
+  if (method !== 'GET' || url.pathname !== '/') return false
+  const bootstrap = url.searchParams.getAll('dshBootstrap')
+  return bootstrap.length === 1 && bootstrap[0] === '1'
+}
+
+/**
+ * Identify low-latency interactive Runtime RPCs eligible for single-statement ready-session admission.
+ * @param method - original HTTP method.
+ * @param pathname - request pathname without query parameters.
+ * @returns whether this interactive POST may use `readySession` with full activity recording.
+ */
+export function isReadyRuntimeInteractive(method: string | undefined, pathname: string): boolean {
+  return method === 'POST' && (pathname === '/api/terminal/write' || pathname === '/api/terminal/resize')
+}
+
+/**
+ * Select reads that can use the primary's approval on a ready personal Runtime.
+ * Workspace file listings require current authorization at the owning Gateway.
+ * @param method - original HTTP method.
+ * @param url - browser request coordinates.
+ * @param accountBound - whether the request declares its expected browser account.
+ * @param accept - browser response format requested for structured bootstrap.
+ * @returns whether this request can use delegated read admission.
+ */
+export function isDelegatablePersonalRead(method: string | undefined, url: URL, accountBound: boolean, accept: string | undefined): boolean {
+  if (method === 'POST' && url.pathname === '/api/prepare/v1/session.history') return true
+  return accountBound && url.pathname !== WORKSPACE_FILE_LIST_PATH
+    && isReadyRuntimeRead(method, url) && (method !== 'GET' || accept === 'application/json')
 }
 
 /** @param method - original HTTP method. @param url - original request coordinates. @returns whether a scope change explicitly prepares an allocation. */
@@ -20,13 +143,55 @@ export function isExplicitScopeRequest(method: string | undefined, url: URL): bo
 /**
  * Remove Gateway-owned selectors without reserializing module-loader query fields.
  * @param path - authenticated request path and its original query bytes.
+ * @param method - original HTTP method; omit to remove only placement selectors.
  * @returns the Runtime's original path, preserving custom module and revision syntax.
  */
-export function runtimeRequestPath(path: string): string {
+export function runtimeRequestPath(path: string, method?: string): string {
+  return stripRoutingSelectors(withoutRuntimeAssetPreload(method, path))
+}
+
+function stripRoutingSelectors(path: string): string {
   const question = path.indexOf('?')
   if (question < 0) return path
   const parts = path.slice(question + 1).split('&').filter(part => !SELECTORS.has(new URLSearchParams(part).keys().next().value ?? ''))
   return `${path.slice(0, question)}${parts.length === 0 ? '' : `?${parts.join('&')}`}`
+}
+
+/**
+ * Identify the two loopback stream liveness operations served by the reserved control pool.
+ * @param pathname - normalized internal request path.
+ * @param method - received HTTP method.
+ * @returns whether to use fresh Runtime control authorization.
+ */
+export function isRuntimeStreamControlRequest(pathname: string, method: string | undefined): boolean {
+  return pathname === '/internal/runtime/stream-principals/renew' && method === 'POST'
+    || pathname === '/internal/runtime/execution/watch' && method === 'GET'
+}
+
+/**
+ * Select the completion request that confirms its exact Runtime owner in the accounting transaction.
+ * @param pathname - parsed HTTP pathname.
+ * @param method - HTTP method.
+ * @returns whether this is a resource completion request.
+ */
+export function isRuntimeResourceCompletionRequest(pathname: string, method: string | undefined): boolean {
+  return pathname === '/internal/runtime/resources/finish' && method === 'POST'
+}
+
+/**
+ * Select requests that can qualify their Runtime as part of personal execution or a model credential lookup.
+ * @param pathname - parsed internal request path.
+ * @param method - HTTP method.
+ * @param activeModelCheck - whether the provider requested an exact active model confirmation.
+ * @returns whether to consider SQL-fenced admission.
+ */
+export function isPersonalExecutionWriteRequest(pathname: string, method: string | undefined, activeModelCheck = false): boolean {
+  return method === 'POST'
+    && (pathname === '/internal/runtime/execution/register-session' || pathname === '/internal/runtime/execution/input'
+      || pathname === '/internal/runtime/execution/enter' || pathname === '/internal/runtime/execution/authorize'
+      || pathname === '/internal/runtime/execution/terminal-authorize'
+      || pathname === RUNTIME_MODEL_CREDENTIAL_PATH || pathname === '/internal/runtime/resources/request'
+      || (pathname === '/internal/runtime/resources/statuses' && activeModelCheck))
 }
 
 /**

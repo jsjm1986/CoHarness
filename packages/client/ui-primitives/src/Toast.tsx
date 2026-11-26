@@ -69,7 +69,7 @@ export function Toast({ text, icon, tone, anchor, holdMs = HOLD_MS, actions, onD
   return createPortal(
     <div
       className={css.toast}
-      role="alert"
+      role={tone === 'success' ? 'status' : 'alert'}
       style={{
         ...left === null ? {} : { left },
         '--dsh-toast-hold': `${String(holdMs)}ms`,

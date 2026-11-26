@@ -1,5 +1,5 @@
 /** General settings row for transcript width. */
-import type { ChangeEvent } from 'react'
+import { useId, type ChangeEvent } from 'react'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConversationDisplaySettingsSnapshot } from '../display-settings.ts'
@@ -40,7 +40,9 @@ export function inputValue(event: ChangeEvent<HTMLInputElement>): number {
  * @param props - slider label, bounds, value, and write callback.
  * @returns the range input element.
  */
-export function RangeInput({ label, min, max, value, disabled, onChange }: {
+export function RangeInput({ id, label, min, max, value, disabled, onChange }: {
+  /** ID referenced by the visible label. */
+  id: string
   /** Accessible label and control name. */
   label: string
   /** Slider bounds. */
@@ -55,6 +57,7 @@ export function RangeInput({ label, min, max, value, disabled, onChange }: {
 }) {
   return (
     <input
+      id={id}
       type="range"
       min={min}
       max={max}
@@ -102,6 +105,7 @@ export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFullWidth,
     || snapshot.settings.write.status === 'saving'
   const notice = noticeOf(snapshot.settings, t)
   const widthLabel: ConversationKey = 'settings.display.width'
+  const widthId = useId()
   return (
     <div className={css.row}>
       <div className={css.rowText}>
@@ -114,9 +118,10 @@ export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFullWidth,
         )}
       </div>
       <div className={css.controls}>
-        <label className={css.control}>
-          <span className={css.controlLabel}>{t(widthLabel)}</span>
+        <div className={css.control}>
+          <label htmlFor={widthId} className={css.controlLabel}>{t(widthLabel)}</label>
           <RangeInput
+            id={widthId}
             label={t(widthLabel)}
             min={CHAT_CONTENT_WIDTH_RANGE.min}
             max={CHAT_CONTENT_WIDTH_RANGE.max}
@@ -137,7 +142,7 @@ export function DisplaySettingsRow({ useDisplaySettings, setWidth, setFullWidth,
               {t('settings.display.fill')}
             </label>
           </span>
-        </label>
+        </div>
       </div>
     </div>
   )

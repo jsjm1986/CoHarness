@@ -22,13 +22,21 @@
       - img
       - text: Trash
     - button "History"
-  - status: Open a conversation to add documents to it. Browsing, downloads and copying remain available.
   - heading "Personal documents" [level=3]
   - button "Back"
   - navigation "Document path":
     - button "Root folder"
     - img
     - button "reports" [disabled]
+  - group "Document actions":
+    - button "New Folder":
+      - img
+      - text: New Folder
+    - button "Upload Document":
+      - img
+      - text: Upload Document
+    - button "More actions":
+      - img
   - group "Document filters":
     - img
     - textbox "Search document name": report
@@ -42,24 +50,14 @@
       - img
       - text: Modified · Newest first
       - img
-  - group "Document actions":
-    - button "New Folder":
-      - img
-      - text: New Folder
-    - button "Upload Document":
-      - img
-      - text: Upload Document
-    - button "More actions":
-      - img
   - checkbox "Select this page"
-  - text: Visible only to you 0 folders · 1 documents
+  - text: "Visible only to you Folders: 0 · Documents: 1"
   - list "Document Manager":
     - group "Upload date 2026-08-14":
       - text: 2026-08-14
       - listitem:
         - checkbox "report.txt"
-        - button "Preview report.txt": report.txt Text · 2026-08-14
+        - button "Preview report.txt": report.txt Text
         - text: 21 B
-        - button "Add report.txt to conversation" [disabled]: Add to conversation
         - 'button "More actions: report.txt"':
           - img

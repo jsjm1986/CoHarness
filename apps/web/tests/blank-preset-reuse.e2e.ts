@@ -1,9 +1,10 @@
 /** Blank Session reuse under the requested or default Agent preset through the shipped Web composition. */
 
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import { chromium, type Browser, type Page } from 'playwright'
+import { type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -25,7 +26,7 @@ describe('web e2e: blank Session reuse under the requested preset', () => {
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
   }, 120_000)
 
   afterAll(async () => {

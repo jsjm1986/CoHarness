@@ -17,7 +17,7 @@
                   #text "c"
                 <mn>
                   #text "2"
-            <annotation encoding="application/x-tex">
+            <annotation aria-hidden="true" encoding="application/x-tex">
               #text "E = mc^2"
       <span aria-hidden="true" class="katex-html">
         <span class="katex-base">
@@ -89,7 +89,7 @@
                 #text "∇"
               <mi>
                 #text "p"
-            <annotation encoding="application/x-tex">
+            <annotation aria-hidden="true" encoding="application/x-tex">
               #text "\\frac{\\partial \\mathbf{u}}{\\partial t} + (\\mathbf{u} \\cdot \\nabla)\\mathbf{u} = -\\frac{1}{\\rho}\\nabla p"
       <span aria-hidden="true" class="katex-html">
         <span class="katex-base">
@@ -194,7 +194,7 @@
                   #text "1"
                 <mn>
                   #text "5"
-            <annotation encoding="application/x-tex">
+            <annotation aria-hidden="true" encoding="application/x-tex">
               #text "\\frac{1}{5}"
       <span aria-hidden="true" class="katex-html">
         <span class="katex-base">
@@ -249,7 +249,7 @@
                   #text "π"
                 <mn>
                   #text "2"
-            <annotation encoding="application/x-tex">
+            <annotation aria-hidden="true" encoding="application/x-tex">
               #text "\\frac{\\pi}{4} < \\theta < \\frac{\\pi}{2}"
       <span aria-hidden="true" class="katex-html">
         <span class="katex-base">

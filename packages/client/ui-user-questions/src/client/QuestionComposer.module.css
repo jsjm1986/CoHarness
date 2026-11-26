@@ -3,6 +3,7 @@
    16px so the relation also holds on narrow viewports. */
 .frame {
   display: flex;
+  container: user-question / inline-size;
   justify-content: center;
   padding: 6px calc(var(--dsh-composer-side-clearance) + 16px) 10px;
 }
@@ -17,7 +18,8 @@
   /* Composer seat sits in a fixed-height conversation column (overflow
      hidden): cap the card against the viewport and scroll the option list
      so header and footer actions stay reachable on long batches. */
-  max-height: min(60vh, 520px);
+  --dsh-question-max-height: min(60dvh, 520px);
+  max-height: var(--dsh-question-max-height);
   padding: 0 0 10px;
   border: 0;
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l2-darkmode-thin);
@@ -66,9 +68,13 @@
    same 24px icon-button grid. */
 .headerActions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
 }
 
 .waitButton {
@@ -76,24 +82,29 @@
 }
 
 .waitStatus {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 24px;
-  white-space: nowrap;
+  overflow-wrap: break-word;
 }
 
 /* Figma 1019:36938 header, user-tuned: heading block left, close right; the
    pager sits in the footer to balance the card. */
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--dsw-space-4);
+  row-gap: var(--dsw-space-2);
   flex-shrink: 0;
   padding: var(--dsw-space-5) var(--dsw-space-4) 0 var(--dsw-space-6);
 }
 
 .headingBlock {
+  flex: 1 1 14rem;
   min-width: 0;
 }
 
@@ -110,6 +121,7 @@
   font-size: 16px;
   line-height: 22px;
   font-weight: 500;
+  overflow-wrap: break-word;
 }
 
 .detail {
@@ -143,6 +155,7 @@
 
 .iconButton {
   display: grid;
+  flex: none;
   place-items: center;
   width: 24px;
   height: 24px;
@@ -180,6 +193,11 @@
   gap: 1px;
   margin: var(--dsw-space-2) 0 0;
   padding: var(--dsw-space-1) var(--dsw-space-3);
+}
+
+.options:has(.customBlock) {
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .option {
@@ -363,6 +381,7 @@
 .field > * {
   grid-area: 1 / 1;
   min-width: 0;
+  min-height: 0;
   padding: var(--dsh-answer-field-padding);
   font: inherit;
   font-size: 14px;
@@ -374,7 +393,7 @@
 
 .fieldMirror {
   box-sizing: content-box;
-  max-height: 144px;
+  max-height: min(144px, max(24px, calc(var(--dsh-question-max-height) - 40px)));
   overflow: hidden;
   visibility: hidden;
 }
@@ -390,7 +409,8 @@
 }
 
 .fieldInput::placeholder {
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
+  opacity: 1;
 }
 
 /* Inline custom answer shares the row's available copy width. */
@@ -401,7 +421,8 @@
 /* Optionless question: the free-form answer is the whole body. */
 .customBlock {
   min-height: 64px;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  grid-template-rows: minmax(0, 1fr);
   margin: 0 12px;
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: 10px;
@@ -411,6 +432,61 @@
 
 .customBlock:focus-within {
   border-color: var(--dsw-alias-state-business-primary);
+}
+
+:global([data-viewport-short]) .customBlock {
+  min-height: 0;
+}
+
+:global([data-viewport-short]) .card:not(.cardMinimized) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+:global([data-viewport-short]) .card:not(.cardMinimized) .body {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+@container user-question (max-width: 32rem) {
+  .card:not(.cardMinimized) {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .card:not(.cardMinimized) .body {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .footer {
+    flex-wrap: wrap;
+  }
+
+  .card .feedback {
+    flex-basis: 100%;
+    text-align: start;
+  }
+
+  .feedback:empty {
+    display: none;
+  }
+
+  .footerActions {
+    margin-inline-start: auto;
+  }
+}
+
+@media (max-height: 480px) {
+  .card:not(.cardMinimized) {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .card:not(.cardMinimized) .body {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
 }
 
 .footer {
@@ -425,11 +501,13 @@
 
 .feedback {
   flex: 1;
+  min-width: 0;
   min-height: 16px;
-  color: var(--dsw-alias-state-error-primary);
+  color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 80%, var(--dsw-alias-label-primary));
   font-size: 11px;
   line-height: 16px;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 /* Compact-viewport tightening (below the 768 medium boundary, docs/web-styling.md). */
@@ -483,4 +561,11 @@
   .customRow {
     transition: none;
   }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .field > * { font-size: 16px; }
+  .fieldInput { min-block-size: var(--dsw-touch-target); }
+  .option, .customRow { min-height: var(--dsw-touch-target); }
+  .iconButton { width: var(--dsw-touch-target); height: var(--dsw-touch-target); }
 }

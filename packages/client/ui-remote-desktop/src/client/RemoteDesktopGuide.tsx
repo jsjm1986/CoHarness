@@ -1,6 +1,6 @@
 /** Remote-desktop target menu owned by the provider's guide entry. */
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button, IconChevronDownOutline14, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronDownOutline14, Menu, MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { RemoteDesktopGrantView } from '@deepseek-ai/dsh-api-remote-desktop-controller/types'
@@ -58,16 +58,15 @@ export function RemoteDesktopGuide({ title, description, kind, useTabInfo, t, li
     return () => { lifetime.abort() }
   }, [menu.open, menu.attempt, listTargets])
   const { list } = menu
-  const items = list.phase === 'loading'
-    ? [{ id: 'loading', label: t('targetsLoading'), disabled: true }]
-    : list.phase === 'failed'
-      ? [{ id: 'error', label: t('targetsFailed'), disabled: true }, { id: 'retry', label: t('retry') }]
-      : list.targets.length === 0
-        ? [{ id: 'empty', label: t('targetsEmpty'), disabled: true }]
-        : list.targets.map(({ target, level, recording }, index) => ({
-          id: String(index),
-          label: `${target.desktop === undefined ? target.nodeId : `${target.nodeId} · ${target.desktop}`} · ${t(level === 'control' ? 'control' : 'viewOnly')}${recording ? ` · ${t('recording')}` : ''}`,
-        }))
+  const feedback = list.phase === 'loading' ? t('targetsLoading')
+    : list.phase === 'failed' ? t('targetsFailed')
+      : list.targets.length === 0 ? t('targetsEmpty') : undefined
+  const items = list.phase === 'ready'
+    ? list.targets.map(({ target, level, recording }, index) => ({
+      id: String(index),
+      label: `${target.desktop === undefined ? target.nodeId : `${target.nodeId} · ${target.desktop}`} · ${t(level === 'control' ? 'control' : 'viewOnly')}${recording ? ` · ${t('recording')}` : ''}`,
+    }))
+    : []
   return <div className={css.entry} data-sidebar-right-guide-entry={kind}>
     <Button variant="ghost" className={css.main} aria-haspopup="menu" aria-expanded={menu.open} onClick={toggle}>
       <RemoteDesktopGuideIcon size={description === undefined ? 22 : 26} className={css.icon} />
@@ -81,7 +80,6 @@ export function RemoteDesktopGuide({ title, description, kind, useTabInfo, t, li
       items={items}
       onClose={() => { setMenu(value => ({ ...value, open: false })) }}
       onSelect={(id) => {
-        if (id === 'retry') { retry(); return }
         const chosen = list.phase === 'ready' ? list.targets[Number(id)] : undefined
         if (chosen === undefined) return
         setMenu(value => ({ ...value, open: false }))
@@ -94,6 +92,9 @@ export function RemoteDesktopGuide({ title, description, kind, useTabInfo, t, li
         onClick={toggle}>
         <IconChevronDownOutline14 />
       </Button>}
-    />
+    >
+      {feedback !== undefined && <p className={css.feedback} role={list.phase === 'failed' ? 'status' : undefined}>{feedback}</p>}
+      {list.phase === 'failed' && <MenuItemButton onSelect={retry}>{t('retry')}</MenuItemButton>}
+    </Menu>
   </div>
 }

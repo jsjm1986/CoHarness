@@ -44,8 +44,10 @@ export interface ClusterNodeView {
   inflightWrites: number
   /** Instances whose process lifecycle has not confirmed a stopped state. */
   activeRuntimes: number
+  /** Recorded physical isolation plus revoked admission; process observations remain unchanged. */
+  externallyFenced?: true
   /**
-   * All instances stopped and the node's Gateway write gate acknowledged.
+   * Every writer is confirmed stopped or physically isolated with its admission revoked.
    */
   quiesced: boolean
 }
@@ -60,8 +62,8 @@ export interface ClusterState {
   updatedAt: string
   nodes: ClusterNodeView[]
   /**
-   * Every instance is stopped. Active or draining nodes also need a fresh
-   * heartbeat and acknowledgment of the current maintenance epoch.
+   * Every writer is stopped or covered by verified physical isolation. Other active
+   * or draining nodes need a fresh heartbeat and the current maintenance epoch.
    */
   writersQuiesced: boolean
 }
@@ -218,6 +220,25 @@ export class PostgresMaintenanceService {
   }
 
   /**
+   * Verify active Gateway placement and the startup write epoch in one PostgreSQL snapshot.
+   * @param startupWriteEpoch - write epoch captured before loading the Gateway's cached dependencies.
+   * @param signal - cancellation checked before the connection is borrowed and after the query.
+   */
+  async checkGatewayReadiness(startupWriteEpoch: bigint, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    const { pool, organizationId, nodeId } = this.context
+    const result = await pool.query<{ write_epoch: string }>(`SELECT COALESCE(c.write_epoch, 1)::text AS write_epoch
+      FROM harness.organizations o
+      JOIN harness.compute_nodes n ON n.organization_id=o.id
+      LEFT JOIN harness.cluster_control c ON c.organization_id=o.id
+      WHERE o.id=$1 AND o.status='active' AND n.id=$2 AND n.status='active'`, [organizationId, nodeId])
+    signal?.throwIfAborted()
+    const row = result.rows[0]
+    if (row === undefined) throw new Error('PostgreSQL organization or compute node is not active')
+    if (BigInt(row.write_epoch) !== startupWriteEpoch) throw new Error('PostgreSQL write epoch differs from the Gateway startup epoch')
+  }
+
+  /**
    * Acknowledge the maintenance epoch this node's write gate has already
    * observed, publish the node's in-flight writer count, and refresh
    * `last_heartbeat_at`. Acknowledging only the observed epoch keeps a
@@ -226,23 +247,44 @@ export class PostgresMaintenanceService {
    * @param observedMaintenanceEpoch - epoch last returned by {@link writeGate}
    * @param inflightWrites - mutating requests and fenced background tasks
    *   currently executing on this node
+   * @param baselineWriteEpoch - optional data generation for this serving Gateway's heartbeat
    */
-  async heartbeat(observedMaintenanceEpoch: bigint, inflightWrites: number): Promise<void> {
+  async heartbeat(observedMaintenanceEpoch: bigint, inflightWrites: number, baselineWriteEpoch?: bigint): Promise<void> {
     const updated = await this.context.pool.query(
       `UPDATE harness.compute_nodes
        SET last_heartbeat_at=now(),
            status = CASE WHEN status = 'offline' THEN 'active' ELSE status END,
            maintenance_applied_epoch=GREATEST(maintenance_applied_epoch,$3),
            inflight_writes=$4
-       WHERE organization_id=$1 AND id=$2`,
-      [this.context.organizationId, this.context.nodeId, observedMaintenanceEpoch.toString(), inflightWrites],
+       WHERE organization_id=$1 AND id=$2
+         AND ($5::bigint IS NULL OR COALESCE((SELECT write_epoch FROM harness.cluster_control WHERE organization_id=$1),1)=$5)`,
+      [this.context.organizationId, this.context.nodeId, observedMaintenanceEpoch.toString(), inflightWrites,
+        baselineWriteEpoch?.toString() ?? null],
     )
-    if (updated.rowCount !== 1) throw new Error('maintenance heartbeat compute node disappeared')
+    if (updated.rowCount !== 1) throw new Error('maintenance heartbeat lost its compute node or write epoch')
   }
 
   /** Cluster mode plus per-node convergence for the admin API and the applier. */
   async state(): Promise<ClusterState> {
     return this.stateWithin(this.context.pool)
+  }
+
+  /**
+   * Read writer convergence on the published push-only schema, which predates physical isolation records.
+   * @returns maintenance state based on acknowledged process stops and outstanding writes.
+   */
+  async stateBeforePushUpgrade(): Promise<ClusterState> {
+    return this.stateWithin(this.context.pool, false)
+  }
+
+  /**
+   * Hold the legacy deployment in maintenance through the push ledger upgrade.
+   * @param client - migration transaction that owns subsequent schema and ledger writes.
+   */
+  async verifyPushUpgrade(client: Queryable): Promise<void> {
+    const control = await this.lockControl(client)
+    if (control.mode !== 'maintenance') throw new MaintenanceError(409, 'push-upgrade-requires-maintenance')
+    if (!(await this.stateWithin(client, false)).writersQuiesced) throw new MaintenanceError(409, 'writers-not-quiesced')
   }
 
   /**
@@ -256,7 +298,7 @@ export class PostgresMaintenanceService {
     }))
   }
 
-  private async stateWithin(queryable: Queryable): Promise<ClusterState> {
+  private async stateWithin(queryable: Queryable, physicalIsolation = true): Promise<ClusterState> {
     const control = await readControl(queryable, this.context.organizationId)
     const nodes = await queryable.query<{
       id: string
@@ -267,13 +309,15 @@ export class PostgresMaintenanceService {
       maintenance_applied_epoch: string
       inflight_writes: string
       active_runtimes: number
+      externally_fenced: boolean
     }>(
       `SELECT n.id,n.name::text,n.status,n.last_heartbeat_at,
               (EXTRACT(EPOCH FROM (now()-n.last_heartbeat_at))*1000)::bigint heartbeat_age_ms,
               n.maintenance_applied_epoch,n.inflight_writes,
               (SELECT count(*)::integer FROM harness.instances i
                WHERE i.organization_id=n.organization_id AND i.assigned_node_id=n.id
-                 AND (i.observed_state<>'stopped' OR i.desired_state<>'stopped')) active_runtimes
+                 AND (i.observed_state<>'stopped' OR i.desired_state<>'stopped')) active_runtimes,
+              ${physicalIsolation ? 'harness.node_physically_isolated(n.organization_id,n.id)' : 'false'} externally_fenced
        FROM harness.compute_nodes n WHERE n.organization_id=$1 ORDER BY n.name`,
       [this.context.organizationId],
     )
@@ -283,11 +327,10 @@ export class PostgresMaintenanceService {
       const fresh = row.heartbeat_age_ms !== null && row.heartbeat_age_ms <= this.staleHeartbeatMs
       const applied = BigInt(row.maintenance_applied_epoch) >= epoch
       const inflight = Number(row.inflight_writes)
-      // Offline and never-started Gateway nodes need no HTTP drain. Their
-      // runtime records must still confirm that every process has stopped.
-      // A stale or pre-reporting Gateway cannot prove its own writes drained.
+      // Without physical isolation evidence, offline nodes still need confirmed
+      // process stops. A stale Gateway cannot prove its own writes drained.
       const cold = row.last_heartbeat_at === null
-      const nodeQuiesced = row.active_runtimes === 0 && (row.status === 'offline' || cold || (fresh && applied && inflight === 0))
+      const nodeQuiesced = row.externally_fenced || row.active_runtimes === 0 && (row.status === 'offline' || cold || (fresh && applied && inflight === 0))
       if (!nodeQuiesced) quiesced = false
       return {
         nodeId: row.id,
@@ -298,6 +341,7 @@ export class PostgresMaintenanceService {
         maintenanceAppliedEpoch: row.maintenance_applied_epoch,
         inflightWrites: inflight,
         activeRuntimes: row.active_runtimes,
+        ...(row.externally_fenced ? { externallyFenced: true as const } : {}),
         quiesced: nodeQuiesced,
       }
     })

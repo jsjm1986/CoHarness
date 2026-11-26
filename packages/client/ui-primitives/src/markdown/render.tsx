@@ -17,7 +17,7 @@
  */
 
 import { Fragment, createElement, useCallback, useState } from 'react'
-import type { Key, ReactNode } from 'react'
+import type { Key, KeyboardEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
@@ -29,6 +29,7 @@ import { CodeBlock } from './CodeBlock.tsx'
 import { HoverCard } from '../HoverCard.tsx'
 import { ImageLightbox } from '../ImageLightbox.tsx'
 import { ImagePreview } from '../ImagePreview.tsx'
+import { focusWithoutRing } from '../focus.ts'
 import type { CodeToolbarLabels } from '../CodeToolbar.tsx'
 import { renderTexToReact } from './katex.tsx'
 import type { PositionedBlock } from './incremental.ts'
@@ -470,6 +471,16 @@ function renderListItem(
   )
 }
 
+function scrollWideTable(event: KeyboardEvent<HTMLDivElement>): void {
+  if (event.defaultPrevented || event.target !== event.currentTarget) return
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  const scrollport = event.currentTarget
+  if (scrollport.scrollWidth <= scrollport.clientWidth) return
+  event.preventDefault()
+  scrollport.scrollBy({ left: event.key === 'ArrowLeft' ? -40 : 40 })
+}
+
 function renderTable(node: Md.Table, key: Key, context: MarkdownRenderContext): ReactNode {
   const align = node.align ?? null
   const [headRow, ...bodyRows] = node.children
@@ -480,6 +491,7 @@ function renderTable(node: Md.Table, key: Key, context: MarkdownRenderContext): 
       key={key}
       className={clsx(css.tableScroll, wide ? 'md-table-wide' : css.tableFill)}
       tabIndex={wide ? 0 : undefined}
+      onKeyDown={wide ? scrollWideTable : undefined}
     >
       <table>
         {headRow !== undefined && <thead>{renderTableRow(headRow, 'th', align, 0, context)}</thead>}
@@ -646,7 +658,7 @@ function LoadedMarkdownImage({ src, alt, destination, preview }: {
   return <>
     <button type="button" className={css.imageButton} title={preview.labels.open}
       aria-label={alt ? `${preview.labels.open}: ${alt}` : preview.labels.open}
-      onClick={() => { setOpen(true) }}>{img}</button>
+      onClick={(event) => { focusWithoutRing(event.currentTarget); setOpen(true) }}>{img}</button>
     {open && <ImageLightbox src={src} alt={alt} labels={preview.labels} onClose={close} />}
   </>
 }

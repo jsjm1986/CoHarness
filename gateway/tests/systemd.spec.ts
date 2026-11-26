@@ -35,6 +35,21 @@ describe('unitName', () => {
 })
 
 describe('renderUserUnit', () => {
+  it('permits verified retained paths while preserving confinement and unrelated grant rejection',()=>{
+    const retained={...ALICE,homePath:'/data/retained/alice',dshHome:'/data/retained/isolated-runtime'}
+    expect(()=>renderUserUnit(retained,[],OPTS)).toThrow('outside usersRoot')
+    const unit=renderUserUnit({...retained,retainedData:true},[{path:retained.dshHome,mode:'rw'}],OPTS)
+    expect(unit).toContain('WorkingDirectory='+retained.homePath)
+    expect(unit).toContain('BindPaths='+retained.dshHome)
+    expect(unit).toContain('ProtectSystem=strict')
+    expect(unit).toContain('ProtectHome=tmpfs')
+    expect(unit).toContain('TemporaryFileSystem='+OPTS.usersRoot+':ro')
+    expect(()=>renderUserUnit({...retained,retainedData:true},[{path:'/unrelated/private',mode:'rw'}],OPTS)).toThrow('grant is outside managed roots')
+    const project={...retained,kind:'project' as const,homePath:'/data/projects/team',retainedData:true as const}
+    expect(renderUserUnit(project,[],OPTS)).toContain('WorkingDirectory=/data/projects/team')
+    expect(()=>renderUserUnit({...project,homePath:'/unrelated/project'},[],OPTS)).toThrow('outside projectPathRoots')
+  })
+
   const grants = [
     { path: '/srv/harness/users/alice/home', mode: 'rw' as const },
     { path: '/data/projects/team-alpha', mode: 'rw' as const },
@@ -83,6 +98,22 @@ describe('renderUserUnit', () => {
   it('marks the gateway dir inaccessible', () => {
     expect(unit).toContain('InaccessiblePaths=-/srv/harness/gateway')
     expect(unit).toContain('InaccessiblePaths=-/srv/harness/gateway-data/bootstrap-admin-password')
+  })
+
+  it('delivers recovery policy through a read-only credential without exposing its source directory', () => {
+    const policyFile = '/srv/harness/gateway/recovery policy.json'
+    const policySha256 = 'b'.repeat(64)
+    const recovered = renderUserUnit({ ...ALICE, recoveryPolicy: { policyFile, policySha256 } }, grants, OPTS)
+    expect(recovered).toContain('Environment=HGW_RECOVERY_POLICY_FILE=%d/dsh-recovery')
+    expect(recovered).toContain(`Environment=HGW_RECOVERY_POLICY_SHA256=${policySha256}`)
+    expect(recovered).toContain(`LoadCredential="dsh-recovery:${policyFile}"`)
+    expect(recovered).toContain('InaccessiblePaths=-/srv/harness/gateway')
+    expect(recovered).not.toContain(`BindPaths=${policyFile}`)
+    expect(unit).not.toContain('HGW_RECOVERY_POLICY')
+    for (const unsafe of ['%d/recovery', '/tmp/a\nExecStart=bad', '/tmp/a:bad']) {
+      expect(() => renderUserUnit({ ...ALICE, recoveryPolicy: { policyFile: unsafe, policySha256 } }, grants, OPTS)).toThrow()
+    }
+    expect(() => renderUserUnit({ ...ALICE, recoveryPolicy: { policyFile, policySha256: 'bad\nvalue' } }, grants, OPTS)).toThrow('invalid recovery policy handoff')
   })
 
   it('runs as a per-user system account under the user home with the grants file', () => {

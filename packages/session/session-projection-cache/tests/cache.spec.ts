@@ -15,6 +15,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import { z } from 'zod'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
@@ -306,6 +307,56 @@ describe('SessionProjectionCache write policy', () => {
     expect(write).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(1)
     expect(write).toHaveBeenCalledExactlyOnceWith(session)
+  })
+
+  it('checkpoints interval writes outside the Agent that dirtied the Session', async () => {
+    const { ctx, root, cache } = await harness({ config: { writeEveryEvents: 100, writeIntervalMs: 1 } })
+    await ctx.plugin(AgentRegistry)
+    const id = SessionId('detached-interval')
+    const created = whenWritten(ctx, id)
+    const session = ctx.sessions.create(id)
+    await created
+    const initiators: Array<Agent | undefined> = []
+    const original = cache.write.bind(cache)
+    vi.spyOn(cache, 'write').mockImplementation((current) => {
+      initiators.push(ctx.agents.currentInitiator())
+      return original(current)
+    })
+    const agent = { id: session.id } as Agent
+    const written = whenWritten(ctx, id)
+    ctx.agents.withInitiator(agent, () => { mark(session, ['background']) })
+
+    await written
+    expect(initiators).toEqual([undefined])
+    expect((await storedRows(root, id))?.['cache-test/marks']?.val).toEqual({ marks: ['background'] })
+  })
+
+  it('still arms interval writes when AgentRegistry is closing', async () => {
+    const { ctx, root } = await harness({ config: { writeEveryEvents: 100, writeIntervalMs: 1 } })
+    const id = SessionId('closing-registry-interval')
+    const created = whenWritten(ctx, id)
+    const session = ctx.sessions.create(id)
+    await created
+    const warn = vi.spyOn(ctx.logger, 'warn')
+    let markedDuringClose = false
+    const scope = ctx.plugin((inner) => {
+      inner.plugin(AgentRegistry)
+      inner.effect(() => () => {
+        // Ancestor unloading has already moved AgentRegistry to closing while
+        // the service is still present for sibling teardown work.
+        expect(() => { ctx.agents.withoutInitiator(() => undefined) }).toThrow('agent initiator scope is disposed')
+        mark(session, ['during-close'])
+        markedDuringClose = true
+      })
+    })
+    await scope
+    const written = whenWritten(ctx, id)
+    await scope.dispose()
+    await written
+
+    expect(markedDuringClose).toBe(true)
+    expect(warn).not.toHaveBeenCalled()
+    expect((await storedRows(root, id))?.['cache-test/marks']?.val).toEqual({ marks: ['during-close'] })
   })
 
   it('write() on a never-dirty session checkpoints directly and rejects a non-JSON unit state', async () => {

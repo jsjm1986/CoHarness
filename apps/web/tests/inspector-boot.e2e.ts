@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
-import { chromium, type Browser } from 'playwright'
+import type { Browser, Locator, Page } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -15,13 +15,66 @@ import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-experimental-inspector'
 import type {} from '@deepseek-ai/dsh-client-modules'
 import {
-  captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
+  captureStableAria, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, REPO_ROOT, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, REPO_ROOT, saveFailureShot } from './support.ts'
+import { expectViewportFit, responsiveBrowser } from './responsive-browser.ts'
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { auditResponsiveControl } from './responsive-controls.ts'
 
 const PROFILE = join(REPO_ROOT, 'packages/experimental/inspector-profile')
 const EXPECTED = fileURLToPath(new URL('./expected/inspector-boot', import.meta.url))
 const runFile = promisify(execFile)
+
+async function exerciseInspectorConsole(page: Page, state: string): Promise<void> {
+  const container = page.locator('[data-inspector-devtools]')
+  const frontend = page.frameLocator('[data-inspector-devtools]')
+  // Chromium owns the embedded controls. Their actions use the real frontend, and the Inspector owns the frame's bounds.
+  await expectViewportFit(page, container)
+  const consoleTab = frontend.getByRole('tab', { name: 'Console', exact: true })
+  await consoleTab.click()
+  const prompt = frontend.getByRole('textbox', { name: 'Console prompt', exact: true })
+  await prompt.click()
+  await prompt.pressSequentially('"responsive-inspector-result"')
+  await prompt.press('Enter')
+  const result = frontend.locator('.console-user-command-result').filter({ hasText: 'responsive-inspector-result' })
+  await result.waitFor()
+  await auditWorkflowState(page, 'inspector-iframe', `${state}-console`, container)
+
+  const filter = frontend.getByRole('textbox', { name: 'Filter', exact: true })
+  await filter.fill('responsive-inspector-result')
+  expect(await filter.textContent()).toBe('responsive-inspector-result')
+  await result.waitFor()
+  await auditWorkflowState(page, 'inspector-iframe', `${state}-filter`, container)
+  await filter.fill('')
+
+  const settings = frontend.getByRole('button', { name: 'Console settings', exact: true })
+  await settings.click()
+  const preserveLog = frontend.getByRole('checkbox', { name: 'Preserve log', exact: true })
+  await preserveLog.check()
+  expect(await preserveLog.isChecked()).toBe(true)
+  await auditWorkflowState(page, 'inspector-iframe', `${state}-settings`, container)
+  await preserveLog.uncheck()
+  await settings.click()
+}
+
+async function toggleInspectorFromFrame(page: Page, opener: Locator): Promise<void> {
+  const panel = page.locator('[data-inspector-panel]')
+  const frame = page.locator('[data-inspector-devtools]')
+  const retained = await frame.elementHandle()
+  if (retained === null) throw new Error('Inspector frame is unavailable')
+  try {
+    await page.frameLocator('[data-inspector-devtools]').getByRole('textbox', { name: 'Console prompt', exact: true })
+      .press('ControlOrMeta+Shift+.')
+    await panel.waitFor({ state: 'hidden' })
+    expect(await opener.evaluate(element => element === document.activeElement)).toBe(true)
+    await opener.press('ControlOrMeta+Shift+.')
+    await panel.waitFor({ state: 'visible' })
+    expect(await frame.evaluate((element, previous) => element === previous, retained)).toBe(true)
+    await page.frameLocator('[data-inspector-devtools]').locator('.console-user-command-result')
+      .filter({ hasText: 'responsive-inspector-result' }).waitFor()
+  } finally { await retained.dispose() }
+}
 
 it.skipIf(webSnapshotMode() === 'record')('boots inspection from separate transport groups with reusable shared application responses', async () => {
   const scratch = await mkdtemp(join(tmpdir(), 'dsh-inspector-transport-'))
@@ -78,9 +131,9 @@ it.skipIf(webSnapshotMode() === 'record')('boots inspection from separate transp
     expect(second.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
     expect(digest(await second.arrayBuffer())).toBe(baseResponses.get(batch.url))
   }
-  const browser = await chromium.launch()
+  const browser = await responsiveBrowser.launch()
   owned.browser = browser
-  const page = await newEnglishPage(browser)
+  const page = await newWorkflowPage(browser)
   onTestFailed(() => saveFailureShot(page, 'inspector-shared-transport'))
   const tripwire = watchConsole(page)
   await page.goto(inspected.authenticatedUrl, { waitUntil: 'load' })
@@ -89,15 +142,19 @@ it.skipIf(webSnapshotMode() === 'record')('boots inspection from separate transp
   await composer.fill('Inspect this workspace without submitting a model task')
   expect(await composer.inputValue()).toBe('Inspect this workspace without submitting a model task')
   await expect.poll(() => page.locator('[data-inspector-panel]').count()).toBe(1)
-  await compareOrRefreshGolden(join(EXPECTED, 'shared-transport-startup.expected.md'),
+  await compareWorkflowGolden(join(EXPECTED, 'shared-transport-startup.expected.md'),
     await captureStableAria(page, 'body', inspected.workspaceCwd), webSnapshotMode())
+  await composer.focus()
   await page.keyboard.press('ControlOrMeta+Shift+.')
   await page.locator('[data-inspector-panel]').waitFor({ state: 'visible' })
   await page.frameLocator('[data-inspector-devtools]').getByRole('tab', { name: 'Console', exact: true }).waitFor()
+  await auditWorkflowState(page, 'inspector', 'shared-transport-console', page.locator('[data-inspector-panel]'))
+  await exerciseInspectorConsole(page, 'shared-transport')
+  await toggleInspectorFromFrame(page, composer)
   expect(tripwire.pageErrors).toEqual([])
   expect(tripwire.warnings).toEqual([])
   expect(await page.locator('[data-slot-error]').count()).toBe(0)
-})
+}, workflowMatrixEnabled ? 300_000 : 90_000)
 
 it.skipIf(webSnapshotMode() === 'record').each([
   { hostOnly: false, name: 'loopback Client' },
@@ -126,9 +183,9 @@ it.skipIf(webSnapshotMode() === 'record').each([
   owned.scaffold = world
   const inspector = world.ctx.get('inspector')
   if (inspector === undefined) throw new Error('Inspector Host service did not activate')
-  const browser = await chromium.launch()
+  const browser = await responsiveBrowser.launch()
   owned.browser = browser
-  const page = await newEnglishPage(browser)
+  const page = await newWorkflowPage(browser)
   onTestFailed(() => saveFailureShot(page, `inspector-boot-${hostOnly ? 'host-only' : 'client'}`))
   const tripwire = watchConsole(page)
   const ingestSockets: string[] = []
@@ -177,6 +234,7 @@ it.skipIf(webSnapshotMode() === 'record').each([
     .filter(client => client.connection.state === 'connected').length
   await expect.poll(connectedClients).toBe(hostOnly ? 0 : 1)
   expect((await inspector.cordis.getTree()).host?.connection.state).toBe('connected')
+  await composer.focus()
   await page.keyboard.press('ControlOrMeta+Shift+.')
   const panel = page.locator('[data-inspector-panel]')
   await panel.waitFor({ state: 'visible' })
@@ -188,12 +246,32 @@ it.skipIf(webSnapshotMode() === 'record').each([
   expect(selected.get('sourceScope')).toBe(hostOnly ? 'host' : null)
   expect(selected.has('clientSourceId')).toBe(!hostOnly)
   await page.frameLocator('[data-inspector-devtools]').getByRole('tab', { name: 'Console', exact: true }).waitFor()
-  await compareOrRefreshGolden(join(EXPECTED, `${hostOnly ? 'host-only' : 'client'}-panel.expected.md`),
+  const resize = panel.getByRole('separator', { name: 'Resize NodeJS Inspector panel' })
+  await resize.focus()
+  await resize.press('ArrowUp')
+  expect(await resize.getAttribute('aria-valuenow')).toBe('50')
+  await resize.press('End')
+  expect(await resize.getAttribute('aria-valuenow')).toBe('80')
+  await auditWorkflowState(page, 'inspector', hostOnly ? 'host-only-expanded' : 'client-expanded', panel,
+    [resize, panel.getByRole('button', { name: 'Collapse', exact: true })])
+  await exerciseInspectorConsole(page, hostOnly ? 'host-only' : 'client')
+  await resize.press('Home')
+  expect(await resize.getAttribute('aria-valuenow')).toBe('20')
+  await auditWorkflowState(page, 'inspector', hostOnly ? 'host-only-minimum' : 'client-minimum', panel)
+  await auditWorkflowState(page, 'inspector-iframe', hostOnly ? 'host-only-minimum-console' : 'client-minimum-console',
+    page.frameLocator('[data-inspector-devtools]').locator('body'),
+    [page.frameLocator('[data-inspector-devtools]').getByRole('textbox', { name: 'Console prompt', exact: true })],
+    async () => { await auditResponsiveControl(page, frame, 'Inspector minimum-height iframe container') })
+  await toggleInspectorFromFrame(page, composer)
+  expect(await connectedClients()).toBe(hostOnly ? 0 : 1)
+  for (let step = 0; step < 5; step++) await resize.press('ArrowUp')
+  await compareWorkflowGolden(join(EXPECTED, `${hostOnly ? 'host-only' : 'client'}-panel.expected.md`),
     await captureStableAria(page, '[data-inspector-panel]', world.workspaceCwd), webSnapshotMode())
   await panel.getByRole('button', { name: 'Collapse', exact: true }).click()
   await panel.waitFor({ state: 'hidden' })
+  expect(await composer.evaluate(element => element === document.activeElement)).toBe(true)
   expect(ingestSockets).toHaveLength(hostOnly ? 0 : 1)
   expect(tripwire.pageErrors).toEqual([])
   expect(tripwire.warnings).toEqual([])
   expect(await page.locator('[data-slot-error]').count()).toBe(0)
-})
+}, workflowMatrixEnabled ? 300_000 : 90_000)

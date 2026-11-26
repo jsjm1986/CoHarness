@@ -195,12 +195,20 @@ export function TaskMenu({ open, anchor, items = [], selectedId, onSelect, onClo
     }
     /* jscpd:ignore-start -- schedule-local copy of the shared ui-primitives Menu; the two owners change independently. */
     const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey) return
       // Where the keyboard is, computed once: the menu owns it when it holds a
       // row or sits on its anchor region.
       const focused = document.activeElement
       const insideList = listRef.current?.contains(focused) === true
       const anchored = rootRef.current?.contains(focused) === true || insideList
       if (e.key === 'Escape') {
+        // Escape lands in the capture phase so a page-level handler reading
+        // defaultPrevented already sees the key consumed: React dispatches
+        // its delegated keydown before the document bubble phase runs, and a
+        // trigger that never took focus (WebKit does not focus buttons on
+        // click) leaves no wrapper handler in the key's path.
+        e.preventDefault()
+        if (e.repeat) return
         // Closing hands the keyboard back when the menu had it.
         dismiss()
         if (anchored) refocusAnchor()
@@ -271,10 +279,14 @@ export function TaskMenu({ open, anchor, items = [], selectedId, onSelect, onClo
     const onWindowBlur = (): void => {
       if (document.activeElement instanceof HTMLIFrameElement) dismiss()
     }
-    document.addEventListener('keydown', onKeyDown)
+    const onEscape = (event: KeyboardEvent): void => { if (event.key === 'Escape') onKeyDown(event) }
+    const onOtherKey = (event: KeyboardEvent): void => { if (event.key !== 'Escape') onKeyDown(event) }
+    document.addEventListener('keydown', onOtherKey)
+    document.addEventListener('keydown', onEscape, true)
     window.addEventListener('blur', onWindowBlur)
     return () => {
-      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keydown', onOtherKey)
+      document.removeEventListener('keydown', onEscape, true)
       window.removeEventListener('blur', onWindowBlur)
     }
   }, [open, dismiss])

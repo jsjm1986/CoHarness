@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/mcp/mcp-client/README.md
 document:
-  en: 7a24b9a783967f7438ad5535103706f660d4ab61
-  zh: 73edeb998beeede2942e0629bfbf82820b3bf3c6
+  en: 85920bb2846f9a6f5e8579f70a97720a2b3f8a16
+  zh: f5fed8d99294c96778e5b481667d2c87738a1350
 /:
   en: 6440e0efb151c0fa
   zh: d767308eb95b9d3f
@@ -18,8 +18,8 @@ document:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-mcp-client/use-this-package:
-  en: e77871d58566601a
-  zh: 01d5c6eabc8d2db9
+  en: 84f57d670171c457
+  zh: ee3e7ff0c0c8a741
 /deepseek-ai-dsh-mcp-client/use-this-package/minimal-configuration:
   en: 20f4ad9f169fbb35
   zh: 839e5a69dc59e86f

@@ -61,13 +61,13 @@ export class DirectoryHandle {
   get identity(): DirectoryIdentity { return { device: this.handle.device, inode: this.handle.inode } }
 
   /**
-   * Read the filesystem UUID from this owned directory descriptor on macOS.
-   * Other platforms and volumes with a zero UUID return absence; syscall failures reject.
-   * A volume UUID identifies a filesystem, not a directory or an authorization grant.
-   * @returns the lowercase filesystem UUID, or absence where this primitive has no persistent volume identity.
+   * Read the macOS filesystem UUID or Linux Btrfs subvolume UUID from this directory handle.
+   * Unsupported filesystems, older Btrfs kernels and zero UUIDs return absence. Other syscall failures reject.
+   * Callers must also verify the directory inode and its ownership.
+   * @returns the lowercase UUID, or absence when the kernel provides no persistent identity.
    */
   volumeIdentity(): Promise<string | undefined> {
-    return this.enqueue(() => call('fgetattrlist', callback => native().directoryVolume(this.handle, callback)))
+    return this.enqueue(() => call('directoryVolume', callback => native().directoryVolume(this.handle, callback)))
   }
 
   /**

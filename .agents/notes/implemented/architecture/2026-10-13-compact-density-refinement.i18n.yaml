@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-13-compact-density-refinement.md
 document:
-  en: 023cb88721172c5ce55d135c6fdf5060d533150b
-  zh: 0c457a220d629e3bc1cc96eef43f3c8f889011c7
+  en: 6c60c0556972482a59838ca4295d00a3fa337272
+  zh: 0a526a61a60202cd7323575ed04af0d22603d84b
 /agent-note-compact-density-refinement-for-phone-viewports:
   en: 0dc0c42f6e1a7f91
   zh: 8c5376f518cc0db9
@@ -12,17 +12,17 @@ document:
   en: 9ad3fde2e4e07c0f
   zh: 5f1aaca491edcc79
 /agent-note-compact-density-refinement-for-phone-viewports/decision:
-  en: 66a51c525070fa6b
-  zh: 4243f840d5ea8281
+  en: b1ebdb54e8a9553a
+  zh: 5938353ddbf546df
 /agent-note-compact-density-refinement-for-phone-viewports/alternatives-considered:
-  en: 2b7223a61887ff90
-  zh: f4e64e47be586bf7
+  en: 7a4aad768c47c603
+  zh: 7c466a970114aa0f
 /agent-note-compact-density-refinement-for-phone-viewports/consequences:
   en: 3ddc549a6912ed84
   zh: 0da9ed3433c37904
 /agent-note-compact-density-refinement-for-phone-viewports/verification:
-  en: c4a691a9eac7dfb2
-  zh: 5bdb4fc96c42d919
+  en: a25fba1614213b70
+  zh: 0310a9550b60da1b
 /agent-note-compact-density-refinement-for-phone-viewports/related:
   en: f2fe779dfdc5207f
   zh: 5fdd3f06189475c4

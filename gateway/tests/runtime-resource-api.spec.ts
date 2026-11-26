@@ -1,15 +1,30 @@
 /** Real bearer, principal, execution-scope and PostgreSQL admission integration. @module */
 import { createHash, randomUUID } from 'node:crypto'
-import { resolve } from 'node:path'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import type { Pool, PoolClient } from 'pg'
+import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_CHANGE_WAIT_TIMING_HEADER, RESOURCE_GRANT_AGE_HEADER,
+  RESOURCE_INGRESS_TIMING_HEADER, RESOURCE_PHASE_TIMING_HEADER, RESOURCE_QUALIFIED_GRANT_HEADER } from '@deepseek-ai/dsh-resource-budget/wire'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { NodeResourceBudgetConfig } from '../src/node-resource-budget.ts'
+import { InstanceManager } from '../src/instances.ts'
+import { OperationTimings, timeResourceBearer } from '../src/operation-timing.ts'
+import { PostgresAuditService } from '../src/postgres/audit-service.ts'
+import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
+import { PostgresMaintenanceService } from '../src/postgres/maintenance-service.ts'
+import { PostgresProjectService } from '../src/postgres/project-service.ts'
+import { PostgresUserService } from '../src/postgres/user-service.ts'
 import { PRINCIPAL_HEADER } from '../src/principal.ts'
+import { createGatewayServer } from '../src/server.ts'
 import { createExecutionFixture } from './execution-fixture.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
+import { testConfig } from './test-config.ts'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
@@ -30,8 +45,8 @@ describePg('Runtime resource HTTP admission', () => {
   })
   afterAll(async () => { await pool?.end() })
 
-  async function fixture() {
-    const f = await createExecutionFixture(pool, { resourceBudget: config })
+  async function fixture(options: Parameters<typeof createExecutionFixture>[1] = {}) {
+    const f = await createExecutionFixture(pool, { ...options, resourceBudget: config })
     cleanups.push(f.dispose)
     for (const runtime of [f.project, f.other, f.personal, f.peerPersonal]) {
       expect(await f.call(path('register'), {}, undefined, runtime)).toEqual({ status: 200, body: { nextSequence: 1, policy: config } })
@@ -40,6 +55,244 @@ describePg('Runtime resource HTTP admission', () => {
       WHERE organization_id=$1 AND node_id=$2`, [f.organizationId, f.context.nodeId, count])
     return { ...f, grant }
   }
+
+  it('attributes one queued bearer query to its own resource exchange', async () => {
+    const limited = createPostgresPool(databaseUrl!, { max: 1 })
+    cleanups.push(() => limited.end())
+    const ring = new OperationTimings(3)
+    const server = createServer((req, res) => {
+      void ring.run(req, res, async () => {
+        await timeResourceBearer(() => limited.query('SELECT 1'))
+        await limited.query('SELECT 2')
+        res.end()
+      }).catch(() => { res.statusCode = 500; res.end() })
+    })
+    cleanups.push(() => new Promise<void>((closed, reject) => {
+      server.close(error => error === undefined ? closed() : reject(error))
+      server.closeAllConnections()
+    }))
+    await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/internal/runtime/resources`
+    const held = await limited.connect()
+    const request = fetch(`${url}/request`, { method: 'POST' })
+    try {
+      await expect.poll(() => limited.waitingCount).toBe(1)
+    } finally { held.release() }
+    const submitted = await request
+    expect(submitted.status).toBe(200)
+    await submitted.text()
+    const statuses = await fetch(`${url}/statuses`, { method: 'POST' })
+    expect(statuses.status).toBe(200)
+    await statuses.text()
+    const finishId = randomUUID()
+    const completed = await fetch(`${url}/finish`, { method: 'POST', headers: { 'x-dsh-operation-id': finishId } })
+    expect(completed.status).toBe(200)
+    await completed.text()
+    expect(ring.samples()).toMatchObject(['resourceRequest', 'resourceStatuses', 'resourceFinish'].map(operation => ({
+      operation, resourceBearerDatabase: { queries: 1, queryMs: expect.any(Number), poolWaitMs: expect.any(Number), connectionSetupMs: 0 },
+      sql: { governance: { count: 2 } }, databaseCheckout: { governance: { reused: 2, opened: 0 } },
+    })))
+    expect(ring.samples()[0]!.resourceBearerDatabase!.poolWaitMs).toBeGreaterThan(0)
+    expect(submitted.headers.get('x-dsh-operation-id')).toBe(ring.samples()[0]!.id)
+    expect(statuses.headers.get('x-dsh-operation-id')).toBe(ring.samples()[1]!.id)
+    expect(completed.headers.get('x-dsh-operation-id')).toBe(finishId)
+  })
+
+  it('reserves a known personal model operation once after rechecking scope, permission, lease and epoch', async () => {
+    const f = await fixture({ executionWriteEpoch: 1n, resourceStatusWaitMs: 1500,
+      performanceEnabled: true, nodeConnection: { id: randomUUID(), epoch: 1 } })
+    const root = await mkdtemp(join(tmpdir(), 'hgw-resource-admission-'))
+    cleanups.push(() => rm(root, { recursive: true, force: true }))
+    const cfg = testConfig(root)
+    const credentials = new PostgresInstanceRepository(f.context, cfg.instancePortBase, undefined, undefined, 60_000)
+    for (const runtime of [f.personal, f.peerPersonal]) expect(await credentials.authenticateRuntimeToken(runtime.token)).not.toBeNull()
+    const authenticate = vi.fn(async (token: string) => await f.instances.authenticateRuntimeToken(token) ?? false)
+    const maintenance = new PostgresMaintenanceService(f.context, cfg.nodeStaleMs)
+    const maintenanceGate = vi.fn(async () => (await maintenance.writeGate(1n)).verdict)
+    const timings = new OperationTimings(4)
+    let writers = 0
+    const runtime = Object.assign((...args: Parameters<typeof f.handler>) =>
+      timings.run(args[0], args[1], () => f.handler(...args)), f.handler)
+    const server = createGatewayServer({ cfg, maintenanceGate, users: new PostgresUserService(f.context, cfg),
+      auth: new PostgresAuthService(f.context, cfg), projects: new PostgresProjectService(f.context, cfg),
+      audit: new PostgresAuditService(f.context), instances: new InstanceManager(f.instances, cfg),
+      writerSpan() { writers += 1; return () => { writers -= 1 } } }, {
+      runtime,
+      runtimeAuthorize: req => authenticate(req.headers.authorization?.slice('Bearer '.length) ?? ''),
+      runtimePersonalExecutionCandidate: req => credentials.personalExecutionCandidate(req.headers.authorization?.slice('Bearer '.length) ?? ''),
+      runtimePersonalExecutionStopGate: () => 'open',
+    })
+    cleanups.push(() => new Promise<void>((closed, reject) => {
+      server.close(error => error === undefined ? closed() : reject(error))
+      server.closeAllConnections()
+    }))
+    await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
+    const http = (action: string, payload: object, runtime = f.personal, headers: Record<string, string> = {}) => {
+      const endpoint = action === 'enter' ? '/internal/runtime/execution/enter' : path(action)
+      return fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}${endpoint}`, {
+        method: 'POST', body: JSON.stringify(payload), headers: { ...f.headers(runtime), ...headers },
+      })
+    }
+    const call = async <Body = unknown>(...args: Parameters<typeof http>) => {
+      const response = await http(...args)
+      return { status: response.status, body: await response.json() as Body }
+    }
+    const sessionId = await f.session(f.personal)
+    const input = await f.admit(sessionId, f.admin, f.personal)
+    const entry = { sessionId, inputId: input.inputId, messageId: input.messageId, contentHash: input.contentHash, currentScopeId: null }
+    expect((await call('enter', { ...entry, contentHash: '0'.repeat(64) })).status).toBe(403)
+    expect(await call('enter', entry, f.peerPersonal)).toMatchObject({ status: 404 })
+    const [entered, replay] = await Promise.all([call<{ scopeId: string }>('enter', entry), call('enter', entry)])
+    expect(entered).toMatchObject({ status: 200, body: { scopeId: expect.any(String) } })
+    expect(replay).toEqual(entered)
+    expect(await pool.query('SELECT 1 FROM harness.execution_scopes WHERE organization_id=$1 AND session_id=$2',
+      [f.organizationId, sessionId])).toMatchObject({ rowCount: 1 })
+    expect(timings.samples().filter(sample => sample.operation === 'executionEnter' && sample.status === 200)
+      .some(sample => sample.sql.governance.count <= 3)).toBe(true)
+    authenticate.mockClear()
+    maintenanceGate.mockClear()
+    const request = { ...operation(1), kind: 'model', origin: { kind: 'session', sessionId, scopeId: entered.body.scopeId } }
+    const reservations = async () => (await pool.query('SELECT sequence FROM harness.node_resource_requests WHERE organization_id=$1 ORDER BY sequence',
+      [f.organizationId])).rows.map(row => String(row.sequence))
+    const grant = (enabled: boolean, client: Pool | PoolClient = pool) => client.query(`UPDATE harness.computer_use_permissions SET enabled=$4
+      WHERE organization_id=$1 AND node_id=$2 AND user_id=$3`, [f.organizationId, f.context.nodeId, f.admin.uuid, enabled])
+
+    expect(await call('request', request, f.peerPersonal)).toMatchObject({ status: 403, body: { error: 'execution-forbidden' } })
+    const blocker = await pool.connect()
+    let pending: ReturnType<typeof call> | undefined
+    try {
+      await blocker.query('BEGIN')
+      const pid = (await blocker.query<{ pid: number }>('SELECT pg_backend_pid() pid')).rows[0]!.pid
+      await blocker.query('SELECT 1 FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2 FOR UPDATE',
+        [f.organizationId, f.context.nodeId])
+      pending = call('request', request)
+      void pending.catch(() => { /* The test awaits the result after releasing its lock. */ })
+      await expect.poll(async () => (await pool.query<{ blocked: boolean }>(`SELECT EXISTS(SELECT FROM pg_stat_activity
+        WHERE $1::int=ANY(pg_blocking_pids(pid))) blocked`, [pid])).rows[0]!.blocked, { timeout: 3000 }).toBe(true)
+      await blocker.query('SELECT 1 FROM harness.users WHERE id=$1 FOR UPDATE', [f.admin.uuid])
+      await grant(false, blocker)
+      await blocker.query('COMMIT')
+    } finally {
+      try { await blocker.query('ROLLBACK') } finally { blocker.release() }
+      await pending?.catch(() => { /* Release the observed request if the concurrent setup failed. */ })
+    }
+    expect(await pending).toMatchObject({ status: 401, body: { error: 'invalid-runtime-token' } })
+    expect(await reservations()).toEqual([])
+    await grant(true)
+    await pool.query('UPDATE harness.node_agents SET lease_expires_at=clock_timestamp() WHERE organization_id=$1', [f.organizationId])
+    expect(await call('request', request)).toMatchObject({ status: 401, body: { error: 'invalid-runtime-token' } })
+    expect(await reservations()).toEqual([])
+    await pool.query("UPDATE harness.node_agents SET lease_expires_at=clock_timestamp()+interval '1 hour' WHERE organization_id=$1", [f.organizationId])
+    await f.grant(1)
+    const granted = { status: 200, body: { state: 'active' } }
+    const submissionResponse = await http('request', request)
+    expect(submissionResponse.headers.get(RESOURCE_QUALIFIED_GRANT_HEADER)).toBe('1')
+    expect({ status: submissionResponse.status, body: await submissionResponse.json() }).toEqual(granted)
+    expect(timings.samples().at(-1)?.sql.governance.count).toBe(1)
+    expect(await call('request', request)).toEqual(granted)
+    expect(timings.samples().at(-1)?.sql.governance.count).toBe(1)
+    expect(await reservations()).toEqual(['1'])
+    await pool.query(`UPDATE harness.node_resource_state SET limits=jsonb_set(limits,'{sampleMs}','400')
+      WHERE organization_id=$1 AND node_id=$2`, [f.organizationId, f.context.nodeId])
+    expect(await call('request', request)).toEqual(granted)
+    expect(timings.samples().at(-1)?.sql.governance.count).toBe(4)
+    await pool.query(`UPDATE harness.node_resource_state SET limits=jsonb_set(limits,'{sampleMs}','0')
+      WHERE organization_id=$1 AND node_id=$2`, [f.organizationId, f.context.nodeId])
+    expect(await call('request', { ...request, ...operation(2) })).toEqual({ status: 400, body: { error: 'resource-message' } })
+    expect(await reservations()).toEqual(['1'])
+    expect((await pool.query('SELECT last_sequence::int FROM harness.node_resource_runtimes WHERE organization_id=$1 AND runtime_id=$2',
+      [f.organizationId, f.personal.runtimeId])).rows).toEqual([{ last_sequence: 1 }])
+    await pool.query(`UPDATE harness.node_resource_state SET limits=$3::jsonb WHERE organization_id=$1 AND node_id=$2`,
+      [f.organizationId, f.context.nodeId, JSON.stringify(config)])
+    expect(authenticate).not.toHaveBeenCalled()
+    expect(maintenanceGate).not.toHaveBeenCalled()
+    const check = { operations: [{ sequence: request.sequence, requestId: request.requestId }] }
+    const hint = { [RESOURCE_ACTIVE_MODEL_CHECK_HEADER]: '1' }
+    const active = { status: 200, body: [{ state: 'active' }] }
+    expect(await call('statuses', check)).toEqual(active)
+    const ordinaryQueries = timings.samples().at(-1)!.sql.governance.count
+    expect(await call('statuses', check, f.personal, hint)).toEqual(active)
+    expect(ordinaryQueries).toBeGreaterThan(1)
+    expect(timings.samples().at(-1)?.sql.governance.count).toBe(1)
+    expect(await call('statuses', { operations: [operation(1)] }, f.personal, hint)).toEqual({
+      status: 409, body: { error: 'resource-owner-mismatch' },
+    })
+    const otherSession = await f.session(f.personal)
+    const anotherInput = await f.admit(otherSession, f.admin, f.personal)
+    const otherEntry = await call<{ scopeId: string }>('enter', { sessionId: otherSession, inputId: anotherInput.inputId,
+      messageId: anotherInput.messageId, contentHash: anotherInput.contentHash, currentScopeId: null })
+    expect(otherEntry.status).toBe(200)
+    const queued = operation(2)
+    const submission = await http('request', { ...queued, kind: 'model',
+      origin: { kind: 'session', sessionId: otherSession, scopeId: otherEntry.body.scopeId } })
+    expect(await submission.json()).toEqual({ state: 'queued' })
+    expect(timings.samples().at(-1)).toMatchObject({
+      operation: 'resourceRequest',
+      resourceQueue: { reason: 'no-local-observation' },
+    })
+    const cursor = submission.headers.get(RESOURCE_CHANGE_CURSOR_HEADER)
+    expect(submission.headers.get(RESOURCE_QUALIFIED_GRANT_HEADER)).toBeNull()
+    expect(cursor).toBe(f.resourceBudget!.changeCursor)
+    await f.resourceBudget!.observe({ capturedAt: performance.now() - config.sampleMs - 10, cpu: 0.95, memory: 'normal', eventLoopMs: 2, parallelism: 4 })
+    expect(await call('statuses', { operations: [queued] }, f.personal, hint)).toEqual({
+      status: 200, body: [{ state: 'queued' }],
+    })
+    expect(timings.samples().at(-1)).toMatchObject({
+      operation: 'resourceStatuses',
+      resourceQueue: { reason: 'pressure-cpu', cpu: 0.95, memory: 'normal', sampleCredits: 0, sampleApplied: true },
+    })
+    const waitForChange = vi.spyOn(f.resourceBudget!, 'waitForChange')
+    const awaiting = http('statuses', { operations: [queued] }, f.personal, {
+      ...hint, [RESOURCE_CHANGE_CURSOR_HEADER]: f.resourceBudget!.changeCursor, 'x-dsh-operation-id': queued.requestId,
+    })
+    try {
+      await expect.poll(() => waitForChange.mock.calls.length).toBe(1)
+      expect(writers).toBe(0)
+      expect(await reservations()).toEqual(['1', '2'])
+      await f.resourceBudget!.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 1 })
+      const dispatch = await awaiting
+      expect(dispatch.status).toBe(200)
+      expect(await dispatch.json()).toEqual([{ state: 'active' }])
+      expect(dispatch.headers.get(RESOURCE_GRANT_AGE_HEADER)).toMatch(/^\d+$/u)
+      expect(dispatch.headers.get(RESOURCE_CHANGE_WAIT_TIMING_HEADER)).toMatch(/^\d+\.\d{2}$/u)
+      expect(Number(dispatch.headers.get(RESOURCE_CHANGE_WAIT_TIMING_HEADER))).toBeGreaterThan(0)
+      expect(timings.samples(queued.requestId).at(-1)).toMatchObject({ operation: 'resourceStatuses', sql: { governance: { count: 1 } },
+        phases: { resourceChangeWait: expect.any(Number) } })
+    } finally {
+      waitForChange.mockRestore()
+      await awaiting.catch(() => { /* Ensure the bounded waiter settles under a failed assertion. */ })
+    }
+    const completion = { ...queued, outcome: 'quiescent' }
+    const correlation = { 'x-dsh-operation-id': queued.requestId }
+    const mismatchedFinish = await http('finish', { ...completion, requestId: randomUUID() }, f.personal, correlation)
+    expect(mismatchedFinish.status).toBe(409)
+    expect(mismatchedFinish.headers.get(RESOURCE_PHASE_TIMING_HEADER)).toMatch(/^\[\d+(?:\.\d+)?,0,\d+(?:\.\d+)?\]$/u)
+    await mismatchedFinish.json()
+    expect(await reservations()).toEqual(['1', '2'])
+    const finished = await http('finish', completion, f.personal, correlation)
+    expect(finished.headers.get('x-dsh-operation-id')).toBe(queued.requestId)
+    expect(finished.headers.get('cache-control')).toBe('no-store')
+    expect(finished.headers.get(RESOURCE_INGRESS_TIMING_HEADER)).toMatch(/^\[\d+(?:\.\d+)?,\d+(?:\.\d+)?\]$/u)
+    expect(finished.headers.get(RESOURCE_PHASE_TIMING_HEADER)).toMatch(/^\[\d+(?:\.\d+)?,0,\d+(?:\.\d+)?\]$/u)
+    expect({ status: finished.status, body: await finished.json() }).toEqual({ status: 200, body: {} })
+    expect(await reservations()).toEqual(['1'])
+    expect(timings.samples(queued.requestId).filter(sample => sample.operation === 'resourceFinish')).toMatchObject([
+      { status: 409, durationMs: expect.any(Number), phases: { resourceFinishDatabase: expect.any(Number) } },
+      { status: 200, durationMs: expect.any(Number), phases: { resourceFinishDatabase: expect.any(Number) } },
+    ])
+    await grant(false)
+    expect(await call('statuses', check, f.personal, hint)).toMatchObject({ status: 401 })
+    expect(await reservations()).toEqual(['1'])
+    await grant(true)
+    await pool.query('UPDATE harness.node_agents SET lease_expires_at=clock_timestamp() WHERE organization_id=$1', [f.organizationId])
+    expect(await call('statuses', check, f.personal, hint)).toMatchObject({ status: 401 })
+    await pool.query("UPDATE harness.node_agents SET lease_expires_at=clock_timestamp()+interval '1 hour' WHERE organization_id=$1", [f.organizationId])
+    await pool.query("INSERT INTO harness.cluster_control(organization_id,mode,write_epoch) VALUES($1,'serving',2)", [f.organizationId])
+    expect(await call('statuses', check, f.personal, hint)).toMatchObject({ status: 503 })
+    expect(await call('request', { ...request, ...operation(3) })).toMatchObject({ status: 503, body: { error: 'execution-writes-unavailable' } })
+    expect(await reservations()).toEqual(['1'])
+    expect(await call('request', request, { ...f.personal, token: randomUUID() })).toMatchObject({ status: 401 })
+  })
 
   async function stewardFixture() {
     const f = await fixture()

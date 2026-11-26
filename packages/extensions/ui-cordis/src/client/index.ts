@@ -1,6 +1,7 @@
 /** Cordis dynamic-plugin cards, inventory panel, business-view host, and `@pluginId` source. */
 
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -120,5 +121,7 @@ export function apply(ctx: ClientContext): void {
   const slash = ctx.get('inputTriggers') as InputTriggerService
   ctx.effect(() => slash.registerSource(source), 'ui-cordis: @pluginId source')
 
-  sources.forSession().inventory.refresh()
+  const inventory = sources.forSession().inventory
+  const connection = ctx.get('connection') as ConnectionHandle
+  if (ctx.get('startupDraft') === undefined || connection.state.getSnapshot() === 'connected') inventory.refresh()
 }

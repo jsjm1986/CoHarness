@@ -70,7 +70,11 @@
 
 @media (pointer: coarse) {
   .chip {
+    min-width: var(--dsw-touch-target);
     min-height: var(--dsw-touch-target);
+  }
+  :global([data-clip-seat][data-clipped]) .chip {
+    min-width: var(--dsw-touch-target);
   }
 }
 

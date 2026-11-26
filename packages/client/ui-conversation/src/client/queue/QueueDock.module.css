@@ -117,6 +117,7 @@
 .list {
   max-height: 180px;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -194,8 +195,10 @@
   cursor: pointer;
 }
 
-.action:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .action:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .action:focus-visible {
@@ -221,4 +224,21 @@
 :global([data-viewport='compact']) .action {
   width: var(--dsw-touch-target);
   height: var(--dsw-touch-target);
+}
+
+@media (pointer: coarse) {
+  .header,
+  .row {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+  }
+
+  .action {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport-short]) .list {
+  max-height: var(--dsw-touch-target);
 }

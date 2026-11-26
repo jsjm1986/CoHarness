@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-29-package-regrouping.md
 document:
-  en: eaeed3a6a1eaa4688bb72bbaff923619e647ec65
-  zh: 516e11f1544d70d6d39d9125aa05efe22084a262
+  en: 59b57dbeaa25f5799f1dcbbfe53d74bb7a42dbc6
+  zh: 2a90c98c6e1a63f4998c6c60e00bcbf733e8e422
 /agent-note-regroup-packages-by-measured-clustering:
   en: 23ae7573326701c7
   zh: c4535a92a47a0cb9
@@ -24,5 +24,5 @@ document:
   en: 81751321c08276fc
   zh: cd01b03e92b4de2d
 /agent-note-regroup-packages-by-measured-clustering/consequences:
-  en: 1911469d55704f9a
-  zh: 1950333ed7e5d6a6
+  en: 64a34cda155c1362
+  zh: d2aeafa9cb32f059

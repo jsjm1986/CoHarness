@@ -178,6 +178,9 @@ export interface UserDocClient {
   ): Promise<UserDocDirectoryRef>
   overview(signal?: AbortSignal): Promise<UserDocCatalogOverview>
   overviewPage?(query?: UserDocListQuery, signal?: AbortSignal): Promise<UserDocCatalogOverview>
+  /** Report authorized first-page rows while the remaining computers respond. */
+  overviewProgress?(query: UserDocListQuery, signal: AbortSignal,
+    onPage: (page: UserDocCatalogOverview, pending: number) => void): Promise<UserDocCatalogOverview>
   history(signal?: AbortSignal, scope?: UserDocScope): Promise<UserDocCatalogHistory>
   contentUrl(docId: UserDocIdType, inline?: boolean): string
   scopedContentUrl(scope: UserDocScope, docId: UserDocIdType, inline?: boolean): string
@@ -198,6 +201,7 @@ const TRASH_PATH = `${ROOT}/trash`
 const RESTORE_PATH = `${ROOT}/restore`
 const PURGE_PATH = `${ROOT}/purge`
 const OVERVIEW_PATH = `${ROOT}/overview`
+const OVERVIEW_STREAM = 'application/x-ndjson'
 const HISTORY_PATH = `${ROOT}/history`
 const READ_RETRY_LIMIT = 2
 const MAX_RETRY_DELAY_MS = 4000
@@ -350,6 +354,61 @@ function errorFrom(status: number, body: unknown, retryDelay?: number): Error {
     undefined,
     retryDelay,
   )
+}
+
+async function readOverviewStream(
+  response: Response, signal: AbortSignal, onPage: (page: UserDocCatalogOverview, pending: number) => void,
+): Promise<UserDocCatalogOverview> {
+  if (response.body === null) throw new UserDocHttpError(502, 'Document overview ended before the page was ready.', 'DOCUMENT_SCOPE_UNAVAILABLE')
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder('utf-8', { fatal: true })
+  const cancel = (): void => { void reader.cancel(signal.reason).catch(() => { /* The pending read reports the stream failure. */ }) }
+  signal.addEventListener('abort', cancel, { once: true })
+  let parts: Uint8Array[] = [], size = 0
+  try {
+    signal.throwIfAborted()
+    for (;;) {
+      const chunk = await reader.read()
+      signal.throwIfAborted()
+      if (chunk.done) throw new UserDocHttpError(502, 'Document overview ended before the page was ready.', 'DOCUMENT_SCOPE_UNAVAILABLE')
+      for (let start = 0; start < chunk.value.length;) {
+        const end = chunk.value.indexOf(10, start)
+        const part = chunk.value.subarray(start, end === -1 ? undefined : end)
+        size += part.byteLength
+        if (size > MAX_JSON_RESPONSE_BYTES) {
+          throw new UserDocHttpError(502, 'Document overview is too large.', 'DOCUMENT_RESPONSE_TOO_LARGE')
+        }
+        parts.push(part)
+        if (end === -1) break
+        start = end + 1
+        const bytes = new Uint8Array(size)
+        let offset = 0
+        for (const piece of parts) { bytes.set(piece, offset); offset += piece.length }
+        parts = []
+        size = 0
+        const frame = JSON.parse(decoder.decode(bytes)) as {
+          type?: unknown
+          page?: UserDocCatalogOverview
+          pending?: unknown
+          status?: unknown
+          error?: unknown
+        } | null
+        if (frame?.type === 'error' && typeof frame.status === 'number' && frame.status >= 400 && frame.status < 600) {
+          throw errorFrom(frame.status, frame)
+        }
+        if (frame?.page?.version !== 1 || !Array.isArray(frame.page.documents)) throw new Error('Invalid document overview response.')
+        if (frame.type === 'complete') return frame.page
+        if (frame.type !== 'progress' || typeof frame.pending !== 'number' || !Number.isSafeInteger(frame.pending) || frame.pending < 1) {
+          throw new Error('Invalid document overview response.')
+        }
+        onPage(frame.page, frame.pending)
+      }
+    }
+  } finally {
+    signal.removeEventListener('abort', cancel)
+    try { await reader.cancel() } catch { /* An errored reader has already delivered the failure. */ }
+    finally { reader.releaseLock() }
+  }
 }
 
 async function requestJson<T>(input: RequestInfo | URL, init: RequestInit | undefined): Promise<T> {
@@ -625,6 +684,18 @@ export function createUserDocClient(privateResourceUrl: (url: string) => string 
     overviewPage: (query, signal) => readJson<UserDocCatalogOverview>(
       `${OVERVIEW_PATH}${listingSuffix(query).replace(/^&/u, '?')}`, requestInit('GET', signal),
     ),
+    overviewProgress: async (query, signal, onPage) => {
+      const path = `${OVERVIEW_PATH}${listingSuffix(query).replace(/^&/u, '?')}`
+      const url = address(path)
+      if (!url.startsWith('/account/api/')) return readJson<UserDocCatalogOverview>(path, { signal })
+      const response = await fetch(url, { signal, cache: 'no-store', headers: { accept: OVERVIEW_STREAM } })
+      if (response.ok && response.headers.get('content-type')?.split(';')[0] === OVERVIEW_STREAM) {
+        return readOverviewStream(response, signal, onPage)
+      }
+      const body = await parseResponse(response)
+      if (!response.ok) throw errorFrom(response.status, body, retryAfterMs(response))
+      return body as UserDocCatalogOverview
+    },
     history: (signal, scope) => readJson<UserDocCatalogHistory>(scope === undefined ? HISTORY_PATH : scopedPath('/history', scope), requestInit('GET', signal)),
     contentUrl: (id, inline) => address(contentUrl(id, inline)),
     scopedContentUrl: (scope, id, inline) => address(scopedContentUrl(scope, id, inline)),

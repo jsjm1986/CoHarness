@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-catalog.md
 document:
-  en: ec8ed789e613fa6239662b454cf30d41d8d99277
-  zh: c5c6442d143d9830da49e3492b36bac66a8f55fb
+  en: 854f83942e2e38256f7bf1dbeca46a77925603cf
+  zh: 3022cedef220fa4061a0bd2dea5bb7ebfe4c2cfd
 /:
   en: a11f106978c9dce7
   zh: a11f106978c9dce7
@@ -177,8 +177,8 @@ document:
   en: 9edf4ef31e60e880
   zh: 9edf4ef31e60e880
 /session-persistence-event-catalog/events/model/model-selection-log-only:
-  en: c68a4a09b518c7ab
-  zh: 0baf7d170a27b8be
+  en: d77f6183068ebbcb
+  zh: 53280555cbbe92c0
 /session-persistence-event-catalog/events/permission:
   en: 19917bc5438e60af
   zh: 19917bc5438e60af
@@ -672,11 +672,11 @@ document:
   en: f9ff02bdc95614bc
   zh: 0927a2230c6ae47a
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13:
-  en: 0ede6ab37bfbed84
-  zh: a43a1f6604045b39
+  en: 88c04323abc50cde
+  zh: 9b434b8a8d2e6827
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-admission:
-  en: ec8f45687ff37ca4
-  zh: 26055992f805b51e
+  en: 237af9119c77cf20
+  zh: 515a933c83147107
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-documents:
   en: a638b79cac382f23
   zh: 9cad8144614b9f6f
@@ -684,11 +684,11 @@ document:
   en: 833c2190cc6b4312
   zh: 4a4c4edb7154f462
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-documents-item-representation-variant-0:
-  en: 87d96a6319c29610
-  zh: de1568875b57e51d
+  en: 8b2a1b45527da4f8
+  zh: 2a06377b51c8eaf2
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-documents-item-representation-variant-1:
-  en: 1e9969286d81e5de
-  zh: e7d7a50e56b78913
+  en: f1fb405c76830cbf
+  zh: 42a2c46c6c13a0c6
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-participant-role:
   en: 26f84ec67767994a
   zh: ef24e8a5c3f6efc7
@@ -696,14 +696,14 @@ document:
   en: 206e41d285e19ebc
   zh: 38b561a90d5df6ed
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-participant-scope-variant-0:
-  en: c631c2bab991045c
-  zh: 4797a47c7428929c
+  en: 55ff528dfa7cd03a
+  zh: a79530ddd14c45a6
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-participant-scope-variant-0-mode:
   en: 372aef21a1c0ba4d
   zh: 387575c83e4be268
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-13-participant-scope-variant-1:
-  en: 150e19328a0bd3dd
-  zh: f32e98ae93a98a2b
+  en: f6e6e4450bbd8832
+  zh: 8e95861a0b0e69d9
 /session-persistence-event-catalog/resolved-persistence-types/event-agent-inbox-spliced-data-inserted-item-source-variant-14:
   en: cac3143bf208c162
   zh: 1be76384b3da7077
@@ -1839,11 +1839,11 @@ document:
   en: 6bbca429c5297948
   zh: 74c003c1be107b39
 /session-persistence-event-catalog/resolved-persistence-types/packages-attachment-userdoc-src-types-ts-userdocpromptattachment:
-  en: ea0d13e6086e53da
-  zh: 5f6d1c07dc3a62dd
+  en: 6b4cecfe952e3f0e
+  zh: 3e05d26ffa3b453d
 /session-persistence-event-catalog/resolved-persistence-types/packages-attachment-userdoc-src-types-ts-userdocpromptrepresentation:
-  en: 63de1984a2c351bb
-  zh: 1543305c31ce6fad
+  en: 977e136f9f6e92e6
+  zh: 1d0402224aa55758
 /session-persistence-event-catalog/resolved-persistence-types/packages-attachment-userdoc-src-types-ts-userdocref:
   en: 6e0a81ace74450ae
   zh: 11613e8e62e120f0
@@ -1992,11 +1992,11 @@ document:
   en: bde1bd9486faecde
   zh: fd113f2436cacd79
 /session-persistence-event-catalog/resolved-persistence-types/packages-host-apiproxy-src-api-sessions-ts-authenticatedparticipant:
-  en: aa3d087911588f3d
-  zh: ce0f45326f0e24b4
+  en: b45e2dde947af814
+  zh: b155188a60fb1029
 /session-persistence-event-catalog/resolved-persistence-types/packages-host-apiproxy-src-api-sessions-ts-modelselection:
-  en: 5444253e565e0196
-  zh: d1b6cf3bfef42132
+  en: d3b159ed34435732
+  zh: 3b97e4de4b2786e8
 /session-persistence-event-catalog/resolved-persistence-types/packages-interaction-commands-src-types-ts-commandsource:
   en: 54011737af646f70
   zh: 2513511e3c18d7e1

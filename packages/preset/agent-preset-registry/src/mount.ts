@@ -19,7 +19,7 @@ import { pathToFileURL } from 'node:url'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import { Include } from '@deepseek-ai/cordis-plugin-include'
 import { EntryTree, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
-import { prepareProfileEntries } from '@deepseek-ai/dsh-app-boot'
+import { prepareProfileEntries, readRecoveryPresetEntries } from '@deepseek-ai/dsh-app-boot'
 import { scopeOf, scopeParentOf, type ScopeKey } from '@deepseek-ai/dsh-scope'
 import type { PresetDefinition } from './definition.ts'
 import { PresetMountError, type FileAgentPreset } from './preset.ts'
@@ -553,7 +553,9 @@ export async function mountDefinition(
  * Mount `preset` under `agentCtx` and return only once every row is usable.
  *
  * The subtree is owned by `agentCtx`'s fiber, so it unwinds with the agent and
- * the caller receives no disposer. A rejection leaves nothing mounted.
+ * the caller receives no disposer. Pending Host dependencies are rechecked
+ * after the Host Loader settles. Disposing the owning scope or subtree during
+ * initialization rejects publication. A rejection leaves nothing mounted.
  * @param agentCtx - the agent's scope context, from the agent factory's `setup`.
  * @param preset - the resolved preset to compose the agent from.
  * @throws when `agentCtx` carries no scope, a row is unusable, or a row
@@ -566,6 +568,10 @@ export async function mountPreset(agentCtx: Context, preset: FileAgentPreset): P
       `agent-presets: refusing to mount preset "${preset.id}" into an unscoped context; `
       + 'its registrations would apply to every agent in the process',
     )
+  }
+  if (agentCtx.get('recoveryPolicy') !== undefined) {
+    await mountDefinition(agentCtx, preset.id, readRecoveryPresetEntries(preset.path))
+    return
   }
   const config: Include.Config = { path: pathToFileURL(preset.path).href }
   // Captured before the subtree exists: the standing scope context still
@@ -584,7 +590,20 @@ export async function mountPreset(agentCtx: Context, preset: FileAgentPreset): P
     /* v8 ignore next -- the subclass constructor runs before `await()` settles for every mounted tree */
     if (subtree === undefined) throw new Error('mounted subtree did not publish its entry tree')
     const { tree, fiber } = subtree
-    const unusable = await inactiveRows(tree)
+    const assertOwned = (): void => {
+      agentCtx.fiber.assertActive()
+      fiber.assertActive()
+    }
+    assertOwned()
+    let audit = await auditRows(tree)
+    if (audit.pending.length > 0) {
+      await agentCtx.loader.await()
+      // Include disposal empties its entries; an empty audit cannot prove ownership.
+      assertOwned()
+      audit = await auditRows(tree)
+    }
+    assertOwned()
+    const unusable = [...audit.failed, ...audit.pending]
     if (unusable.length > 0) {
       throw new Error(`${String(unusable.length)} row(s) did not activate:\n${unusable.join('\n')}`)
     }

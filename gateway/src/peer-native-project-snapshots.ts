@@ -15,18 +15,30 @@ import { openPeerVssSnapshot } from './peer-vss-snapshot.ts'
 import { PeerBackupError } from './peer-backup-repository.ts'
 import type { PeerProjectFileSnapshots } from './peer-backup-project-export.ts'
 import { verifiedPeerFileRoots,type PeerFileRootMap } from './peer-snapshot-roots.ts'
+import { nativeRuntimeProfileData } from './peer-runtime-profile.ts'
+import { watchPeerSourcePaths, type PeerSourceWrites } from './peer-backup-source-space.ts'
 
 const absolute=z.string().min(1).max(4096).refine(isAbsolute)
 const identity=z.object({version:z.literal(1),organizationId:z.uuid(),nodeId:z.uuid(),commandTimeoutMs:z.number().int().positive().max(2147483647).optional()})
 const location=z.object({projectId:z.uuid(),snapshotDirectory:absolute})
+const bindMount=z.object({path:absolute,sourcePath:absolute}).strict()
 const settings=z.discriminatedUnion('provider',[
-  identity.extend({provider:z.literal('btrfs'),projects:z.array(location.extend({subvolume:absolute}).strict()).min(1).max(1024)}).strict(),
+  identity.extend({provider:z.literal('btrfs'),projects:z.array(location.extend({subvolume:absolute,bindMounts:z.array(bindMount).max(16).optional()}).strict()).min(1).max(1024)}).strict(),
   identity.extend({provider:z.literal('vss'),projects:z.array(location.extend({source:absolute,volume:z.guid()}).strict()).min(1).max(1024)}).strict(),
 ])
 type Description=Omit<PeerFileRootMap['roots'][number],'snapshotRoot'>
 const unavailable=()=>new PeerBackupError(503,'peer-backup/project-snapshot-unavailable')
+const modelPolicyFile='model-governance.json'
 function within(root:string,path:string):boolean{const rest=relative(root,path);return rest==='' || rest!=='..'&&!rest.startsWith('..'+sep)&&!isAbsolute(rest)}
 async function present(path:string){try{return await lstat(path)}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return;throw error}}
+
+// The Gateway reissues this policy and its intake credential from governance on launch.
+async function hasPrivateProjectPolicy(snapshotHome:string):Promise<boolean>{
+  const owner=await present(snapshotHome)
+  if(!owner?.isDirectory())return false
+  const info=await present(join(snapshotHome,modelPolicyFile))
+  return info?.isFile()===true && info.nlink===1 && (info.mode&0o777)===0o600 && info.uid===owner.uid && info.gid===owner.gid
+}
 
 /** The document provider resolves the public and private roots that share the published UserDoc identity. */
 export interface PeerDocumentFileRoots {
@@ -49,12 +61,12 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
       if(cfg.organizationId!==b.organizationId || cfg.nodeId!==b.nodeId || items.length!==1) throw unavailable()
       const item=items[0]!
       const timeout=cfg.commandTimeoutMs??this.timeout
-      return 'subvolume' in item?{provider:'btrfs' as const,source:item.subvolume,directory:item.snapshotDirectory,timeout}:
+      return 'subvolume' in item?{provider:'btrfs' as const,source:item.subvolume,directory:item.snapshotDirectory,timeout,bindMounts:item.bindMounts}:
         {provider:'vss' as const,source:item.source,directory:item.snapshotDirectory,volume:item.volume,timeout}
     } finally {await handle.close()}
   }
 
-  async acquire(b:NodeContentBinding,revision:string,signal:AbortSignal,maxEntries:number) {
+  async acquire(b:NodeContentBinding,revision:string,signal:AbortSignal,maxEntries:number,sourceSpace?:PeerSourceWrites) {
     const selected=await this.selected(b)
     await this.files.verify(b)
     const project=(await this.context.pool.query<{public_id:string;origin:ProjectOrigin}>(`SELECT p.public_id::text,p.origin FROM harness.projects p JOIN harness.project_content_placement b
@@ -62,7 +74,7 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
       AND b.writer_epoch=$5 AND b.volume_id=$6 AND p.status='active'`,[b.organizationId,b.projectId,b.runtimeId,b.nodeId,b.writerEpoch,b.volumeId])).rows[0]
     if(!project)throw unavailable()
     const current=()=>this.store.read(b,async tx=>{
-      const space=(await tx.query<{root_path:string;revision:string;root_id:string;sequence:string;ordinal:number}>(`SELECT s.root_path,s.revision::text,d.root_id,d.sequence::text,d.ordinal
+      const space=(await tx.query<{root_path:string;revision:string;runtime_generation:string;root_id:string;sequence:string;ordinal:number}>(`SELECT s.root_path,s.revision::text,s.runtime_generation::text,d.root_id,d.sequence::text,d.ordinal
         FROM node_content.spaces s JOIN node_content.document_roots d USING(organization_id,runtime_id,volume_id,writer_epoch)
         WHERE s.organization_id=$1 AND s.project_id=$2 AND s.runtime_id=$3 AND d.scope_id=s.project_id AND d.scope_kind='project'`,
       [b.organizationId,b.projectId,b.runtimeId])).rows[0]
@@ -87,13 +99,25 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
       {role:'userdoc-objects',owner:'gateway-documents/'+u+'/files',kind:'directory',logicalRoot:docs.filesRoot},
     ]
     const capturedAt=new Date().toISOString()
-    const snapshot=selected.provider==='btrfs'?await openPeerBtrfsSnapshot(selected.source,selected.directory,selected.timeout,signal):
-      await openPeerVssSnapshot(selected.source,selected.volume,selected.directory,selected.timeout,signal)
+    const unwatch=await watchPeerSourcePaths(sourceSpace,[selected.source,selected.directory])
+    const snapshot=await (selected.provider==='btrfs'?openPeerBtrfsSnapshot(selected.source,selected.directory,selected.timeout,signal,selected.bindMounts):
+      openPeerVssSnapshot(selected.source,selected.volume,selected.directory,selected.timeout,signal)).catch(error=>{unwatch();throw error})
+    const release=async()=>{try{await snapshot.release()}finally{unwatch()}}
+    const covers=(path:string)=>'covers' in snapshot?snapshot.covers(path):within(selected.source,path)
     try {
+      await sourceSpace?.check(selected.source)
       const checked='verifiedPath' in snapshot?snapshot.verifiedPath:undefined
       const gaps=new Set<string>()
+      if(covers(home)){
+        const profile=await nativeRuntimeProfileData(home,path=>snapshot.map(path),maxEntries,signal)
+        for(const gap of profile.gaps)gaps.add(gap)
+        for(const row of profile.roots)inputs.push({role:'plugin',owner:row.owner,kind:row.kind,logicalRoot:row.path})
+      }else gaps.add('runtime:outside-snapshot')
+      const snapshotHome=covers(home)?snapshot.map(home):undefined
+      const projection=selected.provider==='btrfs' && snapshotHome!==undefined && await hasPrivateProjectPolicy(snapshotHome)
+        ? join(home,modelPolicyFile) : undefined
       const manifest=join(home,'managed-data.jsonl')
-      if(!within(selected.source,manifest))gaps.add('runtime:outside-snapshot')
+      if(!covers(manifest))gaps.add('runtime:outside-snapshot')
       else {
         if('inspect' in snapshot)await snapshot.inspect([manifest],maxEntries)
         const stored=snapshot.map(manifest)
@@ -103,14 +127,25 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
             if(record.path===home || !within(home,record.path) && !within(space.root_path,record.path)){
               gaps.add('plugin:external-data');continue
             }
+            if(record.path===projection && record.kind==='file')continue
             if(inputs.some(r=>r.logicalRoot===record.path && r.owner===record.owner))continue
             inputs.push({role:'plugin',owner:record.owner,kind:record.kind,logicalRoot:record.path})
           }
-        } else if(await present(snapshot.map(home)))gaps.add('runtime:undeclared-files')
+        } else if(selected.provider==='btrfs' && space.runtime_generation!=='0'){
+          gaps.add('runtime:undeclared-files')
+        } else if(snapshotHome!==undefined && await present(snapshotHome)){
+          if(selected.provider==='vss')gaps.add('runtime:undeclared-files')
+          else for await(const item of await opendir(snapshotHome,{bufferSize:2})){
+            if(projection!==undefined && item.name===modelPolicyFile)continue
+            gaps.add('runtime:undeclared-files')
+            break
+          }
+        }
       }
       if('inspect' in snapshot)await snapshot.inspect(inputs.map(row=>row.logicalRoot),maxEntries)
-      if(within(selected.source,home) && await present(snapshot.map(home))) {
+      if(snapshotHome!==undefined && await present(snapshotHome)) {
         const known=inputs.map(item=>item.logicalRoot)
+        if(projection!==undefined)known.push(projection)
         const unowned=async(path:string):Promise<boolean>=>{
           if(known.some(root=>within(root,path)))return false
           if(!known.some(root=>within(path,root)))return true
@@ -122,7 +157,7 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
       }
       const roots:PeerFileRootMap['roots']=[]
       for(const item of inputs){
-        if(!within(selected.source,item.logicalRoot)){gaps.add(item.role+':outside-snapshot');continue}
+        if(!covers(item.logicalRoot)){gaps.add(item.role+':outside-snapshot');continue}
         const target=snapshot.map(item.logicalRoot)
         const info=await present(target)
         if(info && ((checked?checked(target):await realpath(target))!==target || (item.kind==='directory'?!info.isDirectory():!info.isFile())))throw unavailable()
@@ -136,8 +171,8 @@ export class NativePeerProjectSnapshots implements PeerProjectFileSnapshots {
         volumeId:b.volumeId,writerEpoch:b.writerEpoch,revision,documentRootId:space.root_id,provider:selected.provider,
         ...('devices' in snapshot?{devices:snapshot.devices}:{}),roots}
       return {revision,capturedAt,roots:roots.map(r=>({owner:r.owner,kind:r.kind,path:r.snapshotRoot})),logicalRoots:map,
-        verifiedVssPath:checked,confirm:snapshot.confirm,gaps:[...gaps],release:snapshot.release}
-    } catch(error){await snapshot.release();throw error}
+        verifiedVssPath:checked,confirm:async()=>{await sourceSpace?.check(selected.source);await snapshot.confirm()},gaps:[...gaps],release}
+    } catch(error){await release();throw error}
   }
 
   async validate(binding:Parameters<PeerProjectFileSnapshots['validate']>[0],payload:string,signal:AbortSignal){

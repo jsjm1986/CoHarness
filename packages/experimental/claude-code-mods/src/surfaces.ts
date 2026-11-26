@@ -21,7 +21,7 @@ export interface SurfaceHost {
   readonly rows: number
   /** Raise `ui.render` for one session through the mods and return the tree. */
   render(sessionId: string, input: UiRenderInput): Promise<UiNode>
-  /** Run one button's callback inside the session; the host owns the invocation and its reporting. */
+  /** Run one button's callback inside the session; report and reject failures without rolling back its effects. */
   runAction(sessionId: string, callback: () => unknown): Promise<void>
   /** Receives diagnostics: invalid trees, failed presses. */
   report(line: string): void
@@ -138,6 +138,7 @@ export class SurfaceTable {
    * @param generation - the generation the client saw.
    * @param actionId - the id the serialized Button carried.
    * @returns the snapshot after the press.
+   * @throws the callback's failure after redrawing any state it changed.
    */
   async press(sessionId: string, generation: number, actionId: string): Promise<SurfaceSnapshot> {
     const band = this.bandOf(sessionId)
@@ -146,8 +147,11 @@ export class SurfaceTable {
       this.host.report(`band press ignored: ${actionId} of generation ${generation} is not on the current drawing (${band.generation})`)
       return band.snapshot()
     }
-    await this.host.runAction(sessionId, action)
-    await this.refresh(sessionId)
+    try {
+      await this.host.runAction(sessionId, action)
+    } finally {
+      await this.refresh(sessionId)
+    }
     return band.snapshot()
   }
 

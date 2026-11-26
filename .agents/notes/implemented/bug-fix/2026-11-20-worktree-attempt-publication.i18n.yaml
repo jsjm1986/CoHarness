@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-20-worktree-attempt-publication.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-20-worktree-attempt-publication.md
+document:
+  en: 4a7489791cfaa20421e32ac8776b664fbf3ac2f6
+  zh: f1e828de812a832463857a03801d1bcad2eba95b
+/agent-note-worktree-attempt-result-publication:
+  en: a4e8837f37de36a1
+  zh: cbc6e7d3c68018fc
+/agent-note-worktree-attempt-result-publication/problem:
+  en: 28c198d19d05683f
+  zh: 598fdb746eb92639
+/agent-note-worktree-attempt-result-publication/decision:
+  en: 798e9e7fd28cb566
+  zh: 58b7b542569dfcc8
+/agent-note-worktree-attempt-result-publication/alternatives-considered:
+  en: 253bd1f3b5448a94
+  zh: 04edd0989b5f6d46
+/agent-note-worktree-attempt-result-publication/consequences:
+  en: b609fbfcb6f03736
+  zh: 42c664a4bbd5816a
+/agent-note-worktree-attempt-result-publication/verification:
+  en: 4ebc86b55f9139cb
+  zh: 53bfb403f363e07d

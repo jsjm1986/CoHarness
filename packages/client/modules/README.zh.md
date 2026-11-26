@@ -35,9 +35,11 @@ kind: "package-reference"
 
 ### 浏览器加载什么
 
-application combo 脚本只携带每个插件的 `client.js` 入口，并在启动时仅注册一次这些 factory；模块主体仍保持惰性，只在首次 import 或物化时运行。经 tsdown 拆分的源码 `import()` 会编译为 `require.async("./client.<name>.js")`；只有执行该表达式时，对应的带版本同级脚本才会到达。共享 combo URL 的 row 共用一个进行中的脚本任务。HMR（热模块替换）会让一条发生变化的 row 改用带 revision 的单资源 combo URL。`<id>/client` 与裸 id 解析到同一组导出，因为插件 bundle 就是其包的客户端半侧。
+应用组合脚本包含各插件的 `client.js` 入口，并注册一次对应的工厂。首次导入时运行工厂。经 tsdown 拆分的源码 `import()` 会编译为 `require.async("./client.<name>.js")`，执行表达式时请求对应版本的同级脚本。共享组合 URL 的条目共用进行中的脚本请求。热更新时，变更条目改用对应版本的单资源组合 URL。`<id>/client` 与裸包名解析到同一组导出。
 
-可选配置 `applicationBatchGroups` 列出使用独立启动响应的包集合。未分组的应用条目共用默认序列；每个配置组中的有效成员保留图内顺序，未挂载的成员不产生响应。引导包、空组、畸形包名和重复成员会导致配置校验失败。模块依赖与应用顺序仍由原始图管理，每组沿用相同的 3 KiB URL 限制。这使可选功能组合包能在启用功能不同的 profile 之间保留共享应用响应；首次访问所需的代码量不因此减少。[Inspector 组合包](../../experimental/inspector-profile/README.zh.md)声明自身分组；[决策记录](../../../.agents/notes/implemented/architecture/2026-10-26-client-startup-transport-groups.zh.md)说明缓存归属。
+`applicationBatchGroups` 配置可为指定的必需应用包分配独立启动响应。未分组的必需条目共用一组响应。每组的已启用成员保留图内顺序，按 3 KiB URL 限制拆分。引导包、空组、错误的包名和重复成员会导致配置校验失败。独立响应使不同 profile 能沿用共享批次的版本。[Inspector 组合包](../../experimental/inspector-profile/README.zh.md)声明了自身分组。[启动传输决策](../../../.agents/notes/implemented/architecture/2026-10-26-client-startup-transport-groups.zh.md)说明缓存归属。
+
+`dsh.client.optional: true` 可延后加载独立应用插件的入口。未声明该字段的条目、引导条目，以及必需包沿 `inject` 和 `external` 声明传递依赖的包，都在启动阶段加载。Host 为每个可选条目发布独立批次，无需预载。渲染器挂载后，每个可选入口以低优先级限时请求，独立于必需条目的更新。模块图变更、主动重试或页面卸载会取消过期请求。下载或激活失败会在侧边栏的「插件」页显示，可从该处重试。Host 发现可选插件产物缺失时会记录日志，并继续提供其余启动图。
 
 ### 插件动态组合
 
@@ -81,11 +83,15 @@ Node 半侧逐包增量扫描——没有全量重扫路径。每次发出 `inte
 
 Node 半侧会在发布前快照每个 `client.js` 入口，并在不构建响应 body 的情况下创建 combo descriptor。图行与批次描述符携带文档相对的 `plugins/combo.js??...&rev=...` 引用——被挂载到前缀下的 shell 会相对文档解析它们——而响应表与路由仍按绝对的 `/plugins/combo.js??...` 键匹配；`combo.js` 文件名让该路径落入 CDN 静态扩展名缓存，每个阶段都在绝对 map 形式 URL 超过 3 KiB 前分区。脚本 body 在首次 `GET` 时只组合一次，并以相对脚本自身 `/plugins/` 目录解析的 `/plugins/combo.js??...&rev=...` source-map 尾注结尾；map 文件则在首次 map `GET` 时单独读取、校验并组合，`HEAD` 不会物化任一 body。
 
+对于受管 Gateway 发起的请求，已发布的脚本组合可返回无响应体的确认，匹配的是未压缩字节的完整 SHA-256。摘要不匹配时返回原始脚本，调试映射与按需分块沿用正常资源传输。
+
 编译器在所有输出完成后，向现有 `dsh-client-artifact=v1` 尾注前写入版本化 chunk revision 表。Host 从入口快照读取该表，不扫描或预加载兄弟文件。精确的 `/plugins/<package>/client.<name>.js?rev=<rev>` 请求会读取并缓存脚本；首次 `GET` 会核对可执行字节与已发布 chunk revision。带表的 row 使用各 chunk 的可执行 revision 生成 URL 和文件名相对的 `client.<name>.js.map?rev=<rev>` 尾注，因此仅修改入口时可保留未变的预览资源。路由也接受当前 owner revision，兼容旧 Client。没有表的 Host 或产物继续使用 owner revision 的 chunk URL。未发布的 chunk、过时 revision 和额外查询参数返回 404；磁盘可执行字节不匹配时会明确失败，不发布该内容。chunk body 失败时只移除自己的响应计划，让后续显式请求重新核对已恢复的字节，不自动重试；成功的 body 仍会缓存。map 仍等到自己的 URL 被请求后才计算；每个 combo 或 chunk map 都是 Indexed Source Map v3，可用时使用作者提供的 section，否则生成 identity section。
 
 首次发布与 HMR 从捕获的入口字节及尾注派生带标记产物的 revision，因此仅入口代码或仅 chunk 代码变化都会推进所属插件 revision。相同可执行输出跨复制、重建和 Host 重启保持 revision。未带标记的第三方产物保留 mtime、ctime 和大小策略；保留标记或表格式错误会导致激活失败。HMR 对未变元数据跳过内容读取，带标记字节相同时只刷新基线、不发布变化。调试 map 字节不参与可执行内容身份，独立 chunk revision 也排除生成的独立调试尾注行。识别的 URL 不含空白、引号、反引号、反斜杠或星号；其它尾部保持原字节，保留类似指令的字符串与可执行代码行分隔符。combo revision 从有序 row revision 派生。已公告的 combo 响应与已请求的 chunk 响应会跨无关图重组保持不可变。
 
 浏览器只对匹配的 owner revision 使用 chunk 表。仅含重建信息、不含完整图的帧会撤销旧表，并继续使用 owner revision URL，直到下一张图提供当前 chunk 身份。每个在途 chunk 独立拥有一次结算，由所有等待者共享；owner 失效后，同一 chunk 的新 factory 必须等待该结算完成才能被采用。过时结算只丢弃自己的 factory 一次，恢复执行的调用者不会删除较新的 factory 或已物化导出。
+
+按需分块通过 `require('./client.js')` 读取所属插件入口已物化的导出。编译器可将共用代码放进入口。同步引用若需要另一个兄弟分块，编译会拒绝该引用。
 
 每个物化的脚本或 map body 会在后台预压缩出 Brotli 与 gzip 变体，并以 `vary: accept-encoding` 应答 `Accept-Encoding`；编码失败只记录日志，identity 与任何已就绪编码继续提供服务。未知资源或 revision 返回 404。
 
@@ -93,11 +99,13 @@ Node 半侧会在发布前快照每个 `client.js` 入口，并在不构建响�
 
 bundle 路由随注入的 `webServer` 生命周期注册：服务就绪时注册，服务被替换时移除并重新注册。模块组合与 `fetchBundle()` 在没有 Web server 时仍可用。
 
-宿主贡献结构化 index 行，并向 `<head>` 注入：`window.__ModuleLoader__` queue facade、每个 application combo 的提示性 preload、阻塞 parser 的 bootstrap combo 脚本，然后才是外壳读取前的启动图。Web 载体把这些行渲染进 index 响应；由 shell 持有的载体则可以在没有 Web server 时渲染同一批行。facade 的 `create()` 物化 modules bundle、把构造委托给其 `createClientModuleSystem` 导出，并让同一 facade 进入 live registration 模式。外壳把返回的系统装成自身 Loader 的 `internal`；modules 插件将该实例发布为 `ctx.modules`，因此不同 Cordis 树不会通过模块级全局状态选择实例。
+Host 提供结构化 index 行，依次插入 `window.__ModuleLoader__` 注册队列、必需应用组合的预载、阻塞解析器的引导组合脚本，以及启动图。Web 载体将这些行渲染至 index 响应，由外壳持有的载体也可独立渲染。注册接口的 `create()` 物化 modules bundle，调用 `createClientModuleSystem` 构造实例，并切换到实时注册模式。外壳将返回的系统安装为 Loader 的 `internal`。modules 插件在所属的 Cordis 树中将该实例发布为 `ctx.modules`。
+
+外壳提前执行批次时，按启动图中的原 URL 提供执行结果。对于已经运行的批次，模块系统不会重新下载整个批次，只按单资源 URL 请求缺失的工厂。提前下载失败计为该批次的首次尝试，按原 URL 再尝试一次，仍失败才按单资源恢复。
 
 ### 条目所有权
 
-`ClientEntries` 记录启动时创建的条目，并在同一个 Loader 上串行执行完整图更新、重试和代码重载。本地代际阻止旧下载在目标条目或代码变化后挂载；目标相同的快照共用进行中的加载。来自非启动 release 的图不进入队列：重试仍对账最近应用的图，rebuilt 帧在 Host 提供该 release 期间被忽略。新增模块使用单资源 URL，不会重新执行可能重复注册现有 factory 的启动 batch。Factory 在条目创建前就保留产物 revision；图更新会在导入消费者前丢弃未归属条目的陈旧 factory、其样式和失败的到达目标。清理会保留每个剩余 Loader 条目的已声明及已观察到的传递模块依赖。其可观察状态不导入运行时库，因为 modules bootstrap 在平台种子可用之前物化。
+`ClientEntries` 通过同一个 Loader 管理启动、延后激活、完整图更新、重试和代码重载。目标条目或代码变化后，本地代际阻止旧下载继续挂载。目标相同的快照共用进行中的加载。Host 提供其他发布版本时，重试沿用最近应用的图。图更新后的新加载使用单资源 URL，避免重复注册工厂。工厂在条目创建前便保留产物版本。图更新会在导入消费者前清除未挂载条目的陈旧工厂、样式和失败的加载目标。清理会保留剩余 Loader 条目的声明依赖和实际使用的传递依赖。可观察状态无需导入运行时库，因为 modules 引导包早于平台模块表物化。
 
 ### 源码索引
 

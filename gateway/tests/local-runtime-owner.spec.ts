@@ -1,12 +1,17 @@
 /** Real kernel leases fence local-runtime allocation across Gateway process lifetimes. */
-import { mkdtemp, chmod, readFile, rm, rename, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, chmod, mkdir, readFile, readdir, rm, rename, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
-import { afterEach, expect, it as kernelTest } from 'vitest'
-import { LocalRuntimeOwnerStore, type LocalRuntimeOwnerLease, type LocalRuntimeOwnerRecord } from '../src/local-runtime-owner.ts'
+import { afterEach, expect, it as kernelTest, vi } from 'vitest'
+import { LocalRuntimeOwnerStore, localRuntimeOwnerStores, type LocalRuntimeOwnerLease, type LocalRuntimeOwnerRecord } from '../src/local-runtime-owner.ts'
+import { LocalRuntimeControl } from '../src/local-runtime-control.ts'
+import { localKernelBootId } from '../src/local-runtime-protocol.ts'
+import * as ownerAcl from '../src/local-runtime-owner-win32-acl.ts'
+import { tightenPrivateFileAcl } from '../src/node-private-file.ts'
+import { runGatewayChildCommand, runWindowsShellProbe } from '../src/child-command.ts'
 
 const roots: string[] = [], leases: LocalRuntimeOwnerLease[] = []
 const it = kernelTest.skipIf(!['darwin', 'linux'].includes(process.platform))
@@ -25,6 +30,45 @@ async function acquire(owner: LocalRuntimeOwnerStore) {
   const lease = await owner.acquire(); leases.push(lease); return lease
 }
 
+kernelTest.runIf(process.platform === 'win32')('publishes private owner records and checkpoints with the protected Windows file DACL', async () => {
+  const owner = await store()
+  await mkdir(owner.directory)
+  await tightenPrivateFileAcl(owner.directory)
+  const reference = join(owner.directory, 'reference')
+  await writeFile(reference, '', { flag: 'wx' })
+  await tightenPrivateFileAcl(reference)
+  const lease = await acquire(owner)
+  const reserved = await lease.create(bootId)
+  const starting = await lease.publish({ ...reserved, phase: 'starting', url: 'http://127.0.0.1:1/', groupPid: process.pid })
+  await lease.publish({ ...starting, phase: 'stopping' })
+  await lease.recordShutdownOutcome('confirmed')
+  const check = '& { $ErrorActionPreference="Stop"; $ref=[IO.File]::GetAccessControl($args[0]); '
+    + 'foreach($file in $args[1..2]){$acl=[IO.File]::GetAccessControl($file); '
+    + 'if(!$acl.AreAccessRulesProtected -or $acl.Sddl -ne $ref.Sddl){throw "Unexpected owner file ACL"}} }'
+  await runWindowsShellProbe(['-NoProfile', '-NonInteractive', '-Command', check, reference, owner.recordPath, owner.shutdownReceiptPath], 30_000)
+
+  await runGatewayChildCommand('icacls.exe', [reference, '/grant', '*S-1-1-0:(R)'], 10_000)
+  expect(await ownerAcl.probeNativeWindowsOwnerAcl(reference)).toBe('not-private')
+  await ownerAcl.protectRuntimeOwnerFile(reference)
+  expect(await ownerAcl.probeNativeWindowsOwnerAcl(reference)).toBe('private')
+  await expect(ownerAcl.protectRuntimeOwnerFile(join(owner.directory, 'absent'))).rejects.toThrow()
+}, 30_000)
+
+it('keeps the prior owner record when the empty replacement cannot be protected', async () => {
+  const owner = await store(), lease = await acquire(owner)
+  const reserved = await lease.create(bootId)
+  const protection = vi.spyOn(ownerAcl, 'protectRuntimeOwnerFile').mockImplementationOnce(async file => {
+    expect(await readFile(file)).toHaveLength(0)
+    throw new Error('cannot protect owner replacement')
+  })
+  try {
+    await expect(lease.publish({ ...reserved, phase: 'starting', url: 'http://127.0.0.1:1/', groupPid: process.pid }))
+      .rejects.toThrow('cannot protect owner replacement')
+    expect(await owner.read()).toEqual(reserved)
+    expect((await readdir(owner.directory)).filter(file => file.endsWith('.tmp'))).toEqual([])
+  } finally { protection.mockRestore() }
+})
+
 it('retains one exclusive inode and immutable generation identity until its descriptor closes', async () => {
   const owner = await store(), lease = await acquire(owner)
   const record = await lease.create(bootId)
@@ -35,6 +79,26 @@ it('retains one exclusive inode and immutable generation identity until its desc
   const recovered = await acquire(owner)
   expect((await owner.read())?.nonce).toBe(record.nonce)
   await expect(recovered.create(bootId)).rejects.toThrow('already fenced')
+})
+
+it('proves only stopped generations without cancelling or reaping a busy or unknown writer',async()=>{
+  const owner=await store(),lease=await acquire(owner),record=await lease.create(await localKernelBootId())
+  const control=new LocalRuntimeControl(owner,5000),before=await readFile(owner.recordPath,'utf8')
+  await expect(control.assertQuiescent()).rejects.toMatchObject({code:expect.stringMatching(/^E(?:AGAIN|WOULDBLOCK)$/u)})
+  await lease.close()
+  await expect(control.assertQuiescent()).rejects.toThrow('confirmed stopped receipt')
+  expect(await readFile(owner.recordPath,'utf8')).toBe(before)
+  await expect(readFile(owner.cancellationPath)).rejects.toMatchObject({code:'ENOENT'})
+  const stopped=await acquire(owner);await stopped.publish({...record,phase:'stopped'});await stopped.close()
+  const final=await readFile(owner.recordPath,'utf8')
+  await control.assertQuiescent()
+  expect(await readFile(owner.recordPath,'utf8')).toBe(final)
+  await expect(readFile(owner.cancellationPath)).rejects.toMatchObject({code:'ENOENT'})
+  const newer=new LocalRuntimeOwnerStore(owner.directory,{...identity,generation:9,credentialHash:'b'.repeat(64)})
+  const allocation=await acquire(newer);await allocation.create(record.bootId);await allocation.close()
+  const stores=await localRuntimeOwnerStores(owner.directory,identity)
+  expect(stores.map(store=>store.identity.generation).sort((a,b)=>a-b)).toEqual([2,9])
+  await expect(new LocalRuntimeControl(stores.find(store=>store.identity.generation===9)!,5000).assertQuiescent()).rejects.toThrow('confirmed stopped receipt')
 })
 
 it('keeps an inherited kernel lease after its Gateway descriptor closes', async () => {

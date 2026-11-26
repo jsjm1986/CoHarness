@@ -1,5 +1,5 @@
 /** A real dump cannot reactivate destination-owned project content authority. */
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -10,6 +10,7 @@ import { createPostgresPool, runMigrations, transaction } from '../src/postgres/
 import { acquireDeploymentDataLock } from '../src/postgres/deployment-lock.ts'
 import { PostgresMaintenanceService } from '../src/postgres/maintenance-service.ts'
 import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
+import { publishRecoveryProtocol } from '../src/peer-backup-recovery-access.ts'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 function command(value: string | undefined, executable: string): string[] {
@@ -54,6 +55,11 @@ it.skipIf(databaseUrl === undefined).each(['retired-runtime', 'offline-node', 'c
     if (scenario === 'cancelled-recovery') {
       const destination = (await pool.query<{ id: string }>(
         "INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'recovery-target') RETURNING id", [organization])).rows[0]!.id
+      await pool.query(`UPDATE harness.deployment_topology SET enabled=true,primary_node_id=$2,primary_origin='https://content-guard.test'
+        WHERE organization_id=$1`, [organization, node])
+      await pool.query(`INSERT INTO harness.node_agents(organization_id,node_id,credential_hash,platform,architecture,connection_id,connection_epoch,lease_expires_at)
+        VALUES($1,$2,$3,'linux','x64',$4,1,now()+interval '5 minutes')`, [organization, destination, randomBytes(32), randomUUID()])
+      await publishRecoveryProtocol(pool, organization, destination, 300_000, { project: true, personal: false })
       const targetVolume = randomUUID(), policy = randomUUID(), point = randomUUID()
       recovery = randomUUID()
       await pool.query(`INSERT INTO harness.node_content_volumes(organization_id,node_id,volume_id,cluster_id,database_oid)

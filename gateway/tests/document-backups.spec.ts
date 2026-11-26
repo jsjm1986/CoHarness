@@ -43,8 +43,9 @@ async function fixture() {
   const context: PostgresRuntimeContext = { pool, organizationId: 'org', organizationSlug: 'default', nodeId: 'node', nodeName: 'node' }
   vi.spyOn(pool, 'query').mockImplementation(async sql => {
     const text = String(sql)
-    const rows = text.includes('count(*)::text FROM harness.organizations') ? [{ organizations: '1', nodes: '1' }]
-      : text.includes('SELECT u.public_id::text') ? [{ public_id: '7', username: 'reader', home_path: home, generation: 0 }] : []
+    const rows = text.includes('to_regclass(') ? [{ present: false }]
+      : text.includes('count(*)::text FROM harness.organizations') ? [{ organizations: '1', nodes: '1' }]
+      : text.includes('SELECT u.public_id::text') ? [{ public_id: '7', username: 'reader', home_path: home, generation: 0, runtime_id: null, storage_layout: null }] : []
     return { rows, command: 'SELECT', rowCount: rows.length, oid: 0, fields: [] }
   })
   const engine = createEngine()

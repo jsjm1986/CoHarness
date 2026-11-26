@@ -16,8 +16,8 @@
 
 .status,
 .failure {
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   color: var(--dsw-alias-label-tertiary);
 }
 
@@ -74,7 +74,7 @@
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .search input::placeholder {
@@ -84,6 +84,13 @@
 .search input:focus-visible {
   border-color: var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)) 18%, transparent);
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .search input {
+    min-height: var(--dsw-touch-target);
+    font-size: 1rem;
+  }
 }
 
 .cards {
@@ -167,8 +174,8 @@
 .cardTitle {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   font-weight: 500;
 }
 
@@ -177,8 +184,8 @@
   display: -webkit-box;
   overflow: hidden;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   text-wrap: pretty;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -202,8 +209,8 @@
 .cardIdentity,
 .entryValue {
   font-family: var(--ds-font-family-code);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .cardIdentity {
@@ -283,8 +290,8 @@
 }
 
 .groupTitle {
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   font-weight: 400;
   color: var(--dsw-alias-label-primary);
 }
@@ -295,8 +302,8 @@
   row-gap: 4px;
   margin: -6px 0 0 20px;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -314,8 +321,8 @@
   background: var(--dsw-alias-bg-module-platform);
   color: var(--dsw-alias-label-primary);
   font: inherit;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   cursor: pointer;
 }
 
@@ -338,6 +345,15 @@
   text-overflow: ellipsis;
 }
 
+@media (pointer: coarse), (max-width: 767px) {
+  .groupToggle,
+  .switcher,
+  .failure button {
+    min-block-size: var(--dsw-touch-target);
+    height: auto;
+  }
+}
+
 
 .groupBody {
   display: flex;
@@ -352,8 +368,8 @@
   padding: 8px 10px;
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
   color: var(--dsw-alias-state-error-primary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   overflow-wrap: anywhere;
   white-space: pre-line;
 }
@@ -365,8 +381,8 @@
   gap: 4px 8px;
   margin: 0;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .jumpLink {
@@ -375,7 +391,7 @@
   background: transparent;
   color: var(--dsw-alias-state-business-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 
@@ -442,8 +458,8 @@
 
 .details dt {
   color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  line-height: 17px;
+  font-size: 0.6875rem;
+  line-height: 1.0625rem;
 }
 
 .details dd {
@@ -451,8 +467,8 @@
   margin: 0;
   overflow-wrap: anywhere;
   color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  line-height: 17px;
+  font-size: 0.75rem;
+  line-height: 1.0625rem;
 }
 
 .visuallyHidden {

@@ -9,13 +9,21 @@ kind: "package-reference"
 
 外壳插件提供唯一的三栏 AppFrame、拖动尺寸与窄屏抽屉。它在 `root` 下声明左侧 `sidebar`、中间 `conversation`、右侧 `rightbar`、浮动层及移动顶栏操作。四会话 Workbench 保持为唯一的中间会话容器；右侧栏的标签、分栏与开合由 [ui-sidebar-right](../ui-sidebar-right/README.zh.md) 管理，框架只消费其呈现报告并分配空间。列宽与调整条立即到达最终位置，恢复面板时不会让会话文字沿中间宽度反复重排。主题呈现器负责配色、别名 token、字号、字体列表与 document 元数据。
 
-框架发布 `data-viewport` 与 `--dsw-viewport-height`，以支持窄窗格和屏幕键盘。medium 模式保留导航控制栏，右侧栏覆盖中间内容；compact 模式使用左侧抽屉和全屏辅助栏。遮罩和 Escape 将关闭请求交给标签状态所有者，不直接改写另一份开合状态。侧边抽屉关闭后恢复顶栏开关焦点。框架尺寸不写入 localStorage，Session 标签的恢复规则由右侧栏负责。
+框架发布 `data-viewport` 与 `--dsw-viewport-height`，以支持窄窗格和屏幕键盘。所有宽度模式都在遵守父容器高度的同时，以可见视口作为高度上限，因此横屏键盘也会缩小 medium 及更宽布局。medium 模式保留导航控制栏，右侧栏覆盖中间内容；compact 模式使用左侧抽屉和全屏辅助栏。全屏面板使用框架实测宽度并清除普通面板的缩进，嵌入式框架也如此。遮罩和 Escape 将关闭请求交给标签状态所有者，不直接改写另一份开合状态。选择全局面板会关闭 compact 抽屉，重复选择当前面板也如此。侧边抽屉关闭后恢复顶栏开关焦点。关闭的 compact 抽屉保持挂载并处于 inert 状态，显式设置可见性的后代也无法交互；打开、离开 compact 模式或卸载时，只释放框架持有的 inert 引用。框架尺寸不写入 localStorage，Session 标签的恢复规则由右侧栏负责。
 
-`shell.mobile.header.context` 在紧凑顶栏标题旁显示当前标签页的身份信息；侧边栏收起为控制栏时显示于中间内容上方，尚未选择 Session 时也可使用。会话操作仍由 `shell.mobile.header.actions` 提供，并要求已选中 Session。
+`shell.mobile.header.context` 在紧凑顶栏标题旁显示当前标签页的身份信息；侧边栏收起为控制栏时显示于中间内容上方，尚未选择 Session 时也可使用。会话操作仍由 `shell.mobile.header.actions` 提供，并要求已选中 Session。全局面板以自身 main-panel id 为键，通过 `shell.mobile.header.title` 提供本地化标题；紧凑顶栏仅在选中 Conversation 时读取保留的 Session 标题。
+
+侧边栏在各视口模式间保留同一组件拥有者；设备旋转跨越 compact 断点时，打开的设置 portal 和未保存表单状态保持不变。
+
+在桌面三栏布局中，打开的辅助栏占用输入区旁的空间，选中的 Session 即使尚未发送第一条消息也如此。
+
+紧凑抽屉观察起点位于框架最左侧 24 像素内的触摸，不在内容上叠加透明命中区域。触摸开始和无位移点按保留原生行为。打开抽屉的手势从交互控件以外的内容开始，点按贴边控件时手指轻微移动仍能触发点击。首次移动朝向抽屉目标位置且横向位移大于纵向位移时，抽屉取得手势控制权；可见移动仅在超过 12 像素后开始。起步为纵向或反方向的移动仍交由内容处理，非边缘的横向滚动也保持原样。取消手势会恢复起始状态；改变视口模式或卸载时移除监听器和待执行的过渡清理。
 
 `/client` 导出表层包含插件主体（`apply`／`inject`）、`LayoutController` 和 owner-share 接口（包括 `MobileHeaderActionOwnerProps`）。AppFrame、面板 store 与让步求解器仍属于包内部。
 
 `layout.openDetails(sessionId, target)` 把工具调用交给唯一的辅助栏所有者；`target.callId` 明确指定调用，标签不依赖聊天中当前选中的调用。`layout.focusRightbar(sessionId)` 只切换辅助栏目标，不改变中间窗格选择。该 Session 被选中后，再离开它会释放框架目标，侧栏随之显示新选中对话保留的标签。辅助栏向框架报告是否显示、是否占轨道以及是否全屏；折叠不会结束 Host Session。
+
+紧凑页头按全部已注册操作调整操作列宽度；标题让出可用宽度，各操作保留触控目标。
 
 ## 概述
 

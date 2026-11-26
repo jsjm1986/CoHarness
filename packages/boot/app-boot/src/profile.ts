@@ -31,7 +31,7 @@ import {
   existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync,
   statSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
@@ -48,6 +48,7 @@ import {
   isPackagedExecutable,
   PROFILE_MODULE_FALLBACK_DIR,
   realModuleDirectory,
+  realModuleFile,
   symlinkPointsTo,
 } from './profile-resolution/legacy-links.ts'
 
@@ -82,14 +83,25 @@ export function bundlePatchFiles(bundle: DshBundleManifest): string[] {
 }
 
 /**
- * Resolve a bundle declaration to its ordered absolute patch files.
+ * Resolve the bundle's ordered patch files inside its installed package.
  * @param packageDir - absolute directory of the bundle package.
  * @param bundle - the bundle's `dsh.bundle` declaration, as read from package.json.
  * @returns the absolute patch file paths in application order.
- * @throws {Error} when `patch` is neither a string nor a list of strings.
+ * @throws {Error} for invalid declarations, missing files, or paths outside the package.
  */
 export function bundlePatchPaths(packageDir: string, bundle: DshBundleManifest): string[] {
-  return bundlePatchFiles(bundle).map(file => join(packageDir, file))
+  const root = realpathSync(packageDir)
+  const outside = (path: string) => {
+    const child = relative(root, path)
+    return child === '' || isAbsolute(child) || /^\.\.(?:[\\/]|$)/u.test(child)
+  }
+  return bundlePatchFiles(bundle).map((file) => {
+    const path = resolve(root, file)
+    if (isAbsolute(file) || outside(path)) throw new Error(`bundle patch must be inside its package: ${file}`)
+    const target = realModuleFile(path)
+    if (outside(target)) throw new Error(`bundle patch must be inside its package: ${file}`)
+    return target
+  })
 }
 
 /** One resolved bundle layer of a profile. */

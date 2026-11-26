@@ -40,6 +40,8 @@ const USER_AGENTS_RANK = 500
 const DEFAULT_WATCH_STABILITY_THRESHOLD_MS = 200
 const DEFAULT_WATCH_POLL_INTERVAL_MS = 100
 const DEFAULT_WATCH_MAX_PROJECTS = 128
+/** Bound the number of skill bodies held by concurrent reads during one catalog scan. */
+const CATALOG_READ_LIMIT = 4
 
 export const name = 'skill-filesystem'
 export const inject = ['skills']
@@ -180,7 +182,8 @@ export class FileSystemSkillProvider implements SkillProvider {
    *   logged and omitted; root or watcher failures make the observation incomplete.
    */
   async list(options: SkillLookupOptions): Promise<SkillCandidate[] | SkillProviderObservation> {
-    const roots = await this.roots(options.cwd)
+    const roots = await this.roots(options.cwd, options.signal)
+    options.signal?.throwIfAborted()
     let complete = true
     try {
       await this.watchManager.observeRoots(roots)
@@ -192,7 +195,7 @@ export class FileSystemSkillProvider implements SkillProvider {
     for (const root of roots) {
       options.signal?.throwIfAborted()
       try {
-        const discovered = await discoverRoot(root, this.ctx, this.name)
+        const discovered = await discoverRoot(root, this.ctx, this.name, options.signal)
         options.signal?.throwIfAborted()
         candidates.push(...discovered)
       } catch (error) {
@@ -245,10 +248,10 @@ export class FileSystemSkillProvider implements SkillProvider {
     return this.disposal
   }
 
-  private async roots(cwd: string | undefined): Promise<SkillRoot[]> {
+  private async roots(cwd: string | undefined, signal?: AbortSignal): Promise<SkillRoot[]> {
     const roots: SkillRoot[] = []
     if (this.includeDefaultRoots && cwd !== undefined) {
-      const projectRoot = await findProjectRoot(resolve(cwd), optionalFileSystem(this.ctx))
+      const projectRoot = await findProjectRoot(resolve(cwd), optionalFileSystem(this.ctx), signal)
       roots.push(
         { path: join(projectRoot, '.dsh/skills'), source: 'project-dsh', rank: PROJECT_DSH_RANK, projectRoot },
         { path: join(projectRoot, '.agents/skills'), source: 'project-agents', rank: PROJECT_AGENTS_RANK, projectRoot },
@@ -731,61 +734,66 @@ function hasErrorCode(error: unknown, code: string): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === code
 }
 
-async function discoverRoot(root: SkillRoot, ctx: Context, provider: string): Promise<SkillCandidate[]> {
+async function discoverRoot(root: SkillRoot, ctx: Context, provider: string, signal?: AbortSignal): Promise<SkillCandidate[]> {
   const skills: SkillCandidate[] = []
-  const entries = await listSkillRootEntries(root, ctx)
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (root.skipSystem && entry.name === '.system') continue
-    const locator = entry.type === 'directory'
-      ? { path: join(entry.path, 'SKILL.md'), directory: entry.path }
-      : entry.type === 'file' && entry.name.endsWith('.md')
-        ? { path: entry.path, directory: root.path }
-        : undefined
-    if (locator === undefined) continue
-    const parsed = await parseSkillFile(locator.path, ctx, undefined, root.trustedHost === true)
-    if (parsed === undefined) continue
-    skills.push({
-      name: parsed.name,
-      description: parsed.description,
-      ...parsed.whenToUse !== undefined ? { whenToUse: parsed.whenToUse } : {},
-      invocation: parsed.invocation,
-      provider,
-      source: root.source,
-      rank: root.rank,
-      locator,
-      resourceBase: { kind: 'directory', path: locator.directory },
-      path: parsed.path,
-      ...parsed.metadata !== undefined ? { metadata: parsed.metadata } : {},
+  const entries = await listSkillRootEntries(root, ctx, signal)
+  const locators = entries.sort((a, b) => a.name.localeCompare(b.name)).flatMap((entry) => {
+    if (root.skipSystem && entry.name === '.system') return []
+    if (entry.type === 'directory') return [{ path: join(entry.path, 'SKILL.md'), directory: entry.path }]
+    if (entry.type === 'file' && entry.name.endsWith('.md')) return [{ path: entry.path, directory: root.path }]
+    return []
+  })
+  for (let offset = 0; offset < locators.length; offset += CATALOG_READ_LIMIT) {
+    signal?.throwIfAborted()
+    const reads = locators.slice(offset, offset + CATALOG_READ_LIMIT).map(async (locator): Promise<SkillCandidate | undefined> => {
+      const parsed = await parseSkillFile(locator.path, ctx, signal, root.trustedHost === true)
+      if (parsed === undefined) return
+      return {
+        name: parsed.name,
+        description: parsed.description,
+        ...parsed.whenToUse !== undefined ? { whenToUse: parsed.whenToUse } : {},
+        invocation: parsed.invocation,
+        provider,
+        source: root.source,
+        rank: root.rank,
+        locator,
+        resourceBase: { kind: 'directory', path: locator.directory },
+        path: parsed.path,
+        ...parsed.metadata !== undefined ? { metadata: parsed.metadata } : {},
+      }
     })
+    // A failed file makes its root incomplete after the active reads have settled.
+    for (const result of await Promise.allSettled(reads)) {
+      if (result.status === 'rejected') throw result.reason
+      if (result.value !== undefined) skills.push(result.value)
+    }
   }
   return skills
 }
 
-async function listSkillRootEntries(root: SkillRoot, ctx: Context): Promise<SkillRootEntry[]> {
+async function listSkillRootEntries(root: SkillRoot, ctx: Context, signal?: AbortSignal): Promise<SkillRootEntry[]> {
   const fs = optionalFileSystem(ctx)
-  if (fs !== undefined && root.trustedHost !== true) return await listSkillRootEntriesFromFileSystem(root, fs)
-  return await listSkillRootEntriesFromNode(root, ctx)
+  if (fs !== undefined && root.trustedHost !== true) return await listSkillRootEntriesFromFileSystem(root, fs, signal)
+  return await listSkillRootEntriesFromNode(root, ctx, signal)
 }
 
-async function listSkillRootEntriesFromFileSystem(root: SkillRoot, fs: FileSystem): Promise<SkillRootEntry[]> {
+async function listSkillRootEntriesFromFileSystem(root: SkillRoot, fs: FileSystem, signal?: AbortSignal): Promise<SkillRootEntry[]> {
   try {
-    return (await fsListDir(fs, root.path)).map(entryFromFs)
+    const target = await fs.resolve(root.path, signal === undefined ? undefined : { signal })
+    signal?.throwIfAborted()
+    return (await fs.listDir(target, signal)).map(entryFromFs)
   } catch (error) {
+    signal?.throwIfAborted()
     if (isAbsentSkillPathError(error)) return []
     throw error
   }
-}
-
-async function fsListDir(fs: FileSystem, path: string): Promise<FsDirEntry[]> {
-  const target = await fs.resolve(path)
-  return await fs.listDir(target)
 }
 
 function entryFromFs(entry: FsDirEntry): SkillRootEntry {
   return { name: entry.name, type: entry.type, path: entry.target.displayPath }
 }
 
-async function listSkillRootEntriesFromNode(root: SkillRoot, ctx: Context): Promise<SkillRootEntry[]> {
+async function listSkillRootEntriesFromNode(root: SkillRoot, ctx: Context, signal?: AbortSignal): Promise<SkillRootEntry[]> {
   let entries
   try {
     entries = await readdir(root.path, { withFileTypes: true, encoding: 'utf8' })
@@ -798,6 +806,7 @@ async function listSkillRootEntriesFromNode(root: SkillRoot, ctx: Context): Prom
 
   const result: SkillRootEntry[] = []
   for (const entry of entries) {
+    signal?.throwIfAborted()
     const path = join(root.path, entry.name)
     const type = await nodeEntryKind(path, entry, ctx)
     result.push({ name: entry.name, type: type ?? 'other', path })
@@ -879,8 +888,9 @@ async function readSkillTextFromFileSystem(
   signal?.throwIfAborted()
   let target
   try {
-    target = await fs.resolve(path)
+    target = await fs.resolve(path, signal === undefined ? undefined : { signal })
   } catch (error) {
+    signal?.throwIfAborted()
     if (isAbsentSkillPathError(error)) return undefined
     throw error
   }
@@ -955,36 +965,35 @@ function findClosingFrontmatter(raw: string, start: number): { start: number; bo
   }
 }
 
-async function findProjectRoot(cwd: string, fs: FileSystem | undefined): Promise<string> {
+async function findProjectRoot(cwd: string, fs: FileSystem | undefined, signal?: AbortSignal): Promise<string> {
   let current = cwd
   while (true) {
-    if (await pathExists(join(current, '.git'), fs)) {
-      return current
-    }
+    signal?.throwIfAborted()
+    const candidate = join(current, '.git')
+    const exists = fs === undefined
+      ? await pathExistsInNode(candidate)
+      : await pathExistsInFileSystem(candidate, fs, signal)
+    signal?.throwIfAborted()
+    if (exists) return current
     const parent = dirname(current)
     if (parent === current) return cwd
     current = parent
   }
 }
 
-async function pathExists(path: string, fs: FileSystem | undefined): Promise<boolean> {
-  if (fs !== undefined) {
-    return await pathExistsInFileSystem(path, fs)
-  }
-  return await pathExistsInNode(path)
-}
-
-async function pathExistsInFileSystem(path: string, fs: FileSystem): Promise<boolean> {
+async function pathExistsInFileSystem(path: string, fs: FileSystem, signal?: AbortSignal): Promise<boolean> {
   let target
   try {
-    target = await fs.resolve(path)
+    target = await fs.resolve(path, signal === undefined ? undefined : { signal })
   } catch {
+    signal?.throwIfAborted()
     // A backend may reject or hide this candidate; continue walking upward.
     return false
   }
   try {
-    return await fs.stat(target) !== undefined
+    return await fs.stat(target, signal) !== undefined
   } catch {
+    signal?.throwIfAborted()
     // Transient stat failures make only this git-root candidate unusable.
     return false
   }

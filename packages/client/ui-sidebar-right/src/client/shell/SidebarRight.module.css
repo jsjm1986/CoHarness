@@ -30,12 +30,9 @@
 .panel {
   --dsh-dockkit-dock-layer: 10;
   --dsh-dockkit-float-layer: 60;
-  /* The docked strip's band matches the conversation header's 52px
-     (space-3 + the 32px titleRow + space-2) so the rules under both headers
-     draw on one line; the strip's content shares the header's space-3 top
-     inset. Floats carry their own FloatHeader and never read the strip. */
+  /* Preferred desktop band height. Dockkit centers its track and enforces
+     the larger touch minimum; floats use their own FloatHeader. */
   --dsh-dockkit-strip-block: 52px;
-  --dsh-dockkit-strip-block-start: var(--dsw-space-3);
   position: absolute;
   top: 0;
   right: 0;

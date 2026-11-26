@@ -1,7 +1,7 @@
 /** Owner-private, immutable organization keyring generations. Key material stays on the designated primary. */
 import { constants } from 'node:fs'
 import { link, open, realpath, rm, stat } from 'node:fs/promises'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { dirname, isAbsolute, join } from 'node:path'
 import { z } from 'zod'
 import { privateDirectoryState, privateFileState, syncStateDirectory } from './node-private-file.ts'
@@ -24,6 +24,24 @@ export async function readProjectNameKeyring(file:string,organizationId:string,n
     if (ring.organizationId!==organizationId || ring.ownerNodeId!==nodeId) throw new Error('Keyring belongs to another entry.')
     return ring
   } finally { await handle.close() }
+}
+
+/** Validate backup or live key material against the organization's required equality-key fingerprints without changing policy.
+ * @param file - canonical private keyring path, including a verified backup member.
+ * @param organizationId - expected organization. @param nodeId - the entry that owns these keys.
+ * @param fingerprints - active and pending key identifiers with their database-registered SHA-256 digests.
+ */
+export async function verifyProjectNameKeyring(file:string,organizationId:string,nodeId:string,fingerprints:Readonly<Record<string,string>>):Promise<void>{
+  const ring=await readProjectNameKeyring(file,organizationId,nodeId)
+  for(const [id,fingerprint] of Object.entries(fingerprints)) {
+    const encoded=Object.hasOwn(ring.keys,id)?ring.keys[id]:undefined
+    if(!encoded) throw new Error('Required project name key is missing.')
+    const key=Buffer.from(encoded,'base64')
+    try {
+      if(key.length!==32 || key.toString('base64')!==encoded || createHash('sha256').update(key).digest('hex')!==fingerprint)
+        throw new Error('Project name key fingerprint differs from its registered identity.')
+    } finally {key.fill(0)}
+  }
 }
 
 /** Create a new private keyring generation without modifying an existing file.

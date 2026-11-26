@@ -16,18 +16,18 @@ Status: implemented
 
 本决策更新了[通过 Host settings 持久化 Web 用户偏好](../bug-fix/2026-08-06-host-backed-web-preferences.zh.md)和[由插件自己拥有的设置表层](2026-08-12-plugin-owned-settings-surface.zh.md)所记录的浏览器读取与失效机制，同时保留其中关于偏好所有权与命名空间暴露的决策。它也取代了 [DeepSeek 官方首次使用凭据配置](../feature/2026-07-30-deepseek-onboarding-credential-setup.zh.md)中的设置直读描述；该联接的 settings 部分现在从本镜像派生。
 
-冷启动预算由 `apps/web/tests/startup-rpc-budget.e2e.ts` 钉在两次读取：镜像在绑定时的急切读取，加上首连 reset 触发的读取——后者是有意保留的：它关闭了「文档提交落在急切 HTTP 读取与 SSE 订阅之间、其失效通知丢失」的窗口。方案最初的一次读取目标，若不接受该失效丢失窗口、或不把首次读取推迟到 SSE 流建立之后，无法达成。
+独立入口冷启动提前读取一次，并在首次 reset 时刷新，以覆盖 HTTP 读取与事件订阅之间的提交。已认证的 Gateway 页面等到订阅就绪再首次读取设置。这次读取涵盖订阅前的提交。读取开始后收到的变更事件会发起尾随刷新。独立入口与分阶段远端入口的浏览器组装测试分别验证请求次数，后者也验证在订阅前后提交的设置变更。
 
 ## 考虑过的备选
 
 - **仅在 `bind()` 内做 single-flight 共享**——能去重并发风暴，但仍保留 N 个直连读取方、N 套订阅以及 revision 偏差；binder 之外的读取方（welcome、models、tab、permission）毫无受益。以治标为由否决。
 - **boot 载荷内嵌**（宿主把 describe 应答内联进页面 boot）——省下首次读取，却在镜像仍然需要的前提下增加第二条带自身陈旧规则的取数路径。推迟；若将来需要，它可与镜像叠加。
 - **按命名空间的 `settings.describe(ns)`**——缩小单次应答，但每个消费者仍各读一次，扇出与增长率原样保留。否决。
-- **一次读取（去掉首连 reset 重读）**——只有接受「急切 HTTP 读取与 SSE 订阅之间的失效丢失窗口」、或把首次读取推迟到流建立之后才可达成；两者都在用正确性或首屏新鲜度换一次环回请求。否决，保留钉住的两次。
+- **将提前读取的结果当作首次连接基线。** HTTP 应答与事件订阅之间可能有设置提交，使已连接镜像陈旧。独立入口在订阅之后刷新一次。
 
 ## 后果
 
-- 启动期 `settings.describe` 从 15 次降到 2 次，新增持有偏好设置的插件带来零次新增读取。
+- 冷启动期间没有同时提交设置时，独立入口执行两次 `settings.describe`，已认证的 Gateway 页面执行一次。新增持有偏好设置的插件不会增加读取次数。
 - 任一时刻每个派生面看到的都是同一份文档 revision；各读取方的防护（`refreshWelcomeIfLoaded`、`refreshPermissionIfLoaded`、`refreshDocumentIfLoaded`）及其订阅随之消失。
 - 镜像对任何命名空间的文档提交都会刷新，因此在没有任何设置表面打开时，一次外部设置编辑现在也花费一次后台读取——这是「表面打开即新鲜」的代价。随着各 scope 订阅的删除，按命名空间的 `ns !== spec.namespace` 过滤一并消失。
 - `credentials.describe`、`agentPreset.list` 与 `llm.providers` 是独立的数据源，保持直连。凭据状态的按需读取和失效遵循[客户端请求生命周期决策](../bug-fix/2026-10-04-client-request-retirement-lifetimes.zh.md)，此镜像不合并这些领域。

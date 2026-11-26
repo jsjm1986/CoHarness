@@ -64,7 +64,8 @@ describe('published PDF.js licenses', () => {
 
       const client = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.js'], packageRoot, task.timeout)
       const pdf = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.pdf.js'], packageRoot, task.timeout)
-      expect([...client.matchAll(/require\.async\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]).sort())
+      const asyncChunks = new Set(Array.from(client.matchAll(/require\.async\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu), match => match[2]))
+      expect([...asyncChunks].sort())
         .toEqual(['./client.excel.js', './client.frontmatter-fields.js', './client.pdf.js'])
       expect(client).not.toMatch(/\brequire\((["'`])\.\/client[^"'`/]*\.js\1\)/u)
       expect([...pdf.matchAll(/require\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]))

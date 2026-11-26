@@ -1,7 +1,7 @@
 /** Node-half composition diagnostics for package metadata and built client bundles. */
 
-import { Hash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { createHash, Hash } from 'node:crypto'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SourceMap } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -13,8 +13,8 @@ import { Context, FiberState, type Fiber } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderIndexInjections, type WebServer, type WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import * as modulesClient from '../src/client/index.ts'
-import { ClientModuleRegistry, bootInjections, orderByModuleGraph, type Config } from '../src/index.ts'
-import { clientChunkRevision, stampClientArtifact } from '../src/artifact-revision.ts'
+import { ClientModuleRegistry, bootInjections, openReleaseComboReader, orderByModuleGraph, RELEASE_COMBO_DIGEST_HEADER, type Config } from '../src/index.ts'
+import { clientChunkRevision, clientContentRevision, stampClientArtifact } from '../src/artifact-revision.ts'
 import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '../src/client/index.ts'
 
 const MODULES_ID = '@deepseek-ai/dsh-client-modules'
@@ -167,7 +167,8 @@ function construct(packageNames: string[]): ClientModuleRegistry {
 }
 
 /** Invoke the registered plugin route and capture status, headers, and bytes. */
-async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET', acceptEncoding?: string): Promise<{
+async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET', acceptEncoding?: string,
+  extraHeaders?: Record<string, string>): Promise<{
   status: number
   headers: Record<string, string> | undefined
   body: Buffer
@@ -190,7 +191,7 @@ async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET
   const request = {
     method,
     url: `${resolved.pathname}${resolved.search}`,
-    headers: acceptEncoding === undefined ? {} : { 'accept-encoding': acceptEncoding },
+    headers: { ...(acceptEncoding === undefined ? {} : { 'accept-encoding': acceptEncoding }), ...extraHeaders },
   } as IncomingMessage
   await (await route).handler(request, response)
   return { status, headers, body }
@@ -266,12 +267,15 @@ describe('HTML bootstrap facade', () => {
       .toThrow('create called after module-system boot')
   })
 
-  it('preloads every application combo', () => {
+  it('preloads required application combos and leaves optional combos for after mount', () => {
     const graph = bootGraph()
     const secondId = '@fixture/second-application-combo'
     const secondUrl = comboUrl([secondId], 'app-2')
     graph.entries.push({ id: secondId, url: comboUrl([secondId], 'row-2'), rev: 'row-2' })
     graph.batches.push({ phase: 'application', url: secondUrl, rev: 'app-2', entries: [secondId] })
+    const optionalId = '@fixture/optional'
+    graph.entries.push({ id: optionalId, url: comboUrl([optionalId], 'row-3'), rev: 'row-3', optional: true })
+    graph.batches.push({ phase: 'application', url: comboUrl([optionalId], 'app-3'), rev: 'app-3', entries: [optionalId] })
     expect(bootInjections(graph).flatMap(row => row.kind === 'script-preload' ? [row.src] : []))
       .toEqual([APPLICATION_URL, secondUrl])
   })
@@ -488,6 +492,40 @@ describe('client bundle activation', () => {
     mkdirSync(dirname(clientPath), { recursive: true })
     writeFileSync(clientPath, 'module.exports = {}\n')
     expect(construct([currentName]).graph().entries.map(entry => entry.id)).toEqual([currentName])
+  })
+
+  it('separates optional responses after promoting dependencies used by required packages', () => {
+    const extra = '@fixture/extra'
+    const dependency = '@fixture/dependency'
+    const provider = '@fixture/provider'
+    const chat = '@fixture/chat'
+    writeBuiltPackage(extra, { optional: true })
+    writeBuiltPackage(dependency, { optional: true, inject: [provider] })
+    writeBuiltPackage(provider, { optional: true })
+    writeBuiltPackage(chat, { external: [`${dependency}/client`] })
+    const composed = construct([extra, provider, dependency, chat]).graph()
+
+    expect(composed.entries.filter(row => row.optional).map(row => row.id)).toEqual([extra])
+    expect(composed.batches.map(batch => batch.entries)).toEqual([[provider, dependency, chat], [extra]])
+    expect(bootInjections(composed).flatMap(row => row.kind === 'script-preload' ? [row.src] : []))
+      .toEqual([composed.batches[0]?.url])
+  })
+
+  it('leaves a missing optional bundle out of the graph and stops when it supplies a required package', () => {
+    const extra = '@fixture/absent-extra'
+    const chat = '@fixture/chat'
+    const path = writePackage(extra, { dsh: { client: { platform: 'web', optional: true } } })
+    writeBuiltPackage(chat)
+    expect(construct([extra, chat]).graph().entries.map(row => row.id)).toEqual([chat])
+
+    writeBuiltPackage(chat, { inject: [extra] })
+    expect(() => construct([extra, chat])).toThrow(path)
+  })
+
+  it('rejects an invalid client optional declaration', () => {
+    const name = '@fixture/bad-optional'
+    writeBuiltPackage(name, { optional: 'yes' })
+    expect(() => construct([name])).toThrow(`${name} dsh.client.optional must be a boolean`)
   })
 
   it('groups missing bundles under one source-build instruction with a package/path list', () => {
@@ -893,6 +931,143 @@ describe('client bundle activation', () => {
 
     expect(service.rebuilt(packageName)).not.toBe(first.entries[0]!.rev)
     expect(construct([packageName]).graph()).toEqual(service.graph())
+  })
+
+  it('confirms a release combo only when its published executable bytes match', async () => {
+    const ids = ['@deepseek-ai/dsh-release-fixture-a', '@deepseek-ai/dsh-release-fixture-b']
+    for (const [i, id] of ids.entries()) {
+      const client = writeBuiltPackage(id)
+      const source = stampClientArtifact(`module.exports = ${String(i)}\n`, [])
+      writeFileSync(client, source)
+      const releasePath = join(root!, 'packages', 'client', `fixture-${String(i)}`)
+      mkdirSync(join(releasePath, 'lib'), { recursive: true })
+      writeFileSync(join(releasePath, 'package.json'), JSON.stringify({ name: id, exports: { './client': './lib/client.js' } }))
+      writeFileSync(join(releasePath, 'lib', 'client.js'), source)
+    }
+    const { service, route } = constructWithRoute(ids)
+    const url = service.graph().batches[0]!.url
+    const readRelease = openReleaseComboReader(root!)
+    const local = await readRelease(`/${url}`)
+    expect(local).toBeDefined()
+    const proof = { 'x-dsh-gateway-principal': 'fixture', [RELEASE_COMBO_DIGEST_HEADER]: local!.sha256 }
+    const confirmed = await routeRequest(route, url, 'GET', 'br', proof)
+    expect(confirmed).toMatchObject({ status: 204, headers: { [RELEASE_COMBO_DIGEST_HEADER]: local!.sha256 }, body: Buffer.alloc(0) })
+    const publicResult = await routeRequest(route, url, 'GET', 'identity', { [RELEASE_COMBO_DIGEST_HEADER]: local!.sha256 })
+    expect(publicResult.status).toBe(200)
+    expect(publicResult.body).toEqual(local!.body)
+    const mismatched = await routeRequest(route, url, 'GET', 'identity', {
+      ...proof, [RELEASE_COMBO_DIGEST_HEADER]: createHash('sha256').update('other bytes').digest('hex'),
+    })
+    expect(mismatched.status).toBe(200)
+    expect(mismatched.headers?.[RELEASE_COMBO_DIGEST_HEADER]).toBeUndefined()
+    expect(mismatched.body).toEqual(local!.body)
+    const unpublished = url.replace(/rev=[0-9a-f]+$/u, 'rev=000000000000')
+    expect((await routeRequest(route, unpublished, 'GET', 'identity', proof)).status).toBe(404)
+    expect(await readRelease(`/${unpublished}`)).toBeUndefined()
+    expect(await readRelease(`/${mapUrl(url)}`)).toBeUndefined()
+  })
+
+  it('enforces release combo canonical bounds, index retries, concurrency limits, and byte budgets', async () => {
+    const release = mkdtempSync(join(tmpdir(), 'dsh-release-combos-'))
+    const outside = mkdtempSync(join(tmpdir(), 'dsh-release-outside-'))
+    try {
+      const writePkg = (folder: string, manifest: unknown, clientSource?: string | Buffer) => {
+        const dir = join(release, 'packages', 'client', folder)
+        mkdirSync(join(dir, 'lib'), { recursive: true })
+        writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+        if (clientSource !== undefined) writeFileSync(join(dir, 'lib', 'client.js'), clientSource)
+        return dir
+      }
+      // Retry index creation after an initial failure (missing packages/ directory).
+      const retryReader = openReleaseComboReader(release)
+      expect(await retryReader('/plugins/combo.js??@deepseek-ai/dsh-alpha/client.js&rev=000000000000')).toBeUndefined()
+
+      // Populate valid packages (string and conditional object exports), ignored manifests, and symlink escapes.
+      const srcA = stampClientArtifact('module.exports = "a"\n', [])
+      const srcB = stampClientArtifact('module.exports = "b"\n', [])
+      const srcBig1 = stampClientArtifact(`module.exports = "${'x'.repeat(4_500_000)}"\n`, [])
+      const srcBig2 = stampClientArtifact(`module.exports = "${'y'.repeat(4_500_000)}"\n`, [])
+      const emptyStampedLen = Buffer.byteLength(stampClientArtifact('module.exports = ""\n', []))
+      const srcOverflow = stampClientArtifact(`module.exports = "${'z'.repeat(8 * 1024 * 1024 - emptyStampedLen + 64)}"\n`, [])
+      const srcRenderedOverflow = stampClientArtifact(`module.exports = "${'w'.repeat(8 * 1024 * 1024 - emptyStampedLen - 16)}"\n`, [])
+      const revOf = (src: string): string => clientContentRevision(Buffer.from(src))!
+
+      writePkg('alpha', { name: '@deepseek-ai/dsh-alpha', exports: { './client': './lib/client.js' } }, srcA)
+      writePkg('beta', { name: '@deepseek-ai/dsh-beta', exports: { './client': { default: './lib/client.js' } } }, srcB)
+      writePkg('big-one', { name: '@deepseek-ai/dsh-big-one', exports: { './client': './lib/client.js' } }, srcBig1)
+      writePkg('big-two', { name: '@deepseek-ai/dsh-big-two', exports: { './client': './lib/client.js' } }, srcBig2)
+      writePkg('overflow', { name: '@deepseek-ai/dsh-overflow', exports: { './client': './lib/client.js' } }, srcOverflow)
+      writePkg('rendered-overflow', { name: '@deepseek-ai/dsh-rendered-overflow', exports: { './client': './lib/client.js' } }, srcRenderedOverflow)
+      writePkg('empty', { name: '@deepseek-ai/dsh-empty', exports: { './client': './lib/client.js' } }, '')
+      writePkg('unstamped', { name: '@deepseek-ai/dsh-unstamped', exports: { './client': './lib/client.js' } }, 'module.exports = 1\n')
+      writePkg('ignored-non-workspace', { name: '@other/pkg', exports: { './client': './lib/client.js' } }, srcA)
+      writePkg('ignored-no-client', { name: '@deepseek-ai/dsh-no-client', exports: {} })
+
+      // Symlinked package.json pointing outside packages/ is ignored during indexing.
+      const outsidePkgJson = join(outside, 'package.json')
+      writeFileSync(outsidePkgJson, JSON.stringify({ name: '@deepseek-ai/dsh-escaped-manifest', exports: { './client': './lib/client.js' } }))
+      const escapedManifestDir = join(release, 'packages', 'client', 'escaped-manifest')
+      mkdirSync(escapedManifestDir, { recursive: true })
+      symlinkSync(outsidePkgJson, join(escapedManifestDir, 'package.json'))
+
+      // Symlinked lib/client.js pointing outside its owning package directory is rejected.
+      const outsideClient = join(outside, 'client.js')
+      writeFileSync(outsideClient, srcA)
+      const escapedClientDir = writePkg('escaped-client', { name: '@deepseek-ai/dsh-escaped-client', exports: { './client': './lib/client.js' } })
+      symlinkSync(outsideClient, join(escapedClientDir, 'lib', 'client.js'))
+
+      // Symlink alias of releaseRoot itself must still canonicalize packagesRoot cleanly.
+      const releaseAlias = join(outside, 'release-alias')
+      symlinkSync(release, releaseAlias)
+      const reader = openReleaseComboReader(releaseAlias)
+
+      const targetA = `/plugins/combo.js??@deepseek-ai/dsh-alpha/client.js&rev=${revOf(srcA)}`
+      const targetB = `/plugins/combo.js??@deepseek-ai/dsh-beta/client.js&rev=${revOf(srcB)}`
+      const targetBig1 = `/plugins/combo.js??@deepseek-ai/dsh-big-one/client.js&rev=${revOf(srcBig1)}`
+      const targetBig2 = `/plugins/combo.js??@deepseek-ai/dsh-big-two/client.js&rev=${revOf(srcBig2)}`
+
+      // Retry reader recovers after packages/ is populated and resolves single-entry rev.
+      expect(await retryReader(targetA)).toBeDefined()
+
+      // Oversized target URL, malformed target URL, duplicate/non-workspace resources, unknown package.
+      expect(await reader(`/plugins/combo.js??${'a'.repeat(3100)}&rev=000000000000`)).toBeUndefined()
+      expect(await reader('/plugins/not-combo.js')).toBeUndefined()
+      expect(await reader('/plugins/combo.js??@deepseek-ai/dsh-alpha/client.js,@deepseek-ai/dsh-alpha/client.js&rev=000000000000')).toBeUndefined()
+      expect(await reader('/plugins/combo.js??@deepseek-ai/dsh-missing/client.js&rev=000000000000')).toBeUndefined()
+      expect(await reader('/plugins/combo.js??@deepseek-ai/dsh-escaped-manifest/client.js&rev=000000000000')).toBeUndefined()
+
+      // Escaped client.js symlink, empty file, unstamped file, disk size > 8 MiB, and rendered body > 8 MiB.
+      expect(await reader(`/plugins/combo.js??@deepseek-ai/dsh-escaped-client/client.js&rev=${revOf(srcA)}`)).toBeUndefined()
+      expect(await reader('/plugins/combo.js??@deepseek-ai/dsh-empty/client.js&rev=000000000000')).toBeUndefined()
+      expect(await reader('/plugins/combo.js??@deepseek-ai/dsh-unstamped/client.js&rev=000000000000')).toBeUndefined()
+      expect(await reader(`/plugins/combo.js??@deepseek-ai/dsh-overflow/client.js&rev=${revOf(srcOverflow)}`)).toBeUndefined()
+      expect(await reader(`/plugins/combo.js??@deepseek-ai/dsh-rendered-overflow/client.js&rev=${revOf(srcRenderedOverflow)}`)).toBeUndefined()
+
+      // Concurrent reads: same-target dedup + MAX_CONCURRENT_READS (2) ceiling drops the 3rd concurrent target.
+      const [firstA, dedupA, firstB, droppedBig] = await Promise.all([
+        reader(targetA),
+        reader(targetA),
+        reader(targetB),
+        reader(targetBig1),
+      ])
+      expect(firstA).toBeDefined()
+      expect(dedupA).toBe(firstA)
+      expect(firstB).toBeDefined()
+      expect(droppedBig).toBeUndefined()
+
+      // LRU cache hit (touches entry) and byte-budget eviction across two >4 MiB entries.
+      expect(await reader(targetA)).toBe(firstA)
+      expect(await reader(targetBig1)).toBeDefined()
+      expect(await reader(targetBig2)).toBeDefined()
+
+      // Duplicate package name inside packages/ causes indexing to reject and reader returns undefined.
+      writePkg('alpha-dup', { name: '@deepseek-ai/dsh-alpha', exports: { './client': './lib/client.js' } }, srcA)
+      const duplicateReader = openReleaseComboReader(release)
+      expect(await duplicateReader(targetA)).toBeUndefined()
+    } finally {
+      rmSync(release, { recursive: true, force: true })
+      rmSync(outside, { recursive: true, force: true })
+    }
   })
 
   it('reuses shared application responses when an optional transport group is present', async () => {

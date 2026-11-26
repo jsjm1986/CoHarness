@@ -28,6 +28,12 @@ export interface UserTerminalAuthorization {
    * @returns creator identity and a grant cancelled on revocation.
    */
   authorize(sessionId: SessionId, signal: AbortSignal): Promise<TerminalAuthority>
+  /**
+   * Confirm that an upgraded input socket carries the same verified user identity as an already-admitted creator.
+   * @param creator - creator identity bound to the live output attachment.
+   * @returns true only when the current upgrade request verifies the exact same creator.
+   */
+  verifyUpgradeCreator?(creator: TerminalCreatorId): boolean
 }
 
 /** Administrator access grants metadata and termination, never screen or input access. */
@@ -87,6 +93,21 @@ export class TerminalAccess {
     if (this.managed && policy === undefined) throw new RemoteError('terminal/forbidden', 'An active terminal administration policy is required.', {})
     await policy?.administrator(signal)
     signal.throwIfAborted()
+  }
+
+  /**
+   * Verify whether an upgraded input socket carries the same creator identity as an active output attachment.
+   * Managed runtimes fail closed unless the active authorization policy confirms the exact creator.
+   * @param creator - creator identity bound to the live output attachment.
+   * @returns true only when the upgrade caller matches the attachment's creator.
+   */
+  verifyUpgrade(creator: TerminalCreatorId): boolean {
+    this.managed ||= this.ctx.get('executionAuthorityRequired') === true || this.ctx.get('executionAuthority') !== undefined
+    const policy = this.ctx.get('userTerminalAuthorization')
+    if (this.managed || policy !== undefined) {
+      return policy?.verifyUpgradeCreator?.(creator) === true
+    }
+    return creator === this.local.creator
   }
 
 }

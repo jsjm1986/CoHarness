@@ -1,0 +1,40 @@
+- "button \"Preview {{cwd}}/workspace-review-multiple/delivery-1.txt in sidebar\""
+- text: delivery-1.txt Delivered delivery-1.txt
+- "button \"Open {{cwd}}/workspace-review-multiple/delivery-1.txt in sidebar\"": Open
+- "button \"More file actions for {{cwd}}/workspace-review-multiple/delivery-1.txt\"":
+  - img
+- "button \"Preview {{cwd}}/workspace-review-multiple/delivery-2.txt in sidebar\""
+- text: delivery-2.txt Delivered delivery-2.txt
+- "button \"Open {{cwd}}/workspace-review-multiple/delivery-2.txt in sidebar\"": Open
+- "button \"More file actions for {{cwd}}/workspace-review-multiple/delivery-2.txt\"":
+  - img
+- "button \"Preview {{cwd}}/workspace-review-multiple/delivery-3.txt in sidebar\""
+- text: delivery-3.txt Delivered delivery-3.txt
+- "button \"Open {{cwd}}/workspace-review-multiple/delivery-3.txt in sidebar\"": Open
+- "button \"More file actions for {{cwd}}/workspace-review-multiple/delivery-3.txt\"":
+  - img
+- "button \"Preview {{cwd}}/workspace-review-multiple/delivery-4.txt in sidebar\""
+- text: delivery-4.txt Delivered delivery-4.txt
+- "button \"Open {{cwd}}/workspace-review-multiple/delivery-4.txt in sidebar\"": Open
+- "button \"More file actions for {{cwd}}/workspace-review-multiple/delivery-4.txt\"":
+  - img
+- "button \"Preview {{cwd}}/workspace-review-multiple/第五份-完整交付文件.txt in sidebar\""
+- text: 第五份-完整交付文件.txt Delivered 第五份-完整交付文件.txt
+- "button \"Open {{cwd}}/workspace-review-multiple/第五份-完整交付文件.txt in sidebar\"": Open
+- "button \"More file actions for {{cwd}}/workspace-review-multiple/第五份-完整交付文件.txt\"":
+  - img
+- button "Review this turn’s changes in the sidebar": Edited 5 files +5 -5
+- list:
+  - listitem:
+    - button "View changes to delivery-1.txt": delivery-1.txt +1 -1
+  - listitem:
+    - button "View changes to delivery-2.txt": delivery-2.txt +1 -1
+  - listitem:
+    - button "View changes to delivery-3.txt": delivery-3.txt +1 -1
+  - listitem:
+    - button "View changes to delivery-4.txt": delivery-4.txt +1 -1
+  - listitem:
+    - button "View changes to 第五份-完整交付文件.txt": 第五份-完整交付文件.txt +1 -1
+- button "Collapse changed files" [expanded]:
+  - text: Collapse
+  - img

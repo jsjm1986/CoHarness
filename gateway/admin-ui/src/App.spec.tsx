@@ -1,9 +1,10 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
 import { App } from './App.tsx'
 
-vi.mock('./ComputerSelector.tsx', () => ({ ComputerSelector: () => null }))
+vi.mock('./ComputerSelector.tsx', () => ({ ComputerSelectorProvider: ({ children }: { children: ReactNode }) => children }))
 vi.mock('./pages/UsersPage.tsx', () => ({ UsersPage: () => <h1>用户页面</h1> }))
 vi.mock('./pages/ProjectListPage.tsx', () => ({ ProjectListPage: () => <h1>项目页面</h1> }))
 vi.mock('./pages/ProjectDetailPage.tsx', () => ({ ProjectDetailPage: () => <h1>项目详情页面</h1> }))
@@ -29,6 +30,8 @@ describe('App', () => {
     expect(logoutForms).toHaveLength(2)
     for (const form of logoutForms) expect(form.getAttribute('method')).toBe('post')
     expect(screen.getAllByRole('button', { name: '退出登录' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: '中文，切换为 English' }).map(button => button.textContent)).toEqual(['中', '中'])
+    expect(screen.queryByText('管理中心')).toBeNull()
     expect(screen.getAllByText('COHARNESS')).toHaveLength(2)
     expect(screen.queryByText('DeepSeek Harness')).toBeNull()
     expect(screen.getAllByRole('navigation', { name: '管理导航' })).toHaveLength(2)
@@ -40,17 +43,17 @@ describe('App', () => {
     expect(within(desktop!).getByRole('link', { name: '审计' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '用户页面' })).toBeTruthy()
     await userEvent.click(screen.getAllByRole('link', { name: '项目' })[0]!)
-    expect(screen.getByRole('heading', { name: '项目页面' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '项目页面' })).toBeTruthy()
     await userEvent.click(within(mobile!).getByRole('button', { name: '更多管理功能' }))
     const menu = within(screen.getByRole('dialog', { name: '更多管理功能' }))
     expect(menu.getAllByRole('link')).toHaveLength(10)
-    expect(menu.getByLabelText('界面语言')).toBeTruthy()
+    expect(menu.queryByRole('button', { name: '中文，切换为 English' })).toBeNull()
     expect(document.documentElement.lang).toBe('zh')
     expect(menu.getByRole('link', { name: '桌面' })).toBeTruthy()
     expect(menu.getByRole('link', { name: '远程桌面' })).toBeTruthy()
     expect(menu.getByRole('link', { name: '审计' })).toBeTruthy()
     await userEvent.click(menu.getByRole('link', { name: '终端' }))
-    expect(screen.getByRole('heading', { name: '终端页面' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '终端页面' })).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: '更多管理功能' })).toBeNull()
     expect(within(mobile!).getByRole('button', { name: '更多管理功能' }).classList.contains('active')).toBe(true)
   })
@@ -66,6 +69,7 @@ describe('App', () => {
     try {
       const view = render(<App />)
       expect(document.documentElement.lang).toBe('en')
+      expect(screen.getAllByRole('button', { name: 'English, switch to Chinese' }).map(button => button.textContent)).toEqual(['EN', 'EN'])
       view.unmount()
       expect(document.documentElement.lang).toBe(previousLang)
     } finally {
@@ -88,7 +92,7 @@ describe('App', () => {
     const desktop = screen.getAllByRole('navigation', { name: '管理导航' })[0]!
     expect(within(desktop).getByRole('link', { name: '项目' }).getAttribute('href')).toBe(`${base}/projects`)
     await userEvent.click(within(desktop).getByRole('link', { name: '项目' }))
-    expect(screen.getByRole('heading', { name: '项目页面' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '项目页面' })).toBeTruthy()
     expect(window.location.pathname).toBe(`${base}/projects`)
     expect(within(desktop).getByRole('link', { name: '用户' }).getAttribute('href')).toBe(`${base}`)
   })

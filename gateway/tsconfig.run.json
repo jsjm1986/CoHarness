@@ -15,10 +15,13 @@
     "strict": true,
     "allowImportingTsExtensions": true,
     "paths": {
+      "@deepseek-ai/dsh-session-persistence": ["../packages/session/session-persistence/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-persistence-jsonl": ["../packages/session/session-persistence-jsonl/lib/types/index.js"],
       "@deepseek-ai/dsh-subprocess-local": ["../packages/subprocess/subprocess-local/lib/types/index.js"],
       "@deepseek-ai/dsh-subprocess": ["../packages/subprocess/subprocess/lib/types/index.js"],
       "@deepseek-ai/node-addon-system/flock": ["../native/system/packages/entry/lib/flock.js"],
       "@deepseek-ai/dsh-resource-budget/wire": ["../packages/context/resource-budget/lib/types/wire.js"],
+      "@deepseek-ai/dsh-gateway-runtime/steward-statement": ["../packages/context/gateway-runtime/lib/types/steward-statement.js"],
       "@deepseek-ai/dsh-userdoc-gateway/protocol": ["../packages/attachment/userdoc-gateway/lib/types/protocol.js"],
       "@deepseek-ai/dsh-userdoc-gateway/server": ["../packages/attachment/userdoc-gateway/lib/types/server.js"],
       "@deepseek-ai/cordis": ["../vendor/cordis/lib/types/index.js"],

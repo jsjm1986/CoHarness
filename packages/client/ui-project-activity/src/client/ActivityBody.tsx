@@ -1,5 +1,5 @@
 /** Project activity panel: grouping toolbar over per-mode folded reading views. */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   IconCheckOutline14,
@@ -11,20 +11,24 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ActivityItem, ActivityMode, ActivitySection, ProgressEntry, ProgressItem, ProgressPage } from './feed.ts'
-import { agoLabel, convTone, dayLabel, feedMembers, groupItems, relativeDayLabel, timeLabel } from './feed.ts'
-import type { ActivityStore } from './store.ts'
+import { agoLabel, convTone, dayLabel, groupItems, hasReadableProgress, relativeDayLabel, timeLabel } from './feed.ts'
+import type { ActivityStore, ProgressObservation } from './store.ts'
 import css from './ActivityBody.module.css'
 
 /** Injected business face built by apply over the tab's store and services. */
 export interface ActivityInjected {
-  /** Replace the feed with a fresh first page and re-read the journal. */
-  refresh: () => void
-  /** Append the next older page when the feed is not exhausted. */
-  loadMore: (before: string) => void
+  /** Read the selected member's feed and journal while the body is visible. Release it on hide or unmount. */
+  attach: (signal: AbortSignal, member: number | null) => () => void
+  /** Replace the current member's first page and re-read the journal. */
+  refresh: (member: number | null) => void
+  /** Change the contributor filter and read its first page. Null selects all contributors. */
+  filter: (member: number | null) => void
+  /** Append the older page for the member that issued the cursor. */
+  loadMore: (before: string, member: number | null) => void
   /** Force one digest pass now, overriding the idle gates. */
   generate: () => void
-  /** Open a conversation pane, revealing the named event when `seq` is given. */
-  reveal: (sessionId: string, seq: number | null) => void
+  /** Open a conversation in the cited Runtime, or the panel's Runtime when the citation lacks one. */
+  reveal: (sessionId: string, seq: number | null, runtimeId?: ProgressItem['runtimeId']) => void
 }
 
 /** Activity tab body props assembled by the tab seat. */
@@ -67,7 +71,7 @@ function ConvChip({ item, reveal, t }: {
 }): ReactNode {
   return (
     <button type="button" className={css.chip} title={t('row.openConversation')}
-      onClick={(event) => { event.stopPropagation(); reveal(item.sessionId, null) }}>
+      onClick={() => { reveal(item.sessionId, null) }}>
       <ConvDot sessionId={item.sessionId} />
       <span className={css.chipLabel}>{itemTitle(item, t)}</span>
     </button>
@@ -82,26 +86,28 @@ function ItemRow({ item, showConv, reveal, t }: {
   readonly t: Translate
 }): ReactNode {
   return (
-    <div className={css.xRow} role="button" tabIndex={0}
-      title={t('row.reveal')}
-      onClick={() => { reveal(item.sessionId, item.seq) }}
-      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') reveal(item.sessionId, item.seq) }}>
-      <TypeIcon kind={item.kind} />
-      <span className={css.xMain}>
-        <span className={css.xMeta}>
-          <span className={css.who}>{item.actorLabel}</span>
-          {item.kind === 'answer' && <span className={css.verbAns}>{t('verb.decided')}</span>}
-          {showConv && <ConvChip item={item} reveal={reveal} t={t} />}
-          <span className={css.xTime}>{timeLabel(item.occurredAt)}</span>
+    <div className={css.xItem}>
+      <div className={css.xRow} role="button" tabIndex={0}
+        title={t('row.reveal')}
+        onClick={() => { reveal(item.sessionId, item.seq) }}
+        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') reveal(item.sessionId, item.seq) }}>
+        <TypeIcon kind={item.kind} />
+        <span className={css.xMain}>
+          <span className={css.xMeta}>
+            <span className={css.who}>{item.actorLabel}</span>
+            {item.kind === 'answer' && <span className={css.verbAns}>{t('verb.decided')}</span>}
+            <span className={css.xTime}>{timeLabel(item.occurredAt)}</span>
+          </span>
+          {item.kind === 'answer' && item.questionText !== undefined && (
+            <span className={css.xQ}>{t('row.questionLine', { question: item.questionText })}</span>
+          )}
+          {item.kind === 'answer'
+            ? <span className={css.xAns}><IconCheckOutline14 />{item.text}</span>
+            : <span className={css.xTxt}>{item.text}</span>}
         </span>
-        {item.kind === 'answer' && item.questionText !== undefined && (
-          <span className={css.xQ}>{t('row.questionLine', { question: item.questionText })}</span>
-        )}
-        {item.kind === 'answer'
-          ? <span className={css.xAns}><IconCheckOutline14 />{item.text}</span>
-          : <span className={css.xTxt}>{item.text}</span>}
-      </span>
-      <IconRightUpOutline14 className={css.jump} aria-hidden />
+        <IconRightUpOutline14 className={css.jump} aria-hidden />
+      </div>
+      {showConv && <ConvChip item={item} reveal={reveal} t={t} />}
     </div>
   )
 }
@@ -115,19 +121,22 @@ function TimeEntry({ item, reveal, t }: {
   const [open, setOpen] = useState(false)
   return (
     <div className={css.tEntry}>
-      <div className={css.tLine} role="button" tabIndex={0}
-        title={open ? t('section.collapse') : t('section.expand')}
-        onClick={() => { setOpen(!open) }}
-        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setOpen(!open) }}>
-        <TypeIcon kind={item.kind} />
-        <span className={css.tWho}>{item.actorLabel}</span>
+      <div className={css.tRow}>
+        <div className={css.tLine} role="button" tabIndex={0}
+          aria-expanded={open}
+          title={open ? t('section.collapse') : t('section.expand')}
+          onClick={() => { setOpen(!open) }}
+          onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setOpen(!open) }}>
+          <TypeIcon kind={item.kind} />
+          <span className={css.tWho}>{item.actorLabel}</span>
+          <span className={css.tGist}>
+            {item.kind === 'answer'
+              ? <><span className={css.verbAns}>{t('verb.decided')}</span>{' '}<b>{item.text}</b></>
+              : item.text}
+          </span>
+          <span className={css.tTime}>{timeLabel(item.occurredAt)}</span>
+        </div>
         <ConvChip item={item} reveal={reveal} t={t} />
-        <span className={css.tGist}>
-          {item.kind === 'answer'
-            ? <><span className={css.verbAns}>{t('verb.decided')}</span>{' '}<b>{item.text}</b></>
-            : item.text}
-        </span>
-        <span className={css.tTime}>{timeLabel(item.occurredAt)}</span>
       </div>
       {open && (
         <div className={css.tDetail}>
@@ -161,6 +170,7 @@ function DaySection({ section, reveal, t }: {
   return (
     <div className={css.dayBlock}>
       <div className={css.dayHead} role="button" tabIndex={0}
+        aria-expanded={open}
         title={open ? t('section.collapse') : t('section.expand')}
         onClick={() => { setOpen(!open) }}
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setOpen(!open) }}>
@@ -190,6 +200,7 @@ function ConvBlock({ section, reveal, t }: {
   return (
     <div className={css.block}>
       <div className={css.blockHead} role="button" tabIndex={0}
+        aria-expanded={open}
         title={open ? t('section.collapse') : t('section.expand')}
         onClick={() => { setOpen(!open) }}
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setOpen(!open) }}>
@@ -248,6 +259,7 @@ function MemberBlock({ section, reveal, t }: {
   return (
     <div className={css.block}>
       <div className={css.blockHead} role="button" tabIndex={0}
+        aria-expanded={open}
         title={open ? t('section.collapse') : t('section.expand')}
         onClick={() => { setOpen(!open) }}
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setOpen(!open) }}>
@@ -300,7 +312,7 @@ function ProgressChip({ item, reveal, t }: {
   const sessionId = item.sessionId
   return (
     <button type="button" className={css.chip} title={t('row.openConversation')}
-      onClick={() => { reveal(sessionId, item.seq ?? null) }}>
+      onClick={() => { reveal(sessionId, item.seq !== undefined && item.seq >= 0 ? item.seq : null, item.runtimeId) }}>
       <ConvDot sessionId={sessionId} />
       <span className={css.chipLabel}>{item.sessionTitle ?? t('row.untitledConversation')}</span>
     </button>
@@ -343,6 +355,9 @@ function PeriodBlock({ entry, defaultOpen, reveal, t }: {
 }): ReactNode {
   const [open, setOpen] = useState(defaultOpen)
   const week = entry.periodKey?.split('-W')[1] ?? ''
+  const title = entry.spansWeeks && entry.periodStart !== undefined && entry.periodEnd !== undefined
+    ? t('progress.periodRange', { from: dayLabel(entry.periodStart), to: dayLabel(entry.periodEnd) })
+    : t('progress.period', { week })
   const coverage = entry.periodStart !== undefined && entry.periodEnd !== undefined
     ? t('progress.coverage', {
       from: dayLabel(entry.periodStart).slice(5),
@@ -353,12 +368,13 @@ function PeriodBlock({ entry, defaultOpen, reveal, t }: {
   return (
     <div className={css.block}>
       <div className={css.blockHead} role="button" tabIndex={0}
+        aria-expanded={open}
         title={open ? t('section.collapse') : t('section.expand')}
         onClick={() => { setOpen(!open) }}
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setOpen(!open) }}>
         <div className={css.blockTop}>
           <IconChevronRightOutline14 className={open ? css.chevOpen : css.chev} aria-hidden />
-          <span className={css.blockTitle}>{t('progress.period', { week })}</span>
+          <span className={css.blockTitle}>{title}</span>
           <span className={css.ago}>{stampLabel(entry.generatedAt)}</span>
         </div>
         <div className={css.blockMeta}>
@@ -390,50 +406,52 @@ function PeriodBlock({ entry, defaultOpen, reveal, t }: {
 }
 
 /** Progress mode: rolling current block, folded periods, and the digest footer. */
-function ProgressView({ page, failed, generate, reveal, t }: {
+function ProgressView({ page, observation, refresh, generate, reveal, t }: {
   readonly page: ProgressPage | undefined
-  readonly failed: boolean
+  readonly observation: ProgressObservation
+  readonly refresh: () => void
   readonly generate: ActivityInjected['generate']
   readonly reveal: ActivityInjected['reveal']
   readonly t: Translate
 }): ReactNode {
-  if (failed) return <div className={css.notice}>{t('progress.failed')}</div>
-  if (page === undefined) return <div className={css.notice}>{t('feed.loading')}</div>
-  const status = page.status
-  const entries = page.current === undefined && page.periods.length === 0
+  const status = page?.status
+  const busy = observation === 'submitting' || observation === 'watching'
+  const failure = observation === 'load-failed' ? t('progress.failed')
+    : observation === 'status-unknown' ? t('progress.statusUnknown')
+      : observation === 'generate-unavailable' ? t('progress.generateUnavailable') : undefined
   return (
     <div className={css.progress}>
-      {entries && !status.generating && (
-        <div className={css.notice}>{status.enabled ? t('progress.empty') : t('progress.unavailable')}</div>
+      {page === undefined && failure === undefined && <div className={css.notice}>{t('feed.loading')}</div>}
+      {page !== undefined && !hasReadableProgress(page) && !busy && failure === undefined && (
+        <div className={css.notice}>{page.status.enabled ? t('progress.empty') : t('progress.unavailable')}</div>
       )}
-      {page.current?.content.summary !== undefined && (
+      {page?.current?.content.summary !== undefined && (
         <div className={css.pCurrent}>
           <div className={css.pCurrentHead}>
             <span className={css.pCurrentTag}>{t('progress.current')}</span>
+            <span className={css.pCurrentTime}>{t('progress.ai')}</span>
             <span className={css.pCurrentTime}>{t('progress.generatedAt', { time: stampLabel(page.current.generatedAt) })}</span>
           </div>
           <div className={css.pSummary}>{page.current.content.summary}</div>
         </div>
       )}
-      {page.periods.map((entry, index) => (
+      {page?.periods.map((entry, index) => (
         <PeriodBlock key={entry.id} entry={entry} defaultOpen={index === 0} reveal={reveal} t={t} />
       ))}
-      {(status.enabled || status.pending > 0 || status.generating) && (
+      {(failure !== undefined || busy || status?.enabled || (status?.pending ?? 0) > 0 || status?.lastError !== undefined) && (
         <div className={css.pStatus}>
-          <span className={css.pStatusText}>
-            {status.generating
-              ? t('progress.generating')
-              : status.pending > 0
-                ? t('progress.pending', { count: status.pending })
-                : ''}
+          <span className={css.pStatusText} role="status">
+            {failure ?? (observation === 'submitting' ? t('progress.submitting')
+              : observation === 'watching' ? t('progress.generating')
+                : status !== undefined && status.pending > 0 ? t('progress.pending', { count: status.pending }) : '')}
           </span>
-          {status.lastError !== undefined && !status.generating && (
+          {status?.lastError !== undefined && !busy && failure === undefined && (
             <span className={css.pError}>{t('progress.lastError', { error: status.lastError })}</span>
           )}
-          {status.canGenerate && status.enabled && (
-            <button type="button" className={css.pGenerate} disabled={status.generating}
-              onClick={() => { generate() }}>
-              {t('progress.generate')}
+          {(failure !== undefined || (status?.canGenerate && status.enabled)) && (
+            <button type="button" className={css.pGenerate} aria-disabled={busy || undefined}
+              onClick={() => { if (!busy) (failure === undefined ? generate : refresh)() }}>
+              {failure === undefined ? t('progress.generate') : t('progress.refreshStatus')}
             </button>
           )}
         </div>
@@ -446,24 +464,26 @@ const MODES: readonly ActivityMode[] = ['progress', 'time', 'conversation', 'mem
 
 /** Folded reading views of member messages, chosen answers, and the project journal. */
 export function ActivityBody(props: ActivityBodyProps): ReactNode {
-  const { useStore, actions, refresh, loadMore, generate, reveal, t } = props
+  const { useTabInfo, useStore, actions, attach, refresh, filter, loadMore, generate, reveal, t } = props
+  const { tab } = useTabInfo()
   const items = useStore(state => state.items)
+  const members = useStore(state => state.members)
   const nextBefore = useStore(state => state.nextBefore)
   const loading = useStore(state => state.loading)
   const failed = useStore(state => state.failed)
   const progress = useStore(state => state.progress)
-  const progressFailed = useStore(state => state.progressFailed)
-  const grouping = useStore(state => state.grouping)
+  const observation = useStore(state => state.progressObservation)
+  const grouping = useStore(state => state.grouping ?? 'time')
   const member = useStore(state => state.member)
 
-  useEffect(() => { refresh() }, [refresh])
+  const readOnAttach = useEffectEvent((signal: AbortSignal) => attach(signal, member))
+  useEffect(() => tab.visible ? readOnAttach(tab.signal) : undefined, [attach, tab.signal, tab.visible])
 
-  const visible = useMemo(() => member === null ? items : items.filter(item => item.actorUserId === member), [items, member])
-  const members = useMemo(() => feedMembers(items), [items])
   const sections = useMemo(
-    () => grouping === 'progress' ? [] : groupItems(visible, grouping, () => t('row.untitledConversation')),
-    [visible, grouping, t],
+    () => grouping === 'progress' ? [] : groupItems(items, grouping, () => t('row.untitledConversation')),
+    [items, grouping, t],
   )
+  const reload = () => { refresh(member) }
 
   return (
     <div className={css.root}>
@@ -472,6 +492,7 @@ export function ActivityBody(props: ActivityBodyProps): ReactNode {
           {MODES.map(mode => (
             <button key={mode} type="button"
               className={mode === grouping ? css.segmentActive : css.segment}
+              aria-pressed={mode === grouping}
               onClick={() => { actions.grouped(mode) }}>
               {t(`grouping.${mode}`)}
             </button>
@@ -479,23 +500,25 @@ export function ActivityBody(props: ActivityBodyProps): ReactNode {
         </div>
         {grouping !== 'progress' && (
           <select className={css.member} value={member === null ? '' : String(member)}
-            aria-label={t('filter.allMembers')}
-            onChange={(event) => { actions.filtered(event.target.value === '' ? null : Number(event.target.value)) }}>
+            aria-label={t('filter.member')}
+            onChange={(event) => { filter(event.target.value === '' ? null : Number(event.target.value)) }}>
             <option value="">{t('filter.allMembers')}</option>
             {members.map(entry => <option key={entry.userId} value={String(entry.userId)}>{entry.label}</option>)}
           </select>
         )}
         <button type="button" className={css.iconButton} title={t('toolbar.refresh')} aria-label={t('toolbar.refresh')}
-          onClick={() => { refresh() }}>
+          onClick={reload}>
           <IconRefreshOutline14 />
         </button>
       </div>
       <div className={css.feed}>
         {grouping === 'progress' && (
-          <ProgressView page={progress} failed={progressFailed} generate={generate} reveal={reveal} t={t} />
+          <ProgressView page={progress} observation={observation} refresh={reload} generate={generate} reveal={reveal} t={t} />
         )}
         {grouping !== 'progress' && failed && <div className={css.notice}>{t('feed.failed')}</div>}
-        {grouping !== 'progress' && !failed && items.length === 0 && !loading && <div className={css.notice}>{t('feed.empty')}</div>}
+        {grouping !== 'progress' && !failed && items.length === 0 && !loading && (
+          <div className={css.notice} role="status">{t(member === null ? 'feed.empty' : 'feed.memberEmpty')}</div>
+        )}
         {grouping === 'time' && sections.map(section => (
           <DaySection key={section.id} section={section} reveal={reveal} t={t} />
         ))}
@@ -506,7 +529,7 @@ export function ActivityBody(props: ActivityBodyProps): ReactNode {
           <MemberBlock key={section.id} section={section} reveal={reveal} t={t} />
         ))}
         {grouping !== 'progress' && nextBefore !== undefined && !loading && (
-          <button type="button" className={css.more} onClick={() => { loadMore(nextBefore) }}>{t('feed.loadMore')}</button>
+          <button type="button" className={css.more} onClick={() => { loadMore(nextBefore, member) }}>{t('feed.loadMore')}</button>
         )}
         {grouping !== 'progress' && loading && <div className={css.notice}>{t('feed.loading')}</div>}
       </div>

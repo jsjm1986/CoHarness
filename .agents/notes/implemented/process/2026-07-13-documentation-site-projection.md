@@ -20,6 +20,8 @@ Locale home projections retain only the canonical YAML frontmatter. The reposito
 
 The projector parses Markdown links without reserializing the document. A link to another published source becomes a site-relative route; a link to an unpublished repository file becomes a source link under the `deepseek-ai/deepseek-harness` repository home; a repository image is copied into the generated tree and referenced from there ([why](2026-08-06-doc-site-carries-its-images.md)). Missing relative targets fail projection. Unit tests pin these transformations, and `docs:check` runs the projector tests plus a production VitePress build as part of `doc-sync` and the parallel documentation gates.
 
+VitePress tags links that occupy an entire paragraph, list item, or table cell so the theme can size independent navigation targets to 44 CSS pixels on small screens and coarse pointers. Links within prose use the containing line's typography. A named, keyboard-focusable region owns each Markdown table's horizontal scroll. Bottom padding keeps cell links above the horizontal scrollbar's touch area. Navigation flyouts open below the header controls.
+
 `verify-public-repository-links` rejects references to the unavailable legacy repository from tracked files. Source and edit links use the current repository home.
 
 `website/AGENTS.md` is the only maintained Markdown file in the website subtree. The projector test enumerates tracked and unignored files and rejects any other website Markdown, so site-specific locale, route, API, or generated source copies cannot bypass the publication manifest.

@@ -292,32 +292,21 @@ export function relativeDisplay(root: string, path: string): string {
   return escapeProjectDisplayPath(relative(root, path))
 }
 
-async function allExistingInstructionFiles(
-  dir: string,
-  root: string,
-  instructionFileCandidates: readonly string[],
-  fileSystem?: FileSystem,
-  signal?: AbortSignal,
-): Promise<DiscoveredInstructionFile[]> {
-  const found: DiscoveredInstructionFile[] = []
-  for (const candidate of instructionFileCandidates) {
-    const path = join(dir, candidate)
-    const probe = await statFile(path, fileSystem, signal)
-    switch (probe.kind) {
-      case 'present':
-        found.push({ absolutePath: path, displayPath: relativeDisplay(root, path), ...probe.info })
-        continue
-      // A missing candidate is skipped; a transient provider failure skips only
-      // that candidate so the remaining independent candidates still load.
-      case 'absent':
-      case 'unavailable':
-        continue
-      /* v8 ignore next 2 -- StatFileProbe is closed; this arm only makes adding a kind a compile error. */
-      default:
-        assertNever(probe, 'StatFileProbe')
+/** Bound each discovery's simultaneous metadata operations and open text streams. */
+const BASELINE_READ_LIMIT = 4
+
+async function* readBaselineInOrder<Input, Output>(
+  entries: readonly Input[],
+  read: (entry: Input) => Promise<Output>,
+): AsyncIterable<Output> {
+  for (let offset = 0; offset < entries.length; offset += BASELINE_READ_LIMIT) {
+    const batch = entries.slice(offset, offset + BASELINE_READ_LIMIT)
+    // Settle every started stream before propagating a provider failure or cancellation.
+    for (const result of await Promise.allSettled(batch.map(read))) {
+      if (result.status === 'rejected') throw result.reason
+      yield result.value
     }
   }
-  return found
 }
 
 async function discoverInstructionFiles(
@@ -325,43 +314,28 @@ async function discoverInstructionFiles(
   fileSystem?: FileSystem,
 ): Promise<DiscoveredInstructionFile[]> {
   const config = resolveDiscoveryConfig(options)
-  const files: DiscoveredInstructionFile[] = []
-  const seen = new Set<string>()
-  const addFile = (file: DiscoveredInstructionFile): void => {
-    if (seen.has(file.absolutePath)) return
-    seen.add(file.absolutePath)
-    files.push(file)
-  }
-
-  for (const root of userGlobalRoots(config)) {
-    const absolutePath = join(root.home, USER_GLOBAL_FILE)
-    const probe = await statFile(absolutePath, fileSystem, options.signal)
-    switch (probe.kind) {
-      case 'present':
-        addFile({
-          absolutePath,
-          displayPath: `${root.display}/${USER_GLOBAL_FILE}`,
-          ...probe.info,
-        })
-        continue
-      case 'absent':
-      case 'unavailable':
-        continue
-      /* v8 ignore next 2 -- StatFileProbe is closed; this arm only makes adding a kind a compile error. */
-      default:
-        assertNever(probe, 'StatFileProbe')
-    }
-  }
-
   const cwd = resolve(options.cwd)
   const projectRoot = options.projectRoot
     ?? await findProjectRoot(cwd, config.projectRootMarkers, fileSystem, options.signal)
-  for (const dir of ancestorChain(projectRoot, cwd)) {
-    for (const candidates of [config.instructionFileCandidates, config.localInstructionFileCandidates]) {
-      for (const file of await allExistingInstructionFiles(dir, projectRoot, candidates, fileSystem, options.signal)) {
-        addFile(file)
-      }
-    }
+  const globalFiles = userGlobalRoots(config).map(root => ({
+    absolutePath: join(root.home, USER_GLOBAL_FILE),
+    displayPath: `${root.display}/${USER_GLOBAL_FILE}`,
+  }))
+  const names = [...config.instructionFileCandidates, ...config.localInstructionFileCandidates]
+  const projectFiles = ancestorChain(projectRoot, cwd).flatMap(dir => names.map((name) => {
+    const absolutePath = join(dir, name)
+    return { absolutePath, displayPath: relativeDisplay(projectRoot, absolutePath) }
+  }))
+  const files: DiscoveredInstructionFile[] = []
+  const seen = new Set<string>()
+  const discovered = readBaselineInOrder([...globalFiles, ...projectFiles], async (file) => {
+    const probe = await statFile(file.absolutePath, fileSystem, options.signal)
+    return probe.kind === 'present' ? { ...file, ...probe.info } : undefined
+  })
+  for await (const file of discovered) {
+    if (file === undefined || seen.has(file.absolutePath)) continue
+    seen.add(file.absolutePath)
+    files.push(file)
   }
   return files
 }
@@ -475,16 +449,18 @@ export async function loadBaselineInstructionSet(
   if (config.maxSourceBytes <= 0 || !Number.isFinite(config.maxSourceBytes)) return undefined
   const discovered = await discoverInstructionFiles(options, fileSystem)
   const loaded: LoadedInstructionFile[] = []
-  for (const file of discovered) {
+  const reads = readBaselineInOrder(discovered, async (file) => {
     const content = await readBounded(file, config.maxSourceBytes, fileSystem, options.signal)
-    if (content !== undefined) {
-      loaded.push({
-        absolutePath: file.absolutePath,
-        displayPath: file.displayPath,
-        content,
-        ...file.version === undefined ? {} : { version: file.version },
-      })
+    if (content === undefined) return
+    return {
+      absolutePath: file.absolutePath,
+      displayPath: file.displayPath,
+      content,
+      ...file.version === undefined ? {} : { version: file.version },
     }
+  })
+  for await (const file of reads) {
+    if (file !== undefined) loaded.push(file)
   }
   const kept = dedupInstructionFilesByCandidateGroup(loaded)
   if (kept.length === 0) {

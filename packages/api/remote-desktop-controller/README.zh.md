@@ -40,6 +40,8 @@ kind: "package-reference"
 <a id="authorization"></a>
 ## 授权
 
+没有桌面提供方时，Remote 命名空间仍保持可用。核验调用者后，`listGrants` 返回空列表；状态、连接、审计和管理操作返回 `remote-desktop/unavailable`。受管匿名请求及非管理员的管理操作仍被拒绝。已启用提供方继续执行原有授权、确认与流控制。
+
 `RemoteDesktopAccess` 在托管部署（存在 execution-authority）中通过 `gatewayRuntime.interactive()` 读取请求自带的已验证 Gateway 断言：`principal` 取断言中的用户名，`admin` 取角色，因此管理员签发的授权文件就是全部产品权限——不再要求用户终端授权。受限 purpose 与非交互调用以 `remote-desktop/forbidden` 拒绝；独立部署回退到具备管理员权限的 `local-operator` 身份。服务端仍独立执行——即使部署错误接线策略，管理方法也拒绝非 admin actor。
 
 <a id="client-half"></a>

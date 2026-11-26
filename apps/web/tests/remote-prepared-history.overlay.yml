@@ -1,0 +1,3 @@
+- id: connection
+  config:
+    preparedHistoryMessages: 2

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-07-24-web-gui-browser-e2e-lane.md
 document:
-  en: 02331bccd693a5b4b4805c64ddeced3e46257b60
-  zh: 7ce40b36413a5bfd665e1be9e1c283aa399dca31
+  en: 11b1f6ac63fdbfac692ae3d681f723a86621a78f
+  zh: 940bee3344e6e173353173340c5b4d1aa60f0535
 /agent-note-keyless-browser-e2e-lane-for-the-web-gui:
   en: acbf72f6a3c5bea9
   zh: 4d655027ac2b78db
@@ -12,8 +12,8 @@ document:
   en: 1837d33ff7988a4d
   zh: 96a5efc7ee20ee1f
 /agent-note-keyless-browser-e2e-lane-for-the-web-gui/decision:
-  en: 8542245742e142b2
-  zh: adfb563c97fa7c90
+  en: e0c2b1dadce0c128
+  zh: 832f62c43743b8f7
 /agent-note-keyless-browser-e2e-lane-for-the-web-gui/decision/scaffold-apps-web-tests-scaffold-ts:
   en: 26034af48758bda3
   zh: 69f6a035565ad5e0

@@ -1,5 +1,5 @@
 /** Real managed-file collection and restoration with fixture-owned runtime rosters. */
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -13,12 +13,18 @@ import { collectDeploymentData, planDeploymentDataRelocation } from '../src/post
 import type { PostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { TunnelCredentialCipher } from '../src/postgres/tunnel-access-service.ts'
 import { testConfig } from './test-config.ts'
+import { createProjectNameKeyring, readProjectNameKeyring } from '../src/project-name-keyring.ts'
+import { verifyDeploymentProjectNameKey } from '../src/postgres/deployment-name-key.ts'
+import { GovernanceRebuildLocalData } from '../src/governance-rebuild-local-data.ts'
+import { personalRuntimeLayout } from '../src/runtime-layout.ts'
+import type { RuntimeId } from '../src/runtime-catalog.ts'
 
 function runtimeContext(pool: Pool, user?: { public_id: string; username: string; home_path: string; generation: number }): PostgresRuntimeContext {
   vi.spyOn(pool, 'query').mockImplementation(async (sql) => {
-    const rows = typeof sql === 'string' && sql.includes('count(*)::text FROM harness.organizations')
+    const rows = typeof sql === 'string' && sql.includes('to_regclass(') ? [{ present: false }]
+      : typeof sql === 'string' && sql.includes('count(*)::text FROM harness.organizations')
       ? [{ organizations: '1', nodes: '1' }]
-      : typeof sql === 'string' && sql.includes('FROM harness.users') && user !== undefined ? [user] : []
+      : typeof sql === 'string' && sql.includes('FROM harness.users') && user !== undefined ? [{ ...user, runtime_id: null, storage_layout: null }] : []
     return { rows, command: 'SELECT', rowCount: rows.length, oid: 0, fields: [] }
   })
   return {
@@ -59,6 +65,103 @@ describe('deployment tunnel key ownership', () => {
     const restored = await readFile(cfg.tunnelCredentialKeyFile)
     expect(restored).toEqual(key)
     expect(new TunnelCredentialCipher(restored).decrypt('organization', 'node', 'run-token', packed)).toBe('synthetic-token')
+  })
+
+  it.each([{ kind: 'user', retained: true }, { kind: 'project', retained: true }, { kind: 'user', retained: false }] as const)(
+    'collects the verified $kind home (retained Runtime: $retained) and refuses missing evidence', async ({ kind, retained }) => {
+    const cfg = testConfig(directory), runtime = randomUUID(), operation = randomUUID(), binding = randomUUID()
+    const home = join(directory, 'retained-work'), dshHome = retained ? join(directory, 'retained-runtime')
+      : personalRuntimeLayout(cfg, { username: 'retained', runtimeId: runtime as RuntimeId, storageLayout: 'isolated' }).dshHome
+    const sessions = join(dshHome, 'sessions')
+    await mkdir(home); await mkdir(sessions, { recursive: true })
+    await writeFile(join(sessions, 'preserved.jsonl'), 'retained session generation\n')
+    registerManagedDataPath({ owner: '@deepseek-ai/dsh-session-persistence-jsonl', kind: 'directory', path: sessions }, join(dshHome, 'managed-data.jsonl'))
+    let hasBinding = true
+    vi.mocked(context.pool.query).mockImplementation(async sql => {
+      const query = String(sql)
+      const rows = query.includes("to_regclass('harness.governance_rebuild_operations')") ? [{ present: true }]
+        : query.includes('to_regclass(') ? [{ present: false }]
+        : query.includes('SELECT FROM harness.governance_rebuild_operations') ? [{}]
+        : query.includes('count(*)::text FROM harness.organizations') ? [{ organizations: '1', nodes: '1' }]
+        : query.includes('SELECT u.public_id::text') ? kind === 'user' ? [{ public_id: '1', username: 'retained', home_path: '/placeholder', generation: 1, runtime_id: runtime, storage_layout: 'isolated' }] : []
+        : query.includes('SELECT p.public_id::text') ? kind === 'project' ? [{ public_id: '1', local_path: '/placeholder', generation: 1, runtime_id: runtime }] : []
+        : query.includes('SELECT i.runtime_id "runtimeId"') ? [{ runtimeId: runtime }]
+        : query.includes('governance_rebuild_execution_route') ? [{ route: retained ? 'governance' : 'ordinary' }]
+        : query.includes('SELECT r.id,r.owner_kind') ? [{ id: operation, ownerKind: kind, publicId: 1, nodeId: context.nodeId,
+          bindingId: hasBinding ? binding : null, evidenceDigest: hasBinding ? 'a'.repeat(64) : null }] : []
+      return { rows, command: 'SELECT', rowCount: rows.length, oid: 0, fields: [] }
+    })
+    const verified = vi.spyOn(GovernanceRebuildLocalData.prototype, 'paths').mockResolvedValue({ home: dshHome, homePath: home, cwd: home, admin: false })
+    const accountHomes = vi.spyOn(GovernanceRebuildLocalData.prototype, 'accountHomes').mockImplementation(async () => new Map([[1, hasBinding ? home : null]]))
+    try {
+      const roots = await collectDeploymentData(context, cfg)
+      if (retained) expect(verified).toHaveBeenCalledWith(operation, { bindingId: binding, evidenceDigest: 'a'.repeat(64) })
+      else { expect(verified).not.toHaveBeenCalled(); expect(accountHomes).toHaveBeenCalledWith([1]) }
+      expect(roots).toContainEqual({ owner: (kind === 'user' ? 'runtime:' + runtime : 'project:1') + '/@deepseek-ai/dsh-session-persistence-jsonl', kind: 'directory', path: sessions })
+      const captured = await snapshotManagedFiles(roots)
+      expect(captured.files.some(file => file.sourcePath === join(sessions, 'preserved.jsonl'))).toBe(true)
+      expect(roots.some(row => row.path.startsWith('/placeholder'))).toBe(false)
+      const next = { ...cfg, usersRoot: join(directory, 'next-users'), projectRuntimesRoot: join(directory, 'next-projects') }
+      expect((await planDeploymentDataRelocation(context, cfg, next)).movements).toEqual(retained ? [] : [{ from: dshHome,
+        to: personalRuntimeLayout(next, { username: 'retained', runtimeId: runtime as RuntimeId, storageLayout: 'isolated' }).dshHome }])
+      hasBinding = false
+      await expect(collectDeploymentData(context, cfg)).rejects.toMatchObject({ code: 'peer-backup/governance-local-binding-required' })
+    } finally { verified.mockRestore(); accountHomes.mockRestore() }
+  })
+
+  async function nameKey() {
+    context.organizationId=randomUUID();context.nodeId=randomUUID()
+    const file=join(directory,'name-keys','generation.json'),cfg=testConfig(directory,{HGW_PROJECT_NAME_KEY_FILE:file})
+    await mkdir(dirname(file),{mode:0o700})
+    await createProjectNameKeyring({organizationId:context.organizationId,nodeId:context.nodeId,keyId:'active',file})
+    const original=await readFile(file),ring=await readProjectNameKeyring(file,context.organizationId,context.nodeId)
+    const fingerprint=createHash('sha256').update(Buffer.from(ring.keys.active!,'base64')).digest('hex')
+    vi.mocked(context.pool.query).mockImplementation(async sql=>{
+      const rows=String(sql).includes('to_regclass(')?[{present:false}]:String(sql).includes('count(*)::text FROM harness.organizations')?[{organizations:'1',nodes:'1'}]:
+        String(sql).includes('FROM harness.project_name_policies')?[{revision:'1',state:'active',activeKeyId:'active',nextKeyId:null,compatible:true,fingerprints:{active:fingerprint}}]:[]
+      return {rows,command:'SELECT',rowCount:rows.length,oid:0,fields:[]}
+    })
+    return {cfg,file,original,ring}
+  }
+
+  it('copies and restores the same name key without registering or changing project-name authority',async()=>{
+    const f=await nameKey(),roots=await collectDeploymentData(context,f.cfg),files=join(directory,'names-backup')
+    expect(roots).toContainEqual({owner:'gateway-project-name-key',kind:'file',path:f.file})
+    await mkdir(files)
+    const snapshot=await snapshotManagedFiles(roots,files)
+    await writeFile(join(files,'manifest.json'),JSON.stringify(snapshot))
+    expect(await verifyDeploymentProjectNameKey(snapshot,files,context,f.cfg)).toEqual([])
+    await writeFile(f.file,JSON.stringify({...f.ring,keys:{active:randomBytes(32).toString('base64')}}),{mode:0o600})
+    await expect(collectDeploymentData(context,f.cfg)).rejects.toThrow('project-name-key-identity-mismatch')
+    expect((await previewBackupNodeConfiguration('backup',snapshot,files,context,f.cfg,{})).incompatibleFields).toEqual([])
+    await restoreManagedSnapshot(files,snapshot,roots)
+    expect(await readFile(f.file)).toEqual(f.original)
+    expect(vi.mocked(context.pool.query).mock.calls.every(([sql])=>String(sql).trimStart().startsWith('SELECT'))).toBe(true)
+  })
+
+  it('refuses missing, foreign and unconfigured key evidence without replacing the file',async()=>{
+    const f=await nameKey()
+    await expect(collectDeploymentData(context,{...f.cfg,projectNameKeyFile:undefined})).rejects.toThrow('project-name-key-not-configured')
+    const empty=await snapshotManagedFiles([])
+    await expect(verifyDeploymentProjectNameKey(empty,directory,context,f.cfg)).rejects.toThrow('backup-project-name-key-evidence-missing')
+    await writeFile(f.file,JSON.stringify({...f.ring,ownerNodeId:randomUUID()}),{mode:0o600})
+    await expect(collectDeploymentData(context,f.cfg)).rejects.toThrow('project-name-key-identity-mismatch')
+    await writeFile(f.file,f.original)
+    await rm(f.file)
+    await expect(collectDeploymentData(context,f.cfg)).rejects.toThrow('project-name-key-identity-mismatch')
+    await expect(readFile(f.file)).rejects.toMatchObject({code:'ENOENT'})
+  })
+
+  it('keeps key location changes explicit and copies existing identity during declared relocation',async()=>{
+    const f=await nameKey(),next={...f.cfg,projectNameKeyFile:join(directory,'new-name-keys','generation.json')}
+    const plan=await planDeploymentDataRelocation(context,f.cfg,next)
+    expect(plan.copies).toContainEqual({from:{owner:'gateway-project-name-key',kind:'file',path:f.file},
+      to:{owner:'gateway-project-name-key',kind:'file',path:next.projectNameKeyFile}})
+    const files=join(directory,'location-backup');await mkdir(files)
+    const snapshot=await snapshotManagedFiles(await collectDeploymentData(context,f.cfg),files)
+    expect(await verifyDeploymentProjectNameKey(snapshot,files,context,next)).toEqual(['HGW_PROJECT_NAME_KEY_FILE'])
+    await expect(planDeploymentDataRelocation(context,f.cfg,{...f.cfg,projectNameKeyFile:undefined}))
+      .rejects.toThrow('project-name-key-configuration-change-requires-explicit-migration')
   })
 
   it('refuses a backup whose tunnel key location differs from the configured destination', async () => {
@@ -103,8 +206,9 @@ describe('deployment tunnel key ownership', () => {
       registerManagedDataPath({ ...row, owner: `user:1/${row.owner}` }, cfg.managedDataApprovalFile)
       vi.mocked(context.pool.query).mockImplementation(async sql => {
         const query = String(sql)
-        const rows = query.includes('count(*)::text FROM harness.organizations') ? [{ organizations: '1', nodes: '1' }]
-          : query.includes('SELECT u.public_id::text') ? [{ public_id: '1', username: 'fixture', home_path: home, generation: 1 }] : []
+        const rows = query.includes('to_regclass(') ? [{ present: false }]
+          : query.includes('count(*)::text FROM harness.organizations') ? [{ organizations: '1', nodes: '1' }]
+          : query.includes('SELECT u.public_id::text') ? [{ public_id: '1', username: 'fixture', home_path: home, generation: 1, runtime_id: null, storage_layout: null }] : []
         return { rows, command: 'SELECT', rowCount: rows.length, oid: 0, fields: [] }
       })
       await expect(collectDeploymentData(context, cfg)).rejects.toThrow('managed-data-root-overlaps-runtime-control')

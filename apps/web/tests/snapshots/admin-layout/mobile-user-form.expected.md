@@ -1,0 +1,17 @@
+- dialog "新建用户":
+  - heading "新建用户" [level=2]
+  - paragraph: 创建登录账号并分配初始管理角色。
+  - button "关闭"
+  - text: 用户名
+  - textbox "用户名": mobile-layout-draft
+  - text: 用于登录，创建后不可修改。 显示名
+  - textbox "显示名":
+    - /placeholder: 可选
+  - text: 初始密码
+  - textbox "初始密码"
+  - text: 角色
+  - combobox "角色":
+    - option "普通用户" [selected]
+    - option "管理员"
+  - button "取消"
+  - button "创建用户"

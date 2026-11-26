@@ -44611,7 +44611,7 @@
       "digest": "11e15542af87e45e8f0f1e133f03e1e0effb99b719a8c2a1cea677a18325f083",
       "names": [],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:29"
+        "packages/host/apiproxy/src/api/sessions.ts:35"
       ]
     },
     {
@@ -44892,7 +44892,7 @@
       "digest": "1e788d9e90f320b51cba113f9dbed35cae28a903fec07a9cd4c52605d2a0c0dd",
       "names": [],
       "sources": [
-        "packages/attachment/userdoc/src/types.ts:469"
+        "packages/attachment/userdoc/src/types.ts:472"
       ]
     },
     {
@@ -45007,7 +45007,7 @@
       "digest": "275a4fcdb1adac21ee846fc5b6dcd16c6808a3969c53ca22008c6b076f729dfe",
       "names": [],
       "sources": [
-        "packages/attachment/userdoc/src/types.ts:470"
+        "packages/attachment/userdoc/src/types.ts:473"
       ]
     },
     {
@@ -46199,7 +46199,7 @@
         "packages/attachment/userdoc/src/types.ts#UserDocPromptAttachment"
       ],
       "sources": [
-        "packages/attachment/userdoc/src/types.ts:473"
+        "packages/attachment/userdoc/src/types.ts:476"
       ]
     },
     {
@@ -46720,7 +46720,7 @@
       "digest": "844e2decba6e7c717c04484888eb8c1ee5c1f38e613e9aa8ce7dbe95e53b2e64",
       "names": [],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:99"
+        "packages/host/apiproxy/src/api/sessions.ts:105"
       ]
     },
     {
@@ -47538,7 +47538,7 @@
         "packages/host/apiproxy/src/api/sessions.ts#AuthenticatedParticipant"
       ],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:22"
+        "packages/host/apiproxy/src/api/sessions.ts:28"
       ]
     },
     {
@@ -47941,7 +47941,7 @@
       "names": [],
       "sources": [
         "packages/context/collaboration/src/types.ts:25",
-        "packages/host/apiproxy/src/api/sessions.ts:28"
+        "packages/host/apiproxy/src/api/sessions.ts:34"
       ]
     },
     {
@@ -47987,7 +47987,7 @@
         "packages/attachment/userdoc/src/types.ts#UserDocPromptRepresentation"
       ],
       "sources": [
-        "packages/attachment/userdoc/src/types.ts:468"
+        "packages/attachment/userdoc/src/types.ts:471"
       ]
     },
     {
@@ -48718,7 +48718,7 @@
         "packages/host/apiproxy/src/api/sessions.ts#ModelSelection"
       ],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:190"
+        "packages/host/apiproxy/src/api/sessions.ts:200"
       ]
     },
     {
@@ -48854,7 +48854,7 @@
       "digest": "f7e8c6fddd59fe7ecec72b632ae599cbad848dcc487be86881da11c156be7697",
       "names": [],
       "sources": [
-        "packages/host/apiproxy/src/api/sessions.ts:104"
+        "packages/host/apiproxy/src/api/sessions.ts:110"
       ]
     },
     {

@@ -49,9 +49,26 @@ export interface PeerRepositoryGrant {
   targetNodeId: string
   scopeId: string
   mode: 'append' | 'recover'
+  /** An approved operation may retrieve only its declared point; encrypted packs remain repository-shared. */
+  recoveryPointId?: string
   quotaBytes: number
   /** Compare-and-admit again before publishing a durable mutation. */
   revalidate(): Promise<void>
+}
+
+/** Receiver limits measured on the target independently from capture success. */
+export interface PeerReceiverCapacity {
+  used: number
+  remaining: number
+  receiverUsed: number
+  receiverLimit: number
+  remainingObjects: number
+  reason: 'policy-quota' | 'receiver-capacity' | 'disk-reserve' | 'object-limit'
+}
+
+type RepositoryCoordinates = Pick<PeerRepositoryGrant, 'organizationId' | 'sourceNodeId' | 'targetNodeId' | 'policyId'>
+function repositoryKey(coordinates: RepositoryCoordinates): string {
+  return [coordinates.organizationId, coordinates.sourceNodeId, coordinates.targetNodeId, coordinates.policyId].join('/')
 }
 
 /** A declared refusal safe to expose without command output, secrets or source paths. */
@@ -169,6 +186,27 @@ export class PeerBackupRepository {
     })
   }
 
+  /** Sample a repository and its shared receiver without an append or recovery credential.
+   * @param policy - exact repository coordinates and current policy quota from the control plane.
+   * @returns target storage usage and the first limiting resource.
+   */
+  capacity(policy: RepositoryCoordinates & { quotaBytes: number }): Promise<PeerReceiverCapacity> {
+    return this.request('capacity', { repository: this.localKey(policy), quota: policy.quotaBytes })
+  }
+
+  /** Reclaim a bounded batch after current organization retirement approval. This operation is private to the receiver worker.
+   * @param policy - exact repository coordinates locked by the retirement worker.
+   * @returns whether reclaim is complete. A durable tombstone fences requests throughout retries.
+   */
+  retireBatch(policy: RepositoryCoordinates): Promise<boolean> {
+    return this.request('retire', { repository: this.localKey(policy) })
+  }
+
+  private localKey(policy: RepositoryCoordinates): string {
+    if (policy.targetNodeId !== this.config.nodeId) throw new PeerBackupError(403, 'peer-backup/pair-denied')
+    return repositoryKey(policy)
+  }
+
   /** Stop admitting HTTP work and finish already queued database transactions. */
   async close(): Promise<void> {
     this.closed = true
@@ -215,7 +253,8 @@ export class PeerBackupRepository {
         grant.quotaBytes < 1
       )
         throw new PeerBackupError(403, 'peer-backup/pair-denied')
-      const repository = [grant.organizationId, grant.sourceNodeId, grant.targetNodeId, policyId].join('/')
+      if(kind==='points'&&grant.recoveryPointId&&name!==grant.recoveryPointId)throw new PeerBackupError(403,'peer-backup/recovery-point-denied')
+      const repository = repositoryKey(grant)
       const fields = { repository, kind, name, quota: grant.quotaBytes }
       const mutate = request.method === 'POST' || request.method === 'DELETE'
       if (mutate && grant.mode !== 'append') throw new PeerBackupError(403, 'peer-backup/read-only')
@@ -280,7 +319,11 @@ export class PeerBackupRepository {
           }
           const length = end - start + 1
           const data =
-            request.method === 'GET' ? await this.request<Uint8Array>('get', { ...fields, start, length }) : undefined
+            request.method === 'GET' ? await this.request<Uint8Array | null>('get', { ...fields, start, length }) : undefined
+          if (data === null) {
+            response.writeHead(404).end()
+            return true
+          }
           response
             .writeHead(request.headers.range ? 206 : 200, {
               'content-length': length,

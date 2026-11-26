@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.1.coharness.1/document-volume-identity/guide.md
 document:
-  en: e8017cfbb912883a0b3f96ea438e51fe93fdac20
-  zh: a4ae6c85fea8878e3fa86753369a831dab93f3dc
+  en: 731d03ad1720d16300256071486fd5ad1a9d87e7
+  zh: a4ca486df57d7138ac637b5ee4cca1e117b672f7
 /:
   en: c611343e400bb392
   zh: e531f0249e8f1f9e
@@ -12,8 +12,8 @@ document:
   en: fa4a0c9f249142b0
   zh: bb7c1a1f9bffaede
 /preserve-managed-document-identity-across-remounts/change:
-  en: f8038beea0b7e289
-  zh: bf1c30cd69ae9437
+  en: c62a1d90a16c46a4
+  zh: 10bb5409b6a02e31
 /preserve-managed-document-identity-across-remounts/migration:
-  en: 0970cd9d1b0d6ae1
-  zh: 725a3410aa9a0634
+  en: de7b7bdc318bb5fc
+  zh: 0bb6f0895815ce6b

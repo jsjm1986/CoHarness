@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-composer-single-icon-row.md
 document:
-  en: 33241584a1b3a9f111e6414a13bbb08bc9d8e6b4
-  zh: 6a7f004f847a5c064cef0ebc6196b297a7520d92
+  en: fead6c8774cf1bfa7cb6630e47c5b5af1101b205
+  zh: 1149cf27acc42d71501e81acde25c51405d1d072
 /agent-note-mobile-composer-keeps-one-icon-only-toolbar-row:
   en: 9e56e23285257246
   zh: c6ad3f05436c0e14
@@ -12,14 +12,14 @@ document:
   en: eb9386bff1250c6a
   zh: 9ebcc0791e68cdc6
 /agent-note-mobile-composer-keeps-one-icon-only-toolbar-row/decision:
-  en: cc9e47b7449069ad
-  zh: c0962d9ffe105681
+  en: b7a3d217697bcafa
+  zh: 1439a9aa68b68ad5
 /agent-note-mobile-composer-keeps-one-icon-only-toolbar-row/alternatives-considered:
   en: 880c047192ff0652
   zh: c27f730dfa99f143
 /agent-note-mobile-composer-keeps-one-icon-only-toolbar-row/consequences:
-  en: 64c43521dc621627
-  zh: 33292759ecf53f41
+  en: bfe9cb21723c7f1b
+  zh: f07a00aad032b479
 /agent-note-mobile-composer-keeps-one-icon-only-toolbar-row/testing:
-  en: 28e9d6f30c8bd87f
-  zh: 6da36f8151b6d01e
+  en: 45f5832bc3504676
+  zh: 5d3c082501587318

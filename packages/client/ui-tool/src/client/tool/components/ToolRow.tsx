@@ -267,7 +267,7 @@ export function ToolRow({
         title={title}
         open={open}
         expandable={expandable}
-        expandOnRowClick
+        expandOnRowClick={!fileLink && linkHref === undefined}
         keepContentWhenOpen
         onToggle={toggleExpand}
         collapsedContent={summaryText !== '' && (

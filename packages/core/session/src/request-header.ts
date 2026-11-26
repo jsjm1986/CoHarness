@@ -29,13 +29,51 @@ export function canonicalHeader(header: EpochHeader): EpochHeader {
   }
 }
 
-/** Canonical JSON equality for tool schemas assembled through the same path. */
-function sameSchema(a: ToolSchema, b: ToolSchema): boolean {
-  return JSON.stringify(a) === JSON.stringify(b)
+/**
+ * Compare lossless JSON tool schemas in serialization order without encoding their text.
+ * @param a - one tool schema.
+ * @param b - the other tool schema.
+ * @returns whether both schemas have identical structure and property order.
+ */
+export function sameToolSchema(a: ToolSchema, b: ToolSchema): boolean {
+  const pending: Array<readonly [unknown, unknown]> = [[a, b]]
+  const visited = new WeakSet<object>()
+  for (let pair = pending.pop(); pair !== undefined; pair = pending.pop()) {
+    const [left, right] = pair
+    if (left === right) continue
+    if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) return false
+    const leftArray = Array.isArray(left)
+    if (leftArray !== Array.isArray(right)) return false
+    if (leftArray) {
+      if (left.length !== (right as unknown[]).length) return false
+    } else {
+      const leftPrototype: unknown = Object.getPrototypeOf(left)
+      const rightPrototype: unknown = Object.getPrototypeOf(right)
+      if ((leftPrototype !== Object.prototype && leftPrototype !== null)
+        || (rightPrototype !== Object.prototype && rightPrototype !== null)) {
+        return JSON.stringify(a) === JSON.stringify(b)
+      }
+    }
+    // The canonical snapshot has no repeated nodes. Preserve serialization for a shared noncanonical graph.
+    if (visited.has(left)) return JSON.stringify(a) === JSON.stringify(b)
+    visited.add(left)
+    const leftKeys = Object.keys(left)
+    const rightKeys = Object.keys(right)
+    if (leftKeys.length !== rightKeys.length) return false
+    let index = 0
+    for (const key of leftKeys) {
+      if (key !== rightKeys[index++]) return false
+      const leftValue = (left as Record<string, unknown>)[key]
+      const rightValue = (right as Record<string, unknown>)[key]
+      if (leftValue !== rightValue) pending.push([leftValue, rightValue])
+    }
+  }
+  return true
 }
 
 /**
- * Field-wise equality over canonical headers. Tool schemas compare in order.
+ * Field-wise equality over canonical headers. Tool schemas use lossless JSON
+ * values and compare both tool order and object property order.
  * @param a - one canonical header.
  * @param b - the other.
  * @returns whether config and tools all match.
@@ -48,7 +86,7 @@ export function headerEquals(a: EpochHeader, b: EpochHeader): boolean {
   ) return false
   const at = a.tools ?? []
   const bt = b.tools ?? []
-  return at.length === bt.length && at.every((tool, i) => sameSchema(tool, bt[i] as ToolSchema))
+  return at.length === bt.length && at.every((tool, i) => sameToolSchema(tool, bt[i] as ToolSchema))
 }
 
 /**

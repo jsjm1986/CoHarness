@@ -31,6 +31,8 @@ View original and View translation share one always-visible action in the plugin
 
 For custom compositions, mount this plugin alongside the [translator service](../translator/README.md) and the ordinary Web GUI. The plugin's configuration fields are `provider` and `targetLanguage`; the generated [configuration catalog](../../../docs/config-catalog.md) owns their complete schema.
 
+The `cot-translation` settings section stores saved provider and language preferences over the composition defaults. Translation requests and the browser read the same accepted values; without a settings provider, the composition values apply. On touch screens, form controls have 44-pixel targets and editable text is at least 16 pixels.
+
 -----
 
 <a id="understand-the-implementation"></a>

@@ -21,6 +21,8 @@
 
 Gateway 托管启动在 SDK 引导或 profile 插件运行前，就要求模型、资源和执行授权。详见[托管启动参考](reference/README.zh.md#managed-launch)。
 
+灾难恢复启动在导入插件前，按进程提供的摘要验证节点私有策略文件。环境文件不能替换该许可。根作用域在启动前安装历史 Session 准入限制和已密封的插件组合；该模式拒绝 SDK bootstrap 注入。普通 profile 启动保持原有行为。
+
 ## 应用参数
 
 启动器只解析自身的 flag，并将其后的所有内容交给已启动的 profile；注入该 profile 的任意应用插件都可以解析这份共享的不可变快照（[`dsh-cmdline`](../../packages/boot/cmdline/README.zh.md)）。启动器无法识别的第一个 token 标志着应用参数的开始：

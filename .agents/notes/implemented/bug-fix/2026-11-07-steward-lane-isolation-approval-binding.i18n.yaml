@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-07-steward-lane-isolation-approval-binding.md
 document:
-  en: 9a6f5cc1d1ddc145451afd4a549c558345b9c65e
-  zh: cd77e73c7be122caac76c9a760af516e37d30890
+  en: d0ce5e1875630e972af9ee887447fb8dcdcf57dd
+  zh: 61bb82780f5dcb690446161e2359cbaf65b8e4a0
 /agent-note-steward-read-lane-isolation-and-statement-bound-approvals:
   en: 0f2b17b23f7a201a
   zh: 9561ab2c685b8b34
@@ -12,8 +12,8 @@ document:
   en: 1dbf82b389f289ad
   zh: 0d566c4e8ce5727f
 /agent-note-steward-read-lane-isolation-and-statement-bound-approvals/decision:
-  en: c2484011836493c8
-  zh: 5d4684bb8c9ae982
+  en: a3bad45f8ba7e9f7
+  zh: 9bd1371012639f88
 /agent-note-steward-read-lane-isolation-and-statement-bound-approvals/alternatives-considered:
   en: 64430943c98dba95
   zh: 5fc09d441d816a7f

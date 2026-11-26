@@ -7,7 +7,7 @@ import { Context, FiberState, LoggerLevel } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import AgentPresetRegistry, { mountPreset } from '@deepseek-ai/dsh-agent-preset-registry'
 import DeepSeekLlmApiExtensionRegistry from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
@@ -16,6 +16,21 @@ import * as PluginInventory from '../src/index.ts'
 const contexts: Context[] = []
 const roots: string[] = []
 const SIGNAL = new AbortController().signal
+
+function inventoryAgent(ctx: Context, id: SessionId): Agent {
+  const unexpected = (): never => { throw new Error('Package inventory must leave the Agent idle') }
+  return {
+    id, ctx, options: {}, status: 'idle', session: Session.create(id),
+    get inbox(): Agent['inbox'] { return unexpected() },
+    cancel: unexpected,
+    whenIdle: () => Promise.resolve(),
+    runMaintenance: unexpected,
+    send: unexpected,
+    followup: unexpected,
+    steer: unexpected,
+    inject: unexpected,
+  }
+}
 
 afterEach(async () => {
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
@@ -193,7 +208,7 @@ describe('DeepSeek plugin package inventory', () => {
 
     const id = SessionId('bare-agent')
     const agentScope = createScope(ctx, {})
-    ctx.agents.register({ id, ctx: agentScope.ctx, session: { id } } as unknown as Agent)
+    ctx.agents.register(inventoryAgent(agentScope.ctx, id))
     await vi.waitFor(() => { expect(ctx.agents.get(id)).toBeDefined() })
     const bare = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL, sessionId: id })
     expect(bare.fields.dsh_plugin_packages?.packages).toEqual([{ name: 'host-only', version: '3.0.0' }])
@@ -299,8 +314,7 @@ describe('DeepSeek plugin package inventory', () => {
     const agentKey = {}
     const agentScope = createScope(ctx, agentKey, { parent: standingKey })
     const id = SessionId('preset-agent')
-    const agent = { id, ctx: agentScope.ctx, session: { id } } as unknown as Agent
-    await ctx.agents.register(agent)
+    await ctx.agents.register(inventoryAgent(agentScope.ctx, id))
 
     const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL, sessionId: id })
     expect(prepared.fields.dsh_plugin_packages?.packages).toEqual([{ name: 'preset-only', version: '4.0.0' }])

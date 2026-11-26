@@ -10,7 +10,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { RemoteDesktopError, RemoteDesktopGrantId } from '@deepseek-ai/dsh-remote-desktop'
+import { RemoteDesktopError, RemoteDesktopGrantId, type RemoteDesktop } from '@deepseek-ai/dsh-remote-desktop'
 import type { RemoteDesktopActor, RemoteDesktopAuditEvent, RemoteDesktopGrant } from '@deepseek-ai/dsh-remote-desktop'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { RemoteDesktopAccess } from './authorization.ts'
@@ -83,10 +83,16 @@ function auditView(event: RemoteDesktopAuditEvent): RemoteDesktopAuditEventView 
  * browser-visible principal is always the verified user, never caller input.
  */
 export class RemoteDesktopController extends TypertRemoteService {
-  /** The grant-enforcing provider plus the Remote descriptor registry. */
-  static inject = ['remoteDesktop', 'typert']
+  /** The Remote descriptor registry; the desktop provider is optional. */
+  static inject = ['typert']
 
   private readonly access: RemoteDesktopAccess
+
+  private provider(): RemoteDesktop {
+    const provider = this.ctx.get('remoteDesktop')
+    if (provider === undefined) throw new RemoteError('remote-desktop/unavailable', 'No remote-desktop provider is enabled in this runtime.', {})
+    return provider
+  }
 
   /**
    * @param ctx - Host context carrying the remote-desktop capability and the
@@ -107,7 +113,7 @@ export class RemoteDesktopController extends TypertRemoteService {
   @Remote
   async status(agent: Agent, request: RemoteDesktopTargetView, signal: AbortSignal): Promise<RemoteDesktopStatusView> {
     const actor = this.access.actor(signal)
-    return await this.ctx.remoteDesktop.status(actor, request, { sessionId: agent.id }).catch(translate)
+    return await this.provider().status(actor, request, { sessionId: agent.id }).catch(translate)
   }
 
   /**
@@ -125,7 +131,7 @@ export class RemoteDesktopController extends TypertRemoteService {
     signal: AbortSignal,
   ): Promise<RemoteDesktopSpecView> {
     const actor = this.access.actor(signal)
-    const spec = await this.ctx.remoteDesktop.confirm({
+    const spec = await this.provider().confirm({
       principal: actor.principal,
       target: { nodeId: request.nodeId, ...(request.desktop === undefined ? {} : { desktop: request.desktop }) },
       sessionId: agent.id,
@@ -148,7 +154,7 @@ export class RemoteDesktopController extends TypertRemoteService {
     signal: AbortSignal,
   ): Promise<RemoteDesktopAttachView> {
     const actor = this.access.actor(signal)
-    const session = await this.ctx.remoteDesktop.attach({
+    const session = await this.provider().attach({
       principal: actor.principal,
       target: { nodeId: request.nodeId, ...(request.desktop === undefined ? {} : { desktop: request.desktop }) },
       sessionId: agent.id,
@@ -169,7 +175,7 @@ export class RemoteDesktopController extends TypertRemoteService {
    * @param agent - caller's Session address; supplies session-scope matching.
    * @param request - optional principal, revoked-row, and attachable filters.
    * @param signal - request cancellation.
-   * @returns matching grants, newest administration first.
+   * @returns matching grants, newest administration first; empty when no desktop provider is enabled.
    */
   @Remote
   async listGrants(
@@ -178,7 +184,9 @@ export class RemoteDesktopController extends TypertRemoteService {
     signal: AbortSignal,
   ): Promise<RemoteDesktopGrantView[]> {
     const actor = this.access.actor(signal)
-    const rows = await this.ctx.remoteDesktop.listGrants(actor, {
+    const provider = this.ctx.get('remoteDesktop')
+    if (provider === undefined) return []
+    const rows = await provider.listGrants(actor, {
       ...(request.principal === undefined ? {} : { principal: request.principal }),
       ...(request.includeRevoked === undefined ? {} : { includeRevoked: request.includeRevoked }),
       ...(request.attachable === undefined ? {} : { attachable: request.attachable }),
@@ -198,7 +206,7 @@ export class RemoteDesktopController extends TypertRemoteService {
   async grant(agent: Agent, request: RemoteDesktopGrantInputView, signal: AbortSignal): Promise<RemoteDesktopGrantView> {
     const actor = this.adminActor(signal)
     void agent // Wire-bound routing address; the actor comes from the request principal.
-    const grant = await this.ctx.remoteDesktop.grant({
+    const grant = await this.provider().grant({
       target: request.target,
       principal: request.principal,
       level: request.level,
@@ -226,7 +234,7 @@ export class RemoteDesktopController extends TypertRemoteService {
   ): Promise<RemoteDesktopGrantView> {
     const actor = this.adminActor(signal)
     void agent // Wire-bound routing address; the actor comes from the request principal.
-    const grant = await this.ctx.remoteDesktop.setLevel(RemoteDesktopGrantId(request.grantId), request.level, actor).catch(translate)
+    const grant = await this.provider().setLevel(RemoteDesktopGrantId(request.grantId), request.level, actor).catch(translate)
     return grantView(grant)
   }
 
@@ -241,7 +249,7 @@ export class RemoteDesktopController extends TypertRemoteService {
   async revoke(agent: Agent, request: { grantId: string }, signal: AbortSignal): Promise<RemoteDesktopGrantView> {
     const actor = this.adminActor(signal)
     void agent // Wire-bound routing address; the actor comes from the request principal.
-    const grant = await this.ctx.remoteDesktop.revoke(RemoteDesktopGrantId(request.grantId), actor).catch(translate)
+    const grant = await this.provider().revoke(RemoteDesktopGrantId(request.grantId), actor).catch(translate)
     return grantView(grant)
   }
 
@@ -261,7 +269,7 @@ export class RemoteDesktopController extends TypertRemoteService {
   ): Promise<RemoteDesktopAuditEventView[]> {
     const actor = this.access.actor(signal)
     void agent // Wire-bound routing address; the actor comes from the request principal.
-    const events = await this.ctx.remoteDesktop.audit(actor, {
+    const events = await this.provider().audit(actor, {
       ...(request.principal === undefined ? {} : { principal: request.principal }),
       ...(request.target === undefined ? {} : { target: request.target }),
     }).catch(translate)

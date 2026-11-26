@@ -14,6 +14,7 @@
  */
 
 import { posix } from 'node:path'
+import type { RuntimeRecoveryPolicy } from './launcher.ts'
 
 export interface SystemdOptions {
   /** Parent of all per-user directories, masked for non-privileged units then selectively re-bound. */
@@ -35,6 +36,8 @@ export interface SystemdOptions {
 }
 
 export interface SystemdUser {
+  /** Private recovery policy copied into systemd's read-only credentials directory. */
+  recoveryPolicy?: RuntimeRecoveryPolicy
   kind?: 'user' | 'project'
   ownerId?: number
   username: string
@@ -51,6 +54,8 @@ export interface SystemdUser {
   homePath: string
   /** Absolute `$DSH_HOME` for this instance. */
   dshHome: string
+  /** Node-local recovery proof authorizes these exact existing paths outside standard personal/profile roots. */
+  retainedData?: true
 }
 
 export interface GrantEntry {
@@ -173,6 +178,7 @@ export function renderUserUnit(
   grants: readonly GrantEntry[],
   opts: SystemdOptions,
   gatewayCredentialPath?: string,
+  shutdownReceiptPath?: string,
 ): string {
   const runtimeKey = user.runtimeKey ?? user.username
   if (!RUNTIME_KEY_RE.test(runtimeKey)) throw new Error(`invalid runtime key: ${runtimeKey}`)
@@ -191,18 +197,25 @@ export function renderUserUnit(
   assertResourceValue(opts.memoryMax, 'MemoryMax')
   assertResourceValue(opts.cpuQuota, 'CPUQuota')
   if (gatewayCredentialPath !== undefined) assertSafePath(gatewayCredentialPath)
+  if (shutdownReceiptPath !== undefined) assertSafePath(shutdownReceiptPath)
+  if (user.recoveryPolicy !== undefined) {
+    assertSafePath(user.recoveryPolicy.policyFile)
+    if (user.recoveryPolicy.policyFile.includes('%') || !/^[a-f0-9]{64}$/u.test(user.recoveryPolicy.policySha256)) {
+      throw new Error('invalid recovery policy handoff')
+    }
+  }
   // Project units may carry privileged confinement only for the reserved
   // steward space; the flag alone decides, and every other project stays masked.
   const privileged = user.privileged === true
   if (user.kind === 'project') {
-    if (!strictlyContainsPath(opts.projectRuntimesRoot, user.dshHome)) {
+    if (!user.retainedData && !strictlyContainsPath(opts.projectRuntimesRoot, user.dshHome)) {
       throw new Error(`project dsh home is outside projectRuntimesRoot: ${user.dshHome}`)
     }
     if (!opts.projectPathRoots.some(root => strictlyContainsPath(root, user.homePath))) {
       throw new Error(`project home is outside projectPathRoots: ${user.homePath}`)
     }
-  } else if (!strictlyContainsPath(opts.usersRoot, user.homePath)
-    || !strictlyContainsPath(opts.usersRoot, user.dshHome)) {
+  } else if (!user.retainedData && (!strictlyContainsPath(opts.usersRoot, user.homePath)
+    || !strictlyContainsPath(opts.usersRoot, user.dshHome))) {
     throw new Error(`user runtime paths are outside usersRoot: ${user.username}`)
   }
 
@@ -243,8 +256,14 @@ Environment=HOME=${user.homePath}
 Environment=DSH_HOME=${user.dshHome}
 Environment=DSH_MANAGED_DATA_MANIFEST=${posix.join(user.dshHome, 'managed-data.jsonl')}
 Environment=DSH_DIRECTORY_GRANTS=${user.dshHome}/directory-grants.json
-${gatewayCredentialPath === undefined ? '' : `Environment=DSH_GATEWAY_CREDENTIAL_FILE=%d/dsh-gateway
+${user.recoveryPolicy === undefined ? '' : `Environment=HGW_RECOVERY_POLICY_FILE=%d/dsh-recovery
+Environment=HGW_RECOVERY_POLICY_SHA256=${user.recoveryPolicy.policySha256}
+LoadCredential=${JSON.stringify(`dsh-recovery:${user.recoveryPolicy.policyFile}`)}
+`}${gatewayCredentialPath === undefined ? '' : `Environment=DSH_GATEWAY_CREDENTIAL_FILE=%d/dsh-gateway
 LoadCredential=dsh-gateway:${gatewayCredentialPath}
+`}${shutdownReceiptPath === undefined ? '' : `Environment=${JSON.stringify(`DSH_GATEWAY_SHUTDOWN_RECEIPT=${shutdownReceiptPath.replaceAll('%', '%%')}`)}
+KillMode=mixed
+RestartPreventExitStatus=80 81 82 83
 `}ExecStart=${renderedExecStart}
 Restart=${user.resident === true ? 'always' : 'on-failure'}
 RestartSec=5

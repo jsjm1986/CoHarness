@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { clientSessionKey, createSnapshotStore, type ConversationViewportSnapshot, type DeploymentContextSnapshot, type ProjectUiPolicySnapshot, type SessionListState, type SessionRuntimeTarget, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
@@ -621,6 +621,26 @@ describe('pane header controls', () => {
     expect(screen.getByText('个人空间 · Workspace A')).toBeTruthy()
     expect(screen.getByText('就绪')).toBeTruthy()
   })
+  it('exposes full pane identity and layout actions through the touch-accessible menu', async () => {
+    const p = props()
+    const onFocus = vi.fn()
+    const onMaximize = vi.fn()
+    const onToggleCollapse = vi.fn()
+    render(<WorkbenchPaneHeader {...p} sessionId={SID_A} active maximized={false} collapsible
+      onFocus={onFocus} onClose={vi.fn()} onMaximize={onMaximize} onToggleCollapse={onToggleCollapse}
+      replacePane={vi.fn()} movePane={vi.fn()} useSession={(() => undefined) as never}
+      useProjection={() => undefined} useInput={(() => undefined) as never} inputActions={{} as never} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '更多面板操作' }))
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByText('Alpha')).toBeTruthy()
+    expect(within(menu).getByText('个人空间 · Workspace A')).toBeTruthy()
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '放大面板' }))
+    expect(onMaximize).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: '更多面板操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '收起面板' }))
+    expect(onToggleCollapse).toHaveBeenCalledOnce()
+    expect(onFocus).not.toHaveBeenCalled()
+  })
   it('routes the pane files action to its own Workspace browser entry only when the runtime provides one', async () => {
     const p = props()
     const openFiles = vi.fn()
@@ -707,7 +727,7 @@ describe('workbench toolbar edge paths', () => {
       openWorkspaceResource,
     })
     act(() => { p.actions.openBrowser({ sessionId: SID_A, runtimeTarget: { kind: 'base' } }) })
-    fireEvent.click(await screen.findByRole('treeitem', { name: 'a.txt' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'a.txt' }))
     expect(openWorkspaceResource).toHaveBeenCalledWith(expect.objectContaining({ sessionId: SID_A, path: 'a.txt' }))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
@@ -719,7 +739,7 @@ describe('workbench toolbar edge paths', () => {
       openWorkspaceResource: () => { throw new Error('Workspace permission revoked') },
     })
     act(() => { p.actions.openBrowser({ sessionId: SID_A, runtimeTarget: { kind: 'base' } }) })
-    fireEvent.click(await screen.findByRole('treeitem', { name: 'a.txt' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'a.txt' }))
     expect(screen.getByRole('alert').textContent).toBe('Workspace permission revoked')
     expect(screen.getByRole('dialog')).toBeTruthy()
   })

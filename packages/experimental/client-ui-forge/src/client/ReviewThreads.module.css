@@ -193,7 +193,7 @@
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-3);
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
   font: inherit;
   text-align: start;
   cursor: text;
@@ -313,6 +313,20 @@
   color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xs-13);
   font-family: Inter, var(--dsw-font-family);
+}
+
+@media (pointer: coarse) {
+  .link,
+  .icon,
+  .replyPrompt {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+
+  .link {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }
 
 /* A changes view narrower than 480px gives the code more width; the query names no container, since CSS Modules rename

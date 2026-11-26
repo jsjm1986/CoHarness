@@ -8,7 +8,6 @@
   - img
 - button "Add conversation":
   - img
-  - text: Add conversation
 - tablist "Workbench":
   - tab "Use the read tool twice Ready" [selected]
   - tab "Use the read tool twice Ready"

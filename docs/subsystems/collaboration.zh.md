@@ -47,7 +47,11 @@ interface GatewayPrincipalClaims {
   expiresAt: number
   nonce: string
   /** Optional capability purpose used by loopback-only runtime integrations. */
-  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch'
+  purpose?: 'archive-read' | 'document-admin' | 'terminal-admin' | 'plugin-admin' | 'webhook-dispatch' | 'runtime-asset'
+  /** Exact resource coordinates; required only for a read-only asset assertion. */
+  asset?: { method: 'GET' | 'HEAD'; path: string }
+  /** Request step for an empty draft in the selected personal Runtime. */
+  personalDraft?: 'prepare' | 'admit-input'
 }
 ```
 
@@ -94,6 +98,8 @@ interface GatewayRuntimeCredential {
   gatewayUrl: string
   organization: string
   runtime: GatewayRuntimeIdentity
+  /** Registered computer supplied by the launcher. Legacy launch credentials omit it. */
+  nodeId?: Branded<'RuntimeNodeId'>
   token: string
   principalPublicKey: string
   /** Present only when this managed release enables private event-connection renewal. */
@@ -307,6 +313,13 @@ interface ExecutionInheritance {
   readonly unverifiedHistory: boolean
   readonly primaryActorUserId?: number
 }
+```
+
+终端输入连接在同一组织和 Runtime 内绑定到这个创建者身份。
+
+```ts type-equiv
+/** Organization and runtime-scoped identity of a terminal's human creator. */
+type TerminalCreatorId = Branded<'TerminalCreatorId'>
 ```
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
@@ -575,6 +588,13 @@ Managed deployments verify the interactive user and current writable scope.
  * @returns creator identity and a grant cancelled on revocation.
  */
 authorize(sessionId: SessionId, signal: AbortSignal): Promise<TerminalAuthority>
+
+/**
+ * Confirm that an upgraded input socket carries the same verified user identity as an already-admitted creator.
+ * @param creator - creator identity bound to the live output attachment.
+ * @returns true only when the current upgrade request verifies the exact same creator.
+ */
+verifyUpgradeCreator?(creator: TerminalCreatorId): boolean
 ```
 
 Types: [SessionId](core.zh.md)

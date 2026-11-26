@@ -1,0 +1,8 @@
+- img
+- text: Blocked Goal Review the deployment rollout and verify mobile controls Preserve the existing project data and the recovery path.
+- alert: Goal clear was refused for this acceptance scenario. (qa/goal-refused)
+- button "Edit goal":
+  - img
+- button "Clear goal":
+  - img
+- group: View blocked reason The deployment approval is unavailable. Review workspace permissions and retry after the release owner restores access. The deployment approval is unavailable. Review workspace permissions and retry after the release owner restores access. The deployment approval is unavailable. Review workspace permissions and retry after the release owner restores access.

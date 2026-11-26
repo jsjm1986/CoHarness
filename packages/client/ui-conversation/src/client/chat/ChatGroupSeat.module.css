@@ -71,3 +71,12 @@
   flex-direction: column;
   min-width: 0;
 }
+
+@media (pointer: coarse) {
+  .title { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
+}
+
+:global([data-viewport='compact']) .title {
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
+}

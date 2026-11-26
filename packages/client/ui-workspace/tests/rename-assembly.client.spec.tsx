@@ -173,7 +173,14 @@ describe('session rename through the assembled browser', () => {
     const input = await view.findByLabelText('会话名称') as HTMLInputElement
     expect(input.value).toBe('旧标题')
     fireEvent.change(input, { target: { value: '  分叉  实验记录  ' } })
-    fireEvent.click(view.getByRole('button', { name: '重命名' }))
+    fireEvent.compositionStart(input)
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(rename).not.toHaveBeenCalled()
+    fireEvent.compositionEnd(input)
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    expect(rename).not.toHaveBeenCalled()
+    fireEvent.keyDown(input, { key: 'Enter' })
 
     // The injected hop reached the session face with the edge-trimmed draft
     // (the dialog trims edges; interior normalization is host-side).

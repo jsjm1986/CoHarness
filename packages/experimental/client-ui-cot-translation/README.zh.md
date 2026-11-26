@@ -31,6 +31,8 @@ kind: "package-reference"
 
 自定义组合可将本插件与[翻译服务](../translator/README.zh.md)和普通 Web GUI 一起挂载。本插件的配置字段是 `provider` 和 `targetLanguage`；完整定义见生成的[配置目录](../../../docs/config-catalog.zh.md)。
 
+`cot-translation` 设置分区在组合默认值之上保存提供方与目标语言。翻译请求与浏览器读取同一份已接受值；没有设置提供方时使用组合值。触屏表单的操作目标至少为 44 像素，可编辑文字至少为 16 像素。
+
 -----
 
 <a id="understand-the-implementation"></a>

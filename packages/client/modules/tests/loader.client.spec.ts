@@ -22,6 +22,7 @@ const bootstrapExports = { apply, createClientModuleSystem }
 type Factory = ClientBundleRegistration['factory']
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   delete win.__ModuleLoader__
   for (const el of document.querySelectorAll('style, script')) el.remove()
@@ -82,6 +83,7 @@ function bench(
     transportFailures?: Record<string, number>
     /** URLs whose script loads but registers only the listed ids (a runtime throw after those registrations). */
     registerOnly?: Record<string, string[]>
+    preloadedBundles?: ReadonlyMap<string, 'executed' | 'load-failed'>
     applicationBatches?: { url: string; entries: string[] }[]
   } = {},
 ): Bench {
@@ -150,6 +152,7 @@ function bench(
       batches,
     },
     staticModules: opts.seed ?? {},
+    ...(opts.preloadedBundles === undefined ? {} : { preloadedBundles: opts.preloadedBundles }),
     ...(opts.defaultTransport === true ? {} : { loadBundle }),
   })
   return { loader, target, fetched, gates }
@@ -286,11 +289,11 @@ describe('lazy CJS arrival', () => {
     expect(b.fetched).toHaveLength(1)
   })
 
-  it('loads a package-local dynamic chunk only when its factory requests it', async () => {
+  it('loads an on-demand chunk and lets it reuse its already loaded entry', async () => {
     const b = bench([row('a')], {
       a: req => ({ load: () => req.async('./client.terminal.js') }),
     }, {
-      chunks: { 'a/client.terminal.js': () => ({ marker: 'terminal' }) },
+      chunks: { 'a/client.terminal.js': request => ({ marker: 'terminal', owner: request('./client.js') }) },
     })
     const entry = await b.loader.import('a', '', {}) as { load: () => Promise<{ marker: string }> }
     expect(b.fetched).toEqual([APPLICATION_URL])
@@ -298,7 +301,7 @@ describe('lazy CJS arrival', () => {
     const first = await entry.load()
     const second = await entry.load()
     expect(first).toBe(second)
-    expect(first).toEqual({ marker: 'terminal' })
+    expect(first).toEqual({ marker: 'terminal', owner: entry })
     expect(b.fetched).toEqual([APPLICATION_URL, chunkUrl('a', 'client.terminal.js')])
   })
 
@@ -527,6 +530,27 @@ describe('bundle arrival recovery', () => {
     expect(b.fetched).toEqual([APPLICATION_URL, single('b')])
     expect(await b.loader.import('a', '', {})).toEqual({ a: 1 })
     expect(b.fetched).toHaveLength(2)
+  })
+
+  it('loads only missing rows from a batch executed by the entry document', async () => {
+    const b = bench([row('a'), row('b')], { a: () => ({ a: 1 }), b: () => ({ b: 2 }) }, {
+      pending: [{ id: 'a', factory: () => ({ a: 1 }) }],
+      preloadedBundles: new Map([[APPLICATION_URL, 'executed']]),
+    })
+    expect(await b.loader.import('b', '', {})).toEqual({ b: 2 })
+    expect(await b.loader.import('a', '', {})).toEqual({ a: 1 })
+    expect(b.fetched).toEqual([single('b')])
+  })
+
+  it('uses the original batch URL once more after a failed speculative request', async () => {
+    const b = bench([row('a'), row('b')], { a: () => ({ a: 1 }), b: () => ({ b: 2 }) }, {
+      preloadedBundles: new Map([[APPLICATION_URL, 'load-failed']]),
+      transportFailures: { [APPLICATION_URL]: 1 },
+    })
+    await expect(Promise.all([b.loader.import('a', '', {}), b.loader.import('b', '', {})])).resolves.toEqual([{ a: 1 }, { b: 2 }])
+    expect(b.fetched).toHaveLength(3)
+    expect(b.fetched[0]).toBe(APPLICATION_URL)
+    expect(b.fetched.slice(1).sort()).toEqual([single('a'), single('b')].sort())
   })
 
   it('never re-executes a batch that already ran, even when its first importer was one of the rows it did register', async () => {
@@ -795,6 +819,30 @@ describe('boot manifest wire', () => {
     ])
   })
 
+  it('keeps bootstrap and transitive dependencies required and splits legacy mixed application batches', () => {
+    const wire = {
+      rev: 'graph',
+      entries: [
+        { id: 'bootstrap', url: '/bootstrap.js', rev: '1', optional: true, inject: ['adapter'] },
+        { id: 'adapter', url: '/adapter.js', rev: '1', optional: true, external: ['common/client'] },
+        { id: 'common', url: '/common.js', rev: '1', optional: true },
+        { id: 'chat', url: '/chat.js', rev: '1' },
+        { id: 'extra', url: '/extra.js', rev: '1', optional: true, immediately: true },
+      ],
+      batches: [
+        { phase: 'bootstrap', url: '/boot.js', rev: '1', entries: ['bootstrap'] },
+        { phase: 'application', url: '/app.js', rev: '1', entries: ['adapter', 'common', 'chat', 'extra'] },
+      ],
+    }
+    const manifest = parseBootManifest(wire)
+    expect(manifest.plugins.filter(row => row.optional).map(row => row.id)).toEqual(['extra'])
+    expect(manifest.modules.map(row => row.initialUrl)).toEqual([
+      '/boot.js', '/adapter.js', '/common.js', '/chat.js', '/extra.js',
+    ])
+    expect(() => parseBootManifest({ ...wire, entries: [{ ...wire.entries[0], optional: 'yes' }] }))
+      .toThrow('optional must be a boolean')
+  })
+
   it('rejects a non-array external', () => {
     expect(() => parseBootManifest({
       rev: 'graph',
@@ -965,6 +1013,7 @@ describe('default transport seam', () => {
       const script = nodes[0]
       if (!(script instanceof HTMLScriptElement)) throw new Error('expected script node')
       expect(script.async).toBe(true)
+      expect(script.fetchPriority).not.toBe('low')
       expect(script.getAttribute('src')).toBe(APPLICATION_URL)
       queueMicrotask(() => {
         win.__ModuleLoader__?.load({ id: 'dee', factory: () => ({ marker: 'via-script' }) })
@@ -976,6 +1025,55 @@ describe('default transport seam', () => {
     expect((exports as { marker: string }).marker).toBe('via-script')
     expect(append).toHaveBeenCalledOnce()
     expect([...document.querySelectorAll('script')]).toEqual([])
+  })
+
+  it('sets low priority only on the optional entry, keeping on-demand chunks at browser priority', async () => {
+    const requests: { url: string | null; lowPriority: boolean }[] = []
+    const url = comboUrl(['extra'], '1')
+    vi.spyOn(document.head, 'append').mockImplementation((...nodes) => {
+      const script = nodes[0]
+      if (!(script instanceof HTMLScriptElement)) throw new Error('expected script node')
+      const src = script.getAttribute('src')
+      requests.push({ url: src, lowPriority: script.fetchPriority === 'low' })
+      queueMicrotask(() => {
+        win.__ModuleLoader__?.load({
+          id: 'extra', ...(src === url ? {} : { chunk: 'client.detail.js' }),
+          factory: require => ({ open: () => require.async('./client.detail.js') }),
+        })
+        script.dispatchEvent(new Event('load'))
+      })
+    })
+    const b = bench([row('extra', { optional: true, initialUrl: url })], {}, {
+      defaultTransport: true, applicationBatches: [{ url, entries: ['extra'] }],
+    })
+    const entry = await b.loader.import('extra', '', {}) as { open: () => Promise<unknown> }
+    await entry.open()
+    expect(requests).toEqual([
+      { url, lowPriority: true }, { url: chunkUrl('extra', 'client.detail.js'), lowPriority: false },
+    ])
+  })
+
+  it('removes cancelled classic scripts and ignores registration from a detached script', async () => {
+    const url = comboUrl(['extra'], '1')
+    const b = bench([row('extra', { optional: true, initialUrl: url })], {}, {
+      defaultTransport: true, applicationBatches: [{ url, entries: ['extra'] }],
+    })
+    const controller = new AbortController()
+    const arrival = b.loader.prefetch('extra', controller.signal)
+    const stale = document.querySelector('script')
+    expect(stale).not.toBeNull()
+    controller.abort()
+    await expect(arrival).rejects.toMatchObject({ name: 'AbortError' })
+    expect(stale?.isConnected).toBe(false)
+    const current = vi.spyOn(document, 'currentScript', 'get').mockReturnValue(stale)
+    win.__ModuleLoader__?.load({ id: 'extra', factory: () => ({ revision: 'stale' }) })
+    current.mockRestore()
+    const fresh = b.loader.import('extra', '', {})
+    const script = document.querySelector('script')
+    expect(script).not.toBeNull()
+    win.__ModuleLoader__?.load({ id: 'extra', factory: () => ({ revision: 'fresh' }) })
+    script?.dispatchEvent(new Event('load'))
+    await expect(fresh).resolves.toEqual({ revision: 'fresh' })
   })
 
   it('a script load failure is loud and removes the node', async () => {

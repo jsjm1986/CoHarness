@@ -15,6 +15,8 @@ Confirming a directory is the picked path and dismissing the dialog is the cance
 
 The node half is an empty `apply`: it exists so the plugin appears in the host cordis.yml and Loader, while the browser half ships through `exports["./client"]` and is discovered through the `dsh.client` manifest declaration.
 
+The path and new-folder inputs reserve IME confirmation Enter for text composition, including Safari's composition-end ordering; a subsequent Enter performs the navigation or creation. Touch inputs use 16px text and directory controls provide 44px targets. New-folder hints use full-opacity secondary text colors. Short phone landscape layouts keep the footer on one row. In low-height windows the card scrolls as a whole while retaining two folder rows in its list. The nested new-folder form scrolls within its card when browser controls or the keyboard reduce the available height.
+
 ## Summary
 
 This package provides the in-app directory-browsing surface for the Web GUI: a Select Workspace Directory dialog that lists, navigates, and creates folders through the local Host, with no operating-system chooser involved. It fills the two directory-flow slots declared by `ui-workspace`, composing the client side of the browse picking interaction in one cordis.yml row. Choose it when the browser is remote or in-process and no local OS chooser exists; local deployments may prefer the [`-native`](../ui-directory-picker-native/README.md) surface.

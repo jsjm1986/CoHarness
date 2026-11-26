@@ -14,7 +14,7 @@ import {
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { bridge, type FetchHandler } from './http-bridge.ts'
 import { header, isRemoteAuthority, isTrustedApiRequest } from './api-request-trust.ts'
-import { API_PATH } from './api-path.ts'
+import { API_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from './api-path.ts'
 import type { BrowserAuth } from './browser-auth.ts'
 import type {
   ConnectionAuthenticationRequest,
@@ -27,6 +27,14 @@ import type {
   ConnectionRpcHandlerOptions,
   HostConnectionRpc,
 } from './rpc.ts'
+import {
+  ConnectionWebSocketChannel,
+  type ConnectionWebSocketHandler,
+  type ConnectionWebSocketOptions,
+  type HostConnectionWebSocket,
+} from './websocket-channel.ts'
+import { rejectWebSocketUpgrade } from './websocket-downlink.ts'
+import { buildConnectionRequestBoundary, createUpgradeRouteHandler } from './ws-upgrade.ts'
 
 /** Handler for a streaming HTTP subtree mounted below Connection's trusted `/api` route. */
 export type ConnectionHttpHandler = (
@@ -56,6 +64,8 @@ export interface HostConnectionHandle {
   readonly rpc: HostConnectionRpc
   /** Streaming HTTP registry. */
   readonly http: HostConnectionHttp
+  /** Authenticated bidirectional WebSocket channel registry. */
+  readonly ws: HostConnectionWebSocket
 
   /**
    * Whether this deployment accepts authorities beyond loopback: true only
@@ -129,11 +139,13 @@ export class HostConnectionService extends Service implements HostConnectionHand
    * @param ctx - owning Connection plugin context.
    * @param trustedHosts - deployment authorities accepted by trusted-host channels.
    * @param browserAuth - process token and persistent browser-session owner.
+   * @param websocketHeartbeatIntervalMs - interval between Ping frames on registered WebSocket channels.
    */
   constructor(
     ctx: Context,
     private readonly trustedHosts: readonly string[],
     private readonly browserAuth: BrowserAuth,
+    private readonly websocketHeartbeatIntervalMs = 30_000,
   ) {
     super(ctx, 'connection')
     this.allowsRemoteAuthorities = trustedHosts.some(isRemoteAuthority)
@@ -150,6 +162,16 @@ export class HostConnectionService extends Service implements HostConnectionHand
     return {
       handlePrefix: (path, handler, options) =>
         this.registerHttpPrefix(owner, path, handler, options),
+    }
+  }
+
+  /** Authenticated bidirectional WebSocket registry scoped to the Context reading this service. */
+  get ws(): HostConnectionWebSocket {
+    // The carrier's child plugin resolves its dependencies from the caller's own fiber.
+    const owner = this.ctx.fiber.ctx
+    return {
+      handle: (path, handler, options) =>
+        this.registerWebSocket(owner, path, handler, options),
     }
   }
 
@@ -332,6 +354,49 @@ export class HostConnectionService extends Service implements HostConnectionHand
     }, `client-connection: ${path} streaming HTTP subtree`)
   }
 
+  private registerWebSocket(
+    owner: Context,
+    path: string,
+    handler: ConnectionWebSocketHandler,
+    options: ConnectionWebSocketOptions,
+  ): () => Promise<void> {
+    assertWebSocketPath(path)
+    const fork = owner.inject(['webServer'], (webCtx) => {
+      webCtx.effect(() => {
+        const channel = new ConnectionWebSocketChannel(
+          this.websocketHeartbeatIntervalMs,
+          options.maxMessageBytes,
+        )
+        const routeLifetime = new AbortController()
+        const inFlight = new Set<Promise<void>>()
+        const unregister = webCtx.webServer.registerUpgrade({
+          path,
+          handler: createUpgradeRouteHandler({
+            owner: webCtx,
+            isRejected: req => this.rejectionFor(req, options.authority, 'upgrade') !== undefined,
+            rejectOnError: true,
+            routeSignal: routeLifetime.signal,
+            inFlight,
+            onAccepted: async (req, socket, head, signal) => {
+              if (options.authorize !== undefined && !await options.authorize(req, signal)) {
+                rejectWebSocketUpgrade(socket)
+                return
+              }
+              await channel.upgrade(req, socket, head, signal, handler)
+            },
+          }),
+        })
+        return async () => {
+          unregister()
+          routeLifetime.abort()
+          await Promise.allSettled([...inFlight])
+          await channel.close()
+        }
+      }, `client-connection: ${path} WebSocket channel`)
+    })
+    return () => fork.dispose()
+  }
+
   private register(
     owner: Context,
     channel: string,
@@ -353,13 +418,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
         // Every accepted request crosses the same `connection/request`
         // waterfall as the `/api` route, so authentication and request-context
         // plugins apply identically to generic channels.
-        await owner.waterfall('connection/request', {
-          kind: 'http',
-          headers: req.headers,
-          ...(req.method === undefined ? {} : { method: req.method }),
-          pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
-          ...(req.url === undefined ? {} : { url: req.url }),
-        }, async () => {
+        await owner.waterfall('connection/request', buildConnectionRequestBoundary('http', req), async () => {
           await bridge(req, res, fetchHandler)
         })
       },
@@ -486,5 +545,12 @@ function assertHttpPrefix(path: string): void {
   if (!path.startsWith(`${API_PATH}/`) || path.endsWith('/')
     || path.split('/').slice(2).some(segment => segment === '' || !ENDPOINT_SEGMENT_PATTERN.test(segment))) {
     throw new Error(`connection: invalid streaming HTTP prefix ${JSON.stringify(path)}`)
+  }
+}
+
+function assertWebSocketPath(path: string): void {
+  assertHttpPrefix(path)
+  if (path === MUX_EVENTS_PATH || path === HOST_EVENTS_PATH) {
+    throw new Error(`connection: reserved WebSocket path ${JSON.stringify(path)}`)
   }
 }

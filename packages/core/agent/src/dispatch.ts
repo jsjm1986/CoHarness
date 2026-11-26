@@ -12,11 +12,19 @@ import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { AssembleContext } from '@deepseek-ai/dsh-system-prompt'
 import type { Agent } from './types.ts'
+import { measurePreStep } from './pre-step-timing.ts'
 
 /** Extract the parameter tuple from an event handler type (its `this` is not part of the tuple). */
 type Params<F> = F extends (...args: infer P) => unknown ? P : never
 /** Extract the return type from an event handler type. */
 type Return<F> = F extends (...args: never[]) => infer R ? R : never
+
+declare module '@deepseek-ai/cordis' {
+  export interface Context {
+    /** Optional metadata sink for measured Agent pre-step listeners. */
+    agentPreStepTiming?: (input: Params<Events['agent/pre-step']>[0], hooks: ReadonlyArray<{ plugin: string; elapsedMs: number }>) => void
+  }
+}
 
 /**
  * The event names whose subject is an agent: the handler's first parameter is
@@ -142,6 +150,14 @@ export function agentEvents(ctx: Context, agent: Agent, carrier: Scoped<Agent> =
       return await serial(carrier, name, fused(payload))
     },
     waterfall(name, payload, ...rest) {
+      if (name === 'agent/pre-step') {
+        const timing = ctx.get('agentPreStepTiming')
+        if (timing !== undefined) {
+          // The event name fixes the payload and continuation at runtime.
+          const measure = measurePreStep as (...args: unknown[]) => never
+          return measure(ctx, carrier, fused(payload), rest[0], timing)
+        }
+      }
       // oxlint-disable-next-line typescript/unbound-method -- the events mixin accessor returns a pre-bound function
       const waterfall = ctx.waterfall as (thisArg: Scoped<Agent>, name: string, ...args: unknown[]) => never
       return waterfall(carrier, name, fused(payload), ...rest)

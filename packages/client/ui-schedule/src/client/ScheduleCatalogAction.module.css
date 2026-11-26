@@ -188,3 +188,19 @@
 .trigger[aria-expanded='true'] {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+
+/* The row-covering ::after reaches only inside the row, so taps on the
+   button's own edge fall into the gap between rows. Give both buttons a full
+   target-size box of their own at coarse pointers. */
+@media (pointer: coarse) {
+  .openButton {
+    display: flex;
+    align-items: center;
+    min-height: var(--dsw-touch-target);
+  }
+
+  .deleteButton {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}

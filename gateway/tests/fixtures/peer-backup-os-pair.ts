@@ -333,11 +333,13 @@ async function main() {
         const workspace = join(out, 'workspace'),
           home = join(out, 'dsh')
         const op = {
+          recoveryMode: 'planned' as const,
           id: randomUUID(),
           organizationId: binding.organizationId,
           projectId: binding.scopeId,
           runtimeId: roles.runtimeId as RuntimeId,
           sourceNode: binding.sourceNodeId,
+          targetVerifiedAt:null,repositoryNode: binding.targetNodeId,
           sourceVolume: roles.volumeId,
           oldEpoch: roles.writerEpoch,
           targetNode: binding.targetNodeId,
@@ -349,6 +351,7 @@ async function main() {
           phase: 'prepared',
           publicId: config.replacement?.publicId ?? 1,
           scheduleDigest: null,
+          suspendedEnvironmentKeys: [],
           filesDigest: null,
           targetPortBase: null,
           policyId: binding.policyId,

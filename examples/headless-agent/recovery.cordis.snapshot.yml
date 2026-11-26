@@ -1,0 +1,8 @@
+# Recovery must remove configured resumes before the Agent loop is constructed.
+- id: agent-loop
+  config:
+    agents:
+      - id: recovered-root
+- insert:
+    - id: unreviewed-recovery-hook
+      name: './tests/fixtures/recovery/unreviewed-hook.mjs'

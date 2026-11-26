@@ -4,7 +4,7 @@ import { createUserMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { inboxProjectionDefinition, ReactLoopInbox } from '../src/inbox.ts'
 
 function unsupportedInbox(): Agent['inbox'] {
@@ -305,6 +305,31 @@ describe('ReactLoopInbox', () => {
     expect(() => { tiny.inbox.append('next-turn', first) }).toThrow('inbox byte limit reached')
   })
 
+  it('applies the UTF-8 quota to a replacement committed by another inbox writer', async () => {
+    const original = createUserMessage({ content: [{ type: 'text', text: '原文' }], source: { kind: 'user' } })
+    const extra = createUserMessage({ content: [{ type: 'text', text: '附录' }], source: { kind: 'user' } })
+    const replacement = freezeMessage({ ...original, content: [{ type: 'text', text: '替换后的原文' }] })
+    const maxBytes = Buffer.byteLength(JSON.stringify(original)) + Buffer.byteLength(JSON.stringify(extra))
+    const { ctx, session, inbox } = await inboxAgent('bounded-inbox-after-replacement', { maxBytes })
+    try {
+      inbox.append('next-turn', original)
+      inbox.append('next-step', extra)
+      inbox.remove(extra.id)
+      session.append('agent/inbox/spliced', {
+        target: 'next-turn', start: 0, removedCount: 1, inserted: [replacement],
+      })
+
+      expect(() => { inbox.append('next-step', extra) }).toThrow('inbox byte limit reached')
+      expect(inbox.nextTurn).toEqual([replacement])
+      expect(inbox.nextStep).toEqual([])
+      inbox.remove(replacement.id)
+      inbox.append('next-step', extra)
+      expect(inbox.nextStep).toEqual([extra])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('keeps identity lookup correct after prepend, remove, and replacement', async () => {
     const { agent, inbox } = await inboxAgent('indexed-inbox')
     const first = createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } })
@@ -319,5 +344,22 @@ describe('ReactLoopInbox', () => {
     expect(agent.inbox.remove(third.id)).toBe(true)
     expect(agent.inbox.remove(first.id)).toBe(true)
     expect(inbox.hasPending).toBe(false)
+  })
+
+  it('caches newly inserted message sizes on their committed snapshots', async () => {
+    const { agent } = await inboxAgent('cached-inbox-sizes', { maxBytes: 10_000 })
+    const first = createUserMessage({ content: [{ type: 'text', text: 'first-cached' }], source: { kind: 'user' } })
+    const second = createUserMessage({ content: [{ type: 'text', text: 'second-cached' }], source: { kind: 'user' } })
+    const stringify = vi.spyOn(JSON, 'stringify')
+    try {
+      agent.inbox.append('next-turn', first)
+      const callsAfterFirst = stringify.mock.calls.length
+      agent.inbox.append('next-turn', second)
+      const callsOnSecond = stringify.mock.calls.length - callsAfterFirst
+      expect(callsAfterFirst).toBe(1)
+      expect(callsOnSecond).toBe(1)
+    } finally {
+      stringify.mockRestore()
+    }
   })
 })

@@ -10,18 +10,18 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { ActivityBody, type ActivityInjected } from './ActivityBody.tsx'
 import { ActivityTitle } from './ActivityTitle.tsx'
 import { ACTIVITY_ID, activityDefinition } from './definition.tsx'
-import { fetchActivity, fetchProgress, generateProgress } from './feed.ts'
 import { en, zh, type ActivityKey } from './locales.ts'
+import { activityRequests } from './requests.ts'
 import { createActivityStore } from './store.ts'
 
 export { type ActivityBodyProps, type ActivityInjected } from './ActivityBody.tsx'
 export type {
-  ActivityGrouping, ActivityItem, ActivityMode, ActivityPage, ActivitySection,
+  ActivityGrouping, ActivityItem, ActivityMember, ActivityMode, ActivityPage, ActivitySection,
   ProgressContent, ProgressEntry, ProgressItem, ProgressPage, ProgressStatus,
 } from './feed.ts'
 export type { ActivityKey } from './locales.ts'
 export { createActivityStore } from './store.ts'
-export type { ActivityState, ActivityStore } from './store.ts'
+export type { ActivityState, ActivityStore, ProgressObservation, ProgressReadFailure } from './store.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -44,6 +44,19 @@ export const inject = ['slots', 'locale', 'sidebarRightTabs', 'projectUiPolicy',
 export function apply(ctx: Context): void {
   const t = ctx.locale.bind(namespace)
   const store = createActivityStore()
+  const lifetime = new AbortController()
+  const pending = new Set<Promise<void>>()
+  const track = (task: Promise<void>): void => {
+    pending.add(task)
+    void task.then(() => { pending.delete(task) }, (error: unknown) => {
+      pending.delete(task)
+      console.error('Project activity request failed', error)
+    })
+  }
+  ctx.effect(() => async () => {
+    lifetime.abort()
+    await Promise.allSettled(pending)
+  }, 'ui-project-activity.requests')
   const targetFor = (sessionId: SessionId | undefined): SessionRuntimeTarget | undefined => {
     const owner = sessionId === undefined ? undefined
       : ctx.sessions.runtimeIdentityFor?.(sessionId) ?? parseClientSessionKey(sessionId)?.runtime
@@ -74,66 +87,15 @@ export function apply(ctx: Context): void {
     name: 'sidebar.right.pane.tab', key: ACTIVITY_ID, locale: namespace, store,
     inject: (sessionId, actions): ActivityInjected => {
       const target = targetFor(sessionId)
-      let inFlight: AbortController | undefined
-      let journalPoll: AbortController | undefined
-      const load = async (before: string | undefined): Promise<void> => {
-        inFlight?.abort()
-        const controller = new AbortController()
-        inFlight = controller
-        actions.loading()
-        try {
-          const page = await fetchActivity(before, controller.signal, target)
-          if (controller.signal.aborted) return
-          if (before === undefined) actions.refreshed(page.items, page.nextBefore)
-          else actions.appended(page.items, page.nextBefore)
-        } catch {
-          if (!controller.signal.aborted) actions.failed()
-        }
-      }
-      // A pass is asynchronous on the gateway; poll the journal page while
-      // `generating` stays set so the member watches it land.
-      const pollJournal = async (): Promise<void> => {
-        journalPoll?.abort()
-        const controller = new AbortController()
-        journalPoll = controller
-        for (let round = 0; round < 48; round += 1) {
-          await new Promise(resolve => setTimeout(resolve, 2_500))
-          if (controller.signal.aborted) return
-          if (await readJournal(controller.signal)) return
-        }
-      }
-      const readJournal = async (signal: AbortSignal): Promise<boolean> => {
-        try {
-          const page = await fetchProgress(signal, target)
-          if (signal.aborted) return true
-          actions.progressLoaded(page)
-          return !page.status.generating
-        } catch {
-          if (!signal.aborted) actions.progressFailed()
-          return true
-        }
-      }
       return {
-        refresh: () => {
-          journalPoll?.abort()
-          const controller = new AbortController()
-          journalPoll = controller
-          void load(undefined)
-          void readJournal(controller.signal).then((complete) => {
-            if (!complete && !controller.signal.aborted) void pollJournal()
-          })
-        },
-        loadMore: (before) => { void load(before) },
-        generate: () => {
-          void generateProgress(target)
-            .then(() => pollJournal())
-            .catch(() => { actions.progressFailed() })
-        },
-        reveal: (sourceSessionId, seq) => {
+        ...activityRequests(target, actions, lifetime.signal, track),
+        reveal: (sourceSessionId, seq, sourceRuntimeId) => {
           const viewport: ConversationViewport | undefined = ctx.get('conversationViewport')
           if (viewport === undefined) return
           const raw = sourceSessionId as SessionId
-          const key = target === undefined ? raw : ctx.sessions.keyFor?.(raw, target) ?? clientSessionKey(target, raw)
+          const owner = target?.kind === 'project' && sourceRuntimeId !== undefined && sourceRuntimeId !== target.runtimeId
+            ? { kind: 'project' as const, projectId: target.projectId, runtimeId: sourceRuntimeId } : target
+          const key = owner === undefined ? raw : ctx.sessions.keyFor?.(raw, owner) ?? clientSessionKey(owner, raw)
           if (seq === null) viewport.replaceActive(key)
           else viewport.reveal(key, seq)
         },

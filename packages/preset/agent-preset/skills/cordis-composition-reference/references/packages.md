@@ -387,7 +387,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-session-log-deepseek` | yes | Incremental lossless session-log request extension for the official DeepSeek LLM API |
 | `@deepseek-ai/dsh-session-persistence-gateway` | yes | Gateway PostgreSQL session persistence provider for CoHarness |
 | `@deepseek-ai/dsh-session-persistence-jsonl` | yes | JSONL durable session persistence backend for the DeepSeek Harness |
-| `@deepseek-ai/dsh-session-persistence-sqlite` | yes | SQLite durable session persistence with physical chunk-row packing |
+| `@deepseek-ai/dsh-session-persistence-sqlite` | yes | Durable SQLite Session persistence with compressed event payloads |
 | `@deepseek-ai/dsh-session-projection` | no | Session-projection seam: the merge-extensible projection type table, the provider contract, and the ctx.sessionProjections registry serving whole current values of log-derived per-session state |
 | `@deepseek-ai/dsh-session-projection-cache` | yes | Persisted projection cache (ctx.sessionProjectionCache): durable per-session projection checkpoints in the per-record `session_projcache` domain, throttled write-behind, and caller-supplied cold folding |
 | `@deepseek-ai/dsh-session-stats` | no | Whole-log conversation counts and wall times projection (sessionStats) for the DeepSeek Harness |

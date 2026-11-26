@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { TypertContext } from '@deepseek-ai/dsh-typert-protocol'
 import { typertOwnedValue } from '@deepseek-ai/dsh-typert-protocol'
 import type { MaybeSnapshotSelectorHook, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import { managedSelectionStorageKey, type StartupDraft } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from './slots.ts'
 import { SessionRuntime } from './sessions/service.ts'
 import { SessionRuntimePool } from './sessions/pool.ts'
@@ -111,7 +112,7 @@ export type {
   SessionFace,
   SubmissionHandle,
 } from './contract/session.ts'
-export type { AgentContext, ISessions, SessionRuntimeTarget, SessionTarget, SessionReference, SessionRetainOptions, SessionRetainInfo } from './contract/sessions.ts'
+export type { AgentContext, ISessions, SessionRuntimeTarget, SessionSearchProgress, SessionTarget, SessionReference, SessionRetainOptions, SessionRetainInfo } from './contract/sessions.ts'
 export type { IWorkspaces, StartSessionOptions } from './contract/workspaces.ts'
 export type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/session-create.ts'
 export type {
@@ -135,11 +136,12 @@ export { createSnapshotStore, defineStore, shallowEqual } from './contract/store
 export type {
   EngineStoreHandle, EngineStoreInstance, ObservableSnapshot, SnapshotStore,
 } from './contract/store.ts'
-// Account/document UI consumers share the Host carrier's byte-budgeted JSON
+// Account/document UI consumers share the Host carrier's byte-budgeted body
 // reader so a direct same-origin response cannot bypass the transport limit.
 export {
   ApiResponseTooLargeError,
   DEFAULT_UNARY_RESPONSE_MAX_BYTES,
+  readApiResponseBytes,
   readApiResponseJson,
   readApiResponseText,
 } from '@deepseek-ai/dsh-host-apiproxy/client'
@@ -326,6 +328,8 @@ declare module '@deepseek-ai/cordis' {
     ): void
   }
   interface Context {
+    /** Document-only input bridge, installed by the authenticated web carrier. */
+    startupDraft?: StartupDraft
     slots: import('./slots.ts').SlotRegistry
     /** Event-to-business-Context Definition registry. */
     conversationEvents: import('./conversation/event-registry.ts').ConversationEventRegistry
@@ -431,13 +435,14 @@ export function apply(ctx: Context): void {
     views: new ConversationViewRegistry(ctx),
   }
   const identity = connection.documentIdentity
-  const selectionPersistenceKey = identity === undefined ? undefined
-    : `dsh.sessions.current.v2.${String(identity.principalId)}.${identity.runtimeTarget.kind === 'personal'
-      ? 'personal' : `project-${String(identity.runtimeTarget.projectId)}`}`
+  const selectionPersistenceKey = identity?.runtimeTarget.runtimeId === undefined ? undefined
+    : managedSelectionStorageKey(identity.principalId, identity.runtimeTarget.runtimeId, identity.runtimeTarget.kind === 'personal'
+      ? 'personal' : `project:${identity.runtimeTarget.projectId}`)
   const baseSessions = new SessionRuntime(ctx, connection.wireApi ?? connection.api, ctx.remote, conversation, {
     provideService: false,
     hostDescription: connection.hostDescription,
-    ...(selectionPersistenceKey === undefined ? {} : { selectionPersistenceKey }),
+    ...(identity === undefined ? {} : selectionPersistenceKey === undefined
+      ? { persistSelection: false } : { selectionPersistenceKey }),
   })
   const sessions = new SessionRuntimePool(ctx, baseSessions, connection, ctx.remote, conversation)
   ctx.effect(() => {
@@ -472,8 +477,10 @@ export function apply(ctx: Context): void {
     () => workspaces.startInitialSelection(),
     'runtime: initial Workspace selection',
   )
+  sessions.prefetchStartupHistory()
   let initialConnection = true
   const loop = connection.start({
+    onResumeMuxEnvelope: (envelope, description, signal) => sessions.resumeMuxEnvelope(envelope, description, signal),
     onMuxEnvelope: (envelope) => {
       sessions.handleMuxEnvelope(envelope)
     },

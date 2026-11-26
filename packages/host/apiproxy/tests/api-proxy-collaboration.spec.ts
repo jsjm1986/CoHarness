@@ -8,6 +8,7 @@ import { collaborationCapabilities, CollaborationError, type CollaborationAuthor
 import SessionStore, { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { LlmAttemptId } from '@deepseek-ai/dsh-llm/brand'
 import {
   TypertLookupFailure,
   type TypertGatewayAuthorizationRequest,
@@ -445,6 +446,49 @@ describe('project collaboration Typert Remote ACL', () => {
 })
 
 describe('project collaboration streams', () => {
+  it('opens a new mux with the attempt prefix produced while no browser was connected', async () => {
+    const authority = controlledAuthority().authority
+    authority.readableSessionIds = ids => Promise.resolve(new Set(ids))
+    const { ctx, api } = await harness(authority)
+    const session = ctx.sessions.create(SessionId('assistant-baseline-after-disconnect'))
+    const agent = stubAgent(ctx, session)
+    const turn = session.append('turn/start', { turn: 1 })
+    const attemptId = LlmAttemptId('held-attempt')
+    ctx.emit('agent/assistant-stream', { agent, frame: { type: 'start', revision: 1, attemptId, turn: 1, step: 0 } })
+    ctx.emit('agent/assistant-stream', { agent, frame: {
+      type: 'chunk', revision: 2, attemptId, index: 0, time: 1,
+      chunk: { type: 'text-delta', index: 0, text: 'first part' },
+    } })
+    const title = session.append('session/title', {
+      title: 'A title generated during the disconnect',
+      messageSeqs: [],
+      source: { kind: 'fallback' },
+    })
+
+    const abort = new AbortController()
+    const stream = api.events.mux(request({}), abort.signal)[Symbol.asyncIterator]()
+    try {
+      expect(await stream.next()).toMatchObject({
+        value: { payload: { type: 'session/event', sessionId: session.id, event: turn } },
+      })
+      const opening = await stream.next()
+      expect(opening).toMatchObject({ value: { payload: { type: 'session/subscribed', sessionId: session.id, lastSeq: title.seq,
+        assistantStream: { revision: 2, activeAttempt: { attemptId, nextIndex: 1 } } } } })
+      expect(await stream.next()).toMatchObject({
+        value: { payload: { type: 'session/event', sessionId: session.id, event: title } },
+      })
+      ctx.emit('agent/assistant-stream', { agent, frame: {
+        type: 'chunk', revision: 3, attemptId, index: 1, time: 2,
+        chunk: { type: 'text-delta', index: 0, text: 'next part' },
+      } })
+      expect(await stream.next()).toMatchObject({ value: { payload: { type: 'session/assistant-stream', sessionId: session.id,
+        frame: { type: 'chunk', index: 1, revision: 3 } } } })
+    } finally {
+      abort.abort()
+      await stream.return?.()
+    }
+  })
+
   it.each(['mux', 'host'] as const)('rechecks an already visible Session for each %s publication', async (kind) => {
     const secretId = SessionId('later-revoked')
     const witnessId = SessionId('still-readable')

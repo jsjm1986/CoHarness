@@ -51,12 +51,15 @@ kind: "package-reference"
 | `readFrom(id, fromSeq, signal?): Promise<{ meta; events }>` | 返回 `seq >= fromSeq` 的有效已存储事件，不进入 preparation 缓存、不截断、不合成 closer，也不发布协调器状态。`fromSeq` 达到或超过已存储末尾时返回空事件列表；负数或非安全整数 `fromSeq` 会被拒绝。可寻址后端（SQLite）只读后缀，除非转换受支持的旧记录需要读取更早的记录；顺序后端（JSONL）解析整个产物并向前跳过。未知类型拒绝遵循同一读取方式：寻址读取只检查返回的后缀，顺序回退路径还会拒绝窗口以下的未知必需事件。供 checkpoint 消费方只应用已存序号之后的事件。 |
 | `readHeader(id, signal?): Promise<SessionHeader \| undefined>` | 只读取会话 header，不实体化事件行。第一方带索引的提供方按会话 id 查询；默认实现过滤 `listSnapshots()`，兼容第三方提供方。 |
 | `readRevision(id, signal?): Promise<SessionPersistenceRevision \| undefined>` | 供只需要新鲜度的调用方使用的具名轻量 revision 查询。第一方提供方使用按 id 的索引；默认实现委托给 `revision()`。 |
+| `readCommittedEvent(id, seq, signal?): Promise<SessionEvent \| undefined>` | 校验已存储的 Session，并从已提交前缀返回一个精确事件。序号不存在时返回 `undefined`。读取不使用分页游标，追加期间可以读取仍完整的早期前缀。 |
 | `readPage(id, request, signal?): Promise<SessionPersistencePage>` | 读取一个有界的升序事件区间，限制为 `maxBytes`（512 KiB）、`maxEvents`（2,000）和 `maxGroups`（50）。组数统计会把同一 turn/step 的 assistant 流式 chunk 归为一组，并让每个工具调用生命周期保持独立，因此 token chunk 不会各自消耗一组。绑定 revision 的 cursor 可沿相同方向续取，并在追加或修复后失效——与单页读取中 revision 变化一样报为 `dependency`；指向其他会话或方向的 cursor 才是 `protocol` 错误。提供方区分 `too-large`、`aborted`、`timeout`、`dependency` 和 `protocol` 失败；没有 seek 实现的提供方保留完整读取兼容回退。 |
 | `readHistoryIndex(id, maxItems?, signal?): Promise<SessionHistoryIndex \| undefined>` | 在不实体化事件正文的情况下读取有界轮次范围及简短问答预览。第一方带索引提供方最多返回 2,000 个标记，并让结果绑定源 revision；`undefined` 表示后端没有此可选加速能力，调用方继续使用普通分页。 |
 | `listHeaders(signal?): Promise<SessionHeader[]>` | 从元数据轻量列出，不解析完整日志。可选信号取消后端列表工作。零事件延迟实体化会话不在 `list` 中。 |
 | `revision(id, signal?): Promise<SessionPersistenceRevision \| undefined>` | 在不加载事件的情况下读取一份已实体化日志不透明、来源限定的修订值。第一方提供方使用按 id 的存储查询；`undefined` 表示该 id 不存在。默认实现会筛选 `listSnapshots`，使第三方提供方保持兼容，但可能扫描其目录。 |
 | `listSnapshots(signal?): Promise<SessionPersistenceSnapshot[]>` | 返回轻量元数据和每份日志一个不透明、带品牌类型的修订值，不加载事件日志。日志及其后端存储不变时，修订保持相等；append 或变更性 load 修复后会改变；不会仅因两个存储使用相同本地计数器而冲突。可选信号请求取消后端发现工作；第一方后端会先等待所有已启动的列出工作结束，再予以拒绝，因此调用返回拒绝时，相关工作已完全停稳。 |
 | `reserveDraft(request): Promise<SessionDraftReservation \| undefined>` | 可在 Agent 创建前为浏览器草稿预留身份。Gateway 提供方返回按 scope 限定的 canonical Session id 和有期限 lease；本地提供方返回 `undefined`。请求只含 id、cwd、可见性和 preset 元数据。 |
+| `reservedProjectDraft(id, signal?)` | 读取当前用户创建且尚未落盘的项目草稿预留。获授权的 Host 可在重建 Session 后接管预留。 |
+| `saveDraftModelSelection(id, selection): Promise<void>` | 模型选择确认前，将未落盘项目草稿的选择写入已跟踪的预留。没有项目预留的提供方立即返回。 |
 | `heartbeatDraft(request): Promise<void>` / `releaseDraft(request): Promise<void>` | 续期或释放提供方拥有的草稿 lease。两个操作都是幂等的，绝不持久化 prompt 文本或凭据。 |
 
 <a id="invariants-every-backend-must-honor"></a>
@@ -64,13 +67,13 @@ kind: "package-reference"
 
 - **仅追加；崩溃轮次会被关闭，而非截断。** 已 flush 事件绝不重写。崩溃可留下未关闭最终轮次，其事件真实且可能很大；`load` 保留它们，并持久追加合成 closer（为每个未获回答的 assistant 调用添加一个带风险分类错误的 `tool/result`，再添加 `step/end?`+`turn/end {interrupted}`），以平衡日志，并确保重新载入的历史仍是有效的提供方 transcript（文本记录）。只丢弃从未完整写入的撕裂尾部碎片。
 - **连续 seq。**`load` 拒绝日志中间的 `seq` 缺口/解析错误；`append` 的第一个 `seq` 必须等于已存储 next-seq。
-- **JSON 可序列化数据。**`append` 通过共享单遍无损 JSON 边界实体化每个直接/回放批次。活动 `Session` 事件已深度冻结，但写入协调器仍将每个事件复制到持久化自有缓冲区。
+- **JSON 可序列化数据。**`append` 在一次无损 JSON 遍历中校验并分离直接追加或回放的批次。活动写入队列借用 Session 已提交且深度冻结的事件，在接纳前计算准确的 UTF-8 JSON 字节数。
 - **持久性。**`append` 只在批次持久后返回。
 
 <a id="the-write-coordinator"></a>
 ## 写入协调器
 
-`PersistenceCoordinator` 负责每 id 状态和串行化、每个活动会话各自的有界写入 controller、延迟实体化、崩溃尾部修复、会话接管和完全停稳的 dispose。浏览器草稿会把策略和边界事件保留在内存中，首个非空消息才以原子方式实体化完整前缀；命令／goal／plan 状态事件会实体化为隐藏的 command-only 记录；未实体化草稿在 dispose 时丢弃缓冲。第一方后端组合一个协调器，实现小型 `PersistenceBackend` 存储钩子接口，并委托其有状态方法。因此 JSONL 和 SQLite 共享生命周期正确性，同时保留不同存储原语；见[协调器 Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.zh.md)、[flush controller 简化](../../../.agents/notes/implemented/simplification/2026-07-23-collapse-persistence-flush-state.zh.md)和[有界批处理决策](../../../.agents/notes/implemented/architecture/2026-08-08-bounded-session-persistence-write-batching.zh.md)。
+`PersistenceCoordinator` 负责每 id 状态和串行化、每个活动会话各自的有界写入 controller、延迟实体化、崩溃尾部修复、会话接管和完全停稳的 dispose。浏览器草稿在内存中缓冲策略和边界事件。首次收到非空消息、带回执的入队事件或命令、目标、计划状态时，以原子方式实体化完整前缀。出现可见内容才提升草稿状态。未实体化草稿在释放时丢弃缓冲。第一方后端组合一个协调器，实现小型 `PersistenceBackend` 存储钩子接口，并委托其有状态方法。因此 JSONL 和 SQLite 共享生命周期正确性，同时保留不同存储原语；见[协调器 Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.zh.md)、[flush controller 简化](../../../.agents/notes/implemented/simplification/2026-07-23-collapse-persistence-flush-state.zh.md)和[有界批处理决策](../../../.agents/notes/implemented/architecture/2026-08-08-bounded-session-persistence-write-batching.zh.md)。
 
 每个 `session/event` 将事件复制到会话 controller。第一个待处理事件会开启固定批处理窗口；后续事件会加入该批次，但不会重置截止时间。配置的 `writeBatchMaxDelayMs` 只限制这段有意等待，而不限制事件循环、初始化、串行化操作或后端延迟。写入期间接纳的事件会形成一个新的有界批次；`maxPendingEvents` 和 `maxPendingBytes` 会在 controller 保留无界队列前拒绝生产者。默认上限是每个活动会话 100,000 个事件和 64 MiB UTF-8 JSON 字节。活动事件接纳被拒绝后，该 controller 保留永久失败：已保留的事件可以 drain，但后续每次 flush 和拆卸都会报告缺口。Session observer 的异常包含不能把该失败变成成功的持久化屏障，排空队列也不能恢复受影响的生命周期。`session/flush` 会取消等待，并作为共享的完全停稳屏障，排空屏障运行期间接纳的事件。后台写入失败只记录一次日志，保留顺序不变的批次，并暂停自动重试；新事件会开启新的固定窗口，而显式 flush 或后端拆卸会立即重试，并在失败再次发生时向调用方暴露失败。
 

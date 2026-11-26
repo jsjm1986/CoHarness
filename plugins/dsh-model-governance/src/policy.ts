@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 import type {
   ManagedModelCompat,
@@ -431,10 +432,37 @@ function providerProfiles(value: unknown): ManagedModelProviderProfile[] {
   })
 }
 
-/** Load and fail closed on a missing or malformed deployment policy. */
-export function loadPolicy(filename: string): GovernancePolicyFile {
+/**
+ * Reuse validation only when a fresh file read returns identical bytes.
+ * @param filename - deployed policy file checked on every call.
+ * @returns a synchronous boot reader and an asynchronous live reader with shared validation.
+ */
+export function policyReader(filename: string): {
+  load: () => GovernancePolicyFile
+  read: () => Promise<GovernancePolicyFile>
+} {
+  let previous: { bytes: Buffer; policy: GovernancePolicyFile } | undefined
+  const validate = (bytes: Buffer): GovernancePolicyFile => {
+    if (previous !== undefined && bytes.equals(previous.bytes)) return previous.policy
+    const policy = parsePolicy(bytes, filename)
+    previous = { bytes, policy }
+    return policy
+  }
+  const unableToRead = (error: unknown): Error =>
+    new Error(`model-governance: cannot load policy ${filename}: ${String(error)}`, { cause: error })
+  return {
+    load: () => {
+      let bytes: Buffer
+      try { bytes = readFileSync(filename) } catch (error) { throw unableToRead(error) }
+      return validate(bytes)
+    },
+    read: async () => validate(await readFile(filename).catch(error => { throw unableToRead(error) })),
+  }
+}
+
+function parsePolicy(source: Buffer, filename: string): GovernancePolicyFile {
   let raw: unknown
-  try { raw = JSON.parse(readFileSync(filename, 'utf8')) } catch (error) {
+  try { raw = JSON.parse(source.toString('utf8')) } catch (error) {
     throw new Error(`model-governance: cannot load policy ${filename}: ${String(error)}`)
   }
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('model-governance: policy must be an object')

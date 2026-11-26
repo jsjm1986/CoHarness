@@ -102,8 +102,29 @@ try {
   assert.equal(cancelled.error.reason, 'cancelled')
   assert.equal(await state(secondGeneration), 'waiting')
   assert.equal((await budget.snapshot()).outcomes.runtime_starts_admitted, 1)
+
+  await repository.markStopped(target, secondGeneration)
+  const thirdGeneration = await repository.beginStart(target, Date.now(), Buffer.alloc(32, 3), 'explicit')
+  await budget.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 1 })
+  const statements = []
+  const observedPool = new Proxy(pool, { get(actualPool, key) {
+    if (key === 'connect') return async () => {
+      const client = await actualPool.connect()
+      return new Proxy(client, { get(actual, property) {
+        if (property === 'query') return (sql, values) => { statements.push(sql); return actual.query(sql, values) }
+        const value = Reflect.get(actual, property, actual)
+        return typeof value === 'function' ? value.bind(actual) : value
+      } })
+    }
+    const value = Reflect.get(actualPool, key, actualPool)
+    return typeof value === 'function' ? value.bind(actualPool) : value
+  } })
+  await new NodeResourceBudget(observedPool, organizationId, context.nodeId, budget.config)
+    .admitRuntimeStart(target, thirdGeneration, new AbortController().signal)
+  assert.equal(await state(thirdGeneration), 'possible')
+  assert.deepEqual(statements, ['BEGIN', 'SELECT * FROM harness.admit_runtime_start($1,$2,$3,$4,$5,$6,$7::jsonb,$8)', 'COMMIT'])
   const result = { freshPressureRequired: true, sharedCreditSpent: true, cancellationBeforeAllocation: true,
-    activeAssignmentPreserved: true, explicitRuntimeIdentityRequired: true }
+    activeAssignmentPreserved: true, explicitRuntimeIdentityRequired: true, singleStatementStartAdmission: true }
   assert.deepEqual(result, JSON.parse(await readFile(new URL('../expected/runtime-start-built.json', import.meta.url), 'utf8')))
   console.log(JSON.stringify(result))
 } finally {

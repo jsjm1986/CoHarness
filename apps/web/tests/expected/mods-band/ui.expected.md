@@ -1,0 +1,6 @@
+- group "Claude Code mods":
+  - text: Reviewed 1 changes. Keep the original draft while working through the shared review.
+  - button "Review next change [R]"
+  - button "Show action failure"
+  - button "Unavailable action" [disabled]
+  - status: "The button failed: This review action could not be completed."

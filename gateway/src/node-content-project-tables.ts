@@ -28,6 +28,7 @@ export const peerProjectTables = [
   'document_receipts',
   'project_name_versions',
   'plugin_states',
+  'plugin_inventory',
   'project_file_anchors',
   'conversation_archive_search',
   'conversation_archive_commands',

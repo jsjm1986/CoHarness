@@ -69,6 +69,8 @@ Gateway-managed runtimes recheck administrator authority before every mutation; 
 
 A Gateway-managed runtime also publishes its observed composition — the managed patch rows and the bundle selection — to the deployment's plugin-state store after each committed change, carrying the revision it last projected. The store answers the new revision, or a conflict when an administrator saved a newer desired state meanwhile; the manager then materializes that saved state into the profile files and reconciles the running composition, so an offline edit converges on a live instance at the next change. A publish the store cannot accept leaves the committed files in place and reports the pending synchronization in the result's `warnings`; the next startup's projection applies the store's revision.
 
+The same runtime reports its full observed inventory — the `listBundles` and `listPlugins` projections, including localized titles, install sources, and fiber phases — to the deployment's inventory store once startup settles, after each committed change, and after a burst of loader-entry transitions (debounced to one report). Reports serialize behind desired-state publishes and degrade to a warning, so a store outage never blocks management; spaces that never open the manager still report. Standalone profiles without the provider report nothing.
+
 Administrative installation uses a request-scoped stream, with a bounded progress buffer and fresh authority checks. Duplicate active request ids are rejected. Disconnect cancels the installation and waits for its cleanup; clients must not automatically replay it. Ordinary Host event subscriptions never receive these logs.
 
 <a id="version-compatibility-and-exemptions"></a>

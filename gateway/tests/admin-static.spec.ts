@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { gzipSync } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createAdminApiHandler } from '../src/admin-api.ts'
 import { AuditService } from '../src/audit.ts'
@@ -31,6 +32,10 @@ async function setupWithAdminAssets() {
   mkdirSync(join(adminRoot, 'assets'), { recursive: true })
   writeFileSync(join(adminRoot, 'index.html'), '<div data-testid="admin-app">hello</div>')
   writeFileSync(join(adminRoot, 'assets', 'app.js'), 'window.__admin=1')
+  writeFileSync(join(adminRoot, 'assets', 'app.js.gz'), gzipSync('window.__admin=1'))
+  writeFileSync(join(adminRoot, 'assets', 'legacy.css'), 'body{}')
+  writeFileSync(join(root, 'outside.css.gz'), gzipSync('body{display:none}'))
+  symlinkSync(join(root, 'outside.css.gz'), join(adminRoot, 'assets', 'legacy.css.gz'))
   writeFileSync(join(root, 'secret.txt'), 'nope')
   symlinkSync(join(root, 'secret.txt'), join(adminRoot, 'assets', 'leak.txt'))
   const db = openDb(join(root, 'g.sqlite'))
@@ -79,6 +84,11 @@ describe('admin static hosting', () => {
     expect(page.headers.get('content-type')).toMatch(/text\/plain/)
     expect(await page.text()).toBe('forbidden')
     expect((await fetch(`${base}/admin/projects/1`, { headers: { cookie: workerCookie, accept: 'text/html' } })).status).toBe(403)
+    const asset = await fetch(`${base}/admin/assets/app.js`, {
+      headers: { cookie: workerCookie, 'accept-encoding': 'gzip' },
+    })
+    expect(asset.status).toBe(403)
+    expect(asset.headers.get('content-encoding')).toBeNull()
   })
 
   it('does not treat /adminfoo as admin', async () => {
@@ -100,5 +110,29 @@ describe('admin static hosting', () => {
     const escape = await fetch(`${base}/admin/assets/leak.txt`, { headers: { cookie } })
     expect(escape.status).toBe(404)
     expect(escape.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('serves build-time gzip with the same media type, access and cache policy', async () => {
+    const { base, cookie } = await setupWithAdminAssets()
+    const url = `${base}/admin/assets/app.js`
+    const headers = { cookie, 'accept-encoding': 'gzip' }
+    const gzip = await fetch(url, { headers })
+    expect(gzip.status).toBe(200)
+    expect(gzip.headers.get('content-encoding')).toBe('gzip')
+    expect(gzip.headers.get('vary')).toBe('accept-encoding')
+    expect(gzip.headers.get('content-type')).toMatch(/javascript/)
+    expect(gzip.headers.get('cache-control')).toBe('private, max-age=31536000, immutable')
+    expect(await gzip.text()).toBe('window.__admin=1')
+    const head = await fetch(url, { method: 'HEAD', headers })
+    expect(head.headers.get('content-encoding')).toBe('gzip')
+    expect(await head.text()).toBe('')
+
+    const identity = await fetch(url, { headers: { cookie, 'accept-encoding': '*;q=1, gzip;q=0' } })
+    expect(identity.headers.get('vary')).toBe('accept-encoding')
+    expect(identity.headers.get('content-encoding')).toBeNull()
+    expect(await identity.text()).toBe('window.__admin=1')
+    const legacy = await fetch(`${base}/admin/assets/legacy.css`, { headers })
+    expect(legacy.headers.get('content-encoding')).toBeNull()
+    expect(await legacy.text()).toBe('body{}')
   })
 })

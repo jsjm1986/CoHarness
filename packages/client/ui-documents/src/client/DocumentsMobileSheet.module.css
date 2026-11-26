@@ -94,12 +94,12 @@
 .wide.wide { width: min(680px, calc(100vw - 48px)); }
 .bodyWithFooter { padding-bottom: var(--dsw-space-4); }
 .footer { display: flex; flex: none; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--dsw-space-2); padding: var(--dsw-space-3) var(--dsw-space-4); border-top: 0.5px solid var(--dsw-alias-border-l2); }
-.footer > button { min-height: 32px; border-radius: var(--dsw-radius-control); font-size: 13px; }
+.footer > button { min-height: 32px; border-radius: var(--dsw-radius-control); font-size: 0.8125rem; }
 @media (hover: hover) { .close:hover { background: var(--dsw-alias-interactive-bg-hover); } }
 @media (max-width: 767px) {
   .wide.wide { width: calc(100vw - (2 * var(--dsw-mobile-sheet-edge))); }
   .footer { padding-bottom: calc(var(--dsw-space-3) + var(--dsw-safe-bottom)); }
-  .footer > button { min-height: var(--dsw-touch-target); font-size: 14px; }
+  .footer > button { min-height: var(--dsw-touch-target); font-size: 0.875rem; }
 }
 
 @media (pointer: coarse) { .footer > button { min-height: var(--dsw-touch-target); } }
@@ -109,4 +109,19 @@
   .body { scrollbar-gutter: auto; }
   .footer { flex-wrap: nowrap; }
   .footer > button { flex: 1 1 0; min-width: 0; white-space: normal; }
+}
+
+@media (max-height: 480px) {
+  .overlay {
+    padding: var(--dsw-space-2);
+    padding-top: max(var(--dsw-space-2), var(--dsw-safe-top));
+    padding-bottom: max(var(--dsw-space-2), var(--dsw-safe-bottom));
+  }
+  .dialog.dialog {
+    max-width: 100%;
+    max-height: calc(var(--dsw-viewport-height, 100vh) - max(var(--dsw-space-2), var(--dsw-safe-top)) - max(var(--dsw-space-2), var(--dsw-safe-bottom)));
+    margin: 0;
+  }
+  .header { min-height: var(--dsw-touch-target); }
+  .body, .footer { padding-block: var(--dsw-space-2); }
 }

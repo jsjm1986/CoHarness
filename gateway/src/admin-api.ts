@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { createAdministratorResponse, AdministratorReadUnavailableError, type AdministratorResponse, type AdministratorResponseHeaders } from './admin-response.ts'
+import { sendCompressed } from './http-compression.ts'
 import { NodeMigrationConflict } from './node-content-migration-admin.ts'
 import { nodeMigrationPublishSchema, nodeMigrationTargetSchema, nodeRetirementOpenSchema, nodeRetirementFinalizeSchema } from './node-content-migration-protocol.ts'
 import { NodeContentUnavailable } from './node-content-store.ts'
@@ -10,7 +11,8 @@ import { auditSummary } from './audit-summary.ts'
 import { RuntimeStartBlockedError, RuntimeStopError, RuntimeGenerationConflictError, type RuntimeTarget } from './instances.ts'
 import { RuntimeManagementError } from './runtime-management.ts'
 import { runtimeManagementApi } from './runtime-management-api.ts'
-import { RuntimeCatalogError } from './runtime-catalog.ts'
+import { RUNTIME_SHUTDOWN_OUTCOME_HEADER } from './runtime-shutdown.ts'
+import { RuntimeCatalogError, type RuntimeId, type RuntimeNodeId } from './runtime-catalog.ts'
 import { RuntimeCapacityError } from './runtime-capacity.ts'
 import { RuntimeAccountError } from './launcher.ts'
 import { NodeResourceBudgetError } from './node-resource-budget.ts'
@@ -70,6 +72,23 @@ import { TunnelAccessError } from './tunnel-access.ts'
 import { ResourceAccessError, resourcePolicyOwner } from './resource-access.ts'
 import { stewardPolicyOwner } from './steward-access.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
+
+const DEPLOYMENT_OVERVIEW_SECTIONS = [
+  'deployment',
+  'backups',
+  'tunnel',
+  'nodeConfiguration',
+  'nodeConnection',
+  'runtimeAllocationPolicy',
+  'nodeAccess',
+] as const
+
+type DeploymentOverviewSectionKey = typeof DEPLOYMENT_OVERVIEW_SECTIONS[number]
+type DeploymentOverviewSlice =
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly status: number; readonly error: string; readonly code?: string }
+
+const DEPLOYMENT_OVERVIEW_SECTION_SET = new Set<string>(DEPLOYMENT_OVERVIEW_SECTIONS)
 
 /** Resolve optional Admin coordinates without borrowing the target owner's personal authority. */
 async function selectedAdminRuntime(deps: GatewayDeps, actor: UserRow, req: IncomingMessage, target: RuntimeTarget, bodyId?: unknown): Promise<RuntimeTarget> {
@@ -242,7 +261,7 @@ export function createAdminApiHandler(
   return async (req: IncomingMessage, res: ServerResponse, admin: UserRow, pathname: string, body: string): Promise<boolean> => {
     if (!pathname.startsWith('/admin/api')) return false
     const reply = createAdministratorResponse(deps.users, admin.id, req.method ?? 'GET',
-      (status, value, headers) => sendJson(res, status, value, headers))
+      (status, value, headers) => sendCompressed(req, res, status, JSON.stringify(value), 'application/json', headers))
     try {
       if (pathname==='/admin/api/deployment/project-content-migrations') {
         res.setHeader('cache-control','no-store')
@@ -402,9 +421,10 @@ async function dispatch(
   if (pathname === '/admin/api/deployment/current-node' && method === 'GET') {
     res.setHeader('cache-control', 'no-store')
     if (deps.nodeServiceIdentity === undefined) { await reply.error(503, 'node-service/unavailable'); return true }
+    const deployment = await deps.topology?.adminRead(admin)
     await reply.json(200, { nodeId: deps.nodeServiceIdentity.nodeId, name: deps.cfg.computeNodeName,
-      forwardingEnabled: deps.topology === undefined ? deps.cfg.nodeService.forwarding : (await deps.topology.adminRead(admin)).scope === 'organization',
-      ...(deps.topology === undefined ? {} : { deployment: await deps.topology.adminRead(admin) }) })
+      forwardingEnabled: deployment === undefined ? deps.cfg.nodeService.forwarding : deployment.scope === 'organization',
+      ...(deployment === undefined ? {} : { deployment }) })
     return true
   }
   if (pathname === '/admin/api/deployment/node-connection') {
@@ -492,13 +512,72 @@ async function dispatch(
     return true
   }
 
+  if (pathname === '/admin/api/deployment/overview' && method === 'GET') {
+    res.setHeader('cache-control', 'no-store')
+    const raw = new URL(req.url ?? pathname, 'http://admin').searchParams.get('sections')
+    const selected = (raw === null || raw.trim() === ''
+      ? [...DEPLOYMENT_OVERVIEW_SECTIONS]
+      : [...new Set(raw.split(',').map(part => part.trim()).filter(part => part !== ''))]) as DeploymentOverviewSectionKey[]
+    if (selected.length === 0 || selected.some(key => !DEPLOYMENT_OVERVIEW_SECTION_SET.has(key))) {
+      await reply.error(400, 'invalid-deployment-overview-sections')
+      return true
+    }
+    const readSlice = async (load: () => Promise<unknown>): Promise<DeploymentOverviewSlice> => {
+      try { return { ok: true, value: await load() } }
+      catch (error) {
+        const mapped = mapError(error)
+        // Per-slice isolation must not hide the server faults the single-route handler logs.
+        if (mapped.status >= 500) console.error('[gateway] deployment overview slice failed:', error)
+        return { ok: false, status: mapped.status, error: mapped.error, ...(mapped.code === undefined ? {} : { code: mapped.code }) }
+      }
+    }
+    const unavailable = (error: string): DeploymentOverviewSlice => ({ ok: false, status: 503, error })
+    const loaders: Record<DeploymentOverviewSectionKey, () => Promise<DeploymentOverviewSlice>> = {
+      deployment: async () => {
+        if (deps.maintenance === undefined) return unavailable('deployment-unavailable')
+        return readSlice(async () => {
+          const [state, plan] = await Promise.all([
+            deps.maintenance!.administration(admin.id),
+            deps.migrationPlan?.() ?? Promise.resolve(undefined),
+          ])
+          return { ...state, releaseId: deps.cfg.releaseId, migrations: plan ?? null }
+        })
+      },
+      backups: async () => deps.backups === undefined
+        ? unavailable('deployment-unavailable')
+        : readSlice(async () => ({ backups: await deps.backups!.list() })),
+      tunnel: async () => deps.tunnelAccess === undefined
+        ? unavailable('tunnel-unavailable')
+        : readSlice(() => deps.tunnelAccess!.view()),
+      nodeConfiguration: async () => deps.nodeConfiguration === undefined
+        ? unavailable('node-configuration-unavailable')
+        : readSlice(() => deps.nodeConfiguration!.view(admin.id)),
+      nodeConnection: async () => deps.nodeConnection === undefined
+        ? unavailable('node-connection-unavailable')
+        : readSlice(() => deps.nodeConnection!.view(admin)),
+      runtimeAllocationPolicy: async () => {
+        if (admin.role !== 'admin') {
+          return { ok: false, status: 403, error: 'runtime-management/forbidden', code: 'runtime-management/forbidden' }
+        }
+        if (deps.runtimeManagement === undefined) return unavailable('runtime-management/unavailable')
+        return readSlice(() => deps.runtimeManagement!.policy(admin, undefined))
+      },
+      nodeAccess: async () => deps.nodeAccess === undefined
+        ? unavailable('node-access/unavailable')
+        : readSlice(() => deps.nodeAccess!.list(admin, {})),
+    }
+    const entries = await Promise.all(selected.map(async key => [key, await loaders[key]()] as const))
+    await reply.json(200, { sections: Object.fromEntries(entries) })
+    return true
+  }
+
   if (pathname === '/admin/api/deployment' && method === 'GET') {
     if (deps.maintenance === undefined) { await reply.error(503, 'deployment-unavailable'); return true }
     const [state, plan] = await Promise.all([
       deps.maintenance.administration(admin.id),
       deps.migrationPlan?.() ?? Promise.resolve(undefined),
     ])
-    await reply.json(200, { ...state, migrations: plan ?? null })
+    await reply.json(200, { ...state, releaseId: deps.cfg.releaseId, migrations: plan ?? null })
     return true
   }
   if (pathname === '/admin/api/tunnel' && method === 'GET') {
@@ -575,6 +654,20 @@ async function dispatch(
     } catch (error) {
       if (!(error instanceof NodeChannelError && error.code === 'node-channel/cancelled' && res.destroyed)) throw error
     } finally { res.removeListener('close', cancel) }
+    return true
+  }
+  const nodeRemoval = /^\/admin\/api\/deployment\/nodes\/access\/([^/]+)\/removal$/u.exec(pathname)
+  if (nodeRemoval !== null && (method === 'GET' || method === 'POST')) {
+    res.setHeader('cache-control', 'no-store')
+    if (deps.nodeAccess === undefined) { await reply.error(503, 'node-access/unavailable'); return true }
+    const nodeId = nodeRemoval[1]!
+    if (method === 'GET') await reply.json(200, await deps.nodeAccess.checkRemoval(admin, nodeId))
+    else {
+      const result = await deps.nodeAccess.remove(admin, nodeId, parseObject(body), ip)
+      deps.nodeChannels?.revoke(result.nodeId)
+      deps.nodeServices?.revoke(result.nodeId)
+      await reply.json(200, result)
+    }
     return true
   }
   const nodeAccess = /^\/admin\/api\/deployment\/nodes\/access\/([^/]+)$/u.exec(pathname)
@@ -868,6 +961,11 @@ async function dispatch(
   if (pathname === '/admin/api/plugins/overview' && method === 'GET') {
     if (deps.pluginManagement === undefined) { await reply.error(503, 'plugin-management-unavailable'); return true }
     await reply.json(200, await deps.pluginManagement.overview(admin))
+    return true
+  }
+  if (pathname === '/admin/api/plugins/inventory' && method === 'GET') {
+    if (deps.pluginManagement === undefined) { await reply.error(503, 'plugin-management-unavailable'); return true }
+    await reply.json(200, await deps.pluginManagement.inventory(admin))
     return true
   }
   if (pathname === '/admin/api/plugins/target' && method === 'GET') {
@@ -1376,13 +1474,10 @@ async function dispatch(
     if (target === null) { await reply.error(404, 'user not found'); return true }
     const address = await selectedAdminRuntime(deps, admin, req, { kind: 'user', id: userId })
     const subject = { ...target, ...(address.runtimeId === undefined ? {} : { runtimeId: address.runtimeId }) }
-    if (op === 'stop') await deps.instances.stop(address.runtimeId === undefined ? userId : address, 'manual', admin.id)
-    else if (op === 'start') await deps.instances.ensureRunning(subject, 'explicit', admin.id)
-    else {
-      await deps.instances.stop(address.runtimeId === undefined ? userId : address, 'manual', admin.id)
-      await deps.instances.ensureRunning(subject, 'explicit', admin.id)
-    }
-    await write(`admin.instances.${op}`, { id: userId, runtimeId: address.runtimeId })
+    const stopped = op === 'start' ? undefined : await deps.instances.stop(address.runtimeId === undefined ? userId : address, 'manual', admin.id)
+    if (op !== 'stop') await deps.instances.ensureRunning(subject, 'explicit', admin.id)
+    await write(`admin.instances.${op}`, { id: userId, runtimeId: address.runtimeId, ...stopped })
+    if (stopped !== undefined) res.setHeader(RUNTIME_SHUTDOWN_OUTCOME_HEADER, stopped.shutdownOutcome)
     sendNoContent(res)
     return true
   }
@@ -1945,9 +2040,13 @@ async function dispatch(
     const project = await deps.projects.getById(projectId)
     if (project === null) { await reply.error(404, 'project not found'); return true }
     const target = { kind: 'project' as const, id: projectId }
-    if (op !== 'start') await deps.instances.stop(target, 'manual', admin.id)
-    if (op !== 'stop') await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit', admin.id)
-    await write(`admin.project-instances.${op}`, { projectId })
+    const selected = await selectedAdminRuntime(deps, admin, req, target)
+    const stopped = op === 'start' ? undefined : await deps.instances.stop(selected, 'manual', admin.id)
+    if (op !== 'stop') {
+      await deps.instances.ensureRunning({ ...selected, kind: 'project', name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit', admin.id)
+    }
+    await write(`admin.project-instances.${op}`, { projectId, ...(selected.runtimeId === undefined ? {} : { runtimeId: selected.runtimeId }), ...stopped })
+    if (stopped !== undefined) res.setHeader(RUNTIME_SHUTDOWN_OUTCOME_HEADER, stopped.shutdownOutcome)
     sendNoContent(res)
     return true
   }
@@ -1962,9 +2061,24 @@ async function dispatch(
       const target = { kind: 'project' as const, id: projectId }
       let runtimeState = 'unavailable'
       let runtimeGeneration = 0
+      let assignment: { runtimeId: RuntimeId; nodeId: RuntimeNodeId } | undefined
       try {
-        runtimeState = await deps.instances.stateOf(target)
-        runtimeGeneration = await deps.instances.generationOf(target)
+        const catalog = deps.runtimeCatalog
+        const id = catalog?.resolveForAdministrator === undefined ? undefined
+          : project.runtimeId ?? (await deps.instances.resolveTarget?.(target))?.runtimeId
+        if (id !== undefined && catalog?.resolveForAdministrator !== undefined) {
+          const row = await catalog.resolveForAdministrator(admin, id)
+          if (row.id !== id || row.owner.kind !== 'project' || row.owner.id !== projectId
+            || (project.nodeId ?? deps.nodeServiceIdentity?.nodeId) !== row.node.id) {
+            throw new RuntimeCatalogError(400, 'runtime-catalog/target-mismatch')
+          }
+          runtimeState = row.observedState
+          runtimeGeneration = row.generation
+          assignment = { runtimeId: row.id, nodeId: row.node.id }
+        } else {
+          runtimeState = await deps.instances.stateOf(target)
+          runtimeGeneration = await deps.instances.generationOf(target)
+        }
       } catch {
         // A project can lack an instance row on this node; configuration
         // summaries remain useful without inventing lifecycle data.
@@ -1993,6 +2107,7 @@ async function dispatch(
           managementSurface: 'user-frontend',
           runtimeState,
           runtimeGeneration,
+          ...assignment,
           filesystemManagedIn: '/admin',
           ...(projectModelSummary === undefined ? {} : { projectModels: projectModelSummary }),
         },

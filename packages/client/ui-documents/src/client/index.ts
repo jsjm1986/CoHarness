@@ -14,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { DocumentsButton } from './DocumentsButton.tsx'
 import type { DocumentsButtonInjected } from './DocumentsButton.tsx'
 import { DocumentsOverlay } from './DocumentsOverlay.tsx'
-import { DocumentsModal } from './DocumentsModal.tsx'
+import { DeferredDocumentsModal, preloadDocumentsModal } from './DeferredDocumentsModal.tsx'
 import { DocumentPreview } from './DocumentPreview.tsx'
 import { NS, en, zh } from './locales.ts'
 import type { DocumentsKey } from './locales.ts'
@@ -35,6 +35,20 @@ export const inject = ['slots', 'locale', 'sessions', 'conversation', 'connectio
 export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-documents: dictionaries')
+  const ready = ctx.conversation.firstEditableComposer
+  if (ready !== undefined) {
+    ctx.effect(() => {
+      let started = false
+      const warmWhenReady = (): void => {
+        if (started || !ready.getSnapshot()) return
+        started = true
+        preloadDocumentsModal()
+      }
+      const unsubscribe = ready.subscribe(warmWhenReady)
+      warmWhenReady()
+      return unsubscribe
+    }, 'ui-documents: prepare picker after composer paint')
+  }
 
   const injected = (): DocumentsButtonInjected => ({
     hooks: { deployment: ctx.deploymentContext },
@@ -64,4 +78,4 @@ export function apply(ctx: ClientContext): void {
   }, DocumentsButton))
 }
 
-export { DocumentsButton, DocumentsModal, DocumentPreview }
+export { DocumentsButton, DeferredDocumentsModal as DocumentsModal, DocumentPreview }

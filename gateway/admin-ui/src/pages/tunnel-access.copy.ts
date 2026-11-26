@@ -48,6 +48,7 @@ export const zh = {
   loadingTunnel: '正在加载隧道状态',
   unsupportedPlatform: '当前平台不支持内置隧道管理；请改用手工 cloudflared 或反向代理。',
   lastErrorLabel: '最近错误',
+  lastErrorLine: '最近错误：{error}',
   updatedMeta: '更新于 {value}',
 } satisfies Record<string, string>
 
@@ -101,5 +102,6 @@ export const en = {
   loadingTunnel: 'Loading tunnel status',
   unsupportedPlatform: 'In-product tunnel management is not supported on this platform; use a manual cloudflared or reverse-proxy setup instead.',
   lastErrorLabel: 'Last error',
+  lastErrorLine: 'Last error: {error}',
   updatedMeta: 'Updated {value}',
 } satisfies Record<TunnelAccessCopyKey, string>

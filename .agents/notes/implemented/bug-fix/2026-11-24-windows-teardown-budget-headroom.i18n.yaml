@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-24-windows-teardown-budget-headroom.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-24-windows-teardown-budget-headroom.md
+document:
+  en: 973233ce13e1dda9c380b5957d999bbfaff5775d
+  zh: 2c9d1a841306b15bd3ebeb0171ee3b7465b41a60
+/agent-note-size-lsp-stdio-teardown-budgets-for-degraded-windows-helper-delivery:
+  en: e6b99ec89ee3e8c7
+  zh: af188fdba2eec2f1
+/agent-note-size-lsp-stdio-teardown-budgets-for-degraded-windows-helper-delivery/problem:
+  en: 340e4d4dc1d79b19
+  zh: d0a2b33f6d1658fa
+/agent-note-size-lsp-stdio-teardown-budgets-for-degraded-windows-helper-delivery/decision:
+  en: ab38dbeef24f8467
+  zh: 1a2beec9420ef4af
+/agent-note-size-lsp-stdio-teardown-budgets-for-degraded-windows-helper-delivery/alternatives-considered:
+  en: d5cf29af108865a1
+  zh: 9dd1c349f3b5cabe
+/agent-note-size-lsp-stdio-teardown-budgets-for-degraded-windows-helper-delivery/consequences:
+  en: 0a0f48697b37b617
+  zh: a7fa5255d766fd3a

@@ -15,13 +15,13 @@ export async function projectReplacementLayout(
   context: PostgresRuntimeContext,
   op: PeerRecoveryOperation,
 ): Promise<PeerProjectReplacementLayout> {
-  if (op.organizationId !== context.organizationId || op.targetNode !== context.nodeId || !['prepared','cancelled'].includes(op.phase))
+  if (op.organizationId !== context.organizationId || op.targetNode !== context.nodeId || !['preparing','prepared','cancelled','externally-fenced'].includes(op.phase))
     throw new PeerBackupError(403, 'peer-backup/wrong-recovery-node')
   const base = await realpath(op.origin === 'user' ? config.userProjectsRoot : config.projectsRoot)
   const runtimes = await realpath(config.projectRuntimesRoot)
   const workspace = join(base, 'recovery-' + op.projectId + '-' + op.id)
   const root = join(runtimes, String(op.publicId))
-  if (op.phase==='prepared') await peerPrivateDirectory(root)
+  if (op.phase==='preparing' || op.phase==='prepared' || op.phase==='externally-fenced') await peerPrivateDirectory(root)
   const parent=await lstat(root).catch((error:unknown)=>{if(error instanceof Error && 'code' in error && error.code==='ENOENT')return undefined;throw error})
   if (parent && ((await realpath(root)) !== root || !parent.isDirectory()))
     throw new PeerBackupError(409, 'peer-backup/invalid-target-files')

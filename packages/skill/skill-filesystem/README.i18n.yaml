@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/skill/skill-filesystem/README.md
 document:
-  en: 96274a5e7ccaa82b6c3920f9b5e2d66f8815eac3
-  zh: ec0887d65c9ca9bf1e3da4c7ebf747aca43bac0b
+  en: 2baf20854c762a2fa3d0f86c8c90d09c7f851355
+  zh: c2f95f725506a5ddddc826e9d880eb5d0003ca15
 /:
   en: 88f372ab5e279e8d
   zh: 61495d48365178df
@@ -24,8 +24,8 @@ document:
   en: 2ef062c58b0878c7
   zh: 44720f7433a45031
 /deepseek-ai-dsh-skill-filesystem/discovery:
-  en: 7f53e1f86fe10fa4
-  zh: 7fa8a707b6a7c358
+  en: 8110455d246fb8bd
+  zh: 0dca8cc2dba10f3a
 /deepseek-ai-dsh-skill-filesystem/catalog-change-detection:
   en: 4837f3d492fe8684
   zh: 40b892c923341287

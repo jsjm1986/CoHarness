@@ -44,6 +44,12 @@ export const TEST_LABELS: DockLabels = {
   addTab: 'new tab',
   dockFloat: 'dock',
   closeFloat: 'close panel',
+  tabActions: 'tab actions', moveBefore: 'move earlier', moveAfter: 'move later',
+  moveToPane: position => `move to pane ${String(position)}`, floatTab: 'float tab',
+  resizePane: 'resize panes with arrow keys', moveFloat: 'move panel with arrow keys', resizeFloat: 'resize panel with arrow keys',
+  expandBefore: 'expand previous pane', expandAfter: 'expand next pane', equalPanes: 'equalize panes',
+  adjustFloat: { left: 'move left', right: 'move right', up: 'move up', down: 'move down',
+    wider: 'increase width', narrower: 'decrease width', taller: 'increase height', shorter: 'decrease height' },
   dropZone: { center: 'move here', left: 'split left', right: 'split right', top: 'split top', bottom: 'split bottom' },
 }
 

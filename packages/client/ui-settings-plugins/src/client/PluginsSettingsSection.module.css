@@ -10,13 +10,13 @@
 
 .heading {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
 }
 
 .intro {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--dsw-alias-label-tertiary);
 }
 
@@ -35,8 +35,8 @@
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font: inherit;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
   cursor: pointer;
 }
 
@@ -80,7 +80,7 @@
 
 .empty {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--dsw-alias-label-tertiary);
 }
 
@@ -102,7 +102,7 @@
 
 .presetSettingsTitle {
   margin: 0;
-  font-size: 15px;
-  line-height: 22px;
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
   font-weight: 600;
 }

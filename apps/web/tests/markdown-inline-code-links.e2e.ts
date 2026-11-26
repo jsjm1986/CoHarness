@@ -1,6 +1,7 @@
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { createMessage, createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -100,7 +101,7 @@ describe('web e2e: Markdown inline-code links', () => {
     scaffold = await launchWebScaffold({})
     linkUrl = new URL('/?demo=1', scaffold.baseUrl).toString()
     await seedSession(scaffold, markdownFixture(linkUrl), SEED_ID)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -142,7 +143,7 @@ describe('web e2e: Markdown inline-code links', () => {
     // re-issue it a bounded number of times rather than assume the lost one
     // reports back.
     let popup: Page | undefined
-    for (let attempt = 0; attempt < 6 && popup === undefined; attempt++) {
+    for (let attempt = 0; attempt < 3 && popup === undefined; attempt++) {
       const popupPromise = page.context().waitForEvent('page', { timeout: 10_000 })
         .catch(() => undefined)
       await inlineCodeLink.click({ modifiers: ['Shift'] })
@@ -152,7 +153,7 @@ describe('web e2e: Markdown inline-code links', () => {
       if (navigated) popup = candidate
       else await candidate.close().catch(() => {})
     }
-    if (popup === undefined) throw new Error('shift+click produced no navigated popup after 6 attempts')
+    if (popup === undefined) throw new Error('shift+click produced no navigated popup after 3 attempts')
     expect(popup.url()).toBe(linkUrl)
     await popup.close()
 
@@ -165,5 +166,5 @@ describe('web e2e: Markdown inline-code links', () => {
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])
-  }, 120_000)
+  }, 60_000)
 })

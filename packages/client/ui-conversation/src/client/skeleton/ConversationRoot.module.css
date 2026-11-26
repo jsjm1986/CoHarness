@@ -8,6 +8,7 @@
   flex-direction: column;
   height: 100%;
   min-width: 0;
+  overflow: hidden auto;
   background: var(--dsw-alias-bg-base);
 
   /* Shared width axis for the whole column: one content width W
@@ -35,9 +36,9 @@
      surface around its 16px/28px design baseline (preference 14 ↔ design 16;
      the 1.75 line-height ratio is kept). Headings h1–h3, code, and table
      tokens keep their design sizes. */
-  --dsw-font-markdown-base: calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family);
-  --dsw-font-markdown-base-strong: 600 calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family);
-  --dsw-font-markdown-h4: 600 calc(16px + var(--dsh-chat-font-size) - 14px)/calc(28px + (var(--dsh-chat-font-size) - 14px) * 1.75) var(--dsw-font-family);
+  --dsw-font-markdown-base: calc(1rem + var(--dsh-chat-font-size) - 14px)/1.75 var(--dsw-font-family);
+  --dsw-font-markdown-base-strong: 600 calc(1rem + var(--dsh-chat-font-size) - 14px)/1.75 var(--dsw-font-family);
+  --dsw-font-markdown-h4: var(--dsw-font-markdown-base-strong);
 }
 
 .header {
@@ -143,6 +144,14 @@
 .sharedHeader .headerCorner { margin-left: 0; }
 .toolsContext { flex: none; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
 .toolsScope { flex: 0 1 auto; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
+
+@media (max-height: 480px) {
+  .sharedHeader .toolsContext,
+  .sharedHeader .toolsScope { display: none; }
+  .sharedHeader .titleCluster { flex: 0 1 auto; }
+  .sharedHeader .crumbs:not(:has(.crumb:not([data-workbench-duplicate-title]), [data-slot]:not(:empty))),
+  .sharedHeader .titleCluster:not(:has(.crumb:not([data-workbench-duplicate-title]), [data-slot]:not(:empty))) { display: none; }
+}
 
 @media (hover: hover) and (pointer: fine) {
   /* A lone sidebar opener shares the identity row. Other contributed tools
@@ -277,6 +286,10 @@
   letter-spacing: -0.01em;
   color: var(--dsw-alias-label-primary);
   cursor: default;
+}
+
+.headerTools {
+  display: contents;
 }
 
 .headerActions {
@@ -440,10 +453,6 @@
 /* Active phase: header is ordinary column chrome above the scrollport (not
    sticky). The scroll body holds the transcript and the sticky composer seat
    so wheel over the footer moves the flow. */
-.root[data-phase='active'] {
-  overflow: hidden;
-}
-
 .root[data-phase='active'] .header {
   flex: none;
 }
@@ -456,10 +465,14 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  min-height: 0;
+  /* Very short visual viewports scroll the header with the body instead of
+     leaving an input-sized target inside a smaller fixed-header remainder. */
+  min-height: min(100%, calc(2 * var(--dsw-touch-target)));
+  container-type: size;
 }
 
 .scrollBody {
+  --dsh-composer-overlap-height: var(--dsh-composer-height, 152px);
   position: relative;
   display: flex;
   flex: 1;
@@ -627,6 +640,16 @@
   );
 }
 
+/* A composer taller than its own scrollport cannot remain an overlay. Its
+   natural-flow height already separates it from the transcript. */
+.scrollBody[data-composer-flow] {
+  --dsh-composer-overlap-height: 0px;
+}
+
+.scrollBody[data-composer-flow] > .composerSeat {
+  position: relative;
+}
+
 /* A phone session-settings sheet is a modal reading takeover. The composer
    normally sits in stacking level 7 so the back-to-bottom affordance can stay
    above it; once the sheet mounts, that sibling must move underneath the
@@ -675,18 +698,15 @@
   left: 0;
 }
 
-/* A trajectory event-details sheet is a deliberate reading takeover. Raise
-   the whole session-view stacking context above the absolute composer seat;
-   raising only the ledger's inner child is insufficient in WebKit because
-   the flex view wrapper establishes the nearer paint boundary. The normal
-   trajectory list keeps the composer above it and therefore preserves the
-   send/queue controls. */
 @media (max-width: 767px) {
   .widthHandle {
     display: none;
   }
+}
 
-.scrollBody:has([data-conversation-composer-overlay]):has([data-trajectory-details-open])
+/* The session view owns the stacking context when the inspector meets the composer. */
+@media (max-width: 767px), (max-height: 480px) and (orientation: landscape) {
+  .scrollBody:has([data-conversation-composer-overlay]):has([data-trajectory-details-open])
     > :global([data-slot='conversation.session']) {
     position: relative;
     z-index: 8;
@@ -729,6 +749,7 @@
 
 .heroWorkspaceRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   min-width: 0;
@@ -748,8 +769,24 @@
   line-height: 18px;
 }
 
+.recoveryNotice {
+  align-self: center;
+  box-sizing: border-box;
+  width: min(var(--dsh-composer-card-max-width), calc(100% - var(--dsh-composer-side-clearance) * 2));
+  margin: 0;
+  padding: 0 var(--dsw-space-4);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 :global([data-viewport='compact']) .root {
   --dsh-composer-side-clearance: 12px;
+}
+
+:global([data-viewport='compact']) .headerCorner,
+:global([data-viewport='compact']) .headerBlank {
+  display: none;
 }
 
 :global([data-viewport='compact']) .header {
@@ -768,26 +805,38 @@
 
 :global([data-viewport='compact']) .tabs {
   order: 0;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 1 auto;
+  grid-auto-columns: minmax(var(--dsw-touch-target), max-content);
+  min-width: min(100%, calc(2 * var(--dsw-touch-target) + 6px));
   margin: 0;
   align-self: center;
   overflow-x: auto;
   overflow-y: hidden;
-  min-height: 34px;
+  min-height: var(--dsw-touch-target);
+  scrollbar-width: none;
+}
+
+:global([data-viewport='compact']) .tabs::before {
+  display: none;
 }
 
 :global([data-viewport='compact']) .tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
+  min-height: var(--dsw-touch-target);
   padding: 3px var(--dsw-space-2);
   font: var(--dsw-mobile-font-secondary);
 }
 
+:global([data-viewport='compact']) .tabActive {
+  background: var(--dsw-alias-bg-raised);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+  box-shadow: var(--dsw-elevation-control);
+}
+
 :global([data-viewport-short]) .tab {
-  min-height: 28px;
+  min-height: var(--dsw-touch-target);
 }
 
 :global([data-viewport='compact']) .titleRow {
@@ -814,30 +863,30 @@
   display: contents;
 }
 
-:global([data-viewport='compact']) .headerActions {
+:global([data-viewport='compact']) .headerTools {
   order: 1;
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
   align-items: center;
   max-width: 42%;
-  min-width: 0;
+  min-width: var(--dsw-touch-target);
   overflow-x: auto;
   gap: var(--dsw-space-1);
   scrollbar-width: none;
 }
 
-:global([data-viewport='compact']) .headerActions button,
-:global([data-viewport='compact']) .headerActions [role='button'] {
-  min-width: 40px;
-  min-height: 36px;
+:global([data-viewport='compact']) .headerTools button,
+:global([data-viewport='compact']) .headerTools [role='button'] {
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
   flex: none;
 }
 
-:global([data-viewport='compact']) .headerActions::-webkit-scrollbar {
+:global([data-viewport='compact']) .headerTools::-webkit-scrollbar {
   display: none;
 }
 
-:global([data-viewport='compact']) .headerUtilities {
+:global([data-viewport='compact']) .headerTools:not(:has([data-slot]:not(:empty))) {
   display: none;
 }
 
@@ -866,7 +915,7 @@
 /* Hero: the composer sits inside the session scroll body; center there so
    the tree seat matches active (sticky footer) without a Root remount. */
 .root[data-phase='hero'] .scrollBody {
-  justify-content: center;
+  justify-content: safe center;
   overflow-y: auto;
 }
 
@@ -874,8 +923,22 @@
    visual viewport keeps tall phones from leaving a large dead lower half while
    short phones still receive the same safe-area and composer constraints. */
 :global([data-viewport='compact']) .root[data-phase='hero'] .scrollBody {
-  justify-content: center;
+  justify-content: safe center;
   padding-top: 0;
+}
+
+@container (max-height: 320px) {
+  .scrollBody { --dsh-composer-overlap-height: 0px; }
+
+  .root[data-phase='active'] .composerSeat {
+    position: relative;
+  }
+
+  .scrollBody:has([data-conversation-composer-overlay]) > :global([data-slot='conversation.session']) > .viewArea {
+    flex: 0 0 auto;
+    block-size: 100cqh;
+    min-height: 100cqh;
+  }
 }
 
 /* Initial navigation and unread history retain the mounted composer until its layout is known. */
@@ -905,38 +968,43 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  overflow: hidden;
+  overflow: hidden auto;
   position: relative;
   background: var(--dsw-alias-bg-base);
 }
 
 .workbenchGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-auto-rows: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   flex: 1;
-  min-width: 0;
-  min-height: 0;
-  width: 100%;
+  min-inline-size: 0;
+  min-block-size: min-content;
+  inline-size: 100%;
   overflow-x: auto;
   overflow-y: hidden;
 }
 
-.workbenchRow { display: grid; width: 100%; min-height: 0; min-width: 0; }
-.workbenchRoot[data-maximized] .workbenchGrid { grid-template-columns: minmax(0, 1fr); }
+.workbenchRow {
+  display: grid;
+  flex: 1 1 0px;
+  inline-size: 100%;
+  min-block-size: min-content;
+  min-inline-size: 0;
+}
+
+.workbenchRow[data-collapsed] { flex: none; }
 .workbenchRoot[data-maximized] { align-self: stretch; }
-.workbenchRoot[data-maximized] .workbenchGrid { display: flex; flex-direction: column; }
 .workbenchRoot[data-maximized] .workbenchRow { display: flex; flex: 1 1 100%; }
 .workbenchRoot[data-maximized] .workbenchPane { flex: 1 1 100%; width: 100%; }
 .workbenchPane { position: relative; display: flex; box-sizing: border-box; flex-direction: column; min-width: 0; min-height: 0; transition: opacity var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)), box-shadow var(--dsw-motion-duration-micro, 0.14s) var(--dsw-motion-ease-standard, var(--ds-ease-in-out)); }
 .workbenchPane + .workbenchPane { border-left: 0.5px solid var(--dsw-alias-border-l1); }
 .workbenchUnavailable { display: grid; flex: 1; place-content: center; margin: 0; padding: var(--dsw-space-5); color: var(--dsw-alias-label-tertiary); text-align: center; }
-.workbenchRoot > .root, .workbenchPane > .root { flex: 1; min-height: 0; height: auto; overflow: hidden; }
+.workbenchRoot > .root, .workbenchPane > .root { flex: 1; min-height: 0; height: auto; }
 
 /* Collapsed panes render only the header slot's identity strip. */
-.paneBody { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; overflow: hidden; background: var(--dsw-alias-bg-base); }
+.paneBody { display: flex; flex: 1; min-height: var(--dsw-touch-target); min-width: 0; flex-direction: column; overflow: hidden; background: var(--dsw-alias-bg-base); }
 .paneBody[hidden] { display: none; }
-.paneBody > .root { flex: 1; min-height: 0; height: auto; overflow: hidden; }
+.paneBody > .root { flex: 1; min-height: 0; height: auto; }
 
 /* Pane reorder: the dragged pane dims in place; the hovered sibling grows a
    2px insertion edge on the drop side. */
@@ -1077,3 +1145,11 @@
 }
 .resumeDraft { font: inherit; color: inherit; cursor: pointer; }
 .resumeDraft { align-self: start; }
+
+@media (pointer: coarse) {
+  .tab { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
+
+  /* The absolute real input inherits its touch area from the card; the static
+     pending clone has to carry the floor on its own box. */
+  .pendingCard textarea { min-height: var(--dsw-touch-target); }
+}

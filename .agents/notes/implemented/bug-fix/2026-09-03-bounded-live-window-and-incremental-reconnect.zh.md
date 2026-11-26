@@ -10,9 +10,9 @@ Web 客户端在长对话上感觉很慢，且会话运行越久越慢。五个�
 
 ## Decision
 
-活动补齐在尾页之后最多保留 `LIVE_HISTORY_RETAINED_PAGES = 3` 页更早页面，由 `Session.liveHistoryPages` 计数并随窗口重置（`leaveStage`、`installWindow`）。因此运行中的舞台会话最多驻留 4 × `PAGE_MESSAGES` 条消息；达到上限后 `beginLiveHistory()` 成为空操作，之后的 prompt 与 running 边沿不再扩展窗口。走到日志头部的补齐仍进入 `historyWindowMode: 'live'`；被上限截断的补齐回到 `'tail'` 并保持 `hasMore: true`，所以更早页面控件与近顶自动分页在轮次结束后恢复。`MAX_HISTORY_EXPANSION_PAGES` 仍是阅读器跳转（`loadHistoryUntil`）与 detail 补全的上限。
+活动补齐在尾页之后最多保留 `LIVE_HISTORY_RETAINED_PAGES = 3` 页更早页面，由 `Session.liveHistoryPages` 计数并随窗口重置（`leaveStage`、`installWindow`）。因此运行中的舞台会话最多驻留 4 × `PAGE_MESSAGES` 条消息；达到上限后 `beginLiveHistory()` 成为空操作，之后的 prompt 与 running 边沿不再扩展窗口。走到日志头部的补齐仍进入 `historyWindowMode: 'live'`；被上限截断的补齐回到 `'tail'` 并保持 `hasMore: true`，所以更早页面控件与近顶自动分页在轮次结束后恢复。`MAX_HISTORY_EXPANSION_PAGES` 仍是阅读器跳转（`loadHistoryUntil`）、transcript 回执恢复与 detail 补全的上限。
 
-`Session.resync()` 保留已打开的窗口。持久事件从不改变，所以重连只清除待处理交互等待与 subscribed 基线，然后执行缺口修复：读一次尾页合并进驻留窗口，且不递增 open generation，因为在途的分页请求仍是有效历史。只有仍在加载或处于错误状态的窗口才会重置并重新打开。`repairGap()` 可等待且可合并：修复在途时发出的请求会让正在运行的修复再读一次尾页，而不是被 stitching 守卫丢弃。`mergeTail()` 在所有遗漏事件都位于尾部之后时原地追加（重连的常态，节点身份保持），在页面同时覆盖更早前缀时按序合并，仅当尾页的逻辑基线不再与窗口相接——流断开时间超过一页所覆盖的范围——时才通过 `installWindow()` 替换窗口；运行中的舞台会话随后重新开始有界补齐。越过已打开窗口尾部的 `session/subscribed` 基线触发同一修复，因此流断开期间转为空闲的会话无需等待下一个实时事件即可追上。
+`Session.resync()` 保留已打开的窗口。持久事件从不改变，所以重连只清除待处理交互等待与 subscribed 基线，然后执行缺口修复：读一次尾页合并进驻留窗口，且不递增 open generation，因为在途的分页请求仍是有效历史。只有仍在加载或处于错误状态的窗口才会重置并重新打开。`repairGap()` 可等待且可合并：修复在途时发出的请求会让正在运行的修复再读一次尾页，而不是被 stitching 守卫丢弃。`mergeTail()` 在所有遗漏事件都位于尾部之后时原地追加（重连的常态，节点身份保持），在页面同时覆盖更早前缀时按序合并，仅当尾页的逻辑基线不再与窗口相接——流断开时间超过一页所覆盖的范围——时才通过 `installWindow()` 替换窗口；运行中的舞台会话随后重新开始有界补齐。恢复出的尾页只有在此前的驻留窗口为空时才可以恢复 `hasMore`，因为空窗口没有提供任何前序事件，而之后的录取可以创建更早前缀；当未录取的 transcript 回执位于恢复尾页之前时，一次有界的更早页面遍历会恰好安装观察到它所需的连续链（[transcript 回执历史恢复](2026-11-25-transcript-receipt-history-recovery.zh.md)）。越过已打开窗口尾部的 `session/subscribed` 基线触发同一修复，因此流断开期间转为空闲的会话无需等待下一个实时事件即可追上。
 
 `TrajectorySnapshotBuilder` 区分「只移动了某个 Assistant 流式 partial 的发布」（settled 节点相同、request 浅相等）与其他一切变化：前者只替换上一个快照的 `partial` 字段；后者重建账本，但对内容浅相等的每一行复用上一个元素（按 `seq` 或 `startSeq` 匹配），没有任何行变化时复用上一个数组，条目完全相同时复用上一个 `eventLocations` 与 `callSchemas` Map。
 

@@ -1,9 +1,6 @@
 /**
- * The per-tab context menu, opened by a secondary press on the chip. It carries
- * the close gesture and whatever the embedder appends; the copy and float
- * gestures have no menu item — copying is an embedder API, floating is a drag
- * released clear of the surface. A menu that would hold no item at all renders
- * no popup, so a secondary press on a chip with nothing to offer shows nothing.
+ * The tab and floating-panel actions menu. It accepts the kit's actions and
+ * embedder items, with arrow-key traversal and focus return to its invoker.
  * Presentational — it renders what its props supply and dismisses itself on
  * outside presses or an unmodified Escape, returning menu focus to its tab.
  *
@@ -47,18 +44,34 @@ function placeMenu(anchor: HTMLElement, menu: HTMLElement): CSSProperties {
   const left = rect.left + width + MENU_GAP > window.innerWidth
     ? Math.max(MENU_GAP, rect.right - width)
     : rect.left
-  return { top: rect.bottom + MENU_GAP, left }
+  const height = menu.offsetHeight
+  const viewport = window.visualViewport
+  const bottom = viewport == null ? window.innerHeight : viewport.offsetTop + viewport.height
+  const top = Math.max(viewport?.offsetTop ?? MENU_GAP, Math.min(rect.bottom + MENU_GAP, bottom - height - MENU_GAP))
+  return { top, left: Math.max(MENU_GAP, Math.min(left, window.innerWidth - width - MENU_GAP)) }
 }
 
 /** The actions menu body, anchored to the control that opened it. */
 export function TabMenu({ labels, anchor, onClose, onDismiss, extras }: TabMenuProps): ReactNode {
   const self = useRef<HTMLDivElement | null>(null)
   const [position, setPosition] = useState<CSSProperties | undefined>(undefined)
+  const dismiss = useRef(onDismiss)
+  dismiss.current = onDismiss
   const hasItems = onClose !== undefined || Children.toArray(extras).some(item => item !== '')
 
   useLayoutEffect(() => {
-    if (self.current === null) return
-    setPosition(placeMenu(anchor, self.current))
+    const menu = self.current
+    if (menu === null) return
+    const place = (): void => { setPosition(placeMenu(anchor, menu)) }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    window.visualViewport?.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+      window.visualViewport?.removeEventListener('resize', place)
+    }
   }, [anchor, hasItems])
 
   useEffect(() => {
@@ -67,23 +80,41 @@ export function TabMenu({ labels, anchor, onClose, onDismiss, extras }: TabMenuP
     if (menu === null) return undefined
     const document = menu.ownerDocument
     const composition = observeComposition(document)
+    const items = (): HTMLElement[] => [...menu.querySelectorAll<HTMLElement>('[role^="menuitem"]:not(:disabled):not([aria-disabled="true"])')]
+    focusWithoutRing(items()[0] ?? menu)
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (composition.guards(event) || event.defaultPrevented || event.key !== 'Escape'
-        || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return
+      if (composition.guards(event) || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) return
       const top = [...document.querySelectorAll(modalSelector)].at(-1)
       if (top !== menu) return
+      if (event.key === 'Tab') {
+        dismiss.current()
+        anchor.focus({ preventScroll: true })
+        return
+      }
+      if (event.shiftKey) return
+      const rows = items()
+      const index = rows.findIndex(item => item === document.activeElement)
+      const target = event.key === 'Home' ? rows[0] : event.key === 'End' ? rows.at(-1)
+        : event.key === 'ArrowDown' ? rows[(index + 1) % rows.length]
+          : event.key === 'ArrowUp' ? rows[(index - 1 + rows.length) % rows.length] : undefined
+      if (target !== undefined) {
+        event.preventDefault()
+        target.focus()
+        return
+      }
+      if (event.key !== 'Escape') return
       event.preventDefault()
       if (event.repeat) return
       const restoreFocus = menu.contains(document.activeElement)
-      onDismiss()
+      dismiss.current()
       if (restoreFocus) focusWithoutRing(anchor)
     }
     document.addEventListener('keydown', onKeyDown, true)
     // A press anywhere but inside the menu dismisses it; one with no element
     // target (dispatched to the window itself) counts as outside.
     const onPointerDown = (event: PointerEvent): void => {
-      if (event.target instanceof Node && menu.contains(event.target)) return
-      onDismiss()
+      if (event.target instanceof Node && (menu.contains(event.target) || anchor.contains(event.target))) return
+      dismiss.current()
     }
     // Capture phase: a press on a tab chip starts a drag on its own handler,
     // so the menu must be gone before that handler runs.
@@ -93,7 +124,7 @@ export function TabMenu({ labels, anchor, onClose, onDismiss, extras }: TabMenuP
       document.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('pointerdown', onPointerDown, true)
     }
-  }, [anchor, onDismiss, hasItems])
+  }, [anchor, hasItems])
 
   if (!hasItems) return null
   return createPortal(
@@ -101,6 +132,7 @@ export function TabMenu({ labels, anchor, onClose, onDismiss, extras }: TabMenuP
       className={css.menu}
       ref={self}
       role="menu"
+      tabIndex={-1}
       data-dockkit-tab-menu
       // Unplaced for one layout pass: measured, then positioned.
       style={position ?? { visibility: 'hidden', top: 0, left: 0 }}

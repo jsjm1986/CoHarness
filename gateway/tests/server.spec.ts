@@ -1,7 +1,11 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
+import { RESOURCE_INGRESS_TIMING_HEADER } from '@deepseek-ai/dsh-resource-budget/wire'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
+import { Pool } from 'pg'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { AuditService } from '../src/audit.ts'
@@ -20,10 +24,16 @@ import { GatewayPerformanceObserver } from '../src/performance-observer.ts'
 import { RuntimeCapacityError } from '../src/runtime-capacity.ts'
 import { RuntimeAccountError } from '../src/launcher.ts'
 import { PostgresCheckoutQueueFullError } from '../src/postgres/database.ts'
+import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
+import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import { MAX_PASSWORD_LENGTH } from '../src/password.ts'
 import type { AccessInvalidationSubject } from '../src/access-invalidation.ts'
 import { GatewayRuntimeRouter, LocalRuntimeAdapter } from '../src/runtime-router.ts'
 import type { RuntimeCatalogEntry, RuntimeId, RuntimeNodeId } from '../src/runtime-catalog.ts'
+import { RuntimeCatalogError } from '../src/runtime-catalog.ts'
+import { DeploymentTopologyError } from '../src/deployment-topology.ts'
+import { NodeServiceResponseUnknownError } from '../src/node-service-proxy.ts'
+import { NodeServiceError } from '../src/node-service-stream.ts'
 
 const conversationEnvironment: RuntimeCatalogEntry = {
   id: '10111111-1111-4111-8111-111111111111' as RuntimeId, owner: { kind: 'project', id: 7, name: 'Shared' },
@@ -135,6 +145,72 @@ async function login(base: string, username: string, password: string): Promise<
   const cookie = response.headers.get('set-cookie') ?? ''
   return cookie.split(';')[0] ?? ''
 }
+
+it('tries exact personal event admission before general routing and refuses a mismatched document owner', async () => {
+  const runtimeId = randomUUID() as RuntimeId
+  const nodeId = randomUUID() as RuntimeNodeId
+  const readyEvent = vi.fn<NonNullable<GatewayHandlers['readyEvent']>>(async (_req, socket) => {
+    socket.destroy()
+    return true
+  })
+  const upgrade = vi.fn<NonNullable<GatewayHandlers['upgrade']>>()
+  const { deps, base } = await setup({}, { readyEvent, upgrade }, undefined, conversationEnvironment)
+  const cookie = await login(base, 'root-admin', 'pw-12345678')
+  const route = vi.fn(async () => false)
+  const resolve = vi.spyOn(deps.runtimeRouter!, 'resolve')
+  deps.nodeServiceIdentity = { nodeId, organizationId: randomUUID(), authorize: async () => { throw new Error('Unexpected node request') } }
+  deps.nodeServiceProxy = { http: vi.fn(), upgrade: route }
+
+  const connect = async (expected: number): Promise<void> => {
+    const url = new URL('/api/events.mux', base.replace('http:', 'ws:'))
+    url.search = new URLSearchParams({ dshRuntime: runtimeId, dshTarget: 'personal', dshNode: nodeId, dshPrincipal: String(expected) }).toString()
+    const stream = new WebSocket(url, { headers: { cookie, origin: base } })
+    try { await once(stream, 'error', { signal: AbortSignal.timeout(5000) }) }
+    finally { stream.terminate() }
+  }
+  await connect(2)
+  expect(readyEvent).not.toHaveBeenCalled()
+  await connect(1)
+  expect(readyEvent).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.anything(), expect.anything(),
+    expect.objectContaining({ actor: expect.objectContaining({ id: 1 }), runtimeId, nodeId }))
+  expect(route).not.toHaveBeenCalled()
+  expect(resolve).not.toHaveBeenCalled()
+  expect(upgrade).not.toHaveBeenCalled()
+})
+
+it('reads the entry directory for an offline bootstrap without contacting its computer and rejects mismatched authority', async () => {
+  const { deps, base } = await setup({}, {}, undefined, conversationEnvironment)
+  const cookie = await login(base, 'root-admin', 'pw-12345678')
+  const environment = { ...conversationEnvironment, node: { ...conversationEnvironment.node, status: 'offline' as const } }
+  const placement = vi.spyOn(deps.runtimeRouter!, 'placement').mockResolvedValue({ environment, local: false, target: 'project:7', resetScope: false })
+  const resolve = vi.spyOn(deps.runtimeRouter!, 'resolve')
+  const start = vi.spyOn(deps.instances, 'ensureRunning')
+  const forward = vi.fn<NonNullable<GatewayDeps['nodeServiceProxy']>['http']>(async () => { throw new Error('Offline bootstrap must not be contacted') })
+  deps.nodeServiceProxy = { http: forward, upgrade: async () => false }
+  installProjectCollaboration(deps)
+  const members = [{ projectId: 7, name: '#7', path: '', mode: 'rw' as const, metadataOnNode: true as const,
+    nodeId: environment.node.id, nodeName: environment.node.name }]
+  const projects = vi.spyOn(deps.collaboration!, 'projectsForUser').mockResolvedValue(members)
+  const assertNode = vi.fn(async () => {})
+  deps.topology = { assertNode, read: vi.fn(), adminRead: vi.fn(), save: vi.fn(), preflight: vi.fn(), candidates: vi.fn() }
+  const path = `/account/api/workbench/context?dshRuntime=${environment.id}&dshTarget=project:7&dshNode=${environment.node.id}`
+  const response = await fetch(base + path, { headers: { cookie, 'x-dsh-expected-principal-id': '1' } })
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ user: { id: 1 }, environment: { id: environment.id, nodeId: environment.node.id }, projects: members })
+  expect(assertNode).toHaveBeenCalledWith(environment.node.id)
+  expect(placement).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), { runtimeId: environment.id, target: 'project:7', scopeCookie: undefined })
+  expect(forward).not.toHaveBeenCalled(); expect(resolve).not.toHaveBeenCalled(); expect(start).not.toHaveBeenCalled()
+  for (const query of ['', '?dshRuntime=invalid&dshTarget=personal', `?dshRuntime=${environment.id}&dshTarget=project:7&dshNode=${environment.id}`]) {
+    expect((await fetch(`${base}/account/api/workbench/context${query}`, { headers: { cookie } })).status).toBe(400)
+  }
+  const count = projects.mock.calls.length
+  assertNode.mockRejectedValueOnce(new DeploymentTopologyError(403, 'deployment/remote-disabled'))
+  expect((await fetch(base + path, { headers: { cookie } })).status).toBe(403)
+  placement.mockRejectedValueOnce(new RuntimeCatalogError(403, 'runtime-catalog/forbidden'))
+  expect((await fetch(base + path, { headers: { cookie } })).status).toBe(403)
+  expect(projects).toHaveBeenCalledTimes(count)
+  expect((await fetch(base + path, { headers: { cookie, 'x-dsh-expected-principal-id': '2' } })).status).toBe(409)
+})
 
 it('answers the browser fallback icon without resolving, starting or forwarding a Runtime', async () => {
   const proxy = vi.fn<NonNullable<GatewayHandlers['proxy']>>()
@@ -298,6 +374,22 @@ describe('gateway server', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
+  it.each([false,true])('uses authenticated draft storage without weakening legacy Session checks (authenticated=%s)',async(authenticated)=>{
+    const environment={...conversationEnvironment,owner:{kind:'project' as const,id:1,name:'Shared'}}
+    const apply=vi.fn().mockReturnValue({status:200,value:{revision:0,text:''}})
+    const applyAuthenticated=authenticated?vi.fn().mockResolvedValue({status:200,value:{revision:0,text:''}}):undefined
+    const {deps,base}=await setup({}, {nodeDrafts:{apply,...applyAuthenticated?{applyAuthenticated}:{}}},undefined,environment)
+    await deps.projects.create({name:'Shared',createdBy:1});installProjectCollaboration(deps)
+    const access=vi.spyOn(deps.collaboration!,'access').mockRejectedValue(new CollaborationDeniedError('conversation-not-found'))
+    deps.nodeServiceIdentity={organizationId:'org',nodeId:environment.node.id,authorize:async()=>{throw new Error('Unexpected handoff')}}
+    const cookie=await login(base,'root-admin','pw-12345678')
+    const response=await fetch(base+'/account/api/drafts/'+randomUUID()+'?'+new URLSearchParams({dshRuntime:environment.id,dshTarget:'project:1',sessionId:'reserved-session'}),{headers:{cookie}})
+    await response.arrayBuffer();expect(response.status).toBe(authenticated?200:404)
+    expect(access).toHaveBeenCalledTimes(authenticated?0:1)
+    expect(apply).not.toHaveBeenCalled()
+    if(applyAuthenticated)expect(applyAuthenticated).toHaveBeenCalledWith(expect.objectContaining({sessionId:'reserved-session',runtimeId:environment.id,userId:1}),{kind:'read'},expect.any(Buffer))
+  })
+
   it.each([
     ['personal', 'zh'], ['personal', 'en'], ['project', 'zh'], ['project', 'en'],
   ] as const)('keeps the %s selection in the %s HTML start failure without changing another tab scope', async (kind, language) => {
@@ -348,6 +440,90 @@ describe('gateway server', () => {
     expect(ensure).toHaveBeenCalledTimes(1)
     expect(ensure.mock.calls[0]?.[0]).toMatchObject({ runtimeId: environment.id })
   })
+
+  it.each(['personal', 'project'] as const)('observes an uncertain remote %s start without replaying it or changing another tab', async kind => {
+    const environment: RuntimeCatalogEntry = { ...conversationEnvironment, node: { ...conversationEnvironment.node },
+      owner: kind === 'personal' ? { kind, id: 1, name: 'root-admin' } : { kind, id: 7, name: 'Shared' } }
+    const { base, deps } = await setup({}, {}, undefined, environment)
+    environment.node.id = '71f22202-1c02-4a3c-8d34-f11222333444' as RuntimeNodeId
+    const ensure = vi.spyOn(deps.instances, 'ensureRunning')
+    deps.runtimeCatalog = { pageForAccount: async () => ({ items: [environment], nextCursor: null }),
+      pageForAdministrator: async () => ({ items: [environment], nextCursor: null }), resolveForAccount: async () => environment }
+    const http = vi.fn().mockImplementation(async (_req, _res, _user, parsed) => {
+      expect(parsed).toMatchObject({ runtimeId: environment.id, body: expect.stringContaining(`kind=${kind}`) })
+      expect(new URL(_req.url, base).searchParams.get('dshNode')).toBe(environment.node.id)
+      expect(new URL(_req.url, base).searchParams.get('dshTarget')).toBe(kind === 'personal' ? 'personal' : 'project:7')
+      environment.observedState = 'starting'
+      throw new NodeServiceResponseUnknownError(new NodeServiceError(504, 'node-service/timeout'))
+    })
+    deps.nodeServiceProxy = { http, upgrade: vi.fn() }
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const post = await fetch(`${base}/account/runtime/start?dshRuntime=${environment.id}`, { method: 'POST', redirect: 'manual',
+      headers: { cookie: `${cookie}; hgw_scope=project:999`, origin: base, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ kind, ...(kind === 'project' ? { projectId: '7' } : {}) }) })
+    expect(post.status).toBe(303)
+    expect(post.headers.get('set-cookie')).toBeNull()
+    const location = post.headers.get('location')!
+    expect(location.startsWith('/account/runtime/wait?observation=')).toBe(true)
+    const wait = await fetch(base + location, { headers: { cookie }, redirect: 'manual' })
+    expect(wait.status).toBe(200)
+    expect(wait.headers.get('cache-control')).toBe('no-store')
+    const body = await wait.text()
+    expect(body).toContain('正在确认工作台状态')
+    expect(body).toContain('http-equiv="refresh"')
+    expect(body).not.toContain('<form')
+    environment.observedState = 'ready'
+    const ready = await fetch(base + location, { headers: { cookie }, redirect: 'manual' })
+    expect(ready.status).toBe(302)
+    const destination = new URL(ready.headers.get('location')!, base)
+    expect(Object.fromEntries(destination.searchParams)).toEqual({ dshRuntime: environment.id, dshNode: environment.node.id,
+      dshTarget: kind === 'personal' ? 'personal' : 'project:7' })
+    expect(ready.headers.get('set-cookie')).toBeNull()
+    environment.observedState = 'stopped'
+    const stopped = await fetch(base + location, { headers: { cookie } })
+    expect(stopped.status).toBe(409)
+    expect(await stopped.text()).not.toContain('http-equiv="refresh"')
+    environment.node.id = '81f22202-1c02-4a3c-8d34-f11222333444' as RuntimeNodeId
+    const moved = await fetch(base + location, { headers: { cookie } })
+    expect(moved.status).toBe(409)
+    expect(await moved.text()).not.toContain('<form')
+    expect(http).toHaveBeenCalledTimes(1)
+    expect(ensure).not.toHaveBeenCalled()
+    vi.spyOn(deps.runtimeCatalog, 'pageForAccount').mockResolvedValueOnce({ items: [], nextCursor: null })
+    const denied = await fetch(base + location, { headers: { cookie } })
+    expect(denied.status).toBe(403)
+    expect(await denied.text()).not.toContain('http-equiv="refresh"')
+    const altered = await fetch(base + location + '&dshRuntime=' + environment.id, { headers: { cookie } })
+    expect(altered.status).toBe(400)
+    environment.node.id = '71f22202-1c02-4a3c-8d34-f11222333444' as RuntimeNodeId
+    const originalNow = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(originalNow + deps.cfg.readinessTimeoutMs + deps.cfg.runtimeCapacity.maxQueueWaitMs + 1)
+    try {
+      const expired = await fetch(base + location, { headers: { cookie } })
+      expect(expired.status).toBe(504)
+      const page = await expired.text()
+      expect(page).toContain('后台启动可能仍在继续')
+      expect(page).not.toContain('http-equiv="refresh"')
+      expect(page).not.toContain('<form')
+    } finally { clock.mockRestore() }
+    expect(http).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['node-service/busy', 'node-service/unavailable', 'node-service/cancelled', 'node-service/mismatch'] as const)(
+    'does not observe a definite remote %s failure', async code => {
+      const environment: RuntimeCatalogEntry = { ...conversationEnvironment, node: { ...conversationEnvironment.node },
+        owner: { kind: 'personal', id: 1, name: 'root-admin' } }
+      const { base, deps } = await setup({}, {}, undefined, environment)
+      environment.node.id = '71f22202-1c02-4a3c-8d34-f11222333444' as RuntimeNodeId
+      const http = vi.fn().mockRejectedValue(new NodeServiceError(code === 'node-service/cancelled' || code === 'node-service/mismatch' ? 409 : 503, code))
+      deps.nodeServiceProxy = { http, upgrade: vi.fn() }
+      const cookie = await login(base, 'root-admin', 'pw-12345678')
+      const response = await fetch(`${base}/account/runtime/start?dshRuntime=${environment.id}`, { method: 'POST', redirect: 'manual',
+        headers: { cookie, origin: base, 'content-type': 'application/x-www-form-urlencoded' }, body: 'kind=personal' })
+      expect(response.status).toBe(code === 'node-service/cancelled' || code === 'node-service/mismatch' ? 409 : 503)
+      expect(response.headers.get('location')).toBeNull()
+      expect(http).toHaveBeenCalledTimes(1)
+    })
 
   it.each(['html', 'api'] as const)('preserves %s startup refusal during maintenance without starting a Runtime', async presentation => {
     const { base, deps } = await setup()
@@ -892,6 +1068,75 @@ describe('gateway server', () => {
     expect(runtime).not.toHaveBeenCalled()
   })
 
+  it.each(['renewal', 'completion'] as const)('reports unavailable %s authentication before buffering the body', async route => {
+    const pathname = route === 'renewal' ? '/internal/runtime/stream-principals/renew' : '/internal/runtime/resources/finish'
+    const authorize = vi.fn(async () => { throw new Error('Database connection unavailable') })
+    const runtime = vi.fn(async () => true)
+    const { base } = await setup({ HGW_RUNTIME_API_BODY_LIMIT_BYTES: '16' }, { runtimeAuthorize: authorize, runtime })
+    const response = await fetch(base + pathname, { method: 'POST', body: 'x'.repeat(17) })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'runtime-authorization-unavailable' })
+    expect(runtime).not.toHaveBeenCalled()
+  })
+
+  it('accepts authenticated resource completion under the matching write epoch during maintenance', async () => {
+    const completionGate = vi.fn<NonNullable<GatewayHandlers['runtimeResourceCompletionWriteGate']>>()
+      .mockResolvedValue('open')
+    const runtime = vi.fn<GatewayRuntimeHandler>(async (_req, res) => {
+      res.writeHead(200)
+      res.end('{}')
+      return true
+    })
+    const { base, deps } = await setup({}, {
+      runtime,
+      runtimeResourceCompletionWriteGate: completionGate,
+      runtimeAuthorize: req => req.headers.authorization === 'Bearer fixture'
+        ? { organizationId: 'org', target: { kind: 'project', id: 7 }, generation: 1 } : false,
+    })
+    deps.maintenanceGate = async () => 'maintenance'
+    const request = (route: string, bearer = 'fixture') => fetch(`${base}/internal/runtime/${route}`, {
+      method: 'POST', headers: { authorization: `Bearer ${bearer}` }, body: '{}',
+    })
+    expect((await request('resources/finish', 'unverified')).status).toBe(401)
+    expect((await request('resources/request')).status).toBe(503)
+    expect((await request('session/append')).status).toBe(503)
+    expect(completionGate).not.toHaveBeenCalled()
+    expect((await request('resources/finish')).status).toBe(200)
+    completionGate.mockResolvedValue('stale-epoch')
+    const stale = await request('resources/finish')
+    expect(stale.status).toBe(503)
+    expect(await stale.json()).toEqual({ error: 'stale-epoch' })
+    expect(completionGate).toHaveBeenCalledTimes(2)
+    expect(runtime).toHaveBeenCalledOnce()
+  })
+
+  it('reports resource ingress timings after the same bearer and maintenance checks', async () => {
+    const runtime = vi.fn<GatewayRuntimeHandler>(async (_req, res) => { res.writeHead(200); res.end('{}'); return true })
+    const { base, deps } = await setup({ HGW_PERFORMANCE_ENABLED: 'true' }, {
+      runtime,
+      runtimeAuthorize: async req => req.headers.authorization === 'Bearer fixture',
+    })
+    const gate = vi.fn<NonNullable<GatewayDeps['maintenanceGate']>>().mockResolvedValue('open')
+    deps.maintenanceGate = gate
+    const path = `${base}/internal/runtime/resources/request`
+    const request = (token: string) => fetch(path, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: '{}' })
+    const accepted = await request('fixture')
+    expect(accepted.status).toBe(200)
+    await accepted.text()
+    expect(JSON.parse(accepted.headers.get(RESOURCE_INGRESS_TIMING_HEADER) ?? 'null')).toEqual([expect.any(Number), expect.any(Number)])
+    const denied = await request('invalid')
+    expect(denied.status).toBe(401)
+    expect(denied.headers.has(RESOURCE_INGRESS_TIMING_HEADER)).toBe(false)
+    await denied.text()
+    gate.mockResolvedValue('maintenance')
+    const blocked = await request('fixture')
+    expect(blocked.status).toBe(503)
+    expect(blocked.headers.has(RESOURCE_INGRESS_TIMING_HEADER)).toBe(false)
+    await blocked.text()
+    expect(runtime).toHaveBeenCalledTimes(1)
+    expect(gate).toHaveBeenCalledTimes(2)
+  })
+
   it('logs in, enforces csrf origin, logs out', async () => {
     const { base } = await setup()
     const cookie = await login(base, 'root-admin', 'pw-12345678')
@@ -913,13 +1158,8 @@ describe('gateway server', () => {
 
   it('registers and removes push devices only through an authenticated same-origin request', async () => {
     const { deps, base } = await setup()
-    const registerDevice = vi.fn(async (userId: number, input: {
-      token: string
-      platform: 'android'
-      provider?: 'fcm' | 'jpush'
-      deviceId?: string
-      appVersion?: string
-    }) => {
+    type PushService = NonNullable<GatewayDeps['push']>
+    const registerDevice = vi.fn<PushService['registerDevice']>(async (userId, input) => {
       expect(userId).toBe(1)
       return { id: `device-${input.token}` }
     })
@@ -1411,7 +1651,47 @@ describe('gateway server', () => {
     expect(proxy).toHaveBeenCalledOnce()
   })
 
-  it('uses authorized remote project owner metadata without reading details on the entry computer', async () => {
+  it('reads account context for remote projects in one current directory query', async () => {
+    const { deps, base } = await setup()
+    const node = randomUUID() as RuntimeNodeId
+    const projects = Array.from({ length: 8 }, (_, index) => ({
+      public_id: String(index + 1), name: 'private project', path: '/private/project',
+      content: { projectId: String(index + 1) }, access_mode: 'ro', administrator: false,
+      can_manage: false, ui_theme_policy: 'dark', kind: 'standard', node_id: randomUUID(),
+      node_name: `computer-${index + 1}`, origin: 'user', owner: { id: '2', username: 'owner', displayName: 'Owner' },
+    }))
+    let visible = projects
+    const query = vi.fn(async (sql: string) => ({
+      rows: sql.includes('FROM harness.users actor') ? visible : [],
+    }))
+    const pool = Object.assign(new Pool(), { query })
+    const context = { pool, organizationId: randomUUID(), organizationSlug: 'org', nodeId: node, nodeName: 'entry' }
+    deps.collaboration = new PostgresCollaborationService(context, node)
+    deps.projects = new PostgresProjectService(context, deps.cfg)
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const read = async () => {
+      const response = await fetch(`${base}/account/api/context`, { headers: { cookie, 'accept-encoding': 'br' } })
+      expect(response.status).toBe(200)
+      expect(response.headers.get('cache-control')).toBe('no-store')
+      if (visible.length > 0) expect(response.headers.get('content-encoding')).toBe('br')
+      return (await response.json() as { projects: unknown[] }).projects
+    }
+    try {
+      const scopes = await read()
+      expect(query).toHaveBeenCalledTimes(1)
+      expect(scopes).toHaveLength(8)
+      expect(scopes[0]).toEqual({
+        projectId: 1, name: '#1', path: '', metadataOnNode: true, mode: 'ro',
+        nodeId: projects[0]!.node_id, nodeName: 'computer-1', kind: 'standard', origin: 'user',
+        owner: { id: 2, username: 'owner', displayName: 'Owner' }, uiThemePolicy: 'dark',
+      })
+      visible = []
+      await expect(read()).resolves.toEqual([])
+      expect(query).toHaveBeenCalledTimes(2)
+    } finally { await pool.end() }
+  })
+
+  it('uses authorized remote project owner metadata from a legacy scope directory', async () => {
     const { deps, base } = await setup()
     installProjectCollaboration(deps)
     deps.collaboration!.projectsForUser = async () => [{ projectId: 991, name: 'Remote project', path: '/remote/project', mode: 'rw',

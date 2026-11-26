@@ -3,7 +3,7 @@ import { enableFixtureTopology } from './fixtures/topology-fixture.mjs'
 import { spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { createServer, type ServerResponse } from 'node:http'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -122,6 +122,160 @@ describePg('PostgreSQL outbound node access', () => {
     })
     return { ...f, deps, base, server, login, adminRequest, nodeRequest, starts: () => starts }
   }
+
+  async function removalFixture() {
+    const f = await httpFixture()
+    await pool.query('INSERT INTO harness.cluster_control(organization_id) VALUES($1) ON CONFLICT DO NOTHING', [f.organizationId])
+    return f
+  }
+
+  it('removes a detached unbound computer once and retains the audit, local files and spent request identity', async () => {
+    const f = await removalFixture(), ticket = await f.issue('111')
+    const deviceFile = join(f.root, 'independent-file.txt')
+    await writeFile(deviceFile, 'independent content')
+    const detached = await f.nodes.mutate(f.admin, ticket.nodeId, { action: 'detach', revision: ticket.revision })
+    const path = `access/${ticket.nodeId}/removal`
+    const preview = await f.adminRequest(path)
+    expect(preview.status).toBe(200)
+    expect(await preview.json()).toEqual({ nodeId: ticket.nodeId, revision: detached.revision, blockers: [] })
+    const refused = await f.adminRequest(path, { revision: detached.revision }, await f.login('member'))
+    expect(refused.status).toBe(403)
+    await refused.arrayBuffer()
+    const stale = await f.adminRequest(path, { revision: ticket.revision })
+    expect(stale.status).toBe(409)
+    expect(await stale.json()).toMatchObject({ error: 'node-access/revision-conflict' })
+    await new PostgresAuditService(f.context).write({ userId: f.admin.id, action: 'admin.computer.preexisting', detail: ticket.nodeId })
+    const a = await f.adminRequest(path, { revision: detached.revision })
+    expect(a.status).toBe(200)
+    expect(await a.json()).toMatchObject({ nodeId: ticket.nodeId, revision: detached.revision + 1, status: 'removed' })
+    expect((await f.nodes.list(f.admin, {})).items).toEqual([])
+    expect((await pool.query('SELECT FROM harness.compute_nodes WHERE id=$1', [ticket.nodeId])).rowCount).toBe(0)
+    expect((await pool.query('SELECT node_id FROM harness.node_agent_enrollments WHERE id=$1', [ticket.enrollmentId])).rows)
+      .toEqual([{ node_id: null }])
+    await expect(f.nodes.enroll(ticket.token, enrollment(credential()))).rejects.toMatchObject({ status: 401 })
+    await expect(f.nodes.issue(f.admin, { name: '111', requestId: ticket.enrollmentId }))
+      .rejects.toMatchObject({ code: 'node-access/enrollment-already-issued' })
+    const gone = await f.adminRequest(path, { revision: detached.revision })
+    expect(gone.status).toBe(404)
+    await gone.arrayBuffer()
+    expect((await f.issue('111')).nodeId).not.toBe(ticket.nodeId)
+    const audit = new PostgresAuditService(f.context)
+    const removed = await audit.query({ action: 'admin.deployment.nodes.remove' })
+    expect(removed).toHaveLength(1)
+    expect(removed[0]).toMatchObject({ userId: f.admin.id, outcome: 'success', status: 200 })
+    expect(JSON.parse(removed[0]!.detail)).toEqual({ nodeId: ticket.nodeId, name: '111', revision: detached.revision + 1 })
+    expect(await audit.query({ action: 'admin.computer.preexisting' })).toHaveLength(1)
+    expect(await readFile(deviceFile, 'utf8')).toBe('independent content')
+    expect(f.starts()).toBe(0)
+  })
+
+  it('retains projects, stopped Runtimes, peer backups and cascading permissions when a detached computer remains bound', async () => {
+    const f = await removalFixture(), ticket = await f.issue('bound-worker')
+    const detached = await f.nodes.mutate(f.admin, ticket.nodeId, { action: 'detach', revision: ticket.revision })
+    const userId = (await pool.query<{ id: string }>('SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2',
+      [f.organizationId, f.admin.id])).rows[0]!.id
+    const projectId = (await pool.query<{ id: string }>('INSERT INTO harness.projects(organization_id,name) VALUES($1,$2) RETURNING id',
+      [f.organizationId, 'removal fixture project'])).rows[0]!.id
+    await pool.query(`INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path)
+      VALUES($1,$2,$3,'/fixture/working','/fixture/working')`, [f.organizationId, projectId, ticket.nodeId])
+    await pool.query(`INSERT INTO harness.node_user_accounts(organization_id,node_id,user_id,home_path)
+      VALUES($1,$2,$3,$4)`, [f.organizationId, ticket.nodeId, userId, join(f.root, 'bound-user')])
+    await pool.query(`INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port)
+      VALUES($1,$2,$3,51390)`, [f.organizationId, userId, ticket.nodeId])
+    await pool.query(`INSERT INTO harness.computer_use_permissions(organization_id,node_id,user_id,enabled)
+      VALUES($1,$2,$3,true)`, [f.organizationId, ticket.nodeId, userId])
+    await pool.query(`INSERT INTO harness.peer_backup_policies(id,organization_id,scope_kind,scope_id,source_node_id,target_node_id,
+      tier,enabled,revision,quota_bytes,append_hash,recovery_hash)
+      VALUES(gen_random_uuid(),$1,'project',$2,$3,$4,'ordinary',true,1,1024,repeat('a',64),repeat('b',64))`,
+    [f.organizationId, projectId, f.context.nodeId, ticket.nodeId])
+    const path = `access/${ticket.nodeId}/removal`
+    const response = await f.adminRequest(path)
+    expect(response.status).toBe(200)
+    const assessment = await response.json()
+    expect(assessment).toEqual({ nodeId: ticket.nodeId, revision: detached.revision, blockers: expect.arrayContaining([
+      'node-access/removal-projects', 'node-access/removal-runtimes', 'node-access/removal-backups', 'node-access/removal-other-bindings',
+    ]) })
+    const refused = await f.adminRequest(path, { revision: detached.revision })
+    expect(refused.status).toBe(409)
+    await refused.arrayBuffer()
+    const counts = await pool.query(`SELECT
+      (SELECT count(*)::int FROM harness.project_mounts WHERE node_id=$1) projects,
+      (SELECT count(*)::int FROM harness.instances WHERE assigned_node_id=$1) runtimes,
+      (SELECT count(*)::int FROM harness.peer_backup_policies WHERE target_node_id=$1) backups,
+      (SELECT count(*)::int FROM harness.computer_use_permissions WHERE node_id=$1) grants`, [ticket.nodeId])
+    expect(counts.rows).toEqual([{ projects: 1, runtimes: 1, backups: 1, grants: 1 }])
+    expect(await new PostgresAuditService(f.context).query({ action: 'admin.deployment.nodes.remove' })).toEqual([])
+  })
+
+  it('rechecks attachment and new associations after a clean preview', async () => {
+    const f = await removalFixture(), ticket = await f.issue('racing-computer')
+    expect((await f.nodes.checkRemoval(f.admin, ticket.nodeId)).blockers).toEqual([])
+    const project = (await pool.query<{ id: string }>('INSERT INTO harness.projects(organization_id,name) VALUES($1,$2) RETURNING id',
+      [f.organizationId, 'later mount'])).rows[0]!.id
+    await pool.query(`INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path)
+      VALUES($1,$2,$3,'/fixture/new','/fixture/new')`, [f.organizationId, project, ticket.nodeId])
+    await expect(f.nodes.remove(f.admin, ticket.nodeId, { revision: ticket.revision }, '127.0.0.1'))
+      .rejects.toMatchObject({ code: 'node-access/removal-projects' })
+    const live = await f.issue('connected-computer'), secret = credential()
+    await f.nodes.enroll(live.token, enrollment(secret))
+    expect((await f.nodes.checkRemoval(f.admin, live.nodeId)).blockers).toContain('node-access/removal-attached')
+    await f.nodes.connect(secret, { connectionId: randomUUID() })
+    const check = await f.nodes.checkRemoval(f.admin, live.nodeId)
+    expect(check.blockers).toContain('node-access/removal-in-use')
+    await expect(f.nodes.remove(f.admin, live.nodeId, { revision: check.revision }, '127.0.0.1'))
+      .rejects.toMatchObject({ code: 'node-access/removal-in-use' })
+  })
+
+  it('waits for a concurrent project mount and refuses to cascade it', async () => {
+    const f = await removalFixture(), ticket = await f.issue('mount-in-flight')
+    const assessment = await f.nodes.checkRemoval(f.admin, ticket.nodeId)
+    expect(assessment.blockers).toEqual([])
+    const project = (await pool.query<{ id: string }>(
+      "INSERT INTO harness.projects(organization_id,name) VALUES($1,'concurrent mount') RETURNING id", [f.organizationId],
+    )).rows[0]!.id
+    const writer = await pool.connect()
+    let removal: Promise<unknown> | undefined
+    try {
+      await writer.query('BEGIN')
+      const { pid } = (await writer.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!
+      await writer.query(`INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path)
+        VALUES($1,$2,$3,'/fixture/concurrent','/fixture/concurrent')`, [f.organizationId, project, ticket.nodeId])
+      removal = f.nodes.remove(f.admin, ticket.nodeId, { revision: assessment.revision }, '127.0.0.1').catch((error: unknown) => error)
+      await expect.poll(async () => (await pool.query('SELECT 1 FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid))',
+        [pid])).rowCount).toBe(1)
+      await writer.query('COMMIT')
+      expect(await removal).toMatchObject({ code: 'node-access/removal-projects' })
+      expect((await pool.query('SELECT FROM harness.project_mounts WHERE node_id=$1', [ticket.nodeId])).rowCount).toBe(1)
+    } finally {
+      try { await writer.query('ROLLBACK') } finally { writer.release() }
+      await removal
+    }
+  })
+
+  it('blocks an offline computer with outstanding writes or a running deployment operation', async () => {
+    const f = await removalFixture(), ticket = await f.issue('busy-offline')
+    await pool.query('UPDATE harness.compute_nodes SET inflight_writes=1 WHERE id=$1', [ticket.nodeId])
+    expect((await f.nodes.checkRemoval(f.admin, ticket.nodeId)).blockers).toEqual(['node-access/removal-in-use'])
+    await pool.query('UPDATE harness.compute_nodes SET inflight_writes=0 WHERE id=$1', [ticket.nodeId])
+    await pool.query(`INSERT INTO harness.deployment_operations(organization_id,kind,status,node_name)
+      VALUES($1,'apply','running','BUSY-OFFLINE')`, [f.organizationId])
+    await expect(f.nodes.remove(f.admin, ticket.nodeId, { revision: ticket.revision }, '127.0.0.1'))
+      .rejects.toMatchObject({ code: 'node-access/removal-in-use' })
+    expect((await f.nodes.list(f.admin, {})).items).toMatchObject([{ nodeId: ticket.nodeId }])
+  })
+
+  it('rolls back removal when the audit event cannot be written', async () => {
+    const f = await removalFixture(), ticket = await f.issue('audit-failure')
+    const audit = vi.spyOn(PostgresAuditService.prototype, 'write').mockRejectedValueOnce(new Error('isolated audit failure'))
+    try {
+      await expect(f.nodes.remove(f.admin, ticket.nodeId, { revision: ticket.revision }, '127.0.0.1'))
+        .rejects.toThrow('isolated audit failure')
+      expect(audit).toHaveBeenCalledTimes(1)
+      expect((await f.nodes.list(f.admin, {})).items).toMatchObject([{ nodeId: ticket.nodeId, revision: ticket.revision }])
+      expect((await pool.query('SELECT node_id FROM harness.node_agent_enrollments WHERE id=$1', [ticket.enrollmentId])).rows)
+        .toEqual([{ node_id: ticket.nodeId }])
+    } finally { audit.mockRestore() }
+  })
 
   it('reserves offline nodes and stores only token digests; enrollment retries bind to the same credential', async () => {
     const f = await fixture(), requestId = randomUUID()
@@ -311,9 +465,11 @@ describePg('PostgreSQL outbound node access', () => {
     const foreign = new PostgresNodeAccessService({ ...f.context, nodeId: other.nodeId }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
     await expect(foreign.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch }))
       .rejects.toMatchObject({ status: 409, code: 'node-access/mode-disabled' })
+    await expect(foreign.authorizeServiceIdentity(secret, { connectionId: lease.connectionId, epoch: lease.epoch }))
+      .rejects.toMatchObject({ status: 409, code: 'node-access/mode-disabled' })
   })
 
-  it('authorizes one current channel with one database round trip', async () => {
+  it('authorizes both a current channel and a local service with one database round trip each', async () => {
     const f = await fixture(), ticket = await f.issue(), secret = credential()
     await f.nodes.enroll(ticket.token, enrollment(secret))
     const lease = await f.nodes.connect(secret, { connectionId: randomUUID() })
@@ -324,10 +480,23 @@ describePg('PostgreSQL outbound node access', () => {
     })
     try {
       const nodes = new PostgresNodeAccessService({ ...f.context, pool: reader }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
-      await expect(nodes.authorizeChannel(secret, { connectionId: lease.connectionId, epoch: lease.epoch })).resolves.toEqual(lease)
-      const statements = queries.flatMap(query => query.mock.calls.map(([statement]) => statement))
-      expect(statements).toHaveLength(1)
-      expect(statements[0]).toContain('harness.node_channel_lease')
+      const input = { connectionId: lease.connectionId, epoch: lease.epoch }
+      const statements = () => queries.flatMap(query => query.mock.calls.map(([statement]) => statement))
+      await expect(nodes.authorizeChannel(secret, input)).resolves.toEqual(lease)
+      expect(statements()).toEqual([expect.stringContaining('harness.node_channel_lease')])
+      for (const query of queries) query.mockClear()
+
+      const local = new PostgresNodeAccessService({ ...f.context, nodeId: ticket.nodeId, pool: reader }, f.cfg.nodeAccess, f.cfg.runtimeCatalog)
+      const revision = await pool.query<{ access_revision: string }>(
+        'SELECT access_revision::text FROM harness.organizations WHERE id=$1', [f.organizationId])
+      await expect(local.authorizeServiceIdentity(secret, input)).resolves.toEqual({
+        ...lease, managedPrimary: { nodeId: f.context.nodeId, accessRevision: BigInt(revision.rows[0]!.access_revision) },
+      })
+      expect(statements()).toEqual([expect.stringContaining('harness.node_channel_lease')])
+      expect(statements()[0]).toContain('harness.deployment_topology')
+      await expect(nodes.authorizeServiceIdentity(secret, input)).resolves.toEqual(lease)
+      await expect(local.authorizeServiceIdentity(secret, { ...input, epoch: String(BigInt(lease.epoch) + 1n) }))
+        .rejects.toMatchObject({ status: 409, code: 'node-access/lease-lost' })
     } finally {
       await reader.end()
       for (const query of queries) query.mockRestore()

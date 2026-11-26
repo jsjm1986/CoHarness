@@ -1,8 +1,9 @@
 /** Input admission survives lost downlink frames and a paged history repair. */
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import { chromium, type Browser, type WebSocketRoute } from 'playwright'
+import { type Browser, type WebSocketRoute } from 'playwright'
 import { afterEach, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
@@ -36,7 +37,7 @@ it.skipIf(MODE === 'record')('unlocks accepted input when its receipt returns on
   // admission receipt lands on an older page exactly as the scenario requires.
   await writeFile(join(workspace, 'receipt-source.txt'), Array.from({ length: 60 },
     (_, i) => `receipt line ${String(i + 1)} ${'x'.repeat(7_000)}`).join('\n') + '\n')
-  browser = await chromium.launch()
+  browser = await responsiveBrowser.launch()
   const page = await newEnglishPage(browser)
   onTestFailed(() => saveFailureShot(page, 'submission-history-receipt'))
   const sockets = new Set<WebSocketRoute>()

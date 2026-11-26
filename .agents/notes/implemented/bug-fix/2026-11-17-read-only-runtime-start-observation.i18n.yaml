@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-17-read-only-runtime-start-observation.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-17-read-only-runtime-start-observation.md
+document:
+  en: 3bf1b94545ba988f3f3b4f8e5d3818ad2dcb839e
+  zh: 314b54491c1b03c00b7eb41d5588452f4ea37bf1
+/agent-note-read-only-observation-after-a-lost-runtime-start-response:
+  en: 1041e96ed7e619cb
+  zh: 17d66ad46c7932c9
+/agent-note-read-only-observation-after-a-lost-runtime-start-response/problem:
+  en: 9e0d3cff05f94981
+  zh: 7d3e4c2de171532d
+/agent-note-read-only-observation-after-a-lost-runtime-start-response/decision:
+  en: 01d4c40ea86938f6
+  zh: 90906eee39ad523d
+/agent-note-read-only-observation-after-a-lost-runtime-start-response/alternatives-considered:
+  en: 7c75d43f6393b0da
+  zh: b505000cfa92736c
+/agent-note-read-only-observation-after-a-lost-runtime-start-response/consequences:
+  en: b573714a89f869cb
+  zh: beffdb6edfda9a4c
+/agent-note-read-only-observation-after-a-lost-runtime-start-response/verification:
+  en: 6e1e5ae5059bfaa3
+  zh: 564fcf92b2cd749e

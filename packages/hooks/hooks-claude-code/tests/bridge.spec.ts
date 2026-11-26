@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { installRecoveryPolicy, recoveryHookConnection } from '@deepseek-ai/dsh-app-boot'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { provideWorkingDirectoryFixture, mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -476,4 +478,31 @@ describe('hooks-claude-code bridge — load resilience', () => {
     expect(unwrapped.inject).toEqual(['shell', 'sessionProjections', 'workingDirectory'])
     expect(typeof unwrapped.apply).toBe('function')
   })
+})
+
+/** Recovery review gates the real shell hook without blocking the new conversation. */
+it.each([false, true])('recovery hook approval=%s controls execution and configuration drift stays paused', async (approved) => {
+  const dir = writeConfig({ UserPromptSubmit: [{ hooks: [{ command: 'printf reviewed >> marker' }] }] })
+  const configPath = join(dir, 'hooks.json'), marker = join(dir, 'marker')
+  const command = `printf reviewed >> "${marker}"`
+  writeFileSync(configPath, JSON.stringify({ UserPromptSubmit: [{ hooks: [{ command }] }] }))
+  const configSha256 = createHash('sha256').update(readFileSync(configPath)).digest('hex')
+  const connection = recoveryHookConnection({ dialect: 'claude-code', configPath, point: 'UserPromptSubmit', command, configSha256 })
+  const ctx = await harness(dir, new MockAdapter([textResponse('first'), textResponse('second')]), (ctx) => {
+    installRecoveryPolicy(ctx, { version: 1, mode: 'new-conversations-only', operationId: 'operation', pointId: 'point', runtimeId: 'runtime', nodeId: 'node',
+      writerEpoch: '2', reviewRevision: '00000000-0000-4000-8000-000000000001', oldSessionIds: [], approvedItems: [], compositionDigest: 'fixture',
+      composition: { version: 1, rows: [], connections: approved ? [connection] : [] } }, () => {})
+  })
+  try {
+    const agent = await ctx.agentLoop.create(SessionId('recovery-hook'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } }))
+    await agent.whenIdle()
+    expect(existsSync(marker)).toBe(approved)
+    expect(events(agent).filter(event => event.type === 'hook/invoked')).toHaveLength(approved ? 1 : 0)
+    writeFileSync(configPath, readFileSync(configPath, 'utf8') + '\n')
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'second' }], source: { kind: 'user' } }))
+    await agent.whenIdle()
+    expect(events(agent).filter(event => event.type === 'hook/invoked')).toHaveLength(approved ? 1 : 0)
+    if (approved) expect(readFileSync(marker, 'utf8')).toBe('reviewed')
+  } finally { await ctx.fiber.dispose() }
 })

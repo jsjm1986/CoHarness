@@ -16,7 +16,7 @@ Web GUI 已经可以通过 `QuestionComposer` 的输入区接管收集回答，�
 
 输入区重设计将分页移到底部操作区旁，多选选项渲染显式复选框，单选保留编号行，并用始终可见的自定义输入行取代展开式自定义入口（无选项问题用多行文本框）。删除 `parseQuestionTitle` 的多选后缀约定；`multi_select` 已是结构化元数据，标题原样渲染。
 
-输入区界面文案实现双语：插件在 `dsh-client-locale` 的 `question` 命名空间下注册中英词典，并通过 slot inject face 向条目提供绑定命名空间的翻译器和作为 hooks compartment 来源的 locale 快照，语言切换时已挂载的输入区会重新渲染。校验反馈以词典 key 存储、切换时重新翻译；载体失败消息与所有模型撰写的问题/选项文本原样渲染。
+输入区界面文案支持双语：插件在 `dsh-client-locale` 的 `question` 命名空间下注册中英词典，并通过 slot inject face 向条目提供绑定命名空间的翻译器和作为 hooks compartment 来源的 locale 快照，语言切换时已挂载的输入区会重新渲染。校验与提交反馈使用词典 key，切换语言时重新翻译。未能确认的提交或取消显示本地化恢复提示；带有组件标识的浏览器警告保留原始原因，不附加回答草稿。模型撰写的问题与选项文本原样渲染。[定时问题传输决策](2026-10-02-timed-user-questions-mux-port.zh.md)负责说明回执、重试和结算行为。
 
 两个相邻修复随行。所有通用 toolview 前导图标（含悬停箭头）现在统一继承三级标签色 —— 删除了 others 变体的二级色覆盖和独立的箭头颜色规则，只保留有意为之的 cordis 业务主色强调。客户端 dev-watch 打包器用 `addWatchFile` 注册每个 CSS 模块，因为虚拟模块间接层此前使仅改 CSS 的编辑对 watcher 不可见。
 

@@ -4,7 +4,7 @@ import { usePendingEdits, useProtectedNavigation } from '../pending-edits.tsx'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { RuntimePicker } from '../components/RuntimePicker.tsx'
 import type { RuntimeCatalogEntry } from '../api.ts'
-import { AdminRequestError, getPluginPolicy, listProjects, listUsers, pluginManagementOverview, pluginManagementTarget, setPluginPolicy, type AdminResourcePolicy, type PluginManagementOverviewRow, type PluginManagementTarget } from '../api.ts'
+import { AdminRequestError, getPluginPolicy, listProjects, listUsers, pluginManagementTarget, setPluginPolicy, type AdminResourcePolicy, type PluginManagementTarget } from '../api.ts'
 import { ErrorBanner, Field, PageHeader, Button, LoadingState, Section, StatusBadge, Switch } from '../components/ui.tsx'
 import { adminLanguage } from '../language.ts'
 import { PluginManagerPage } from '../plugins/PluginManagerPage.tsx'
@@ -16,6 +16,7 @@ import { resolveLocalized, translatePlugin, type Translate } from '../plugins/pr
 import { ProfileSettingsController } from '../plugins/settings-store.ts'
 import { PluginConfiguration, SETTINGS_OWNER_KEYS } from '../plugins/PluginConfiguration.tsx'
 import { PluginPermissions } from '../components/PluginPermissions.tsx'
+import { SpacesInventory } from '../plugins/SpacesInventory.tsx'
 
 function Manager({ target, invalidate, composition, t }: { target: PluginManagementTarget; invalidate: (message: string) => void; composition: PluginComposition; t: Translate }) {
   const [owner, setOwner] = useState<{ controller: PluginManagerController; settings: ProfileSettingsController; abort: AbortController } | null>(null)
@@ -125,41 +126,6 @@ function LifecycleLine({ t }: { t: Translate }) {
   return <p className="muted pluginLifecycle">{t('lifecycleLine')}</p>
 }
 
-/**
- * The cross-space map: every user or project carrying a saved plugin
- * composition, its row and disabled counts, and whether its instance is
- * live. Picking a row binds the target picker below to that space.
- */
-function SpacesOverview({ t, onPick }: { readonly t: Translate; readonly onPick: (key: string) => void }) {
-  const [rows, setRows] = useState<PluginManagementOverviewRow[] | null>(null)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    let alive = true
-    void pluginManagementOverview().then(value => { if (alive) setRows(value) })
-      .catch((cause: unknown) => { if (alive) setError(cause instanceof Error ? cause.message : String(cause)) })
-    return () => { alive = false }
-  }, [])
-  if (error !== '') return <Section title={t('spacesTitle')}><ErrorBanner message={error} /></Section>
-  if (rows === null) return null
-  return <Section title={t('spacesTitle')}>
-    <p className="muted">{t('spacesHint')}</p>
-    {rows.length === 0
-      ? <p className="muted">{t('spacesEmpty')}</p>
-      : <div className="tableWrap"><table className="dataTable">
-          <thead><tr>
-            <th>{t('targetField')}</th><th>{t('spacesEntries')}</th><th>{t('spacesState')}</th><th>{t('spacesUpdated')}</th><th aria-label="actions" />
-          </tr></thead>
-          <tbody>{rows.map(row => <tr key={`${row.target.kind}:${String(row.target.id)}`}>
-            <td><strong>{row.target.label}</strong> <small className="muted">{row.target.kind === 'user' ? t('spacesKindUser') : t('spacesKindProject')}</small></td>
-            <td>{row.entries}{row.disabled === 0 ? '' : ` · ${t('spacesDisabledCount', { count: `${row.disabled}` })}`}</td>
-            <td>{row.live ? t('spaceRunning') : t('spaceStopped')}</td>
-            <td><time dateTime={row.updatedAt}>{new Date(row.updatedAt).toLocaleString()}</time></td>
-            <td><button type="button" className="tableLink" onClick={() => { onPick(`${row.target.kind}:${String(row.target.id)}`) }}><strong>{t('spacesManage')}</strong></button></td>
-          </tr>)}</tbody>
-        </table></div>}
-  </Section>
-}
-
 /** The entry-level matrix the friendly list folds away, open by default while the instance is stopped. */
 function CompositionView({ composition, open, t }: { readonly composition: PluginComposition; readonly open: boolean; readonly t: Translate }) {
   return <details className="pluginAdvanced" open={open}>
@@ -228,7 +194,7 @@ export function PluginsPage() {
   }, [ownerId, ownerKind, runtime, reload, t])
   return <div className="page">
     <PageHeader title={t('title')} description={t('pageDescription')} />
-    <SpacesOverview t={t} onPick={key => { if (!navigation.canReplace()) return; generation.current++; setBinding(null); setRuntime(undefined); setSelected(key) }} />
+    <SpacesInventory t={t} onPick={key => { if (!navigation.canReplace()) return; generation.current++; setBinding(null); setRuntime(undefined); setSelected(key) }} />
     <Section title={t('targetSection')}>
       <ErrorBanner message={error} />
       <div className="targetPicker">

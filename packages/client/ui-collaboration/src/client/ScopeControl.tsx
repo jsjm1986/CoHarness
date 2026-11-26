@@ -5,7 +5,7 @@ import {
   IconCheckOutline16, IconChevronLeftOutline14, IconChevronRightOutline14, IconCloseFill14, IconGlobeOutline14,
   IconSearchOutline16, IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16,
   IconUsersOutline16, IconWarningOutline16, IconFollowsystemOutline16,
-  Button, Menu, Modal, SegmentedTabs, Tag, useDismissOnOutsidePointer, useMediaQuery, useModalLayer, type MenuEntry,
+  Button, Menu, Modal, SegmentedTabs, Tag, holdInert, useDismissOnOutsidePointer, useMediaQuery, useModalLayer, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {
@@ -168,10 +168,9 @@ export function ScopeControl({
       const browsing = sidebar.querySelector<HTMLElement>('[data-sidebar-browsing]')
       if (browsing !== null) covered.add(browsing)
     }
-    const previous = [...covered].map(element => ({ element, inert: element.inert }))
-    for (const { element } of previous) element.inert = true
-    if (previous.some(({ element }) => element.contains(document.activeElement))) backRef.current?.focus({ preventScroll: true })
-    return () => { for (const { element, inert } of previous) element.inert = inert }
+    const restore = [...covered].map(holdInert)
+    if ([...covered].some(element => element.contains(document.activeElement))) backRef.current?.focus({ preventScroll: true })
+    return () => { for (const release of restore.reverse()) release() }
   }, [open, wide, phone])
   // The menu tracks the trigger's rendered width — the sidebar is draggable,
   // so the floating list re-measures on every layout change instead of

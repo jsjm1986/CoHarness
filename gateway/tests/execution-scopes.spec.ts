@@ -2,10 +2,10 @@
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
 import { resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
-import type { Pool } from 'pg'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { Client, type Pool } from 'pg'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
-import { verifyExecutionAttribution, type ExecutionIdentityState } from '../src/execution-identity.ts'
+import { GatewayExecutionIdentity, verifyExecutionAttribution, type ExecutionIdentityState } from '../src/execution-identity.ts'
 import { createExecutionFixture, type Receipt } from './execution-fixture.ts'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
@@ -38,18 +38,65 @@ async function fixture() {
 }
 
 describePg('current execution scopes', () => {
+  const observeClientQueries = () => vi.spyOn(Client.prototype, 'query')
+  let clientQueries: ReturnType<typeof observeClientQueries>
   beforeAll(async () => {
+    clientQueries = observeClientQueries()
     pool = createPostgresPool(databaseUrl!, { max: 10 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     await runMigrations(pool, resolve(import.meta.dirname, '../deploy/postgres/migrations'))
   })
-  afterAll(async () => { await pool?.end() })
+  afterAll(async () => {
+    await pool?.end()
+    clientQueries?.mockRestore()
+  })
+
+  it('authorizes inherited personal witnesses and checks current computer access on every dispatch', async () => {
+    const f = await createExecutionFixture(pool, { executionWriteEpoch: 1n })
+    cleanup.push(f.dispose)
+    const parent = await f.session(f.personal)
+    const parentInput = await f.admit(parent, f.admin, f.personal)
+    const parentEntry = await f.call<ExecutionIdentityState>('enter', { sessionId: parent,
+      inputId: parentInput.inputId, messageId: parentInput.messageId, contentHash: parentInput.contentHash,
+      currentScopeId: null, unverifiedHistory: false }, undefined, f.personal)
+    expect(parentEntry.status).toBe(200)
+    const parentScope = parentEntry.body
+    const child = await f.session(f.personal, parent)
+    const inherited = await f.call<ExecutionIdentityState>('inherit', { sessionId: child, parentSessionId: parent,
+      scopeId: parentScope.scopeId, inputs: parentScope.inputs, primaryActorUserId: f.admin.id, unverifiedHistory: false }, undefined, f.personal)
+    expect(inherited.status).toBe(200)
+    const childInput = await f.admit(child, f.admin, f.personal)
+    const combined = await f.call<ExecutionIdentityState>('enter', { sessionId: child,
+      inputId: childInput.inputId, messageId: childInput.messageId, contentHash: childInput.contentHash,
+      currentScopeId: inherited.body.scopeId, unverifiedHistory: false }, undefined, f.personal)
+    expect(combined.status).toBe(200)
+    expect(combined.body.inputs).toHaveLength(2)
+    const request = { sessionId: child, scopeId: combined.body.scopeId, capability: 'execute', unverifiedHistory: false }
+    expect(await f.call('authorize', request, undefined, f.personal)).toEqual({ status: 200, body: combined.body })
+    expect((await f.call('authorize', { ...request, sessionId: parent }, undefined, f.personal)).status).toBe(403)
+    expect((await f.call('authorize', request, undefined, f.peerPersonal)).status).toBe(403)
+
+    const identity = new GatewayExecutionIdentity(pool, f.context.nodeId)
+    const authenticated = (await f.instances.authenticateRuntimeToken(f.personal.token))!
+    await expect(identity.authorize(authenticated, request, { bearer: f.personal.token, epoch: 2n })).rejects.toMatchObject({ status: 503 })
+    await pool.query(`UPDATE harness.computer_use_permissions SET enabled=false
+      WHERE organization_id=$1 AND node_id=$2 AND user_id=$3`, [f.organizationId, f.context.nodeId, f.admin.uuid])
+    await expect(identity.authorize(authenticated, request, { bearer: f.personal.token, epoch: 1n })).rejects.toMatchObject({ status: 403 })
+    expect((await f.call('authorize', request, undefined, f.personal)).status).toBe(401)
+  })
 
   it('allows a new qualified initiator after an ordinary historical participant and retains both audit witnesses', async () => {
     const f = await fixture(), id = await f.session()
     const old = await f.enter(id, await f.admit(id, f.member))
     expect((await f.authorize(id, old)).status).toBe(403)
-    const current = await f.enter(id, await f.admit(id, f.admin))
+    const admitted = await f.admit(id, f.admin)
+    clientQueries.mockClear()
+    const current = await f.enter(id, admitted)
+    const statements = clientQueries.mock.calls.flatMap(([query]) => typeof query === 'string' ? [query] : [])
+    const actorLookups = statements.filter(sql => /FROM harness\.users\s+WHERE organization_id=\$1 AND id=ANY\(\$2::uuid\[\]\) ORDER BY public_id/u.test(sql))
+    const scopeLookups = statements.filter(sql => /FROM harness\.execution_scopes WHERE .*fingerprint=\$6/u.test(sql))
+    expect(actorLookups).toHaveLength(1)
+    expect(scopeLookups).toHaveLength(1)
     expect(current.actors).toEqual([{ userId: f.admin.id }])
     expect((await f.authorize(id, current)).status).toBe(200)
     expect((await f.call('selection', { sessionId: id, capability: 'auto-review' }, f.admin)).status).toBe(204)

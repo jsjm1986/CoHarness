@@ -1405,6 +1405,78 @@ describe('pending submission echoes', () => {
     expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
     expect(chatSeqs(session.getSnapshot())).toEqual([47, 48])
   })
+
+  it('repairs a fresh tail far ahead of the window as a partial history window', async () => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    api.onHistory = () => histResponse([], false)
+    await session.open()
+    expect(session.getSnapshot().hasMore).toBe(false)
+    api.onHistory = () => histResponse([ev.turnStart(20, 1), ev.assistant(21, 1, '尾部')], true)
+    await session.resync()
+    expect(chatSeqs(session.getSnapshot())).toEqual([20, 21])
+    expect(session.getSnapshot().hasMore).toBe(true)
+  })
+
+  it('walks older pages after a reconnect until a transcript receipt retires', async () => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    api.onHistory = () => histResponse([], false)
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '断线前已接受', images: [], onRetire: retired })
+    await expect(session.prompt([{ type: 'text', text: '断线前已接受' }], 'queue', undefined, handle.requestId))
+      .resolves.toMatchObject({ ok: true })
+    const tail = [ev.turnStart(20, 1), ev.assistant(21, 1, '尾部')]
+    api.onHistory = payload => payload.beforeSeq === 20
+      ? histResponse([durableUser(19, handle.requestId)], false)
+      : histResponse(tail, true)
+    await session.resync()
+    await vi.waitFor(() => { expect(retired).toHaveBeenCalledOnce() })
+    await flushSubmissionFrame()
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [] })
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(chatSeqs(session.getSnapshot())).toEqual([19, 20, 21])
+    expect(api.callsOf('session.history')).toMatchObject([{}, {}, { beforeSeq: 20 }])
+  })
+
+  it('walks older pages after first open when submission registration preceded the tail', async () => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '打开前已接受', images: [], onRetire: retired })
+    const tail = [ev.turnStart(20, 1), ev.assistant(21, 1, '尾部')]
+    api.onHistory = payload => payload.beforeSeq === 20
+      ? histResponse([durableUser(19, handle.requestId)], false)
+      : histResponse(tail, true)
+    await session.open()
+    await vi.waitFor(() => { expect(retired).toHaveBeenCalledOnce() })
+    expect(chatSeqs(session.getSnapshot())).toEqual([19, 20, 21])
+    expect(api.callsOf('session.history')).toMatchObject([{}, { beforeSeq: 20 }])
+  })
+
+  it('discards a receipt recovery walk that reaches the log head without a match', async () => {
+    const { api, session } = makeSession()
+    onTestFinished(() => { session.dispose() })
+    api.onHistory = () => histResponse([], false)
+    await session.open()
+    const retired = vi.fn()
+    const handle = session.beginSubmission({ mode: 'queue', text: '仍待录取', images: [], onRetire: retired })
+    await expect(session.prompt([{ type: 'text', text: '仍待录取' }], 'queue', undefined, handle.requestId))
+      .resolves.toMatchObject({ ok: true })
+    const tail = [ev.turnStart(20, 1), ev.assistant(21, 1, '尾部')]
+    api.onHistory = payload => payload.beforeSeq === 20
+      ? histResponse([ev.turnStart(19, 1)], false)
+      : histResponse(tail, true)
+    await session.resync()
+    await vi.waitFor(() => {
+      expect(api.callsOf('session.history')).toMatchObject([{}, {}, { beforeSeq: 20 }])
+    })
+    expect(retired).not.toHaveBeenCalled()
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+    expect(chatSeqs(session.getSnapshot())).toEqual([20, 21])
+    expect(session.getSnapshot().hasMore).toBe(true)
+  })
 })
 
 describe('pending interactions', () => {
@@ -1542,6 +1614,43 @@ describe('remaining branches', () => {
     await vi.waitFor(() => { expect(session.getSnapshot().nodes).toHaveLength(2) })
     await session.resync(false)
     expect(read).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([5, 11])('merges one prepared tail only when the resumed watermark %s is missing', async (watermark) => {
+    const initial = plainTurn(0, 0, 'first', 'reply')
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(initial)
+    await session.open()
+    session.enterStage()
+    const carrier = new AbortController()
+    const read = vi.fn(() => histResponse([...initial, ...plainTurn(6, 1, 'missed', 'recovered')]))
+    expect(session.beginMuxRecovery(4, carrier.signal, read)).toBe(false)
+    expect(session.beginMuxRecovery(watermark, carrier.signal, read)).toBe(true)
+    session.handleMuxEnvelope('resumed' as never, { type: 'session/subscribed', sessionId: SID, lastSeq: watermark })
+    await session.resync()
+    expect(read).toHaveBeenCalledTimes(watermark === 11 ? 1 : 0)
+    if (watermark === 11) expect(read).toHaveBeenCalledWith({ sessionId: SID, maxMessages: 50, detail: 'conversation' }, expect.any(AbortSignal))
+    expect(api.callsOf('session.history')).toHaveLength(1)
+    expect(session.getSnapshot().nodes.map(node => node.seq)).toEqual(watermark === 11 ? [1, 3, 7, 9] : [1, 3])
+    carrier.abort()
+    expect(session.followsResumedMux(carrier.signal)).toBe(false)
+  })
+
+  it('discards a prepared reply from a superseded Mux', async () => {
+    const initial = plainTurn(0, 0, 'first', 'reply')
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(initial)
+    await session.open()
+    session.enterStage()
+    const carrier = new AbortController()
+    const held = deferred<Awaited<ReturnType<typeof api.sessions.history>>>()
+    expect(session.beginMuxRecovery(11, carrier.signal, () => held.promise)).toBe(true)
+    session.handleMuxEnvelope('old' as never, { type: 'session/subscribed', sessionId: SID, lastSeq: 11 })
+    const resync = session.resync()
+    carrier.abort()
+    held.resolve(await histResponse([...initial, ...plainTurn(6, 1, 'aborted', 'not present')]))
+    await resync
+    expect(session.getSnapshot().nodes.map(node => node.seq)).toEqual([1, 3])
   })
 
   it('a failed second stitch pull keeps the first window and still opens', async () => {
@@ -1726,7 +1835,8 @@ describe('remaining branches', () => {
     api.onHistory = () => histResponse(plainTurn(6, 1, '中', '间'), true)
     await session.open()
     // The window is shorter than a page: the repaired tail reaches below its base and past its tail.
-    api.onHistory = () => histResponse([...plainTurn(0, 0, '更', '早'), ...plainTurn(6, 1, '中', '间'), ...plainTurn(12, 2, '缺', '口')], false)
+    api.onHistory = () => histResponse([...plainTurn(0, 0, '更', '早'), ...plainTurn(6, 1, '中', '间'),
+      ...plainTurn(12, 2, '缺', '口'), ev.turnStart(18, 3)], false)
     session.handleMuxEnvelope('gap' as never, { type: 'session/event', sessionId: SID, event: ev.user(19, '再之后') })
     await vi.waitFor(() => { expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([1, 3, 7, 9, 13, 15, 19]) })
     expect(session.getSnapshot().hasMore).toBe(false)
@@ -1736,7 +1846,7 @@ describe('remaining branches', () => {
     const { api, session } = makeSession()
     api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'), true) // the Host claimed an older prefix
     await session.open()
-    api.onHistory = () => histResponse([...plainTurn(0, 0, 'a', 'b'), ...plainTurn(6, 1, 'c', 'd')], false)
+    api.onHistory = () => histResponse([...plainTurn(0, 0, 'a', 'b'), ...plainTurn(6, 1, 'c', 'd'), ev.turnStart(12, 2)], false)
     session.handleMuxEnvelope('gap' as never, { type: 'session/event', sessionId: SID, event: ev.user(13, '后') })
     await vi.waitFor(() => { expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([1, 3, 7, 9, 13]) })
     expect(session.getSnapshot().hasMore).toBe(false)
@@ -1816,6 +1926,51 @@ describe('remaining branches', () => {
 })
 
 describe('resync', () => {
+  it('uses the pending history read when it covers the new mux watermark', async () => {
+    const original = plainTurn(0, 0, 'first question', 'first answer')
+    const nextTurn = plainTurn(6, 1, 'missed question', 'missed answer')
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(original)
+    await session.open()
+    const readStarted = deferred<undefined>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    api.onHistory = () => {
+      readStarted.resolve(undefined)
+      return history.promise
+    }
+    const reconnect = session.resync()
+    await readStarted.promise
+    session.handleMuxEnvelope('new-stream' as never, { type: 'session/subscribed', sessionId: SID, lastSeq: 11 })
+    history.resolve(await histResponse([...original, ...nextTurn]))
+    await reconnect
+    expect(api.callsOf('session.history')).toHaveLength(2)
+    expect(session.getSnapshot().nodes.map(node => node.seq)).toEqual([1, 3, 7, 9])
+  })
+
+  it('publishes a contiguous completed reply while the reconnect history read is still pending', async () => {
+    const original = plainTurn(0, 0, 'first question', 'first answer')
+    const nextTurn = plainTurn(6, 1, 'second question', 'completed reply')
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(original)
+    await session.open()
+    const readStarted = deferred<undefined>()
+    const history = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    api.onHistory = () => {
+      readStarted.resolve(undefined)
+      return history.promise
+    }
+    const reconnect = session.resync()
+    try {
+      await readStarted.promise
+      for (const event of nextTurn) session.handleMuxEnvelope('live' as never, { type: 'session/event', sessionId: SID, event })
+      expect(session.getSnapshot().nodes.map(node => node.seq)).toEqual([1, 3, 7, 9])
+    } finally {
+      history.resolve(await histResponse([...original, ...nextTurn]))
+      await reconnect
+    }
+    expect(session.getSnapshot().nodes.map(node => node.seq)).toEqual([1, 3, 7, 9])
+  })
+
   it('rebuilds the window and clears pending; cold instances no-op', async () => {
     const { api, session } = makeSession()
     api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'))

@@ -5,15 +5,20 @@
 
 /* Mirrors InputBar .root so the takeover is a content swap, not a layout jump. */
 .root {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
+  max-height: 100cqh;
   /* Sides = clearance + 16px so the card lands on the shared content width
      (input card - 32) at every viewport. */
   padding: 8px calc(var(--dsh-composer-side-clearance) + 16px) 12px;
 }
 
 .card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
   width: 100%;
   max-width: var(--dsh-chat-content-width);
@@ -48,11 +53,12 @@
 /* Tinted full-width header band. */
 .strip {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--dsw-space-2);
   padding: 10px var(--dsw-space-4);
   background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-alias-label-primary);
   font-size: 13px;
   line-height: 18px;
   transition: background-color var(--dsw-motion-duration-micro, 0.14s)
@@ -76,11 +82,10 @@
   50% { opacity: 0.45; transform: scale(0.82); }
 }
 
-/* Answered frame: the card settles — strip recolors to the recorded outcome,
-   body dims, the breathing stops. */
+/* Recorded outcomes retain readable detail text; the strip tint and dot
+   identify the decision, and the waiting animation stops. */
 .card[data-answered='allowed-once'] .strip {
   background: var(--dsw-alias-tint-success);
-  color: var(--dsw-alias-state-success-primary);
 }
 
 .card[data-answered='allowed-once'] .dot {
@@ -90,16 +95,11 @@
 
 .card[data-answered='rejected'] .strip {
   background: var(--dsw-alias-tint-error);
-  color: var(--dsw-alias-state-error-primary);
 }
 
 .card[data-answered='rejected'] .dot {
   background: var(--dsw-alias-state-error-primary);
   animation: none;
-}
-
-.card[data-answered] .body {
-  opacity: 0.6;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -108,24 +108,20 @@
   }
 }
 
-/* Scroll region: an agent's justification and its command are unbounded model
-   text (a one-line `cd` or a 40-line heredoc), and the seat sits in a
-   fixed-height column — uncapped, a long command pushed the action row past
-   the viewport and the approval could not be answered at all. The strip and
-   the action row stay outside, so the buttons are always on screen. */
+/* The whole reading region fits the conversation scrollport, including in
+   short panes where the surrounding card scrolls in normal flow. */
 .body {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   gap: 6px;
   /* border-box so the cap is the region's OUTER height: the composer's draft
      area counts its padding inside the same number, and the two seats are
      only interchangeable if they occupy the same box. */
   box-sizing: border-box;
-  max-height: var(--dsh-composer-text-max-height);
+  max-height: min(var(--dsh-composer-text-max-height), 100cqh);
   overflow-y: auto;
   padding: var(--dsw-space-3) var(--dsw-space-4) 0;
-  transition: opacity var(--dsw-motion-duration-micro, 0.14s)
-    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 /* The model's justification is the panel's message, not a footnote. */
@@ -155,8 +151,9 @@
 }
 
 .feedback {
+  flex: none;
   padding: var(--dsw-space-2) var(--dsw-space-4) 0;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-label-primary);
   font-size: 13px;
   line-height: 20px;
   overflow-wrap: anywhere;
@@ -178,6 +175,7 @@
    only the reject's danger hover is local. */
 .actionRow {
   display: flex;
+  flex: none;
   justify-content: flex-end;
   gap: var(--dsw-space-2);
   padding: 14px var(--dsw-space-4) 14px;
@@ -195,8 +193,15 @@
 
 .reject:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover-danger);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-label-primary);
   border-color: transparent;
+}
+
+/* ConversationRoot releases the sticky composer at this same container height. */
+@container (max-height: 320px) {
+  .root {
+    max-height: none;
+  }
 }
 
 :global([data-viewport='compact']) .actionRow {

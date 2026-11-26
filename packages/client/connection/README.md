@@ -23,6 +23,8 @@ Authenticated Gateway HTML supplies a versioned account ID and Runtime target to
 
 `ConnectionHandle.documentIdentity` exposes the validated account and initial Runtime for namespacing browser state. It is absent for standalone pages, fixtures and explicit transports. Derived target handles share the originating document identity; it grants no target access.
 
+An HTTP/1 document, or a document with an unknown protocol, admits up to three background requests across its Runtime targets until response headers arrive. At most two can be reads, including passive desktop status checks. Session activation and plugin manifest synchronization take precedence over queued navigation reads and catalogs. HTTP/2 and HTTP/3 issue these operations concurrently. Explicit high-priority requests, desktop status refreshes, conversation creation and send, draft operations, workbench search and workbench pagination bypass the queue. Cancellation withdraws pending requests before they contact the Gateway. The [scheduling decision](../../../.agents/notes/implemented/architecture/2026-11-22-browser-advisory-read-scheduling.md) explains the connection measurements.
+
 The fetch wrapper identifies a native request rejection as `ApiTransportError` with status `0` and code `request-unavailable`; it preserves the cause and makes no retry. This identifies failure to receive an HTTP response, not an offline diagnosis or a known server outcome. An aborted request keeps its signal reason; identity failures and response-decoding defects are not classified as network failures. See the [fetch carrier](../../host/apiproxy/README.md) for HTTP and RPC failure semantics.
 
 ## Summary
@@ -45,11 +47,15 @@ A managed tab pins its initial `dshRuntime` before connecting; the Host must con
 <a id="host-configuration"></a>
 ## Host configuration
 
-Host `rpcTimeoutMs` configures bounded browser unary RPC calls; its default remains 30000 milliseconds. The served page and its pooled Runtime connections inherit the value. Custom API carriers retain their own deadlines, and user-paced calls and event streams keep their existing lifetime. Browser generation recovery remains separately configurable through `recovery`.
+Host `rpcTimeoutMs` configures bounded browser unary RPC calls; its default remains 30000 milliseconds. The served page and its pooled Runtime connections inherit the value. Custom API carriers retain their own deadlines, and user-paced calls and event streams keep their existing lifetime. Browser generation recovery remains separately configurable through `recovery`. The target handle also exposes the configured jittered backoff for receipt recovery.
 
 `historyPageTargetBytes` accepts a positive integer and sets the target size of each complete uncompressed history RPC `server-response` JSON body in UTF-8 bytes. It defaults to 131072 bytes. Because pagination preserves complete append-origin message groups, one indivisible group may exceed the target. Fetch history responses still pack remaining `assistant/chunk` runs and round-trip optional `omittedSpans` from `detail: 'conversation'`; the [two-tier conversation history decision](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md) owns the download gears.
 
+`preparedHistoryMessages` sets an optional positive upper limit on append-origin messages in the first prepared conversation page, including the inline first page from prepared creation. The Host honors a smaller client limit. Ordinary history and pages with a cursor use the requested limit.
+
 The shared unary carrier reads successful JSON responses through a 16 MiB byte budget by default; `AbstractApiClient` and `InProcessApiClient` accept a positive override where a deployment needs a smaller limit. The bounded reader accepts an optional `AbortSignal` and cancels a response body when the caller disconnects. An over-limit response is rejected before envelope parsing.
+
+Generic RPC streams explicitly cancel their response reader when the caller aborts, including a read waiting for the next frame. Termination removes the abort listener and awaits body cancellation before releasing the reader; it preserves the original read or cancellation reason when cleanup also fails.
 
 The browser connection also exposes optional Gateway transports for account preferences and project-owned model settings. Account preference requests are same-origin, revision-fenced, and value-safe; they cover locale, appearance and six font fields, busy-Enter, transcript display, and link-opening preferences. Project model requests cover the project Provider descriptor, encrypted-credential state, endpoint discovery, and mutation responses without putting a key value in a response. A host that does not provide these routes leaves the transports absent, so callers show an explicit unavailable state instead of falling back to another account's settings.
 
@@ -65,7 +71,11 @@ The Host sends a WebSocket Ping control frame to every open downlink at `websock
 
 Each browser downlink keeps a head-indexed queue capped at 1,024 frames and 8 MiB of encoded data. A stalled consumer closes that socket and lets the connection generation reconnect instead of retaining an unbounded burst.
 
-`/api/events.mux` and `/api/events.host` each accept a WebSocket upgrade and send only the corresponding `ServerRequest` text messages to the browser; the client sends no application data over these sockets. If either socket ends, the current connection generation fails and rebuilds both streams; readiness still requires both sockets to be open and the `host.describe` HTTP call to succeed. Host teardown terminates both sockets, aborts their sources, and waits for source cleanup before returning. Ordinary network GETs to these paths return 426 with no SSE fallback; `toFetchHandler`'s SSE codec serves only the isomorphic in-process carrier.
+`/api/events.mux` and `/api/events.host` each accept a WebSocket upgrade and send only the corresponding `ServerRequest` text messages to the browser; the client sends no application data over those two event downlinks. Host plugins that need low-latency bidirectional text messaging under `/api/` register exact upgrade paths on `ctx.connection.ws.handle(path, handler, options)`, which enforces the same Host/Origin fence, authentication, `connection/request` waterfall, optional pre-upgrade `authorize` check, `maxMessageBytes` payload cap (256 KiB default, binary frames closed with `1003`), shared protocol Ping/Pong heartbeat (armed only while sockets are open), and clean disposal that aborts and drains in-flight upgrade authorizations before closing the channel. The registering plugin owns the upgrade route and its sockets, and its child plugin resolves the active Web carrier in that scope. If either event downlink ends, the current connection generation fails and rebuilds both streams; readiness still requires both event sockets to be open and the `host.describe` HTTP call to succeed. Host teardown terminates active sockets, aborts their sources, and waits for cleanup before returning. Ordinary network GETs to the event downlink paths return 426 with no SSE fallback; `toFetchHandler`'s SSE codec serves only the isomorphic in-process carrier.
+
+When the Client ends a connection generation, its WebSocket readers discard queued frames and request socket closure. A replacement can connect while the browser finishes closing the retired sockets.
+
+An authenticated browser reconnect can offer Mux frames for early conversation recovery once the Mux opens and `host.describe` confirms the previous exact Runtime and computer. The consumer accepts only frames it can apply to an existing view. Host metadata and other frames keep their normal delivery order after full connection readiness, and ending the generation aborts its recovery reads.
 
 `onFailure` preserves the original `kind` and `error`, with optional `diagnostic` metadata for the first unexpected termination: source, fixed cause, opening/connected phase, relative durations, and available WebSocket `closeCode`/`wasClean`. An ordinary stream EOF reports a fixed transport error without an HTTP status; normal Client cancellation reports no failure. The retry warning includes only this metadata, excluding URLs, query strings, close reasons, error text, payloads, and Session IDs. `clientGeneration` counts this Controller's connection attempts, not Host process generations; a close code alone does not identify a TLS, proxy, or server fault. The [carrier decision](../../../.agents/notes/implemented/architecture/2026-08-04-websocket-downlink-carrier.md) explains first-failure attribution.
 
@@ -83,6 +93,8 @@ None, as the wire consumer layer moves already-composed messages between browser
 None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **History availability follows the Host** — this carrier only transports the bounded `session.history` response; whether a deployment can read a cold log without resuming an Agent belongs to the Host persistence provider.
 - **A plain-HTTP listener exposes the bearer cookie in transit** — such a deployment cannot mark the browser cookie `Secure`, so serving the same authority over a network can leak the session cookie; configuring TLS on the Web carrier ([`dsh-host-webserver`](../../host/webserver/README.md)) marks the cookie `Secure` and confines it to TLS.

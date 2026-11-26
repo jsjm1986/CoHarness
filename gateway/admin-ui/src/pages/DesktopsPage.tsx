@@ -120,14 +120,14 @@ export function DesktopsPage() {
           <EmptyState icon={Monitor} title={t('emptyTitle')} detail={t('emptyDetail')} />
         ) : (
           <>
-            <div className="tableWrap desktopOnly">
+            <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionResources')} tabIndex={0}>
               <table className="dataTable">
                 <thead><tr><th>{t('columnNode')}</th><th>{t('columnDesktop')}</th><th>{t('labelState')}</th><th>{t('labelFencingSeq')}</th><th>{t('labelUpdated')}</th><th /></tr></thead>
                 <tbody>
                   {rows.map(row => (
                     <tr key={row.resourceKey}>
-                      <td><span className="codeText">{row.node}</span></td>
-                      <td><span className="codeText">{row.desktop}</span></td>
+                      <td className="tableTextCell"><span className="codeText">{row.node}</span></td>
+                      <td className="tableTextCell"><span className="codeText">{row.desktop}</span></td>
                       <td><ResourceState state={row.state} note={row.stateNote} /></td>
                       <td><span className="codeText">{row.fencingSeq}</span></td>
                       <td><time dateTime={new Date(row.updatedAt).toISOString()}>{formatTime(row.updatedAt)}</time></td>
@@ -167,7 +167,7 @@ export function DesktopsPage() {
                 <Button type="button" variant="danger" icon={ShieldOff} disabled={detail.resource?.state !== 'unavailable'} onClick={() => setConfirm({ kind: 'clear', resource: detail.resource! })}>{t('clearUnavailable')}</Button>
                 {detail.resource?.stateNote === null || detail.resource?.stateNote === undefined ? null : <span className="muted">{detail.resource.stateNote}</span>}
               </div>
-              <div className="tableWrap">
+              <div className="tableWrap" role="region" aria-label={t('columnHolder')} tabIndex={0}>
                 <table className="dataTable">
                   <thead><tr><th>{t('columnHolder')}</th><th>{t('columnRuntime')}</th><th>{t('labelState')}</th><th>{t('columnFencing')}</th><th>{t('columnHeartbeat')}</th><th>{t('columnAcquired')}</th><th /></tr></thead>
                   <tbody>
@@ -175,8 +175,8 @@ export function DesktopsPage() {
                       <tr><td colSpan={7}><span className="muted">{t('noGrants')}</span></td></tr>
                     ) : detail.grants.map(grant => (
                       <tr key={grant.grantId}>
-                        <td><HolderLabel holderJson={grant.holderJson} /></td>
-                        <td><RuntimeLabel holderJson={grant.holderJson} /></td>
+                        <td className="tableTextCell"><HolderLabel holderJson={grant.holderJson} /></td>
+                        <td className="tableTextCell"><RuntimeLabel holderJson={grant.holderJson} /></td>
                         <td><GrantState grant={grant} /></td>
                         <td><span className="codeText">{grant.fencing}</span></td>
                         <td><time dateTime={new Date(grant.heartbeatAt).toISOString()}>{formatTime(grant.heartbeatAt)}</time></td>
@@ -190,15 +190,15 @@ export function DesktopsPage() {
                 </table>
               </div>
               {detail.queue.length === 0 ? null : (
-                <div className="tableWrap">
+                <div className="tableWrap" role="region" aria-label={t('columnPosition')} tabIndex={0}>
                   <table className="dataTable">
                     <thead><tr><th>{t('columnPosition')}</th><th>{t('columnHolder')}</th><th>{t('columnRuntime')}</th><th>{t('labelState')}</th><th>{t('columnQueued')}</th></tr></thead>
                     <tbody>
                       {detail.queue.map(entry => (
                         <tr key={entry.queueId}>
                           <td><span className="codeText">{entry.position}</span></td>
-                          <td><HolderLabel holderJson={entry.holderJson} /></td>
-                          <td><RuntimeLabel holderJson={entry.holderJson} /></td>
+                          <td className="tableTextCell"><HolderLabel holderJson={entry.holderJson} /></td>
+                          <td className="tableTextCell"><RuntimeLabel holderJson={entry.holderJson} /></td>
                           <td><QueueState entry={entry} /></td>
                           <td><time dateTime={new Date(entry.queuedAt).toISOString()}>{formatTime(entry.queuedAt)}</time></td>
                         </tr>

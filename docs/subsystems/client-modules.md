@@ -8,7 +8,7 @@ Source: [`packages/client/modules/src/client/manifest.ts`](../../packages/client
 
 ## The wire
 
-The graph is the wire single source between the Node and browser halves. The host composes `WebBootEntry` rows and `WebBootBatch` descriptors from scanned packages, then contributes the registration facade, application preloads, bootstrap scripts, and graph global to the structured index-injection table before the Vite entry. The `global` row renders as `globalThis["__DSH_BOOT__"]` with `<` escaped so plugin-controlled strings cannot break out of the script element. A page without a valid manifest cannot boot: the browser parser rejects malformed rows or batches, unknown batch members, and entries without exactly one initial combo descriptor.
+The graph defines the wire format between the Node and browser halves. The host composes `WebBootEntry` rows and `WebBootBatch` descriptors from scanned packages, then passes the registration facade, required application preloads, bootstrap scripts, and graph global to the index before the Vite entry. Optional batches load after required startup. The `global` row assigns `globalThis["__DSH_BOOT__"]` and escapes `<` to keep plugin strings within the script element. The browser rejects malformed rows or batches, unknown batch members, and entries without exactly one initial combo descriptor.
 
 ```ts type-equiv
 /**
@@ -32,6 +32,8 @@ interface WebBootEntry {
   inject?: string[]
   /** Stage-one prefetch mark: load the script for factory registration during module-face boot. */
   immediately?: boolean
+  /** May activate after required application startup. Missing means required. */
+  optional?: boolean
   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
   external?: string[]
 }
@@ -45,7 +47,7 @@ type WebBootBatchPhase = 'bootstrap' | 'application'
 ```ts type-equiv
 /** One initial combo script; a scheduling phase may span several descriptors. */
 interface WebBootBatch {
-  /** Parser-blocking bootstrap or preloaded application scheduling. */
+  /** Parser-blocking bootstrap or application scheduling after module setup. */
   phase: WebBootBatchPhase
   /** Revisioned combo script endpoint. */
   url: string

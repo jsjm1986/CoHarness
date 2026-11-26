@@ -20,12 +20,14 @@ Generation-checked stop, restart and retirement affect only the selected runtime
 Computer permission alone cannot borrow another computer’s personal home.
 Normal login opens the original Harness workbench with its authorized local personal default; exact links and other runtimes stay unchanged.
 Documents retain computer ownership; a planned verified snapshot copies through the center without starting a Runtime.
+The streamed document overview pages through both locations without repeating a document or starting a Runtime.
 Revoking computer access hides its document metadata and denies direct content without retargeting the active Runtime.
 A disconnected computer returns unavailable without starting a replacement on the center.
 Organization model and quota management remain available while the execution computer is disconnected.
 A renewed node connection rejects old credentials and resumes the same Runtime only after confirmed stop in a fresh generation.
 Entry-owned policy keeps direct secondary access local and rejects reverse computer selection.
 Browser recovery deadlines follow computer B’s configuration while primary-local defaults remain unchanged.
+A draining entry refuses new starts and forwards the exact Runtime stop to its owner.
 Computer conversation creation attaches the selected Runtime Workspace, registers its default directory, and keeps other computers separate.
 Captured Client Remote calls retain their Runtime, reject foreign Sessions, and stop sending after namespace withdrawal.
 Composer-owned blank conversations remain observable without opening another Runtime.

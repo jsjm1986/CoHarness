@@ -1,4 +1,4 @@
-import { closeSync, constants, fchmodSync, fchownSync, lstatSync, mkdirSync, openSync, realpathSync, writeFileSync } from 'node:fs'
+import { closeSync, constants, fchmodSync, fchownSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, realpathSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { GatewayConfig } from './config.ts'
 import type { EffectiveGrant } from './projects.ts'
@@ -16,17 +16,26 @@ export function writeGrantsFile(cfg: GatewayConfig, username: string, grants: Ef
   return writeRuntimeGrantsFile(join(cfg.usersRoot, username, 'dsh'), grants, cfg.usersRoot)
 }
 
-/** Write one runtime's complete directory grant projection. */
-export function writeRuntimeGrantsFile(dshHome: string, grants: EffectiveGrant[], containmentRoot?: string): string {
+/**
+ * Write one Runtime's complete directory grant projection.
+ * @param dshHome - assigned private Runtime directory.
+ * @param grants - effective grants for this exact Runtime.
+ * @param containmentRoot - managed root under which an ordinary directory may be provisioned.
+ * @param options - use an existing home only after the repository verifies its node-private recovery binding; no directory is created.
+ * @returns absolute path of the written projection.
+ */
+export function writeRuntimeGrantsFile(dshHome: string, grants: EffectiveGrant[], containmentRoot?: string, options?:{existingHome:true}): string {
   const resolvedHome = resolve(dshHome)
-  if (containmentRoot !== undefined) ensureManagedDirectoryTree(resolve(containmentRoot), resolvedHome)
+  if(options?.existingHome){
+    if(!isAbsolute(dshHome)||dshHome!==resolvedHome||realpathSync(dshHome)!==dshHome)throw new Error('Retained Runtime home must be an existing canonical directory')
+  }else if (containmentRoot !== undefined) ensureManagedDirectoryTree(resolve(containmentRoot), resolvedHome)
   else mkdirSync(dshHome, { recursive: true })
   const homeEntry = lstatSync(resolvedHome, { throwIfNoEntry: false })
   if (homeEntry === undefined || !homeEntry.isDirectory()) {
     throw new Error(`runtime dsh home is not a directory: ${resolvedHome}`)
   }
   if (homeEntry.isSymbolicLink()) throw new Error(`runtime dsh home must not be a symbolic link: ${resolvedHome}`)
-  if (containmentRoot !== undefined) {
+  if (containmentRoot !== undefined && !options?.existingHome) {
     const canonicalRoot = resolve(realpathSync(containmentRoot))
     const canonicalHome = resolve(realpathSync(resolvedHome))
     const nested = relative(canonicalRoot, canonicalHome)
@@ -34,13 +43,17 @@ export function writeRuntimeGrantsFile(dshHome: string, grants: EffectiveGrant[]
       throw new Error(`runtime dsh home is outside its managed root: ${resolvedHome}`)
     }
   }
-  const path = join(dshHome, 'directory-grants.json')
+  const path = join(resolvedHome, 'directory-grants.json')
   const entry = lstatSync(path, { throwIfNoEntry: false })
   if (entry?.isSymbolicLink()) throw new Error(`runtime grants file must not be a symbolic link: ${path}`)
   if (entry !== undefined && !entry.isFile()) throw new Error(`runtime grants path is not a file: ${path}`)
   const noFollow = constants.O_NOFOLLOW ?? 0
-  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | noFollow, 0o600)
+  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | noFollow, 0o600)
   try {
+    const opened=fstatSync(fd),currentHome=lstatSync(resolvedHome)
+    if(!opened.isFile()||opened.nlink!==1||entry!==undefined&&(opened.dev!==entry.dev||opened.ino!==entry.ino))throw new Error('Runtime grants file identity changed')
+    if(currentHome.dev!==homeEntry.dev||currentHome.ino!==homeEntry.ino||options?.existingHome&&realpathSync(resolvedHome)!==resolvedHome)throw new Error('Runtime home identity changed')
+    ftruncateSync(fd,0)
     writeFileSync(fd, JSON.stringify(grants, null, 2), { encoding: 'utf8' })
     if (process.platform !== 'win32') { fchownSync(fd, homeEntry.uid, homeEntry.gid); fchmodSync(fd, 0o600) }
   } finally {
@@ -120,7 +133,7 @@ export async function applyGrantsToUser(
       if (storage?.provisioning === 'preparing') continue
       const subject = { ...user, ...storage, runtimeId: target.runtimeId }
       writeRuntimeGrantsFile(storage?.dshHome ?? join(deps.cfg.usersRoot, user.username, 'dsh'),
-        await runtimeDirectoryGrants(subject, deps.projects), deps.cfg.usersRoot)
+        await runtimeDirectoryGrants(subject, deps.projects), deps.cfg.usersRoot,storage?.retainedData?{existingHome:true}:undefined)
       const address = target.runtimeId === undefined ? userId : target
       const state = await deps.instances.stateOf(address)
       if (state !== 'ready' && state !== 'starting') continue

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-23-web-assistant-markdown.md
 document:
-  en: 5a629d6a744251d1447380bafa2aff2ed5e3dc7d
-  zh: 53640153c91ae9afe8aa622ad02fb7fe4d6d74df
+  en: ae37e695edae79f0b81baa2fbab9777706be1a3e
+  zh: f62a36e1067c637f9c02a79faa1feba825fa3393
 /agent-note-safe-assistant-markdown-in-the-web-conversation:
   en: 72e6aeab6ff39576
   zh: ef2935dbc82c8b14
@@ -15,8 +15,8 @@ document:
   en: 9a53cae60753b6e9
   zh: b48a04d80497947f
 /agent-note-safe-assistant-markdown-in-the-web-conversation/untrusted-output-policy:
-  en: a2a74008e44ce25d
-  zh: 2e8689fe2adde85c
+  en: 1713d4950deb7663
+  zh: 1db137725a263f42
 /agent-note-safe-assistant-markdown-in-the-web-conversation/alternatives-considered:
   en: 7fe81d54c27cf49e
   zh: 7e529a0ad5851e61

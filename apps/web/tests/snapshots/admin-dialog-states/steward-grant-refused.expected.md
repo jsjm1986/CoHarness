@@ -1,0 +1,7 @@
+- dialog "授予维护空间准入":
+  - heading "授予维护空间准入" [level=2]
+  - paragraph: 授予 移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789 进入常驻维护空间的权限。该通道可审计地操作部署数据库与项目代码，全部动作留痕。
+  - button "关闭"
+  - alert: 授权被拒绝：QA write refused. The reviewed record remains unchanged.
+  - button "取消"
+  - button "授予"

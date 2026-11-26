@@ -1,3 +1,10 @@
+.notice,
+.consent {
+  box-sizing: border-box;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
 .notice {
   padding: 24px;
   color: var(--dsw-alias-label-secondary);
@@ -110,13 +117,18 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: safe center;
   gap: 12px;
   padding: 24px;
   margin: 0;
   max-width: 320px;
+  overflow-y: auto;
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-primary);
+}
+
+.auth > * {
+  flex-shrink: 0;
 }
 
 .field {
@@ -133,8 +145,21 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.field:not(:disabled)::placeholder {
+  color: var(--dsw-alias-label-secondary);
+  opacity: 1;
+}
+
 .field:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 0;
   border-color: transparent;
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .field {
+    box-sizing: border-box;
+    min-height: 44px;
+    font-size: 16px;
+  }
 }

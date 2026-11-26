@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-20-node-runtime-drain-report.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-20-node-runtime-drain-report.md
+document:
+  en: 8247ac5e66aef3a56ba335ef59bc71c59dfb7237
+  zh: 4a784343c69985d80f69e9258b2d771ee7699e86
+/agent-note-confirm-every-runtime-in-an-opted-in-node-drain:
+  en: 8c78b0ed587fb5c1
+  zh: ea095db86a3d34fd
+/agent-note-confirm-every-runtime-in-an-opted-in-node-drain/problem:
+  en: 82663de278246b39
+  zh: cfb33acc24a1c83e
+/agent-note-confirm-every-runtime-in-an-opted-in-node-drain/decision:
+  en: fb2f574673cc7310
+  zh: 49993fdb63877444
+/agent-note-confirm-every-runtime-in-an-opted-in-node-drain/alternatives-considered:
+  en: efcdc99012448799
+  zh: 41d43c251809015b
+/agent-note-confirm-every-runtime-in-an-opted-in-node-drain/consequences:
+  en: 1d38346c1ccaca82
+  zh: ad5b1738023589f8

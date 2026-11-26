@@ -2,7 +2,7 @@
 import { setImmediate } from 'node:timers/promises'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { clientSessionKey, createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { RemoteError, type RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import { RemoteStream, type ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 import { streamMethod } from '@deepseek-ai/dsh-remote-mock'
@@ -918,6 +918,58 @@ it('waits for verified Client services and disposes their ownership observers', 
   expect(subscriptions.every(subscribe => subscribe.mock.calls.length === 1)).toBe(true)
   host.set({ executionAuthorityRequired: false })
   expect(() =>{  service.selectShell(sessionId, '/bin/zsh') }).toThrow('not verified')
+})
+
+it('opens terminal input WebSockets through apply() for both qualified and bare session keys', async () => {
+  storage()
+  const openedUrls: string[] = []
+  class StubWebSocket extends EventTarget {
+    static readonly CONNECTING = 0
+    static readonly OPEN = 1
+    static readonly CLOSING = 2
+    static readonly CLOSED = 3
+    readyState = StubWebSocket.CONNECTING
+    constructor(readonly url: string) {
+      super()
+      openedUrls.push(url)
+    }
+    close(): void { this.readyState = StubWebSocket.CLOSED }
+    send(): void {}
+  }
+  vi.stubGlobal('WebSocket', StubWebSocket)
+  vi.stubGlobal('location', { href: 'https://gateway.example/' })
+
+  const h = fixture(), ctx = new Context()
+  cleanups.push(() => ctx.fiber.dispose())
+  const qualified = clientSessionKey({ kind: 'project', projectId: 7 }, 'sess-1' as SessionId)
+  const catalog = createSnapshotStore({ byId: { [sessionId]: { id: sessionId }, [qualified]: { id: qualified } } })
+  const host = createSnapshotStore<{ executionAuthorityRequired: boolean } | undefined>({ executionAuthorityRequired: false })
+  const policy = createSnapshotStore<{ verifiedAccountId?: number }>({ verifiedAccountId: 12 })
+  ctx.provide('remote', { ...{ $stream: (options: Parameters<ClientRemote['$stream']>[0]) => new RemoteStream({ generation: createSnapshotStore(undefined) }, options) }, terminal: h.remote } as never)
+  ctx.provide('remote.terminal', h.remote)
+  ctx.provide('sessions', { list: catalog, runtimeIdentityFor: () => ({ kind: 'personal' }) } as never)
+  ctx.provide('connection', {
+    hostDescription: host,
+    forSession: (id: SessionId) => id === qualified
+      ? { privateResourceUrl: (value: string) => `${value}&dshRuntime=project-7` }
+      : undefined,
+  } as never)
+  ctx.provide('projectUiPolicy', policy as never)
+  await ctx.plugin({ inject: TerminalClient.inject, apply: TerminalClient.apply })
+
+  const bareView = ctx.webTerminals.view(sessionId, 'tab-bare', 'tab-bare')
+  bareView.mount()
+  await bareView.refresh()
+  await expect.poll(() => openedUrls.length).toBe(1)
+  expect(openedUrls[0]).toContain(`sessionId=${sessionId}`)
+  expect(openedUrls[0]).not.toContain('dshRuntime=')
+
+  const qualView = ctx.webTerminals.view(qualified, 'tab-qual', 'tab-qual')
+  qualView.mount()
+  await qualView.refresh()
+  await expect.poll(() => openedUrls.length).toBe(2)
+  expect(openedUrls[1]).toContain('sessionId=sess-1')
+  expect(openedUrls[1]).toContain('dshRuntime=project-7')
 })
 
 it('ignores foreign cleanup storage while preserving the current account intent', () => {

@@ -20,6 +20,7 @@ agent（智能体）的唯一具体实现插件和循环驱动器。其包内部
 ## 目录
 
 - [服务：`AgentLoop`（ctx 键：`agentLoop`）](#service-agentloop-ctx-key-agentloop)
+  - [计划停止](#planned-shutdown)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -30,6 +31,8 @@ agent（智能体）的唯一具体实现插件和循环驱动器。其包内部
 ## 服务：`AgentLoop`（ctx 键：`agentLoop`）
 
 ### 公开 API
+
+驱动器在准备或加载 Session 前检查根作用域持有的[执行准入](../agent/README.zh.md#create-or-resume-an-agent)。恢复的历史身份不能通过配置式或编程式 Agent 消费保留的 inbox 消息；新身份继续遵循普通循环与权限检查。
 
 创建与恢复属于同一个受回滚保护的事务：构造私有会话、具体 agent 和带作用域的上下文；等待可选 setup；进入两个注册表；宣告 `session/created`，再等待 `agent/created`；此后才启动驱动器。Setup 作为受信任的同进程组合代码，接收完整的带作用域 `Context`，并且不得驱动尚未发布的 agent。普通的类型化身份与选项输入按只读约定借用；seed 事件和会话元数据会跨越持久会话边界，因此系统会对其进行验证并创建快照。可选的 `AbortSignal` 只取消加载／setup／发布，并在返回的 handle 可见前分离。
 
@@ -82,7 +85,7 @@ interface Config {
 
 统一的 `send()` 原语按（`target` × `wakeup`）路由内容与来源；`followup`/`steer`/`inject` 是它的固定预设别名。`followup()` 追加到 `next-turn` FIFO 并唤醒驱动器，`steer()` 追加到 `next-step` inbox 并唤醒驱动器，`inject()` 则追加到同一个 `next-step` inbox，但不唤醒驱动器。在轮次边界，驱动器会先打开持久轮次，再原子领取待处理的 next-step 输入和一条排队提示词；在步骤之间则只领取 next-step 输入。领取操作通过仅执行删除的 splice 移除整批消息，并为每条消息各发出一次 `agent/inbox/claimed { message, turn }`。随后 `agent/pre-step` 返回拒绝结果，或返回将进入拟议步骤的完整消息。拒绝后，已领取批次保持已删除，并关闭不含步骤的轮次；领取后插入的输入仍等待后续处理，而空闲注入会一直等待，直到 follow-up 或 steering 唤醒驱动器。批次中的运行时上下文候选项只标记位置而不提交组装时文本：每次请求准入尝试都会刷新已注册的运行时上下文，并在已接纳输入之后提交其当前快照。
 
-每次 inbox 变更都会提交一条规范化的 `agent/inbox/spliced` 事件。投影注册表同步折叠该事件，因此 `Session.append()` 返回时实时投影已反映该 splice。插入、编辑、移除、领取与取消都通过同一组标准 splice 坐标回放。普通删除携带 `outcome: 'canceled'` 并发出 `agent/inbox/discarded { message }`；领取使用不带 outcome 的纯删除并发出 `agent/inbox/claimed`。每次插入都会发出 `agent/inbox/inserted { message }`。`MessageId` 在两个待处理列表之间保持唯一。需要被移除消息的消费方使用 claimed 或 discarded 通知，而不是依赖 splice 前的 `session/event` 视图。
+每次 inbox 变更都会提交一条规范化的 `agent/inbox/spliced` 事件。投影注册表同步折叠该事件，因此 `Session.append()` 返回时实时投影已反映该 splice。插入、编辑、移除、领取与取消都通过同一组标准 splice 坐标回放。普通删除携带 `outcome: 'canceled'` 并发出 `agent/inbox/discarded { message }`；领取使用不带 outcome 的纯删除并发出 `agent/inbox/claimed`。每次插入都会发出 `agent/inbox/inserted { message }`。`MessageId` 在两个待处理列表之间保持唯一。字节配额按 UTF-8 JSON 计算，队列中保留的不可变消息可以复用已测得的大小。需要被移除消息的消费方使用 claimed 或 discarded 通知，而不是依赖 splice 前的 `session/event` 视图。
 
 AgentLoop 要求挂载 session-projection 注册表（`sessionProjections` 在其 inject 列表中），并在其上注册 host-only 的 `turnBoundary` projection。该投影记录打开的轮次和最近的步骤边界，供授权读取方使用，不增加第二条事件流。
 
@@ -111,6 +114,13 @@ AgentLoop 要求挂载 session-projection 注册表（`sessionProjections` 在�
 - subagent：在循环外部实现为 `ctx.subagents` 提供方；进程内提供方使用 `ctx.agents.create()` 创建 agent，并通过其拥有的 `AgentHandle` 执行 teardown，而通用的 [`ctx.jobs`](../../jobs/jobs/) 与 [`dsh-tool-subagent`](../../subagent/tool-subagent/) 负责后台收集。
 - 持久化：`session/event` 发生后立即安排延后写入；`session/flush` 是显式观测屏障
 - UI：`session/event`（assistant token 流、边界、工具活动）+ `agent/*` 控制事件（`agent/status`、`agent/created`/`agent/disposed`）
+
+<a id="planned-shutdown"></a>
+### 计划停止
+
+托管启动器在卸载 profile 前调用 `ctx.agentLoop.stopForShutdown()`。工厂关闭创建、恢复和新 inbox 提交入口，中止活跃轮次与维护任务，并等待 Agent 作用域清理。两个 inbox 中已经准入的用户输入会保留在日志里，恢复后等待下一次唤醒。作用域所有者仍可在清理期间撤回各自排队的合成消息。
+
+随后各 Agent 封存 Session 日志，在持久化组件仍挂载时刷新日志，并在关闭写入句柄前从存储验证最终事件序号。轮次或步骤未关闭、检查点失败或缺少必需的尾部事件时，停止操作会拒绝。托管启动器也会将卸载中的 fiber 报告的错误视为清理失败。空 Session 可以不物化。从未开启轮次且没有待处理输入的浏览器草稿也可以继续延迟物化。
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -161,7 +171,7 @@ AgentLoop 要求挂载 session-projection 注册表（`sessionProjections` 在�
 ## 已知限制与暂缓事项
 
 - **分类是一元的**：安全性取决于比较同级调用或资源的调用必须保持独占（参见[设计原理](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.zh.md)）。
-- **根上下文关停的持久化**：存在活跃 Agent 时，关停根上下文可能使最终的 `turn/end` 仅留在内存中，未写入持久化日志。Agent teardown 完成不保证该事件已保存。
+- **直接释放根上下文**时，同级持久化监听器可能先卸载，活跃 Agent 最终的 `turn/end` 可能只保留在内存中。
 - **配置 label 默认对应新会话**：省略 `sessionId` 时，每次启动都会创建新的 `${id}-session-<uuid>`；如需确切的恢复或创建行为，必须显式提供稳定的 `sessionId`，而 `resumeSessionId` 要求已有持久化历史。
 - **配置 agent 没有逐 agent persona 字段或 setup 钩子**：它们使用部署 persona；只有编程式 `ctx.agents.create()` / `resume()` 工厂选项支持带作用域的 persona／工具组合。
 - **没有内置轮次预算**：工具调用或 steering 会让当前轮次继续；限制失控轮次的策略必须从既有生命周期扩展点（如 `agent/turn-stopping`）执行取消。

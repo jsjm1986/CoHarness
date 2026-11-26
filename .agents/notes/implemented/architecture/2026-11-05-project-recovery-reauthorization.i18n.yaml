@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-05-project-recovery-reauthorization.md
 document:
-  en: 336f12cf5860475fc757ca770093609b588df4c8
-  zh: 2f245cffe4f262499792eba118e2ef3bb2fc3241
+  en: 6672726455cae774e48637c976aec39a28015d73
+  zh: 5a6fbc6dae723a1ce83b1ddd627171277b08bb63
 /agent-note-scoped-backup-coverage-and-recovery-reauthorization:
   en: 675e0fc57bfa6f9e
   zh: 3adef5ba2230c1a6
@@ -12,14 +12,14 @@ document:
   en: 7c8c3e6796056eab
   zh: 9cef2238491bcc4b
 /agent-note-scoped-backup-coverage-and-recovery-reauthorization/decision:
-  en: e5d47f507d5616a8
-  zh: 537d943488159ccb
+  en: 785a030f74a92219
+  zh: cb35e1aef3e35b45
 /agent-note-scoped-backup-coverage-and-recovery-reauthorization/alternatives-considered:
   en: 9fb0377d7f48fd4e
   zh: 60879c73dbb16239
 /agent-note-scoped-backup-coverage-and-recovery-reauthorization/consequences:
-  en: 3fc8aa5da9682bda
-  zh: 8fb523f3c7b6bdfa
+  en: e0cd83eb9385a3f8
+  zh: d8e10f9197bc7d9a
 /agent-note-scoped-backup-coverage-and-recovery-reauthorization/verification:
-  en: d6f35d4f8532fbbc
-  zh: 86d01a4411edcbc3
+  en: e3e7f95beac5b5e4
+  zh: 6c9c0b662cf81a8a

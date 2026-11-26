@@ -40,6 +40,18 @@ function renderPills(
 }
 
 describe('StatsPills', () => {
+  it.each([
+    { turns: 1, steps: 1, label: '1 turn · 1 step' },
+    { turns: 1, steps: 2, label: '1 turn · 2 steps' },
+    { turns: 2, steps: 1, label: '2 turns · 1 step' },
+    { turns: 0, steps: 2, label: '0 turns · 2 steps' },
+  ])('labels turn and step totals independently: $label', ({ turns, steps, label }) => {
+    const view = renderPills({ sessionStats: {
+      turns, steps, llmMs: 1_200, toolMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0,
+    } })
+    expect(view.getByRole('button', { name: label })).toBeTruthy()
+  })
+
   it('shows token total and cache-hit share, then exposes exact buckets', () => {
     const view = renderPills({
       tokenUsage: { uncachedInputTokens: 100, outputTokens: 20, cacheReadTokens: 900, cacheWriteTokens: 0 },

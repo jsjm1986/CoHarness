@@ -1,12 +1,12 @@
 /** Real PostgreSQL reservations across independently owned Runtime generations and Gateway coordinators. */
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { fork } from 'node:child_process'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { mkdtemp, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import type { Pool } from 'pg'
+import type { Pool, QueryResult } from 'pg'
 import type { ResourceOperationId } from '@deepseek-ai/dsh-resource-budget/types'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { GatewayModelBudget } from '../src/gateway-model-budget.ts'
@@ -23,6 +23,7 @@ import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.t
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import type { RuntimeCredentialSubject } from '../src/runtime-api.ts'
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
+import { enableFixtureTopology } from './fixtures/topology-fixture.mjs'
 
 const databaseUrl = postgresTestDatabaseUrl(process.env.HGW_TEST_DATABASE_URL)
 const describePg = databaseUrl === undefined ? describe.skip : describe
@@ -149,7 +150,7 @@ describePg('durable node resource budget', () => {
         const client = await actualPool.connect()
         return new Proxy(client, { get(actual, property) {
           if (property === 'query') return async (sql: string, values?: readonly unknown[]) => {
-            if (sql.includes('harness.node_resource_state') || sql.includes('harness.lock_node_resources')) entered.add(actual)
+            if (sql.includes('harness.node_resource_state') || sql.includes('harness.request_node_resource(')) entered.add(actual)
             return actual.query(sql, values === undefined ? undefined : [...values])
           }
           const value: unknown = Reflect.get(actual, property, actual)
@@ -196,7 +197,8 @@ describePg('durable node resource budget', () => {
     let calls = 0
     const instrumented = new Proxy(observerPool, { get(actualPool, key) {
       if (key === 'query') return async (sql: string, values?: readonly unknown[]) => {
-        if (sql === 'SELECT harness.observe_node_resources($1,$2,$3::jsonb,$4,$5::jsonb)') {
+        if (sql.includes('SELECT harness.observe_node_resources($1,$2,$3::jsonb,$4,$5::jsonb) AS observed')
+          && sql.includes('COALESCE(control.write_epoch,1)=$6')) {
           calls++
           await new Promise(resolve => setTimeout(resolve, 150))
         }
@@ -219,7 +221,7 @@ describePg('durable node resource budget', () => {
         const client = await actualPool.connect()
         return new Proxy(client, { get(actual, property) {
           if (property === 'query') return async (sql: string, values?: readonly unknown[]) => {
-            if (sql === 'SELECT harness.schedule_node_resources($1,$2)') {
+            if (sql.includes('harness.read_node_resource_admissions(')) {
               await actual.query(`UPDATE harness.node_resource_state SET valid_until=clock_timestamp()
                 WHERE organization_id=$1 AND node_id=$2`, [f.context.organizationId, f.context.nodeId])
               calls++
@@ -242,6 +244,26 @@ describePg('durable node resource budget', () => {
     await f.repository.markStopped(previous.target, previous.generation)
     const generation = await f.repository.beginStart(previous.target, Date.now(), Buffer.alloc(32, index + 1), 'explicit')
     return { ...previous, generation }
+  }
+
+  async function startPool(intercept: (sql: string, execute: () => Promise<QueryResult>) => Promise<QueryResult>, applicationName?: string) {
+    const owned = createPostgresPool(databaseUrl!, { max: 1, ...(applicationName === undefined ? {} : { application_name: applicationName }) })
+    cleanups.push(() => owned.end())
+    return new Proxy(owned, { get(actualPool, key) {
+      if (key === 'query') return (sql: string, values?: readonly unknown[]) =>
+        intercept(sql, () => actualPool.query(sql, values === undefined ? undefined : [...values]))
+      if (key === 'connect') return async () => {
+        const client = await actualPool.connect()
+        return new Proxy(client, { get(actual, property) {
+          if (property === 'query') return (sql: string, values?: readonly unknown[]) =>
+            intercept(sql, () => actual.query(sql, values === undefined ? undefined : [...values]))
+          const value: unknown = Reflect.get(actual, property, actual)
+          return typeof value === 'function' ? value.bind(actual) : value
+        } })
+      }
+      const value: unknown = Reflect.get(actualPool, key, actualPool)
+      return typeof value === 'function' ? value.bind(actualPool) : value
+    } })
   }
 
   async function allocationState(f: Awaited<ReturnType<typeof fixture>>, subject: RuntimeCredentialSubject): Promise<string> {
@@ -267,7 +289,7 @@ describePg('durable node resource budget', () => {
         return new Proxy(client, { get(actual, property) {
           if (property === 'query') return async (sql: string, values?: readonly unknown[]) => {
             const result = await actual.query(sql, values === undefined ? undefined : [...values])
-            if (armed && sql.includes('FOR SHARE OF i') && result.rowCount === 1) {
+            if (armed && sql.includes('harness.request_node_resource(') && result.rowCount === 1) {
               armed = false
               acquired((actual as typeof actual & { processID: number }).processID)
               await gate
@@ -330,6 +352,8 @@ describePg('durable node resource budget', () => {
     await expect(repository.touch(f.subjects[0]!.target, Date.now()))
       .rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE', cause: { code: '57014' } })
     await expect(budget.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 2 }))
+      .rejects.toMatchObject({ status: 503, reason: 'database-busy', cause: { code: '57014' } })
+    await expect(budget.finish(f.subjects[0]!, held.operation, 'quiescent'))
       .rejects.toMatchObject({ status: 503, reason: 'database-busy', cause: { code: '57014' } })
     expect((await pool.query<{ at: string }>('SELECT last_activity_at::text at FROM harness.instances WHERE organization_id=$1 AND user_id=$2',
       [f.context.organizationId, f.users[0]!.uuid])).rows[0]!.at).toBe(before)
@@ -451,6 +475,191 @@ describePg('durable node resource budget', () => {
     expect(await f.budget.request(f.subjects[1]!, f.request(1, 1))).toEqual({ state: 'queued' })
   })
 
+  it('admits a Runtime before a fresh two-second credit expires over a 500 ms statement link', async () => {
+    const f = await fixture({ maxWaitMs: 6000 }), subject = await prepareStart(f, 0)
+    const statements: string[] = []
+    const delayed = await startPool(async (sql, execute) => {
+      statements.push(sql)
+      if (sql.includes('harness.lock_node_resources(') || sql.includes('harness.admit_runtime_start(')) {
+        await f.budget.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 1 })
+      }
+      const result = await execute()
+      // Only this connection simulates acknowledgement latency; PostgreSQL keeps its real expiry clock.
+      await new Promise(resolve => setTimeout(resolve, 500))
+      return result
+    })
+    await new NodeResourceBudget(delayed, f.context.organizationId, f.context.nodeId, f.config)
+      .admitRuntimeStart(subject.target, subject.generation, new AbortController().signal)
+    expect(await allocationState(f, subject)).toBe('possible')
+    expect((await f.budget.snapshot()).outcomes.runtime_starts_admitted).toBe(1)
+    expect(statements).toEqual(['BEGIN', 'SELECT * FROM harness.admit_runtime_start($1,$2,$3,$4,$5,$6,$7::jsonb,$8)', 'COMMIT'])
+  })
+
+  it('admits a model with a two-second pressure credit over a 500 ms database link', async () => {
+    const f = await fixture(), subject = f.subjects[0]!, operation = f.request(0, 1)
+    const statements: string[] = []
+    const delayed = await startPool(async (sql, execute) => {
+      statements.push(sql)
+      const result = await execute()
+      await new Promise(resolve => setTimeout(resolve, 500))
+      return result
+    })
+    const budget = new NodeResourceBudget(delayed, f.context.organizationId, f.context.nodeId, f.config)
+    await f.budget.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 1 })
+    expect(await budget.request(subject, { ...operation, origin: 'runtime' })).toEqual({ state: 'active' })
+    expect(await budget.admissions(subject, [operation])).toEqual([{ status: { state: 'active' }, origin: { kind: 'runtime' } }])
+    expect(statements.map(sql => sql.split('(')[0])).toEqual([
+      'BEGIN', 'SELECT * FROM harness.request_node_resource', 'COMMIT',
+      'BEGIN', 'SELECT * FROM harness.read_node_resource_admissions', 'COMMIT',
+    ])
+  })
+
+  it('keeps a committed possible allocation when cancellation arrives with its acknowledgement', async () => {
+    const f = await fixture(), subject = await prepareStart(f, 0), cancelled = new AbortController()
+    await f.grant(1)
+    const delayed = await startPool(async (sql, execute) => {
+      const result = await execute()
+      if (sql === 'COMMIT') cancelled.abort()
+      return result
+    })
+    await expect(new NodeResourceBudget(delayed, f.context.organizationId, f.context.nodeId, f.config)
+      .admitRuntimeStart(subject.target, subject.generation, cancelled.signal))
+      .rejects.toMatchObject({ code: 'INSTANCE_CAPACITY', reason: 'cancelled' })
+    expect(await allocationState(f, subject)).toBe('possible')
+    expect((await f.budget.snapshot()).outcomes.runtime_starts_admitted).toBe(1)
+  })
+
+  it('does not replay a Runtime allocation when its commit acknowledgement is lost', async () => {
+    const f = await fixture(), subject = await prepareStart(f, 0)
+    await f.grant(1)
+    let commits = 0
+    const delayed = await startPool(async (sql, execute) => {
+      const result = await execute()
+      if (sql === 'COMMIT') { commits++; throw Object.assign(new Error('acknowledgement lost'), { code: 'ECONNRESET' }) }
+      return result
+    })
+    await expect(new NodeResourceBudget(delayed, f.context.organizationId, f.context.nodeId, f.config)
+      .admitRuntimeStart(subject.target, subject.generation, new AbortController().signal)).rejects.toMatchObject({ code: 'ECONNRESET' })
+    expect(commits).toBe(1)
+    expect(await allocationState(f, subject)).toBe('possible')
+    expect((await f.budget.snapshot()).outcomes.runtime_starts_admitted).toBe(1)
+  })
+
+  it('rolls back a Runtime decision whose deadline expires before dispatch', async () => {
+    const f = await fixture(), subject = await prepareStart(f, 0)
+    await f.grant(1)
+    let clock = 0
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    try {
+      const delayed = await startPool(async (sql, execute) => {
+        const result = await execute()
+        if (sql === 'BEGIN') clock += f.config.maxWaitMs
+        return result
+      })
+      await expect(new NodeResourceBudget(delayed, f.context.organizationId, f.context.nodeId, f.config)
+        .admitRuntimeStart(subject.target, subject.generation, new AbortController().signal))
+        .rejects.toMatchObject({ code: 'INSTANCE_CAPACITY', reason: 'timeout' })
+    } finally { now.mockRestore() }
+    expect(await allocationState(f, subject)).toBe('not-started')
+    expect((await f.budget.snapshot()).outcomes.runtime_starts_admitted).toBe(0)
+  })
+
+  it('retains an acknowledged allocation when the caller deadline expires during commit', async () => {
+    const f = await fixture(), subject = await prepareStart(f, 0)
+    await f.grant(1)
+    let clock = 0
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    try {
+      const delayed = await startPool(async (sql, execute) => {
+        const result = await execute()
+        if (sql === 'COMMIT') clock += f.config.maxWaitMs
+        return result
+      })
+      await expect(new NodeResourceBudget(delayed, f.context.organizationId, f.context.nodeId, f.config)
+        .admitRuntimeStart(subject.target, subject.generation, new AbortController().signal))
+        .rejects.toMatchObject({ code: 'INSTANCE_CAPACITY', reason: 'timeout' })
+    } finally { now.mockRestore() }
+    expect(await allocationState(f, subject)).toBe('possible')
+    expect((await f.budget.snapshot()).outcomes.runtime_starts_admitted).toBe(1)
+  })
+
+  it('includes a database node-lock wait in the Runtime start deadline before spending a credit', async () => {
+    const f = await fixture({ maxWaitMs: 50 }), subject = await prepareStart(f, 0)
+    await f.grant(1)
+    const applicationName = `start-deadline-${randomUUID()}`
+    const waitingPool = createPostgresPool(databaseUrl!, { max: 1, application_name: applicationName, lock_timeout: 20, statement_timeout: 5000 })
+    const blocker = await pool.connect()
+    let pending: Promise<unknown> | undefined
+    try {
+      await blocker.query('BEGIN')
+      await blocker.query('SELECT 1 FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2 FOR UPDATE',
+        [f.context.organizationId, f.context.nodeId])
+      pending = new NodeResourceBudget(waitingPool, f.context.organizationId, f.context.nodeId, f.config)
+        .admitRuntimeStart(subject.target, subject.generation, new AbortController().signal).then(() => null, (error: unknown) => error)
+      await expect.poll(async () => (await pool.query<{ expired: boolean }>(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity
+        WHERE application_name=$1 AND wait_event_type='Lock' AND clock_timestamp()-query_start>interval '50 milliseconds') expired`,
+      [applicationName])).rows[0]!.expired).toBe(true)
+      await blocker.query('COMMIT')
+      await expect(pending).resolves.toMatchObject({ code: 'INSTANCE_CAPACITY', reason: 'timeout' })
+      expect(await allocationState(f, subject)).toBe('not-started')
+      expect((await f.budget.snapshot()).outcomes.runtime_starts_admitted).toBe(0)
+    } finally {
+      await blocker.query('ROLLBACK')
+      blocker.release()
+      await pending
+      await waitingPool.end()
+    }
+  })
+
+  it('rolls back Runtime admission when the durable pressure policy fails validation', async () => {
+    const f = await fixture(), subject = await prepareStart(f, 0)
+    await f.grant(1)
+    await pool.query("UPDATE harness.node_resource_state SET limits=jsonb_set(limits,'{sampleMs}','0') WHERE organization_id=$1 AND node_id=$2",
+      [f.context.organizationId, f.context.nodeId])
+    await expect(f.budget.admitRuntimeStart(subject.target, subject.generation, new AbortController().signal))
+      .rejects.toMatchObject({ name: 'ZodError' })
+    expect(await allocationState(f, subject)).toBe('not-started')
+    const result = await pool.query<{ credits: number; admitted: string }>(`SELECT credits,runtime_starts_admitted::text admitted
+      FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2`, [f.context.organizationId, f.context.nodeId])
+    expect(result.rows).toEqual([{ credits: 1, admitted: '0' }])
+  })
+
+  it.each(['expire', 'fail'] as const)('keeps the credit and allocation consistent when an instance trigger makes them %s', async action => {
+    const f = await fixture({ sampleMs: 10 }), subject = await prepareStart(f, 0)
+    await f.grant(1)
+    const name = `runtime_admission_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`CREATE FUNCTION harness.${name}() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.organization_id::text=TG_ARGV[0] THEN
+          IF TG_ARGV[1]='expire' AND NEW.allocation_state='waiting' THEN
+            UPDATE harness.node_resource_state SET valid_until=clock_timestamp()-interval '1 second'
+              WHERE organization_id=NEW.organization_id AND node_id=NEW.assigned_node_id;
+          ELSIF TG_ARGV[1]='fail' AND NEW.allocation_state='possible' THEN
+            RAISE EXCEPTION 'allocation write refused' USING ERRCODE='23514';
+          END IF;
+        END IF;
+        RETURN NEW;
+      END $$`)
+    cleanups.push(async () => {
+      await pool.query(`DROP TRIGGER IF EXISTS ${name} ON harness.instances`)
+      await pool.query(`DROP FUNCTION harness.${name}()`)
+    })
+    await pool.query(`CREATE TRIGGER ${name} BEFORE UPDATE ON harness.instances
+      FOR EACH ROW EXECUTE FUNCTION harness.${name}('${f.context.organizationId}','${action}')`)
+    const cancel = new AbortController(), pending = f.budget.admitRuntimeStart(subject.target, subject.generation, cancel.signal)
+    const failure = expect(pending).rejects.toMatchObject(action === 'fail' ? { code: '23514' } : { code: 'INSTANCE_CAPACITY', reason: 'cancelled' })
+    cleanups.push(async () => { cancel.abort(); await pending.catch(() => {}) })
+    if (action === 'expire') {
+      await expect.poll(() => allocationState(f, subject)).toBe('waiting')
+      cancel.abort()
+    }
+    await failure
+    expect(await allocationState(f, subject)).toBe(action === 'fail' ? 'not-started' : 'waiting')
+    expect((await f.budget.snapshot()).outcomes.runtime_starts_admitted).toBe(0)
+    expect((await pool.query<{ credits: number }>('SELECT credits FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2',
+      [f.context.organizationId, f.context.nodeId])).rows[0]!.credits).toBe(1)
+  })
+
   it.each(['account', 'project', 'computer', 'unknown'] as const)('honors the explicit Runtime identity instead of a %s reference', async (reference) => {
     const f = await fixture()
     const subject = await prepareStart(f, 0)
@@ -506,6 +715,24 @@ describePg('durable node resource budget', () => {
       await observing
       await observerPool.end()
     }
+  })
+
+  it('gates observation credits inside the write statement using the current mode and epoch', async () => {
+    const f = await fixture()
+    const sample = () => ({ capturedAt: performance.now(), cpu: 0, memory: 'normal' as const, eventLoopMs: 0, parallelism: 2 })
+    const credits = async () => (await pool.query<{ credits: number }>(
+      'SELECT credits FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2',
+      [f.context.organizationId, f.context.nodeId],
+    )).rows[0]!.credits
+    await pool.query("INSERT INTO harness.cluster_control(organization_id,mode,write_epoch) VALUES($1,'maintenance',2)", [f.context.organizationId])
+    const before = await credits()
+    await f.budget.observe(sample(), 2n)
+    expect(await credits()).toBe(before)
+    await pool.query("UPDATE harness.cluster_control SET mode='serving' WHERE organization_id=$1", [f.context.organizationId])
+    await f.budget.observe(sample(), 1n)
+    expect(await credits()).toBe(before)
+    await f.budget.observe(sample(), 2n)
+    expect(await credits()).toBe(2)
   })
 
   it('publishes only the remaining pressure validity after capture', async () => {
@@ -704,11 +931,198 @@ describePg('durable node resource budget', () => {
     expect(await restarted.status(f.subjects[1]!, f.request(1, 1))).toEqual({ state: 'active' })
   })
 
+  async function completionFixture() {
+    const f = await fixture(), original = f.subjects[0]!
+    const subject = { ...original, target: await f.repository.resolveTarget(original.target) }
+    const operation = f.request(0, 1), successor = f.request(1, 1)
+    await f.grant(1)
+    expect(await f.budget.request(subject, operation)).toEqual({ state: 'active' })
+    expect(await f.budget.request(f.subjects[1]!, successor)).toEqual({ state: 'queued' })
+    const requests = async () => (await pool.query(
+      'SELECT operation_id,state FROM harness.node_resource_requests WHERE organization_id=$1 ORDER BY state',
+      [f.context.organizationId],
+    )).rows
+    return { ...f, subject, operation, successor, requests }
+  }
+
+  it.each(['matching', 'drifted'].flatMap(policy => [false, true].map(change => ({ policy, change }))))(
+    'keeps the activity row available during $policy-policy scheduling with generation change=$change', async ({ policy, change }) => {
+      const f = await completionFixture()
+      await f.grant(1)
+      const applicationName = `resource-finish-${randomUUID()}`
+      const waitingPool = createPostgresPool(databaseUrl!, { max: 1, application_name: applicationName })
+      cleanups.push(() => waitingPool.end())
+      const config = policy === 'matching' ? f.config : { ...f.config, maxWaitMs: f.config.maxWaitMs - 1 }
+      const budget = new NodeResourceBudget(waitingPool, f.context.organizationId, f.context.nodeId, config)
+      let settled: Promise<PromiseSettledResult<void>[]> | undefined
+      try {
+        await transaction(pool, async blocker => {
+          const { rows: [held] } = await blocker.query<{ pid: number }>(`SELECT pg_backend_pid() pid FROM harness.node_resource_requests
+            WHERE organization_id=$1 AND operation_id=$2 AND state='queued' FOR UPDATE`, [f.context.organizationId, f.successor.requestId])
+          expect(held).toBeDefined()
+          settled = Promise.allSettled([budget.finish(f.subject, f.operation, 'quiescent')])
+          await expect.poll(async () => (await pool.query(`SELECT FROM pg_stat_activity
+            WHERE application_name=$1 AND $2=ANY(pg_blocking_pids(pid))`, [applicationName, held!.pid])).rowCount).toBe(1)
+          await transaction(pool, async client => {
+            const args = [f.context.organizationId, f.subject.target.runtimeId]
+            expect((await client.query('SELECT id FROM harness.instances WHERE organization_id=$1 AND runtime_id=$2 FOR UPDATE NOWAIT', args)).rowCount).toBe(1)
+            if (change) await client.query('UPDATE harness.instances SET generation=generation+1 WHERE organization_id=$1 AND runtime_id=$2', args)
+          })
+        })
+      } finally { await settled }
+      expect(await settled).toEqual(change
+        ? [{ status: 'rejected', reason: expect.objectContaining({ reason: 'stale-generation' }) }]
+        : [{ status: 'fulfilled', value: undefined }])
+      expect(await f.requests()).toEqual(change ? [
+        { operation_id: f.operation.requestId, state: 'active' }, { operation_id: f.successor.requestId, state: 'queued' },
+      ] : [{ operation_id: f.successor.requestId, state: 'active' }])
+      expect((await f.budget.snapshot()).outcomes.completed).toBe(change ? 0 : 1)
+    },
+  )
+
   it('returns the committed node policy when another coordinator changes the deployment limits', async () => {
     const f = await fixture()
     const policy = { ...f.config, maxWaitMs: 12_000 }
     await new NodeResourceBudget(pool, f.context.organizationId, f.context.nodeId, policy).configure()
     expect(await f.budget.register(f.subjects[0]!)).toEqual({ nextSequence: 1, policy })
+  })
+
+  it('registers a Runtime with one ownership statement between begin and commit', async () => {
+    const f = await fixture(), statements: string[] = []
+    const observed = await startPool(async (sql, execute) => { statements.push(sql); return execute() })
+    const budget = new NodeResourceBudget(observed, f.context.organizationId, f.context.nodeId, f.config)
+    expect(await budget.register(f.subjects[0]!)).toEqual({ nextSequence: 1, policy: f.config })
+    expect(statements).toEqual(['BEGIN', 'SELECT * FROM harness.register_runtime_resources($1,$2,$3,$4,$5,$6,$7::jsonb)', 'COMMIT'])
+  })
+
+  it.each(['queued', 'active', 'uncertain'] as const)('retains %s work and its sequence across concurrent Runtime registrations', async state => {
+    const f = await fixture(), subject = f.subjects[0]!, operation = f.request(0, 1)
+    if (state !== 'queued') await f.grant(1)
+    await f.budget.request(subject, operation)
+    if (state === 'uncertain') await f.budget.finish(subject, operation, 'uncertain')
+    const other = new NodeResourceBudget(pool, f.context.organizationId, f.context.nodeId, f.config)
+    expect(await Promise.all([f.budget.register(subject), other.register(subject)]))
+      .toEqual([{ nextSequence: 2, policy: f.config }, { nextSequence: 2, policy: f.config }])
+    expect(await f.budget.status(subject, operation)).toEqual({ state })
+    await expect(f.budget.request(subject, { ...operation, requestId: randomUUID() as ResourceOperationId }))
+      .rejects.toMatchObject({ reason: 'request-conflict' })
+  })
+
+  it.each(['organization', 'computer', 'generation', 'environment'] as const)('refuses Runtime registration for a different %s', async changed => {
+    const f = await fixture(), original = f.subjects[0]!
+    const subject = { ...original, target: await f.repository.resolveTarget(original.target) }
+    let budget = f.budget
+    if (changed === 'organization') subject.organizationId = randomUUID()
+    else if (changed === 'generation') subject.generation++
+    else if (changed === 'environment') subject.target = await f.repository.resolveTarget(f.subjects[1]!.target)
+    else {
+      const nodeId = (await pool.query<{ id: string }>("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'other') RETURNING id",
+        [f.context.organizationId])).rows[0]!.id
+      budget = new NodeResourceBudget(pool, f.context.organizationId, nodeId, f.config)
+    }
+    // An explicit environment mismatch keeps the original owner coordinate.
+    if (changed === 'environment') subject.target = { ...subject.target, id: original.target.id }
+    await expect(budget.register(subject)).rejects.toMatchObject({ reason: changed === 'organization' ? 'organization-mismatch' : 'stale-generation' })
+    expect(await f.budget.register(original)).toEqual({ nextSequence: 1, policy: f.config })
+  })
+
+  it('rolls back Runtime registration and expired-request cleanup when the durable policy is invalid', async () => {
+    const f = await fixture(), subject = f.subjects[0]!
+    await f.budget.request(f.subjects[1]!, f.request(1, 1))
+    await pool.query("UPDATE harness.node_resource_requests SET deadline=clock_timestamp()-interval '1 second' WHERE organization_id=$1", [f.context.organizationId])
+    await pool.query('DELETE FROM harness.node_resource_runtimes WHERE organization_id=$1 AND runtime_public_id=$2 AND runtime_kind=$3',
+      [f.context.organizationId, subject.target.id, subject.target.kind])
+    await pool.query("UPDATE harness.node_resource_state SET limits=jsonb_set(limits,'{sampleMs}','0') WHERE organization_id=$1", [f.context.organizationId])
+    await expect(f.budget.register(subject)).rejects.toMatchObject({ name: 'ZodError' })
+    expect(await f.budget.registered(subject.target, subject.generation)).toBe(false)
+    expect((await pool.query('SELECT state FROM harness.node_resource_requests WHERE organization_id=$1', [f.context.organizationId])).rows)
+      .toEqual([{ state: 'queued' }])
+    expect((await pool.query('SELECT timed_out::int FROM harness.node_resource_state WHERE organization_id=$1', [f.context.organizationId])).rows)
+      .toEqual([{ timed_out: 0 }])
+  })
+
+  it('refuses a conflicting Runtime registration without replacing its identity or sequence', async () => {
+    const f = await fixture(), subject = f.subjects[0]!
+    const other = await f.repository.resolveTarget(f.subjects[1]!.target)
+    await pool.query(`UPDATE harness.node_resource_runtimes SET runtime_id=$3,last_sequence=7
+      WHERE organization_id=$1 AND runtime_kind='user' AND runtime_public_id=$2`, [f.context.organizationId, subject.target.id, other.runtimeId])
+    await expect(f.budget.register(subject)).rejects.toMatchObject({ status: 409, reason: 'stale-generation' })
+    expect((await pool.query(`SELECT runtime_id,last_sequence::int FROM harness.node_resource_runtimes
+      WHERE organization_id=$1 AND runtime_kind='user' AND runtime_public_id=$2`, [f.context.organizationId, subject.target.id])).rows)
+      .toEqual([{ runtime_id: other.runtimeId, last_sequence: 7 }])
+  })
+
+  it.each(['stopping', 'generation', 'computer', 'lease', 'connection'] as const)('rechecks %s after a Runtime registration waits for the node lock', async change => {
+    const f = await fixture(), subject = f.subjects[0]!, applicationName = `resource-register-${randomUUID()}`
+    if (change === 'lease' || change === 'connection') {
+      const connection = randomUUID()
+      await enableFixtureTopology(f.context)
+      await pool.query(`INSERT INTO harness.node_agents
+        (organization_id,node_id,credential_hash,connection_id,connection_epoch,lease_expires_at)
+        VALUES($1,$2,$3,$4,1,clock_timestamp()+interval '1 hour')`,
+      [f.context.organizationId, f.context.nodeId, randomBytes(32), connection])
+      await pool.query('UPDATE harness.instances SET node_connection_id=$2,node_connection_epoch=1 WHERE organization_id=$1',
+        [f.context.organizationId, connection])
+      expect(await f.budget.register(subject)).toEqual({ nextSequence: 1, policy: f.config })
+    }
+    const waitingPool = createPostgresPool(databaseUrl!, { max: 1, application_name: applicationName })
+    const holder = await pool.connect()
+    let pending: Promise<unknown> | undefined
+    try {
+      await holder.query('BEGIN')
+      await holder.query('SELECT 1 FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2 FOR UPDATE',
+        [f.context.organizationId, f.context.nodeId])
+      pending = new NodeResourceBudget(waitingPool, f.context.organizationId, f.context.nodeId, f.config).register(subject).catch(error => error)
+      await expect.poll(async () => (await pool.query(`SELECT 1 FROM pg_stat_activity
+        WHERE application_name=$1 AND wait_event_type='Lock'`, [applicationName])).rowCount).toBe(1)
+      if (change === 'computer') await holder.query("UPDATE harness.compute_nodes SET status='offline' WHERE id=$1", [f.context.nodeId])
+      else if (change === 'lease') await holder.query("UPDATE harness.node_agents SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE node_id=$1", [f.context.nodeId])
+      else if (change === 'connection') await holder.query('UPDATE harness.node_agents SET connection_id=$2,connection_epoch=connection_epoch+1 WHERE node_id=$1', [f.context.nodeId, randomUUID()])
+      else await holder.query(`UPDATE harness.instances SET ${change === 'stopping' ? "observed_state='stopping'" : 'generation=generation+1'}
+        WHERE organization_id=$1 AND user_id=$2`, [f.context.organizationId, f.users[0]!.uuid])
+      await holder.query('COMMIT')
+      expect(await pending).toMatchObject({ status: 409, reason: 'stale-generation' })
+    } finally {
+      await holder.query('ROLLBACK'); holder.release()
+      await pending
+      await waitingPool.end()
+    }
+  })
+
+  it('rolls back a Runtime registration whose database write fails', async () => {
+    const f = await fixture(), subject = f.subjects[0]!, name = `registration_failure_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`CREATE FUNCTION harness.${name}() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.organization_id::text=TG_ARGV[0] THEN RAISE EXCEPTION 'registration write refused' USING ERRCODE='23514'; END IF;
+        RETURN NEW;
+      END $$`)
+    cleanups.push(async () => {
+      await pool.query(`DROP TRIGGER IF EXISTS ${name} ON harness.node_resource_runtimes`)
+      await pool.query(`DROP FUNCTION harness.${name}()`)
+    })
+    await pool.query(`CREATE TRIGGER ${name} BEFORE INSERT OR UPDATE ON harness.node_resource_runtimes
+      FOR EACH ROW EXECUTE FUNCTION harness.${name}('${f.context.organizationId}')`)
+    await expect(f.budget.register(subject)).rejects.toMatchObject({ code: '23514' })
+    expect((await pool.query(`SELECT last_sequence::int FROM harness.node_resource_runtimes
+      WHERE organization_id=$1 AND runtime_kind='user' AND runtime_public_id=$2`, [f.context.organizationId, subject.target.id])).rows)
+      .toEqual([{ last_sequence: 0 }])
+  })
+
+  it('preserves Runtime registration after a lost commit acknowledgement without replaying it', async () => {
+    const f = await fixture(), subject = f.subjects[0]!
+    await f.grant(1)
+    await f.budget.request(subject, f.request(0, 1))
+    let commits = 0
+    const lost = await startPool(async (sql, execute) => {
+      const response = await execute()
+      if (sql === 'COMMIT') { commits++; throw Object.assign(new Error('acknowledgement lost'), { code: 'ECONNRESET' }) }
+      return response
+    })
+    await expect(new NodeResourceBudget(lost, f.context.organizationId, f.context.nodeId, f.config).register(subject))
+      .rejects.toMatchObject({ code: 'ECONNRESET' })
+    expect(commits).toBe(1)
+    expect(await f.budget.register(subject)).toEqual({ nextSequence: 2, policy: f.config })
+    expect(await f.budget.status(subject, f.request(0, 1))).toEqual({ state: 'active' })
   })
 
   it('applies the committed Linux memory reserve to observations from an older coordinator', async () => {
@@ -737,6 +1151,125 @@ describePg('durable node resource budget', () => {
     await f.grant(1)
     expect(await f.budget.status(f.subjects[3]!, f.request(3, 1))).toEqual({ state: 'active' })
     expect(await f.budget.status(f.subjects[2]!, f.request(2, 2))).toEqual({ state: 'queued' })
+  })
+
+  it('commits a granted model completion and its next grant in one database round trip', async () => {
+    const f = await completionFixture()
+    await f.grant(1)
+    let commands = 0
+    const observed = await startPool((_sql, execute) => { commands += 1; return execute() })
+    const budget = new NodeResourceBudget(observed, f.context.organizationId, f.context.nodeId, f.config)
+    await budget.finish(f.subject, f.operation, 'quiescent')
+    expect(commands).toBe(1)
+    expect(await f.requests()).toEqual([{ operation_id: f.successor.requestId, state: 'active' }])
+    expect((await f.budget.snapshot()).outcomes.completed).toBe(1)
+  })
+
+  it.each(['valid', 'invalid'] as const)('leaves accounting untouched on %s policy drift committed while the node lock is held', async policy => {
+    const f = await completionFixture(), expired = f.request(2, 1)
+    expect(await f.budget.request(f.subjects[2]!, expired)).toEqual({ state: 'queued' })
+    await pool.query("UPDATE harness.node_resource_requests SET deadline=clock_timestamp() WHERE operation_id=$1", [expired.requestId])
+    await f.grant(1)
+    const args = [f.context.organizationId, f.context.nodeId]
+    const counters = async () => (await pool.query(`SELECT completed::int,timed_out::int FROM harness.node_resource_state
+      WHERE organization_id=$1 AND node_id=$2`, args)).rows[0]
+    const applicationName = `resource-policy-${randomUUID()}`, commands: string[] = []
+    const observed = await startPool(async (sql, execute) => {
+      commands.push(sql)
+      const result = await execute()
+      if (commands.length === 1) {
+        expect(result.rows).toEqual([{ applied: false }])
+        expect(await counters()).toEqual({ completed: 0, timed_out: 0 })
+        expect(await f.requests()).toContainEqual({ operation_id: expired.requestId, state: 'queued' })
+      }
+      return result
+    }, applicationName)
+    const budget = new NodeResourceBudget(observed, f.context.organizationId, f.context.nodeId, f.config)
+    let settled: Promise<PromiseSettledResult<void>[]> | undefined
+    try {
+      await transaction(pool, async blocker => {
+        const limits = policy === 'valid' ? { ...f.config, maxWaitMs: f.config.maxWaitMs - 1 } : { ...f.config, sampleMs: 0 }
+        const { rows: [held] } = await blocker.query<{ pid: number }>(`UPDATE harness.node_resource_state SET limits=$3::jsonb
+          WHERE organization_id=$1 AND node_id=$2 RETURNING pg_backend_pid() pid`, [...args, JSON.stringify(limits)])
+        settled = Promise.allSettled([budget.finish(f.subject, f.operation, 'quiescent')])
+        await expect.poll(async () => (await pool.query(`SELECT FROM pg_stat_activity
+          WHERE application_name=$1 AND $2=ANY(pg_blocking_pids(pid))`, [applicationName, held!.pid])).rowCount).toBe(1)
+      })
+    } finally { await settled }
+    if (policy === 'valid') {
+      expect(await settled).toEqual([{ status: 'fulfilled', value: undefined }])
+      expect(commands.slice(1)).toHaveLength(6)
+      expect(commands.at(-1)).toBe('COMMIT')
+      expect(await counters()).toEqual({ completed: 1, timed_out: 1 })
+      expect(await f.requests()).toEqual([{ operation_id: f.successor.requestId, state: 'active' }])
+    } else {
+      expect(await settled).toEqual([{ status: 'rejected', reason: expect.objectContaining({ name: 'ZodError' }) }])
+      expect(commands.at(-1)).toBe('ROLLBACK')
+      expect(await counters()).toEqual({ completed: 0, timed_out: 0 })
+      expect(await f.requests()).toHaveLength(3)
+    }
+  })
+
+  it('falls back for an absent node policy without initializing accounting on the fast-path miss', async () => {
+    const f = await fixture()
+    const { rows: [node] } = await pool.query<{ id: string }>("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'other') RETURNING id",
+      [f.context.organizationId])
+    const stateRows = async () => (await pool.query('SELECT 1 FROM harness.node_resource_state WHERE organization_id=$1 AND node_id=$2',
+      [f.context.organizationId, node!.id])).rowCount
+    const commands: string[] = []
+    const observed = await startPool(async (sql, execute) => {
+      commands.push(sql)
+      const result = await execute()
+      if (commands.length === 1) {
+        expect(result.rows).toEqual([{ applied: false }])
+        expect(await stateRows()).toBe(0)
+      }
+      return result
+    })
+    const budget = new NodeResourceBudget(observed, f.context.organizationId, node!.id, f.config)
+    await expect(budget.finish(f.subjects[0]!, f.request(0, 1), 'quiescent')).rejects.toMatchObject({ reason: 'unknown-operation' })
+    expect(commands.some(sql => sql.includes('harness.lock_node_resources('))).toBe(true)
+    expect(commands.at(-1)).toBe('ROLLBACK')
+    expect(await stateRows()).toBe(0)
+  })
+
+  it.each(['stale-generation', 'unknown-operation', 'owner-mismatch'] as const)(
+    'rejects %s without retrying or publishing completion and its next grant', async reason => {
+      const f = await completionFixture()
+      await f.grant(1)
+      let commands = 0
+      const observed = await startPool((_sql, execute) => { commands += 1; return execute() })
+      const budget = new NodeResourceBudget(observed, f.context.organizationId, f.context.nodeId, f.config)
+      const other = await f.repository.resolveTarget(f.subjects[1]!.target)
+      const subject = reason === 'stale-generation'
+        ? { ...f.subject, target: { ...f.subject.target, runtimeId: other.runtimeId } } : f.subject
+      const operation = reason === 'unknown-operation' ? { ...f.operation, sequence: f.operation.sequence + 1 }
+        : reason === 'owner-mismatch' ? { ...f.operation, requestId: f.successor.requestId } : f.operation
+      const cursor = budget.changeCursor
+      await expect(budget.finish(subject, operation, 'quiescent')).rejects.toMatchObject({ status: 409, reason })
+      expect(commands).toBe(1)
+      expect(budget.changeCursor).toBe(cursor)
+      expect(await f.requests()).toEqual([
+        { operation_id: f.operation.requestId, state: 'active' }, { operation_id: f.successor.requestId, state: 'queued' },
+      ])
+      expect((await f.budget.snapshot()).outcomes.completed).toBe(0)
+    },
+  )
+
+  it('counts concurrent completions once after waiting for the registration transaction', async () => {
+    const f = await fixture(), held = await heldRequest(f)
+    const subject = f.subjects[0]!
+    const joined = Promise.allSettled([f.budget.finish(subject, held.operation, 'quiescent'),
+      f.budget.finish(subject, held.operation, 'quiescent')])
+    cleanups.push(async () => { held.release(); await joined })
+    await expect.poll(async () => (await pool.query('SELECT FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid))',
+      [held.pid])).rowCount).toBeGreaterThan(0)
+    held.release()
+    await expect(held.request).resolves.toEqual({ state: 'active' })
+    expect((await joined).map(result => result.status)).toEqual(['fulfilled', 'fulfilled'])
+    const snapshot = await f.budget.snapshot()
+    expect(snapshot.kinds.process.active).toBe(0)
+    expect(snapshot.outcomes.completed).toBe(1)
   })
 
   it('fences delayed registrations after cancellation without retaining completed rows', async () => {
@@ -777,6 +1310,7 @@ describePg('durable node resource budget', () => {
     await expect(f.budget.status(subject, second)).rejects.toMatchObject({ status: 409 })
     await expect(f.budget.statuses(subject, [first, second])).rejects.toMatchObject({ status: 409 })
     await expect(f.budget.finish(subject, second, 'not-started')).rejects.toMatchObject({ status: 409 })
+    await expect(f.budget.finish(subject, second, 'quiescent')).rejects.toMatchObject({ reason: 'owner-mismatch' })
     await expect(f.budget.finish(subject, second, 'uncertain')).rejects.toMatchObject({ status: 409 })
     expect(await f.budget.request(subject, first)).toEqual({ state: 'active' })
     expect((await f.budget.snapshot()).kinds.model.active).toBe(1)

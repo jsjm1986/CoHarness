@@ -7,19 +7,22 @@
 // read. The Session is a seeded cold log resumed through the production agent
 // path, so the frame's session, ACL, and canonical-path checks all run for
 // real.
+import { responsiveBrowser, responsiveBrowserName, responsiveMobileEmulation, responsiveViewports, expectViewportFit } from './responsive-browser.ts'
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
-import { afterEach, describe, expect, it, onTestFailed } from 'vitest'
+import type { Browser, Page, Locator } from 'playwright'
+
+import { afterEach, describe, expect, it } from 'vitest'
 import { FsVersion } from '@deepseek-ai/dsh-fs'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, launchWebScaffold,
   seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, revealDocumentZoom, saveFailureShot } from './support.ts'
+import { revealDocumentZoom, saveFailureShot } from './support.ts'
+import { auditResponsiveControls } from './responsive-controls.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workspace-files', import.meta.url))
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
@@ -31,6 +34,16 @@ const HTML_TOO_LARGE_EXPECTED = join(SNAPSHOT_DIR, 'html-too-large.expected.md')
 const MODE = webSnapshotMode()
 const TINY_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+
+// Authored 8×6 solid-color raster files exercise each supported decoder.
+const RASTER_FIXTURES = [
+  { name: 'sample.jpg', base64: '/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAGAAgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCfAKCHv//Z' },
+  { name: 'sample.jpeg', base64: '/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAGAAgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCfAKCHv//Z' },
+  { name: 'sample.gif', base64: 'R0lGODlhCAAGAIAAAExpcRRatCH5BAUAAAAALAAAAAAIAAYAAAIGjI+py30FADs=' },
+  { name: 'sample.webp', base64: 'UklGRjoAAABXRUJQVlA4IC4AAADQAQCdASoIAAYAAUAmJaACdLoB+AADsAD+8iJf/UGfIM+QZ+ql/82BAzQ+dAAA' },
+  { name: 'sample.avif', base64: 'AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAANZtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAACJpbG9jAAAAAERAAAEAAQAAAAAA+gABAAAAAAAAACUAAAAjaWluZgAAAAAAAQAAABVpbmZlAgAAAAABAABhdjAxAAAAAA5waXRtAAAAAAABAAAAVmlwcnAAAAA4aXBjbwAAAAxhdjFDgSACAAAAABRpc3BlAAAAAAAAAAgAAAAGAAAAEHBpeGkAAAAAAwgICAAAABZpcG1hAAAAAAAAAAEAAQOBAgMAAAAtbWRhdBIACgg4CL1pAQ0GkDIXGUJjBMAANAAAkEDJHGFKa47MrGmukYA=' },
+] as const
+
 const FILE_NAME = 'notes.txt'
 const FIRST_CONTENT = 'alpha line\n'
 const SECOND_CONTENT = 'beta line\n'
@@ -69,7 +82,7 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
       : { kind: 'absent' }, { agent: { session } })
   }
 
-  it.skipIf(MODE === 'record')('browses, previews, and converges on Host change frames', async () => {
+  it.skipIf(MODE === 'record').each(responsiveViewports)('$name browses every file preview and converges on Host changes', async ({ name, width, height }) => {
     scaffold = await launchWebScaffold({
       workbench: true,
       remoteAuthority: 'app.localhost',
@@ -79,6 +92,7 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     const workspaceDir = join(scaffold.workspaceCwd, 'workspace')
     await mkdir(workspaceDir, { recursive: true })
     await writeFile(join(workspaceDir, FILE_NAME), FIRST_CONTENT)
+    await writeFile(join(workspaceDir, 'paged.txt'), Array.from({ length: 5_001 }, (_, index) => `Page line ${index + 1}\n`).join(''))
     const linkedLines = Array.from({ length: 32 }, (_, index) => `Line ${String(index + 1)}`)
     await writeFile(join(workspaceDir, 'links.txt'), linkedLines.join('\n'))
     await writeFile(join(workspaceDir, 'guide.md'), '---\nname: guide\ndescription: Packed markdown preview\n---\n\n# Guide\n\nPacked **markdown** preview.\n')
@@ -92,6 +106,9 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     await writeFile(join(workspaceDir, 'oversized.js'), Buffer.alloc(4 * 1024 * 1024 + 1, 65))
     await writeFile(join(workspaceDir, 'oversized.html'), '<!doctype html><script src="oversized.js"></script>\n')
     await writeFile(join(workspaceDir, 'pixel.png'), TINY_PNG)
+    for (const image of RASTER_FIXTURES) await writeFile(join(workspaceDir, image.name), Buffer.from(image.base64, 'base64'))
+    await writeFile(join(workspaceDir, 'corrupt.png'), Buffer.from([0, 1, 2, 3, 4, 5]))
+    await writeFile(join(workspaceDir, 'opaque.bin'), Buffer.from([0, 255, 1, 254, 2, 253]))
     await writeFile(join(workspaceDir, 'large.svg'), [
       '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">',
       '<rect width="1200" height="1600" fill="#3366ff"/>',
@@ -105,173 +122,270 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
       setup: agentCtx => scaffold!.ctx.agentPresets.mount(agentCtx).then(() => undefined),
     })
 
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await browser.newPage({ viewport: { width, height }, locale: 'en-US', hasTouch: true, isMobile: responsiveMobileEmulation && width < 768, reducedMotion: 'reduce' })
     tripwire = watchConsole(page)
-    onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-files'))
-    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-    const toolbar = page.locator('[data-workbench-toolbar]')
-    await toolbar.waitFor({ timeout: 30_000 })
-    await toolbar.getByRole('button', { name: 'Select workbench' }).click()
-    await page.getByRole('menuitem', { name: /My workbench/ }).click()
-    await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
-    const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
-    await picker.getByRole('button', { name: /Use the read tool twice/ }).click()
-    await picker.waitFor({ state: 'hidden' })
-    await page.locator('[data-session-pane]').waitFor({ timeout: 30_000 })
+    async function checkPreview(region: Locator, kind: string, zoom: 'available' | 'unavailable' = 'available'): Promise<void> {
+      await expectViewportFit(page, region, [region.getByRole('button', { name: 'Reload', exact: true }), region.getByRole('button', { name: 'Close preview', exact: true })])
+      await auditResponsiveControls(page, region, `workspace-preview/${kind}`)
+      const scrollport = region.locator('[data-document-zoom-scrollport]')
+      const zoomControls = region.locator('[data-document-zoom-controls]')
+      if (zoom === 'unavailable') expect(await zoomControls.count()).toBe(0)
+      else if (await scrollport.count() > 0) {
+        const content = await scrollport.boundingBox()
+        const controls = await zoomControls.boundingBox()
+        expect(content).not.toBeNull()
+        expect(controls).not.toBeNull()
+        expect(content!.height).toBeGreaterThan(0)
+        expect(content!.y + content!.height).toBeLessThanOrEqual(controls!.y + 1)
+      }
+      const directory = process.env.DSH_MOBILE_SCREENSHOTS
+      if (directory !== undefined) {
+        await mkdir(directory, { recursive: true })
+        await page.screenshot({ path: join(directory, `workspace-${responsiveBrowserName}-${name}-${kind}.png`), animations: 'disabled' })
+      }
+    }
+    async function revealConversation(): Promise<void> {
+      const overlay = page.locator(':is([data-viewport="medium"] [data-sidebar-right-panel], [data-sidebar-right-panel="fullscreen"])[data-sidebar-right-open]')
+      if (await overlay.count() > 0) {
+        await overlay.getByRole('button', { name: 'Collapse right sidebar', exact: true }).click()
+        await expect.poll(() => overlay.count()).toBe(0)
+      }
+    }
+    try {
+      await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      const toolbar = page.locator('[data-workbench-toolbar]')
+      await toolbar.waitFor({ timeout: 30_000 })
+      await toolbar.getByRole('button', { name: 'Select workbench' }).click()
+      await page.getByRole('menuitem', { name: /My workbench/ }).click()
+      await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
+      const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
+      await picker.getByRole('button', { name: /Use the read tool twice/ }).click()
+      await picker.waitFor({ state: 'hidden' })
+      await page.locator('[data-session-pane]').waitFor({ timeout: 30_000 })
 
-    // The toolbar advertises file browsing only for a connected remote
-    // authority; the active pane supplies the Session address.
-    const filesButton = toolbar.getByRole('button', { name: 'Workspace files' })
-    await filesButton.waitFor({ timeout: 15_000 })
-    await filesButton.click()
-    const browserDialog = page.getByRole('dialog', { name: 'Workspace files' })
-    await browserDialog.waitFor({ timeout: 10_000 })
-    await browserDialog.getByRole('treeitem', { name: FILE_NAME }).click()
+      // The toolbar advertises file browsing only for a connected remote
+      // authority; the active pane supplies the Session address.
+      const filesButton = toolbar.getByRole('button', { name: 'Workspace files' })
+      await filesButton.waitFor({ timeout: 15_000 })
+      await revealConversation()
+      await filesButton.click()
+      const browserDialog = page.getByRole('dialog', { name: 'Workspace files' })
+      await browserDialog.waitFor({ timeout: 10_000 })
+      await browserDialog.getByRole('button', { name: FILE_NAME }).click()
 
-    const previewDialog = page.getByRole('region', { name: FILE_NAME, exact: true })
-    const preview = previewDialog.locator('[data-workspace-file-preview]')
-    await preview.waitFor({ timeout: 15_000 }).catch(async (error: unknown) => {
-      await saveFailureShot(page, 'web-e2e-workspace-files-open')
+      const previewDialog = page.getByRole('region', { name: FILE_NAME, exact: true })
+      const preview = previewDialog.locator('[data-workspace-file-preview]')
+      await preview.waitFor({ timeout: 15_000 }).catch(async (error: unknown) => {
+        await saveFailureShot(page, 'web-e2e-workspace-files-open')
+        throw error
+      })
+      expect(await preview.textContent()).toBe(FIRST_CONTENT)
+      await checkPreview(previewDialog, 'text')
+
+      expect(await page.locator('[data-sidebar-right-panel]').count()).toBe(1)
+      expect(await page.getByRole('dialog', { name: FILE_NAME }).count()).toBe(0)
+
+      await revealConversation()
+      await filesButton.click()
+      await browserDialog.getByRole('button', { name: 'paged.txt', exact: true }).click()
+      const pagedRegion = page.getByRole('region', { name: 'paged.txt', exact: true })
+      const pagedText = pagedRegion.locator('[data-workspace-file-preview]')
+      await pagedText.waitFor()
+      const firstPage = await pagedText.textContent()
+      expect(firstPage).toMatch(/^Page line 1\n/)
+      expect(firstPage).not.toContain('Page line 5001')
+      const nextPage = pagedRegion.getByRole('button', { name: 'Next page', exact: true })
+      const previousPage = pagedRegion.getByRole('button', { name: 'Previous page', exact: true })
+      await expectViewportFit(page, pagedRegion, [nextPage, previousPage])
+      expect(await previousPage.isDisabled()).toBe(true)
+      await nextPage.tap()
+      await expect.poll(() => pagedText.textContent()).not.toBe(firstPage)
+      expect(await previousPage.isEnabled()).toBe(true)
+      await checkPreview(pagedRegion, 'text-next-page')
+      await previousPage.tap()
+      await expect.poll(() => pagedText.textContent()).toBe(firstPage)
+
+      await revealConversation()
+      await page.getByRole('button', { name: 'Line twenty-four', exact: true }).click()
+      const linkedPreview = page.getByRole('region', { name: 'links.txt', exact: true }).locator('[data-workspace-file-preview]')
+      await expect.poll(() => linkedPreview.textContent()).toBe(linkedLines.slice(23).join('\n'))
+      const linkedSnapshot = await captureStableAria(page, 'section[aria-label="links.txt"]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(LINKED_LINE_EXPECTED, linkedSnapshot, MODE)
+      const fileTabs = page.locator('[data-sidebar-right-panel]').getByRole('tab')
+      const tabCount = await fileTabs.count()
+      await revealConversation()
+      await page.getByRole('button', { name: 'Line three', exact: true }).click()
+      await expect.poll(() => linkedPreview.textContent()).toBe(linkedLines.slice(2).join('\n'))
+      expect(await fileTabs.count()).toBe(tabCount)
+      await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).tap()
+      await expect.poll(() => preview.textContent()).toBe(FIRST_CONTENT)
+
+      // Markdown renders through the accumulated authorized read; HTML packs its
+      // declared sibling assets through the same Session-scoped service into an
+      // opaque sandboxed frame.
+      await revealConversation()
+      await filesButton.click()
+      await browserDialog.getByRole('button', { name: 'guide.md' }).click()
+      const markdownDialog = page.getByRole('region', { name: 'guide.md', exact: true })
+      await markdownDialog.locator('[data-workspace-markdown] h1').waitFor({ timeout: 15_000 })
+      expect(await markdownDialog.locator('[data-workspace-markdown] h1').textContent()).toBe('Guide')
+      await markdownDialog.locator('[data-workspace-frontmatter] dl').waitFor({ timeout: 15_000 })
+      await checkPreview(markdownDialog, 'markdown-frontmatter')
+      const markdownSnapshot = await captureStableAria(page, 'section[aria-label="guide.md"]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(MARKDOWN_EXPECTED, markdownSnapshot, MODE)
+
+      await revealConversation()
+      await filesButton.click()
+      const dependencyReads = { stat: 0, readBytes: 0 }
+      page.on('request', (request) => {
+        const method = new URL(request.url()).pathname.split('.').at(-1)
+        if (method !== 'stat' && method !== 'readBytes') return
+        const body = JSON.parse(request.postData() ?? '{}') as { payload?: { path?: string } }
+        if (body.payload?.path !== undefined && assets.includes(body.payload.path)) dependencyReads[method] += 1
+      })
+      const htmlStarted = performance.now()
+      await browserDialog.getByRole('button', { name: 'page.html' }).click()
+      const htmlDialog = page.getByRole('region', { name: 'page.html', exact: true })
+      const htmlFrame = htmlDialog.locator('iframe[data-workspace-html-preview]')
+      await htmlFrame.waitFor({ timeout: 15_000 })
+      expect(await htmlFrame.getAttribute('sandbox')).toBe('allow-scripts')
+      const packedFrame = page.frameLocator('iframe[data-workspace-html-preview]')
+      await expect.poll(async () => packedFrame.locator('p').textContent(), { timeout: 15_000 }).toBe('HTML body')
+      await expect.poll(async () => packedFrame.locator('body').getAttribute('data-packed'), { timeout: 15_000 }).toBe('8')
+      console.info('WORKSPACE_HTML_PREPARATION', JSON.stringify({
+        assets: assets.length, dependencyReads, clickToReadyMs: performance.now() - htmlStarted,
+        clock: 'automation click through all eight scripts executing; no model or public tunnel',
+      }))
+      expect(dependencyReads).toEqual({ stat: 0, readBytes: 8 })
+      await checkPreview(htmlDialog, 'html')
+      await compareOrRefreshGolden(HTML_EXPECTED, await packedFrame.locator('body').ariaSnapshot(), MODE)
+      await revealConversation()
+      await filesButton.click()
+      const [refusal] = await Promise.all([
+        page.waitForResponse((response) => {
+          if (!new URL(response.url()).pathname.endsWith('/workspaceFiles.readBytes')) return false
+          const request = JSON.parse(response.request().postData() ?? '{}') as { payload?: { path?: string } }
+          return request.payload?.path === 'oversized.js'
+        }),
+        browserDialog.getByRole('button', { name: 'oversized.html', exact: true }).click(),
+      ])
+      const body = await refusal.json() as { result: { ok: boolean; error: { code: string } } }
+      expect(body.result).toMatchObject({ ok: false, error: { code: 'workspace-file/too-large' } })
+      const failedHtml = page.getByRole('region', { name: 'oversized.html', exact: true })
+      await failedHtml.getByRole('alert').waitFor()
+      expect(await failedHtml.locator('iframe').count()).toBe(0)
+      await checkPreview(failedHtml, 'html-refusal')
+      await compareOrRefreshGolden(HTML_TOO_LARGE_EXPECTED,
+        await captureStableAria(page, 'section[aria-label="oversized.html"]', scaffold.workspaceCwd), MODE)
+      await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).tap()
+      await preview.waitFor({ timeout: 15_000 })
+
+      // A small image keeps its intrinsic size under fit width; a wide SVG shrinks
+      // to the pane until a fixed zoom restores horizontal overflow inside the
+      // zoom viewport's own scrollport.
+      await revealConversation()
+      await filesButton.click()
+      await browserDialog.getByRole('button', { name: 'pixel.png' }).click()
+      const pixelRegion = page.getByRole('region', { name: 'pixel.png', exact: true })
+      const pixelImage = pixelRegion.locator('[data-workspace-file-image]')
+      await pixelImage.waitFor({ state: 'visible', timeout: 15_000 })
+      expect(await pixelImage.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(1)
+      await expect.poll(async () => (await pixelImage.boundingBox())!.width).toBeCloseTo(1, 0)
+      await checkPreview(pixelRegion, 'raster-image')
+      let imageZoom = await revealDocumentZoom(page, pixelRegion)
+      await expect.poll(() => imageZoom.innerText()).toBe('100%')
+      await imageZoom.click()
+      await page.getByRole('menuitem', { name: '200%', exact: true }).click()
+      await expect.poll(async () => (await pixelImage.boundingBox())!.width).toBeCloseTo(2, 0)
+
+      await revealConversation()
+      await filesButton.click()
+      await browserDialog.getByRole('button', { name: 'large.svg' }).click()
+      const svgRegion = page.getByRole('region', { name: 'large.svg', exact: true })
+      const svgImage = svgRegion.locator('[data-workspace-file-image]')
+      await svgImage.waitFor({ state: 'visible', timeout: 15_000 })
+      expect(await svgImage.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(1200)
+      const fittedWidth = (await svgImage.boundingBox())!.width
+      expect(fittedWidth).toBeLessThan(1200)
+      const imageScrollport = svgRegion.locator('[data-document-zoom-scrollport]')
+      expect(await imageScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(false)
+      imageZoom = await revealDocumentZoom(page, svgRegion)
+      await imageZoom.click()
+      await page.getByRole('menuitem', { name: '100%', exact: true }).click()
+      await expect.poll(async () => (await svgImage.boundingBox())!.width).toBeCloseTo(1200, 0)
+      expect(await imageScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true)
+      imageZoom = await revealDocumentZoom(page, svgRegion)
+      await imageZoom.click()
+      await page.getByRole('menuitem', { name: 'Fit width', exact: true }).click()
+      await expect.poll(async () => (await svgImage.boundingBox())!.width).toBeCloseTo(fittedWidth, 0)
+      expect(await imageScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(false)
+
+      await checkPreview(svgRegion, 'vector-image')
+
+      for (const image of RASTER_FIXTURES) {
+        await revealConversation()
+        await filesButton.click()
+        await browserDialog.getByRole('button', { name: image.name, exact: true }).click()
+        const region = page.getByRole('region', { name: image.name, exact: true })
+        const decoded = region.locator('[data-workspace-file-image]')
+        await decoded.waitFor({ state: 'visible' })
+        expect(await decoded.evaluate((node: HTMLImageElement) => [node.naturalWidth, node.naturalHeight])).toEqual([8, 6])
+        await checkPreview(region, image.name)
+        const zoom = await revealDocumentZoom(page, region)
+        await zoom.click()
+        await page.getByRole('menuitem', { name: '200%', exact: true }).click()
+        await expect.poll(async () => (await decoded.boundingBox())?.width).toBeCloseTo(16, 0)
+      }
+
+      await revealConversation()
+      await filesButton.click()
+      await browserDialog.getByRole('button', { name: 'corrupt.png', exact: true }).click()
+      const corrupt = page.getByRole('region', { name: 'corrupt.png', exact: true })
+      await corrupt.getByRole('alert').waitFor()
+      expect(await corrupt.locator('[data-workspace-file-image]:visible').count()).toBe(0)
+      await checkPreview(corrupt, 'image-decode-failure', 'unavailable')
+
+      await revealConversation()
+      await filesButton.click()
+      await browserDialog.getByRole('button', { name: 'opaque.bin', exact: true }).click()
+      const binary = page.getByRole('region', { name: 'opaque.bin', exact: true })
+      await binary.locator('[data-workspace-file-bytes]').waitFor()
+      await checkPreview(binary, 'binary-fallback')
+
+      // A present observation with a fresh version marks the open resource
+      // changed; the page content stays until Reload.
+      await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).tap()
+      await preview.waitFor({ timeout: 15_000 })
+      await writeFile(join(workspaceDir, FILE_NAME), SECOND_CONTENT)
+      await emitObservation(sessionId, FILE_NAME, true)
+      const changedBadge = previewDialog.locator('[data-workspace-file-changed]')
+      await changedBadge.waitFor({ timeout: 15_000 })
+      expect(await changedBadge.textContent()).toBe('This file changed. Reload to see its current content.')
+      expect(await preview.textContent()).toBe(FIRST_CONTENT)
+      const changedSnapshot = await captureStableAria(page, `section[aria-label="${FILE_NAME}"]`, scaffold.workspaceCwd)
+      await compareOrRefreshGolden(CHANGED_EXPECTED, changedSnapshot, MODE)
+
+      await previewDialog.getByRole('button', { name: 'Reload' }).click()
+      await expect.poll(() => preview.textContent(), { timeout: 15_000 }).toBe(SECOND_CONTENT)
+      await expect.poll(() => changedBadge.count()).toBe(0)
+
+      // An absent observation converges the same way; the next read surfaces the
+      // disappearance instead of stale content.
+      await rm(join(workspaceDir, FILE_NAME))
+      await emitObservation(sessionId, FILE_NAME, false)
+      await changedBadge.waitFor({ timeout: 15_000 })
+      await previewDialog.getByRole('button', { name: 'Reload' }).click()
+      await previewDialog.locator('[role="alert"]').waitFor({ timeout: 15_000 })
+      await checkPreview(previewDialog, 'missing-file')
+
+      expect(await page.locator('[data-slot-error]').count()).toBe(0)
+      expect(tripwire.pageErrors).toEqual([])
+      expect(tripwire.warnings).toEqual([])
+      await assertFixtureInventory(SNAPSHOT_DIR, ['changed.expected.md', 'linked-line.expected.md', 'markdown.expected.md', 'html.expected.md', 'html-too-large.expected.md'])
+    } catch (error) {
+      await saveFailureShot(page, `workspace-files-${responsiveBrowserName}-${name}`)
       throw error
-    })
-    expect(await preview.textContent()).toBe(FIRST_CONTENT)
-
-    expect(await page.locator('[data-sidebar-right-panel]').count()).toBe(1)
-    expect(await page.getByRole('dialog', { name: FILE_NAME }).count()).toBe(0)
-
-    await page.getByRole('button', { name: 'Line twenty-four', exact: true }).click()
-    const linkedPreview = page.getByRole('region', { name: 'links.txt', exact: true }).locator('[data-workspace-file-preview]')
-    await expect.poll(() => linkedPreview.textContent()).toBe(linkedLines.slice(23).join('\n'))
-    const linkedSnapshot = await captureStableAria(page, 'section[aria-label="links.txt"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(LINKED_LINE_EXPECTED, linkedSnapshot, MODE)
-    const fileTabs = page.locator('[data-sidebar-right-panel]').getByRole('tab')
-    const tabCount = await fileTabs.count()
-    await page.getByRole('button', { name: 'Line three', exact: true }).click()
-    await expect.poll(() => linkedPreview.textContent()).toBe(linkedLines.slice(2).join('\n'))
-    expect(await fileTabs.count()).toBe(tabCount)
-    await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).click()
-    await expect.poll(() => preview.textContent()).toBe(FIRST_CONTENT)
-
-    // Markdown renders through the accumulated authorized read; HTML packs its
-    // declared sibling assets through the same Session-scoped service into an
-    // opaque sandboxed frame.
-    await filesButton.click()
-    await browserDialog.getByRole('treeitem', { name: 'guide.md' }).click()
-    const markdownDialog = page.getByRole('region', { name: 'guide.md', exact: true })
-    await markdownDialog.locator('[data-workspace-markdown] h1').waitFor({ timeout: 15_000 })
-    expect(await markdownDialog.locator('[data-workspace-markdown] h1').textContent()).toBe('Guide')
-    await markdownDialog.locator('[data-workspace-frontmatter] dl').waitFor({ timeout: 15_000 })
-    const markdownSnapshot = await captureStableAria(page, 'section[aria-label="guide.md"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(MARKDOWN_EXPECTED, markdownSnapshot, MODE)
-
-    await filesButton.click()
-    const dependencyReads = { stat: 0, readBytes: 0 }
-    page.on('request', (request) => {
-      const method = new URL(request.url()).pathname.split('.').at(-1)
-      if (method !== 'stat' && method !== 'readBytes') return
-      const body = JSON.parse(request.postData() ?? '{}') as { payload?: { path?: string } }
-      if (body.payload?.path !== undefined && assets.includes(body.payload.path)) dependencyReads[method] += 1
-    })
-    const htmlStarted = performance.now()
-    await browserDialog.getByRole('treeitem', { name: 'page.html' }).click()
-    const htmlDialog = page.getByRole('region', { name: 'page.html', exact: true })
-    const htmlFrame = htmlDialog.locator('iframe[data-workspace-html-preview]')
-    await htmlFrame.waitFor({ timeout: 15_000 })
-    expect(await htmlFrame.getAttribute('sandbox')).toBe('allow-scripts')
-    const packedFrame = page.frameLocator('iframe[data-workspace-html-preview]')
-    await expect.poll(async () => packedFrame.locator('p').textContent(), { timeout: 15_000 }).toBe('HTML body')
-    await expect.poll(async () => packedFrame.locator('body').getAttribute('data-packed'), { timeout: 15_000 }).toBe('8')
-    console.info('WORKSPACE_HTML_PREPARATION', JSON.stringify({
-      assets: assets.length, dependencyReads, clickToReadyMs: performance.now() - htmlStarted,
-      clock: 'automation click through all eight scripts executing; no model or public tunnel',
-    }))
-    expect(dependencyReads).toEqual({ stat: 0, readBytes: 8 })
-    await compareOrRefreshGolden(HTML_EXPECTED, await packedFrame.locator('body').ariaSnapshot(), MODE)
-    await filesButton.click()
-    const [refusal] = await Promise.all([
-      page.waitForResponse((response) => {
-        if (!new URL(response.url()).pathname.endsWith('/workspaceFiles.readBytes')) return false
-        const request = JSON.parse(response.request().postData() ?? '{}') as { payload?: { path?: string } }
-        return request.payload?.path === 'oversized.js'
-      }),
-      browserDialog.getByRole('treeitem', { name: 'oversized.html', exact: true }).click(),
-    ])
-    const body = await refusal.json() as { result: { ok: boolean; error: { code: string } } }
-    expect(body.result).toMatchObject({ ok: false, error: { code: 'workspace-file/too-large' } })
-    const failedHtml = page.getByRole('region', { name: 'oversized.html', exact: true })
-    await failedHtml.getByRole('alert').waitFor()
-    expect(await failedHtml.locator('iframe').count()).toBe(0)
-    await compareOrRefreshGolden(HTML_TOO_LARGE_EXPECTED,
-      await captureStableAria(page, 'section[aria-label="oversized.html"]', scaffold.workspaceCwd), MODE)
-    await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).click()
-    await preview.waitFor({ timeout: 15_000 })
-
-    // A small image keeps its intrinsic size under fit width; a wide SVG shrinks
-    // to the pane until a fixed zoom restores horizontal overflow inside the
-    // zoom viewport's own scrollport.
-    await filesButton.click()
-    await browserDialog.getByRole('treeitem', { name: 'pixel.png' }).click()
-    const pixelRegion = page.getByRole('region', { name: 'pixel.png', exact: true })
-    const pixelImage = pixelRegion.locator('[data-workspace-file-image]')
-    await pixelImage.waitFor({ state: 'visible', timeout: 15_000 })
-    expect(await pixelImage.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(1)
-    await expect.poll(async () => (await pixelImage.boundingBox())!.width).toBeCloseTo(1, 0)
-    let imageZoom = await revealDocumentZoom(page, pixelRegion)
-    await expect.poll(() => imageZoom.innerText()).toBe('100%')
-    await imageZoom.click()
-    await page.getByRole('menuitem', { name: '200%', exact: true }).click()
-    await expect.poll(async () => (await pixelImage.boundingBox())!.width).toBeCloseTo(2, 0)
-
-    await filesButton.click()
-    await browserDialog.getByRole('treeitem', { name: 'large.svg' }).click()
-    const svgRegion = page.getByRole('region', { name: 'large.svg', exact: true })
-    const svgImage = svgRegion.locator('[data-workspace-file-image]')
-    await svgImage.waitFor({ state: 'visible', timeout: 15_000 })
-    expect(await svgImage.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(1200)
-    const fittedWidth = (await svgImage.boundingBox())!.width
-    expect(fittedWidth).toBeLessThan(1200)
-    const imageScrollport = svgRegion.locator('[data-document-zoom-scrollport]')
-    expect(await imageScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(false)
-    imageZoom = await revealDocumentZoom(page, svgRegion)
-    await imageZoom.click()
-    await page.getByRole('menuitem', { name: '100%', exact: true }).click()
-    await expect.poll(async () => (await svgImage.boundingBox())!.width).toBeCloseTo(1200, 0)
-    expect(await imageScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true)
-    imageZoom = await revealDocumentZoom(page, svgRegion)
-    await imageZoom.click()
-    await page.getByRole('menuitem', { name: 'Fit width', exact: true }).click()
-    await expect.poll(async () => (await svgImage.boundingBox())!.width).toBeCloseTo(fittedWidth, 0)
-    expect(await imageScrollport.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(false)
-
-    // A present observation with a fresh version marks the open resource
-    // changed; the page content stays until Reload.
-    await page.locator('[data-sidebar-right-panel]').getByRole('tab', { name: /notes.txt/ }).click()
-    await preview.waitFor({ timeout: 15_000 })
-    await writeFile(join(workspaceDir, FILE_NAME), SECOND_CONTENT)
-    await emitObservation(sessionId, FILE_NAME, true)
-    const changedBadge = previewDialog.locator('[data-workspace-file-changed]')
-    await changedBadge.waitFor({ timeout: 15_000 })
-    expect(await changedBadge.textContent()).toBe('This file changed. Reload to see its current content.')
-    expect(await preview.textContent()).toBe(FIRST_CONTENT)
-    const changedSnapshot = await captureStableAria(page, `section[aria-label="${FILE_NAME}"]`, scaffold.workspaceCwd)
-    await compareOrRefreshGolden(CHANGED_EXPECTED, changedSnapshot, MODE)
-
-    await previewDialog.getByRole('button', { name: 'Reload' }).click()
-    await expect.poll(() => preview.textContent(), { timeout: 15_000 }).toBe(SECOND_CONTENT)
-    await expect.poll(() => changedBadge.count()).toBe(0)
-
-    // An absent observation converges the same way; the next read surfaces the
-    // disappearance instead of stale content.
-    await rm(join(workspaceDir, FILE_NAME))
-    await emitObservation(sessionId, FILE_NAME, false)
-    await changedBadge.waitFor({ timeout: 15_000 })
-    await previewDialog.getByRole('button', { name: 'Reload' }).click()
-    await previewDialog.locator('[role="alert"]').waitFor({ timeout: 15_000 })
-
-    expect(await page.locator('[data-slot-error]').count()).toBe(0)
-    expect(tripwire.pageErrors).toEqual([])
-    expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['changed.expected.md', 'linked-line.expected.md', 'markdown.expected.md', 'html.expected.md', 'html-too-large.expected.md'])
+    }
   }, 120_000)
 })

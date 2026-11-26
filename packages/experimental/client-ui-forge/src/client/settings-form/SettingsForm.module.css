@@ -15,6 +15,7 @@
 
 .footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding-top: 16px;
@@ -31,6 +32,7 @@
 
 .save {
   appearance: none;
+  min-height: var(--dsw-space-7);
   border: 1px solid transparent;
   border-radius: var(--dsw-radius-md);
   padding: 5px 14px;
@@ -50,4 +52,10 @@
 .save:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .save {
+    min-height: var(--dsw-touch-target, 44px);
+  }
 }

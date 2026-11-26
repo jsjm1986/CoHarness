@@ -357,6 +357,35 @@ describe('HoverCard', () => {
     }
   })
 
+  it('routes keyboard focus from the anchor through the copy action and returns it on Escape', () => {
+    render(<HoverCard
+      anchor={<button type="button">Session</button>}
+      content={<div>Full session title</div>}
+      keyboardAnchor
+      copyText="Full session title"
+      copyLabel="Copy"
+      copiedLabel="Copied"
+    />)
+    const anchor = screen.getByRole('button', { name: 'Session' })
+    const wrapper = anchor.parentElement as HTMLElement
+    vi.spyOn(anchor, 'matches').mockImplementation(selector => selector === ':focus-visible')
+    act(() => { anchor.focus() })
+    const card = screen.getByRole('button', { name: 'Copy: Full session title' })
+    expect(card.tabIndex).toBe(-1)
+    fireEvent.keyDown(anchor, { key: 'Tab' })
+    expect(document.activeElement).toBe(card)
+    fireEvent.pointerLeave(wrapper)
+    act(() => { vi.advanceTimersByTime(POINTER_GRACE_MS) })
+    expect(card.isConnected).toBe(true)
+    fireEvent.keyDown(card, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(anchor)
+    fireEvent.keyDown(anchor, { key: 'Tab' })
+    expect(document.activeElement).toBe(card)
+    fireEvent.keyDown(card, { key: 'Escape' })
+    expect(document.activeElement).toBe(anchor)
+    expect(card.isConnected).toBe(false)
+  })
+
   it('a press while closed leaves the card closed', () => {
     mount()
     fireEvent.pointerDown(screen.getByText('row'))
@@ -409,7 +438,7 @@ describe('HoverCard', () => {
       fireEvent.pointerEnter(wrapper)
       act(() => { vi.advanceTimersByTime(500) })
       const card = screen.getByRole('button')
-      fireEvent.keyDown(card, { key: 'Escape' })
+      fireEvent.keyDown(card, { key: 'ArrowDown' })
       expect(writeText).not.toHaveBeenCalled()
       await act(async () => { fireEvent.keyDown(card, { key: 'Enter' }) })
       expect(writeText).toHaveBeenCalledOnce()

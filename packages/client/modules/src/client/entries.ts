@@ -1,8 +1,8 @@
 /** Page-owned Loader entries; transport-independent reconciliation, retries and code replacement. */
 import type { FiberState } from '@deepseek-ai/cordis'
 import type { Entry, Loader } from '@deepseek-ai/cordis-plugin-loader'
-import { parseBootManifest, readRelease } from './manifest.ts'
-import type { BootManifest, ClientModuleLoader } from './manifest.ts'
+import { atRevision, parseBootManifest, readRelease } from './manifest.ts'
+import type { BootManifest, BootModuleRow, ClientModuleLoader } from './manifest.ts'
 import { removeOwnedStyles, tearDownEntryFiber } from './entry-lifecycle.ts'
 import { ReleaseChangeGate, type ClientReleaseChange } from './release-change.ts'
 import { notifySubscribers } from './notify.ts'
@@ -25,10 +25,11 @@ interface ModuleIndex {
 /** Numeric values mirror Cordis's const enum, which bundle loaders cannot import as a runtime object. */
 const ACTIVE = 2 as FiberState.ACTIVE
 const FAILED = 3 as FiberState.FAILED
+const OPTIONAL_ARRIVAL_TIMEOUT_MS = 30_000
 
 /** Revisions and requests identify desired code; URLs only select its immutable delivery resource. */
 function entryTargets(manifest: BootManifest): string {
-  return JSON.stringify(manifest.modules.map(row => [row.id, row.rev, row.inject, row.external]))
+  return JSON.stringify(manifest.modules.map(row => [row.id, row.rev, row.inject, row.external, row.optional]))
 }
 
 /** Manages only entries created from the Host manifest; other Loader contributors retain ownership. */
@@ -55,7 +56,10 @@ export class ClientEntries {
   private queue: Promise<void> = Promise.resolve()
   private desired: BootManifest
   private generation = 0
+  private optionalLifetime = new AbortController()
+  private readonly optionalLoads = new Map<string, Promise<void>>()
   private stopped = false
+  private optionalStarted = false
 
   /**
    * Construct the page controller before Cordis boot.
@@ -81,10 +85,10 @@ export class ClientEntries {
   }
 
   /**
-   * Create the initial roster and retain its entry identities for subsequent reconciliation.
+   * Create the required roster and retain its entry identities for subsequent reconciliation.
    * @param loader - Page Loader, already configured with the module system.
    * @param manifest - Initial roster audited by the boot caller.
-   * @returns after initial entries and their activation settle; boot owns its activation audit.
+   * @returns after required entries and their activation settle; boot owns its activation audit.
    */
   start(loader: Loader, manifest: BootManifest): Promise<void> {
     if (this.loader !== undefined) throw new Error('client-modules: entries already started')
@@ -92,11 +96,11 @@ export class ClientEntries {
     this.desired = manifest
     loader.ctx.effect(() => () => {
       this.stopped = true
-      this.generation++
+      this.optionalLifetime.abort()
       return this.queue
     }, 'client-modules: entry reconciliation')
     return this.enqueue(async () => {
-      await Promise.all(this.desired.plugins.map(async ({ id }) => {
+      await Promise.all(this.desired.plugins.filter(row => row.optional !== true).map(async ({ id }) => {
         await this.create(loader, id)
       }))
       await loader.await()
@@ -105,16 +109,27 @@ export class ClientEntries {
   }
 
   /**
+   * Release optional entries after application mount. Failed entries remain in page diagnostics and can be retried.
+   * @returns after the released operations settle, including any per-entry failure reporting.
+   */
+  startOptional(): Promise<void> {
+    if (this.optionalStarted || this.stopped) return this.queue.then(() => this.awaitOptional())
+    this.optionalStarted = true
+    if (!this.desired.plugins.some(row => row.optional === true)) return this.queue
+    return this.enqueue(() => this.reconcile(this.generation)).then(() => this.awaitOptional())
+  }
+
+  /**
    * Validate and apply the latest full Host graph. Changed targets cancel obsolete mounts; identical targets share pending loads.
    * The release is compared before the rest of the graph is validated: a graph of another release, including one whose
    * format this page cannot read, is not applied and {@link releaseChange} announces it.
    * @param graph - JSON-decoded graph received from the Host.
-   * @returns after the queued reconciliation, or at once for another release; per-package failures remain available in {@link state}.
+   * @returns after required reconciliation and dispatch of optional loads, or at once for another release.
    */
   sync(graph: unknown): Promise<void> {
     if (!this.release.observe(readRelease(graph))) return Promise.resolve()
     const manifest = parseBootManifest(graph)
-    if (entryTargets(manifest) !== entryTargets(this.desired)) this.generation++
+    if (entryTargets(manifest) !== entryTargets(this.desired)) this.advanceGeneration()
     this.desired = manifest
     const generation = this.generation
     return this.enqueue(() => this.reconcile(generation))
@@ -125,8 +140,8 @@ export class ClientEntries {
    * @returns after retry settlement, with remaining errors in {@link state}.
    */
   retry(): Promise<void> {
-    const generation = ++this.generation
-    return this.enqueue(() => this.reconcile(generation))
+    const generation = this.advanceGeneration()
+    return this.enqueue(() => this.reconcile(generation)).then(() => this.awaitOptional())
   }
 
   /**
@@ -139,13 +154,19 @@ export class ClientEntries {
    */
   reload(id: string, rev: string): Promise<void> {
     if (!this.release.matches) return Promise.resolve()
+    const previous = this.desired.modules.find(row => row.id === id)
     this.desired = {
       ...this.desired,
       modules: this.desired.modules.map((row) => {
         if (row.id !== id || row.rev === rev) return row
         const { chunks: _chunks, ...owner } = row
-        return { ...owner, rev }
+        return { ...owner, rev, url: atRevision(owner.url, rev) }
       }),
+    }
+    if (previous?.optional === true) {
+      if (previous.rev === rev) return this.queue
+      const generation = this.advanceGeneration()
+      return this.enqueue(() => this.reconcile(generation))
     }
     return this.enqueue(async () => {
       const desired = this.desired.modules.find(row => row.id === id)
@@ -185,6 +206,17 @@ export class ClientEntries {
     return !this.stopped && generation === this.generation
   }
 
+  private advanceGeneration(): number {
+    this.optionalLifetime.abort()
+    this.optionalLifetime = new AbortController()
+    this.optionalLoads.clear()
+    return ++this.generation
+  }
+
+  private async awaitOptional(): Promise<void> {
+    if (!this.stopped) await Promise.all(this.optionalLoads.values())
+  }
+
   /** Keep ownership even when Loader rejects a module's plugin exports after inserting its entry. */
   private async create(loader: Loader, id: string): Promise<void> {
     const options = { name: id }
@@ -199,6 +231,10 @@ export class ClientEntries {
   private async replace(entry: Entry, id: string, rev: string, generation: number): Promise<void> {
     this.index.invalidateForReplacement(id, rev)
     await this.modules.prefetch(id)
+    await this.applyReplacement(entry, id, rev, generation, true)
+  }
+
+  private async applyReplacement(entry: Entry, id: string, rev: string, generation: number, waitForActivation: boolean): Promise<void> {
     if (!this.current(generation)) return
     await tearDownEntryFiber(entry)
     removeOwnedStyles(id)
@@ -206,9 +242,71 @@ export class ClientEntries {
     await this.modules.import(id, '', {})
     if (!this.current(generation)) return
     await entry.refresh()
-    await entry.fiber?.await()
     if (entry.fiber === undefined) throw new Error(`client-modules: ${id} import failed (see console)`)
+    if (waitForActivation) await entry.fiber.await()
     this.revisions.set(id, rev)
+  }
+
+  private async applyRow(loader: Loader, row: BootModuleRow, generation: number, prepared: boolean): Promise<void> {
+    if (!this.current(generation)) return
+    const { id, rev } = row
+    const entry = this.managed.get(id)
+    if (entry === undefined) {
+      if (!prepared) await this.modules.prefetch(id)
+      if (!this.current(generation)) return
+      await this.modules.import(id, '', {})
+      if (!this.current(generation)) return
+      await this.create(loader, id)
+      this.revisions.set(id, rev)
+    } else if (this.revisions.get(id) !== rev || entry.fiber === undefined) {
+      if (prepared) await this.applyReplacement(entry, id, rev, generation, false)
+      else await this.replace(entry, id, rev, generation)
+    } else if (entry.fiber.state === FAILED) {
+      // A retry with unchanged config is not a configuration change to persist.
+      entry.fiber.update(entry.options.config, true)
+    }
+  }
+
+  private async requireActive(id: string, entry: Entry | undefined): Promise<void> {
+    const fiber = entry?.fiber
+    if (fiber === undefined) throw new Error(`client-modules: ${id} import failed (see console)`)
+    await fiber.await()
+    if (fiber.state !== ACTIVE) throw new Error(`client-modules: ${id} is waiting for activation`)
+  }
+
+  /** Prepare transport outside the queue. Only work with registered factories enters the Loader. */
+  private startOptionalRow(loader: Loader, row: BootModuleRow, generation: number): void {
+    const { id, rev } = row
+    if (this.optionalLoads.has(id)) return
+    const entry = this.managed.get(id)
+    const replacing = entry !== undefined && (this.revisions.get(id) !== rev || entry.fiber === undefined)
+    if (!replacing && entry?.fiber?.state === ACTIVE) return
+    const lifetime = this.optionalLifetime.signal
+    const task = (async () => {
+      let failure: { id: string; message: string } | undefined
+      try {
+        if (entry === undefined || replacing) {
+          if (replacing) this.index.invalidateForReplacement(id, rev)
+          const signal = AbortSignal.any([lifetime, AbortSignal.timeout(OPTIONAL_ARRIVAL_TIMEOUT_MS)])
+          await this.modules.prefetch(id, signal)
+        }
+        if (!this.current(generation)) return
+        await this.enqueue(() => this.applyRow(loader, row, generation, true), id)
+        await loader.await()
+        if (!this.current(generation)) return
+        await this.requireActive(id, this.managed.get(id))
+      } catch (error) {
+        failure = { id, message: String(error) }
+      }
+      if (this.current(generation)) {
+        const failures = this.snapshot.failures.filter(entry => entry.id !== id)
+        if (failure !== undefined) failures.push(failure)
+        this.publish({ ...this.snapshot, failures })
+      }
+    })().finally(() => {
+      if (this.optionalLoads.get(id) === task) this.optionalLoads.delete(id)
+    })
+    this.optionalLoads.set(id, task)
   }
 
   private async reconcile(generation: number): Promise<void> {
@@ -216,10 +314,12 @@ export class ClientEntries {
     const loader = this.loader
     if (loader === undefined) throw new Error('client-modules: entries have not started')
     const manifest = this.desired
-    this.publish({ syncing: true, failures: [] })
+    const optional = new Set(manifest.modules.filter(row => row.optional === true).map(row => row.id))
+    this.publish({ syncing: true, failures: this.snapshot.failures.filter(failure => optional.has(failure.id)) })
     const failures: { id: string; message: string }[] = []
-    this.index.update(manifest, this.managed.keys())
-    const wanted = new Set(manifest.plugins.map(row => row.id))
+    if (manifest !== this.modules.manifest) this.index.update(manifest, this.managed.keys())
+    const rows = this.optionalStarted ? manifest.modules : manifest.modules.filter(row => row.optional !== true)
+    const wanted = new Set(rows.map(row => row.id))
     for (const [id, entry] of this.managed) {
       if (wanted.has(id)) continue
       const fiber = entry.fiber
@@ -229,42 +329,22 @@ export class ClientEntries {
       // Removed fibers no longer appear in Loader.getTasks().
       while (fiber?.inertia !== undefined) await fiber.inertia
     }
-    for (const row of manifest.modules) {
-      if (!this.current(generation)) break
-      try {
-        const entry = this.managed.get(row.id)
-        if (entry === undefined) {
-          await this.modules.prefetch(row.id)
-          if (!this.current(generation)) break
-          await this.modules.import(row.id, '', {})
-          if (!this.current(generation)) break
-          await this.create(loader, row.id)
-          this.revisions.set(row.id, row.rev)
-        } else if (this.revisions.get(row.id) !== row.rev) {
-          await this.replace(entry, row.id, row.rev, generation)
-        } else if (entry.fiber === undefined) {
-          await this.replace(entry, row.id, row.rev, generation)
-        } else if (entry.fiber.state === FAILED) {
-          // A retry with unchanged config is not a configuration change to persist.
-          entry.fiber.update(entry.options.config, true)
-        }
-      } catch (error) {
-        failures.push({ id: row.id, message: String(error) })
-      }
+    for (const row of rows) {
+      if (row.optional === true) continue
+      try { await this.applyRow(loader, row, generation, false) }
+      catch (error) { failures.push({ id: row.id, message: String(error) }) }
     }
-    await loader.await()
     for (const [id, entry] of this.managed) {
-      if (failures.some(failure => failure.id === id)) continue
-      if (entry.fiber?.state === ACTIVE) continue
-      try {
-        if (entry.fiber === undefined) throw new Error(`client-modules: ${id} import failed (see console)`)
-        await entry.fiber.await()
-        failures.push({ id, message: `client-modules: ${id} is waiting for activation` })
-      } catch (error) {
-        failures.push({ id, message: String(error) })
-      }
+      if (optional.has(id) || failures.some(failure => failure.id === id)) continue
+      try { await this.requireActive(id, entry) }
+      catch (error) { failures.push({ id, message: String(error) }) }
     }
     this.index.prune([...loader.entries()].map(entry => entry.options.name))
-    if (this.current(generation)) this.publish({ syncing: false, failures })
+    if (!this.current(generation)) return
+    failures.push(...this.snapshot.failures.filter(failure => optional.has(failure.id)))
+    this.publish({ syncing: false, failures })
+    for (const row of rows) {
+      if (row.optional === true) this.startOptionalRow(loader, row, generation)
+    }
   }
 }

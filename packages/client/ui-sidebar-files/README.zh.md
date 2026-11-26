@@ -37,6 +37,8 @@ kind: "package-reference"
 
 根是会话的工作目录，读自 `useSessions().byId[sessionId].cwd`。`/` 和 Windows 盘根等文件系统根路径均可作为树的根。每一层以绝对路径为键；子路径是父路径以 `/` 拼上条目名。一层在首次展开时经 Session 目标连接上的 `connection.api.workspaceFiles.list({ sessionId, path })` 列出，`path` 为工作区相对路径——face 依据 Session 的 `cwd` 把显示的绝对路径换算成相对路径；适配器保留列表的条目与截断标志。行序为目录优先，其后按自然序、不分大小写的名称排列；dotfiles 与其他条目一样显示。
 
+目录读取失败时在对应分支显示，包括传输失败。刷新会重试打开的分支，并保留展开状态。
+
 | 条目类型 | 行 |
 |---|---|
 | `directory` | 切换展开与折叠；再次打开时重新列举，并恢复仍存在的已展开后代。折叠期间保留已显示条目的缓存。 |

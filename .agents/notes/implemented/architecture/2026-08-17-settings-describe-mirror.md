@@ -16,18 +16,18 @@ A cold web boot issued `settings.describe` fifteen times inside ~200ms, and the 
 
 This decision updates the browser read and invalidation mechanics recorded by [Host-backed Web preferences](../bug-fix/2026-08-06-host-backed-web-preferences.md) and [plugin-owned settings surface](2026-08-12-plugin-owned-settings-surface.md), while preserving their preference-ownership and namespace-exposure decisions. It also replaces the direct settings-read description in [official DeepSeek first-run credential setup](../feature/2026-07-30-deepseek-onboarding-credential-setup.md); that join now derives its settings half from this mirror.
 
-The cold-boot budget is pinned at two reads by `apps/web/tests/startup-rpc-budget.e2e.ts`: the mirror's eager bind-time read, plus the first-connection reset read, which is kept deliberately — it closes the window where a document commit lands between the eager HTTP read and the SSE subscription and its invalidation is lost. The plan's original target of one read is unreachable without either accepting that lost-invalidation window or delaying the first read until after the SSE stream opens.
+Standalone cold boot takes an eager read and a first-reset refresh, covering commits between the HTTP read and event subscription. An authenticated Gateway document defers its first read until the stream subscription is ready. The first read covers commits made before the subscription. Events received after a read starts mark a trailing refresh. The standalone and deferred remote browser compositions measure their respective request budgets and the latter verifies settings committed on each side of subscription.
 
 ## Alternatives considered
 
 - **Single-flight sharing inside `bind()` only** — deduplicates the concurrent bursts but keeps N direct readers, N subscription sets, and the revision skew; readers outside the binder (welcome, models, tab, permission) gain nothing. Rejected as treating the symptom.
 - **Boot-payload embedding** (host inlines the describe answer into the page boot) — saves the first read but adds a second acquisition path with its own staleness rules on top of the mirror it would still need. Deferred; it composes with the mirror if ever wanted.
 - **Per-namespace `settings.describe(ns)`** — shrinks each answer but keeps one read per consumer, so the fan-out and the growth rate stay. Rejected.
-- **One read (no first-reset re-read)** — reachable only by accepting the lost-invalidation window between the eager HTTP read and the SSE subscription, or by delaying the first read until the stream opens; both trade correctness or first-paint freshness for one loopback request. Rejected in favor of the pinned two.
+- **Reuse an eager read as the first connected baseline.** A setting can commit between the HTTP response and subscription, leaving the connected mirror stale. The eager standalone path retains a post-subscription refresh.
 
 ## Consequences
 
-- Startup `settings.describe` went 15 → 2, and a new preference-owning plugin adds zero reads.
+- Cold boot without a concurrent settings commit takes two standalone `settings.describe` reads or one on an authenticated Gateway document. A new preference-owning plugin adds zero reads.
 - Every derived surface shows the same document revision at any moment; the per-reader guards (`refreshWelcomeIfLoaded`, `refreshPermissionIfLoaded`, `refreshDocumentIfLoaded`) and their subscriptions are gone.
 - The mirror refreshes on every document commit regardless of namespace, so an external settings edit now costs one background read even while no settings surface is open — the price of surfaces that open already fresh. The per-namespace `ns !== spec.namespace` filters are gone with the per-scope subscriptions.
 - `credentials.describe`, `agentPreset.list`, and `llm.providers` are independent sources and stay direct. Credential-hint demand and invalidation follow the [client request lifetime decision](../bug-fix/2026-10-04-client-request-retirement-lifetimes.md); this mirror does not coalesce those domains.

@@ -4,11 +4,12 @@
 // keyless. Assertions read the exact durable system-prompt surface,
 // runtime-context messages, and tool calls, so assistant prose alone cannot
 // satisfy the scenario.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { canonicalPath } from '@deepseek-ai/dsh-sandbox'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -67,7 +68,7 @@ describe('web e2e: current sandbox policy reaches the model before tools', () =>
       sessionWorkspace = session.header.cwd
       sessionEvents.push(event)
     })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

@@ -1,5 +1,5 @@
 /** Independently versioned migrations for dedicated physical content stores. */
-import { nodeContentMigrations,checkedNodeContentVersions } from './node-content-manifest.ts'
+import { nodeContentMigrations,checkedNodeContentVersions,NODE_CONTENT_MIGRATION_LOCK_KEY } from './node-content-manifest.ts'
 import { escapeIdentifier } from 'pg'
 import { transaction } from './postgres/database.ts'
 import { NodeContentUnavailable, proveNodeContentVolume, type NodeContentOptions } from './node-content-store.ts'
@@ -13,7 +13,7 @@ import { NodeContentUnavailable, proveNodeContentVolume, type NodeContentOptions
 export async function migrateNodeContent(options: NodeContentOptions, directory: string, applicationRole?: string): Promise<number> {
   const migrations=await nodeContentMigrations(directory)
   return transaction(options.pool, async tx => {
-    await tx.query('SELECT pg_advisory_xact_lock(1397703491)')
+    await tx.query('SELECT pg_advisory_xact_lock($1)',[NODE_CONTENT_MIGRATION_LOCK_KEY])
     const { rows: [plane] } = await tx.query<{ organization: boolean; content: boolean; occupied: boolean; template: boolean }>(`SELECT
       to_regnamespace('harness') IS NOT NULL organization,to_regnamespace('node_content') IS NOT NULL content,
       EXISTS(SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace

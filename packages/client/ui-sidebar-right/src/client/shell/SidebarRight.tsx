@@ -30,7 +30,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
-import { IconCloseOutline16, IconFullscreenOutline16, IconMinimizeOutline16, IconPanelLeftOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseOutline16, IconFullscreenOutline16, IconMinimizeOutline16, IconPanelLeftOutline16, Tooltip, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   HostObservable, InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
@@ -259,7 +259,7 @@ function bodiesFor(panel: PanelProps): TabRenderer {
 
 /** Dispatch a tab's title to its registered type; without one the chip shows the title captured at open time. */
 function titlesFor(panel: PanelProps): TabRenderer {
-  return tab => <TabSlot key={tab.id} {...panel} tab={tab} seat="sidebar.right.pane.tab.title" fallback={tab.title} />
+  return tab => <TabSlot key={tab.id} {...panel} tab={tab} seat="sidebar.right.pane.tab.title" fallback={<span>{tab.title}</span>} />
 }
 
 /** Expand-to-viewport glyph from the shared product artwork. */
@@ -447,14 +447,15 @@ function useLeadingEdgeDismiss(
 function SidebarPanel(panel: PanelProps & { width: number; panelRef: RefObject<HTMLDivElement | null> }): ReactNode {
   const { sessionId, surface, actions, t, renderSlot, openTab, width, reportRoom, fullscreen, panelRef } = panel
   const { expanded } = surface.layout
+  const coarsePointer = useMediaQuery('(pointer: coarse)')
   const types = panel.useTabTypes(value => value)
   useLeadingEdgeDismiss(panelRef, panel.autoFullscreen && expanded, () => { actions.setExpanded(sessionId, false) })
   return (
     <div
       ref={panelRef}
       className={css.panel}
-      style={{ width: fullscreen ? '100vw' : width,
-        '--dsh-sidebar-width': fullscreen ? '100vw' : `${width}px` } as CSSProperties}
+      style={{ width,
+        '--dsh-sidebar-width': `${width}px` } as CSSProperties}
       data-sidebar-right-session={sessionId}
       data-sidebar-right-panel={fullscreen ? 'fullscreen' : 'push'}
       data-sidebar-right-open={expanded || undefined}
@@ -474,7 +475,7 @@ function SidebarPanel(panel: PanelProps & { width: number; panelRef: RefObject<H
              room verdict and re-renders the control forever (the kit measures
              the hidden footprint when this flag is set, keeping the verdict
              independent of visibility). */
-          hideSplitWhenBlocked={panel.autoFullscreen}
+          hideSplitWhenBlocked={panel.autoFullscreen || coarsePointer}
           dropZones="horizontal"
           minPaneFraction={0.2}
           canAddTab={paneId => guideIn(surface.layout, paneId) === undefined}
@@ -576,5 +577,5 @@ export function RightbarSeat({
     sessionId, actions, t, renderSlot, surface, openTab, closeTab, useTabTypes, useTabNavigation, useStore, occurrence,
     fullscreen, autoFullscreen, reportRoom, active, retainTab, shortcuts, splitPane, toggleFullscreen,
   }
-  return <SidebarPanel {...panel} width={width} panelRef={panelRef} />
+  return <SidebarPanel {...panel} width={fullscreen ? viewportWidth : width} panelRef={panelRef} />
 }

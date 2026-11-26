@@ -12,6 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@deepseek-ai/dsh-user-approval/types'
 import { defineTool, type PreToolDecision, type ToolExecution } from '@deepseek-ai/dsh-tools'
 import { isReadOnly, statementPreview } from './query.ts'
 
@@ -51,13 +52,6 @@ function argsOf(exec: ToolExecution): StewardQueryArgs | undefined {
   return out
 }
 
-/** Approval ids keyed by owning session so entries die with their session. */
-type ApprovalIndex = Map<Session, Map<string, string>>
-
-function approvalKey(callId: unknown): string {
-  return String(callId)
-}
-
 function renderResult(result: StewardQueryWire): string {
   const suffix = result.truncated ? '\n(result truncated — raise row_limit or narrow the statement)' : ''
   if (result.dryRun) {
@@ -88,17 +82,22 @@ export function apply(ctx: Context): void {
       + 'is journaled. Prefer dry_run previews before writes, keep result sets narrow, and '
       + 'explain what you are inspecting or changing.',
   }), 'steward.policy()')
-  const approvals: ApprovalIndex = new Map()
+  const approvals = new WeakMap<Session, Map<string, string>>()
   ctx.on('session/event', (session, event) => {
     if (event.type !== 'approval/asked') return
-    const data = event.data as { id?: unknown; callId?: unknown }
-    if (data.id === undefined || data.callId === undefined) return
+    const { toolName, id, callId } = event.data
+    if (toolName !== TOOL || callId === undefined) return
     let per = approvals.get(session)
     if (per === undefined) {
       per = new Map()
       approvals.set(session, per)
     }
-    per.set(approvalKey(data.callId), String(data.id))
+    per.set(String(callId), String(id))
+  }, { global: true })
+  ctx.on('tools/result', exec => {
+    if (exec.name === TOOL && exec.agent !== undefined) {
+      approvals.get(exec.agent.session)?.delete(String(exec.callId))
+    }
   }, { global: true })
   ctx.on('session/disposed', (session) => {
     approvals.delete(session)
@@ -152,13 +151,14 @@ export function apply(ctx: Context): void {
         // interaction id is the executor-side proof the Gateway re-verifies.
         approvalId = exec.agent === undefined
           ? undefined
-          : approvals.get(exec.agent.session)?.get(approvalKey(exec.callId))
+          : approvals.get(exec.agent.session)?.get(String(exec.callId))
         if (approvalId === undefined) {
           throw new Error('steward_query write statements require an in-session approval that did not resolve')
         }
       }
       const response = await gateway.request('/internal/runtime/steward/query', {
         method: 'POST',
+        signal: exec.signal,
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           sql: args.sql,

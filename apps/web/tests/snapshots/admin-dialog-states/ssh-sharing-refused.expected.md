@@ -1,0 +1,7 @@
+- dialog "共享 移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789":
+  - heading "共享 移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789" [level=2]
+  - paragraph: 共享使项目运行时能够解析该目标；每位执行用户仍需独立 SSH 资格。
+  - button "关闭"
+  - alert: QA write refused. The reviewed record remains unchanged.
+  - checkbox "移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789"
+  - text: 移动验收 · LongOrganizationProjectAndComputerIdentifierWithNoBreaks01234567890123456789

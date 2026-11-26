@@ -25,7 +25,7 @@ import { ForgeTab, type ForgeTabInjected } from '../src/client/ForgeTab.tsx'
 import { ForgeTabTitle } from '../src/client/ForgeTabTitle.tsx'
 import { HeaderButton, type HeaderButtonInjected } from '../src/client/HeaderButton.tsx'
 import { en, NS, zh } from '../src/client/locales.ts'
-import { inject, mountForgePanel, TAB_ID, TAB_KIND, WORKTREE_NS, WORKTREE_ROW_KEY } from '../src/client/mount.ts'
+import { inject, mountForgePanel, TAB_ID, TAB_KIND, WORKTREE_NS } from '../src/client/mount.ts'
 import type { SessionListInjected } from '../src/client/session-list.ts'
 import { SessionHoverForge } from '../src/client/SessionHoverForge.tsx'
 import { SessionRowForge } from '../src/client/SessionRowForge.tsx'
@@ -77,6 +77,7 @@ function stream<F = ForgePanelState>(signal: AbortSignal) {
       }
     },
   }
+  signal.addEventListener('abort', () => { handle.dispose() }, { once: true })
   return handle
 }
 
@@ -159,12 +160,12 @@ async function base() {
     follow: vi.fn((_sessionId: SessionId, signal: AbortSignal) => {
       const handle = stream(signal)
       streams.push(handle)
-      return handle
+      return { [Symbol.asyncIterator]: () => handle[Symbol.asyncIterator]() }
     }),
     changeRequestStates: vi.fn((signal: AbortSignal) => {
       const handle = stream<ForgeChangeRequestStatesFrame>(signal)
       stateStreams.push(handle)
-      return handle
+      return { [Symbol.asyncIterator]: () => handle[Symbol.asyncIterator]() }
     }),
     worktreeCleanup: vi.fn(async (_sessionId: SessionId, _revision: number | null): Promise<RemoteResult<WorktreeCleanup | null>> =>
       ({ ok: true, value: null })),
@@ -250,7 +251,7 @@ async function base() {
       'shell.overlay': { kind: 'list', scope: 'root' },
       'sidebar.session.row.trailing': { kind: 'list', scope: 'root' },
       'sidebar.session.row.hover': { kind: 'list', scope: 'root' },
-      'plugins.row.config': { kind: 'keyed', scope: 'root' },
+      'plugins.item': { kind: 'list', scope: 'root' },
     },
   } as never, () => null)
   return {
@@ -998,12 +999,29 @@ describe('mountForgePanel changes view', () => {
 })
 
 
-describe('worktree row settings', () => {
-  it('registers the row page over the worktree namespace and stages the retain switch as a boolean write', async () => {
+describe('worktree package settings', () => {
+  it('keeps the staged switch when a fulfilled mutation reports a failed write', async () => {
     const f = await fixture()
     try {
-      const registration = f.ctx.slots.entries('plugins.row.config').find(candidate => candidate.component === WorktreeSettings)
-      expect(registration?.options).toMatchObject({ key: WORKTREE_ROW_KEY })
+      const registration = f.ctx.slots.entries('plugins.item').find(candidate => candidate.component === WorktreeSettings)
+      const face = registration!.inject!() as Partial<WorktreeSettingsInjected>
+      if (face.hooks === undefined || face.edit === undefined || face.save === undefined) throw new Error('expected the worktree settings face')
+      const hooks = face.hooks
+      f.worktreeForm.publish({ status: 'ready', value: { retainOnArchive: false }, base: { retainOnArchive: false }, user: {}, writable: true })
+      f.worktreeForm.mutate.mockImplementation(async () => {
+        f.worktreeForm.publish({ write: { status: 'error', code: 'settings/write-failed', message: 'Fixture unavailable' } })
+      })
+      face.edit('retainOnArchive', 'true')
+      face.save()
+      await vi.waitFor(() => { expect(hooks.worktreeForm.getSnapshot()).toMatchObject({ saving: false, failed: true, dirty: true, retainOnArchive: { text: 'true' } }) })
+    } finally { await f.ctx.fiber.dispose() }
+  })
+
+  it('registers the package page over the worktree namespace and stages the retain switch as a boolean write', async () => {
+    const f = await fixture()
+    try {
+      const registration = f.ctx.slots.entries('plugins.item').find(candidate => candidate.component === WorktreeSettings)
+      expect(registration?.options).toMatchObject({ id: WORKTREE_NS })
       const face = registration!.inject!() as Partial<WorktreeSettingsInjected>
       if (face.hooks === undefined || face.edit === undefined || face.save === undefined) throw new Error('expected the worktree settings face')
       f.worktreeForm.publish({ status: 'ready', value: { retainOnArchive: false }, base: { retainOnArchive: false }, user: {}, writable: true })

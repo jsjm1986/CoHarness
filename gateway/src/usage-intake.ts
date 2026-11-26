@@ -1,13 +1,47 @@
-import { createServer, type IncomingMessage, type Server } from 'node:http'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { ModelRegistrationEvent, UsageEvent } from './model-governance.ts'
 import type { GatewayAuditService, GatewayModelGovernanceService } from './services.ts'
 import type { GatewayPerformanceObserver } from './performance-observer.ts'
-import { PostgresCheckoutQueueFullError } from './postgres/database.ts'
+import { isDatabaseContentionError, isTransientDatabaseError, PostgresCheckoutQueueFullError } from './postgres/database.ts'
+import { NodeContentUnavailable } from './node-content-error.ts'
+import { ModelUsageRejection } from './model-usage-rejection.ts'
 
 async function body(req: IncomingMessage, limit = 256 * 1024): Promise<string> {
+  const declared = req.headers['content-length']
+  if (typeof declared === 'string') {
+    const length = Number(declared)
+    if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
+      req.resume()
+      throw new ModelUsageRejection('body too large')
+    }
+  }
   const chunks: Buffer[] = []; let size = 0
-  for await (const chunk of req) { const value = Buffer.from(chunk as Uint8Array); size += value.length; if (size > limit) throw new Error('body too large'); chunks.push(value) }
+  for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+    const value = Buffer.from(chunk as Uint8Array)
+    size += value.length
+    if (size > limit) {
+      req.resume()
+      throw new ModelUsageRejection('body too large')
+    }
+    chunks.push(value)
+  }
   return Buffer.concat(chunks).toString('utf8')
+}
+
+function parseReport(payload: string): UsageEvent | ModelRegistrationEvent {
+  try { return JSON.parse(payload) as UsageEvent | ModelRegistrationEvent }
+  catch (error) {
+    if (error instanceof SyntaxError) throw new ModelUsageRejection('invalid JSON report', { cause: error })
+    throw error
+  }
+}
+
+function unavailable(res: ServerResponse, error: unknown): boolean {
+  const code = error instanceof PostgresCheckoutQueueFullError || error instanceof NodeContentUnavailable ? error.code
+    : isTransientDatabaseError(error) || isDatabaseContentionError(error) ? 'database-unavailable' : undefined
+  if (code === undefined) return false
+  res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: code }))
+  return true
 }
 
 /** Maintenance fencing for the intake's write path. */
@@ -27,7 +61,7 @@ export interface UsageIntakeWrites {
  * @returns An unbound server whose caller owns listening and closure.
  */
 export function createUsageIntakeServer(
-  governance: GatewayModelGovernanceService,
+  governance: Pick<GatewayModelGovernanceService, 'subjectForIntakeToken' | 'ingest' | 'ingestRegistration'>,
   audit?: GatewayAuditService,
   writes?: UsageIntakeWrites,
   performanceObserver?: GatewayPerformanceObserver,
@@ -47,7 +81,7 @@ export function createUsageIntakeServer(
         res.writeHead(503, { 'content-type': 'application/json' }).end('{"error":"maintenance"}')
         return
       }
-      const event = JSON.parse(await body(req)) as UsageEvent | ModelRegistrationEvent
+      const event = parseReport(await body(req))
       if (event !== null && typeof event === 'object' && 'kind' in event && event.kind === 'model-registration') {
         const result = await governance.ingestRegistration(subject, event as ModelRegistrationEvent)
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(result))
@@ -72,18 +106,15 @@ export function createUsageIntakeServer(
     try {
       await (writes === undefined ? ingest() : writes.track(ingest))
     } catch (error) {
-      if (error instanceof PostgresCheckoutQueueFullError) {
-        res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error.code }))
-        return
-      }
-      res.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: String(error) }))
+      if (unavailable(res, error)) return
+      if (!(error instanceof ModelUsageRejection)) throw error
+      const headers: Record<string, string> = { 'content-type': 'application/json' }
+      if (!req.complete) headers.connection = 'close'
+      res.writeHead(400, headers).end(JSON.stringify({ error: error.message }))
     }
   })().catch((error: unknown) => {
     if (res.writableEnded) return
-    if (error instanceof PostgresCheckoutQueueFullError) {
-      res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error.code }))
-      return
-    }
+    if (unavailable(res, error)) return
     res.writeHead(500).end()
   }) })
 }

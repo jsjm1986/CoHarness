@@ -8,7 +8,7 @@ The `./directory` entry supplies POSIX mechanisms, not authorization. Callers ch
 
 Each handle owns its descriptor; children remain usable after their parent closes. `identity` returns copied device and inode values captured by `fstat`, without transferring native ownership. `createDirectory(name)` runs nonrecursive `mkdirat` against the retained parent with mode 0777 subject to umask. Renaming or replacing the original path does not redirect these operations.
 
-`volumeIdentity()` queries `ATTR_VOL_UUID` with `fgetattrlist` on the retained macOS descriptor. It returns a lowercase filesystem UUID; a zero UUID and other POSIX platforms return absence. Syscall failures reject without substituting a device number or resolving the current path. The query follows ordinary operation ordering and completes before close. A filesystem UUID does not identify a directory or authorize access; persistent consumers also retain inode evidence, and live consumers still verify the opened device/inode against their selected path.
+`volumeIdentity()` returns a lowercase UUID. macOS reads the filesystem UUID through `fgetattrlist`. Linux reads the Btrfs subvolume UUID with `BTRFS_IOC_GET_SUBVOL_INFO` through a readable descriptor opened relative to the retained descriptor. Unsupported filesystems, kernels without the ioctl and zero UUIDs return absence. Other syscall failures reject. The query completes before close. Persistent consumers retain inode evidence, and live consumers verify the opened device and inode against the selected path.
 
 ## Enumeration and failures
 
@@ -22,4 +22,4 @@ Operations on one handle run serially. `close()` refuses subsequent work and ret
 
 Queued work retains its native owner. Environment cleanup waits for running work, closes newly opened descriptors that cannot be delivered, and releases wrapped handles when the environment exits. Native ownership transfers to a JavaScript object only after result construction succeeds; a terminating Worker may refuse object creation before cleanup hooks run.
 
-`test/directory.test.js` exercises retained-object reads and creation, bounded batches, invalid native inputs, ordered close, and forced Worker termination. The Worker cases count references to their own private directory before and after exit. Packed-install verification repeats directory replacement through the installed public entry.
+`test/directory.test.js` exercises retained-object reads and creation, bounded batches, invalid native inputs, ordered close, and forced Worker termination. The Worker cases count references to their own private directory before and after exit. Packed-install verification repeats directory replacement through the installed public entry. The Gateway's native relocation fixture verifies the same subvolume UUID and actual UserDoc reads after an unmount changes the Linux device number.

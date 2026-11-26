@@ -18,11 +18,8 @@ export interface StreamSnapshot<S> {
 /** What the panel surfaces of one Session read; `state` is null before the first one arrives. */
 export type PanelSnapshot = StreamSnapshot<ForgePanelState | null>
 
-/** One open Host stream. */
-export interface HostStream<F> extends AsyncIterable<F> {
-  /** Close the stream. */
-  dispose: () => void
-}
+/** One open Host stream, cancelled through the signal passed to its opener. */
+export type HostStream<F> = AsyncIterable<F>
 
 /** One open stream of panel states. */
 export type PanelStream = HostStream<ForgePanelState>
@@ -90,7 +87,6 @@ export function createStreamSource<F, S>(deps: StreamSourceDeps<F>, initial: S, 
     const stopped = running
     running = undefined
     stopped?.controller.abort()
-    stopped?.stream.dispose()
   }
   const start = (): void => {
     const controller = new AbortController()

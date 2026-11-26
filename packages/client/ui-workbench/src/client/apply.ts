@@ -29,6 +29,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { WorkspaceFileTab } from './components/WorkspaceFileTab.tsx'
 import { WorkspaceFileTitle } from './components/WorkspaceFileTitle.tsx'
+import { PdfPreview } from './components/PdfPreview.tsx'
 import { createWorkspacePreviewReaders } from './preview-readers.ts'
 
 /** Required Cordis capabilities; slot declarations may arrive in either order. */
@@ -84,6 +85,9 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => () => { disposed = true; lifetime.abort() }, 'ui-workbench: pending navigation lifetime')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workbench: dictionaries')
   ctx.effect(() => ctx.locale.register('sidebarPdf', { zh: pdfZh, en: pdfEn }))
+  ctx.effect(() => ctx.slots.registerFactory({
+    name: 'document.pdf.preview', scope: 'root', locale: 'sidebarPdf',
+  }, PdfPreview))
   ctx.effect(() => ctx.locale.register('sidebarOffice', { zh: officeZh, en: officeEn }))
   ctx.effect(() => ctx.locale.register('sidebarMarkdown', { zh: markdownZh, en: markdownEn }))
   ctx.effect(() => ctx.locale.register('sidebarHtml', { zh: htmlZh, en: htmlEn }))

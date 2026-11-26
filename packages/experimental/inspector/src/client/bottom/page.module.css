@@ -23,10 +23,13 @@
   color: var(--dsw-alias-label-primary);
   font-size: 12px;
   line-height: 20px;
+  gap: 8px;
+  overflow-wrap: anywhere;
 }
 
 .close {
   width: 28px;
+  flex: none;
   padding: 0;
 }
 
@@ -42,6 +45,12 @@
 .resize:hover,
 .resize:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .close { min-width: var(--dsw-touch-target, 44px); min-height: var(--dsw-touch-target, 44px); }
+  .resize { height: 24px; }
+  .header { padding-top: 24px; }
 }
 
 .page {

@@ -74,6 +74,34 @@ try {
   assert.equal(destination.llm.isAgentLoopRequest(b.requests.at(-1)), true)
   assert.equal(origin.llm.isAgentLoopRequest(b.requests.at(-1)), false)
   output({ operation: 'local-loop-request', titleCalls: b.titleCalls, title: 'Revision 2', headerUnchanged: true })
+
+  const admission = Promise.withResolvers(), firstText = Promise.withResolvers()
+  destination.effect(() => destination.provide('resourceBudgetRequired', true))
+  destination.effect(() => destination.provide('resourceBudget', {
+    async acquire(request) {
+      assert.equal(request.kind, 'model')
+      admission.resolve()
+      return { signal: new AbortController().signal, async release() {}, async uncertain() {} }
+    },
+  }))
+  b.hold = firstText
+  try {
+    const managed = await destination.agentLoop.create(SessionId('managed-title-admission'), options)
+    prompt(managed, 'Foreground reply first')
+    await admission.promise
+    await setImmediate()
+    const fallback = destination.sessionTitle.get(managed.session)
+    assert.equal(fallback?.source.kind, 'fallback')
+    assert.equal(b.titleCalls, 2)
+    firstText.resolve()
+    await managed.whenIdle()
+    await setImmediate()
+    assert.equal(b.titleCalls, 3)
+    const title = destination.sessionTitle.get(managed.session)
+    assert.equal(title?.title, 'Revision 3')
+    output({ operation: 'managed-reply-before-title', initialTitle: fallback.title, generatedTitle: title.title, titleCalls: b.titleCalls })
+  } finally { firstText.resolve(); b.hold = undefined }
+
   const retired = origin.llm
   a.hold.resolve()
   await original.whenIdle()

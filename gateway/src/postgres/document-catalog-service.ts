@@ -6,7 +6,7 @@ import { transaction } from './database.ts'
 import { literalLikePattern } from './literal-like-pattern.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 import { documentUpdateTime } from '../node-content-documents-admin.ts'
-import { mergeDocumentOverview, type DocumentOverviewSource, type DocumentOverviewPage } from '../node-content-documents-overview.ts'
+import { mergeDocumentOverview, type DocumentOverviewSource, type DocumentOverviewPage, type DocumentOverviewProgress } from '../node-content-documents-overview.ts'
 import type { NodeContentDocuments } from '../node-content-documents.ts'
 import type { RuntimeNodeId } from '../runtime-catalog.ts'
 
@@ -1321,39 +1321,58 @@ export class PostgresDocumentCatalogService {
   /** Combine local published roots and legacy rows. The browser entry supplies authenticated remote source readers. */
   async overview(actorUserId: number, options: DocumentCatalogOverviewOptions = {}, allNodes = false,
     remote?: (nodeId: string, offset: number, limit: number, signal?: AbortSignal) => Promise<DocumentOverviewPage>,
-    signal?: AbortSignal, concurrency = 1) {
-    if (!this.nodeDocuments) return this.legacyOverview(actorUserId, options, allNodes)
-    const grants = await this.nodeDocuments.authority.readable(actorUserId, allNodes)
+    signal?: AbortSignal, concurrency = 1, progress?: DocumentOverviewProgress) {
+    const service = this.nodeDocuments
+    if (!service) return this.legacyOverview(actorUserId, options, allNodes)
+    const grants = await service.authority.readable(actorUserId, allNodes)
     if (!grants.length) return this.legacyOverview(actorUserId,options,allNodes)
-    const nodes = [...new Set(grants.map(grant=>grant.placement.nodeId))].sort()
+    const allowed = new Map<string, Set<string>>()
+    for (const { placement } of grants) {
+      let scopes = allowed.get(placement.nodeId)
+      if (!scopes) allowed.set(placement.nodeId, scopes = new Set())
+      scopes.add(`${placement.kind}:${placement.publicId}`)
+    }
+    const nodes = [...allowed.keys()].sort()
+    const localNode = nodes.indexOf(this.context.nodeId)
+    if (localNode > 0) nodes.unshift(...nodes.splice(localNode, 1))
     const sources: DocumentOverviewSource[] = [{ id:'legacy', read:(offset,limit)=>this.legacyOverview(actorUserId,
       {...options,cursor:undefined,limit},allNodes,offset) }]
     for (const nodeId of nodes) sources.push({id:nodeId,read:async(offset,limit,lifetime)=>{
-      if (nodeId===this.context.nodeId && this.nodeDocuments) return this.nodeDocuments.overview(actorUserId,options,offset,limit)
+      if (nodeId===this.context.nodeId) return service.overview(actorUserId,options,offset,limit,lifetime)
       if (!remote) throw new DocumentCatalogError('DOCUMENT_SCOPE_UNAVAILABLE',503,'The selected computer is unavailable.')
       const page=await remote(nodeId,offset,limit,lifetime)
-      const allowed=new Set(grants.filter(grant=>grant.placement.nodeId===nodeId).map(grant=>grant.placement.kind+':'+grant.placement.publicId))
-      if (page.documents.some(row=>row.scope.nodeId!==nodeId || !allowed.has(row.scope.kind+':'+row.scope.id))) {
+      const scopes = allowed.get(nodeId)!
+      if (page.documents.some(row=>row.scope.nodeId!==nodeId || !scopes.has(`${row.scope.kind}:${row.scope.id}`))) {
         throw new DocumentCatalogError('COLLABORATION_FORBIDDEN',403,'The computer returned documents outside the selected account scope.')
       }
       return page
     }})
-    const page=await mergeDocumentOverview({organizationId:this.context.organizationId,userId:actorUserId,entryNodeId:this.context.nodeId},
-      options,sources,concurrency,signal)
-    const current=await this.nodeDocuments.authority.readable(actorUserId,allNodes)
-    if (current.length!==grants.length || current.some((item,i)=>item.placement.rootId!==grants[i]?.placement.rootId || item.mode!==grants[i]?.mode)) {
-      throw new DocumentCatalogError('COLLABORATION_FORBIDDEN',403,'Document access changed during the query.')
+    const checkGrants = async () => {
+      const current=await service.authority.readable(actorUserId,allNodes)
+      if (current.length!==grants.length || current.some((item,i)=>{
+        const old=grants[i]!
+        return item.mode!==old.mode || item.placement.rootId!==old.placement.rootId
+          || item.placement.nodeId!==old.placement.nodeId || item.placement.writerEpoch!==old.placement.writerEpoch
+          || item.placement.nameVersion!==old.placement.nameVersion
+      })) throw new DocumentCatalogError('COLLABORATION_FORBIDDEN',403,'Document access changed during the query.')
+      signal?.throwIfAborted()
     }
+    const page=await mergeDocumentOverview({organizationId:this.context.organizationId,userId:actorUserId,entryNodeId:this.context.nodeId},
+      options,sources,concurrency,signal,progress===undefined ? undefined : async (partial,pending)=>{
+        await checkGrants()
+        await progress(partial,pending)
+      })
+    await checkGrants()
     return page
   }
 
   /** Only the addressed computer may return its own published document rows. */
-  async localOverview(actorUserId:number, options:DocumentCatalogOverviewOptions, offset:number,limit:number) {
+  async localOverview(actorUserId:number, options:DocumentCatalogOverviewOptions, offset:number,limit:number, signal?:AbortSignal) {
     if (!this.nodeDocuments) throw new DocumentCatalogError('DOCUMENT_SCOPE_UNAVAILABLE',503,'The document volume is unavailable.')
     if (!Number.isSafeInteger(offset) || offset<0 || !Number.isSafeInteger(limit) || limit<1 || limit>200) {
       throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA',400,'Invalid document page.')
     }
-    return this.nodeDocuments.overview(actorUserId,options,offset,limit)
+    return this.nodeDocuments.overview(actorUserId,options,offset,limit,signal)
   }
 
   /** Return readable metadata from active projects, including Steward qualification checks. */

@@ -230,8 +230,15 @@ describePg('Gateway maintenance control', () => {
     await maintenance.beginRestore(null, verified.id)
     const state = await maintenance.completeRestore(null, verified.id, {})
     expect(state.mode).toBe('maintenance')
-    expect((await backups.get(verified.id)).status).toBe('restored')
-    expect((await backups.list())[0]?.id).toBe(verified.id)
+    const restored = await backups.get(verified.id)
+    expect(restored.status).toBe('restored')
+    expect(restored.managedSnapshot?.files[0]?.sourcePath).toBe('/tmp/key')
+    const { managedSnapshot: _manifest, ...metadata } = restored
+    expect(await backups.list()).toEqual([{ ...metadata, hasManagedSnapshot: true }])
+    await f.context.pool.query("UPDATE harness.backup_records SET managed_files='[]'::jsonb WHERE organization_id=$1 AND id=$2",
+      [f.context.organizationId, verified.id])
+    expect(await backups.list()).toEqual([{ ...metadata, hasManagedSnapshot: false }])
+    expect((await backups.get(verified.id)).managedSnapshot).toBeNull()
     await expect(backups.get(randomUUID())).rejects.toMatchObject({ status: 404 })
   })
 

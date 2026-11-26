@@ -5,7 +5,6 @@ import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
 import { installAdminComputerFixture } from './admin-computer-fixture.ts'
 import { loadConfig } from '../../../gateway/src/config.ts'
@@ -28,11 +27,16 @@ import { GatewayTunnelAccess, type TunnelAccessDeps } from '../../../gateway/src
 import { TunnelCredentialCipher, type TunnelAccessRow } from '../../../gateway/src/postgres/tunnel-access-service.ts'
 import { installCloudflared } from '../../../gateway/src/tunnel-supervisor.ts'
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
+import { responsiveBrowser, responsiveMobileEmulation } from './responsive-browser.ts'
+import { auditAdminState } from './admin-responsive-state.ts'
+import { testConfig } from '../../../gateway/tests/test-config.ts'
+
+const matrix = process.env.DSH_FEATURE_MATRIX === '1'
 
 const DIRECTORY = fileURLToPath(new URL('./snapshots/admin-form-values', import.meta.url))
 const GOLDENS = [
   'archive-pending.expected.md', 'archive-purged.expected.md', 'archive-refused.expected.md',
-  'audit-metadata.expected.md', 'model-price.expected.md', 'more-navigation.expected.md',
+  'audit-metadata.expected.md', 'mobile-account-actions.expected.md', 'model-price.expected.md', 'more-navigation.expected.md',
   'node-config-conflict.expected.md', 'node-config-fields.expected.md', 'node-config-review.expected.md', 'pending-edits.expected.md', 'personal-document.expected.md',
   'project-quota.expected.md', 'project-rename-error.expected.md', 'project-runtime-stop.expected.md', 'runtime-account-missing.expected.md', 'runtime-stopped.expected.md',
   'ssh-reference.expected.md', 'webhook-error.expected.md', 'webhook-visibility.expected.md',
@@ -43,7 +47,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
   const cleanup: Array<() => unknown> = [() => rm(root, { recursive: true, force: true })]
   try {
     const db = openDb(join(root, 'gateway.sqlite')); cleanup.push(() => db.close())
-    const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_STATE_ROOT: join(root, 'state') })
+    const cfg = testConfig(root)
     await mkdir(cfg.projectsRoot, { recursive: true })
     const governance = new ModelGovernanceService(db)
     const deps: GatewayDeps = { cfg, instances: new InstanceManager(db, cfg), auth: new AuthService(db, cfg),
@@ -73,9 +77,10 @@ it('preserves stored values through built forms and keeps every mobile destinati
     }
     const runtimeActions: unknown[] = []
     const stopInstance = deps.instances.stop.bind(deps.instances)
-    deps.instances.stop = async (target, reason) => {
-      if (typeof target !== 'number' && target.kind === 'project') runtimeActions.push(target)
-      else await stopInstance(target, reason)
+    deps.instances.stop = async (target, reason, administratorUserId) => {
+      if (typeof target === 'number' || target.kind !== 'project') return stopInstance(target, reason, administratorUserId)
+      runtimeActions.push(target)
+      return { generation: 0, shutdownOutcome: 'unconfirmed' }
     }
     const admin = await deps.users.create({ username: 'admin', password: 'fixture-password', role: 'admin' })
     await deps.users.changeOwnPassword(admin.id, 'fixture-password')
@@ -166,7 +171,14 @@ it('preserves stored values through built forms and keeps every mobile destinati
     installAdminComputerFixture(deps)
     const server = createGatewayServer(deps, {
       ...proxy,
-      adminRoot: resolve('gateway/public/admin'),
+      adminRoot: resolve(process.env.DSH_ADMIN_ASSET_ROOT ?? 'gateway/public/admin'),
+      peerBackups: {
+        admin: async (req, res) => {
+          if (req.method !== 'GET' || req.url !== '/admin/api/peer-backups/recoveries/local-execution') return false
+          res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"items":[]}'); return true
+        },
+        internal: async () => false,
+      },
       admin: async (req, res, user, path, body) => {
         if (req.method === 'GET') {
           const owner = typeof req.headers.referer === 'string' ? new URL(req.headers.referer).pathname : ''
@@ -209,14 +221,18 @@ it('preserves stored values through built forms and keeps every mobile destinati
       server.close((error) => { if (error) reject(error); else done() })
     }))
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`; cfg.publicOrigins.push(base)
-    const browser = await chromium.launch(); cleanup.push(() => browser.close())
-    const page = await browser.newPage({ viewport: { width: 1400, height: 1000 }, colorScheme: 'light', timezoneId: 'Asia/Shanghai' })
+    const browser = await responsiveBrowser.launch(); cleanup.push(() => browser.close())
+    const page = await browser.newPage({ viewport: { width: 1400, height: 1000 }, colorScheme: 'light', timezoneId: 'Asia/Shanghai', hasTouch: matrix, isMobile: matrix && responsiveMobileEmulation })
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
     // Expected 4xx responses also log "Failed to load resource" console errors;
     // skip those for the deliberately refused admin writes below.
     const refusalPaths = /^\/admin\/api\/(projects\/\d+(?:\/instance\/start)?|deployment\/configuration)$/
     page.on('console', (message) => {
       if (message.type() !== 'error') return
+      // WebKit logs the intentional report-only CSP as an error when it lacks report-to;
+      // Firefox reports the same report-only violations with different phrasing.
+      if (message.text().includes('delivered in report-only mode')) return
+      if (message.text().includes('(Report-Only policy)')) return
       const url = message.location().url
       if (url !== undefined && url !== '' && refusalPaths.test(new URL(url).pathname)) return
       errors.push(`console: ${message.text()} (${url})`)
@@ -229,11 +245,18 @@ it('preserves stored values through built forms and keeps every mobile destinati
     })
     const login = await page.request.post(`${base}/login`, { form: { username: 'admin', password: 'fixture-password' }, headers: { origin: base }, maxRedirects: 0 })
     expect(login.status()).toBe(302)
-    await page.goto(`${base}/admin/projects/${project.id}`)
+    // WebKit reports fetches killed by navigation as unhandled "access control
+    // checks" rejections; settle the previous page before leaving it.
+    const nav = async (path: string): Promise<void> => {
+      await page.waitForLoadState('networkidle')
+      await page.goto(`${base}${path}`)
+    }
+    await nav(`/admin/projects/${project.id}`)
     await page.getByRole('button', { name: '停止实例', exact: true }).click()
     const runtimeDialog = page.getByRole('dialog', { name: '停止项目实例', exact: true })
     expect(runtimeActions).toEqual([])
-    await compareOrRefreshGolden(join(DIRECTORY, 'project-runtime-stop.expected.md'), await runtimeDialog.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'project-runtime-stop.expected.md'), await runtimeDialog.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-project-runtime-stop', runtimeDialog)
     await runtimeDialog.getByRole('button', { name: '确认执行', exact: true }).click()
     await runtimeDialog.waitFor({ state: 'hidden' })
     expect(runtimeActions).toEqual([{ kind: 'project', id: project.id }])
@@ -245,7 +268,8 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await startDialog.getByRole('button', { name: '确认执行', exact: true }).click()
     await startDialog.getByRole('alert').getByText(accountFailure.message, { exact: true }).waitFor()
     expect(await startDialog.innerText()).not.toContain('/private/command-output')
-    await compareOrRefreshGolden(join(DIRECTORY, 'runtime-account-missing.expected.md'), await startDialog.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'runtime-account-missing.expected.md'), await startDialog.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-runtime-account-missing', startDialog)
     await startDialog.getByRole('button', { name: '取消', exact: true }).click()
     deps.instances.ensureRunning = ensureRunning
     await page.getByRole('button', { name: '重命名', exact: true }).click()
@@ -255,7 +279,8 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await renameDialog.getByRole('alert').waitFor({ state: 'visible' })
     expect(await renameDialog.getByLabel('项目名称', { exact: true }).inputValue()).toBe('Taken')
     expect((await deps.projects.getById(project.id))?.name).toBe('Form fixture')
-    await compareOrRefreshGolden(join(DIRECTORY, 'project-rename-error.expected.md'), await renameDialog.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'project-rename-error.expected.md'), await renameDialog.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-project-rename-error', renameDialog)
     await renameDialog.getByLabel('项目名称', { exact: true }).fill('Renamed fixture')
     await renameDialog.getByRole('button', { name: '保存名称', exact: true }).click()
     await renameDialog.waitFor({ state: 'hidden' })
@@ -264,11 +289,12 @@ it('preserves stored values through built forms and keeps every mobile destinati
     const quotaDialog = page.getByRole('dialog', { name: '配置项目额度', exact: true })
     expect(await quotaDialog.getByLabel('每月 Token', { exact: true }).inputValue()).toBe('12345')
     expect(await quotaDialog.getByLabel('每月人民币元', { exact: true }).inputValue()).toBe('8.5')
-    await compareOrRefreshGolden(join(DIRECTORY, 'project-quota.expected.md'), await quotaDialog.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'project-quota.expected.md'), await quotaDialog.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-project-quota', quotaDialog)
     await quotaDialog.getByRole('button', { name: '保存额度', exact: true }).click()
     await expect.poll(() => quotaWrites).toEqual([{ kind: 'project', id: String(project.id), tokens: 12345, cost: 8500000 }])
 
-    await page.goto(`${base}/admin/usage`)
+    await nav('/admin/usage')
     await page.locator('.usageTable').waitFor({ state: 'visible' })
     await page.getByRole('button', { name: '配置额度', exact: true }).click()
     const usageQuota = page.getByRole('dialog', { name: '配置月度额度', exact: true })
@@ -291,6 +317,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await roleCostInput.fill('9.250001')
     await expect.poll(async () => roleCostInput.inputValue()).toBe('9.250001')
     await expect.poll(async () => roleCostInput.getAttribute('value')).toBe('9.250001')
+    await auditAdminState(page, 'form-usage-role-quota', usageQuota)
     await usageQuota.getByRole('button', { name: '保存额度', exact: true }).click()
     await usageQuota.waitFor({ state: 'hidden' })
     expect(governance.roleQuota('user')).toEqual({ tokenLimit: 42_000, companyCostMicrosLimit: 9_250_001 })
@@ -299,6 +326,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await expect.poll(async () => usageReopen.getByRole('button', { name: '保存额度', exact: true }).isEnabled()).toBe(true)
     expect(await usageReopen.getByLabel('每月 Token', { exact: true }).inputValue()).toBe('42000')
     expect(await usageReopen.getByLabel('每月人民币元', { exact: true }).inputValue()).toBe('9.250001')
+    await auditAdminState(page, 'form-usage-role-saved', usageReopen)
     // Editing tokens alone keeps the stored micro-precision cost unchanged.
     const reopenedTokens = usageReopen.getByLabel('每月 Token', { exact: true })
     await reopenedTokens.fill('777')
@@ -320,6 +348,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await userTokenInput.fill('777')
     await expect.poll(async () => userTokenInput.inputValue()).toBe('777')
     await expect.poll(async () => userTokenInput.getAttribute('value')).toBe('777')
+    await auditAdminState(page, 'form-usage-user-quota', usageUserDialog)
     await userSave.click()
     await usageUserDialog.waitFor({ state: 'hidden' })
     expect(governance.userQuota(admin.id)).toEqual({
@@ -330,14 +359,16 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await page.locator('.sidebarNav').getByRole('link', { name: '部署', exact: true }).click()
     const networkSettings = page.getByRole('group', { name: '访问与监听', exact: true })
     await networkSettings.getByRole('textbox', { name: 'Gateway 端口（1–65535）', exact: true }).waitFor()
-    await compareOrRefreshGolden(join(DIRECTORY, 'node-config-fields.expected.md'), await networkSettings.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'node-config-fields.expected.md'), await networkSettings.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-node-config-fields', page.locator('section', { has: networkSettings }))
     const editable = networkSettings.locator('input').first()
     const originalValue = await editable.inputValue()
     await editable.fill(`${Number(originalValue) + 1}`)
     await page.locator('.sidebarNav').getByRole('link', { name: '模型', exact: true }).click()
     const pendingEdits = page.getByRole('dialog', { name: '保留当前编辑', exact: true })
     await pendingEdits.waitFor()
-    await compareOrRefreshGolden(join(DIRECTORY, 'pending-edits.expected.md'), await pendingEdits.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'pending-edits.expected.md'), await pendingEdits.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-pending-edits', pendingEdits)
     expect(await pendingEdits.getByRole('link', { name: '在新标签页打开' }).getAttribute('target')).toBe('_blank')
     await pendingEdits.getByRole('button', { name: '留在当前页面', exact: true }).click()
     expect(await editable.inputValue()).toBe(`${Number(originalValue) + 1}`)
@@ -355,12 +386,14 @@ it('preserves stored values through built forms and keeps every mobile destinati
     expect((await nodeConfiguration.view(admin.id)).desired.HGW_PORT).toBe('9330')
     await page.getByRole('button', { name: '应用并重启', exact: true }).click()
     const configurationDialog = page.getByRole('dialog', { name: '应用节点配置并重启', exact: true })
-    await compareOrRefreshGolden(join(DIRECTORY, 'node-config-review.expected.md'), await configurationDialog.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'node-config-review.expected.md'), await configurationDialog.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-node-config-review', configurationDialog)
     const latest = await nodeConfiguration.view(admin.id)
     await nodeConfiguration.save(nodeIdentity, latest.revision, { ...latest.desired, HGW_PORT: '9340' }, admin.id)
     await configurationDialog.getByRole('button', { name: '确认应用并重启', exact: true }).click()
     await configurationDialog.getByRole('alert').waitFor({ state: 'visible' })
-    await compareOrRefreshGolden(join(DIRECTORY, 'node-config-conflict.expected.md'), await configurationDialog.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'node-config-conflict.expected.md'), await configurationDialog.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-node-config-conflict', configurationDialog)
     expect((await nodeConfiguration.view(admin.id)).operation).toBeNull()
     await configurationDialog.getByRole('button', { name: '取消', exact: true }).click()
     await page.locator('section', { has: networkSettings }).getByRole('button', { name: '重新读取', exact: true }).click()
@@ -370,25 +403,27 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await configurationDialog.waitFor({ state: 'hidden' })
     expect((await nodeConfiguration.view(admin.id)).operation).toMatchObject({ status: 'pending', revision: 2, writeEpoch: '1' })
 
-    await page.goto(`${base}/admin/ssh`)
+    await nav('/admin/ssh')
     await page.getByRole('option', { name: /Renamed fixture/u }).waitFor({ state: 'attached' })
     expect(adminReads.get('/admin/ssh /admin/api/projects')).toBe(1)
     await page.getByRole('button', { name: '编辑', exact: true }).click()
     const sshDialog = page.getByRole('dialog', { name: '编辑 SSH fixture', exact: true })
     const reference = sshDialog.getByLabel('密码凭据引用', { exact: false })
     expect(await reference.inputValue()).toBe('SSH_FIXTURE_PASSWORD')
-    await compareOrRefreshGolden(join(DIRECTORY, 'ssh-reference.expected.md'), await reference.locator('..').ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'ssh-reference.expected.md'), await reference.locator('..').ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-ssh-reference', reference.locator('..'))
     await sshDialog.getByRole('button', { name: '保存', exact: true }).click()
     await expect.poll(() => sshWrites).toMatchObject([{ targetId: 1, revision: '1', fields: { passwordRef: 'SSH_FIXTURE_PASSWORD' } }])
 
-    await page.goto(`${base}/admin/models`)
+    await nav('/admin/models')
     await page.locator('.organizationModelsEditor').getByText('当前部署的设置文档为只读。', { exact: true }).waitFor()
     expect(adminReads.get('/admin/models /admin/api/model-settings')).toBe(1)
     await page.getByRole('button', { name: '权限与计价', exact: true }).click()
     await page.getByRole('button', { name: '配置模型治理', exact: true }).first().click()
     const priceDialog = page.getByRole('dialog', { name: '配置模型治理', exact: true })
     expect(await priceDialog.getByLabel('缓存读取', { exact: true }).inputValue()).toBe('0.000001')
-    await compareOrRefreshGolden(join(DIRECTORY, 'model-price.expected.md'), await priceDialog.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'model-price.expected.md'), await priceDialog.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-model-price', priceDialog)
     await priceDialog.getByRole('button', { name: '保存治理配置', exact: true }).click()
     await priceDialog.waitFor({ state: 'hidden' })
     expect(governance.listModels().find(row => row.model === 'model-a')).toEqual(model)
@@ -403,10 +438,22 @@ it('preserves stored values through built forms and keeps every mobile destinati
     expect(finalPrice.y + finalPrice.height).toBeLessThanOrEqual(footer.y + 1)
     await page.getByRole('button', { name: '更多管理功能', exact: true }).click()
     const more = page.getByRole('dialog', { name: '更多管理功能', exact: true })
-    await compareOrRefreshGolden(join(DIRECTORY, 'more-navigation.expected.md'), await more.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'more-navigation.expected.md'), await more.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-more-navigation', page.locator('body'), async () => {
+      const trigger = page.getByRole('button', { name: '更多管理功能', exact: true })
+      if (await trigger.isVisible() && !await more.isVisible()) await trigger.click()
+    })
+    if (!await more.isVisible()) await page.getByRole('button', { name: '更多管理功能', exact: true }).click()
     expect(await more.getByRole('link').count()).toBe(10)
-    await more.getByLabel('界面语言', { exact: true }).selectOption('en')
+    await page.keyboard.press('Escape')
+    await more.waitFor({ state: 'hidden' })
+    const mobileAccount = page.locator('.mobileHeader .accountActions')
+    const language = mobileAccount.getByRole('button', { name: '中文，切换为 English', exact: true })
+    expect(await language.innerText()).toBe('中')
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'mobile-account-actions.expected.md'), await mobileAccount.ariaSnapshot(), webSnapshotMode())
+    await language.click()
     await page.getByRole('button', { name: 'More administration features', exact: true }).waitFor()
+    expect(await mobileAccount.getByRole('button', { name: 'English, switch to Chinese', exact: true }).innerText()).toBe('EN')
     expect(await page.evaluate(() => localStorage.getItem('coharness-admin-language'))).toBe('en')
     expect(await page.evaluate(() => document.documentElement.lang)).toBe('en')
     expect(await page.evaluate(() => document.cookie.includes('hgw_lang=en'))).toBe(true)
@@ -417,13 +464,11 @@ it('preserves stored values through built forms and keeps every mobile destinati
       .getByRole('option', { name: /Renamed fixture/u }).waitFor({ state: 'attached' })
     expect(adminReads.get('/admin/terminals /admin/api/projects')).toBe(1)
     await page.getByRole('heading', { name: 'Terminals', exact: true }).waitFor()
-    await page.getByRole('button', { name: 'More administration features', exact: true }).click()
-    await page.getByRole('dialog', { name: 'More administration features', exact: true })
-      .getByLabel('Interface language', { exact: true }).selectOption('zh')
+    await mobileAccount.getByRole('button', { name: 'English, switch to Chinese', exact: true }).click()
     await page.getByRole('heading', { name: '终端', exact: true }).waitFor()
     expect(await page.evaluate(() => document.documentElement.lang)).toBe('zh')
 
-    await page.goto(`${base}/admin/ssh`)
+    await nav('/admin/ssh')
     const targetTable = page.getByRole('table')
     const removeTarget = targetTable.getByRole('button', { name: '删除', exact: true })
     await removeTarget.waitFor({ state: 'visible' })
@@ -432,8 +477,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
     const initialRemoveBox = await removeTarget.boundingBox()
     if (viewportBox === null || initialRemoveBox === null) throw new Error('SSH table action regions are missing')
     expect(initialRemoveBox.x + initialRemoveBox.width).toBeGreaterThan(viewportBox.x + viewportBox.width)
-    await page.mouse.move(viewportBox.x + viewportBox.width / 2, initialRemoveBox.y + initialRemoveBox.height / 2)
-    await page.mouse.wheel(2_000, 0)
+    await removeTarget.scrollIntoViewIfNeeded()
     await expect.poll(async () => {
       const button = await removeTarget.boundingBox()
       return button !== null && button.x >= viewportBox.x
@@ -443,67 +487,76 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await sshDialog.waitFor({ state: 'visible' })
     await sshDialog.getByRole('button', { name: '取消', exact: true }).click()
 
-    await page.goto(`${base}/admin/webhooks`)
+    await nav('/admin/webhooks')
     await page.getByRole('button', { name: '注册端点', exact: true }).click()
     const webhookDialog = page.getByRole('dialog', { name: '注册 Webhook 端点', exact: true })
     await webhookDialog.getByRole('button', { name: '保存', exact: true }).click()
     const alert = webhookDialog.getByRole('alert')
     await alert.waitFor({ state: 'visible' })
-    await compareOrRefreshGolden(join(DIRECTORY, 'webhook-error.expected.md'), await alert.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'webhook-error.expected.md'), await alert.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-webhook-error', alert)
     await webhookDialog.getByRole('combobox', { name: /^运行时类型/ }).selectOption('project')
     const visibility = webhookDialog.getByRole('combobox', { name: /^新会话可见性/ })
     expect(await visibility.inputValue()).toBe('project')
     await visibility.selectOption('private')
-    await compareOrRefreshGolden(join(DIRECTORY, 'webhook-visibility.expected.md'), await visibility.locator('..').ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'webhook-visibility.expected.md'), await visibility.locator('..').ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-webhook-visibility', visibility.locator('..'))
     await page.setViewportSize({ width: 1400, height: 1000 })
-    await page.goto(`${base}/admin/documents`)
+    await nav('/admin/documents')
     await page.getByRole('button', { name: '查看详情', exact: true }).click()
     const documentDialog = page.getByRole('dialog', { name: 'Fixture document', exact: true })
     await documentDialog.waitFor({ state: 'visible' })
     expect(await documentDialog.getByRole('button', { name: '转移所有权', exact: true }).count()).toBe(0)
-    await compareOrRefreshGolden(join(DIRECTORY, 'personal-document.expected.md'), await documentDialog.ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'personal-document.expected.md'), await documentDialog.ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-personal-document', documentDialog)
 
-    await page.goto(`${base}/admin/archives`)
+    await nav('/admin/archives')
     await page.getByRole('button', { name: '查看 归档清理示例', exact: true }).click()
     const archiveDialog = page.getByRole('dialog', { name: '归档清理示例', exact: true })
-    const purge = async () => {
+    const purge = async (attempt: string) => {
       await archiveDialog.getByRole('button', { name: '彻底删除', exact: true }).click()
+      await auditAdminState(page, `form-archive-purge-${attempt}-confirm`, page.getByRole('dialog', { name: '彻底删除所选对话？', exact: true }))
       await page.getByRole('dialog', { name: '彻底删除所选对话？', exact: true })
         .getByRole('button', { name: '彻底删除', exact: true }).click()
     }
-    await purge()
+    await purge('initial')
     await archiveDialog.getByText('处理中·等待实例', { exact: true }).waitFor()
-    await compareOrRefreshGolden(join(DIRECTORY, 'archive-pending.expected.md'), await archiveDialog.locator('.archiveDetail').ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'archive-pending.expected.md'), await archiveDialog.locator('.archiveDetail').ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-archive-pending', archiveDialog.locator('.archiveDetail'))
     expect(archiveReads).toBe(1)
     expect(archivePurges).toBe(1)
     archive = { ...archive, syncState: 'conflict', lastSyncError: '会话仍有运行中的终端，请关闭终端后重试。' }
     await archiveDialog.getByRole('alert').getByText(archive.lastSyncError!, { exact: true }).waitFor()
-    await compareOrRefreshGolden(join(DIRECTORY, 'archive-refused.expected.md'), await archiveDialog.locator('.archiveDetail').ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'archive-refused.expected.md'), await archiveDialog.locator('.archiveDetail').ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-archive-refused', archiveDialog.locator('.archiveDetail'))
     expect(archiveReads).toBe(1)
-    await purge()
+    await purge('retry')
     await archiveDialog.getByText('处理中·等待实例', { exact: true }).waitFor()
     archive = { ...archive, syncState: 'synced', state: 'purged' }
     await archiveDialog.getByText('已彻底删除', { exact: true }).waitFor()
     expect(await archiveDialog.getByText('需要保留的对话内容', { exact: true }).count()).toBe(0)
     expect(archivePurges).toBe(2)
     expect(archiveReads).toBe(1)
-    await compareOrRefreshGolden(join(DIRECTORY, 'archive-purged.expected.md'), await archiveDialog.locator('.archiveDetail').ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'archive-purged.expected.md'), await archiveDialog.locator('.archiveDetail').ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-archive-purged', archiveDialog.locator('.archiveDetail'))
 
     await deps.audit.write({ userId: admin.id, action: 'admin.fixture.audit', status: 200,
       detail: JSON.stringify({ targetId: 17, revision: '12', state: 'unknown', password: 'not-public' }) })
     await page.setViewportSize({ width: 1400, height: 1000 })
-    await page.goto(`${base}/admin/audit`)
+    await nav('/admin/audit')
     const auditRow = page.getByRole('row').filter({ hasText: 'admin.fixture.audit' })
     await auditRow.waitFor({ state: 'visible' })
     expect(await auditRow.innerText()).toContain('请求成功')
     expect(await auditRow.innerText()).not.toContain('not-public')
-    await compareOrRefreshGolden(join(DIRECTORY, 'audit-metadata.expected.md'), await auditRow.locator('dl').ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'audit-metadata.expected.md'), await auditRow.locator('dl').ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-audit-metadata', page.locator('.responsiveSection'))
     await deps.instances.stop(admin.id)
-    await page.goto(base)
+    await nav('')
     await page.getByRole('button', { name: '启动并打开', exact: true }).waitFor({ state: 'visible' })
     expect(await deps.instances.isLive(admin.id)).toBe(false)
     expect(await page.locator('meta[http-equiv="refresh"]').count()).toBe(0)
-    await compareOrRefreshGolden(join(DIRECTORY, 'runtime-stopped.expected.md'), await page.locator('main').ariaSnapshot(), webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'runtime-stopped.expected.md'), await page.locator('main').ariaSnapshot(), webSnapshotMode())
+    await auditAdminState(page, 'form-runtime-stopped', page.locator('main'))
     const deliberateRefusals = [
       /^4\d\d PATCH \/admin\/api\/projects\/\d+$/,
       /^4\d\d POST \/admin\/api\/deployment\/configuration$/,
@@ -516,7 +569,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
     for (const dispose of cleanup.reverse()) { try { await dispose() } catch (error) { failures.push(error) } }
     if (failures.length > 0) throw new AggregateError(failures, 'Admin form fixture cleanup failed')
   }
-}, 60_000)
+}, matrix ? 600_000 : 60_000)
 
 it('owns the Admin form and mobile navigation goldens', async () => { expect((await readdir(DIRECTORY)).sort()).toEqual(GOLDENS) })
 
@@ -566,18 +619,20 @@ it('cancels an unregistered connector through the built Admin and reports clipbo
     let initialReadEntered!: () => void, releaseInitialRead!: () => void
     const initialReadPending = new Promise<void>((resolve) => { initialReadEntered = resolve })
     const initialReadRelease = new Promise<void>((resolve) => { releaseInitialRead = resolve })
-    const server = createGatewayServer(deps, { ...createProxyHandlers(deps), admin: async (req, res, user, path, body) => {
-      if (path === '/admin/api/tunnel') {
-        tunnelReads++
-        if (failRead) {
-          initialReadEntered()
-          await initialReadRelease
-          failRead = false
-          res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'fixture-read-unavailable' })); return true
+    const server = createGatewayServer(deps, { ...createProxyHandlers(deps),
+      adminRoot: resolve(process.env.DSH_ADMIN_ASSET_ROOT ?? 'gateway/public/admin'),
+      admin: async (req, res, user, path, body) => {
+        if (path === '/admin/api/tunnel') {
+          tunnelReads++
+          if (failRead) {
+            initialReadEntered()
+            await initialReadRelease
+            failRead = false
+            res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'fixture-read-unavailable' })); return true
+          }
         }
-      }
-      return handler(req, res, user, path, body)
-    } })
+        return handler(req, res, user, path, body)
+      } })
     await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
     cleanup.push(() => new Promise<void>((done, reject) => {
       server.closeAllConnections()
@@ -585,8 +640,8 @@ it('cancels an unregistered connector through the built Admin and reports clipbo
     }))
     cleanup.push(() => { releaseInitialRead() })
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`; cfg.publicOrigins.push(base)
-    const browser = await chromium.launch(); cleanup.push(() => browser.close())
-    const page = await browser.newPage({ viewport: { width: 1200, height: 1000 }, colorScheme: 'light' })
+    const browser = await responsiveBrowser.launch(); cleanup.push(() => browser.close())
+    const page = await browser.newPage({ viewport: { width: 1200, height: 1000 }, colorScheme: 'light', hasTouch: matrix, isMobile: matrix && responsiveMobileEmulation })
     await page.clock.install()
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
     const login = await page.request.post(`${base}/login`, { form: { username: 'admin', password: 'fixture-password' }, headers: { origin: base }, maxRedirects: 0 })
@@ -595,17 +650,21 @@ it('cancels an unregistered connector through the built Admin and reports clipbo
     const section = page.locator('section', { has: page.getByRole('heading', { name: '公网访问', exact: true }) })
     const snapshots = fileURLToPath(new URL('./snapshots/admin-tunnel-access', import.meta.url))
     if (webSnapshotMode() === 'refresh') await mkdir(snapshots, { recursive: true })
-    const snapshot = async (name: string) => compareOrRefreshGolden(join(snapshots, `${name}.expected.md`),
-      (await section.ariaSnapshot()).replaceAll(root, '<fixture>'), webSnapshotMode())
+    const snapshot = async (name: string) => {
+      if (!matrix) await compareOrRefreshGolden(join(snapshots, `${name}.expected.md`),
+        (await section.ariaSnapshot()).replaceAll(root, '<fixture>'), webSnapshotMode())
+      await auditAdminState(page, `tunnel-${name}`, section)
+    }
     await initialReadPending
     await section.getByText('正在加载隧道状态', { exact: true }).waitFor()
     await page.clock.runFor(20_000)
     expect(tunnelReads).toBe(1)
     const pendingReadSnapshot = (await section.ariaSnapshot()).replaceAll(root, '<fixture>')
+    await auditAdminState(page, 'tunnel-slow-read-pending', section)
     releaseInitialRead()
     await section.getByRole('alert').waitFor({ timeout: 15_000 })
     expect(tunnelReads).toBe(1)
-    await compareOrRefreshGolden(join(snapshots, 'slow-read-pending.expected.md'), pendingReadSnapshot, webSnapshotMode())
+    if (!matrix) await compareOrRefreshGolden(join(snapshots, 'slow-read-pending.expected.md'), pendingReadSnapshot, webSnapshotMode())
     await snapshot('read-failure')
     await section.getByRole('button', { name: '重新读取', exact: true }).click()
     await section.getByRole('button', { name: '安装 cloudflared', exact: true }).click()
@@ -613,6 +672,9 @@ it('cancels an unregistered connector through the built Admin and reports clipbo
     expect(failedDownloadCancelled).toBe(true)
     await snapshot('download-failure')
     binaryAvailable = true
+    // WebKit reports fetches killed by the reload as unhandled "access control
+    // checks" rejections; let in-flight reads finish first.
+    await page.waitForLoadState('networkidle')
     await page.reload()
     await section.getByRole('button', { name: '开启临时链接', exact: true }).click()
     let witness: { controlUrl: string; probeToken: string } | undefined
@@ -667,4 +729,4 @@ it('cancels an unregistered connector through the built Admin and reports clipbo
     for (const dispose of cleanup.reverse()) { try { await dispose() } catch (error) { failures.push(error) } }
     if (failures.length > 0) throw new AggregateError(failures, 'Admin tunnel fixture cleanup failed')
   }
-}, 60_000)
+}, matrix ? 300_000 : 60_000)

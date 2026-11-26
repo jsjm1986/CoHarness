@@ -1,4 +1,7 @@
 /** Assembled acceptance using the built CLI profile, real pnpm and actual Admin HTTP routes. */
+import { responsiveBrowser, responsiveMobileEmulation } from './responsive-browser.ts'
+import { auditAdminState } from './admin-responsive-state.ts'
+import type { Locator, Route } from 'playwright'
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises'
 import { parse as parseYaml } from 'yaml'
@@ -6,12 +9,13 @@ import { generateKeyPairSync, randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import type { AddressInfo } from 'node:net'
-import { chromium } from 'playwright'
+
 import { expect, it } from 'vitest'
 import { compareOrRefreshGolden, webSnapshotMode } from './expected.ts'
 import { fileURLToPath } from 'node:url'
 
 const DIRECTORY = fileURLToPath(new URL('./snapshots/plugin-administration', import.meta.url))
+const matrix = process.env.DSH_FEATURE_MATRIX === '1'
 import { loadConfig } from '../../../gateway/src/config.ts'
 import { openDb } from '../../../gateway/src/db.ts'
 import { AuthService } from '../../../gateway/src/auth.ts'
@@ -74,7 +78,7 @@ it('installs a local bundle through the built Admin workflow and verifies the re
       allocationReceipt: unsupportedAllocation, retire: unsupportedAllocation }
     deps.nodeServiceIdentity = { nodeId, organizationId: 'fixture', authorize: async () => { throw new Error('The plugin fixture has no node bridge') } }
     deps.pluginManagement = new GatewayPluginManagement(deps, new GatewayPrincipalSigner(pair.privateKey, 'fixture', 30000), nodeId)
-    const server = createGatewayServer(deps, { admin: createAdminApiHandler(deps), adminRoot: resolve('gateway/public/admin') })
+    const server = createGatewayServer(deps, { admin: createAdminApiHandler(deps), adminRoot: resolve(globalThis.process.env.DSH_ADMIN_ASSET_ROOT ?? 'gateway/public/admin') })
     await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
     cleanup.push(() => new Promise<void>((resolve, reject) => {
       server.closeAllConnections()
@@ -122,21 +126,28 @@ it('installs a local bundle through the built Admin workflow and verifies the re
     expect(await catalog.json()).toMatchObject({
       rpcId, result: { ok: true, value: { managementAvailable: true, manage: true } },
     })
-    const browser = await chromium.launch(); cleanup.push(() => browser.close())
-    const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } })
+    const browser = await responsiveBrowser.launch(); cleanup.push(() => browser.close())
+    const page = await browser.newPage({ viewport: { width: 1400, height: 1000 },
+      ...(matrix ? { hasTouch: true, isMobile: responsiveMobileEmulation, reducedMotion: 'reduce' as const } : {}) })
+    const activate = async (control: Locator) => { if (matrix) await control.tap(); else await control.click() }
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
     const login = await page.request.post(`${base}/login`, { form: { username: 'admin', password: 'fixture-password' }, headers: { origin: base }, maxRedirects: 0 }); expect(login.status()).toBe(302)
     try {
       await page.goto(`${base}/admin/plugins`)
       await page.getByLabel('插件管理对象').selectOption(`user:${admin.id}`)
-      await page.getByRole('button', { name: '查看 子智能体', exact: true }).click()
+      await page.getByRole('button', { name: '查看 子智能体', exact: true }).waitFor()
+      await auditAdminState(page, 'plugins-runtime-catalog', page.locator('main'))
+      await activate(page.getByRole('button', { name: '查看 子智能体', exact: true }))
       const config = page.getByRole('region', { name: 'subagent 配置', exact: true })
+      await auditAdminState(page, 'plugins-configuration-loaded', config)
       await config.getByLabel('maxDepth', { exact: true }).fill('2')
-      await config.getByRole('button', { name: '保存配置', exact: true }).click()
+      await auditAdminState(page, 'plugins-configuration-draft', config)
+      await activate(config.getByRole('button', { name: '保存配置', exact: true }))
       await config.getByText('配置已保存并即时生效。', { exact: true }).waitFor()
       const settings = async () => parseYaml(await readFile(join(home, 'settings.yaml'), 'utf8')) as { subagent: { maxDepth: number } }
       expect((await settings()).subagent.maxDepth).toBe(2)
-      await compareOrRefreshGolden(join(DIRECTORY, 'configuration.expected.md'), await config.ariaSnapshot(), webSnapshotMode())
+      if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'configuration.expected.md'), await config.ariaSnapshot(), webSnapshotMode())
+      await auditAdminState(page, 'plugins-configuration-saved', config)
       await config.getByLabel('maxDepth', { exact: true }).fill('4')
       const describe = await page.request.post(`${base}/admin/api/plugins/invoke`, { headers: { origin: base }, data: {
         nodeId, target: { kind: 'user', id: admin.id, runtimeId }, generation: 1, rpcId: randomUUID(), endpoint: 'settings.describe', args: {},
@@ -150,16 +161,33 @@ it('installs a local bundle through the built Admin workflow and verifies the re
         args: { ns: 'subagent', expectedRevision: revision, ops: [{ op: 'set', path: ['maxDepth'], value: 3 }] },
       } })
       expect((await concurrent.json() as { result: { ok: boolean } }).result.ok).toBe(true)
-      await config.getByRole('button', { name: '保存配置', exact: true }).click()
+      await activate(config.getByRole('button', { name: '保存配置', exact: true }))
       await config.getByText('配置已在其他位置更新。请放弃草稿、核对新值后重新编辑。', { exact: true }).waitFor()
       expect((await settings()).subagent.maxDepth).toBe(3)
-      await config.getByRole('button', { name: '放弃草稿', exact: true }).click()
+      await auditAdminState(page, 'plugins-configuration-conflict', config)
+      await activate(config.getByRole('button', { name: '放弃草稿', exact: true }))
       expect(await config.getByLabel('maxDepth', { exact: true }).inputValue()).toBe('3')
-      await page.getByRole('button', { name: '返回插件列表', exact: true }).click()
-      await page.getByRole('button', { name: '添加插件', exact: true }).click()
+      await auditAdminState(page, 'plugins-configuration-discarded', config)
+      await activate(page.getByRole('button', { name: '返回插件列表', exact: true }))
+      await activate(page.getByRole('button', { name: '添加插件', exact: true }))
       const dialog = page.getByRole('dialog')
-      await dialog.locator('input').fill(bundle)
-      await dialog.getByRole('button', { name: '安装', exact: true }).click()
+      await auditAdminState(page, 'plugins-install-blank', dialog)
+      await activate(dialog.getByRole('button', { name: '插件安装引导和示例', exact: true }))
+      await auditAdminState(page, 'plugins-install-guide', dialog)
+      await activate(dialog.getByRole('button', { name: '收起引导', exact: true }))
+      await activate(dialog.getByRole('button', { name: /^安装源/ }))
+      const registry = page.getByRole('group', { name: '从哪个 npm 源下载插件', exact: true })
+      await registry.waitFor()
+      await auditAdminState(page, 'plugins-install-registry', registry)
+      await registry.getByRole('textbox', { name: '自定义地址', exact: true }).fill('https://registry.example.invalid/')
+      await auditAdminState(page, 'plugins-install-registry-custom', registry)
+      // pnpm's own registry joins the offered list only when it differs from the first offered one;
+      // a mirror-configured host collapses the official option, so check whichever registry leads.
+      await registry.getByRole('radio').first().check()
+      await activate(dialog.getByRole('button', { name: /^安装源/ }))
+      await dialog.getByRole('textbox', { name: '包名或地址', exact: true }).fill(bundle)
+      await auditAdminState(page, 'plugins-install-path', dialog)
+      await activate(dialog.getByRole('button', { name: '安装', exact: true }))
       await page.getByRole('button', { name: '立即启用', exact: true }).waitFor({ timeout: 60000 })
       const manifest = JSON.parse(await readFile(join(home, 'profiles/web/package.json'), 'utf8')) as {
         dependencies: Record<string, string>
@@ -167,14 +195,56 @@ it('installs a local bundle through the built Admin workflow and verifies the re
       }
       expect(manifest.dependencies['@fixture/admin-install']).toBeTruthy()
       expect(manifest.dsh.profile.bundles).not.toContain('@fixture/admin-install')
+      await auditAdminState(page, 'plugins-installed-disabled', dialog)
+      await activate(dialog.getByRole('button', { name: '查看安装详情', exact: true }))
+      await auditAdminState(page, 'plugins-install-output', dialog)
       const row = page.getByRole('listitem').filter({ has: page.getByRole('button', { name: '查看 @fixture/admin-install', exact: true }) })
-      await compareOrRefreshGolden(join(DIRECTORY, 'install.expected.md'), await row.ariaSnapshot(), webSnapshotMode())
-      await page.getByRole('button', { name: '立即启用', exact: true }).click()
+      if (!matrix) await compareOrRefreshGolden(join(DIRECTORY, 'install.expected.md'), await row.ariaSnapshot(), webSnapshotMode())
+      await activate(page.getByRole('button', { name: '立即启用', exact: true }))
       await expect.poll(async () => (JSON.parse(await readFile(join(home, 'profiles/web/package.json'), 'utf8')) as typeof manifest).dsh.profile.bundles).toContain('@fixture/admin-install')
+      await auditAdminState(page, 'plugins-enabled', row)
+      await activate(page.getByRole('button', { name: '查看 @fixture/admin-install', exact: true }))
+      await auditAdminState(page, 'plugins-installed-details', page.locator('main'))
+      await activate(page.getByRole('button', { name: '卸载 @fixture/admin-install', exact: true }))
+      await auditAdminState(page, 'plugins-uninstall-confirm', dialog)
+      await activate(dialog.getByRole('button', { name: '取消', exact: true }))
+      expect((JSON.parse(await readFile(join(home, 'profiles/web/package.json'), 'utf8')) as typeof manifest)
+        .dependencies['@fixture/admin-install']).toBeTruthy()
+      let removalArrived = false
+      let releaseRemoval!: () => void
+      const removalHeld = new Promise<void>((resolve) => { releaseRemoval = resolve })
+      const refuseRemoval = async (route: Route) => {
+        const input = route.request().postDataJSON() as { endpoint: string; rpcId: string }
+        if (input.endpoint !== 'pluginManager/removeBundle') { await route.fallback(); return }
+        removalArrived = true
+        await removalHeld
+        await route.fulfill({ json: { rpcId: input.rpcId, result: { ok: false,
+          error: { code: 'qa-refusal', message: 'QA package is retained' } } } })
+      }
+      await page.route('**/admin/api/plugins/invoke', refuseRemoval)
+      try {
+        await activate(page.getByRole('button', { name: '卸载 @fixture/admin-install', exact: true }))
+        await activate(dialog.getByRole('button', { name: '卸载', exact: true }))
+        await expect.poll(() => removalArrived, { timeout: 10_000 }).toBe(true)
+        await auditAdminState(page, 'plugins-uninstall-pending', page.locator('main'))
+        releaseRemoval()
+        await page.getByText(/QA package is retained/).waitFor()
+        await auditAdminState(page, 'plugins-uninstall-refused', page.locator('main'))
+      } finally {
+        releaseRemoval()
+        await page.unroute('**/admin/api/plugins/invoke', refuseRemoval)
+      }
+      await activate(page.getByRole('button', { name: '卸载 @fixture/admin-install', exact: true }))
+      await activate(dialog.getByRole('button', { name: '卸载', exact: true }))
+      // pnpm drops the whole dependencies object once its last entry is gone.
+      await expect.poll(async () => (JSON.parse(await readFile(join(home, 'profiles/web/package.json'), 'utf8')) as { dependencies?: Record<string, string> })
+        .dependencies?.['@fixture/admin-install'], { timeout: 60000 }).toBeUndefined()
+      await page.getByRole('button', { name: '查看 @fixture/admin-install', exact: true }).waitFor({ state: 'hidden' })
+      await auditAdminState(page, 'plugins-uninstalled', page.locator('main'))
       expect(errors).toEqual([])
       await expect.poll(() => leases).toBe(0)
     } catch (error) {
-      await page.screenshot({ path: '.artifacts/plugin-admin-failure.png', fullPage: true })
+      await page.screenshot({ path: '.artifacts/plugin-admin-failure.png' })
       await writeFile('.artifacts/plugin-admin-failure.md', await page.locator('main').ariaSnapshot() + '\n')
       await writeFile('.artifacts/plugin-admin-runtime.log', output)
       throw error
@@ -184,6 +254,6 @@ it('installs a local bundle through the built Admin workflow and verifies the re
     for (const dispose of cleanup.reverse()) { try { await dispose() } catch (error) { failures.push(error) } }
     if (failures.length) throw new AggregateError(failures, 'plugin admin cleanup failed')
   }
-}, 150000)
+}, matrix ? 1_800_000 : 150000)
 
 it('owns regional plugin installation and configuration goldens', async () => { expect((await readdir(DIRECTORY)).sort()).toEqual(['configuration.expected.md', 'install.expected.md']) })

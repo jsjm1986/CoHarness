@@ -1,12 +1,11 @@
 /** Behavior and work-count coverage for invocation-local Provider normalization. */
 import { describe, expect, it, vi } from 'vitest'
-import { PostgresModelGovernanceService } from '../src/postgres/model-governance-service.ts'
 import { createProjectionHarness, syntheticProviderRows, type ProjectionScope } from './runtime-provider-projection.fixture.ts'
 
 describe.each<ProjectionScope>(['organization', 'project'])('%s runtime Provider projection', scope => {
   it('normalizes each Provider profile once per query result', async () => {
     const rows = [...syntheticProviderRows(16), ...syntheticProviderRows(8, 'second-provider')]
-    const project = createProjectionHarness(PostgresModelGovernanceService)
+    const project = createProjectionHarness()
     const clone = globalThis.structuredClone
     let clonedModels = 0
     const spy = vi.spyOn(globalThis, 'structuredClone').mockImplementation(value => {
@@ -39,7 +38,7 @@ describe.each<ProjectionScope>(['organization', 'project'])('%s runtime Provider
       row.profile = profile
       row.credential_ref = 'synthetic-credential-reference'
     }
-    const project = createProjectionHarness(PostgresModelGovernanceService)
+    const project = createProjectionHarness()
     const result = await project(scope, rows)
     const provider = result[0]!
     expect(provider).toMatchObject({
@@ -65,7 +64,7 @@ describe.each<ProjectionScope>(['organization', 'project'])('%s runtime Provider
   })
 
   it('uses fresh profiles after an update and isolates Providers with identical model ids', async () => {
-    const project = createProjectionHarness(PostgresModelGovernanceService)
+    const project = createProjectionHarness()
     const firstRows = syntheticProviderRows(1)
     const first = await project(scope, firstRows)
     const updated = syntheticProviderRows(1)
@@ -84,6 +83,6 @@ describe.each<ProjectionScope>(['organization', 'project'])('%s runtime Provider
   ])('rejects malformed stored profile models: $error', async ({ profile, error }) => {
     const rows = syntheticProviderRows(1)
     rows[0]!.profile = profile
-    await expect(createProjectionHarness(PostgresModelGovernanceService)(scope, rows)).rejects.toThrow(error)
+    await expect(createProjectionHarness()(scope, rows)).rejects.toThrow(error)
   })
 })

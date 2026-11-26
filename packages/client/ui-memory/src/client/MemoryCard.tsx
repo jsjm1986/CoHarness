@@ -28,7 +28,8 @@ export function MemoryCard(props: MemoryCardProps) {
       <span className={css.cardText}>
         <span>{t('card.enabled')}</span>
         <span className={css.cardHint}>{t('card.enabledHint')}</span>
-        {state.failed ? <span className={css.editorError}>{t('card.writeError')}</span> : null}
+        {state.saving ? <span className={css.cardHint} role="status">{t('card.saving')}</span> : null}
+        {state.failed ? <span className={css.editorError} role="alert">{t('card.writeError')}</span> : null}
       </span>
       <Switch
         checked={state.enabled}

@@ -15,11 +15,14 @@ export const GATEWAY_RUNTIME_PACKAGES: readonly { readonly directory: string; re
   { directory: 'packages/subprocess/subprocess-local', entry: 'lib/index.js' },
   { directory: 'packages/llm/llm', entry: 'lib/types/discovery.js' },
   { directory: 'packages/session/session-format', entry: 'lib/index.js' },
+  { directory: 'packages/session/session-persistence', entry: 'lib/index.js' },
+  { directory: 'packages/session/session-persistence-jsonl', entry: 'lib/index.js' },
   { directory: 'packages/core/session', entry: 'lib/index.js' },
   { directory: 'packages/session/session-format-catalog', entry: 'lib/index.js' },
   { directory: 'packages/util/home-paths', entry: 'lib/index.js' },
   { directory: 'packages/util/values', entry: 'lib/index.js' },
   { directory: 'packages/context/resource-budget', entry: 'lib/wire.js' },
+  { directory: 'packages/context/gateway-runtime', entry: 'lib/steward-statement.js' },
   { directory: 'packages/schedule/schedule', entry: 'lib/index.js' },
   { directory: 'packages/attachment/userdoc', entry: 'lib/index.js' },
   { directory: 'packages/attachment/userdoc-local', entry: 'lib/index.js' },
@@ -33,8 +36,9 @@ export const GATEWAY_RUNTIME_PACKAGES: readonly { readonly directory: string; re
  * Make the standalone Gateway's compiled ESM graph resolve the workspace
  * packages it imports at runtime. The Gateway is intentionally outside the
  * pnpm workspace, so a clean git-archive release does not get pnpm's usual
- * workspace symlink automatically. The relative link keeps the release
- * self-contained and survives copying the complete release directory.
+ * workspace link automatically. POSIX relative links survive copying the
+ * release. Create Windows junctions in the final release directory, where
+ * their absolute targets stay valid.
  * @param root - absolute release root containing the Gateway and workspace packages.
  */
 export function ensureGatewayRuntimePackages(root: string): void {
@@ -60,7 +64,8 @@ export function ensureGatewayRuntimePackages(root: string): void {
       }
       continue
     }
-    symlinkSync(relative(dirname(link), packageRoot), link, 'dir')
+    if (process.platform === 'win32') symlinkSync(expected, link, 'junction')
+    else symlinkSync(relative(dirname(link), packageRoot), link, 'dir')
   }
 }
 /**

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-15-forge-panel-remote-access-port.md
 document:
-  en: a38533974a991c5c9357be8f912a3e53e87d0091
-  zh: f968c03aa722581eb0c7093862b89ebc3013d40a
+  en: e5137336f26c3b9c56425edf8f4f89d6c415d728
+  zh: 19d69dcb42b49b327ad1a676b28701249a6df6c7
 /agent-note-forge-panel-and-remote-access-port:
   en: e1265acb15d476cb
   zh: f5e5dbc2836e5c41
@@ -12,8 +12,8 @@ document:
   en: 3af8dcbb6639b0a9
   zh: 806bf8bdb8c9a1b0
 /agent-note-forge-panel-and-remote-access-port/decision:
-  en: b1dc93ed74cc95b1
-  zh: 42b0debf4e7ca320
+  en: 4846468a7b068550
+  zh: 5f1d17612b942202
 /agent-note-forge-panel-and-remote-access-port/alternatives-considered:
   en: 69802ef2315af76e
   zh: 9465e10c9ffa7500

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { type Locator, type Page, type Response as BrowserResponse } from 'playwright'
 import { expect, it } from 'vitest'
 import { computerBrowser } from './computer-browser.ts'
+import { armPreparationClock } from './browser-latency-clock.ts'
 import { clientSessionKey, type ClientRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { launchPersonalComputersFixture, personalTargets } from './personal-computers-fixture.ts'
@@ -29,30 +30,7 @@ interface PrepareStages { beforeRequest: number; network: number; afterResponse:
 async function readied(page: Page, click: Locator, runtime: string, method: 'create' | 'history'):
 Promise<{ draft: number; ready: number; stages: PrepareStages }> {
   // Observe the DOM from the actual click task. Driver polling must not inflate the local-edit sample.
-  const armClock = () => page.evaluate(() => {
-    Object.assign(window, { __dshLatency: undefined })
-    document.addEventListener('click', () => {
-      const marks: { start: number; input?: number; ready?: number; runtime?: string } = { start: performance.now() }
-      Object.assign(window, { __dshLatency: marks })
-      const measure = () => {
-        const box = document.querySelector<HTMLElement>('[data-conversation-intent]')
-        const field = box?.querySelector('textarea')
-        if (marks.input === undefined && field && !field.disabled) {
-          marks.input = performance.now()
-          const target = box?.dataset.intentRuntime
-          if (target !== undefined) marks.runtime = target
-        }
-        if (marks.input !== undefined && !box && document.querySelector('textarea:enabled')) {
-          marks.ready = performance.now()
-          observer.disconnect()
-        }
-      }
-      const observer = new MutationObserver(measure)
-      observer.observe(document.body, { subtree: true, childList: true, attributes: true })
-      requestAnimationFrame(measure)
-    }, { capture: true, once: true })
-  })
-  await armClock()
+  await armPreparationClock(page)
   await click.click()
   const readyMark = () => page.waitForFunction(
     () => (window as Window & { __dshLatency?: { ready?: number } }).__dshLatency?.ready !== undefined,
@@ -65,7 +43,7 @@ Promise<{ draft: number; ready: number; stages: PrepareStages }> {
     // never lands. Reopening an already-listed conversation is idempotent —
     // arm a fresh clock and click once more before reporting the stall.
     if (method !== 'history') throw error
-    await armClock()
+    await armPreparationClock(page)
     await click.click()
     await readyMark()
   }

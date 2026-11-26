@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   PermissionCatalog, PermissionSelection as PermissionSelectValue,
@@ -50,6 +50,48 @@ const value: PermissionSelectValue = {
 afterEach(cleanup)
 
 describe('PermissionSelect mobile presentation', () => {
+  it('returns focus after cancelling confirmation and blocks duplicate commands while submitting', async () => {
+    const pending = Promise.withResolvers<boolean>()
+    const command = vi.fn(() => pending.promise)
+    render(<PermissionSelect availability="local" value={value} catalog={catalog}
+      locked={false} command={command} t={t} presentation="section" />)
+    const full = screen.getByRole('menuitemradio', { name: 'Full access' })
+    fireEvent.click(full)
+    expect(full.hasAttribute('disabled')).toBe(false)
+    expect(document.activeElement).toBe(screen.getByRole('checkbox'))
+    expect(screen.queryByRole('menuitemradio', { name: 'Read Only' })).toBeNull()
+    screen.getByRole('menuitemradio', { name: 'Read Only', hidden: true }).focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(document.activeElement).toBe(full)
+    expect(command).not.toHaveBeenCalled()
+
+    fireEvent.click(full)
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: '启用 Full access' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    for (const option of screen.getAllByRole('menuitemradio')) expect(option.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(full)
+    expect(command).toHaveBeenCalledTimes(1)
+    expect(command).toHaveBeenCalledWith('/permission danger-full-access')
+    await act(async () => { pending.resolve(true); await pending.promise })
+    expect(full.hasAttribute('disabled')).toBe(false)
+  })
+
+  it('captures the phone access trigger before opening its settings sheet', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
+    try {
+      const onOpenSettings = vi.fn()
+      render(<PermissionSelect availability="local" value={value} catalog={catalog}
+        locked={false} command={vi.fn()} t={t} onOpenSettings={onOpenSettings} />)
+      const trigger = screen.getByRole('button', { name: '访问模式，当前：Workspace Write' })
+      fireEvent.click(trigger)
+      expect(onOpenSettings).toHaveBeenCalledWith('permission')
+      expect(document.activeElement).toBe(trigger)
+    } finally { vi.unstubAllGlobals() }
+  })
+
   it('keeps selected Auto visible and explains how to leave it without silently changing the mode', () => {
     const command = vi.fn(() => Promise.resolve(true))
     render(<PermissionSelect value={{ currentValue: 'auto' }}

@@ -70,6 +70,7 @@ function TrajectoryTable(
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo')
 })
 
@@ -126,6 +127,30 @@ const FOLD_PROPS = {
 }
 
 describe('TrajectoryTable', () => {
+  it('isolates a compact inspector, cycles focus and restores its clicked record', () => {
+    const view = render(<><button>Outside</button><TrajectoryTable compact turns={TURNS} {...FOLD_PROPS} /></>)
+    const trigger = screen.getByRole('button', { name: /ASSISTANT, Checking files/ })
+    fireEvent.click(trigger)
+    const dialog = screen.getByRole('dialog', { name: 'Event details' })
+    const close = within(dialog).getByRole('button', { name: 'Close details' })
+    expect(document.activeElement).toBe(close)
+    const outside = screen.getByText('Outside')
+    expect(outside.inert).toBe(true)
+    const controls = [...dialog.querySelectorAll<HTMLElement>('button, [tabindex="0"]:not([hidden])')]
+    controls.at(-1)!.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(controls[0])
+    fireEvent.keyDown(document, { key: 'Escape', isComposing: true })
+    expect(screen.getByRole('dialog', { name: 'Event details' })).toBe(dialog)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+    expect(outside.inert).toBe(false)
+    fireEvent.click(trigger)
+    view.unmount()
+    expect(outside.inert).toBe(false)
+  })
+
   it('shows a muted placeholder for an assistant response containing only tool calls', () => {
     const turns: readonly TrajectoryTurnModel[] = [{
       turn: 1,
@@ -191,15 +216,16 @@ describe('TrajectoryTable', () => {
     expect(screen.getByText('15 tok')).toBeTruthy()
   })
 
-  it('marks Summary scroll regions for interaction-only scrollbar thumbs', () => {
+  it('keeps Summary content in one scroll region', () => {
     render(<TrajectoryTable turns={TURNS} {...FOLD_PROPS} />)
     fireEvent.click(screen.getByRole('row', { name: /ASSISTANT/ }))
 
     const panel = screen.getByRole('tabpanel')
-    expect(panel.querySelectorAll('[data-summary-scroll-region]').length).toBeGreaterThan(1)
+    expect(panel.hasAttribute('data-summary-scroll-region')).toBe(true)
+    expect(panel.querySelector('[data-summary-scroll-region]')).toBeNull()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
-    expect(panel.querySelector('[data-summary-scroll-region]')).toBeNull()
+    expect(panel.hasAttribute('data-summary-scroll-region')).toBe(false)
   })
 
   it('keeps long thinking collapsed until the user asks to render it', () => {
@@ -862,7 +888,7 @@ describe('TrajectoryTable', () => {
     expect(recovered.style.getPropertyValue('--request-boundary-offset')).toBe('16px')
   })
 
-  it('shows the custom role tooltip only from the responsive icon', () => {
+  it('shows the custom role tooltip only from the responsive icon', async () => {
     const view = render(<TrajectoryTable turns={TURNS} {...FOLD_PROPS} />)
     const toolTag = view.container.querySelector<HTMLElement>('[data-role-kind="tool"]')
     const toolIcon = toolTag?.querySelector<HTMLElement>('[data-role-icon="wrench"]')
@@ -878,7 +904,7 @@ describe('TrajectoryTable', () => {
     expect(tooltip.textContent).toBe('TOOL')
     expect(tooltip.getAttribute('data-side')).toBe('right')
     fireEvent.mouseLeave(toolIcon as HTMLElement)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await waitFor(() => { expect(screen.queryByRole('tooltip')).toBeNull() })
   })
 
   it('uses information and compression glyphs for injected and compacted context', () => {
@@ -1038,6 +1064,29 @@ describe('TrajectoryTable', () => {
       }],
     }],
   }]
+
+  it.each([true, false])('respects reduced motion (%s) for inspect and timeline navigation', (reduced) => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: reduced })))
+    const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
+    const scroll = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scroll })
+    try {
+      render(
+        <TrajectoryTable
+          turns={CALL_TURNS}
+          {...FOLD_PROPS}
+          inspectCallId="call-1"
+          timelineFocusIndexes={new Set([1])}
+        />,
+      )
+      expect(scroll).toHaveBeenCalledTimes(2)
+      expect(scroll).toHaveBeenNthCalledWith(1, { behavior: reduced ? 'auto' : 'smooth', block: 'center' })
+      expect(scroll).toHaveBeenNthCalledWith(2, { behavior: reduced ? 'auto' : 'smooth', block: 'center' })
+    } finally {
+      if (originalScroll === undefined) Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
+      else Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScroll)
+    }
+  })
 
   it('an inspect target opens the matching record and acknowledges once', () => {
     const onInspectApplied = vi.fn()

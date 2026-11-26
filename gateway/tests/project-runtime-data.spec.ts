@@ -25,6 +25,16 @@ function fixture() {
 }
 
 describe.skipIf(process.platform !== 'linux')('private Linux project profile', () => {
+  it('prepares a verified existing nonstandard home without recreating the standard layout',async()=>{
+    const f=fixture(),selected=join(f.root,'selected-runtime'),original=fs.statSync(f.home)
+    fs.renameSync(f.home,selected)
+    await prepareProjectRuntimeData(f.cfg,27,user,'web',f.signal,selected)
+    expect(fs.statSync(selected).ino).toBe(original.ino)
+    expect(fs.existsSync(f.home)).toBe(false)
+    expect(fs.statSync(join(selected,'profiles','web','node_modules','@deepseek-ai')).mode&0o777).toBe(0o700)
+    await expect(prepareProjectRuntimeData(f.cfg,27,user,'web',f.signal,join(f.root,'absent'))).rejects.toMatchObject({code:'ENOENT'})
+    expect(fs.existsSync(join(f.root,'absent'))).toBe(false)
+  })
   it('assigns fixed private directories and inventory while retaining other file ownership and bytes', async () => {
     const f = fixture(), retained = join(f.home, 'retained.txt'), inventory = join(f.home, 'managed-data.jsonl')
     fs.writeFileSync(retained, 'retained project data', { mode: 0o600 })

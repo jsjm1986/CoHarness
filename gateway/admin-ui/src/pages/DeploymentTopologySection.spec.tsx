@@ -1,8 +1,9 @@
 /** Mode edits use ingress policy, keep unsaved input and inspect detach blockers before committing. */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
 import { DeploymentContextProvider } from '../deployment-context.tsx'
+import { PendingEditsProvider } from '../pending-edits.tsx'
 import { DeploymentTopologySection } from './DeploymentTopologySection.tsx'
 import { deploymentContextSchema } from '../../../src/deployment-protocol.ts'
 
@@ -19,7 +20,8 @@ beforeEach(() => {
   vi.mocked(api.getDeploymentTopology).mockResolvedValue(single)
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
-const open = () => render(<DeploymentContextProvider><DeploymentTopologySection /></DeploymentContextProvider>)
+const open = () => render(<PendingEditsProvider><DeploymentContextProvider><DeploymentTopologySection /></DeploymentContextProvider></PendingEditsProvider>)
+const canUnload = () => window.dispatchEvent(new Event('beforeunload', { cancelable: true }))
 
 it('rereads a committed mode when repeated invalidations arrive during an older policy request', async () => {
   let release!: (value: typeof single) => void
@@ -62,6 +64,67 @@ it('keeps a dirty address through cross-tab invalidation and refreshes the revis
   await waitFor(() => expect(api.saveDeploymentTopology).toHaveBeenLastCalledWith({ revision: '1', enabled: true, primaryOrigin: 'https://draft.test' }))
 })
 
+it('keeps a newer preflight error when an older topology reload finishes', async () => {
+  vi.mocked(api.getDeploymentTopology).mockResolvedValue(multi)
+  const reload = Promise.withResolvers<typeof multi>()
+  vi.mocked(api.preflightDeploymentTopology).mockResolvedValue({ canDisable: false, blockingCount: 1,
+    computers: [{ nodeId: single.entry.nodeId, name: 'Offline B', state: 'managed', activeRuntimes: 1 }] })
+  open()
+  const enabled = await screen.findByRole<HTMLInputElement>('checkbox', { name: '启用多电脑' })
+  fireEvent.click(enabled)
+  vi.mocked(api.getDeploymentTopology).mockReturnValueOnce(reload.promise)
+  fireEvent.click(screen.getByRole('button', { name: '重新读取' }))
+  expect(api.getDeploymentTopology).toHaveBeenCalledTimes(2)
+
+  fireEvent.click(screen.getByRole('button', { name: '保存部署模式' }))
+  const alert = await screen.findByRole('alert')
+  expect(alert.textContent).toContain('还有电脑处于接入状态')
+
+  await act(async () => { reload.resolve(multi) })
+  expect(screen.queryByRole('alert')?.textContent ?? '').toContain('还有电脑处于接入状态')
+  expect(screen.getByText(/Offline B/)).toBeTruthy()
+  expect(enabled.checked).toBe(false)
+  expect(vi.mocked(api.getDeploymentTopology).mock.calls[1]?.[0]?.aborted).toBe(true)
+})
+
+it('allows unloading during a clean reload and preserves edits made after it started', async () => {
+  open()
+  const enabled = await screen.findByRole<HTMLInputElement>('checkbox', { name: '启用多电脑' })
+  const reload = Promise.withResolvers<typeof single>()
+  vi.mocked(api.getDeploymentTopology).mockReturnValueOnce(reload.promise)
+  fireEvent.click(screen.getByRole('button', { name: '重新读取' }))
+  expect(api.getDeploymentTopology).toHaveBeenCalledTimes(2)
+  expect(canUnload()).toBe(true)
+
+  fireEvent.click(enabled)
+  const origin = screen.getByLabelText<HTMLInputElement>('主入口访问地址')
+  fireEvent.change(origin, { target: { value: 'https://new-draft.test' } })
+  await act(async () => { reload.resolve({ ...single, revision: '1' }) })
+  expect(enabled.checked).toBe(true)
+  expect(origin.value).toBe('https://new-draft.test')
+  expect(canUnload()).toBe(false)
+})
+
+it('allows unloading during a clean preflight but protects the confirmed write', async () => {
+  const preflight = Promise.withResolvers<Awaited<ReturnType<typeof api.preflightDeploymentTopology>>>()
+  const save = Promise.withResolvers<typeof single>()
+  vi.mocked(api.getDeploymentTopology).mockResolvedValueOnce({ ...single, legacyMigrationRequired: true })
+  vi.mocked(api.preflightDeploymentTopology).mockReturnValueOnce(preflight.promise)
+  vi.mocked(api.saveDeploymentTopology).mockReturnValueOnce(save.promise)
+  open()
+  fireEvent.click(await screen.findByRole('button', { name: '保存部署模式' }))
+  expect(api.preflightDeploymentTopology).toHaveBeenCalledTimes(1)
+  expect(canUnload()).toBe(true)
+
+  await act(async () => { preflight.resolve({ canDisable: true, blockingCount: 0, computers: [] }) })
+  const dialog = screen.getByRole('dialog', { name: '关闭多电脑模式' })
+  fireEvent.click(within(dialog).getByRole('button', { name: '确认关闭' }))
+  expect(api.saveDeploymentTopology).toHaveBeenCalledExactlyOnceWith({ revision: '0', enabled: false })
+  expect(canUnload()).toBe(false)
+  await act(async () => { save.resolve(single) })
+  expect(canUnload()).toBe(true)
+})
+
 it('does not disable while a disconnected computer remains attached', async () => {
   vi.mocked(api.getDeploymentTopology).mockResolvedValue(multi)
   vi.mocked(api.preflightDeploymentTopology).mockResolvedValue({ canDisable: false, blockingCount: 1,
@@ -72,6 +135,17 @@ it('does not disable while a disconnected computer remains attached', async () =
   await screen.findByText(/Offline B/)
   expect(api.saveDeploymentTopology).not.toHaveBeenCalled()
   expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+it('explains an isolated entry refusal while retaining the proposed primary address', async () => {
+  vi.mocked(api.saveDeploymentTopology).mockRejectedValue(new api.AdminRequestError(409, 'deployment/current-computer-quarantined'))
+  open()
+  fireEvent.click(await screen.findByRole('checkbox', { name: '启用多电脑' }))
+  fireEvent.change(screen.getByLabelText('主入口访问地址'), { target: { value: 'https://replacement.test' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存部署模式' }))
+  expect((await screen.findByRole('alert')).textContent).toContain('当前电脑因灾难恢复已隔离，不能作为主入口。')
+  expect((screen.getByLabelText('主入口访问地址') as HTMLInputElement).value).toBe('https://replacement.test')
+  expect(api.saveDeploymentTopology).toHaveBeenCalledTimes(1)
 })
 
 it('makes a secondary entry local and directs mode changes to the primary in a separate tab', async () => {

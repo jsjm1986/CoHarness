@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { decimalToMicros, microsToDecimal } from '../money.ts'
-import { verifyExecutionAttribution } from '../execution-identity.ts'
+import { ExecutionIdentityError, verifyExecutionAttribution, type PersonalExecutionWriteFence } from '../execution-identity.ts'
+import type { RuntimeCredentialSubject } from '../runtime-api.ts'
 import type { UserRow } from '../auth.ts'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import type {
@@ -36,6 +37,7 @@ import type {
 } from '../model-governance.ts'
 import { ORGANIZATION_PROVIDER_PATTERN, ProjectModelSettingsConflictError } from '../model-governance.ts'
 import { OrganizationModelCredentialCipher } from '../organization-model-credentials.ts'
+import { ModelUsageRejection, usageCount, usageText } from '../model-usage-rejection.ts'
 import { modelEndpointCandidates } from '@deepseek-ai/dsh-llm/discovery'
 import type { Queryable } from './database.ts'
 import { transaction } from './database.ts'
@@ -55,6 +57,10 @@ import type {
   OrganizationCredentialView,
   OrganizationModelSettingsView,
 } from '../model-governance.ts'
+
+type OrganizationCredentialLookup = { verdict: 'open' | 'stale-epoch' | 'maintenance' } & (
+  { provider_id: null } | { provider_id: string; key_version: number; nonce: Buffer; ciphertext: Buffer; auth_tag: Buffer }
+)
 
 const nonEmpty = (value: string, name: string): string => {
   const accepted = value.trim()
@@ -315,6 +321,92 @@ function indexedProfileModels(profile: Record<string, unknown>): Map<unknown, Re
 interface RuntimeProviderProjection {
   provider: RuntimeModelProvider
   models: Map<unknown, Record<string, unknown>>
+}
+
+/** One catalog JOIN row consumed by {@link runtimePolicyFromRows}; `profile: null` marks an inaccessible Provider. */
+export type RuntimePolicyRow = {
+  provider: string
+  model: string
+  provider_enabled: boolean
+  model_enabled: boolean
+  allowed: boolean
+  project_owned: boolean
+  display_name: string
+  credential_ref: string | null
+  model_name: string
+} & (
+  { profile: Record<string, unknown>; protocol: ModelProviderProtocol; base_url: string }
+  | { profile: null; protocol: ModelProviderProtocol | null; base_url: string | null }
+)
+
+const runtimePolicyColumns = `provider.provider_key provider,model.model_key model,
+  (provider.status='enabled') provider_enabled,model.enabled model_enabled,
+  provider.display_name,provider.protocol,provider.base_url,provider.credential_ref,
+  CASE WHEN provider.status='enabled' AND model.enabled THEN provider.profile END profile,
+  model.display_name model_name`
+
+/**
+ * Project catalog JOIN rows into the Runtime model policy shared by organization and project reads.
+ * @param version - configuration revision stamped on the returned policy.
+ * @param rows - rows selected with {@link runtimePolicyColumns}; project-owned rows require `projectId`.
+ * @param projectId - project scope for `project_owned` rows; omitted for organization-only reads.
+ * @returns runtime policy carrying model permissions and projected Providers.
+ */
+export function runtimePolicyFromRows(version: number, rows: readonly RuntimePolicyRow[], projectId?: number): RuntimeModelPolicy {
+  const providers = new Map<string, RuntimeProviderProjection>()
+  const models: RuntimeModelPolicy['models'] = []
+  for (const row of rows) {
+    const owningProject = row.project_owned ? projectId : undefined
+    const route = owningProject === undefined ? row.provider : projectRuntimeProviderKey(owningProject, row.provider)
+    models.push({ provider: route, model: row.model, allowed: row.provider_enabled && row.model_enabled && row.allowed })
+    if (row.profile === null) continue
+
+    const key = row.project_owned ? `project:${row.provider}` : `organization:${row.provider}`
+    let projection = providers.get(key)
+    if (projection === undefined) {
+      const profile = runtimeManagedProfile(row.profile)
+      // The projected profile and the provider must carry the same canonical endpoint.
+      if (profile.baseURL !== undefined) profile.baseURL = row.base_url
+      const provider: RuntimeModelProvider = {
+        provider: route,
+        displayName: row.display_name,
+        driver: 'pi-ai',
+        protocol: row.protocol,
+        baseURL: row.base_url,
+        ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
+        profile,
+        models: [],
+        ...owningProject === undefined ? { scope: 'organization' } : { scope: 'project', projectId: owningProject },
+      }
+      projection = { provider, models: indexedProfileModels(profile) }
+      providers.set(key, projection)
+    }
+    const configured = projection.models.get(row.model)
+    const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
+    const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
+    const input = Array.isArray(configured?.input)
+      ? configured.input.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
+      : undefined
+    const reasoningEfforts = configured?.reasoningEfforts === false
+      ? false
+      : configured?.reasoningEfforts !== undefined
+        && typeof configured.reasoningEfforts === 'object' && configured.reasoningEfforts !== null
+        ? configured.reasoningEfforts as RuntimeModelProvider['models'][number]['reasoningEfforts']
+        : undefined
+    const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
+      ? configured.compat as RuntimeModelProvider['models'][number]['compat']
+      : undefined
+    projection.provider.models.push({
+      id: row.model,
+      name: row.model_name,
+      ...contextWindow === undefined ? {} : { contextWindow },
+      ...maxTokens === undefined ? {} : { maxTokens },
+      ...input === undefined ? {} : { input },
+      ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
+      ...compat === undefined ? {} : { compat },
+    })
+  }
+  return { version, defaultAllowed: false, models, providers: [...providers.values()].map(projection => projection.provider) }
 }
 
 interface UsageTotalsRow {
@@ -1183,15 +1275,8 @@ export class PostgresModelGovernanceService {
         WHERE u.organization_id=$1 AND u.public_id=$2 AND u.status='active' AND u.deleted_at IS NULL
           AND m.status='active' AND o.status='active' FOR SHARE OF u,m`, [this.context.organizationId, user.id])).rows[0]
       if (account === undefined) throw new CollaborationDeniedError('forbidden')
-      const result = await client.query<{
-        provider: string
-        model: string
-        provider_enabled: boolean
-        model_enabled: boolean
-        allowed: boolean
-      }>(`SELECT model.provider_key provider,model.model_key model,
-        (provider.status='enabled') provider_enabled,model.enabled model_enabled,
-        COALESCE(access.allowed,role_access.allowed,$3='admin') allowed
+      const { rows } = await client.query<RuntimePolicyRow>(`SELECT ${runtimePolicyColumns},
+        COALESCE(access.allowed,role_access.allowed,$3='admin') allowed,false project_owned
         FROM harness.model_catalog model
         JOIN harness.model_providers provider ON provider.id=model.provider_id
           AND provider.organization_id=model.organization_id
@@ -1202,16 +1287,7 @@ export class PostgresModelGovernanceService {
         WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
         ORDER BY model.provider_key,model.model_key`,
       [this.context.organizationId, account.id, account.role])
-      return {
-        version,
-        defaultAllowed: false,
-        models: result.rows.map(row => ({
-          provider: row.provider,
-          model: row.model,
-          allowed: row.provider_enabled && row.model_enabled && row.allowed,
-        })),
-        providers: await this.runtimeProviders(client),
-      }
+      return runtimePolicyFromRows(version, rows)
     })
   }
 
@@ -1220,15 +1296,8 @@ export class PostgresModelGovernanceService {
       const project = await internalProjectId(client, this.context.organizationId, projectId)
       if (project === null) throw new Error(`unknown project ${String(projectId)}`)
       const version = await this.lockConfigurationRevision(client)
-      const result = await client.query<{
-        provider: string
-        model: string
-        provider_enabled: boolean
-        model_enabled: boolean
-        allowed: boolean
-      }>(`SELECT model.provider_key provider,model.model_key model,
-        (provider.status='enabled') provider_enabled,model.enabled model_enabled,
-        COALESCE(access.allowed,project.model_access_default_allowed) allowed
+      const { rows } = await client.query<RuntimePolicyRow>(`SELECT ${runtimePolicyColumns},
+        COALESCE(access.allowed,project.model_access_default_allowed) allowed,false project_owned
         FROM harness.model_catalog model
         JOIN harness.model_providers provider ON provider.id=model.provider_id
           AND provider.organization_id=model.organization_id
@@ -1236,42 +1305,15 @@ export class PostgresModelGovernanceService {
         LEFT JOIN harness.model_project_access access ON access.organization_id=model.organization_id
           AND access.model_id=model.id AND access.project_id=$2
         WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
-        ORDER BY model.provider_key,model.model_key`,
-      [this.context.organizationId, project])
-      const projectModels = await client.query<{
-        provider: string
-        model: string
-        provider_enabled: boolean
-        model_enabled: boolean
-      }>(`SELECT model.provider_key provider,model.model_key model,
-        (provider.status='enabled') provider_enabled,model.enabled model_enabled
+        UNION ALL
+        SELECT ${runtimePolicyColumns},true allowed,true project_owned
         FROM harness.project_model_catalog model
         JOIN harness.project_model_providers provider ON provider.id=model.provider_id
           AND provider.project_id=model.project_id
         WHERE model.organization_id=$1 AND model.project_id=$2
           AND provider.status <> 'archived'
-        ORDER BY model.provider_key,model.model_key`, [this.context.organizationId, project])
-      const projectRoutes = projectModels.rows.map(row => ({
-        provider: projectRuntimeProviderKey(projectId, row.provider),
-        model: row.model,
-        allowed: row.provider_enabled && row.model_enabled,
-      }))
-      return {
-        version,
-        defaultAllowed: false,
-        models: [
-          ...result.rows.map(row => ({
-          provider: row.provider,
-          model: row.model,
-          allowed: row.provider_enabled && row.model_enabled && row.allowed,
-          })),
-          ...projectRoutes,
-        ],
-        providers: [
-          ...await this.runtimeProviders(client),
-          ...await this.runtimeProjectProviders(client, project, projectId),
-        ],
-      }
+        ORDER BY project_owned,provider,model`, [this.context.organizationId, project])
+      return runtimePolicyFromRows(version, rows, projectId)
     })
   }
 
@@ -1280,13 +1322,95 @@ export class PostgresModelGovernanceService {
     if (subject.kind === 'project' && ref.startsWith('DSH_PROJECT_')) {
       return this.resolveProjectCredential(subject.id, ref)
     }
-    const subjectId = subject.kind === 'user'
-      ? await internalUserId(this.context.pool, this.context.organizationId, subject.id)
-      : await internalProjectId(this.context.pool, this.context.organizationId, subject.id)
-    if (subjectId === null) return null
+    const row = await this.readOrganizationCredential(subject, ref)
+    return row === undefined ? null : this.decryptOrganizationCredential(row)
+  }
+
+  /**
+   * Read the current personal or project Runtime, serving state and managed credential in one database snapshot.
+   * Covers both organization-managed and project-owned (`DSH_PROJECT_*`) credentials without separate bearer or write-gate queries.
+   * @param subject - recognized personal or project Runtime coordinates.
+   * @param ref - managed Provider's credential reference.
+   * @param fence - exact Runtime bearer and the Gateway's write epoch.
+   * @returns The credential result, an invalid Runtime, or a closed maintenance gate.
+   */
+  async resolveRuntimeCredential(subject: RuntimeCredentialSubject, ref: string, fence: PersonalExecutionWriteFence):
+    Promise<{ status: 'ok'; value: string | null } | { status: 'invalid-runtime-token' | 'stale-epoch' | 'maintenance' }> {
+    if (subject.target.kind === 'user') return this.resolvePersonalRuntimeCredential(subject, ref, fence)
+    if (subject.organizationId !== this.context.organizationId || subject.target.runtimeId === undefined) {
+      return { status: 'invalid-runtime-token' }
+    }
+    const bearerHash = createHash('sha256').update(fence.bearer).digest()
+    const row = ref.startsWith('DSH_PROJECT_')
+      ? await this.readProjectRuntimeCredential(subject.target.id, ref, {
+        runtimeId: subject.target.runtimeId, generation: subject.generation, bearerHash, epoch: fence.epoch,
+      })
+      : await this.readOrganizationCredential(subject.target, ref, {
+        runtimeId: subject.target.runtimeId, generation: subject.generation, bearerHash, epoch: fence.epoch,
+      })
+    if (row === undefined) return { status: 'invalid-runtime-token' }
+    if (row.verdict !== 'open') return { status: row.verdict }
+    return { status: 'ok', value: this.decryptOrganizationCredential(row) }
+  }
+
+  private async readProjectRuntimeCredential(projectId: number, ref: string,
+    runtime: { runtimeId: RuntimeId; generation: number; bearerHash: Buffer; epoch: bigint }): Promise<OrganizationCredentialLookup | undefined> {
+    const result = await this.context.pool.query<OrganizationCredentialLookup>(`WITH authority AS MATERIALIZED (
+        SELECT owner.id AS project_id,
+          CASE WHEN COALESCE(control.write_epoch,1)<>$8 THEN 'stale-epoch'
+            WHEN COALESCE(control.mode,'serving')<>'serving' THEN 'maintenance' ELSE 'open' END AS verdict
+        FROM harness.instances i
+        JOIN harness.organizations o ON o.id=i.organization_id AND o.status='active'
+        JOIN harness.projects owner ON (owner.organization_id,owner.id)=(i.organization_id,i.project_id)
+          AND owner.public_id=$3 AND owner.status='active'
+        LEFT JOIN harness.project_content_placement cp ON cp.organization_id=i.organization_id AND cp.project_id=i.project_id
+        LEFT JOIN harness.cluster_control control ON control.organization_id=i.organization_id
+        WHERE i.organization_id=$1 AND i.assigned_node_id=$4 AND i.runtime_id=$5 AND i.generation=$6 AND i.runtime_token_hash=$7
+          AND (cp.project_id IS NULL OR (cp.node_id=i.assigned_node_id AND cp.runtime_id=i.runtime_id))
+          AND i.provisioning_state='ready' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
+          AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
+      ) SELECT authority.verdict,credential.* FROM authority
+        LEFT JOIN LATERAL (
+          SELECT provider.id provider_id,credential.key_version,credential.nonce,
+            credential.ciphertext,credential.auth_tag
+          FROM harness.project_model_providers provider
+          JOIN harness.project_model_credentials credential ON credential.organization_id=provider.organization_id
+            AND credential.project_id=provider.project_id AND credential.provider_id=provider.id
+          JOIN harness.project_model_catalog model ON model.organization_id=provider.organization_id
+            AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
+          WHERE provider.organization_id=$1 AND provider.project_id=authority.project_id AND provider.credential_ref=$2
+            AND provider.status='enabled' LIMIT 1
+        ) credential ON authority.verdict='open'`,
+    [this.context.organizationId, ref, projectId, this.context.nodeId,
+      runtime.runtimeId, runtime.generation, runtime.bearerHash, String(runtime.epoch)])
+    return result.rows[0]
+  }
+
+  /**
+   * Read the current Runtime, serving state and organization credential in one database snapshot.
+   * @param subject - recognized personal Runtime coordinates.
+   * @param ref - managed Provider's credential reference.
+   * @param fence - exact Runtime bearer and the Gateway's write epoch.
+   * @returns The credential result, an invalid Runtime, or a closed maintenance gate.
+   */
+  async resolvePersonalRuntimeCredential(subject: RuntimeCredentialSubject, ref: string, fence: PersonalExecutionWriteFence):
+    Promise<{ status: 'ok'; value: string | null } | { status: 'invalid-runtime-token' | 'stale-epoch' | 'maintenance' }> {
+    if (subject.organizationId !== this.context.organizationId || subject.target.kind !== 'user'
+      || subject.target.runtimeId === undefined || subject.contentBinding !== undefined) return { status: 'invalid-runtime-token' }
+    const row = await this.readOrganizationCredential(subject.target, ref, {
+      runtimeId: subject.target.runtimeId, generation: subject.generation,
+      bearerHash: createHash('sha256').update(fence.bearer).digest(), epoch: fence.epoch,
+    })
+    if (row === undefined) return { status: 'invalid-runtime-token' }
+    if (row.verdict !== 'open') return { status: row.verdict }
+    return { status: 'ok', value: this.decryptOrganizationCredential(row) }
+  }
+
+  private async readOrganizationCredential(subject: ModelUsageSubject, ref: string,
+    runtime?: { runtimeId: RuntimeId; generation: number; bearerHash: Buffer; epoch: bigint }): Promise<OrganizationCredentialLookup | undefined> {
     const authorization = subject.kind === 'user'
       ? `EXISTS(SELECT 1 FROM harness.model_catalog model
-          JOIN harness.users target ON target.organization_id=model.organization_id AND target.id=$3
+          JOIN harness.users target ON target.organization_id=model.organization_id AND target.public_id=$3 AND target.deleted_at IS NULL
           JOIN harness.memberships membership ON membership.organization_id=target.organization_id
             AND membership.user_id=target.id AND membership.status='active'
           LEFT JOIN harness.model_role_access role_access ON role_access.organization_id=model.organization_id
@@ -1297,28 +1421,53 @@ export class PostgresModelGovernanceService {
             AND provider.source='managed' AND provider.status <> 'archived'
             AND model.enabled AND COALESCE(user_access.allowed,role_access.allowed,membership.role='admin'))`
       : `EXISTS(SELECT 1 FROM harness.model_catalog model
-          JOIN harness.projects project ON project.id=$3 AND project.organization_id=model.organization_id
+          JOIN harness.projects project ON project.public_id=$3 AND project.organization_id=model.organization_id
           LEFT JOIN harness.model_project_access access ON access.organization_id=model.organization_id
             AND access.model_id=model.id AND access.project_id=project.id
           WHERE model.organization_id=provider.organization_id AND model.provider_id=provider.id
             AND provider.source='managed' AND provider.status <> 'archived'
             AND model.enabled AND COALESCE(access.allowed,project.model_access_default_allowed))`
-    const result = await this.context.pool.query<{
-      provider_id: string
-      key_version: number
-      nonce: Buffer
-      ciphertext: Buffer
-      auth_tag: Buffer
-    }>(`SELECT provider.id provider_id,credential.key_version,credential.nonce,
+    const credential = `SELECT provider.id provider_id,credential.key_version,credential.nonce,
       credential.ciphertext,credential.auth_tag
       FROM harness.model_providers provider
       JOIN harness.organization_model_credentials credential ON credential.organization_id=provider.organization_id
         AND credential.provider_id=provider.id
       WHERE provider.organization_id=$1 AND provider.credential_ref=$2
         AND provider.source='managed' AND provider.status='enabled' AND ${authorization}
-      LIMIT 1`, [this.context.organizationId, ref, subjectId])
-    const row = result.rows[0]
-    if (row === undefined) return null
+      LIMIT 1`
+    const coordinates = [this.context.organizationId, ref, subject.id]
+    const ownerCheck = subject.kind === 'user'
+      ? `JOIN harness.users owner ON (owner.organization_id,owner.id)=(i.organization_id,i.user_id)
+          AND owner.public_id=$3 AND owner.status='active' AND owner.deleted_at IS NULL
+        JOIN harness.memberships owner_membership ON owner_membership.organization_id=owner.organization_id
+          AND owner_membership.user_id=owner.id AND owner_membership.status='active'`
+      : `JOIN harness.projects owner ON (owner.organization_id,owner.id)=(i.organization_id,i.project_id)
+          AND owner.public_id=$3 AND owner.status='active'
+        LEFT JOIN harness.project_content_placement cp ON cp.organization_id=i.organization_id AND cp.project_id=i.project_id`
+    const placementCheck = subject.kind === 'user'
+      ? `AND harness.computer_use_allowed(i.organization_id,i.user_id,i.assigned_node_id)`
+      : `AND (cp.project_id IS NULL OR (cp.node_id=i.assigned_node_id AND cp.runtime_id=i.runtime_id))`
+    const result = runtime === undefined
+      ? await this.context.pool.query<OrganizationCredentialLookup>(`SELECT 'open' verdict,credential.* FROM (${credential}) credential`, coordinates)
+      : await this.context.pool.query<OrganizationCredentialLookup>(`WITH authority AS MATERIALIZED (
+          SELECT CASE WHEN COALESCE(control.write_epoch,1)<>$8 THEN 'stale-epoch'
+            WHEN COALESCE(control.mode,'serving')<>'serving' THEN 'maintenance' ELSE 'open' END AS verdict
+          FROM harness.instances i
+          JOIN harness.organizations o ON o.id=i.organization_id AND o.status='active'
+          ${ownerCheck}
+          LEFT JOIN harness.cluster_control control ON control.organization_id=i.organization_id
+          WHERE i.organization_id=$1 AND i.assigned_node_id=$4 AND i.runtime_id=$5 AND i.generation=$6 AND i.runtime_token_hash=$7
+            AND i.provisioning_state='ready' AND i.desired_state='running' AND i.observed_state IN ('starting','ready')
+            AND harness.runtime_node_execution_allowed(i.organization_id,i.assigned_node_id,i.node_connection_id,i.node_connection_epoch)
+            ${placementCheck}
+        ) SELECT authority.verdict,credential.* FROM authority
+          LEFT JOIN LATERAL (${credential}) credential ON authority.verdict='open'`,
+        [...coordinates, this.context.nodeId, runtime.runtimeId, runtime.generation, runtime.bearerHash, String(runtime.epoch)])
+    return result.rows[0]
+  }
+
+  private decryptOrganizationCredential(row: OrganizationCredentialLookup): string | null {
+    if (row.provider_id === null) return null
     return this.credentialCipher.decrypt(this.context.organizationId, row.provider_id, {
       keyVersion: row.key_version as 1,
       nonce: row.nonce,
@@ -1558,45 +1707,57 @@ export class PostgresModelGovernanceService {
    * @returns whether the event was inserted and the number of resulting quota alerts.
    */
   async ingest(subject: ModelIntakeSubject, event: UsageEvent): Promise<{ inserted: boolean; alerts: number }> {
-    if (event === null || typeof event !== 'object') throw new Error('usage event must be an object')
-    nonEmpty(event.eventId, 'eventId')
+    if (event === null || typeof event !== 'object') throw new ModelUsageRejection('usage event must be an object')
+    usageText(event.eventId, 'eventId')
     if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) {
-      throw new Error('occurredAt must be a non-negative safe integer')
+      throw new ModelUsageRejection('occurredAt must be a non-negative safe integer')
     }
     if (event.actorUserId !== undefined && (!Number.isSafeInteger(event.actorUserId) || event.actorUserId <= 0)) {
-      throw new Error('actorUserId must be a positive safe integer')
+      throw new ModelUsageRejection('actorUserId must be a positive safe integer')
     }
     if (event.actorProjectId !== undefined && (!Number.isSafeInteger(event.actorProjectId) || event.actorProjectId <= 0)) {
-      throw new Error('actorProjectId must be a positive safe integer')
+      throw new ModelUsageRejection('actorProjectId must be a positive safe integer')
     }
     if (event.actorProjectId !== undefined && event.actorUserId === undefined) {
-      throw new Error('actorProjectId requires actorUserId')
+      throw new ModelUsageRejection('actorProjectId requires actorUserId')
     }
-    if (!['company', 'personal', 'unknown'].includes(event.credentialClass)) throw new Error('invalid credentialClass')
+    if (!['company', 'personal', 'unknown'].includes(event.credentialClass)) throw new ModelUsageRejection('invalid credentialClass')
     if (!['succeeded', 'failed', 'cancelled', 'missing-usage', 'denied'].includes(event.status)) {
-      throw new Error('invalid status')
+      throw new ModelUsageRejection('invalid status')
     }
-    if (typeof event.credentialSource !== 'string') throw new Error('credentialSource must be a string')
+    if (typeof event.credentialSource !== 'string' || event.credentialSource.includes('\0')) {
+      throw new ModelUsageRejection('credentialSource must be a string')
+    }
+    if (event.sessionId != null && (typeof event.sessionId !== 'string' || event.sessionId.includes('\0'))) {
+      throw new ModelUsageRejection('sessionId must be a string')
+    }
     const credentialClass = credentialClassOf(event.credentialSource)
-    if (event.credentialClass !== credentialClass) throw new Error('credentialClass does not match credentialSource')
+    if (event.credentialClass !== credentialClass) throw new ModelUsageRejection('credentialClass does not match credentialSource')
     const usage = event.usage
     const buckets = {
-      input: nonnegative(usage?.inputTokens ?? 0, 'inputTokens'),
-      output: nonnegative(usage?.outputTokens ?? 0, 'outputTokens'),
-      read: nonnegative(usage?.cacheReadTokens ?? 0, 'cacheReadTokens'),
-      write: nonnegative(usage?.cacheWriteTokens ?? 0, 'cacheWriteTokens'),
+      input: usageCount(usage?.inputTokens ?? 0, 'inputTokens'),
+      output: usageCount(usage?.outputTokens ?? 0, 'outputTokens'),
+      read: usageCount(usage?.cacheReadTokens ?? 0, 'cacheReadTokens'),
+      write: usageCount(usage?.cacheWriteTokens ?? 0, 'cacheWriteTokens'),
     }
-    const provider = nonEmpty(event.provider, 'provider')
-    const model = nonEmpty(event.model, 'model')
+    const provider = usageText(event.provider, 'provider')
+    const model = usageText(event.model, 'model')
     return transaction(this.context.pool, async (client) => {
       const hasExecutionInputs = Object.hasOwn(event, 'executionInputIds')
       if (hasExecutionInputs) {
         if (!Array.isArray(event.executionInputIds) || typeof event.sessionId !== 'string'
-          || event.actorUserId === undefined) throw new Error('execution attribution requires input ids, Session, and primary actor')
-        await verifyExecutionAttribution(client, {
-          organizationId: this.context.organizationId, runtime: subject,
-          sessionId: event.sessionId, inputIds: event.executionInputIds, primaryActorUserId: event.actorUserId,
-        }, this.nodeContent)
+          || event.actorUserId === undefined) throw new ModelUsageRejection('execution attribution requires input ids, Session, and primary actor')
+        try {
+          await verifyExecutionAttribution(client, {
+            organizationId: this.context.organizationId, runtime: subject,
+            sessionId: event.sessionId, inputIds: event.executionInputIds, primaryActorUserId: event.actorUserId,
+          }, this.nodeContent)
+        } catch (error) {
+          if (error instanceof ExecutionIdentityError && (error.status === 400 || error.status === 403)) {
+            throw new ModelUsageRejection(error.message, { cause: error })
+          }
+          throw error
+        }
       }
       const billingUserId = async (id: number): Promise<string | null> => {
         if (!hasExecutionInputs) return internalUserId(client, this.context.organizationId, id)
@@ -1610,17 +1771,17 @@ export class PostgresModelGovernanceService {
         ? await internalProjectId(client, this.context.organizationId, subject.id)
         : null
       const billingOwner = subject.kind === 'user' ? user : project
-      if (billingOwner === null) throw new Error(`unknown ${subject.kind} ${String(subject.id)}`)
+      if (billingOwner === null) throw new ModelUsageRejection(`unknown ${subject.kind} ${String(subject.id)}`)
       // Actor attribution is an activity projection for shared projects only;
       // personal billing rows must not duplicate their billing user here.
       let actor: string | null = null
       if (subject.kind === 'project') {
         if (event.actorProjectId !== undefined && event.actorProjectId !== subject.id) {
-          throw new Error('actorProjectId must match the project usage subject')
+          throw new ModelUsageRejection('actorProjectId must match the project usage subject')
         }
         if (event.actorUserId !== undefined) {
           actor = await billingUserId(event.actorUserId)
-          if (actor === null) throw new Error(`unknown usage actor ${String(event.actorUserId)}`)
+          if (actor === null) throw new ModelUsageRejection(`unknown usage actor ${String(event.actorUserId)}`)
           if (!hasExecutionInputs) {
             const member = await client.query<{ allowed: boolean }>(`SELECT EXISTS(
             SELECT 1 FROM harness.users u
@@ -1631,15 +1792,15 @@ export class PostgresModelGovernanceService {
             WHERE u.organization_id=$1 AND u.id=$3 AND u.status='active'
               AND (membership.role='admin' OR member.access_mode='rw')
           ) allowed`, [this.context.organizationId, project, actor])
-            if (member.rows[0]?.allowed !== true) throw new Error(`usage actor ${String(event.actorUserId)} is not an active project writer`)
+            if (member.rows[0]?.allowed !== true) throw new ModelUsageRejection(`usage actor ${String(event.actorUserId)} is not an active project writer`)
           }
         }
       } else {
         if (event.actorUserId !== undefined && event.actorUserId !== subject.id) {
-          throw new Error('actorUserId must match the personal usage subject')
+          throw new ModelUsageRejection('actorUserId must match the personal usage subject')
         }
         if (event.actorProjectId !== undefined) {
-          throw new Error('actorProjectId is not valid for personal usage')
+          throw new ModelUsageRejection('actorProjectId is not valid for personal usage')
         }
       }
       const catalog = await client.query<{
@@ -1684,7 +1845,7 @@ export class PostgresModelGovernanceService {
         price?.id ?? null,
         provider,
         model,
-        nonEmpty(event.purpose, 'purpose'),
+        usageText(event.purpose, 'purpose'),
         event.sessionId ?? null,
         event.credentialSource,
         credentialClass,
@@ -1705,26 +1866,26 @@ export class PostgresModelGovernanceService {
   }
 
   async ingestRegistration(subject: ModelUsageSubject, event: ModelRegistrationEvent): Promise<{ inserted: boolean }> {
-    if (subject.kind !== 'user') throw new Error('model registration events require a personal user runtime')
+    if (subject.kind !== 'user') throw new ModelUsageRejection('model registration events require a personal user runtime')
     if (event === null || typeof event !== 'object' || event.kind !== 'model-registration') {
-      throw new Error('model registration event must have kind model-registration')
+      throw new ModelUsageRejection('model registration event must have kind model-registration')
     }
-    nonEmpty(event.eventId, 'eventId')
+    usageText(event.eventId, 'eventId')
     if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) {
-      throw new Error('occurredAt must be a non-negative safe integer')
+      throw new ModelUsageRejection('occurredAt must be a non-negative safe integer')
     }
     const actions: ModelRegistrationEvent['action'][] = [
       'provider-created', 'provider-modified', 'provider-deleted',
       'model-created', 'model-modified', 'model-deleted',
     ]
-    if (!actions.includes(event.action)) throw new Error('invalid model registration action')
-    if (event.scope !== 'personal') throw new Error('model registration scope must be personal')
-    const provider = nonEmpty(event.provider, 'provider')
+    if (!actions.includes(event.action)) throw new ModelUsageRejection('invalid model registration action')
+    if (event.scope !== 'personal') throw new ModelUsageRejection('model registration scope must be personal')
+    const provider = usageText(event.provider, 'provider')
     const modelAction = event.action.startsWith('model-')
-    const model = modelAction ? nonEmpty(event.model ?? '', 'model') : null
-    if (!modelAction && event.model !== undefined) throw new Error('provider registration events cannot name a model')
+    const model = modelAction ? usageText(event.model ?? '', 'model') : null
+    if (!modelAction && event.model !== undefined) throw new ModelUsageRejection('provider registration events cannot name a model')
     const user = await internalUserId(this.context.pool, this.context.organizationId, subject.id)
-    if (user === null) throw new Error(`unknown user ${String(subject.id)}`)
+    if (user === null) throw new ModelUsageRejection(`unknown user ${String(subject.id)}`)
     const inserted = await this.context.pool.query<{ event_id: string }>(`INSERT INTO harness.model_registration_events(
       event_id,organization_id,user_id,occurred_at,received_at,provider_key,model_key,action,scope
     ) VALUES($1,$2,$3,to_timestamp($4/1000.0),now(),$5,$6,$7,$8)
@@ -2528,8 +2689,6 @@ export class PostgresModelGovernanceService {
 
   /** Resolve one project-owned encrypted credential after policy authorization. */
   private async resolveProjectCredential(projectId: number, ref: string): Promise<string | null> {
-    const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
-    if (project === null) return null
     const result = await this.context.pool.query<{
       provider_id: string
       key_version: number
@@ -2537,13 +2696,15 @@ export class PostgresModelGovernanceService {
       ciphertext: Buffer
       auth_tag: Buffer
     }>(`SELECT provider.id provider_id,credential.key_version,credential.nonce,credential.ciphertext,credential.auth_tag
-      FROM harness.project_model_providers provider
+      FROM harness.projects project
+      JOIN harness.project_model_providers provider ON provider.organization_id=project.organization_id
+        AND provider.project_id=project.id
       JOIN harness.project_model_credentials credential ON credential.organization_id=provider.organization_id
         AND credential.project_id=provider.project_id AND credential.provider_id=provider.id
       JOIN harness.project_model_catalog model ON model.organization_id=provider.organization_id
         AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
-      WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.credential_ref=$3
-        AND provider.status='enabled' LIMIT 1`, [this.context.organizationId, project, ref])
+      WHERE project.organization_id=$1 AND project.public_id=$2 AND provider.credential_ref=$3
+        AND provider.status='enabled' LIMIT 1`, [this.context.organizationId, projectId, ref])
     const row = result.rows[0]
     if (row === undefined) return null
     return this.credentialCipher.decrypt(this.context.organizationId, row.provider_id, {
@@ -2720,145 +2881,5 @@ export class PostgresModelGovernanceService {
     const revision = result.rows[0]?.revision
     if (revision === undefined) throw new Error('organization model configuration revision is unavailable')
     return safeCount(revision, 'organization model configuration revision')
-  }
-
-  private async runtimeProviders(queryable: Queryable): Promise<RuntimeModelProvider[]> {
-    const result = await queryable.query<{
-      provider: string
-      display_name: string
-      protocol: ModelProviderProtocol
-      base_url: string
-      credential_ref: string | null
-      profile: Record<string, unknown>
-      model_id: string
-      model_name: string
-    }>(`SELECT provider.provider_key provider,provider.display_name,provider.protocol,
-      provider.base_url,provider.credential_ref,provider.profile,model.model_key model_id,model.display_name model_name
-      FROM harness.model_providers provider
-      JOIN harness.model_catalog model ON model.organization_id=provider.organization_id
-        AND model.provider_id=provider.id
-        AND model.enabled
-      WHERE provider.organization_id=$1 AND provider.source='managed' AND provider.status='enabled'
-      ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId])
-    const providers = new Map<string, RuntimeProviderProjection>()
-    for (const row of result.rows) {
-      let projection = providers.get(row.provider)
-      if (projection === undefined) {
-        const profile = runtimeManagedProfile(row.profile)
-        // Runtime validation requires an embedded profile URL to equal the
-        // canonical Provider URL; older settings may retain a trailing slash.
-        if (profile.baseURL !== undefined) profile.baseURL = row.base_url
-        const provider: RuntimeModelProvider = {
-          provider: row.provider,
-          displayName: row.display_name,
-          driver: 'pi-ai',
-          protocol: row.protocol,
-          baseURL: row.base_url,
-          ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
-          profile,
-          models: [],
-          scope: 'organization',
-        }
-        projection = { provider, models: indexedProfileModels(profile) }
-        providers.set(row.provider, projection)
-      }
-      const configured = projection.models.get(row.model_id)
-      const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
-      const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
-      const input = Array.isArray(configured?.input)
-        ? configured.input.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
-        : undefined
-      const reasoningEfforts = configured?.reasoningEfforts === false
-        ? false
-        : configured?.reasoningEfforts !== undefined
-          && typeof configured.reasoningEfforts === 'object' && configured.reasoningEfforts !== null
-          ? configured.reasoningEfforts as RuntimeModelProvider['models'][number]['reasoningEfforts']
-          : undefined
-      const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
-        ? configured.compat as RuntimeModelProvider['models'][number]['compat']
-        : undefined
-      projection.provider.models.push({
-        id: row.model_id,
-        name: row.model_name,
-        ...contextWindow === undefined ? {} : { contextWindow },
-        ...maxTokens === undefined ? {} : { maxTokens },
-        ...input === undefined ? {} : { input },
-        ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
-        ...compat === undefined ? {} : { compat },
-      })
-    }
-    return [...providers.values()].map(projection => projection.provider)
-  }
-
-  /** Project-owned Provider projection, with runtime-prefixed route ids. */
-  private async runtimeProjectProviders(
-    queryable: Queryable,
-    projectInternalId: string,
-    projectId: number,
-  ): Promise<RuntimeModelProvider[]> {
-    const result = await queryable.query<{
-      provider: string
-      display_name: string
-      protocol: ModelProviderProtocol
-      base_url: string
-      credential_ref: string | null
-      profile: Record<string, unknown>
-      model_id: string
-      model_name: string
-    }>(`SELECT provider.provider_key provider,provider.display_name,provider.protocol,
-      provider.base_url,provider.credential_ref,provider.profile,model.model_key model_id,model.display_name model_name
-      FROM harness.project_model_providers provider
-      JOIN harness.project_model_catalog model ON model.organization_id=provider.organization_id
-        AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
-      WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.status='enabled'
-      ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId, projectInternalId])
-    const providers = new Map<string, RuntimeProviderProjection>()
-    for (const row of result.rows) {
-      const runtimeProvider = projectRuntimeProviderKey(projectId, row.provider)
-      let projection = providers.get(runtimeProvider)
-      if (projection === undefined) {
-        const profile = runtimeManagedProfile(row.profile)
-        if (profile.baseURL !== undefined) profile.baseURL = row.base_url
-        const provider: RuntimeModelProvider = {
-          provider: runtimeProvider,
-          displayName: row.display_name,
-          driver: 'pi-ai',
-          protocol: row.protocol,
-          baseURL: row.base_url,
-          ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
-          profile,
-          models: [],
-          scope: 'project',
-          projectId,
-        }
-        projection = { provider, models: indexedProfileModels(profile) }
-        providers.set(runtimeProvider, projection)
-      }
-      const configured = projection.models.get(row.model_id)
-      const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
-      const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
-      const input = Array.isArray(configured?.input)
-        ? configured.input.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
-        : undefined
-      const reasoningEfforts = configured?.reasoningEfforts === false
-        ? false
-        : configured?.reasoningEfforts !== undefined
-          && typeof configured.reasoningEfforts === 'object' && configured.reasoningEfforts !== null
-          ? configured.reasoningEfforts as RuntimeModelProvider['models'][number]['reasoningEfforts']
-          : undefined
-      const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
-        ? configured.compat as RuntimeModelProvider['models'][number]['compat']
-        : undefined
-      projection.provider.models.push({
-        id: row.model_id,
-        name: row.model_name,
-        ...contextWindow === undefined ? {} : { contextWindow },
-        ...maxTokens === undefined ? {} : { maxTokens },
-        ...input === undefined ? {} : { input },
-        ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
-        ...compat === undefined ? {} : { compat },
-      })
-    }
-    return [...providers.values()].map(projection => projection.provider)
   }
 }

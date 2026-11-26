@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-24-workspace-context.md
 document:
-  en: b676ab146b1449d15cfd20ff667899745344c0bf
-  zh: e75adf39f3000e36aa2360b0225828cb5262a88c
+  en: 83d11fbcb1d313a230f57b23394a19343f1be75a
+  zh: 59abed9f3fbd052dda87cac7ecb2a5a89b38726e
 /agent-note-workspace-context-instruction-files:
   en: 1bab4dc5cd5e415b
   zh: 45624812e7764e38
@@ -18,8 +18,8 @@ document:
   en: 76b089b840a04f57
   zh: 8654b0d53c98d0c4
 /agent-note-workspace-context-instruction-files/decision/baseline-injection:
-  en: b7dc90bc7cbd176a
-  zh: 6bf6170f674148e5
+  en: 9aa26f740efd0560
+  zh: 11405c5ff4432b9f
 /agent-note-workspace-context-instruction-files/decision/dynamic-discovery-and-refresh:
   en: 65240640627a27f8
   zh: 839fe668fe19420d

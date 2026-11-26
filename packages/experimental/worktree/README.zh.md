@@ -27,6 +27,8 @@ kind: "package-reference"
 
 将服务与 `workingDirectory`、`fs`、`subprocess`、`sandbox` 和 `sandboxPolicy` 提供方一起挂载。模型需要此操作时，再添加工具包。
 
+挂载设置提供方时，`worktree` 命名空间在组合默认值之上持久化 `retainOnArchive`。Forge 客户端在插件页的 Worktree 设置卡片提供该开关。每次归档在安排清理前读取已接受的偏好；更改不影响已排队的清理。没有设置提供方时，使用组合的实时值。
+
 ```yaml
 - name: '@deepseek-ai/dsh-experimental-worktree'
 - name: '@deepseek-ai/dsh-experimental-tool-worktree'

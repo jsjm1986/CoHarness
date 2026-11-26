@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-19-user-web-startup-artwork-and-layout.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-19-user-web-startup-artwork-and-layout.md
+document:
+  en: 60e9dd44db358acda7956e06c43fd545238b8ee9
+  zh: 5c00ee347f3ca1987ce573df51085b7844209b0d
+/agent-note-user-web-startup-loads-management-pages-and-artwork-on-demand:
+  en: fd718f005531730c
+  zh: a8983ed827f8d315
+/agent-note-user-web-startup-loads-management-pages-and-artwork-on-demand/problem:
+  en: 027f45799d95e570
+  zh: f9fe3b1751f5a512
+/agent-note-user-web-startup-loads-management-pages-and-artwork-on-demand/decision:
+  en: 1ed54a8eefb153c6
+  zh: 673c9375f7abd2f4
+/agent-note-user-web-startup-loads-management-pages-and-artwork-on-demand/alternatives-considered:
+  en: bac4ba80ee863da5
+  zh: 043d519ada4fd6a2
+/agent-note-user-web-startup-loads-management-pages-and-artwork-on-demand/consequences:
+  en: 5c70a1384eae4312
+  zh: a8840f96eb20f647

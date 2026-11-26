@@ -16,9 +16,15 @@ harness 需要受治理的人类远程桌面访问——查看和操作另一台
 
 `dsh-remote-desktop-vnc` 是 VNC/RFB Provider：JSONL 授权存储（每次变更原子重写）、仅追加 `auditFile` JSONL 日志（其尾部供给有界 `audit()` 窗口）、每目标配置端点、内存中的同意记录、一次性 attach token（恰好消费一次、TTL 有界），以及 `pumpRfb`——级别在流内部强制执行。`RfbClientFilter` 解析确定性的客户端握手（版本、安全类型选择、认证响应、ClientInit），使输入无法藏在未成帧前导中，之后仅转发 `SetPixelFormat`/`SetEncodings`/`FramebufferUpdateRequest`，并消费 `KeyEvent`/`PointerEvent`/`ClientCutText` 计数丢弃；未知消息类型与无法成帧的安全类型按失败关闭处理。`grant.recording` 把服务端→客户端流旁录为 `recordingDir` 下的 `<sessionId>.rfb`。
 
+过滤器采用 [RFC 6143 §7.5](https://www.rfc-editor.org/rfc/rfc6143.html#section-7.5) 的线协议编号：放行 0/2/3，丢弃 4/5/6。协议夹具按规范构造字节；真实 noVNC 浏览器流程还针对独立 RFB 对端验证协商、可见像素与输入投递，避免解析器与单测夹具共享同一个编号错误却被视为互通证据。
+
 `dsh-remote-desktop-stream` 是 Web 传输挂载：`ctx.webServer` 上一条精确路径的 WebSocket upgrade 路由、`?token=` 握手，以及喂给 `serveStream` 的 ws→`Duplex` 适配器。铸造的 token——单次使用、TTL 有界——就是流凭据；路由不执行单独认证。
 
 `dsh-api-remote-desktop-controller` 是 BFF：`remoteDesktop/*` TypertRemoteService 命名空间。每个方法经 `gatewayRuntime.interactive()` 从请求自带的已验证 Gateway 断言解析调用者 actor（身份=断言用户名，admin=断言角色），并把执行委托给能力层——即使部署错误接线策略，服务端拒绝仍然成立。授权基座已从本笔记最初记录的终端授权委托修正，见[交互断言笔记](2026-10-20-remote-desktop-interactive-principal.zh.md)。`REMOTE_SESSION_POLICIES` 声明每个方法的会话路径与读/写分类；attach 为 `execution: 'request'`（人类手势启动远程执行）。
+
+受管 VNC 是否启用由节点部署设置 `HGW_REMOTE_DESKTOP` 明确决定，与 Computer Use、图形会话检测及用户资格相互独立。关闭后，新 Runtime 配置不包含 Gateway 私有桌面文件，但保留通过鉴权的控制器和环境元数据。这样，无 GUI 工作区无需为了打开页面而授予 Unix 用户读取 Gateway 私有存储的权限，也不会屏蔽无 GUI 宿主机上配置的外部 VNC 端点。VNC 初始化归 `Service.init` 所有，存储读取失败时服务不发布，Loader 的失败 fiber 保留错误，避免游离的 Promise 拒绝。
+
+提供方关闭时明确停止新准入并等待已接收操作。附件在拨号及凭据协商期间持续受取消控制；清理会在转发前关闭迟到连接，只记录一次活动会话断开，等待已接收的授权写入并排空审计追加。因此关闭 Promise 表示清理已经完成，而不是只请求关闭已有转发。
 
 ## 后果
 

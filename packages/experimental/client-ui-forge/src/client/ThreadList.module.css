@@ -90,6 +90,21 @@
   padding: 4px 6px;
 }
 
+@media (max-height: 480px) {
+  .pane { overflow-y: auto; }
+  .header,
+  .filters,
+  .rows,
+  .footer { flex: none; }
+  .rows { overflow-y: visible; }
+}
+
+@media (pointer: coarse), (hover: none) {
+  .back,
+  .close,
+  .link { min-width: 44px; min-height: 44px; }
+}
+
 .group + .group { margin-top: 6px; }
 
 .path {

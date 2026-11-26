@@ -10,13 +10,19 @@ type RpcFetch = (url: URL, init: RequestInit) => Promise<Response>
  * @param url - target-scoped stream URL.
  * @param message - ordinary request envelope with its correlation identity.
  * @param signal - caller lifetime, including provider and pane disposal.
- * @returns result frames; reader cancellation is awaited on early return.
+ * @returns result frames; caller abort cancels the body, and termination awaits reader cleanup.
  */
 export async function* readRpcStream(
   send: RpcFetch, url: URL, message: { rpcId: string }, signal: AbortSignal,
 ): AsyncGenerator<ConnectionRpcResult<unknown>> {
   const lifetime = new AbortController(), abort = AbortSignal.any([signal, lifetime.signal])
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+  let cancellation: Promise<void> | undefined
+  const cancel = (): Promise<void> | undefined => cancellation ??= reader?.cancel()
+  const onAbort = (): void => {
+    // The generator's finally block awaits and reports this same cancellation.
+    void cancel()?.catch(() => {})
+  }
   let failed = false
   try {
     abort.throwIfAborted()
@@ -33,6 +39,9 @@ export async function* readRpcStream(
       throw new Error(`RPC stream refused (${String(response.status)})`)
     }
     reader = response.body.getReader()
+    // Body cancellation also releases transports whose fetch signal is no longer retained.
+    abort.addEventListener('abort', onAbort, { once: true })
+    if (abort.aborted) onAbort()
     let parts: Uint8Array[] = [], size = 0
     const decoder = new TextDecoder('utf-8', { fatal: true })
     while (true) {
@@ -71,7 +80,8 @@ export async function* readRpcStream(
     failed = true
     throw error
   } finally {
-    const cancelled = reader?.cancel()
+    abort.removeEventListener('abort', onAbort)
+    const cancelled = cancel()
     lifetime.abort()
     try { await cancelled } catch (error) {
       // An errored reader rejects cancellation with the read failure already delivered above.

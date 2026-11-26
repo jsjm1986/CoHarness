@@ -1,0 +1,13 @@
+{
+  "outcome": "confirmed",
+  "turnEnd": {
+    "kind": "aborted",
+    "reason": {
+      "kind": "disposed"
+    }
+  },
+  "idle": "idle",
+  "cancelled": 0,
+  "nextStep": 1,
+  "nextTurn": 1
+}

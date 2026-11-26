@@ -7,6 +7,7 @@ import { setImmediate } from 'node:timers/promises'
 import type { Pool } from 'pg'
 import { Context } from '@deepseek-ai/cordis'
 import { resourceBudgetOf } from '@deepseek-ai/dsh-resource-budget'
+import { RESOURCE_CHANGE_WAIT_TIMING_HEADER, RESOURCE_INGRESS_TIMING_HEADER, RESOURCE_PHASE_TIMING_HEADER } from '@deepseek-ai/dsh-resource-budget/wire'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import GatewayResourceBudget from '../../packages/context/gateway-runtime/src/resource-budget.ts'
@@ -31,6 +32,95 @@ function barrier() {
 }
 
 const message = () => createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'work' }] })
+
+it.each([
+  ['process', true], ['model', true], ['model', false],
+] as const)('delivers a %s permit after repeated queue polls with model timings %s', async (kind, modelTimings) => {
+  const ctx = new Context()
+  const output = vi.spyOn(console, 'info').mockImplementation(() => {})
+  const measured = kind === 'model' && modelTimings
+  const queuedPolls = 200
+  const policy = { sampleMs: 1, staleMs: 1000, cpuTarget: 0.85, eventLoopTargetMs: 100, linuxMemoryReserveRatio: 0.1,
+    maxQueued: 16, maxQueuedPerUser: 8, maxQueuedPerProject: 8, maxQueuedBytes: 64 * 1024, maxWaitMs: 1000 }
+  let polls = 0
+  let registration: { requestId: string; sequence: number } | undefined
+  const finishes: unknown[] = []
+  const finishIds: Array<string | null> = []
+  ctx.provide('gatewayRuntime', {
+    modelTimings,
+    interactive: () => undefined,
+    async request(pathname: string, init: GatewayRuntimeRequestInit): Promise<Response> {
+      switch (pathname) {
+        case path('register'): return Response.json({ nextSequence: 1, policy })
+        case path('request'): {
+          const { requestId, sequence } = JSON.parse(String(init.body)) as NonNullable<typeof registration>
+          registration = { requestId, sequence }
+          expect(new Headers(init.headers).get('x-dsh-operation-id')).toBe(measured ? requestId : null)
+          return Response.json({ state: 'queued' }, { headers: {
+            [RESOURCE_PHASE_TIMING_HEADER]: '[0,0,0]', [RESOURCE_INGRESS_TIMING_HEADER]: '[0,0]',
+          } })
+        }
+        case path('statuses'): {
+          expect(JSON.parse(String(init.body))).toEqual({ operations: [registration] })
+          expect(new Headers(init.headers).get('x-dsh-operation-id')).toBe(measured ? registration?.requestId : null)
+          polls += 1
+          if (polls === 2) await new Promise<void>(resolveDelay => { setTimeout(resolveDelay, 3) })
+          return Response.json([{ state: polls <= queuedPolls ? 'queued' : 'active' }], {
+            headers: {
+              [RESOURCE_PHASE_TIMING_HEADER]: polls === 1 ? 'invalid' : '[0,0,0]',
+              ...(polls === 2 ? { [RESOURCE_CHANGE_WAIT_TIMING_HEADER]: '2.15' } : {}),
+            },
+          })
+        }
+        case path('finish'): {
+          finishes.push(JSON.parse(String(init.body)))
+          finishIds.push(new Headers(init.headers).get('x-dsh-operation-id'))
+          await new Promise<void>(resolveDelay => { setTimeout(resolveDelay, 2) })
+          return Response.json({}, { headers: {
+            [RESOURCE_PHASE_TIMING_HEADER]: '[0.5,0,1.25]', [RESOURCE_INGRESS_TIMING_HEADER]: '[0.25,0.75]',
+          } })
+        }
+        default: throw new Error('Unexpected resource test request')
+      }
+    },
+  })
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] })
+  try {
+    await ctx.plugin(GatewayResourceBudget, timing)
+    const outcome = Promise.allSettled([ctx.resourceBudget.acquire({ kind, origin: 'infrastructure' })])
+    await vi.advanceTimersByTimeAsync(policy.maxWaitMs)
+    const [granted] = await outcome
+    if (granted?.status !== 'fulfilled') throw granted?.reason ?? new Error('Permit did not settle')
+    const release = granted.value.release()
+    await vi.advanceTimersByTimeAsync(2)
+    await release
+    expect(polls).toBe(queuedPolls + 1)
+    expect(registration).toBeDefined()
+    expect(finishes).toEqual([{ sequence: 1, requestId: registration!.requestId, outcome: 'quiescent' }])
+    expect(finishIds).toEqual([measured ? registration!.requestId : null])
+    if (measured) {
+      expect(granted.value.operationId).toBe(registration!.requestId)
+      expect(output).toHaveBeenCalledTimes(2)
+      const admissionPrefix = '[model-resource-timing] ', finishPrefix = '[model-resource-finish-timing] '
+      const [admission, finish] = output.mock.calls.map(([line]) => String(line))
+      expect(admission?.startsWith(admissionPrefix)).toBe(true)
+      expect(JSON.parse(admission!.slice(admissionPrefix.length))).toMatchObject({ outcome: 'granted',
+        operationId: registration!.requestId, originKind: 'runtime', lastStatusOperationId: registration!.requestId,
+        originMs: 0, registrationWaitMs: 0, submitCalls: 1, submitMs: 0, statusCalls: polls, statusMs: 3,
+        statusChangeWaitSamples: 1, statusChangeWaitMs: 2.15,
+        queuedResponses: polls, pollWaitMs: polls * policy.sampleMs, gatewaySamples: polls,
+        gatewayIngressSamples: 1, gatewayIngressBearerMs: 0, gatewayWriteAdmissionMs: 0 })
+      expect(finish?.startsWith(finishPrefix)).toBe(true)
+      expect(JSON.parse(finish!.slice(finishPrefix.length))).toEqual({ operationId: registration!.requestId,
+        originKind: 'runtime', outcome: 'quiescent', startedAt: expect.any(Number), acknowledged: true, elapsedMs: 2,
+        gatewayHandlerBearerMs: 0.5, gatewayTransactionMs: 1.25, gatewayIngressBearerMs: 0.25, gatewayWriteAdmissionMs: 0.75 })
+    } else expect(output).not.toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+    output.mockRestore()
+    await ctx.fiber.dispose()
+  }
+})
 
 describePg('managed Runtime resource provider', () => {
   let pool: Pool
@@ -58,12 +148,14 @@ describePg('managed Runtime resource provider', () => {
       receive?: (pathname: string, response: Response) => Promise<void>
       prepare?: (ctx: Context) => void
       timing?: typeof timing
+      modelTimings?: boolean
       interactive?: () => GatewayRequestPrincipal | undefined
     } = {}) => {
       const ctx = new Context()
       cleanups.push(() => ctx.fiber.dispose())
       ctx.provide('resourceBudgetRequired', true)
       ctx.provide('gatewayRuntime', {
+        modelTimings: options.modelTimings ?? false,
         interactive: () => options.interactive?.(),
         request: async (pathname: string, init: GatewayRuntimeRequestInit) => {
           const response = await fetch(`${f.base}${pathname}`, { ...init, headers: {
@@ -246,7 +338,7 @@ describePg('managed Runtime resource provider', () => {
     try {
       await expect.poll(async () => (await pool.query<{ waiting: boolean }>(`SELECT EXISTS(
         SELECT FROM pg_stat_activity activity WHERE activity.datname=current_database()
-          AND $1::int=ANY(pg_blocking_pids(activity.pid)) AND activity.query LIKE '%lock_node_resources%') waiting`, [holderPid])).rows[0]!.waiting,
+          AND $1::int=ANY(pg_blocking_pids(activity.pid)) AND activity.query LIKE '%harness.request_node_resource(%') waiting`, [holderPid])).rows[0]!.waiting,
       { timeout: 5000 }).toBe(true)
       await changeAuthority[change](false)
       await unlock()
@@ -705,6 +797,92 @@ describePg('managed Runtime resource provider', () => {
     } finally { vi.useRealTimers() }
   })
 
+  it('finishes a completed model reply while retrying the same occupied permit after coordinator outage', async () => {
+    const f = await fixture(), retried = barrier(), respond = barrier()
+    const config = { requestTimeoutMs: 1000, cleanupTimeoutMs: 1500 }
+    const { ctx } = await f.mount({ timing: config, modelTimings: true })
+    const llm = new LlmRuntime(ctx)
+    const modelAttempt = vi.fn()
+    ctx.on('llm/model-attempt-timing', modelAttempt)
+    let attempts = 0
+    llm.registerAdapter(['budgeted'], new class extends LlmAdapter {
+      override async *stream(): AsyncIterable<StreamChunk> {
+        attempts++
+        yield { type: 'text-delta', index: 0, text: 'complete' }
+      }
+    }())
+    const finish = f.budget.finish.bind(f.budget)
+    const completion = vi.spyOn(f.budget, 'finish').mockImplementationOnce(async () => {
+      vi.setSystemTime(Date.now() + config.cleanupTimeoutMs)
+      throw new Error('Resource coordinator temporarily unavailable')
+    }).mockImplementationOnce(async (...args) => {
+      retried.release()
+      await respond.promise
+      await finish(...args)
+    })
+    await f.grant(1)
+    const output = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const prefix = '[model-resource-finish-timing] '
+    const samples = () => output.mock.calls.map(([line]) => String(line)).filter(line => line.startsWith(prefix))
+      .map((line): unknown => JSON.parse(line.slice(prefix.length)))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const chunks: StreamChunk[] = []
+      for await (const chunk of llm.stream({ provider: 'budgeted', model: 'model', messages: [message()],
+        resourceOrigin: 'infrastructure' })) chunks.push(chunk)
+      expect(chunks).toContainEqual({ type: 'text-delta', index: 0, text: 'complete' })
+      expect(attempts).toBe(1)
+      expect((await f.budget.snapshot()).kinds.model).toMatchObject({ active: 1, uncertain: 0 })
+      await retried.promise
+      expect(completion.mock.calls).toEqual([completion.mock.calls[0], completion.mock.calls[0]])
+      expect(completion.mock.calls[0]?.[2]).toBe('quiescent')
+      const { requestId } = completion.mock.calls[0]![1]
+      expect(modelAttempt).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ resourceOperationId: requestId }))
+      const metadata = { operationId: requestId, originKind: 'runtime', outcome: 'quiescent', startedAt: expect.any(Number), elapsedMs: expect.any(Number) }
+      expect(samples()).toEqual([expect.objectContaining({ ...metadata, acknowledged: false })])
+      expect((samples()[0] as Record<string, unknown>).retry).toBeUndefined()
+      respond.release()
+      await expect.poll(samples).toEqual([
+        expect.objectContaining({ ...metadata, acknowledged: false }), expect.objectContaining({ ...metadata, acknowledged: true, retry: true }),
+      ])
+      expect((await f.budget.snapshot()).kinds.model.active).toBe(0)
+      expect(attempts).toBe(1)
+    } finally { respond.release(); vi.useRealTimers(); output.mockRestore() }
+  })
+
+  it('releases the exact model reservation after a late terminal iterator acknowledgement', async () => {
+    const f = await fixture(), closed = barrier()
+    const { ctx } = await f.mount()
+    const llm = new LlmRuntime(ctx, { streamCloseTimeoutMs: 20 })
+    const close = vi.fn(async () => {
+      await closed.promise
+      return { done: true as const, value: undefined }
+    })
+    const chunk: StreamChunk = { type: 'text-delta', index: 0, text: 'partial' }
+    llm.registerAdapter(['budgeted'], new class extends LlmAdapter {
+      override stream(): AsyncIterable<StreamChunk> {
+        return { [Symbol.asyncIterator]: () => ({ next: async () => ({ done: false, value: chunk }), return: close }) }
+      }
+    }())
+    const finish = vi.spyOn(f.budget, 'finish')
+    const iterator = llm.stream({ provider: 'budgeted', model: 'model', messages: [message()],
+      resourceOrigin: 'infrastructure' })[Symbol.asyncIterator]()
+    try {
+      await f.grant(1)
+      expect((await iterator.next()).done).toBe(false)
+      await expect(iterator.return?.()).rejects.toMatchObject({ code: 'ADAPTER_CLOSE_TIMEOUT' })
+      expect((await f.budget.snapshot()).kinds.model).toMatchObject({ active: 1, uncertain: 1 })
+      closed.release()
+      await expect.poll(async () => (await f.budget.snapshot()).kinds.model).toMatchObject({ active: 0, uncertain: 0 })
+      expect(close).toHaveBeenCalledOnce()
+      const [owner, { requestId, sequence }] = finish.mock.calls[0]!
+      expect(finish.mock.calls).toEqual([
+        [owner, expect.objectContaining({ requestId, sequence }), 'uncertain'],
+        [owner, expect.objectContaining({ requestId, sequence }), 'quiescent'],
+      ])
+    } finally { closed.release() }
+  })
+
   it.each(['missing', 'nonterminal'] as const)('retains model accounting when iterator cleanup is %s', async cleanup => {
     const f = await fixture()
     const { ctx } = await f.mount()
@@ -731,5 +909,60 @@ describePg('managed Runtime resource provider', () => {
     expect((await iterator.next()).done).toBe(false)
     await iterator.return?.()
     expect((await f.budget.snapshot()).kinds.model).toMatchObject({ active: 1, uncertain: 1 })
+  })
+
+  it('correlates session-scoped model admission, finish and turn-tail logs end to end', async () => {
+    const f = await fixture()
+    const sessionId = SessionId(await f.session(f.project))
+    const input = await f.admit(sessionId, f.admin, f.project)
+    const entered = await f.call('/internal/runtime/execution/enter', {
+      sessionId, inputId: input.inputId, messageId: input.messageId, contentHash: input.contentHash, currentScopeId: null,
+    }, undefined, f.project)
+    expect(entered.status).toBe(200)
+    const scopeId = (entered.body as { scopeId: string }).scopeId
+    const { ctx } = await f.mount({ modelTimings: true })
+    const { attachModelResourceFinishRecorder, installModelTurnTailObserver } = await import('../../packages/context/gateway-runtime/src/model-tail-timing.ts')
+    attachModelResourceFinishRecorder(ctx.gatewayRuntime, installModelTurnTailObserver(ctx))
+    ctx.provide('executionAuthority', {
+      current: () => ({ parentSessionId: sessionId, scopeId }),
+    } as never)
+    const llm = new LlmRuntime(ctx)
+    llm.registerAdapter(['budgeted'], new class extends LlmAdapter {
+      override async *stream(): AsyncIterable<StreamChunk> {
+        yield { type: 'text-delta', index: 0, text: 'hello' }
+      }
+    }())
+    await f.grant(1)
+    const output = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      const sessionObj = { id: sessionId } as never
+      ctx.emit('session/event', sessionObj, { type: 'turn/start', seq: 1, time: 1, data: { turn: 1 } } as never)
+      const chunks: StreamChunk[] = []
+      for await (const chunk of llm.stream({ provider: 'budgeted', model: 'model', messages: [message()], sessionId })) chunks.push(chunk)
+      expect(chunks).toContainEqual({ type: 'text-delta', index: 0, text: 'hello' })
+      ctx.emit('session/event', sessionObj, { type: 'assistant/message', seq: 2, time: 2, data: { turn: 1, step: 1 } } as never)
+      ctx.emit('session/event', sessionObj, { type: 'step/end', seq: 3, time: 3, data: { turn: 1, step: 1 } } as never)
+      ctx.emit('session/event', sessionObj, { type: 'turn/end', seq: 4, time: 4, data: { turn: 1, reason: { kind: 'completed' } } } as never)
+      const lines = output.mock.calls.map(([line]) => String(line))
+      const parse = (prefix: string) => {
+        const match = lines.find(line => line.startsWith(prefix))
+        if (match === undefined) throw new Error(`missing log line ${prefix}`)
+        return JSON.parse(match.slice(prefix.length)) as Record<string, unknown>
+      }
+      const admission = parse('[model-resource-timing] ')
+      const finish = parse('[model-resource-finish-timing] ')
+      const tail = parse('[model-turn-tail-timing] ')
+      expect(admission).toMatchObject({ originKind: 'session', outcome: 'granted' })
+      expect(typeof finish.startedAt).toBe('number')
+      expect(finish).toMatchObject({
+        operationId: admission.operationId, originKind: 'session', outcome: 'quiescent', acknowledged: true,
+      })
+      expect(tail).toMatchObject({
+        turn: 1, reason: 'completed', assistantEventType: 'assistant/message', assistantSeq: 2,
+        resourceOperationId: admission.operationId, resourceFinishOutcome: 'quiescent', resourceFinishAcknowledged: true,
+      })
+    } finally {
+      output.mockRestore()
+    }
   })
 })

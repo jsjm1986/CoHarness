@@ -63,6 +63,9 @@ export async function verifyAdminProjectMigration(context:PostgresRuntimeContext
   try {
     const create=(project:PostgresProjectService,name:string)=>project.createManaged({name,ownerUserId:actor,actorUserId:actor},authority)
     const fresh=await create(projects,'fresh-private-'+randomUUID())
+    const documentLocation=(await locations.page(actor,{})).items.find(item=>item.scope.kind==='project' && item.scope.projectId===fresh.id)
+    expect(documentLocation).toMatchObject({name:'#'+fresh.id,metadataOnNode:true,scope:{nodeId:node,projectId:fresh.id}})
+    expect((await metadata.authorizedMetadata(actor,'account',[fresh.id]))[0]?.name).toBe(fresh.name)
     await expect(admin.preflight(actor,fresh.id)).resolves.toMatchObject({storage:'node',sourceRetirement:'new',canPrepare:false,canPublish:false})
     const source=await create(legacy,'existing-private-'+randomUUID())
     await verifyOneConnectionDrafts(context,fresh.id,source.id,cfg.stateRoot)

@@ -17,10 +17,15 @@
   width: max-content;
   min-width: min(300px, calc(100vw - 24px));
   max-width: min(440px, calc(100vw - 24px));
+  max-block-size: max(0px, calc(var(--dsw-viewport-height, 100dvh) - 24px));
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 16px;
   border: 0;
   border-radius: 12px;
   background: var(--dsw-specific-menu);
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   backdrop-filter: var(--dsw-menu-backdrop-filter);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
@@ -82,6 +87,7 @@
 
 .details {
   display: grid;
+  align-items: start;
   grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
   gap: 6px 16px;
   margin: 0;

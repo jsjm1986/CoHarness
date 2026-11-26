@@ -15,10 +15,10 @@
  * retain identity. Pure component: everything arrives through the framework
  * shares — zero cordis or framework imports, zero self-made hooks.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { holdInert, IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   clampWidth, computeColumns, DETAILS_DEFAULT_RATIO, DETAILS_MAX_RATIO, DETAILS_MIN, SIDEBAR_DEFAULT,
 } from './columns.ts'
@@ -29,7 +29,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share + locale seat. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.bottom' | 'shell.overlay' | 'shell.mobile.header.context' | 'shell.mobile.header.actions'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.bottom' | 'shell.overlay' | 'shell.mobile.header.context' | 'shell.mobile.header.title' | 'shell.mobile.header.actions'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'layout'>
   & { dismissRightbar: () => void }
@@ -46,8 +46,8 @@ function CenterColumn(props: { children?: ReactNode }) {
  * conceding track never crops the panel into a strip. The track only decides
  * whether the center makes room.
  */
-function DetailsColumn(props: { children?: ReactNode }) {
-  return <div className={css.detailsCol}>{props.children}</div>
+function DetailsColumn(props: { children?: ReactNode; fullscreen: boolean }) {
+  return <div className={css.detailsCol} data-fullscreen={props.fullscreen || undefined}>{props.children}</div>
 }
 
 /**
@@ -115,7 +115,7 @@ export function AppFrame({
   const panels = useStore(s => s)
   const detailsSession = useSessions((s) => {
     const current = panels.detailsSessionId ?? s.current
-    return current !== undefined && s.byId[current]?.blank === false ? current : undefined
+    return current !== undefined && s.byId[current] !== undefined ? current : undefined
   })
   const currentSession = useSessions(s => s.current)
   const currentTitle = useSessions((s) => {
@@ -259,25 +259,30 @@ export function AppFrame({
   // scroll once horizontal intent shows.
   const drawerEl = useRef<HTMLDivElement | null>(null)
   const scrimEl = useRef<HTMLDivElement | null>(null)
-  const edgeEl = useRef<HTMLDivElement | null>(null)
   const actionsRef = useRef(actions)
   actionsRef.current = actions
+  useLayoutEffect(() => {
+    const drawer = drawerEl.current
+    if (mode !== 'compact' || drawerOpen || drawer === null) return
+    return holdInert(drawer)
+  }, [mode, drawerOpen])
   useEffect(() => {
     if (mode !== 'compact') return
     const drawer = drawerEl.current
     const scrim = scrimEl.current
-    const edge = edgeEl.current
-    if (drawer === null || scrim === null) return
+    const frame = frameRef.current
+    if (drawer === null || scrim === null || frame === null) return
     interface Swipe {
       kind: 'open' | 'close'
       x0: number
       y0: number
       t0: number
       lastDx: number
-      engaged: boolean
+      phase: 'pending' | 'claimed' | 'engaged'
       width: number
     }
     let swipe: Swipe | null = null
+    let finishTransition: (() => void) | undefined
     const clearInline = () => {
       drawer.style.transform = ''
       drawer.style.visibility = ''
@@ -289,17 +294,21 @@ export function AppFrame({
        inline overrides carry the panel from its dragged spot to the target,
        then clear so the [data-open] rules own the steady state. */
     const settle = (opened: boolean, width: number) => {
+      finishTransition?.()
       drawer.style.transition = ''
       scrim.style.transition = ''
       let finished = false
       const done = () => {
         if (finished) return
         finished = true
+        window.clearTimeout(timer)
         drawer.removeEventListener('transitionend', done)
+        finishTransition = undefined
         clearInline()
       }
+      finishTransition = done
       drawer.addEventListener('transitionend', done)
-      window.setTimeout(done, 400)
+      const timer = window.setTimeout(done, 400)
       if (opened) {
         drawer.style.visibility = 'visible'
         drawer.style.transform = 'translateX(0)'
@@ -310,31 +319,52 @@ export function AppFrame({
         scrim.style.opacity = '0'
       }
     }
-    const start = (kind: Swipe['kind']) => (event: TouchEvent) => {
+    const cancel = () => {
+      swipe = null
+      finishTransition?.()
+      clearInline()
+    }
+    const start = (event: TouchEvent) => {
+      cancel()
       const t = event.touches[0]
-      if (t === undefined) return
-      swipe = { kind, x0: t.clientX, y0: t.clientY, t0: performance.now(), lastDx: 0, engaged: false, width: drawer.offsetWidth || 300 }
+      if (t === undefined || event.touches.length !== 1) return
+      if (!drawerOpen) {
+        const offset = t.clientX - frame.getBoundingClientRect().left
+        if (offset < 0 || offset >= 24) return
+        if (event.target instanceof Element && event.target.closest(
+          'button, a[href], input, select, textarea, label, summary, [role="button"], [role="link"], ' +
+          '[contenteditable]:not([contenteditable="false"])',
+        ) !== null) return
+      }
+      swipe = { kind: drawerOpen ? 'close' : 'open', x0: t.clientX, y0: t.clientY, t0: performance.now(), lastDx: 0,
+        phase: 'pending', width: drawer.offsetWidth || 300 }
     }
     const move = (event: TouchEvent) => {
       const s = swipe
       const t = event.touches[0]
       if (s === null || t === undefined) return
+      if (event.touches.length !== 1 || !event.cancelable) { cancel(); return }
       const dx = t.clientX - s.x0
       const dy = t.clientY - s.y0
-      if (!s.engaged) {
-        const horizontal = s.kind === 'open'
-          ? dx > 12 && dx > Math.abs(dy)
-          : dx < -12 && -dx > Math.abs(dy)
-        if (!horizontal) {
-          if (Math.abs(dy) > 12) swipe = null
+      const distance = s.kind === 'open' ? dx : -dx
+      if (s.phase === 'pending') {
+        if (dx === 0 && dy === 0) return
+        if (distance <= Math.abs(dy)) {
+          swipe = null
           return
         }
-        s.engaged = true
+        s.phase = 'claimed'
+      }
+      // The browser may make later moves uncancellable after an unprevented first move.
+      // Reserve horizontal input before the 12px visual threshold without cancelling taps at touchstart.
+      event.preventDefault()
+      if (s.phase === 'claimed') {
+        if (distance <= 12) return
+        s.phase = 'engaged'
         drawer.style.transition = 'none'
         scrim.style.transition = 'none'
       }
       s.lastDx = dx
-      event.preventDefault()
       if (s.kind === 'open') {
         const slid = Math.min(dx, s.width)
         drawer.style.visibility = 'visible'
@@ -349,7 +379,7 @@ export function AppFrame({
     const finish = () => {
       const s = swipe
       swipe = null
-      if (s === null || !s.engaged) return
+      if (s === null || s.phase !== 'engaged') return
       const velocity = s.lastDx / Math.max(1, performance.now() - s.t0)
       const passed = s.kind === 'open'
         ? s.lastDx > s.width * 0.3 || velocity > 0.35
@@ -359,26 +389,18 @@ export function AppFrame({
       if (opened && s.kind === 'open') actionsRef.current.toggleSidebar()
       if (!opened && s.kind === 'close') actionsRef.current.collapseNarrow()
     }
-    const openStart = start('open')
-    const closeStart = start('close')
-    edge?.addEventListener('touchstart', openStart, { passive: true })
-    edge?.addEventListener('touchmove', move, { passive: false })
-    edge?.addEventListener('touchend', finish)
-    edge?.addEventListener('touchcancel', finish)
-    drawer.addEventListener('touchstart', closeStart, { passive: true })
-    drawer.addEventListener('touchmove', move, { passive: false })
-    drawer.addEventListener('touchend', finish)
-    drawer.addEventListener('touchcancel', finish)
+    const surface = drawerOpen ? drawer : frame
+    const capture = !drawerOpen
+    surface.addEventListener('touchstart', start, { passive: true, capture })
+    surface.addEventListener('touchmove', move, { passive: false, capture })
+    surface.addEventListener('touchend', finish, capture)
+    surface.addEventListener('touchcancel', cancel, capture)
     return () => {
-      edge?.removeEventListener('touchstart', openStart)
-      edge?.removeEventListener('touchmove', move)
-      edge?.removeEventListener('touchend', finish)
-      edge?.removeEventListener('touchcancel', finish)
-      drawer.removeEventListener('touchstart', closeStart)
-      drawer.removeEventListener('touchmove', move)
-      drawer.removeEventListener('touchend', finish)
-      drawer.removeEventListener('touchcancel', finish)
-      swipe = null
+      surface.removeEventListener('touchstart', start, capture)
+      surface.removeEventListener('touchmove', move, capture)
+      surface.removeEventListener('touchend', finish, capture)
+      surface.removeEventListener('touchcancel', cancel, capture)
+      cancel()
     }
   }, [mode, drawerOpen])
 
@@ -432,8 +454,14 @@ export function AppFrame({
             <IconPanelLeftOutline16 />
           </button>
           <div className={css.topbarContext} data-mobile-app-header>
-            <span className={css.topbarTitle} title={currentTitle ?? t('app.title')}>
-              {currentTitle ?? t('app.title')}
+            <span className={css.topbarTitle} data-mobile-page-title
+              title={panels.panelInfo.activePanelId === null ? currentTitle ?? t('app.title') : undefined}>
+              {panels.panelInfo.activePanelId === null
+                ? currentTitle ?? t('app.title')
+                : renderSlot('shell.mobile.header.title', {}, {
+                  entryKey: panels.panelInfo.activePanelId,
+                  fallback: t('app.title'),
+                })}
             </span>
             <div className={css.topbarEnvironment}>
               {renderSlot('shell.mobile.header.context', { compact: true })}
@@ -446,47 +474,25 @@ export function AppFrame({
           </div>
         </div>
       )}
-      {mode === 'compact'
-        ? (
-          <>
-            {/* Drawer pair: the scrim owns pointer dismissal (keyboard users
-                  close through the topbar toggle); the drawer keeps the sidebar
-                  slot mounted across open/close and slides by transform. */}
-            <div
-              ref={scrimEl}
-              className={css.scrim}
-              data-open={drawerOpen || undefined}
-              aria-hidden
-              onClick={() => { actions.collapseNarrow() }}
-            />
-            <div ref={drawerEl} className={css.drawer} data-open={drawerOpen || undefined}>
-              {/* The drawer's CSS width is min(82%, 300px) of the frame;
-                  the sidebar's frozen inline width must match exactly —
-                  SIDEBAR_DEFAULT would leave a dead strip on ≥366px phones. */}
-              {renderSlot('sidebar', {
-                collapsed: false,
-                width: viewport > 0 ? Math.min(Math.round(viewport * 0.82), 300) : SIDEBAR_DEFAULT,
-              })}
-            </div>
-            {/* Left-edge swipe target for opening the drawer — the platform
-                back-gesture strip. Taps pass through (no click handling);
-                only a horizontal-dominant drag engages. */}
-            {!drawerOpen && <div ref={edgeEl} className={css.edgeZone} aria-hidden />}
-          </>
-        )
-        : (
-          <div className={css.sidebarCol}>
-            {/* Render-site slot call with live concession output: a closed
-                  sidebar keeps the mounted slot at the compact-rail width, and the
-                  component sees its rendered state as owner params decided here
-                  (collapsed follows the resolved rail, so a derived auto-collapse
-                  renders the rail UI too). */}
-            {renderSlot('sidebar', {
-              collapsed: sidebarCollapsed,
-              width: cols.sidebar,
-            })}
-          </div>
-        )}
+      {mode === 'compact' && (
+        <div
+          ref={scrimEl}
+          className={css.scrim}
+          data-open={drawerOpen || undefined}
+          aria-hidden
+          onClick={() => { actions.collapseNarrow() }}
+        />
+      )}
+      {/* One sidebar owner preserves open portals and drafts across viewport modes. */}
+      <div ref={drawerEl} className={mode === 'compact' ? css.drawer : css.sidebarCol} data-open={drawerOpen || undefined}>
+        {renderSlot('sidebar', {
+          collapsed: mode === 'compact' ? false : sidebarCollapsed,
+          // Match the drawer's min(82%, 300px) width, including narrow phones.
+          width: mode === 'compact'
+            ? viewport > 0 ? Math.min(Math.round(viewport * 0.82), 300) : SIDEBAR_DEFAULT
+            : cols.sidebar,
+        })}
+      </div>
       {/* The center column is keyed between the Conversation and any
           registered global panel; details use the selected Session unless an
           explicit pane action pins their target. */}
@@ -499,7 +505,7 @@ export function AppFrame({
         })}
       </CenterColumn>
       {overlayPanels && <div className={css.scrim} data-open={detailsOpen || undefined} aria-hidden onClick={dismissRightbar} />}
-      <DetailsColumn>
+      <DetailsColumn fullscreen={panels.rightbarFullscreen}>
         {renderSlot('rightbar', {
           width: overlayPanels ? detailsOverlayWidth : normal.details,
           viewportWidth: viewport,

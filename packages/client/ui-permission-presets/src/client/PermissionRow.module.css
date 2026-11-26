@@ -51,6 +51,10 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+@media (pointer: coarse), (max-height: 480px) {
+  .selector { height: auto; min-height: var(--dsw-touch-target); }
+}
+
 .selector:disabled {
   color: var(--dsw-alias-label-dimmed);
   cursor: not-allowed;

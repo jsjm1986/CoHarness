@@ -6,16 +6,28 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import {
+  cloneElement,
+  createContext,
+  useContext,
   useEffect,
   useId,
   useMemo,
   useRef,
   type ButtonHTMLAttributes,
+  type ReactElement,
   type ReactNode,
 } from 'react'
 import { adminLanguage, translateCopy } from '../language.ts'
 import { zh as chromeZh, en as chromeEn } from '../chrome.copy.ts'
 
+/** Organization-scoped control displayed beside each Admin page title. */
+export const PageHeaderComputerContext = createContext<ReactNode>(null)
+
+/**
+ * Render the Admin title and its document-scoped computer control.
+ * @param props - Title, description, metadata and actions supplied by the page.
+ * @returns The page header.
+ */
 export function PageHeader({
   title,
   description,
@@ -27,8 +39,10 @@ export function PageHeader({
   meta?: ReactNode
   actions?: ReactNode
 }) {
+  const computer = useContext(PageHeaderComputerContext)
+  useEffect(() => { document.title = `${title} — COHARNESS` }, [title])
   return (
-    <header className="pageHeader">
+    <header className={computer === null ? 'pageHeader' : 'pageHeader pageHeaderWithComputer'}>
       <div className="pageHeading">
         <div className="pageTitleLine">
           <h1>{title}</h1>
@@ -36,6 +50,7 @@ export function PageHeader({
         </div>
         {description === undefined ? null : <p>{description}</p>}
       </div>
+      {computer === null ? null : <div className="pageHeaderComputer">{computer}</div>}
       {actions === undefined ? null : <div className="pageActions">{actions}</div>}
     </header>
   )
@@ -177,6 +192,9 @@ export function EmptyState({
   )
 }
 
+type FieldControlProps = { id: string; 'aria-describedby'?: string }
+
+/** Associates one native control with its visible label and hint. Wrapped controls forward the render child's props. */
 export function Field({
   label,
   hint,
@@ -185,15 +203,20 @@ export function Field({
 }: {
   label: string
   hint?: string
-  children: ReactNode
+  children: ReactElement<Partial<FieldControlProps>> | ((props: FieldControlProps) => ReactNode)
   className?: string
 }) {
+  const generatedId = useId()
+  const id = typeof children === 'function' ? generatedId : children.props.id ?? generatedId
+  const hintId = hint === undefined ? undefined : `${generatedId}-hint`
+  const describedBy = typeof children === 'function' ? undefined : children.props['aria-describedby']
+  const controlProps = { id, 'aria-describedby': [describedBy, hintId].filter(Boolean).join(' ') || undefined }
   return (
-    <label className={`field ${className}`.trim()}>
-      <span className="fieldLabel">{label}</span>
-      {children}
-      {hint === undefined ? null : <span className="fieldHint">{hint}</span>}
-    </label>
+    <div className={`field ${className}`.trim()}>
+      <label className="fieldLabel" htmlFor={id}>{label}</label>
+      {typeof children === 'function' ? children(controlProps) : cloneElement(children, controlProps)}
+      {hint === undefined ? null : <span id={hintId} className="fieldHint">{hint}</span>}
+    </div>
   )
 }
 
@@ -240,6 +263,7 @@ export function Dialog({
   wide?: boolean
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const hasFooter = footer !== undefined
   const titleId = useId()
   const descriptionId = useId()
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
@@ -250,6 +274,49 @@ export function Dialog({
     if (open && !dialog.open) dialog.showModal()
     if (!open && dialog.open) dialog.close()
   }, [open])
+
+  useEffect(() => {
+    const dialog = ref.current
+    const viewport = window.visualViewport
+    if (!open || dialog === null || !viewport) return
+    const surface = dialog.querySelector<HTMLElement>('.dialogSurface')
+    if (surface === null) return
+    const header = surface.querySelector<HTMLElement>('.dialogHeader')
+    const footer = surface.querySelector<HTMLElement>('.dialogFooter')
+    const update = () => {
+      const wasShort = dialog.hasAttribute('data-short-viewport')
+      dialog.style.setProperty('--dialog-viewport-height', `${viewport.height}px`)
+      dialog.style.setProperty('--dialog-viewport-top', `${viewport.offsetTop}px`)
+      dialog.toggleAttribute('data-compact-viewport', viewport.height <= 320)
+      const bodyHeight = surface.querySelector<HTMLElement>('.dialogBody')?.scrollHeight ?? 0
+      const pinnedHeight = (header?.offsetHeight ?? 0) + (footer?.offsetHeight ?? 0) + Math.min(44, bodyHeight)
+      const short = viewport.height < 192 || pinnedHeight > surface.clientHeight + 1
+      dialog.toggleAttribute('data-short-viewport', short)
+      if (wasShort && !short) surface.scrollTop = 0
+      const focused = document.activeElement
+      if (viewport.height < 96 && focused instanceof HTMLElement && dialog.contains(focused)
+        && focused.matches('input:not([readonly]), textarea:not([readonly])')) {
+        const field = focused.getBoundingClientRect()
+        const surfaceBounds = surface.getBoundingClientRect()
+        surface.scrollTop += field.top + field.height / 2 - (surfaceBounds.top + surfaceBounds.height / 2)
+      }
+    }
+    update()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(update)
+    if (header !== null) observer?.observe(header)
+    if (footer !== null) observer?.observe(footer)
+    viewport.addEventListener('resize', update)
+    viewport.addEventListener('scroll', update)
+    return () => {
+      observer?.disconnect()
+      viewport.removeEventListener('resize', update)
+      viewport.removeEventListener('scroll', update)
+      dialog.style.removeProperty('--dialog-viewport-height')
+      dialog.style.removeProperty('--dialog-viewport-top')
+      dialog.removeAttribute('data-compact-viewport')
+      dialog.removeAttribute('data-short-viewport')
+    }
+  }, [open, hasFooter])
 
   return (
     <dialog
@@ -269,7 +336,7 @@ export function Dialog({
           <IconButton label={t('dialogClose')} icon={X} onClick={onClose} />
         </header>
         {children === undefined ? null : <div className="dialogBody">{children}</div>}
-        {footer === undefined ? null : <footer className={`dialogFooter ${danger ? 'dialogFooterDanger' : ''}`}>{footer}</footer>}
+        {hasFooter ? <footer className={`dialogFooter ${danger ? 'dialogFooterDanger' : ''}`}>{footer}</footer> : null}
       </div>
     </dialog>
   )
@@ -282,6 +349,7 @@ export function ConfirmDialog({
   confirmLabel,
   pending = false,
   error = '',
+  status,
   confirmDisabled = false,
   onConfirm,
   onClose,
@@ -292,6 +360,7 @@ export function ConfirmDialog({
   confirmLabel: string
   pending?: boolean
   error?: string
+  status?: string
   confirmDisabled?: boolean
   onConfirm: () => void
   onClose: () => void
@@ -311,6 +380,7 @@ export function ConfirmDialog({
         </>
       )}
     >
+      {status && <p role="status">{status}</p>}
       {error === '' ? undefined : <ErrorBanner message={error} />}
     </Dialog>
   )

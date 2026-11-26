@@ -7,6 +7,7 @@
 {"scenario":"timeout","outgoingCalls":1,"status":"failed","attempts":1,"currentOwner":"creator","transportAborted":true}
 {"scenario":"gateway-completion","aborted":"inserted","completed":"inserted","duplicate":"duplicate","invalidCredentialStatus":401,"outgoingCalls":1,"completedEventCommittedBeforeSend":true,"status":"sent"}
 {"scenario":"personal-source-current","secondComputerAllowed":true,"outgoingCalls":1,"claimed":1}
+{"scenario":"device-delivery-receipt","wrongOwner":"missing","opened":"recorded","repeated":"recorded","delivered":true}
 {"scenario":"personal-child-current","secondComputerAllowed":true,"outgoingCalls":1,"claimed":1}
 {"scenario":"personal-source-revoked","secondComputerAllowed":true,"outgoingCalls":0,"claimed":0}
 {"scenario":"personal-source-grant-missing","secondComputerAllowed":true,"outgoingCalls":0,"claimed":0}

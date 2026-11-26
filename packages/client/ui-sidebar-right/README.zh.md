@@ -36,25 +36,27 @@ kind: "package-reference"
 <a id="presentations"></a>
 ## 呈现形态
 
-普通与全屏共用同一棵面板内容树，切换不会重挂载Tab。普通面板贴靠右栏；全屏面板覆盖窗口并保留宽屏底层列宽。窗口低于768px时打开右栏自动全屏；窄屏退出全屏会收起右栏，变宽不重新打开已关闭的右栏。 全屏打开时，底层列宽保持不变，直到滑入结束后才无过渡地准备普通轨道。 全屏面板退场前，关闭先准备全宽会话区，恢复先准备普通右轨道；退场期间底层不播放宽度动画。
+普通与全屏共用同一棵面板内容树，切换不会重挂载Tab。普通面板贴靠右栏；全屏面板覆盖实测 AppFrame（包括嵌入式框架）并保留宽屏底层列宽。窗口低于768px时打开右栏自动全屏；窄屏退出全屏会收起右栏，变宽不重新打开已关闭的右栏。 全屏打开时，底层列宽保持不变，直到滑入结束后才无过渡地准备普通轨道。 全屏面板退场前，关闭先准备全宽会话区，恢复先准备普通右轨道；退场期间底层不播放宽度动画。
 
 | 形态 | 轨道 | 面板 |
 |---|---|---|
 | `push`（默认） | 面板宽度：会话区让出空间 | 在轨道内；它的左缘与会话区的右缘沿框架自己的曲线一起移动 |
-| `fullscreen` | 保留宽屏普通轨道；窄屏自动全屏不占轨道 | 覆盖整个窗口 |
+| `fullscreen` | 保留宽屏普通轨道；窄屏自动全屏不占轨道 | 覆盖整个 AppFrame |
 
 在 Windows Electron 中，`html[data-windows-titlebar]` 让全屏面板保持在顶栏下方及展开侧栏的右侧。框架的 `--dsh-windows-sidebar-width` 提供该缩进及最大宽度；`--dsh-windows-content-radius` 提供左上圆角。仅全屏面板为该圆角裁剪溢出内容。
 
 席位通过 `ctx.layout.openRightbar(track, fullscreen)` / `closeRightbar()` 报告呈现，框架不注入本包。宽屏切换全屏不改变中栏宽度；宽度拖拽区只在普通展开态显示。独立浮窗及 `float`/`dock` 操作保持可用。
 
-面板没有标题行。它的两个控件——形态切换与折叠按钮——搭在套件 chrome 席位上，位于右上格 tab 条的最末端，因此 tab 条就是面板的整条上边。每条 tab 条从左到右读作：在允许时带关闭按钮的 tab 胶囊，添加控件（只在该格没有引导 tab 时绘制；它通过 `ctx.sidebarRight.openTab` 在该格打开引导页），该格的分栏控件，以及右上格里的两个面板控件。窄格里只有 chip 让位；其后的控件从不收缩或被裁切。
+面板没有标题行。它的两个控件——形态切换与折叠按钮——搭在套件 chrome 席位上，位于右上格 tab 条的最末端，因此 tab 条就是面板的整条上边。每条 tab 条从左到右读作：在允许时带关闭按钮的 tab 胶囊，添加控件（只在该格没有引导 tab 时绘制；它通过 `ctx.sidebarRight.openTab` 在该格打开引导页），该格的分栏控件，以及右上格里的两个面板控件。手机和粗指针设备省略不可用的分栏控件，为平板窄面板中的活动 tab 及关闭操作保留空间。其他控件保持尺寸，tab 列表可滚动。Dockkit 负责 tab 条的居中留白和触屏最小高度，侧栏只提供桌面栏带的首选高度。
 
 <a id="the-expand-button"></a>
 ## 展开按钮
 
 快捷键查阅包含右侧栏的开合、分栏与面板全屏命令，对应控件上展示同一组有效绑键。分栏与全屏要求焦点位于可见的停靠格内；会话区焦点下它们不可用。分栏不可用时仍保持可见；其可聚焦的 tooltip 展示当前绑键并解释格数上限或宽度要求。文件、浏览器与终端 provider 各自贡献自己的命令。引导按钮把有效快捷键以内联无框文字展示，不叠加重复 tooltip。
 
-面板隐藏时，会话 header 角落席位里的一个按钮（`conversation.session.header.corner`，在工具组右缘之外，与 Session 日志控件齐平）是回去的路。它的图形是左侧 sidebar 折叠图标的镜像。它与面板共用一个存储（slot 运行时允许两个同作用域席位共用一个 handle）；面板显示时它什么也不渲染，角落席位随之收起。于是折叠的 Sidebar 不花会话区任何代价：没有轨条、没有宽度，转录的滚动条留在列的边缘。没有会话就没有按钮也没有面板。
+面板隐藏时，宽屏的展开按钮位于会话标题栏角落（`conversation.session.header.corner`）。窗口低于 768px 时，按钮位于页面顶栏（`shell.mobile.header.actions`），与左侧栏开关分居两侧；会话角落和空标题行隐藏。两个位置共用面板的 Session 状态，并使用左侧栏图标的镜像。面板展开时隐藏按钮；面板收起时不留下轨条或占用会话宽度。没有 Session 就没有按钮或面板。
+
+展开按钮在手机顶栏和宽横屏标题栏中均保留 44px 触摸区域。悬停反馈只在支持悬停的设备上出现。
 
 面板取会话区的底色与正文字号，而不是自成一层浮起的表面：它是页面的一列，不是压在页面上的卡片。
 
@@ -88,6 +90,8 @@ tab 类型分两阶段注册，随包发布的引导类型走的正是别的包�
 
 1. **类型**——`ctx.sidebarRightTabs.register({ id, kind, patterns?, priority?, canOpen?, title, guide?, keepMounted? })`，一份没有运行时钩子的静态声明，返回 disposer。`id` 是这个实现在 tab 系统里的身份，在全部注册中唯一（包名是天然取值；随包引导页是 `@deepseek-ai/dsh-client-ui-sidebar-right/guide`）：一旦 extension 可以接管 builtin 的 kind，kind 就不再唯一，所以实现要自己命名，同一 `id` 的第二次注册会 throw。资源类型给出 `patterns`，即作用于 `dsh-resource://` 地址的 glob：含 `:` 的匹配整个地址（`dsh-resource://file/**`）；不含的匹配 URI 路径的任意深度且忽略大小写（`*.md`），不是 URI 的地址不匹配任何这类模式。页类型——引导页、文件树——不给出模式，按 kind 打开。`canOpen(address)` 否决一次命中。`title(address)` 是 tab chip 的文字，在 tab 打开时捕获。`guide` 列出引导页的入口框；选中一个即把贡献它的类型作为页打开。一个 `kind` 最多承载一份 `builtin` 与一份 `extension` 注册（extension 生效；它离开后 builtin 恢复）；kind 上的其它任何撞名都 throw。`id` 同时也是该类型正文与标题注册时用的 key，因此 extension 与它接管的 builtin 各占一个格位，席位渲染生效的那个。
 2. **正文**——`ctx.slots.register({ name: 'sidebar.right.pane.tab', key: definition.id }, Body)` 通过框架注入的 `useTabInfo()` 读取 `{ sidebar, panel, tab }`。`sidebar` 提供开合与全屏信息，`panel.id` 命名所在格，`tab` 包含原记录字段、`visible`、`navigation`、`signal` 和 `actions`。这些字段不再作为平铺owner props传入；类型自己的store仍使用 `useStore`/`actions`。可选标题注册及引导替换共享该hook；未注册标题时使用打开时保存的文本。标题包裹元素保留 tab 与 occurrence 的 DOM 标记而不增加布局盒，因此停靠 tab 与浮窗头部的图标间距与垂直对齐由 dockkit 控件负责。
+
+标题组件用 `<span>` 等元素包裹文本。席位包裹元素使用 `display: contents`；其中的裸文本在 Firefox 中不会收到原生触摸点击。回退标题也使用同样的文本元素。
 
 由哪个类型打开资源遵循编辑器解析器的惯例：`patterns` 命中的类型先按 `priority` 档排序——`extension`（产品外的类型，最高档，也是未命名时的默认）、`builtin`、`fallback`（任何更具体的类型都应胜过的通用查看器）——再按命中模式的长度，再按注册顺序；`canOpen` 会剔除候选。各档是字符串字面量，因此别的包里的类型不需要从这里做运行时导入。`candidates(address)` 返回排序，`claim(address, kind?)` 返回决定；指定 `kind` 时跳过它的 glob 但保留它的 `canOpen`。
 

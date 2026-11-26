@@ -89,6 +89,17 @@
   accent-color: var(--dsw-alias-state-business-primary);
 }
 
+@media (pointer: coarse) {
+  .control input[type='range'],
+  .fillToggle {
+    min-block-size: 44px;
+  }
+
+  .fillToggle {
+    min-inline-size: 44px;
+  }
+}
+
 @media (max-width: 767px) {
   .row {
     align-items: stretch;

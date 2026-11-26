@@ -25,6 +25,8 @@ export interface NodeAgentConfig {
   centerUrl: string
   /** Ordered origins dialed to reach the center; defaults to `[centerUrl]`. Identity stays `centerUrl`. */
   centerDialUrls: readonly string[]
+  /** When supplied, new service streams use an independent dial sequence to the same center. */
+  serviceDialUrls?: readonly string[]
   /** After a dial fallback, the first fresh attempt at least this long later re-probes candidate 0. */
   dialPreferredRetryMs: number
   stateFile: string
@@ -42,7 +44,8 @@ export interface NodeAgentConfig {
 /** Local failures and authenticated center refusals exposed by the node process. */
 export type NodeAgentErrorCode = typeof NODE_ACCESS_ERROR_CODES[number]
   | 'node-agent/invalid-timing' | 'node-agent/center-url-required' | 'node-agent/invalid-center-url'
-  | 'node-agent/invalid-enrollment-token' | 'node-agent/invalid-dial-urls' | 'node-agent/state-unreadable' | 'node-agent/state-must-be-private'
+  | 'node-agent/invalid-enrollment-token' | 'node-agent/invalid-dial-urls' | 'node-agent/invalid-service-dial-urls'
+  | 'node-agent/state-unreadable' | 'node-agent/state-must-be-private'
   | 'node-agent/invalid-state' | 'node-agent/center-identity-mismatch' | 'node-agent/pending-enrollment-mismatch'
   | 'node-agent/enrollment-required' | 'node-agent/transport-unavailable' | 'node-agent/invalid-response'
   | 'node-agent/center-refused' | 'node-agent/unsupported-platform' | 'node-agent/unsupported-architecture'
@@ -50,6 +53,7 @@ export type NodeAgentErrorCode = typeof NODE_ACCESS_ERROR_CODES[number]
   | 'node-agent/invalid-channel-config' | 'node-agent/channel-failed'
 
 const FAILURE_MESSAGES: Record<NodeAgentErrorCode, string> = {
+  'node-access/quarantined': 'This computer is quarantined after disaster recovery and cannot reconnect. Register a replacement computer with a new identity.',
   'node-access/invalid-request': 'The center refused a control message. Check that the agent and center releases are compatible.',
   'node-access/unauthorized': 'The center refused this credential. Ask an administrator to check or reissue node access.',
   'node-access/forbidden': 'The center refused access. Ask an administrator to check the organization and node.',
@@ -72,6 +76,7 @@ const FAILURE_MESSAGES: Record<NodeAgentErrorCode, string> = {
   'node-agent/invalid-center-url': 'The center URL must be an HTTPS origin without credentials, a path or query fields; loopback HTTP is supported for local verification.',
   'node-agent/invalid-enrollment-token': 'The enrollment token is malformed. Copy the complete ticket from Admin.',
   'node-agent/invalid-dial-urls': 'Each HGW_NODE_CENTER_DIAL_URLS entry must be an HTTPS origin without credentials, a path or query fields; loopback HTTP is supported for local verification; the list holds no empty or duplicate entries.',
+  'node-agent/invalid-service-dial-urls': 'HGW_NODE_SERVICE_DIAL_URLS requires distinct HTTPS origins or loopback HTTP origins for the same center.',
   'node-agent/state-unreadable': 'The node credential file cannot be opened. Check its owner, permissions and file type.',
   'node-agent/state-must-be-private': 'The credential file must be private to this operating-system account (mode 0600 on macOS/Linux, an exclusive ACL on Windows). Fix its ownership and permissions before restarting.',
   'node-agent/invalid-state': 'The credential file is invalid. Preserve it and ask an administrator to reissue access into a new private state file.',
@@ -115,7 +120,7 @@ export type NodeAgentEvent =
   | { status: 'connected'; nodeId: NodeIdentity['nodeId']; epoch: NodeLease['epoch']; executionReady: boolean }
   | { status: 'degraded'; reason: NodeAgentErrorCode }
   | { status: 'stopped' | 'stopped-lease-uncertain' }
-  | { status: 'dial-origin'; origin: string; reason: NodeDialReason }
+  | { status: 'dial-origin'; origin: string; reason: NodeDialReason; service?: true }
   | NodeChannelClientEvent
 
 function timer(value: string | undefined, fallback: number): number {
@@ -138,14 +143,9 @@ function centerUrl(value: string | undefined): string {
   return httpOrigin(value ?? '', 'node-agent/center-url-required', 'node-agent/invalid-center-url')
 }
 
-function centerDialUrls(value: string | undefined, center: string): string[] {
-  if (value === undefined || value.trim() === '') return [center]
-  const origins = value.split(',').map(entry => {
-    const trimmed = entry.trim()
-    if (trimmed === '') throw new NodeAgentError('node-agent/invalid-dial-urls')
-    return httpOrigin(trimmed, 'node-agent/invalid-dial-urls', 'node-agent/invalid-dial-urls')
-  })
-  if (new Set(origins).size !== origins.length) throw new NodeAgentError('node-agent/invalid-dial-urls')
+function dialUrls(value: string, invalid: NodeAgentErrorCode): string[] {
+  const origins = value.split(',').map(entry => httpOrigin(entry.trim(), invalid, invalid))
+  if (new Set(origins).size !== origins.length) throw new NodeAgentError(invalid)
   return origins
 }
 
@@ -168,9 +168,12 @@ export function loadNodeAgentConfig(environment: NodeJS.ProcessEnv): NodeAgentCo
   }
   catch (error) { throw new NodeAgentError('node-agent/invalid-channel-config', false, error) }
   const url = centerUrl(environment.HGW_NODE_CENTER_URL)
+  const centers = environment.HGW_NODE_CENTER_DIAL_URLS?.trim()
+  const services = environment.HGW_NODE_SERVICE_DIAL_URLS
   return {
     centerUrl: url,
-    centerDialUrls: centerDialUrls(environment.HGW_NODE_CENTER_DIAL_URLS, url),
+    centerDialUrls: centers ? dialUrls(centers, 'node-agent/invalid-dial-urls') : [url],
+    ...(services === undefined ? {} : { serviceDialUrls: dialUrls(services, 'node-agent/invalid-service-dial-urls') }),
     dialPreferredRetryMs: timer(environment.HGW_NODE_AGENT_DIAL_PREFERRED_RETRY_MS, 60_000),
     stateFile: resolve(environment.HGW_NODE_AGENT_STATE_FILE ?? join(homedir(), '.dsh-node', 'access.json')),
     ...(enrollment?.success ? { enrollmentToken: enrollment.data } : {}),
@@ -232,7 +235,9 @@ async function writeState(file: string, value: AgentState): Promise<void> {
 
 async function initialState(config: NodeAgentConfig): Promise<AgentState> {
   const created = await mkdir(dirname(config.stateFile), { recursive: true, mode: 0o700 })
-  if (created !== undefined) {
+  // Directory fsync is POSIX-only; Windows mkdir may return a namespaced path
+  // even when stateFile uses a drive path.
+  if (created !== undefined && process.platform !== 'win32') {
     const parent = dirname(created)
     for (let directory = dirname(config.stateFile);; directory = dirname(directory)) {
       await syncStateDirectory(directory)
@@ -311,6 +316,9 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
   const connectionId = randomUUID()
   const dialer = new NodeDialer(config.centerDialUrls, config.dialPreferredRetryMs,
     (origin, reason) => { report({ status: 'dial-origin', origin, reason }) })
+  const serviceDialer = config.serviceDialUrls === undefined ? undefined
+    : new NodeDialer(config.serviceDialUrls, config.dialPreferredRetryMs,
+      (origin, reason) => { report({ status: 'dial-origin', origin, reason, service: true }) })
   let lease: NodeLease | undefined
   let mayHaveLease = false
   let degraded: NodeAgentErrorCode | undefined
@@ -365,7 +373,7 @@ export async function runNodeAgent(config: NodeAgentConfig, signal: AbortSignal,
           const stop = new AbortController()
           const completion = runNodeChannel({ dialer, credential: state.credential, lease,
             limits: config.channel, requestTimeoutMs: config.requestTimeoutMs, retryMs: config.retryMs,
-            ...(config.localGatewayUrl === undefined ? {} : { localGatewayUrl: config.localGatewayUrl, maxServices: config.maxServices }) },
+            ...(config.localGatewayUrl === undefined ? {} : { localGatewayUrl: config.localGatewayUrl, maxServices: config.maxServices, serviceDialer }) },
           AbortSignal.any([signal, stop.signal]), report).catch(error => {
             channelFailure.abort(new NodeAgentError('node-agent/channel-failed', false, error))
           })

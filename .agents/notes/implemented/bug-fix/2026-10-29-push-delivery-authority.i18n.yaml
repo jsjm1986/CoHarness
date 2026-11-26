@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-29-push-delivery-authority.md
 document:
-  en: 4af7a6b1db6e6658ea652bfdb3d228e622817bcd
-  zh: cfd39fd0bede84a6c0f0a1a77ea224c751809e0d
+  en: ffa54e8a9a6cdf112566e006df7aa6b14b9e0e02
+  zh: d256e0ec5e700f85ab1d672135c5f5cbd2d09095
 /agent-note-push-delivery-retains-recipient-and-attempt-ownership:
   en: 89242dd0cccbc68d
   zh: 54d9b0b55804abad
@@ -18,8 +18,8 @@ document:
   en: 4cc0e3ac06a56203
   zh: 210958d1feaf5e45
 /agent-note-push-delivery-retains-recipient-and-attempt-ownership/consequences:
-  en: fc692931fd908414
-  zh: a020e551158a8a61
+  en: 721b291be8538cb0
+  zh: e17316f26c99a87a
 /agent-note-push-delivery-retains-recipient-and-attempt-ownership/verification:
   en: e3a4e1c47b6299c1
   zh: cbf0d4bc8c51a4b5

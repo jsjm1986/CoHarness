@@ -1,0 +1,56 @@
+- main:
+  - region "Recovered execution permissions":
+    - strong: Recovered execution permissions
+    - status: New conversations are enabled; historical conversations remain read-only.
+    - paragraph: Preserving 1 historical conversations for reading. They cannot resume execution.
+    - paragraph: Previous inbox work and schedules remain paused and do not resume with new conversations.
+    - group:
+      - text: Suspended connection and environment settings (5)
+      - paragraph: Reconfigure these settings for the target computer so the Runtime cannot connect to the previous databases or reuse old credentials. Only names appear here; original values remain in the encrypted recovery point.
+      - list:
+        - listitem:
+          - code: DATABASE_URL
+        - listitem:
+          - code: DSH_GATEWAY_CREDENTIAL_FD
+        - listitem:
+          - code: HGW_NODE_TOKEN
+        - listitem:
+          - code: PGHOST
+        - listitem:
+          - code: PGPASSWORD
+    - button "Recheck execution configuration"
+    - strong: Plugins and external connections
+    - paragraph: Review supported items individually. Unapproved items remain disabled. Configuration review requires a stopped Runtime and never stops tasks automatically.
+    - strong: "@deepseek-ai/dsh-remote-desktop-vnc"
+    - text: Ready for review
+    - paragraph: External connection
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - button "Review @deepseek-ai/dsh-remote-desktop-vnc"
+    - strong: "@deepseek-ai/dsh-remote-desktop-stream"
+    - text: Ready for review
+    - paragraph: External connection
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - button "Review @deepseek-ai/dsh-remote-desktop-stream"
+    - strong: "@deepseek-ai/dsh-api-remote-desktop-controller"
+    - text: Ready for review
+    - paragraph: External connection
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - button "Review @deepseek-ai/dsh-api-remote-desktop-controller"
+    - strong: "@deepseek-ai/dsh-client-ui-remote-desktop"
+    - text: Ready for review
+    - paragraph: External connection
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - button "Review @deepseek-ai/dsh-client-ui-remote-desktop"
+    - strong: "@deepseek-ai/dsh-tool-schedule"
+    - text: Ready for review
+    - paragraph: Plugin
+    - paragraph: This capability executes tasks or connects to external services and requires a separate review.
+    - group: Inspect reviewed versions
+    - button "Review @deepseek-ai/dsh-tool-schedule"
+    - group: Items kept disabled (11)
+    - group: Approved or configured inactive components (221)
+    - button "Refresh execution review"

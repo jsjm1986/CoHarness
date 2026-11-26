@@ -1,0 +1,19 @@
+- dialog "Document Manager":
+  - banner:
+    - heading "Document Manager" [level=2]
+    - button "Upload information":
+      - img
+    - button "Close":
+      - img
+  - button "Isolated research":
+    - strong: Isolated research
+    - img
+  - alert: Project access revoked
+  - navigation "Document path":
+    - heading "Root folder" [level=3]
+  - group "Document actions":
+    - button "Upload Document" [disabled]:
+      - img
+      - text: Upload
+    - button "More actions":
+      - img

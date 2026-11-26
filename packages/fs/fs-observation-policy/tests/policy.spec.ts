@@ -109,6 +109,21 @@ describe('edit-intent decision', () => {
   })
 })
 
+it('uses only the deleting Session’s observed file version', async () => {
+  const { ctx, fiber } = await setup()
+  try {
+    const file = target('owned.txt'), owner = ownerExec({}), other = ownerExec({})
+    ctx.emit('fs/observed', file, present('v1'), owner)
+    const remove = (actor: object) => ctx.waterfall('fs/delete-intent', file, actor, () => undefined)
+    await expect(remove(owner)).resolves.toEqual({ version: FsVersion('v1') })
+    await expect(remove(other)).rejects.toMatchObject({ code: 'FS_NOT_OBSERVED' })
+    ctx.emit('fs/observed', file, absent, owner)
+    await expect(remove(owner)).rejects.toMatchObject({ code: 'FS_NOT_FOUND' })
+  } finally {
+    await fiber.dispose()
+  }
+})
+
 describe('observed-state is the prior-observation record', () => {
   it('a read observation authorizes an in-place write at that version', async () => {
     const { ctx } = await setup()

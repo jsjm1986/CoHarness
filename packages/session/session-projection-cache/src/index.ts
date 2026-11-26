@@ -18,7 +18,8 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { SessionLogOffset, snapshotJsonValue } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-agent'
+import { isJsonValue, SessionLogOffset, snapshotJsonValue } from '@deepseek-ai/dsh-session'
 import type {
   Session,
   SessionEvent,
@@ -241,11 +242,9 @@ export class SessionProjectionCache extends Service {
   }
 
   /**
-   * Durably checkpoint one live session NOW (all mandatory points call
-   * this; tests and carriers may too). The registry cut is snapshotted at
-   * this boundary (states are live references), then the session's record is
-   * replaced on the domain's write chain. NOT fail-soft — callers on the
-   * fail-soft paths contain it.
+   * Durably checkpoint a live Session using a detached registry cut. Replaces
+   * the Session's stored record only after the log reaches that cut. Storage
+   * failures reject the call.
    * @param session - the live session to checkpoint.
    * @returns resolution after durability and event emission.
    */
@@ -269,6 +268,7 @@ export class SessionProjectionCache extends Service {
       session.id,
       identityOf(session.header, session.inheritedEventCount),
       rows,
+      'detached',
     )
   }
 
@@ -300,7 +300,7 @@ export class SessionProjectionCache extends Service {
     )
     // Refresh the row so the next cold read seeds from it; fail-soft and
     // fire-and-forget — a failed write-back only costs a longer tail replay.
-    void this.put(meta.id, identity, restored.checkpoint).catch((error: unknown) => {
+    void this.put(meta.id, identity, restored.checkpoint, 'borrowed').catch((error: unknown) => {
       this.ctx.logger.warn(`session projection cache: cold-read write-back for "${meta.id}" failed (cache stays stale): ${String(error)}`)
     })
     return restored.snapshot
@@ -325,9 +325,9 @@ export class SessionProjectionCache extends Service {
         void this.flushSoft(session, 'count threshold')
         return
       }
-      state.timer ??= setTimeout(() => {
-        void this.flushSoft(session, 'interval')
-      }, this.config.writeIntervalMs)
+      if (state.timer === undefined) {
+        state.timer = this.armIntervalTimer(session)
+      }
     })
 
     // Creation is the FIRST mandatory point: a session that never talks (a
@@ -362,6 +362,22 @@ export class SessionProjectionCache extends Service {
     }, 'sessionProjectionCache.timers')
   }
 
+  /** Arm the interval write timer outside any active Agent initiator when the registry is open. */
+  private armIntervalTimer(session: Session): ReturnType<typeof setTimeout> {
+    const arm = () => setTimeout(() => {
+      void this.flushSoft(session, 'interval')
+    }, this.config.writeIntervalMs)
+    const agents = this.ctx.get('agents')
+    if (agents === undefined) return arm()
+    try {
+      return agents.withoutInitiator(arm)
+    } catch {
+      // AgentRegistry rejects new initiator scopes once unloading starts;
+      // the cache still arms its own interval flush until the cache disposes.
+      return arm()
+    }
+  }
+
   /**
    * One fail-soft durable checkpoint. Every caller has work by construction:
    * the throttle triggers only fire dirty (markClean clears the timer with
@@ -386,9 +402,16 @@ export class SessionProjectionCache extends Service {
     }
   }
 
-  /** Replace one session's stored record with its log identity and a detached snapshot of `rows`. */
-  private async put(id: SessionId, identity: CheckpointIdentity, rows: ProjectionCheckpoint): Promise<void> {
-    const detached = snapshotJsonValue(rows)
+  /** Transfer an owned checkpoint or detach a cold fold before queuing its durable write. */
+  private async put(
+    id: SessionId,
+    identity: CheckpointIdentity,
+    rows: ProjectionCheckpoint,
+    ownership: 'detached' | 'borrowed',
+  ): Promise<void> {
+    let detached: ProjectionCheckpoint | undefined
+    if (ownership === 'borrowed') detached = snapshotJsonValue(rows)
+    else if (isJsonValue(rows)) detached = rows
     if (detached === undefined) {
       throw new TypeError('projection checkpoint is not losslessly JSON-serializable (a unit state violates the plain-JSON contract)')
     }

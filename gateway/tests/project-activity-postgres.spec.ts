@@ -35,7 +35,7 @@ describePg('PostgreSQL project activity HTTP', () => {
   })
   afterAll(async () => { await pool?.end() })
 
-  it.for(['tie-order', 'sub-millisecond', 'unanchored-tie', 'delimited-session', 'invalid-cursor', 'invalid-answer', 'legacy-cursor', 'mixed-events'] as const)(
+  it.for(['tie-order', 'sub-millisecond', 'unanchored-tie', 'delimited-session', 'invalid-cursor', 'invalid-answer', 'legacy-cursor', 'mixed-events', 'member-filter'] as const)(
     'reads every activity once for %s', async (kind, { signal }) => {
       const root = await mkdtemp(join(tmpdir(), 'hgw-activity-pagination-'))
       let server: ReturnType<typeof createGatewayServer> | undefined
@@ -97,6 +97,68 @@ describePg('PostgreSQL project activity HTTP', () => {
         await signedIn.arrayBuffer()
         expect(signedIn.status).toBe(302)
         if (cookie === undefined) throw new Error('Activity fixture did not receive its login cookie')
+        if (kind === 'member-filter') {
+          const contributor = await users.create({ username: 'older-contributor', password: 'pw-12345678' })
+          const quiet = await users.create({ username: 'quiet-member', password: 'pw-12345678' })
+          await projects.setMember(project.id, contributor.id, 'rw')
+          await projects.setMember(project.id, quiet.id, 'ro')
+          const message = (author: typeof contributor, seq: number, time: number, text: string) => ({
+            type: 'user/message' as const, seq, time, surfaceOp: 'append' as const,
+            data: { role: 'user' as const, content: [{ type: 'text' as const, text }], source: { kind: 'user' as const,
+              participant: { userId: author.id, username: author.username, displayName: author.displayName, role: 'user' as const,
+                scope: { kind: 'project' as const, projectId: project.id, projectName: project.name, mode: 'rw' as const } } } },
+          })
+          const newest = Date.parse('2026-10-22T00:00:00Z')
+          const older = Date.parse('2026-10-21T00:00:00Z')
+          await sessions.append(firstId, randomUUID(), Array.from({ length: 51 }, (_value, seq) => message(member, seq, newest + seq, 'Recent activity')))
+          await sessions.append(secondId, randomUUID(), [message(contributor, 0, older, 'Older contributor message')])
+          const answerId = randomUUID()
+          expect(await collaboration.claimInteraction(contributor.id, runtimeId, secondId, 'question', answerId, outcome('Older contributor answer'))).toBe(true)
+          await pool.query('UPDATE harness.conversation_interaction_responses SET responded_at=$1 WHERE organization_id=$2 AND interaction_id=$3',
+            [new Date(older - 1), context.organizationId, answerId])
+          const privateId = randomUUID()
+          const contributorId = (await pool.query<{ id: string }>('SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2',
+            [context.organizationId, contributor.id])).rows[0]!.id
+          await sessions.create({ id: privateId, organizationId: context.organizationId, runtimeId, creatorUserId: contributorId,
+            projectId: identities.project_id, visibility: 'private', sessionFormatVersion: 0, createdAt: newest, cwd: project.path })
+          await sessions.append(privateId, randomUUID(), [message(contributor, 0, newest, 'Private source')])
+
+          const request = (params: URLSearchParams) => {
+            params.set('dshTarget', `project:${project.id}`)
+            return fetch(new URL('/account/api/activity?' + params, base), { headers: { cookie }, signal })
+          }
+          const read = async (params: Record<string, string> = {}): Promise<ProjectActivityPage> => {
+            const response = await request(new URLSearchParams(params))
+            expect(response.status).toBe(200)
+            return response.json() as Promise<ProjectActivityPage>
+          }
+          const all = await read()
+          expect(all.items).toHaveLength(50)
+          expect(all.items.every(item => item.actorUserId === member.id)).toBe(true)
+          expect(all.members).toEqual(expect.arrayContaining([{ userId: contributor.id, label: contributor.displayName },
+            { userId: quiet.id, label: quiet.displayName }]))
+          const filter = { member: String(contributor.id), limit: '1' }
+          const first = await read(filter)
+          const second = await read({ ...filter, before: first.nextBefore! })
+          expect(first.items.map(item => item.text)).toEqual(['Older contributor message'])
+          expect(second.items.map(item => item.text)).toEqual(['Older contributor answer'])
+          expect(second.nextBefore).toBeUndefined()
+          expect(second.members).toBeUndefined()
+          expect((await read({ ...filter, before: all.nextBefore! })).items).toEqual(first.items)
+          expect((await read({ member: String(member.id), limit: '1', before: first.nextBefore! })).items).toEqual(all.items.slice(0, 1))
+          expect((await read({ member: String(quiet.id) })).items).toEqual([])
+          for (const candidate of ['member=0', 'member=-1', 'member=1.5', 'member=01', 'member=9007199254740993', 'member=1&member=2']) {
+            const response = await request(new URLSearchParams(candidate))
+            expect(response.status).toBe(400)
+            expect(await response.json()).toEqual({ error: 'invalid-member' })
+          }
+          await expect([
+            '# Project activity member filter', '', 'unfilteredRows=50', 'olderContributorInRoster=true',
+            'filteredPages=Older contributor message,Older contributor answer', 'differentFilterCursor=firstPage',
+            'privateActivity=hidden', 'quietMember=emptyResult', '',
+          ].join('\n')).toMatchFileSnapshot(join(import.meta.dirname, 'snapshots/project-activity/member-filter.expected.md'))
+          return
+        }
         const texts: string[] = [], cursors = new Set<string>(), statuses: number[] = []
         if (kind === 'invalid-cursor') {
           const encoded = (value: unknown) => 'v1.' + Buffer.from(JSON.stringify(value)).toString('base64url')

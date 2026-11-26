@@ -3,10 +3,11 @@ import { PostgresDeploymentTopology } from './deployment-topology.ts'
 import { createBrowserDocumentHandler } from './browser-documents.ts'
 import { nodeConfigurationAuthority } from './postgres/node-configuration-authority.ts'
 import { PostgresNodeAccessService } from './postgres/node-access-service.ts'
+import { NodeAccessError } from './node-access.ts'
 import { GatewayNodeChannels } from './node-channel.ts'
 import { GatewayNodeServices } from './node-service.ts'
 import { GatewayNodeServiceProxy } from './node-service-proxy.ts'
-import { forwardIssuerOf, verifyGatewayForward } from './forwarded-principal.ts'
+import { createGatewayForwardAuthority } from './forwarded-principal.ts'
 import { NodeResourceBudget } from './node-resource-budget.ts'
 import { NodeResourcePressure } from './node-resource-pressure.ts'
 import { GatewayModelBudget } from './gateway-model-budget.ts'
@@ -16,6 +17,7 @@ import { DesktopAccess } from './desktop-access.ts'
 import { MemoryAccess } from './memory-access.ts'
 import { PluginAccess } from './plugin-access.ts'
 import { PostgresPluginState } from './plugin-state.ts'
+import { PostgresPluginInventory } from './plugin-inventory.ts'
 import { SshAccess } from './ssh-access.ts'
 import { StewardAccess } from './steward-access.ts'
 import { TerminalAccess } from './terminal-access.ts'
@@ -24,13 +26,14 @@ import { PostgresTunnelAccessStore, TunnelCredentialCipher } from './postgres/tu
 import { GatewayPluginManagement } from './plugin-management.ts'
 import { GatewayTerminalManagement } from './terminal-management.ts'
 import { randomBytes } from 'node:crypto'
+import { once } from 'node:events'
 import { DOCUMENT_STORE_UNAVAILABLE_CODE, UserDocError } from '@deepseek-ai/dsh-userdoc'
 import { prepareStewardWorktree } from './steward-worktree.ts'
 import type { Server } from 'node:http'
 import { join } from 'node:path'
 import { createAdminApiHandler } from './admin-api.ts'
 import { PostgresAccountPreferencesService } from './postgres/account-preferences-service.ts'
-import { refreshModelGovernance, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
+import { closeModelGovernanceRefresh, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
 import { loadConfig } from './config.ts'
 import { InstanceManager, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from './instances.ts'
 import type { RuntimeSubject, RuntimeTarget } from './instances.ts'
@@ -38,6 +41,8 @@ import { selectLauncher } from './launcher.ts'
 import { PostgresAuditService } from './postgres/audit-service.ts'
 import { PostgresAuthService } from './postgres/auth-service.ts'
 import { PostgresRuntimeCatalog } from './postgres/runtime-catalog.ts'
+import { PostgresRuntimeAssetAdmission } from './runtime-asset-admission.ts'
+import { RuntimeAssets } from './runtime-assets.ts'
 import { PostgresComputerAccess } from './computer-access.ts'
 import { PostgresRuntimeManagement } from './runtime-management.ts'
 import { GatewayRuntimeRouter, LocalRuntimeAdapter } from './runtime-router.ts'
@@ -47,6 +52,7 @@ import { PostgresProgressService } from './postgres/progress-service.ts'
 import { PostgresProgressUsage } from './postgres/progress-usage.ts'
 import {
   createPostgresPool,
+  databaseControlUrl,
   databaseUrlFromFile,
   errorCodeForDiagnostics,
   poolAdmissionSnapshot,
@@ -66,7 +72,7 @@ import {
 } from './organization-model-credentials.ts'
 import { PostgresProjectService } from './postgres/project-service.ts'
 import { StewardQueryService } from './postgres/steward-query.ts'
-import { checkPostgresReadiness, resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
+import { resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { PostgresSshTargetService } from './postgres/ssh-target-service.ts'
 import { PostgresMaintenanceService, type WriteGateVerdict } from './postgres/maintenance-service.ts'
@@ -85,7 +91,11 @@ import { createProxyHandlers } from './proxy.ts'
 import { NodePrincipalDirectory } from './postgres/node-principal-directory.ts'
 import { PostgresAccessMonitor, scopeAccessMonitor } from './access-invalidation.ts'
 import { createPostgresPushService } from './push-notifications.ts'
-import { createRuntimeApiHandler } from './runtime-api.ts'
+import { createRuntimeApiHandler, runtimeBearerToken } from './runtime-api.ts'
+import { isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest } from './runtime-request-path.ts'
+import { isRuntimeShutdownStorageRequest, type RuntimeDrain, type RuntimeDrainReport } from './runtime-shutdown.ts'
+import { GovernanceRebuildAdmission } from './governance-rebuild-admission.ts'
+import { GovernanceRebuildGateway } from './governance-rebuild-gateway.ts'
 import { PrimaryProjectNames } from './primary-project-names.ts'
 import { NodeContentDocuments } from './node-content-documents.ts'
 import { NodeDocumentAuthority } from './node-content-documents-authority.ts'
@@ -128,8 +138,9 @@ import { LocalDocumentBroker } from './documents-local.ts'
 import { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
 import { PostgresDocumentLocations } from './postgres/document-locations.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
-import { createGatewayServer, scopeCookie, type GatewayDeps } from './server.ts'
+import { createGatewayServer, scopeCookie, type GatewayAccessInvalidation, type GatewayDeps } from './server.ts'
 import { ReleaseAssets } from './release-assets.ts'
+import { releaseComboReader } from './release-combos.ts'
 import { GatewayPerformanceObserver } from './performance-observer.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
 import { removeBootstrapAdminPassword, writeBootstrapAdminPassword } from './bootstrap-admin.ts'
@@ -138,16 +149,51 @@ import type { GatewayModelGovernanceService } from './services.ts'
 
 const effectiveEnvironment = await loadManagedNodeEnvironment(process.env)
 /** Consumed nonces of accepted forwarded assertions: nonce → expiresAt. */
-const forwardNonceLedger = new Map<string, number>()
 const cfg = loadConfig(effectiveEnvironment)
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
 const databaseUrl = await databaseUrlFromFile(effectiveEnvironment)
+const controlDatabaseUrl = databaseControlUrl(databaseUrl, effectiveEnvironment.HGW_DATABASE_CONTROL_TUNNEL_PORT)
 const pool = createPostgresPool(databaseUrl, {
   max: cfg.databaseMaxConnections,
   min: cfg.databaseMinConnections,
   maxCheckoutQueue: cfg.databaseMaxCheckoutQueue,
   connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
 })
+const controlPool = createPostgresPool(controlDatabaseUrl, {
+  max: cfg.databaseControlMaxConnections,
+  maxCheckoutQueue: cfg.databaseControlMaxCheckoutQueue,
+  connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
+  application_name: `hgw-control:${cfg.computeNodeName}`,
+})
+const accessListenerPool = createPostgresPool(controlDatabaseUrl, {
+  max: 1, maxCheckoutQueue: 1,
+  connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
+  application_name: `hgw-access:${cfg.computeNodeName}`,
+})
+const gatewayPools = [pool, controlPool, accessListenerPool]
+let poolClosure: Promise<void> | undefined
+function closeGatewayPools(): Promise<void> {
+  return poolClosure ??= (async () => {
+    const outcomes = await Promise.allSettled(gatewayPools.map(source => source.end()))
+    const failures = outcomes.flatMap<unknown>(result => result.status === 'rejected' ? [result.reason] : [])
+    if (failures.length > 0) throw new AggregateError(failures, 'Gateway PostgreSQL pools did not close')
+  })()
+}
+let startupComplete = false
+const startupDatabaseConsumers: Array<() => unknown> = []
+await using startupDatabase = {
+  async [Symbol.asyncDispose]() {
+    if (startupComplete) return
+    for (const close of startupDatabaseConsumers.reverse()) {
+      await Promise.resolve().then(close).catch((error: unknown) => {
+        console.error('[gateway] startup resource cleanup failed', errorCodeForDiagnostics(error))
+      })
+    }
+    await closeGatewayPools().catch((error: unknown) => {
+      console.error('[gateway] startup database cleanup failed', errorCodeForDiagnostics(error))
+    })
+  },
+}
 if (cfg.databaseMinConnections > 0) {
   void Promise.all(Array.from({ length: cfg.databaseMinConnections },
     async () => { (await pool.connect()).release() }))
@@ -173,7 +219,7 @@ const context = await (async () => {
       },
     })
   } catch (error) {
-    await pool.end().catch(() => { /* preserve the startup failure or signal outcome */ })
+    await closeGatewayPools().catch(() => { /* preserve the startup failure or signal outcome */ })
     if (startupAbort.signal.aborted) process.exit(0)
     // Do not rethrow into a supervisor restart loop: the release parks with a
     // degraded health surface so operators get one logged failure plus a
@@ -214,10 +260,13 @@ const context = await (async () => {
   }
 })()
 const maintenance = new PostgresMaintenanceService(context, cfg.nodeStaleMs)
+const controlContext = { ...context, pool: controlPool }
+const controlMaintenance = new PostgresMaintenanceService(controlContext, cfg.nodeStaleMs)
 // Every cached dependency belongs to the data generation observed before loading it.
-const baselineWriteEpoch = await maintenance.currentWriteEpoch()
+const baselineWriteEpoch = await controlMaintenance.currentWriteEpoch()
+const governanceRebuildAdmission = await GovernanceRebuildAdmission.open(context, baselineWriteEpoch)
 async function assertCurrentDataEpoch(): Promise<void> {
-  if (await maintenance.currentWriteEpoch() !== baselineWriteEpoch) {
+  if (await controlMaintenance.currentWriteEpoch() !== baselineWriteEpoch) {
     throw new Error('PostgreSQL write epoch advanced past this process; restart onto the restored snapshot')
   }
 }
@@ -251,6 +300,8 @@ const principalKeys = loadPrincipalKeys(cfg.principalKeyDir, cfg.organizationSlu
 await pool.query('UPDATE harness.compute_nodes SET principal_public_key=$3 WHERE organization_id=$1 AND id=$2',
   [context.organizationId, context.nodeId, principalKeys.publicKeyPem])
 const instanceRepository = new PostgresInstanceRepository(context, cfg.instancePortBase, nodeProjects, nodeFiles, cfg.runtimeTokenCacheMs)
+const authenticateRuntimeControlToken = (token: string) =>
+  instanceRepository.authenticateRuntimeControlToken(token, controlPool, baselineWriteEpoch)
 const conversations = new PostgresConversationStore(pool, contentVolume)
 // Launcher is local child-process (dev) unless HGW_LAUNCHER=systemd (Linux prod);
 // the systemd options factory is only evaluated in the systemd case.
@@ -285,9 +336,13 @@ const launcher = selectLauncher(cfg, () => ({
 const resourceBudget = new NodeResourceBudget(pool, context.organizationId, context.nodeId, cfg.resourceBudget)
 await resourceBudget.configure()
 const gatewayModelBudget = await GatewayModelBudget.open(resourceBudget, join(nodeControlPaths(cfg.stateRoot).gatewayModels, context.nodeId))
-const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs)
+const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs, accessListenerPool,
+  Math.max(cfg.accessInvalidationPollMs, cfg.accessInvalidationHealthyPollMs))
+startupDatabaseConsumers.push(() => accessMonitor.close())
 const localAccessMonitor = scopeAccessMonitor(accessMonitor, context.nodeId as RuntimeNodeId)
 const principalDirectory = new NodePrincipalDirectory(context, cfg.runtimeTokenCacheMs)
+const forwardAuthority = createGatewayForwardAuthority(principalDirectory,
+  { audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug }, cfg.principalAssertionTtlMs)
 localAccessMonitor.subscribe(() => {
   instanceRepository.invalidateRuntimeTokenCache()
 })
@@ -306,7 +361,9 @@ const progress = new PostgresProgressService(context, { nodeContent: contentVolu
 }, cfg.progress)
 const instances = new InstanceManager(instanceRepository, cfg, launcher, {
   principalPublicKey: principalKeys.publicKeyPem,
+  nodeId: context.nodeId as RuntimeNodeId,
 }, resourceBudget, gatewayModelBudget)
+instances.prepareRecovery = async () => { throw new RuntimeStartBlockedError('unavailable') }
 const desktops = new DesktopCoordinator(new PostgresDesktopCoordinatorRepository(context), instances, cfg.desktop, audit)
 await desktops.initialize()
 const archives = new NodeArchiveRouter(context, cfg.archiveRetentionDays,contentVolume)
@@ -323,13 +380,15 @@ const MAINTENANCE_GATE_CACHE_MS = 300
 let stoppingWriters = false
 let gateCache: { at: number; verdict: WriteGateVerdict } | undefined
 let observedMaintenanceEpoch = 0n
-const refreshMaintenanceGate = async (): Promise<WriteGateVerdict> => {
+const readWriteGate = async (authority: PostgresMaintenanceService): Promise<WriteGateVerdict> => {
   if (stoppingWriters) return 'maintenance'
-  const gate = await maintenance.writeGate(baselineWriteEpoch)
+  const gate = await authority.writeGate(baselineWriteEpoch)
   observedMaintenanceEpoch = gate.maintenanceEpoch
   gateCache = { at: Date.now(), verdict: gate.verdict }
   return gate.verdict
 }
+const refreshMaintenanceGate = (): Promise<WriteGateVerdict> => readWriteGate(maintenance)
+const refreshNodeControlGate = (): Promise<WriteGateVerdict> => readWriteGate(controlMaintenance)
 const maintenanceGate = async (): Promise<WriteGateVerdict> => {
   if (stoppingWriters) return 'maintenance'
   if (gateCache !== undefined && Date.now() - gateCache.at < MAINTENANCE_GATE_CACHE_MS) return gateCache.verdict
@@ -382,8 +441,8 @@ const heartbeatTimer = setInterval(() => {
   if (heartbeatInFlight !== undefined) return
   heartbeatInFlight = (async () => {
     const previous = heartbeatVerdict
-    const verdict = await refreshMaintenanceGate()
-    await maintenance.heartbeat(observedMaintenanceEpoch, writersInFlight)
+    const verdict = await refreshNodeControlGate()
+    if (verdict !== 'stale-epoch') await controlMaintenance.heartbeat(observedMaintenanceEpoch, writersInFlight, baselineWriteEpoch)
     heartbeatVerdict = verdict
     if (previous !== 'open' && verdict === 'open') onWritesReopened()
   })().catch((error: unknown) => {
@@ -391,6 +450,10 @@ const heartbeatTimer = setInterval(() => {
   }).finally(() => { heartbeatInFlight = undefined })
 }, cfg.nodeHeartbeatMs)
 heartbeatTimer.unref()
+startupDatabaseConsumers.push(() => {
+  clearInterval(heartbeatTimer)
+  return heartbeatInFlight
+})
 const webhookDeliveries = new PostgresWebhookDeliveryService(context)
 const webhookEndpoints = new PostgresWebhookEndpointService(context,
   new WebhookSecretCipher(loadOrganizationModelCredentialKey(cfg.webhookSecretKeyFile)))
@@ -407,6 +470,7 @@ const tunnelAccess = new GatewayTunnelAccess({
   envBinaryPath: cfg.cloudflaredBin,
 })
 const pluginState = new PostgresPluginState(context, contentVolume, nodeFiles)
+const pluginInventory = new PostgresPluginInventory(context, contentVolume)
 // Statements run on their own small pool: a session-state escape (deny-listed
 // functions, advisory locks, listeners) can then never reach a connection the
 // rest of the Gateway shares; journals still write through the main pool.
@@ -416,19 +480,21 @@ const stewardStatementPool = createPostgresPool(databaseUrl, {
   connectionTimeoutMillis: cfg.databaseConnectionTimeoutMs,
   application_name: 'dsh-steward-query',
 })
+gatewayPools.push(stewardStatementPool)
 const stewardQuery = new StewardQueryService(context, cfg.steward.enabled, stewardStatementPool)
 const performanceObserver = new GatewayPerformanceObserver({
   enabled: cfg.performanceEnabled,
   eventLoopResolutionMs: cfg.performanceEventLoopResolutionMs,
 })
 const runtimeCatalog = new PostgresRuntimeCatalog(context, cfg.runtimeCatalog, context.nodeId as import('./runtime-catalog.ts').RuntimeNodeId)
-const nodeAccess = new PostgresNodeAccessService(context, cfg.nodeAccess, cfg.runtimeCatalog)
+const nodeAccess = new PostgresNodeAccessService(context, cfg.nodeAccess, cfg.runtimeCatalog, controlPool, baselineWriteEpoch)
 const nodeChannels = new GatewayNodeChannels(nodeAccess, cfg.nodeChannel)
-const nodeServices = new GatewayNodeServices(nodeAccess, nodeChannels, cfg.nodeService, cfg.releaseId ?? null)
+const nodeServices = new GatewayNodeServices(nodeAccess, nodeChannels, cfg.nodeService)
 const computerAccess = new PostgresComputerAccess(context, cfg.runtimeCatalog, context.nodeId as import('./runtime-catalog.ts').RuntimeNodeId)
 const topology = new PostgresDeploymentTopology(context, { legacyForwarding: cfg.nodeService.forwarding,
   refreshAfterMs: cfg.deploymentContextRefreshMs, pageSize: cfg.runtimeCatalog.pageSize, maxBytes: cfg.runtimeCatalog.maxBytes,
-  allowedOrigins: cfg.publicOrigins })
+  allowedOrigins: cfg.publicOrigins, monitor: accessMonitor })
+const runtimeAdmission = new PostgresRuntimeAssetAdmission(context, baselineWriteEpoch, cfg.nodeContent === undefined ? undefined : nodeProjects)
 const nodeServiceProxy = new GatewayNodeServiceProxy({
   assertNode: id => topology.assertNode(id),
   localNodeId: context.nodeId as RuntimeNodeId,
@@ -438,18 +504,26 @@ const nodeServiceProxy = new GatewayNodeServiceProxy({
   resetScopeCookie: () => scopeCookie('personal', cfg),
   authorizeAdministratorNode: (actor, id) => nodeAccess.authorizeAdministratorNode(actor, id),
   authorizeAccountNode: (actor, id) => computerAccess.authorize(actor.id, id),
+  ...(cfg.nodeService.preparedReadDelegation === true ? {
+    approvePersonalRead: (request: Parameters<typeof runtimeAdmission.approvePersonalRead>[0]) =>
+      runtimeAdmission.approvePersonalRead(request, principalKeys.publicKeyPem),
+  } : {}),
 }, nodeServices, cfg.upstreamTimeoutMs, cfg.nodeService, accessMonitor,
-async (target, user, request) => {
+async (target, user, request, personalRead) => {
   // Attach the placement this Gateway already authorized so the destination
   // can adopt it as a checked placement; scope and runtime storage are
   // node-local data the destination resolves itself.
   const environment = target.environment
+  const accessRevision = accessMonitor.currentRevision()
   return principalKeys.signer.issueForward({
     issuerNode: context.nodeId, audienceNode: target.nodeId, user,
     selection: { runtimeId: target.runtimeId ?? null, target: target.resolvedTarget ?? null },
     ...(environment === undefined || target.resolvedTarget === undefined
-      ? {} : { context: { environment: { id: environment.id, nodeId: environment.node.id, nodeName: environment.node.name } } }),
+      ? {} : { context: { environment: { id: environment.id, nodeId: environment.node.id, nodeName: environment.node.name },
+        ...(personalRead === undefined ? {} : { personalRead }),
+      } }),
     request,
+    ...(accessRevision === undefined ? {} : { accessRevision: String(accessRevision) }),
   })
 })
 const runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter({ collaboration, instances }), {
@@ -458,8 +532,18 @@ const runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter({ collabo
 const nodeSqlite=new NodePrivateSqliteHost(cfg.stateRoot,cfg.runtimeRequestTimeoutMs)
 const personalIndex = new PersonalNodeIndex(cfg.stateRoot,nodeSqlite)
 const workspaceCatalog = new PostgresWorkspaceCatalog(context, context.nodeId as RuntimeNodeId, personalIndex, contentVolume)
+const runtimeManagement = new PostgresRuntimeManagement(context, cfg)
+const poolUsage = (source: typeof pool) => ({
+  total: source.totalCount, idle: source.idleCount, waiting: source.waitingCount,
+  maximum: source.options.max ?? null, admission: poolAdmissionSnapshot(source),
+})
 const deps: GatewayDeps = {
   revalidateOnComputer:token=>auth.validateOnComputer(token),
+  qualifyStreamOnComputer: token => auth.qualifyForStreamOnComputer(token, pool),
+  streamPrincipalAuthority: {
+    qualifyForStream: token => auth.qualifyForStreamOnComputer(token, controlPool),
+    projectForUser: (projectId, userId) => collaboration.projectForUser(projectId, userId, controlPool),
+  },
   projectMetadata: nodeProjects,
   projectNames: new PrimaryProjectNames(context, () => topology.read(), cfg.projectNameKeyFile, cfg.upstreamTimeoutMs),
   personalDirectory: workspaceCatalog,
@@ -469,43 +553,17 @@ const deps: GatewayDeps = {
   documentLocations,
   documentOverview: documentCatalog,
   computerAccess,
-  runtimeManagement: new PostgresRuntimeManagement(context, cfg),
+  runtimeManagement,
   runtimeCatalog,
   nodeChannels,
   nodeServices,
   nodeServiceProxy,
   nodeServiceIdentity: {
     nodeId: context.nodeId as RuntimeNodeId, organizationId: context.organizationId,
-    authorize: (token, input) => nodeAccess.authorizeChannel(token, input),
+    authorize: (token, input) => cfg.nodeService.preparedReadDelegation
+      ? nodeAccess.authorizeServiceIdentity(token, input) : nodeAccess.authorizeChannel(token, input),
   },
-  forwardedPrincipal: async assertion => {
-    // Any failure here — malformed assertion, directory outage, bad issuer —
-    // resolves to null so the request falls back to ordinary session
-    // validation; a broken forward path must not become a 500.
-    try {
-      const issuerNode = forwardIssuerOf(assertion)
-      const issuerKey = issuerNode === null ? null : await principalDirectory.issuerKey(issuerNode)
-      const claims = issuerKey === null ? null
-        : verifyGatewayForward(assertion, issuerKey, {
-          audienceNode: context.nodeId as RuntimeNodeId, organization: cfg.organizationSlug })
-      if (claims === null) return null
-      // A captured assertion stays replayable within its TTL unless the nonce
-      // is consumed; the ledger is bounded by assertion expiry and each issued
-      // assertion mints a fresh nonce, so a duplicate is replay evidence.
-      const now = Date.now()
-      for (const [nonce, expiry] of forwardNonceLedger) if (expiry <= now) forwardNonceLedger.delete(nonce)
-      if (forwardNonceLedger.has(claims.nonce)) return null
-      // Clamp retained expiry to the issued lifetime and bound the map: a
-      // hostile issuer could mint far-future expiresAt claims and grow the
-      // ledger unboundedly. Clearing under pressure only widens the replay
-      // window for assertions still inside their TTL.
-      if (forwardNonceLedger.size >= 4096) forwardNonceLedger.clear()
-      forwardNonceLedger.set(claims.nonce, Math.min(claims.expiresAt, now + cfg.principalAssertionTtlMs))
-      return claims
-    } catch {
-      return null
-    }
-  },
+  ...forwardAuthority,
   runtimeRouter,
   performance: performanceObserver,
   cfg,
@@ -529,8 +587,9 @@ const deps: GatewayDeps = {
   stewardAccess: new StewardAccess(context),
   memoryAccess: new MemoryAccess(context),
   sshTargets: new PostgresSshTargetService(context),
-  pluginManagement: new GatewayPluginManagement({ users, projects, instances, cfg, pluginState }, principalKeys.signer, context.nodeId),
+  pluginManagement: new GatewayPluginManagement({ users, projects, instances, cfg, pluginState, pluginInventory }, principalKeys.signer, context.nodeId),
   pluginState,
+  pluginInventory,
   terminalManagement: new GatewayTerminalManagement({ users, projects, instances, cfg }, principalKeys.signer, context.nodeId),
   webhookDeliveries,
   webhookEndpoints,
@@ -541,31 +600,30 @@ const deps: GatewayDeps = {
   maintenance,
   nodeConfiguration,
   nodeAccess,
+  maintainNodeConnection: (operation, token, input) => {
+    if (stoppingWriters) throw new NodeAccessError(503, 'node-access/unavailable')
+    return nodeAccess.maintainConnection(operation, token, input, baselineWriteEpoch)
+  },
   backups,
   remoteDesktop: new RemoteDesktopService(cfg.remoteDesktopDir, remoteDesktopAdministration(context)),
   backupWork: new PostgresDeploymentBackups(context, cfg, databaseUrl, deploymentCommands, effectiveEnvironment),
   migrationPlan: () => migrationPlan(pool, cfg.deployMigrationsDir),
   maintenanceGate,
+  leaseControlGate: refreshNodeControlGate,
+  governanceRecovery: governanceRebuildAdmission,
   writerSpan,
   releaseAssets: ReleaseAssets.forConfig(cfg),
   databasePerformance: () => ({
-    total: pool.totalCount,
-    idle: pool.idleCount,
-    waiting: pool.waitingCount,
-    maximum: pool.options.max ?? null,
-    admission: poolAdmissionSnapshot(pool),
+    ...poolUsage(pool), control: poolUsage(controlPool), accessListener: poolUsage(accessListenerPool),
   }),
   readiness: async (signal) => {
-    await checkPostgresReadiness(context, signal)
-    await accessMonitor.synchronize()
     signal?.throwIfAborted()
-    await assertCurrentDataEpoch()
+    await accessMonitor.checkControlReadiness()
+    await controlMaintenance.checkGatewayReadiness(baselineWriteEpoch, signal)
   },
 }
 
 await assertCurrentDataEpoch()
-const reopenModelGovernance = (): void => { scheduleModelGovernanceRefresh(deps) }
-onWritesReopened = reopenModelGovernance
 try {
   await admitWriter(async () => {
     if (await deps.users.count() === 0) {
@@ -584,17 +642,19 @@ try {
       console.log('[gateway] 首次登录后会强制修改密码。')
     }
   })
-  // Reconcile every projection on Gateway startup so a surviving runtime and a
-  // never-started account receive the same current organization default. The
-  // operation is idempotent and does not alter authorization rows.
-  await refreshModelGovernance(deps)
 } catch (error) {
-  // A maintenance restart serves the control UI without creating accounts,
-  // credentials or policy files. Projections resume after maintenance ends.
+  // A maintenance restart serves the control UI without creating accounts.
   if (!(error instanceof RuntimeStartBlockedError) || error.reason !== 'maintenance') throw error
 }
 
-const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
+const personalExecutionStopGate = (): WriteGateVerdict => stoppingWriters ? 'maintenance' : 'open'
+const proxyHandlers = createProxyHandlers(deps, principalKeys.signer, runtimeAdmission, personalExecutionStopGate)
+const runtimeAssets = new RuntimeAssets({
+  cfg, localNodeId: context.nodeId as RuntimeNodeId, admission: runtimeAdmission,
+  instances, monitor: accessMonitor, signer: principalKeys.signer,
+  releaseCombo: cfg.runtimeAssetCacheMaxBytes === 0 ? undefined : releaseComboReader(cfg.releaseRoot),
+  forward: (req, res, actor, placement, generation, delivery) => nodeServiceProxy.asset(req, res, actor, placement, generation, delivery),
+})
 await accessMonitor.synchronize()
 // Browser document operations run against each scope's filesystem root so a
 // panel read never starts a runtime; chat/agent work still launches one.
@@ -652,23 +712,44 @@ const peerFileSource=effectiveEnvironment.HGW_PEER_PROJECT_SNAPSHOTS_FILE
 const peerFiles=peerFileSource?new NativePeerProjectSnapshots(peerFileSource,cfg.runtimeRequestTimeoutMs,context,contentVolume,nodeFiles,
   input=>localDocuments.snapshotProjectDocumentRoots({organizationId:context.organizationId,nodeId:context.nodeId,projectPublicId:input.projectId,
     rootId:input.rootId,origin:input.origin,projectPath:input.workspace,cursor:input.cursor})):undefined
+const governanceRebuild = governanceRebuildAdmission === undefined ? undefined : new GovernanceRebuildGateway({
+  context, config: cfg, limits: cfg.recoveryInspection, pageSize: cfg.recoveryInspection.pageSize, volume: contentVolume,
+  assertStopped: target => instances.assertRuntimeQuiescent(target),
+  prepareProfile: target => instances.prepareRecoveryProfile(target),
+})
+if (governanceRebuild !== undefined) {
+  instanceRepository.resolveLocalPaths = target => governanceRebuild.adapter.localPaths(target)
+  users.resolveLocalHomes = ids => governanceRebuild.data.accountHomes(ids)
+  runtimeManagement.resolveLocalHomes = ids => governanceRebuild.data.accountHomes(ids)
+}
 const peerBackups = await createPeerBackupGateway({ context, stateRoot: cfg.stateRoot, invalidate: id => peerBackupRelay.invalidate(id), configFile: effectiveEnvironment.HGW_PEER_BACKUP_CONFIG_FILE,
-  ...(effectiveEnvironment.HGW_PEER_PERSONAL_SNAPSHOTS_FILE ? { personalFiles:new PeerPersonalFiles(context.pool,cfg.usersRoot,
-    effectiveEnvironment.HGW_PEER_PERSONAL_SNAPSHOTS_FILE,cfg.runtimeRequestTimeoutMs,
+  config: cfg, prepareProfile: target => instances.prepareRecoveryProfile(target),
+  ...(effectiveEnvironment.HGW_PEER_PERSONAL_SNAPSHOTS_FILE ? { personalFiles:new PeerPersonalFiles(context.pool,
+    effectiveEnvironment.HGW_PEER_PERSONAL_SNAPSHOTS_FILE,cfg.runtimeRequestTimeoutMs,target=>instances.storageOf(target),
     (owner,root,cursor,rows)=>localDocuments.snapshotPersonalDocumentRoots(owner,root,cursor,rows)) } : {}),
   nodeContent: contentVolume, files:peerFiles, forward: peerBackupRelay.forward,
-  recovery:recoveryFileGate?{config:cfg,volume:contentVolume,instances,fileGate:recoveryFileGate}:undefined,
+  recovery:recoveryFileGate?{config:cfg,volume:contentVolume,instances,fileGate:recoveryFileGate,
+    prepareProfile: target => instances.prepareRecoveryProfile(target)}:undefined,
   reservedRoots: [cfg.stateRoot, cfg.usersRoot, cfg.projectsRoot, cfg.userProjectsRoot, cfg.projectRuntimesRoot, cfg.backupDir, ...cfg.projectPathRoots] })
+instances.prepareRecovery = async runtime => await governanceRebuild?.execution.beforeStart(runtime) ?? peerBackups.beforeRuntimeStart(runtime)
+const invalidateAccess: GatewayAccessInvalidation = (subject) => {
+  proxyHandlers.invalidateAccess(subject)
+  nodeServiceProxy.invalidate(subject)
+}
 const server = createGatewayServer(deps, {
+  governanceRecovery: governanceRebuild,
   peerBackups,
   workbenchRows: workbenchRows(context, workspaceCatalog, collaboration, cfg.runtimeCatalog, contentVolume),
   nodeDrafts: draftStore,
   browserDocuments: createBrowserDocumentHandler({ locations: documentLocations, organizationId: context.organizationId,
     overview: documentCatalog, overviewConcurrency: cfg.nodeService.maxConnections, overviewDeadlineMs: cfg.documentOverviewDeadlineMs,
+    overviewTimeoutMs: cfg.upstreamTimeoutMs, overviewAccessMonitor: accessMonitor,
     origin: cfg.publicOrigins[0]!, responseLimit: cfg.upstreamResponseLimitBytes,
     transfer: { instances: deps.instances, users, projects, collaboration, principals: principalKeys.signer, audit, catalog: documentCatalog,
       maxResponseBytes: cfg.upstreamResponseLimitBytes, upstreamTimeoutMs: cfg.upstreamTimeoutMs } }),
   ...proxyHandlers,
+  invalidateAccess,
+  runtimeAssets,
   workbenchCatalog: createGatewayWorkbenchCatalogHandler({
     workspaceCatalog,
     instances,
@@ -677,20 +758,40 @@ const server = createGatewayServer(deps, {
     maxResponseBytes: cfg.upstreamResponseLimitBytes,
     upstreamTimeoutMs: cfg.upstreamTimeoutMs,
   }),
-  // Authenticate loopback runtime calls before the Gateway starts buffering
-  // their body. The runtime handler repeats the check at dispatch time; this
-  // early probe is deliberately narrow and exists to turn unauthenticated
-  // large-body requests into a cheap 401 instead of a 64 MiB allocation.
   runtimeAuthorize: async (req) => {
-    const value = req.headers.authorization
-    if (typeof value !== 'string' || !value.startsWith('Bearer ')) return false
-    const token = value.slice('Bearer '.length)
-    if (token === '') return false
+    const token = runtimeBearerToken(req)
+    if (token === undefined) return false
+    const pathname = new URL(req.url ?? '/', 'http://local').pathname
+    if (isRuntimeStreamControlRequest(pathname, req.method)) {
+      return await authenticateRuntimeControlToken(token) ?? false
+    }
+    if (isRuntimeResourceCompletionRequest(pathname, req.method)) {
+      return await instanceRepository.authenticateRuntimeCleanupToken(token) ?? false
+    }
     try {
-      return await instanceRepository.authenticateRuntimeToken(token) !== null
+      const subject = await instanceRepository.authenticateRuntimeToken(token)
+      if (subject !== null) return subject
+      return isRuntimeShutdownStorageRequest(pathname, req.method)
+        && await instanceRepository.authenticateRuntimeShutdownToken(token) !== null ? 'shutdown-storage' : false
     } catch {
       return false
     }
+  },
+  runtimePersonalExecutionStopGate: personalExecutionStopGate,
+  runtimePersonalExecutionCandidate: req => {
+    const token = runtimeBearerToken(req)
+    return token === undefined ? null : instanceRepository.personalExecutionCandidate(token)
+  },
+  runtimeModelCredentialCandidate: req => {
+    const token = runtimeBearerToken(req)
+    return token === undefined ? null : instanceRepository.modelCredentialCandidate(token)
+  },
+  runtimeShutdownStorageWriteGate: async () => (await maintenance.writeGate(baselineWriteEpoch)).verdict,
+  runtimeResourceCompletionWriteGate: async () => {
+    const verdict = await maintenanceGate()
+    if (verdict !== 'maintenance') return verdict
+    const gate = await controlMaintenance.writeGate(baselineWriteEpoch)
+    return gate.verdict === 'maintenance' ? 'open' : gate.verdict
   },
   documentTransferList: createGatewayDocumentTransferListHandler({
     instances: deps.instances,
@@ -723,12 +824,16 @@ const server = createGatewayServer(deps, {
     upstreamTimeoutMs: cfg.upstreamTimeoutMs,
     local: localDocuments,
   }),
-  admin: createAdminApiHandler(deps, documentAdmin, proxyHandlers.invalidateAccess),
+  admin: createAdminApiHandler(deps, documentAdmin, invalidateAccess),
   runtime: createRuntimeApiHandler({
     executionIdentity,
+    executionWriteEpoch: baselineWriteEpoch,
+    resourceStatusWaitMs: cfg.runtimeRequestTimeoutMs >= 2 * cfg.resourceBudget.sampleMs ? cfg.resourceBudget.sampleMs : 0,
+    performanceEnabled: cfg.performanceEnabled,
     nodeContent: contentVolume,
     workspaceCatalog,
     renewStreamPrincipals: proxyHandlers.streamPrincipals?.renew.bind(proxyHandlers.streamPrincipals),
+    authenticateRuntimeControlToken,
     documentStore: invocation => localDocuments.serveRuntimeStore(invocation),
     accessMonitor: localAccessMonitor,
     executionWatchHeartbeatMs: cfg.executionWatchHeartbeatMs,
@@ -742,6 +847,13 @@ const server = createGatewayServer(deps, {
     principals: principalKeys.signer,
     governance,
     pluginState: deps.pluginState,
+    pluginInventory: deps.pluginInventory,
+    recoveryExecution: { verifySubject: async subject => {
+      const runtimeId = subject.target.runtimeId
+      if (governanceRebuild !== undefined && runtimeId !== undefined && await governanceRebuild.adapter.selectHold(runtimeId) !== undefined) {
+        await governanceRebuild.execution.verifySubject(subject)
+      } else await peerBackups.verifyRuntimeSubject(subject)
+    } },
     stewardQuery,
     push,
     documentTransfer: createDocumentTransferHandler({
@@ -822,28 +934,39 @@ const server = createGatewayServer(deps, {
     sshTargets: deps.sshTargets,
   }),
 })
-// Every started generation records a launch stamp covering its code closure
-// and launch inputs; survivors whose stamp this build no longer mints are
-// retired before serving, so same-content restarts re-attach in place and
-// upgrades never serve stale code. A failed retirement leaves the row fenced
-// — attach checks refuse it per-request — and the next boot retries.
+// Retain accepted work across release changes; incompatible survivors refuse
+// new forwarding until an administrator completes a safe restart.
 {
-  const { retired, kept } = await instances.retireIncompatibleSurvivors()
-  if (retired > 0) console.log(`[gateway] retired ${retired} incompatible Runtime survivor(s); ${kept} kept`)
+  const { compatible, pending } = await instances.inspectUpgradeSurvivors()
+  if (pending > 0) console.warn(`[gateway] ${pending} Runtime survivor(s) await a safe upgrade; ${compatible} compatible survivor(s) retained`)
 }
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare
 // tunnel / Nginx) that connects to 127.0.0.1, never directly over the LAN.
-server.listen(cfg.port, '127.0.0.1', () => {
-  console.log(`[gateway] listening on http://127.0.0.1:${cfg.port}`)
-})
-
 const intake = createUsageIntakeServer(governance, audit, {
   open: async () => (await maintenanceGate()) === 'open',
   track: trackWriter,
 }, performanceObserver)
-intake.listen(cfg.intakePort, '127.0.0.1', () => {
-  console.log(`[gateway] usage intake listening on http://127.0.0.1:${cfg.intakePort}`)
+function bindGatewayListener(listener: Server, port: number): Promise<unknown> {
+  startupDatabaseConsumers.push(async () => {
+    if (!listener.listening) return
+    listener.closeAllConnections()
+    await new Promise<void>((resolve, reject) => listener.close(error => error ? reject(error) : resolve()))
+  })
+  const bound = once(listener, 'listening')
+  listener.listen(port, '127.0.0.1')
+  return bound
+}
+const bindingListeners = [bindGatewayListener(server, cfg.port), bindGatewayListener(intake, cfg.intakePort)]
+startupDatabaseConsumers.push(async () => {
+  proxyHandlers.close()
+  await nodeServiceProxy.close()
+  await Promise.all([nodeChannels.close(), nodeServices.close()])
 })
+const boundListeners = await Promise.allSettled(bindingListeners)
+const failedListener = boundListeners.find(result => result.status === 'rejected')
+if (failedListener?.status === 'rejected') throw failedListener.reason
+console.log(`[gateway] listening on http://127.0.0.1:${cfg.port}`)
+console.log(`[gateway] usage intake listening on http://127.0.0.1:${cfg.intakePort}`)
 
 // The tunnel must re-launch after a restart while its desired flag stays
 // 'running'; resume runs after the listener is up so the target port is serving.
@@ -882,12 +1005,27 @@ const fencedTask = (label: string, operation: () => Promise<void>): SingleFlight
     await operation()
   }))
 
+const governanceRebuildLifetime = new AbortController()
+const governanceRebuildTask = governanceRebuild === undefined ? undefined : singleFlightTask('governance recovery inspection',
+  () => trackWriter(async () => {
+    governanceRebuildLifetime.signal.throwIfAborted()
+    const recovery = await governanceRebuildAdmission!.admission()
+    if (recovery.state === 'released' && await maintenanceGate() !== 'open') return
+    await assertCurrentDataEpoch()
+    await governanceRebuild.advance(governanceRebuildLifetime.signal)
+  }))
+const governanceRebuildTimer = governanceRebuildTask === undefined ? undefined
+  : setInterval(governanceRebuildTask.run, cfg.deploymentContextRefreshMs)
+governanceRebuildTimer?.unref()
+governanceRebuildTask?.run()
+
+const canSampleResourcePressure = () => !stoppingWriters && (heartbeatVerdict === undefined || heartbeatVerdict === 'open')
 const resourcePressure = new NodeResourcePressure(cfg.resourceBudget,
   sample => trackWriter(async () => {
-    if (await maintenanceGate() === 'open') await resourceBudget.observe(sample)
+    if (canSampleResourcePressure()) await resourceBudget.observe(sample, baselineWriteEpoch)
   }),
   error => { console.error('[gateway] resource pressure sample failed:', error) },
-  () => heartbeatVerdict === undefined || heartbeatVerdict === 'open')
+  canSampleResourcePressure)
 resourcePressure.start()
 
 /**
@@ -901,6 +1039,9 @@ resourcePressure.start()
  */
 const stewardPreparation = new AbortController()
 const ensureStewardSpace = async (): Promise<void> => {
+  // Reconstructed governance cannot attest copied resident configuration;
+  // administrators must bind and review the existing Runtime before execution.
+  if (governanceRebuildAdmission !== undefined) return
   if (!cfg.steward.enabled || projects.ensureSteward === undefined) return
   await prepareStewardWorktree(cfg.steward, stewardPreparation.signal)
   stewardPreparation.signal.throwIfAborted()
@@ -909,9 +1050,10 @@ const ensureStewardSpace = async (): Promise<void> => {
   await instances.ensureRunning({ kind: 'project', id: steward.id, name: steward.name, path: steward.path, steward: true }, 'explicit')
 }
 const stewardEnsure = fencedTask('steward space', ensureStewardSpace)
-// Both reopen effects must run: assigning a bare closure would discard the
-// model-governance refresh registered earlier.
-onWritesReopened = () => { reopenModelGovernance(); stewardEnsure.run() }
+onWritesReopened = () => {
+  if (startupComplete && server.listening) scheduleModelGovernanceRefresh(deps)
+  stewardEnsure.run()
+}
 stewardEnsure.run()
 
 const reaperTask = fencedTask('idle reaper', async () => {
@@ -975,11 +1117,31 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   stoppingWriters = true
   instances.beginShutdown()
   stewardPreparation.abort(new Error('Gateway is stopping steward workspace preparation'))
+  governanceRebuildLifetime.abort(new Error('Gateway is stopping governance recovery inspection'))
+  clearInterval(governanceRebuildTimer)
   clearInterval(heartbeatTimer)
-  const forced = setTimeout(() => {
-    console.error(`[gateway] forced shutdown after ${String(SHUTDOWN_TIMEOUT_MS)}ms (${signal})`)
-    process.exit(1)
-  }, SHUTDOWN_TIMEOUT_MS)
+  let drain: RuntimeDrain | undefined
+  let drainReportWrite: Promise<void> | undefined
+  let deadlineExpired = false
+  const reportRuntimeDrain = (report: RuntimeDrainReport): Promise<void> => drainReportWrite ??= new Promise((resolve, reject) => {
+    process.stdout.write(`[gateway] Runtime drain ${JSON.stringify(report)}\n`, error => {
+      if (error) reject(error)
+      else resolve()
+    })
+  })
+  const armDeadline = (timeoutMs: number): ReturnType<typeof setTimeout> => setTimeout(() => {
+    deadlineExpired = true
+    console.error(`[gateway] forced shutdown after ${String(timeoutMs)}ms (${signal})`)
+    if (!cfg.drainRuntimesOnShutdown) process.exit(1)
+    const pending = drainReportWrite ?? reportRuntimeDrain(drain?.expire()
+      ?? { inventory: 'pending', deadlineExceeded: true, succeeded: false, runtimes: [] })
+    // The drain deadline fences work immediately. Leave the report a bounded
+    // interval to flush when stdout is a pipe.
+    const reportDeadline = setTimeout(() => { process.exit(1) }, SHUTDOWN_TIMEOUT_MS)
+    const exit = () => { clearTimeout(reportDeadline); process.exit(1) }
+    void pending.then(exit, exit)
+  }, timeoutMs)
+  let forced = armDeadline(SHUTDOWN_TIMEOUT_MS)
   clearInterval(reaper)
   clearInterval(archiveRetentionSweep)
   clearInterval(documentRetentionSweep)
@@ -992,12 +1154,12 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
       if (result.status === 'rejected') failures.push(result.reason)
     }
   }
-  await settle([() => peerBackups.close()])
+  await settle([() => closeModelGovernanceRefresh(deps), () => governanceRebuildTask?.wait(), () => peerBackups.close()])
   await settle([
     () => peerBackupRelay.close(),
+    () => runtimeAssets.close(),
     () => nodeServiceProxy?.close(),
-    () => progress.close(), () => gatewayModelBudget.close(), () => resourcePressure.dispose(), () => tunnelAccess.shutdown(), () => nodeChannels.close(),
-    () => nodeServices.close(),
+    () => progress.close(), () => gatewayModelBudget.close(), () => resourcePressure.dispose(), () => tunnelAccess.shutdown(),
   ])
   await settle([
     () => reaperTask.wait(),
@@ -1007,18 +1169,40 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
     () => progressSweepTask.wait(),
   ])
   await settle([() => proxyHandlers.close()])
-  await settle([() => localDocuments.dispose()])
+  await settle([async () => {
+    if (deadlineExpired) return
+    if (!cfg.drainRuntimesOnShutdown) {
+      await instances.stopAll(true)
+      return
+    }
+    const operation = instances.drainForShutdown()
+    drain = operation
+    clearTimeout(forced)
+    forced = armDeadline(cfg.runtimeDrainTimeoutMs)
+    try {
+      const report = await operation.completion
+      await reportRuntimeDrain(report)
+      if (!report.succeeded) throw new Error('Runtime drain did not confirm every Session checkpoint and process stop')
+    } finally {
+      clearTimeout(forced)
+      forced = armDeadline(SHUTDOWN_TIMEOUT_MS)
+    }
+  }])
+  await settle([() => nodeChannels.close(), () => nodeServices.close()])
+  await settle([() => localDocuments.dispose(), () => topology.dispose()])
   await settle([() => accessMonitor.close()])
   await settle([() => closeListeningServer(server), () => closeListeningServer(intake)])
   await settle([() => waitForWriters()])
   await settle([() => localDrafts.close(), () => personalIndex.close()])
   await settle([() => heartbeatInFlight])
-  await settle([() => deps.instances.stopAll(!cfg.drainRuntimesOnShutdown)])
-  await settle([() => pool.end(), () => contentVolume.close()])
+  await settle([() => closeGatewayPools(), () => contentVolume.close()])
   await settle([() => performanceObserver.dispose()])
   clearTimeout(forced)
   if (failures.length > 0) console.error('[gateway] shutdown failed:', new AggregateError(failures, 'Gateway shutdown failed'))
-  process.exit(failures.length > 0 ? 1 : 0)
+  process.exit(failures.length > 0 || deadlineExpired ? 1 : 0)
 }
 process.once('SIGINT', () => { void shutdown('SIGINT') })
 process.once('SIGTERM', () => { void shutdown('SIGTERM') })
+startupComplete = true
+startupDatabaseConsumers.length = 0
+scheduleModelGovernanceRefresh(deps)

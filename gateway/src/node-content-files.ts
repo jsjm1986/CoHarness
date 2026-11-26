@@ -189,8 +189,12 @@ export class NodeProjectFiles {
       domain,records:data.roots.length,digest:createHash('sha256').update(JSON.stringify({domain,...data,configuration:config.sha})).digest()})
   }
 
-  /** Check one prospective composition in the node transaction already holding the project's writer fence. */
-  async verifyWith(local:PoolClient,binding:NodeContentBinding,state:PluginDesiredState|null):Promise<void>{
+  /** Check the selected composition in the transaction holding the project's writer fence.
+   * @param local - verified project content transaction.
+   * @param binding - current project allocation.
+   * @param state - prospective composition, or omission to verify the saved state.
+   */
+  async verifyWith(local:PoolClient,binding:NodeContentBinding,state?:PluginDesiredState|null):Promise<void>{
     const data=await this.inspect(this.context.pool,local,binding,state)
     await this.anchors(local,binding,data.roots,'pin')
   }

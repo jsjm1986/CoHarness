@@ -46,6 +46,7 @@ import { assertPreparedOperationInput, createPreparedOperation } from './operati
 import { assertModelPolicy, authorizeModelPolicy, captureModelPolicy, type CapturedModelPolicy } from './model-policy.ts'
 import { assertResourceOwner, captureResourceOwner, type CapturedResourceOwner } from './resource-owner.ts'
 import { assertNever } from './never.ts'
+import { chunkHasVisibleText } from './assistant-stream.ts'
 
 export * from './attribution.ts'
 export * from './brand.ts'
@@ -120,7 +121,30 @@ declare module '@deepseek-ai/cordis' {
      * @mode serial
      */
     'llm/authorize'(this: LlmRuntime, options: GenerateOptions): Promise<void>
+
+    /**
+     * Observe one physical model attempt through its first visible text or closure.
+     * @param sample - wall-clock start, outcome, counts and elapsed times in milliseconds.
+     * @mode emit
+     */
+    'llm/model-attempt-timing'(sample: ModelAttemptTiming): void
   }
+}
+
+/** Metadata-only projection of resource admission and the adapter's dispatch checks. */
+export interface ModelAttemptTiming {
+  startedAt: number
+  outcome: 'first-text' | 'closed'
+  elapsedMs: number
+  adapterPreparationMs: number
+  resourceWaitMs: number
+  /** Resource-admission operation UUID returned by the resource provider, when available. */
+  resourceOperationId?: string
+  initialAuthorizationMs: number
+  adapterDispatchPreparationMs: number
+  dispatchAuthorizationMs: number
+  adapterCallbacks: number
+  afterLastAuthorizationMs: number
 }
 
 /**
@@ -1177,6 +1201,26 @@ export class LlmRuntime extends TypertRemoteService {
     let lease: ResourceLease | undefined
     let dispatched = false
     let signal = options.signal
+    const timing = callKind === 'model' ? {
+      startedAt: Date.now(), started: performance.now(), adapterPreparationMs: 0, resourceWaitMs: 0,
+      initialAuthorizationMs: 0, adapterDispatchPreparationMs: 0, dispatchAuthorizationMs: 0,
+      adapterCallbacks: 0, lastAuthorizedDispatch: 0, initialAuthorizationEnd: 0, published: false,
+    } : undefined
+    const publishTiming = (outcome: 'first-text' | 'closed'): void => {
+      if (timing === undefined || timing.published) return
+      const now = performance.now()
+      timing.published = true
+      const sample: ModelAttemptTiming = {
+        startedAt: timing.startedAt, outcome, elapsedMs: now - timing.started,
+        adapterPreparationMs: timing.adapterPreparationMs, resourceWaitMs: timing.resourceWaitMs,
+        ...(lease?.operationId === undefined ? {} : { resourceOperationId: lease.operationId }),
+        initialAuthorizationMs: timing.initialAuthorizationMs, adapterDispatchPreparationMs: timing.adapterDispatchPreparationMs,
+        dispatchAuthorizationMs: timing.dispatchAuthorizationMs, adapterCallbacks: timing.adapterCallbacks,
+        afterLastAuthorizationMs: timing.lastAuthorizedDispatch === 0 ? 0 : now - timing.lastAuthorizedDispatch,
+      }
+      try { this.ctx.emit('llm/model-attempt-timing', sample) }
+      catch { /* A diagnostics consumer cannot interrupt model execution. */ }
+    }
     try {
       assertModelPolicy(this.ctx, policy)
       if (callKind === 'model') assertResourceOwner(this.ctx, resource)
@@ -1234,12 +1278,15 @@ export class LlmRuntime extends TypertRemoteService {
       }
       if (callKind === 'model') assertResourceOwner(this.ctx, resource)
       const budget = callKind === 'model' ? resource.owner : undefined
+      if (timing !== undefined) timing.adapterPreparationMs = performance.now() - timing.started
       if (budget !== undefined) {
+        const beforeBudget = timing === undefined ? 0 : performance.now()
         lease = await budget.acquire({ kind: 'model',
           ...signal === undefined ? {} : { signal },
           ...options.sessionId === undefined ? {} : { sessionId: options.sessionId },
           ...options.resourceOrigin === undefined ? {} : { origin: options.resourceOrigin },
         })
+        if (timing !== undefined) timing.resourceWaitMs = performance.now() - beforeBudget
         signal = signal === undefined ? lease.signal : AbortSignal.any([signal, lease.signal])
         signal.throwIfAborted()
         const bounded = { ...projectedOptions, signal }
@@ -1259,11 +1306,21 @@ export class LlmRuntime extends TypertRemoteService {
         }
         if (lease !== undefined) signal?.throwIfAborted()
       }
+      const beforeAuthorization = timing === undefined ? 0 : performance.now()
       await authorize()
+      if (timing !== undefined) {
+        timing.initialAuthorizationEnd = performance.now()
+        timing.initialAuthorizationMs = timing.initialAuthorizationEnd - beforeAuthorization
+      }
       if (callKind === 'model') assertResourceOwner(this.ctx, resource)
       prepared?.guard?.assertCurrent()
       dispatched = true
       const dispatchRequest: LlmOperationDispatch = async (request) => {
+        const beforeDispatch = timing === undefined ? 0 : performance.now()
+        if (timing !== undefined) {
+          if (timing.adapterCallbacks === 0) timing.adapterDispatchPreparationMs = beforeDispatch - timing.initialAuthorizationEnd
+          timing.adapterCallbacks++
+        }
         await authorize()
         if (callKind === 'model') {
           authorizeModelPolicy(this.ctx, policy, projectedOptions)
@@ -1271,12 +1328,17 @@ export class LlmRuntime extends TypertRemoteService {
         }
         if (signal?.aborted) throw abortError(signal)
         prepared?.guard?.assertCurrent()
+        if (timing !== undefined) {
+          timing.lastAuthorizedDispatch = performance.now()
+          timing.dispatchAuthorizationMs += timing.lastAuthorizedDispatch - beforeDispatch
+        }
         return request()
       }
       const stream = dispatch(this.forAdapter(projectedOptions, adapter), dispatchRequest)
       iterator = stream[Symbol.asyncIterator]()
     } catch (error: unknown) {
       if (lease !== undefined) await (dispatched ? lease.uncertain() : lease.release())
+      publishTiming('closed')
       yield adapterFailureChunk(error, signal)
       return
     }
@@ -1305,17 +1367,42 @@ export class LlmRuntime extends TypertRemoteService {
         }
         // End the adapter-owned try before yielding: consumer/middleware
         // failures resumed into this generator must remain thrown.
+        if (timing !== undefined && !timing.published && chunkHasVisibleText(item.value)) publishTiming('first-text')
         yield item.value
       }
     } finally {
+      publishTiming('closed')
       let quiescent = completed
+      let closing: Promise<IteratorResult<StreamChunk> | void> | undefined
       try {
         if (!completed) {
           const close = iterator.return?.bind(iterator)
-          if (close) quiescent = await closeWithDeadline(close, this.streamCloseTimeoutMs)
+          if (close) {
+            closing = Promise.resolve().then(close)
+            quiescent = await closeWithDeadline(closing, this.streamCloseTimeoutMs)
+          }
         }
       } finally {
-        if (lease !== undefined) await (quiescent ? lease.release() : lease.uncertain())
+        if (lease !== undefined) {
+          if (quiescent) await lease.release()
+          else {
+            const retained = lease
+            const uncertain = retained.uncertain()
+            // A close deadline ends the caller's wait. The original iterator
+            // can still prove quiescence for this exact permit afterwards.
+            if (closing !== undefined) {
+              const logger = this.ctx.logger
+              void closing.then(async (result) => {
+                if (result?.done !== true) return
+                await uncertain.catch(() => { /* confirmed quiescence can supersede an unacknowledged report */ })
+                await retained.release()
+              }, () => { /* a rejected iterator close leaves occupation uncertain */ }).catch(() => {
+                logger.warn('Model resource completion after adapter close could not be acknowledged.')
+              })
+            }
+            await uncertain
+          }
+        }
       }
     }
   }
@@ -1443,7 +1530,7 @@ async function nextWithSignal<T>(
 
 /** Await iterator cleanup without allowing a broken adapter to hang disposal. */
 async function closeWithDeadline(
-  close: () => Promise<IteratorResult<StreamChunk> | void> | void, timeoutMs: number,
+  closing: Promise<IteratorResult<StreamChunk> | void>, timeoutMs: number,
 ): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_resolve, reject) => {
@@ -1452,10 +1539,7 @@ async function closeWithDeadline(
     }, timeoutMs)
   })
   try {
-    const result = await Promise.race([
-      Promise.resolve().then(close),
-      timeout,
-    ])
+    const result = await Promise.race([closing, timeout])
     return result?.done === true
   } finally {
     /* v8 ignore next -- setTimeout always returns a timer handle in supported runtimes. */

@@ -10,7 +10,7 @@ import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import type { ComposerBarProps } from '../contract/slots.ts'
-import { formatTokensPerSecond } from './message-chrome.ts'
+import { formatTokensPerSecond, formatTurnStepCounts } from './message-chrome.ts'
 import { deriveStats } from './window-stats.ts'
 import { formatTokens } from '../stats.ts'
 import css from './StatsLine.module.css'
@@ -139,7 +139,7 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
   // Pipe-separated groups (figma stats strip); a group with no data drops out whole.
   const groups: string[] = []
   if (stats.steps > 0) {
-    groups.push(t('stats.counts', { turns: stats.turns, steps: stats.steps }))
+    groups.push(formatTurnStepCounts(stats.turns, stats.steps, t))
     const durations: string[] = []
     if (stats.llmMs > 0) durations.push(t('stats.llm', { duration: formatDuration(stats.llmMs) }))
     if (stats.toolMs > 0) durations.push(t('stats.toolCall', { duration: formatDuration(stats.toolMs) }))

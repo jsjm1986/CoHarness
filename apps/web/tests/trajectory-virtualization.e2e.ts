@@ -1,12 +1,13 @@
 // Browser contract for the tail-paged, virtualized Trajectory ledger. The
 // scenario proves that semantic row identity survives an older-page prepend,
 // DOM mounting stays bounded, and every scroll range remains reachable.
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { responsiveBrowser, responsiveBrowserName, responsiveMobileEmulation, responsiveViewports, expectViewportFit } from './responsive-browser.ts'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+import type { Browser, Locator, Page } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { ReplayEntry } from '@deepseek-ai/dsh-llm-replay'
@@ -21,6 +22,8 @@ import {
   type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
+import { auditResponsiveControls } from './responsive-controls.ts'
+import { captureTextContrast, expectTextContrast } from './text-contrast.ts'
 
 const MODE = webSnapshotMode()
 const LOAD_MORE_EXPECTED = fileURLToPath(new URL(
@@ -116,7 +119,7 @@ async function openTrajectory(page: Page): Promise<void> {
 async function logicalRows(page: Page): Promise<number> {
   const table = page.locator('[data-trajectory-scroll] table')
   const feed = page.locator('[data-trajectory-scroll] [data-trajectory-feed]')
-  const raw = await (await table.count() > 0 ? table : feed).getAttribute(
+  const raw = await (await table.count() > 0 ? table : feed.getByRole('listitem').first()).getAttribute(
     await table.count() > 0 ? 'aria-rowcount' : 'aria-setsize',
   )
   if (raw === null || !/^\d+$/.test(raw)) {
@@ -227,7 +230,7 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
       replayOverride,
     })
     await seedSession(scaffold, FIXTURE.log, SESSION_ID)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser, 900)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -255,7 +258,7 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
 
     const loadMore = page.locator('[data-history-load] button')
     await loadMore.waitFor({ timeout: 15_000 })
-    expect(await loadMore.textContent()).toBe('Load earlier history')
+    await expect.poll(() => loadMore.textContent()).toBe('Load earlier history')
     const loadMoreSnapshot = await captureStableAria(
       page,
       '[data-history-load]',
@@ -345,12 +348,12 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
     expect(await logicalRows(page)).toBeGreaterThanOrEqual(residentRows)
   }, 180_000)
 
-  it.skipIf(MODE === 'record')('uses the bounded mobile feed presenter at phone width', async () => {
+  it.skipIf(MODE === 'record').each(responsiveViewports)('$name keeps the ledger and selected record reachable', async ({ name, width, height }) => {
     const mobilePage = await browser.newPage({
-      viewport: { width: 390, height: 844 },
+      viewport: { width, height },
       locale: 'en-US',
       hasTouch: true,
-      isMobile: true,
+      isMobile: responsiveMobileEmulation && width < 768, reducedMotion: 'reduce',
     })
     try {
       await mobilePage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -361,15 +364,151 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
         `${FIXTURE.markers.assistant(FIXTURE.turns)}|${STREAM_MARKER}`,
       ))
       await openTrajectory(mobilePage)
-      await expect.poll(() => mobilePage.locator('[data-trajectory-feed]').count(), { timeout: 30_000 }).toBe(1)
-      expect(await mobilePage.locator('[data-trajectory-scroll] table').count()).toBe(0)
+      const phone = width < 768
+      const scroll = async (port: Locator, top: number) => {
+        if (phone && responsiveBrowserName === 'webkit') {
+          await port.evaluate((node, delta) => { node.scrollBy({ top: delta, behavior: 'instant' }) }, top)
+        } else {
+          await port.hover()
+          await mobilePage.mouse.wheel(0, top)
+        }
+      }
+      const pane = mobilePage.locator('[data-trajectory-scroll]')
+      await expectViewportFit(mobilePage, pane)
+      await expect.poll(() => mobilePage.locator('[data-trajectory-feed]').count()).toBe(phone ? 1 : 0)
       expect(await mountedRows(mobilePage)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
-      const first = mobilePage.locator('[data-trajectory-feed] [data-record-index]').first().getByRole('button').last()
+      const record = mobilePage.locator('[data-trajectory-scroll] [data-record-index]').first()
+      const first = phone ? record.getByRole('button').last() : record
       await first.click()
-      await expect.poll(() => mobilePage.locator('[data-trajectory-details]').getAttribute('role'), { timeout: 10_000 }).toBe('dialog')
-      await expect.poll(() => mobilePage.locator('[data-trajectory-details]').getAttribute('aria-modal'), { timeout: 10_000 }).toBe('true')
+      const details = mobilePage.locator('[data-trajectory-details]')
+      await expect.poll(() => details.getAttribute('role')).toBe(phone ? 'dialog' : 'complementary')
+      if (phone) {
+        const close = details.getByRole('button', { name: 'Close details' })
+        await expect.poll(() => close.evaluate(node => node === document.activeElement)).toBe(true)
+        await close.press('Shift+Tab')
+        expect(await details.evaluate(node => node.contains(document.activeElement))).toBe(true)
+        expect(await pane.evaluate(node => node.hasAttribute('inert'))).toBe(true)
+      }
+      await expectViewportFit(mobilePage, details, [details.getByRole('button', { name: 'Close details' })])
+      const closeBox = await details.getByRole('button', { name: 'Close details' }).boundingBox()
+      expect(closeBox?.width).toBeGreaterThanOrEqual(44)
+      expect(closeBox?.height).toBeGreaterThanOrEqual(44)
+      const tabs = details.getByRole('tab')
+      const labels = await tabs.allTextContents()
+      for (const label of labels) {
+        const tab = details.getByRole('tab', { name: label, exact: true })
+        await tab.click()
+        await expect.poll(() => tab.getAttribute('aria-selected')).toBe('true')
+        await expectViewportFit(mobilePage, details, [tab])
+        const tabBox = await tab.boundingBox()
+        expect(tabBox?.width).toBeGreaterThanOrEqual(44)
+        expect(tabBox?.height).toBeGreaterThanOrEqual(44)
+        await auditResponsiveControls(mobilePage, details, `trajectory/inspector/${label}/${name}`)
+      }
+      if (height <= 320 && await details.evaluate(node => node.scrollHeight > node.clientHeight + 1)) {
+        await scroll(details, 300)
+        await expect.poll(() => details.evaluate(node => node.scrollTop)).toBeGreaterThan(0)
+        await expect.poll(() => details.evaluate((node) => {
+          const body = node.querySelector('[role="tabpanel"]')
+          if (body === null) return false
+          const outer = node.getBoundingClientRect(), content = body.getBoundingClientRect()
+          return Math.min(outer.bottom, content.bottom) - Math.max(outer.top, content.top)
+            >= Math.min(80, content.height, outer.height)
+        })).toBe(true)
+      }
+      const directory = process.env.DSH_MOBILE_SCREENSHOTS
+      if (directory !== undefined) {
+        await mkdir(directory, { recursive: true })
+        await mobilePage.screenshot({ path: join(directory, `trajectory-${responsiveBrowserName}-${name}.png`), animations: 'disabled' })
+      }
       await mobilePage.getByRole('button', { name: 'Close details' }).click()
       await expect.poll(() => mobilePage.locator('[data-trajectory-details]').count(), { timeout: 10_000 }).toBe(0)
+      const adjust = mobilePage.getByRole('button', { name: 'Adjust timeline', exact: true })
+      await adjust.focus()
+      await adjust.press('Enter')
+      const controls = mobilePage.getByRole('dialog', { name: 'Adjust timeline', exact: true })
+      await controls.waitFor()
+      const start = controls.getByRole('slider', { name: 'Range start', exact: true })
+      const end = controls.getByRole('slider', { name: 'Range end', exact: true })
+      await start.focus()
+      await start.press('ArrowRight')
+      expect(Number(await start.inputValue())).toBeGreaterThan(0)
+      await end.focus()
+      await end.press('ArrowLeft')
+      expect(Number(await end.inputValue())).toBeLessThan(100)
+      const domain = mobilePage.locator('[data-timeline-domain]')
+      const domainWidth = () => domain.evaluate(node => Number.parseFloat((node as HTMLElement).style.getPropertyValue('--trajectory-domain-width')))
+      const zoomIn = controls.getByRole('button', { name: 'Zoom in', exact: true })
+      await zoomIn.focus()
+      await zoomIn.press('Space')
+      expect(await domainWidth()).toBeGreaterThan(100)
+      await controls.getByRole('button', { name: 'Reset timeline', exact: true }).click()
+      expect(await domainWidth()).toBe(100)
+      expect(Number(await start.inputValue())).toBe(0)
+      expect(Number(await end.inputValue())).toBe(100)
+      await mobilePage.keyboard.press('Escape')
+      await controls.waitFor({ state: 'hidden' })
+      await expect.poll(() => adjust.evaluate(node => node === document.activeElement)).toBe(true)
+      await adjust.tap()
+      await controls.waitFor()
+      await expectViewportFit(mobilePage, controls, [start, end])
+      const startBox = await start.boundingBox()
+      if (startBox === null) throw new Error('Timeline range control has no measurable target')
+      await start.tap({ position: { x: startBox.width * 0.25, y: startBox.height / 2 } })
+      expect(Number(await start.inputValue())).toBeGreaterThan(0)
+      await expectViewportFit(mobilePage, controls, [start, end])
+      await auditResponsiveControls(mobilePage, controls, `trajectory/timeline-controls/${name}`)
+      const controlsDirectory = process.env.DSH_FEATURE_LAYOUT_SCREENSHOTS ?? directory
+      if (controlsDirectory !== undefined) {
+        await mkdir(controlsDirectory, { recursive: true })
+        await mobilePage.screenshot({ path: join(controlsDirectory, `trajectory-${responsiveBrowserName}-${name}-timeline-controls.png`), animations: 'disabled' })
+      }
+      await controls.getByRole('button', { name: 'Close timeline controls', exact: true }).click()
+      await controls.waitFor({ state: 'hidden' })
+      await scrollToRatio(mobilePage, 0.04)
+      const outsideCandidates = pane.locator('[data-timeline-focus="outside"][data-kind="user"][data-record-index]')
+      const reachableOutsideIndex = () => outsideCandidates.evaluateAll((rows) => {
+        const scrollport = rows[0]?.closest('[data-trajectory-scroll]')
+        if (scrollport === undefined || scrollport === null) return null
+        const bounds = scrollport.getBoundingClientRect()
+        const composer = document.querySelector('[data-composer-card]')?.getBoundingClientRect()
+        const top = Math.max(bounds.top, 0)
+        const bottom = composer !== undefined && composer.top > top
+          ? Math.min(bounds.bottom, composer.top, innerHeight)
+          : Math.min(bounds.bottom, innerHeight)
+        const center = (top + bottom) / 2
+        let distance: number | undefined
+        for (const row of rows) {
+          const box = row.getBoundingClientRect()
+          if (box.height === 0) continue
+          if (box.top >= top - 0.5 && box.bottom <= bottom + 0.5) return row.getAttribute('data-record-index')
+          const offset = box.top + box.height / 2 - center
+          if (distance === undefined || Math.abs(offset) < Math.abs(distance)) distance = offset
+        }
+        if (distance !== undefined) scrollport.scrollBy({ top: distance, behavior: 'instant' })
+        return null
+      })
+      let outsideIndex: string | null = null
+      await expect.poll(async () => {
+        outsideIndex = await reachableOutsideIndex()
+        return outsideIndex
+      }).not.toBeNull()
+      const outside = pane.locator(`[data-record-index="${outsideIndex}"]`)
+      const outsidePreview = outside.locator('[class*="contentText"]')
+      const outsideText = phone ? outside.locator('[class*="kindLabel"]') : outsidePreview.locator(':scope > span')
+      const rangeContrast = await captureTextContrast(mobilePage, [
+        { label: 'outside-record-text', text: outsideText, ...(phone ? {} : { region: outsidePreview }) },
+      ], `trajectory-range-outside-${name}`)
+      const outsideAction = phone ? outside.getByRole('button').last() : outside
+      await outsideAction.tap()
+      await details.waitFor()
+      await expect.poll(() => outside.getAttribute('data-selected')).toBe('true')
+      await details.getByRole('button', { name: 'Close details' }).click()
+      await details.waitFor({ state: 'hidden' })
+      expectTextContrast(rangeContrast)
+    } catch (error) {
+      await saveFailureShot(mobilePage, `trajectory-${responsiveBrowserName}-${name}-failed`)
+      throw error
     } finally {
       await mobilePage.close()
     }

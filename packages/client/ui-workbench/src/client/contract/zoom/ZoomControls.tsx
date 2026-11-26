@@ -1,4 +1,4 @@
-/** Floating controls shared by every zoomable document renderer. */
+/** Zoom controls shared by every zoomable document renderer. */
 import { forwardRef, useEffect, useImperativeHandle, useState, type ReactNode } from 'react'
 import { Button, IconChevronDownOutline14, IconPlusOutline16, Menu, Tooltip,
   type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'

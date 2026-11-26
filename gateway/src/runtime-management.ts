@@ -40,6 +40,7 @@ export class RuntimeManagementError extends Error {
     | 'runtime-management/forbidden' | 'runtime-management/not-found' | 'runtime-management/revision-conflict'
     | 'runtime-management/quota-exceeded' | 'runtime-management/request-conflict' | 'runtime-management/provisioning-pending'
     | 'runtime-management/runtimes-not-stopped'
+    | 'runtime-management/local-home-binding-required'
     | 'runtime-management/unavailable', options?: ErrorOptions) {
     super(code, options); this.name = 'RuntimeManagementError'
   }
@@ -54,6 +55,8 @@ interface PolicyRow { revision: string; max_total: number; max_per_node: number;
 
 /** Shared PostgreSQL policy and node-owned filesystem allocation over the existing personal-space services. */
 export class PostgresRuntimeManagement {
+  /** Resolve restored account homes before reserving quota or preparing new Runtime files. */
+  resolveLocalHomes?: (ids: readonly number[]) => Promise<ReadonlyMap<number, string | null>>
   /** @param context - organization and computer whose local files this process owns. @param cfg - this deployment's existing user paths and port allocator settings. */
   constructor(private readonly context: PostgresRuntimeContext, private readonly cfg: GatewayConfig) {}
 
@@ -162,6 +165,9 @@ export class PostgresRuntimeManagement {
       const owner = await this.owner(client, userId, true)
       if (!owner.active || !USERNAME_RE.test(owner.username)) throw new RuntimeManagementError(403, 'runtime-management/forbidden')
       await this.computerPermission(client, owner.id)
+      const homes = await this.resolveLocalHomes?.([userId])
+      const localHome = homes?.get(userId)
+      if (localHome === null) throw new RuntimeManagementError(409, 'runtime-management/local-home-binding-required')
       let runtimeId = previous?.runtimeId
       if (runtimeId === undefined) {
         const policy = await this.resolvedPolicy(client, owner.id)
@@ -189,10 +195,11 @@ export class PostgresRuntimeManagement {
       if (account === undefined) throw new RuntimeManagementError(503, 'runtime-management/unavailable')
       const receipt: RuntimeAllocationReceipt = { requestId: parsed.data.requestId, runtimeId,
         nodeId: this.context.nodeId as RuntimeNodeId, userId, status: 'preparing' }
-      return { kind: 'prepare' as const, receipt, username: owner.username, homePath: account.home_path }
+      return { kind: 'prepare' as const, receipt, username: owner.username, homePath: localHome ?? account.home_path,
+        existingAccountHome: localHome !== undefined }
     })
     if (decision.kind === 'complete') return decision.receipt
-    try { prepareUserData(this.cfg, decision.username, { runtimeId: decision.receipt.runtimeId, storageLayout: 'isolated' }, decision.homePath) }
+    try { prepareUserData(this.cfg, decision.username, { runtimeId: decision.receipt.runtimeId, storageLayout: 'isolated' }, decision.homePath, decision.existingAccountHome) }
     catch (error) { throw new RuntimeManagementError(503, 'runtime-management/provisioning-pending', { cause: error }) }
     return transaction(this.context.pool, async client => {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-admin:${this.context.organizationId}`])

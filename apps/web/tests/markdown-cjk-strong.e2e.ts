@@ -1,6 +1,8 @@
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage } from './workflow-responsive-state.ts'
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { createMessage, createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -8,14 +10,13 @@ import type {} from '@deepseek-ai/dsh-session-title'
 import {
   assertFixtureInventory,
   captureStableAria,
-  compareOrRefreshGolden,
   launchWebScaffold,
   seedSession,
   watchConsole,
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/markdown-cjk-strong', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/markdown-cjk-strong/ui.expected.md', import.meta.url))
@@ -101,8 +102,8 @@ describe('web e2e: CJK-adjacent Markdown strong emphasis', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
     await seedSession(scaffold, markdownFixture(), SEED_ID)
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -132,8 +133,9 @@ describe('web e2e: CJK-adjacent Markdown strong emphasis', () => {
 
     const markdownRegion = '[class*="markdown"]:has(h2)'
     expect(await page.locator(markdownRegion).count()).toBe(1)
+    await auditWorkflowState(page, 'markdown', 'cjk-strong-punctuation', page.locator(markdownRegion))
     const snapshot = await captureStableAria(page, markdownRegion, scaffold.workspaceCwd)
-    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(UI_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])

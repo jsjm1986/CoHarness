@@ -3,6 +3,7 @@ import { decodeDraftHistory } from './draft-history.ts'
 import { prepareDraftSchema } from './node-draft-schema.ts'
 import { openPersonalIndex } from './personal-index-worker.ts'
 import { backup, DatabaseSync } from 'node:sqlite'
+import { statfsSync } from 'node:fs'
 import { lstat, mkdir, mkdtemp, realpath, rm, statfs } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
@@ -79,6 +80,10 @@ async function capture() {
   const projection = new DatabaseSync(join(spool, 'scoped.sqlite'))
   let drafts: DatabaseSync | undefined
   try {
+    const capacity = (bytes: number) => {
+      const disk = statfsSync(spool, { bigint: true })
+      if (disk.bavail * disk.bsize < BigInt(input.reserveBytes) + BigInt(bytes)) throw new Error('peer-backup/source-capacity')
+    }
     // The recovered file contains only scoped rows. The shared source databases never become backup payloads.
     const disk = await statfs(spool, { bigint: true })
     const free = disk.bsize * disk.bavail - BigInt(input.reserveBytes)
@@ -102,6 +107,7 @@ async function capture() {
       const body = JSON.stringify(row)
       bytes += Buffer.byteLength(body)
       if (++rows > input.maxRows || bytes > input.maxBytes) throw new Error('peer-backup/export-budget')
+      capacity(Math.max(65536, Buffer.byteLength(body) * 2))
       insert.run(collection, body)
     }
     for (const table of directoryTables) {
@@ -115,8 +121,9 @@ async function capture() {
         .iterate(lowerDraft, upperDraft))
         append('drafts', row)
     }
+    capacity(input.maxBytes)
     projection.exec('COMMIT')
-    await backup(projection, file, { rate: 64 })
+    await backup(projection, file, { rate: 64, progress: () => { capacity(64 * 4096); return 64 } })
     return { generation: Number(publication.generation), revision: Number(publication.revision), rows, drafts: !!drafts }
   } finally {
     catalog.close()

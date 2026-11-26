@@ -1,0 +1,20 @@
+- button "Discover"
+- heading "Exact-version exemption" [level=3]
+- text: 1.0.0 @fixture/market-exempt
+- button "Install Exact-version exemption" [disabled]: Install
+- paragraph: Read the current installation and compatibility state of Exact-version exemption.
+- note: This version is not compatible with the running DSH {{runtime-version}}; it requires DSH >=999.0.0.
+- heading "Source" [level=4]
+- term: Package
+- definition:
+  - code: "@fixture/market-exempt@1.0.0"
+- term: Registry
+- definition:
+  - code: {{publisher}}/registry/
+- term: Published
+- definition: November 14, 2023
+- term: Plugin market
+- definition: Installation status acceptance
+- heading "Versions" [level=4]
+- list "Versions of Exact-version exemption":
+  - listitem: 1.0.0 Incompatible This version is not compatible with the running DSH {{runtime-version}}; it requires DSH >=999.0.0.

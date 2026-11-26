@@ -1,0 +1,4 @@
+- button "Edit memory"
+- text: Delete this memory? This cannot be undone.
+- button "Delete"
+- button "Cancel"

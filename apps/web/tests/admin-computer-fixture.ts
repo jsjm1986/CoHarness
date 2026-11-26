@@ -15,6 +15,7 @@ export function installAdminComputerFixture(deps: GatewayDeps): void {
     preflight: async () => ({ canDisable: true, blockingCount: 0, computers: [] }), candidates: unavailable,
     assertNode: async (nodeId) => { if (nodeId !== entry.nodeId) throw new Error('This form fixture only exposes its local computer') } }
   deps.nodeAccess = { list: async () => ({ items: [], nextCursor: null }), issue: unavailable, mutate: unavailable,
+    checkRemoval: unavailable, remove: unavailable,
     enroll: unavailable, connect: unavailable, heartbeat: unavailable, disconnect: unavailable }
   deps.runtimeManagement = { policy: async () => ({ revision: '1', maxTotal: 16, maxPerNode: 4, source: 'organization' }),
     setPolicy: unavailable, allocate: unavailable, allocationReceipt: unavailable, retire: unavailable }

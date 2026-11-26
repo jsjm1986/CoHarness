@@ -247,6 +247,7 @@ export class ClaudeCodeMods extends TypertRemoteService {
           await callback()
         } catch (error: unknown) {
           report(`a button's onPress failed: ${messageOf(error)}`)
+          throw error
         }
       },
       report,
@@ -500,6 +501,7 @@ export class ClaudeCodeMods extends TypertRemoteService {
    * @param generation - the drawing the Client saw.
    * @param actionId - the button's action id in that drawing.
    * @returns the snapshot after the press.
+   * @throws the callback's failure after redrawing any state it changed; its effects are not rolled back.
    */
   @Remote
   pressBand(agent: Agent, generation: number, actionId: string): Promise<SurfaceSnapshot> {

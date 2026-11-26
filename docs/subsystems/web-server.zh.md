@@ -24,6 +24,13 @@ interface WebRoute {
 }
 ```
 
+```ts type-equiv
+/** Synchronous admission before HTTP route dispatch; false means the guard has answered or closed the response. */
+type WebRequestGuard = (request: IncomingMessage, response: ServerResponse) => boolean
+```
+
+HTTP 守卫在路由匹配之前按注册顺序同步运行。返回 false 时，响应由该守卫持有，并跳过后续守卫和处理器；移除注册会停止后续检查。升级路由保留各自的准入。
+
 匹配顺序固定：先查 exact 表，再取最长匹配前缀，最后落到已注册的回退。注册顺序不携带任何面向请求的语义：具名路由在组合上互不相交，任何未被具名路由认领的请求都由回退席位应答；席位只有一个所有者，第二次注册会抛出异常。发布的 Web 组合用 [`dsh-host-frontend-static`](../../packages/host/frontend-static/src/index.ts) 认领席位，即遵循固定语义的 SPA dist 服务器：非 GET/HEAD 返回 405，越出 dist 根目录的遍历返回 403，任何未命中都以 HTTP 200 回退到 `index.html`（SPA 路由），未知扩展名按 octet-stream 发送。
 
 <a id="config"></a>
@@ -135,6 +142,14 @@ getOrigin(): string
  * @returns the disposer removing the route.
  */
 register(route: WebRoute): () => void
+
+/**
+ * Qualify HTTP requests before named routes and the fallback; upgrades retain their own admission.
+ * Guards run synchronously in registration order, so removal cannot race an unfinished guard.
+ * @param guard - returns true to continue dispatch, or false after taking response ownership.
+ * @returns the disposer removing this guard.
+ */
+registerRequestGuard(guard: WebRequestGuard): () => void
 
 /**
  * Register an exact-path HTTP upgrade route. Duplicate paths throw because

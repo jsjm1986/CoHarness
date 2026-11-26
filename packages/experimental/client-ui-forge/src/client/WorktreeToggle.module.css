@@ -46,6 +46,11 @@
   padding-right: 4px;
 }
 
+@media (pointer: coarse) {
+  .toggle,
+  .base { min-block-size: var(--dsw-touch-target); }
+}
+
 .current {
   box-sizing: content-box;
   max-width: 200px;

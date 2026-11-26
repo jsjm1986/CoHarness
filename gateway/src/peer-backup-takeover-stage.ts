@@ -57,6 +57,7 @@ const inventory = z
     watermark: z.string(),
     hasFileSnapshot: z.boolean(),
     sourceOnlyFileWitnesses: z.boolean().optional(),
+    hasExecutionPolicies: z.boolean().optional(),
     tables: z
       .array(
         z
@@ -121,6 +122,7 @@ export async function stagePeerProject(
     point.organizationId !== op.organizationId ||
     point.scopeId !== op.projectId ||
     point.sourceNodeId !== op.sourceNode ||
+    point.targetNodeId !== op.repositoryNode ||
     point.writerEpoch !== op.oldEpoch ||
     point.watermark !== op.revision ||
     point.manifestDigest !== op.digest ||
@@ -253,6 +255,9 @@ export async function stagePeerProject(
       ).rows.map((row) => row.name)
       if (!fields.length || fields.some((f) => !/^[a-z_]+[a-z0-9_]*$/u.test(f))) fail('unsupported-source')
       const projection = fields.map((f) => '"' + f + '"').join(',')
+      const requiredFields = name === 'conversation_draft_reservations'
+        ? fields.filter((field) => field !== 'model_selection')
+        : fields
       const stream = createReadStream(join(project, name + '.jsonl'), { signal }),
         lines = createInterface({ input: stream, crlfDelay: Infinity })
       let count = 0
@@ -264,7 +269,7 @@ export async function stagePeerProject(
             row.organization_id !== op.organizationId ||
             (!scopeByProject.has(name) && row.runtime_id !== op.runtimeId) ||
             (row.project_id !== undefined && row.project_id !== op.projectId) ||
-            fields.some((f) => !Object.hasOwn(row, f))
+            requiredFields.some((f) => !Object.hasOwn(row, f))
           )
             fail('cross-scope-row')
           hash.update(line + '\n')

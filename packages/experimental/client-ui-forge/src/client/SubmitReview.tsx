@@ -53,7 +53,7 @@ export function SubmitReview({
     || (state.event === 'comment' && state.body.trim() === '' && count === 0)
   const notice = state.error !== null ? t(state.error === 'load' ? 'review.loadFailed' : 'review.saveFailed')
     : blocked ? t('review.browserDrafts', { count: state.comments.length }) : stale ? t('review.stale') : error
-  return <Modal open onClose={close} title={t('review.submit')} closeLabel={t('review.close')}
+  return <Modal open onClose={close} title={t('review.submit')} closeLabel={t('review.close')} pinShortChrome
     className={clsx(css.modal)} contentClassName={clsx(css.content)}
     footer={<>
       {discard !== undefined && <Button variant="outline" className={clsx(css.discard)} disabled={locked || confirming}

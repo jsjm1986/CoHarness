@@ -205,7 +205,7 @@ describePg('fresh PostgreSQL project authority', () => {
       projectId: f.publicId, name: 'Owned', path: f.root, mode: 'rw', kind: 'standard', canManage: true,
       origin: 'user', owner: { id: f.actors.owner.publicId, username: 'owner', displayName: 'owner' }, uiThemePolicy: 'follow-user',
     }] })
-    expect(statements).toHaveLength(2)
+    expect(statements).toHaveLength(1)
     expect(statements.every(text => !text.includes('COUNT(m.user_id)') && !text.includes('FROM harness.project_members m'))).toBe(true)
     expect(full).not.toHaveBeenCalled()
     expect(single).not.toHaveBeenCalled()

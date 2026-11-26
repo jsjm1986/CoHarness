@@ -15,7 +15,7 @@ import type { PerformanceUsageMode } from '../../submission-settings.ts'
 import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
-import { formatTokensPerSecond } from './message-chrome.ts'
+import { formatTokensPerSecond, formatTurnStepCounts } from './message-chrome.ts'
 import { deriveStats, type WindowStats } from './window-stats.ts'
 import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
 import { MEASURE_STYLE, useStatDialog } from './stat-dialog.ts'
@@ -87,7 +87,7 @@ function TimePill({ stats, t, dialog }: {
   dialog: PillDialog
 }) {
   const { open, setOpen, rootRef, panelRef, pos } = useStatDialog(dialog)
-  const counts = t('stats.counts', { turns: stats.turns, steps: stats.steps })
+  const counts = formatTurnStepCounts(stats.turns, stats.steps, t)
   const tps = stats.decodeMs > 0
     ? t('message.tokensPerSecond', {
       tps: formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1_000)),

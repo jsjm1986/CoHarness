@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/client-ui-forge/README.md
 document:
-  en: 87f2e4aa8c74e9c7ff290ef07a068ce6ffd18224
-  zh: 842f8292e1ef1bf2c137bae6246afdc08e8b6b89
+  en: 92711b0295d951140f373dd70b410774da2efc09
+  zh: b37e28da9e744d8afa3f4590cf99cc82d6be2ba6
 /:
   en: 27cf01b13f177106
   zh: c4b56ad7dfe7b1c7
@@ -18,11 +18,11 @@ document:
   en: d152484eb41ac6b4
   zh: 2f8a621b991260a1
 /deepseek-ai-dsh-experimental-client-ui-forge/use-this-package:
-  en: 9756672b4471c8d9
-  zh: f2d203f61154b9a8
+  en: cf3192e0821298ef
+  zh: 6bd27f5d7bd8e602
 /deepseek-ai-dsh-experimental-client-ui-forge/understand-the-implementation:
-  en: c9541603ea971f46
-  zh: 15c41326e3fb29e4
+  en: 7ac0d4e52e487eb3
+  zh: 47bd1d29dd45bacb
 /deepseek-ai-dsh-experimental-client-ui-forge/further-exploration:
   en: b1e12dd9eabb5ed9
   zh: b9e877e55a48ba95

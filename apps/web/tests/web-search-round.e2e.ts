@@ -2,12 +2,13 @@
 // drives `web_search`; the model stream is replayed while the real DeepSeek
 // provider calls a deterministic local Search API endpoint through
 // the real credentials service.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -147,7 +148,7 @@ describe('web e2e: opt-in Search API web search', () => {
     })
     await scaffold.ctx.credentials.set(SEARCH_CREDENTIAL_REF, SEARCH_CREDENTIAL)
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

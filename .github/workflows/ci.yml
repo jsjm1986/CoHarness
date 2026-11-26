@@ -679,7 +679,23 @@ jobs:
           && github.event.pull_request.head.repo.full_name == github.repository
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '6' || '1' }}
+          && '6' || '2' }}
+      # Hosted ubuntu-latest cannot finish the Admin matrix (20 pages x 18
+      # viewports x 3 engines inside serial per-file tests) within the lane
+      # budget; capable runners keep the full sweep.
+      DSH_ADMIN_ENGINES: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && 'chromium,webkit,firefox' || 'chromium' }}
+      DSH_ADMIN_VIEWPORTS: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '320,360,375,390,412,430,540,667,844,872,767,768,769,839,840,841,1024,1280'
+          || '320,390,768,1280' }}
     steps:
       - name: Record skipped web verification
         if: needs.pr-scope.outputs.snapshot_mode == 'skip' || needs.pr-scope.outputs.snapshot_mode == 'scoped'
@@ -856,7 +872,7 @@ jobs:
     name: gateway / typecheck and unit tests
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17.6-bookworm
         env:
           POSTGRES_USER: hgw
           POSTGRES_PASSWORD: hgw
@@ -904,6 +920,8 @@ jobs:
       # and host addon produce both artifact planes.
       - name: Build the workspace libraries and native addon the Gateway graph consumes
         run: pnpm run build:native-system && pnpm run build:lib:host
+      - name: Link the standalone Gateway Runtime dependencies
+        run: pnpm exec tsx scripts/gateway-runtime-packages.ts
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their
@@ -943,9 +961,11 @@ jobs:
         run: npm test --prefix gateway
       - name: Test Gateway PostgreSQL authorization and invalidation
         env:
-          HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_dump"]'
-          HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","pg_restore"]'
+          HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","/usr/lib/postgresql/17/bin/pg_dump"]'
+          HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","/usr/local/bin/hgw-pg-client","/usr/lib/postgresql/17/bin/pg_restore"]'
         run: npm run test:postgres --prefix gateway
+      - name: Replay managed node maintenance control transcript
+        run: DSH_SNAPSHOT=replay ./node_modules/.bin/vitest run --config vitest.snapshot.config.ts gateway/tests/node-maintenance.snapshot.ts --maxWorkers=1
       - name: Test node content volumes on a disposable cluster
         run: |
           docker pull postgres:17.6-bookworm
@@ -957,6 +977,12 @@ jobs:
         run: |
           command -v restic || sudo apt-get install -y --no-install-recommends restic
           HGW_TEST_RESTIC="$(command -v restic)" node tests/run-node-content-postgres.mjs --recovery
+          cd ..
+          DSH_SNAPSHOT=replay HGW_TEST_RESTIC="$(command -v restic)" ./node_modules/.bin/vitest run --config vitest.snapshot.config.ts gateway/tests/peer-backup-capacity.snapshot.ts --maxWorkers=1
+        working-directory: gateway
+      - name: Verify peer repository rotation on a disposable governance database
+        timeout-minutes: 4
+        run: HGW_TEST_RESTIC="$(command -v restic)" node tests/run-node-content-postgres.mjs --governance
         working-directory: gateway
       - name: Preserve gate evidence
         if: always()
@@ -1074,6 +1100,9 @@ jobs:
       - name: Build the workspace libraries the Gateway graph consumes
         shell: pwsh
         run: pnpm run build:native-system && pnpm run build:lib:host
+      - name: Link the standalone Gateway Runtime dependencies
+        shell: pwsh
+        run: pnpm exec tsx scripts/gateway-runtime-packages.ts
 
       - name: Test Gateway Windows spec set
         shell: pwsh

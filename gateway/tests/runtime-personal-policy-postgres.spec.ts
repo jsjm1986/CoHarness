@@ -157,21 +157,28 @@ describePg('PostgreSQL personal Runtime policy', () => {
     const f = await fixture()
     let manager: InstanceManager | undefined, pending: Promise<unknown> | undefined
     try {
+      const maxWaitMs = 10_000
       const budget = new NodeResourceBudget(pool, f.context.organizationId, f.context.nodeId, {
-        ...f.cfg.resourceBudget, sampleMs: 10, staleMs: 10_000, maxWaitMs: 10_000,
+        ...f.cfg.resourceBudget, sampleMs: 10, staleMs: 10_000, maxWaitMs,
       })
       await budget.configure()
+      let resolveLaunching!: () => void
+      const launching = new Promise<void>((resolve) => { resolveLaunching = resolve })
       let allocations = 0
       manager = new InstanceManager(f.repository, f.cfg, {
         instancesOutliveGateway: false, start: async runtime => {
+          resolveLaunching()
           await runtime.beforeAllocation?.(); allocations += 1
           throw new Error('Revoked administration cannot allocate a Runtime')
         },
       }, { principalPublicKey: '' }, budget)
       pending = manager.ensureRunning(f.waiting.user, 'explicit', f.holder.user.id).catch((error: unknown) => error)
+      await Promise.race([launching, pending.then(cause => {
+        throw new Error('Runtime start ended before entering the allocation wait', { cause })
+      })])
       await expect.poll(async () => (await pool.query<{ allocation_state: string }>(
         'SELECT allocation_state FROM harness.instances WHERE user_id=$1', [f.waiting.uuid],
-      )).rows[0]!.allocation_state).toBe('waiting')
+      )).rows[0]!.allocation_state, { timeout: maxWaitMs }).toBe('waiting')
       if (change === 'role') await pool.query("UPDATE harness.memberships SET role='member' WHERE user_id=$1", [f.holder.uuid])
       else await pool.query('UPDATE harness.password_credentials SET must_change_password=true WHERE user_id=$1', [f.holder.uuid])
       await budget.observe({ capturedAt: performance.now(), cpu: 0, memory: 'normal', eventLoopMs: 0, parallelism: 1 })
@@ -248,7 +255,7 @@ describePg('PostgreSQL personal Runtime policy', () => {
       pending = manager.ensureRunning(f.waiting.user, 'explicit').catch((error: unknown) => error)
       await expect.poll(async () => (await pool.query<{ allocation_state: string }>(
         'SELECT allocation_state FROM harness.instances WHERE user_id=$1', [f.waiting.uuid],
-      )).rows[0]!.allocation_state).toBe('waiting')
+      )).rows[0]!.allocation_state, { timeout: 10_000 }).toBe('waiting')
       if (change === 'role') await pool.query("UPDATE harness.memberships SET role='member' WHERE user_id=$1", [f.waiting.uuid])
       else if (change === 'disabled-membership') await pool.query("UPDATE harness.memberships SET status='disabled' WHERE user_id=$1", [f.waiting.uuid])
       else if (change === 'home') await pool.query('UPDATE harness.node_user_accounts SET home_path=$1 WHERE user_id=$2 AND node_id=$3',

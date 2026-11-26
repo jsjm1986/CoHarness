@@ -1,0 +1,21 @@
+- dialog "添加远程端点":
+  - heading "添加远程端点" [level=2]
+  - paragraph: 填写已配置并可访问的 VNC 服务地址；本机和远端目标均可配置。
+  - button "关闭"
+  - alert: 请填写节点、主机和 1–65535 的整数端口。
+  - text: 节点标识
+  - textbox "节点标识"
+  - text: 用户看到的目标名称 桌面
+  - textbox "桌面"
+  - text: 多桌面目标才需要填写 主机
+  - textbox "主机"
+  - text: VNC 服务地址，本机为 127.0.0.1 端口
+  - textbox "端口": "5900"
+  - text: 登录用户名
+  - textbox "登录用户名"
+  - text: 目标机的系统登录名；仅托管密码时需要 密码引用
+  - textbox "密码引用":
+    - /placeholder: VNC_PASSWORD_…
+  - text: 凭据库中的变量名（如 VNC_PASSWORD_MAC_MINI）；填后服务端托管认证，用户无需输入密码
+  - button "取消"
+  - button "保存"

@@ -11,18 +11,22 @@
 // are host RPCs with no model involvement, and the one session row the
 // flat/hover/menu/archive scenarios need comes from a seeded fixture (the
 // seeded-history seed reused verbatim — no new recording).
+import { responsiveBrowser, responsiveBrowserName, responsiveViewports } from './responsive-browser.ts'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join, sep } from 'node:path'
 import type { Browser, Locator, Page } from 'playwright'
-import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import {
-  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria,
   launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureDom, saveFailureShot } from './support.ts'
+import { saveFailureDom, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { auditResponsiveControl } from './responsive-controls.ts'
+import { captureTextContrast, expectTextContrast } from './text-contrast.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workspace-management', import.meta.url))
 // The seed is another scenario's committed fixture, reused read-only: this
@@ -41,6 +45,28 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
   let browser: Browser
   let page: Page
   let tripwire: ReturnType<typeof watchConsole>
+  const auditedStates = new Set<string>()
+
+  async function audit(state: string, surface: Locator, controls: readonly Locator[] = [], prepare?: () => Promise<void>): Promise<void> {
+    if (auditedStates.has(state)) return
+    await auditWorkflowState(page, 'workspace', state, surface, controls, prepare)
+    auditedStates.add(state)
+  }
+
+  async function showSidebar(target = page): Promise<void> {
+    const width = target.viewportSize()!.width
+    const mode = width < 768 ? 'compact' : width < 1024 ? 'medium' : width < 1440 ? 'expanded' : 'wide'
+    await expect.poll(() => target.locator('[data-viewport]').first().getAttribute('data-viewport')).toBe(mode)
+    const open = target.getByRole('button', { name: 'Open sidebar', exact: true })
+    if (await open.isVisible()) {
+      if (workflowMatrixEnabled) await open.tap()
+      else await open.click()
+    }
+  }
+
+  async function auditSidebar(state: string): Promise<void> {
+    await audit(state, page.locator('[class*="sidebarCol"], [class*="drawer"][data-open]').filter({ has: page.getByRole('button', { name: 'Add workspace' }) }), [], showSidebar)
+  }
 
   /**
    * Raise the region header's directory dialog and drive it to a directory via
@@ -66,7 +92,9 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     const dialog = await browseTo(parent)
     await dialog.getByRole('button', { name: 'New folder' }).click()
     await page.getByLabel('Folder name').fill(name)
-    await page.getByRole('button', { name: 'Create', exact: true }).click()
+    const create = page.getByRole('button', { name: 'Create', exact: true })
+    await audit('new-folder', create.locator('xpath=ancestor::*[@role="dialog"][1]'), [create, page.getByLabel('Folder name')])
+    await create.click()
     // Creating selects the new folder in the listing; Open adopts it.
     await dialog.getByRole('button', { name: 'Open', exact: true }).click()
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
@@ -110,6 +138,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
    */
   async function clickHoverAction(row: Locator, name: string): Promise<void> {
     const button = row.getByRole('button', { name })
+    if (workflowMatrixEnabled) { await button.tap(); return }
     const deadline = Date.now() + 30_000
     for (;;) {
       try {
@@ -134,16 +163,15 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await writeFile(join(sessionCwd, 'a.txt'), 'alpha\n')
     await writeFile(join(sessionCwd, 'b.txt'), 'beta\n')
     await seedSession(scaffold, await readFile(SEED, 'utf8'), SEED_ID)
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
   afterAll(async () => {
-    await browser?.close()
-    await scaffold?.close()
+    try { await browser?.close() } finally { await scaffold?.close() }
   })
 
   it('adds two workspaces through the dialog, each on a folder it created', async () => {
@@ -159,6 +187,25 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     // each titled after the folder the dialog made.
     const titles = scaffold.ctx.workspaceRegistry.list().map(workspace => workspace.title)
     expect(titles.slice(0, 2)).toEqual(['beta-ws', 'alpha-ws'])
+    await auditSidebar('workspace-created')
+    if (workflowMatrixEnabled) {
+      const original = page.viewportSize()!
+      for (const viewport of [{ width: 568, height: 320 }, { width: 872, height: 230 }]) {
+        await page.setViewportSize(viewport)
+        await page.evaluate(() => new Promise<void>((resolve) => {
+          requestAnimationFrame(() => { requestAnimationFrame(() => { resolve() }) })
+        }))
+        await showSidebar()
+        const create = page.getByRole('button', { name: 'New session in beta-ws', exact: true })
+        await create.scrollIntoViewIfNeeded()
+        const directory = process.env.DSH_FEATURE_LAYOUT_SCREENSHOTS
+        if (directory !== undefined) await page.screenshot({ path: join(directory, `workspace-new-session-${viewport.width}.png`), animations: 'disabled' })
+        await create.tap()
+        await page.locator('textarea:enabled').waitFor()
+      }
+      await page.setViewportSize(original)
+      await showSidebar()
+    }
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
 
@@ -175,9 +222,18 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await input.fill('beta-ws')
     await expect.poll(() => dialog.getByRole('alert').count(), { timeout: 5_000 }).toBe(1)
     expect(await dialog.getByRole('button', { name: 'Rename' }).isDisabled()).toBe(true)
+    await audit('rename-conflict', dialog, [input, dialog.getByRole('button', { name: 'Cancel' })])
     // A fresh name goes through workspace.rename to the durable registry.
     await input.fill('gamma-ws')
     await expect.poll(() => dialog.getByRole('alert').count(), { timeout: 5_000 }).toBe(0)
+    await audit('rename-valid', dialog, [input, dialog.getByRole('button', { name: 'Rename' })])
+    await input.dispatchEvent('compositionstart')
+    await input.dispatchEvent('keydown', { key: 'Enter', isComposing: true })
+    expect(await input.isEnabled()).toBe(true)
+    await input.dispatchEvent('compositionend')
+    await input.dispatchEvent('keydown', { key: 'Enter', keyCode: 229 })
+    expect(await input.isEnabled()).toBe(true)
+    expect(scaffold.ctx.workspaceRegistry.list().map(workspace => workspace.title)).toContain('alpha-ws')
     await dialog.getByRole('button', { name: 'Rename' }).click()
     await expect.poll(() => page.getByRole('dialog', { name: 'Rename workspace' }).count(), { timeout: 10_000 }).toBe(0)
     await expect.poll(() => page.getByText('gamma-ws', { exact: true }).count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(1)
@@ -259,6 +315,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     expect(copy).toContain('workspace list')
     expect(copy).toContain('folder and session logs will be kept')
     expect(copy).toContain('sessions will appear under “Independent sessions”')
+    await audit('delete-confirmation', dialog, [dialog.getByRole('button', { name: 'Delete workspace' }), dialog.getByRole('button', { name: 'Cancel' })])
     await dialog.getByRole('button', { name: 'Delete workspace' }).click()
     await expect.poll(() => dialog.count(), { timeout: 10_000 }).toBe(0)
 
@@ -394,6 +451,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await expect.poll(() => page.getByText('Independent sessions', { exact: true }).count(), { timeout: 5_000 }).toBe(0)
     await expect.poll(() => page.locator('[role="treeitem"]').count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(1)
     expect(await page.evaluate(() => localStorage.getItem('dsh.workspace.view.v5'))).toContain('flat')
+    await auditSidebar('flat-list')
     // Persisted across reload; then restore grouped for inter-spec hygiene.
     const warningStart = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })
@@ -423,9 +481,25 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     try {
       const dialog = await browseTo(staged)
       await expect.poll(() => dialog.getByText('alpha', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
+      await audit('directory-browser', dialog, [dialog.getByRole('button', { name: 'Open', exact: true }), dialog.getByRole('button', { name: 'New folder' })])
+      if (workflowMatrixEnabled) {
+        const original = page.viewportSize()!
+        for (const viewport of [{ width: 568, height: 320 }, { width: 872, height: 230 }]) {
+          await page.setViewportSize(viewport)
+          const folder = dialog.getByRole('button', { name: 'alpha', exact: true })
+          await folder.scrollIntoViewIfNeeded()
+          expect((await folder.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+          const directory = process.env.DSH_FEATURE_LAYOUT_SCREENSHOTS
+          if (directory !== undefined) await page.screenshot({ path: join(directory, `workspace-folder-${viewport.width}.png`), animations: 'disabled' })
+          await folder.tap()
+          await dialog.getByRole('button', { name: 'browse-golden', exact: true }).click()
+          await expect.poll(() => dialog.getByRole('button', { name: 'alpha', exact: true }).count()).toBe(1)
+        }
+        await page.setViewportSize(original)
+      }
       const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
       try {
-        await compareOrRefreshGolden(BROWSER_EXPECTED, snapshot, MODE)
+        await compareWorkflowGolden(BROWSER_EXPECTED, snapshot, MODE)
       } finally {
         await dialog.getByRole('button', { name: 'Cancel' }).click()
         await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
@@ -458,6 +532,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await expect.poll(() => dialog.getByText('only-under-alpha', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
     await expect.poll(() => dialog.getByRole('list').count(), { timeout: 10_000 }).toBe(2)
     expect(await path.inputValue()).toBe(`${join(staged, 'alpha')}${sep}`)
+    await audit('path-deep-directory', dialog, [path])
     // Erasing back past the separator walks the panes up, so the level being
     // typed is the last pane again (its children no longer stand to its
     // right) and the tail filters it.
@@ -466,31 +541,34 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     expect(await dialog.getByText('alpha', { exact: true }).count()).toBe(1)
     expect(await dialog.getByText('beta', { exact: true }).count()).toBe(0)
     await expect.poll(() => dialog.getByRole('list').count(), { timeout: 10_000 }).toBe(2)
+    await audit('path-filter', dialog, [path])
     // A tail nobody matches is a name still being spelled: the level shows
     // whole instead of emptying under it.
     await path.fill(`${staged}${sep}zzz`)
     await expect.poll(() => dialog.getByText('beta', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
     expect(await dialog.getByText('alpha', { exact: true }).count()).toBe(1)
+    await audit('path-no-match', dialog, [path])
     await dialog.getByRole('button', { name: 'Cancel' }).click()
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
     expect(tripwire.pageErrors).toEqual([])
-  }, 60_000)
+  }, workflowMatrixEnabled ? 180_000 : 60_000)
 
   /**
    * Expand Ungrouped and return its seeded session row. The only visible child
    * is the non-blank persisted Session; the blank Session created while
    * adopting the Workspace stays hidden.
+   * @param target - the page owning the sidebar.
    * @returns the session row locator, already present.
    */
-  async function seededSessionRow() {
-    const ungroupedRow = page.getByText('Independent sessions', { exact: true }).locator('..').locator('..')
+  async function seededSessionRow(target = page) {
+    const ungroupedRow = target.getByText('Independent sessions', { exact: true }).locator('..').locator('..')
     const ungroupedSection = ungroupedRow.locator('..')
     // Initial-current auto-expansion can race this gesture; converge on
     // expanded rather than assuming which update wins first.
     await expect.poll(async () => {
       if (await ungroupedRow.getAttribute('aria-expanded') !== 'true') {
-        await page.getByText('Independent sessions', { exact: true }).click()
-        await page.waitForTimeout(50)
+        await target.getByText('Independent sessions', { exact: true }).click()
+        await target.waitForTimeout(50)
       }
       return await ungroupedRow.getAttribute('aria-expanded')
     }, { timeout: 5_000 }).toBe('true')
@@ -499,7 +577,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     // that advertises a copyable title instead of relying on the blank row's
     // position; blank rows intentionally have no HoverCard button.
     const candidates = ungroupedSection.locator('[role="treeitem"]')
-      .filter({ has: page.locator('button[aria-label^="Session actions for "]') })
+      .filter({ has: target.locator('button[aria-label^="Session actions for "]') })
     const count = await candidates.count()
     let row: Locator | undefined
     for (let index = 0; index < count; index += 1) {
@@ -524,7 +602,15 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await clickHoverAction(sessionRow, 'Session actions for Untitled')
     await page.getByRole('menuitem', { name: 'Rename' }).click()
     const renameDialog = page.getByRole('dialog', { name: 'Rename session' })
-    await renameDialog.getByLabel('Session name').fill('Hover card title')
+    const renameInput = renameDialog.getByLabel('Session name')
+    await renameInput.fill('Hover card title')
+    await audit('session-rename', renameDialog, [renameInput, renameDialog.getByRole('button', { name: 'Rename' })])
+    await renameInput.dispatchEvent('compositionstart')
+    await renameInput.dispatchEvent('keydown', { key: 'Enter', isComposing: true })
+    expect(await renameInput.isEnabled()).toBe(true)
+    await renameInput.dispatchEvent('compositionend')
+    await renameInput.dispatchEvent('keydown', { key: 'Enter', keyCode: 229 })
+    expect(await renameInput.isEnabled()).toBe(true)
     await renameDialog.getByRole('button', { name: 'Rename' }).click()
     await expect.poll(() => renameDialog.count(), { timeout: 10_000 }).toBe(0)
     const rowTitle = 'Hover card title'
@@ -545,7 +631,9 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     // The full title is the card's primary value: activating anywhere on the
     // card writes it through the browser clipboard and localizes the success
     // feedback through the English locale seat.
-    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    if (responsiveBrowserName !== 'firefox') {
+      await page.context().grantPermissions(responsiveBrowserName === 'webkit' ? ['clipboard-read'] : ['clipboard-read', 'clipboard-write'])
+    }
     const cardHeight = (await card.boundingBox())?.height
     await card.click()
     const copied = page.getByRole('status').getByText('Copied', { exact: true })
@@ -553,11 +641,83 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await page.waitForTimeout(POINTER_HOLD_MS)
     expect((await card.boundingBox())?.height).toBe(cardHeight)
     expect(await copied.isVisible()).toBe(true)
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(rowTitle)
+    if (responsiveBrowserName !== 'firefox') expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(rowTitle)
     // Leaving anchor and card together closes it after the grace.
     await page.getByRole('button', { name: 'Settings' }).hover()
     await expect.poll(() => card.count(), { timeout: 5_000 }).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
+  }, 60_000)
+
+  async function previewWitness() {
+    const previewPage = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    onTestFinished(async () => { await previewPage.close() })
+    onTestFailed(() => saveFailureShot(previewPage, 'workspace-hovercard-witness'))
+    const console = watchConsole(previewPage)
+    await previewPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    const key = await (await seededSessionRow(previewPage)).getAttribute('data-row-key')
+    if (key === null) throw new Error('Preview Session has no row key')
+    const row = previewPage.locator(`[data-row-key=${JSON.stringify(key)}]`)
+    await row.hover()
+    await row.locator('button[aria-label^="Session actions for "]').click()
+    await previewPage.getByRole('menuitem', { name: 'Rename', exact: true }).click()
+    const dialog = previewPage.getByRole('dialog', { name: 'Rename session', exact: true })
+    await dialog.getByLabel('Session name').fill('Preview witness title')
+    await dialog.getByRole('button', { name: 'Rename', exact: true }).click()
+    await dialog.waitFor({ state: 'hidden' })
+    await expect.poll(() => row.locator('[class*="title"]').innerText()).toBe('Preview witness title')
+    const card = previewPage.getByRole('button', { name: 'Copy: Preview witness title', exact: true })
+    await previewPage.mouse.move(0, 0)
+    await card.waitFor({ state: 'hidden' })
+    return { previewPage, row, card, console }
+  }
+
+  it('keeps the Session preview within narrow pointer windows and reachable across its anchor gap', async () => {
+    const { previewPage, row, card, console } = await previewWitness()
+    const reveal = async (): Promise<void> => {
+      await showSidebar(previewPage)
+      await row.hover()
+      await card.waitFor()
+    }
+    if (workflowMatrixEnabled) {
+      await auditWorkflowState(previewPage, 'workspace-hovercard', 'narrow-pointer-preview', card, [], reveal)
+    } else {
+      for (const viewport of [{ width: 320, height: 568 }, { width: 872, height: 230 }]) {
+        await previewPage.setViewportSize(viewport)
+        await reveal()
+        await auditResponsiveControl(previewPage, card, 'Session preview in a narrow pointer window')
+      }
+    }
+    await card.hover()
+    await previewPage.waitForTimeout(POINTER_HOLD_MS)
+    expect(await card.isVisible()).toBe(true)
+    await previewPage.keyboard.press('Escape')
+    await card.waitFor({ state: 'hidden' })
+    expect(console.pageErrors).toEqual([])
+  }, workflowMatrixEnabled ? 180_000 : 60_000)
+
+  it('opens the Session preview from keyboard focus and keeps it while its copy action is focused', async () => {
+    const { previewPage, row, card, console } = await previewWitness()
+    if (responsiveBrowserName !== 'firefox') {
+      await previewPage.context().grantPermissions(responsiveBrowserName === 'webkit' ? ['clipboard-read'] : ['clipboard-read', 'clipboard-write'])
+    }
+    await previewPage.getByRole('button', { name: 'Settings', exact: true }).focus()
+    await previewPage.keyboard.press('Tab')
+    await row.focus()
+    await card.waitFor({ timeout: 5_000 })
+    await previewPage.keyboard.press(responsiveBrowserName === 'webkit' ? 'Alt+Tab' : 'Tab')
+    await previewPage.mouse.move(0, 0)
+    await previewPage.waitForTimeout(POINTER_HOLD_MS)
+    expect(await card.evaluate(element => element === document.activeElement)).toBe(true)
+    await auditResponsiveControl(previewPage, card, 'Keyboard Session preview')
+    await card.press('Enter')
+    await previewPage.getByRole('status').getByText('Copied', { exact: true }).waitFor()
+    if (responsiveBrowserName !== 'firefox') expect(await previewPage.evaluate(() => navigator.clipboard.readText())).toBe('Preview witness title')
+    await previewPage.keyboard.press('Escape')
+    await card.waitFor({ state: 'hidden' })
+    expect(await row.evaluate(element => element === document.activeElement)).toBe(true)
+    await previewPage.keyboard.press(responsiveBrowserName === 'webkit' ? 'Alt+Tab' : 'Tab')
+    expect(await row.evaluate(element => element === document.activeElement)).toBe(false)
+    expect(console.pageErrors).toEqual([])
   }, 60_000)
 
   it('keeps an open row menu up while the pointer moves between trigger and list', async () => {
@@ -570,6 +730,27 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await clickHoverAction(sessionRow, triggerName)
     const item = page.getByRole('menuitem', { name: 'Rename' })
     await item.waitFor({ timeout: 5_000 })
+    await audit('session-actions', page.getByRole('menu'), [], async () => {
+      const width = page.viewportSize()!.width
+      const frame = page.locator('[data-viewport]').first()
+      const mode = width < 768 ? 'compact' : width < 1024 ? 'medium' : width < 1440 ? 'expanded' : 'wide'
+      await expect.poll(() => frame.getAttribute('data-viewport'), { message: `row menu frame at ${width}px` }).toBe(mode)
+      // Each viewport opens the menu from its current sidebar presentation.
+      // Crossing the drawer breakpoint can dismiss the previous owner.
+      if (await item.isVisible()) {
+        await page.keyboard.press('Escape')
+        await item.waitFor({ state: 'hidden', timeout: 5_000 })
+      }
+      await showSidebar()
+      await expect.poll(() => frame.getAttribute('data-sidebar-collapsed'), { message: `row menu sidebar at ${width}px` }).toBeNull()
+      await trigger.tap({ timeout: 5_000 })
+      await item.waitFor({ state: 'visible', timeout: 5_000 })
+    })
+    if (workflowMatrixEnabled) {
+      await page.keyboard.press('Escape')
+      expect(tripwire.pageErrors).toEqual([])
+      return
+    }
     // Into the list, then back up to the trigger across the 4px gap below it:
     // without the gap-crossing grace, that return trip fires the list's
     // pointerleave and closes the menu — a hesitating pointer loses it.
@@ -612,6 +793,8 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
       .filter({ has: page.locator('button[aria-label^="Session actions for "]') })
     await expect.poll(() => sessionRows.count(), { timeout: 10_000 }).toBe(1)
     const sessionRow = sessionRows.first()
+    await sessionRow.click()
+    await expect.poll(() => sessionRow.getAttribute('aria-selected')).toBe('true')
     const rowTitle = await sessionRow.locator('[class*="title"]').innerText()
     const sessionTitles = () => ungroupedSection.locator('[role="treeitem"][aria-selected] [class*="title"]').allTextContents()
     const titlesBefore = await sessionTitles()
@@ -620,17 +803,47 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     // Row menu: hover reveals the actions button; Archive session commits
     // without a confirmation dialog (non-destructive: log + accounting stay).
     const durableIds = (await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id).sort()
+    const originalViewport = page.viewportSize()
+    if (originalViewport === null) throw new Error('Workspace acceptance requires an explicit viewport')
+    try {
+      for (const viewport of workflowMatrixEnabled ? responsiveViewports : [originalViewport]) {
+        await page.setViewportSize(viewport)
+        await showSidebar()
+        await seededSessionRow()
+        await clickHoverAction(sessionRow, `Session actions for ${rowTitle}`)
+        await page.getByRole('menuitem', { name: 'Archive session' }).click()
+        const toast = page.getByRole('status').filter({ has: page.getByRole('button', { name: 'undo', exact: true }) })
+        const undo = toast.getByRole('button', { name: 'undo', exact: true })
+        const filter = toast.getByRole('button', { name: 'filter archived sessions', exact: true })
+        await undo.waitFor()
+        await auditResponsiveControl(page, undo, 'Workspace archive Undo')
+        await auditResponsiveControl(page, filter, 'Workspace archive filter')
+        const readings = await captureTextContrast(page, [{ label: 'undo', text: undo }, { label: 'filter', text: filter }],
+          `workspace-archive-actions-${viewport.width}x${viewport.height}`)
+        if (!workflowMatrixEnabled) {
+          await undo.hover()
+          readings.push(...await captureTextContrast(page, [{ label: 'undo-hover', text: undo }], 'workspace-archive-action-hover'))
+        }
+        await undo.click()
+        await expect.poll(() => [...scaffold.ctx.workspaceRegistry.archivedSessionIds]).not.toContain(SessionId(SEED_ID))
+        await sessionRow.waitFor({ state: 'visible' })
+        expect((await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id).sort()).toEqual(durableIds)
+        expectTextContrast(readings)
+      }
+    } finally { await page.setViewportSize(originalViewport) }
+    await showSidebar()
     await clickHoverAction(sessionRow, `Session actions for ${rowTitle}`)
     await page.getByRole('menuitem', { name: 'Archive session' }).click()
-    // Archiving the active history selects a client-local blank draft. The
-    // draft keeps its group visible without creating a persistent Session.
+    // The active archive opens a client-local draft before the next message creates a Session.
     await expect.poll(() => page.getByText(rowTitle, { exact: true }).count(), { timeout: 10_000 }).toBe(0)
-    await expect.poll(() => page.locator('[role="treeitem"][aria-selected="true"]').innerText(), { timeout: 10_000 }).toBe('New Session')
+    await expect.poll(() => page.locator('[role="treeitem"][aria-selected="true"]').count()).toBe(0)
+    await expect.poll(() => page.locator('[data-composer-seat] textarea:enabled').inputValue()).toBe('')
     expect((await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id).sort()).toEqual(durableIds)
     for (const title of retainedTitles) await expect.poll(() => page.getByText(title, { exact: true }).count()).toBeGreaterThan(0)
     // Durable on the host: the registry-global set carries the id while the
     // session log itself stays in persistence untouched.
     expect([...scaffold.ctx.workspaceRegistry.archivedSessionIds]).toEqual([SessionId(SEED_ID)])
+    await auditSidebar('session-archived')
     expect((await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id)).toContain(SessionId(SEED_ID))
     // Reload: the hidden state is rebuilt from the workspace.list baseline.
     const warningStart = tripwire.warnings.length
@@ -642,7 +855,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     expect(await page.getByText(rowTitle, { exact: true }).count()).toBe(0)
     await expect.poll(sessionTitles, { timeout: 10_000 }).toEqual(retainedTitles)
     expect(tripwire.pageErrors).toEqual([])
-  }, 90_000)
+  }, workflowMatrixEnabled ? 240_000 : 90_000)
 
   it('restores an archived session through the Settings Archived sessions page', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-ws-unarchive'))
@@ -660,12 +873,14 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await expect.poll(() => rows.count(), { timeout: 10_000 }).toBe(1)
     const rowTitle = await rows.first().locator('[class*="title"]').innerText()
     expect(await rows.first().innerText()).toContain('Ungrouped')
+    await audit('archived-sessions', dialog, [rows.first().getByRole('button', { name: `Unarchive ${rowTitle}` })])
     await rows.first().getByRole('button', { name: `Unarchive ${rowTitle}` }).click()
     // Durable on the host: the id leaves the registry-global set and the
     // session log is untouched.
     await expect.poll(() => [...scaffold.ctx.workspaceRegistry.archivedSessionIds], { timeout: 10_000 }).toEqual([])
     expect((await scaffold.ctx.sessionPersistence.listHeaders()).map(header => header.id)).toContain(SessionId(SEED_ID))
     await expect.poll(() => dialog.getByText('No archived sessions.', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
+    await audit('archived-empty', dialog, [dialog.getByRole('button', { name: 'Close', exact: true })])
     await page.keyboard.press('Escape')
     // The restored row is visible again in the sidebar's Ungrouped bucket.
     // (The archive dialog keeps the host display label while the sidebar row

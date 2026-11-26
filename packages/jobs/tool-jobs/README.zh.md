@@ -35,6 +35,8 @@ kind: "package-reference"
 
 三个工具依次返回 `{ text, job }`、`PublicJobSnapshot[]` 与 `{ outcome: 'cancellation-requested' | 'already-finished', job }`。公共快照携带 id、kind、label、带实时进度行或终态 detail 的状态，以及开始／结束时间，并省略归属与环偏移。三个工具都通过通用 UI 卡片渲染：output 和 list 用 `read`，kill 用 `execute`。
 
+待处理的用户中途引导可结束 `job_output` 的阻塞等待，返回当前状态。后台任务仍继续运行。被动输入在下一步使用。驱动器没有实时引导能力时，等待结束于任务结算、超时或取消。
+
 ### 完成通知
 
 任务完成时，拥有它的 agent 会收到会话内消息 `background job <id> (<kind>: <label>) finished [status: ...]. Read its output with job_output.`。繁忙的 agent 会在下一步收到注入的通知——inbox 尚有内容时轮次无法结束，因此同时结算的多个任务只花掉一步，而不是各占一轮。空闲的 agent 则被一个 follow-up 轮次唤醒，因为无人领取的通知就是模型永远不会知道的完成。模型已经收走的完成不再通知：注册表把释放了存活 `wait` 的结算报告为 `awaited`——无论是 `job_output` 的等待，还是 shell 工具在等待自己的前台命令——插件则记着模型经 `job_kill` 请求的杀停；所有者或服务 teardown 导致的结算会被跳过，因为没有人能读它。

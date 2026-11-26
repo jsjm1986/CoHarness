@@ -251,7 +251,7 @@ export function UsagePage() {
           <EmptyState icon={Gauge} title={t('emptyTitle')} detail={t('emptyDetail')} />
         ) : (
           <>
-            <div className="tableWrap desktopOnly">
+            <div className="tableWrap desktopOnly" role="region" aria-label={t('usersTitle')} tabIndex={0}>
               <table className="dataTable usageTable">
                 <thead>
                   <tr><th>{t('columnUser')}</th><th>{t('metricPersonalCalls')}</th><th>{t('metricPersonalTokens')}</th><th>{t('columnContribution')}</th><th>{t('metricPersonalCost')}</th><th>{t('columnPricing')}</th><th>{t('columnMeteringQuota')}</th></tr>
@@ -259,7 +259,7 @@ export function UsagePage() {
                 <tbody>
                   {rows.map(row => (
                     <tr key={row.userId}>
-                      <td><UsageIdentity row={row} /></td>
+                      <td className="tableTextCell"><UsageIdentity row={row} /></td>
                       <td>{row.personal.calls.toLocaleString()}</td>
                       <td><TokenBreakdown summary={row.personal} /></td>
                       <td><ContributionValue value={row.projectContribution.totalTokens} calls={row.projectContribution.calls} /></td>
@@ -292,7 +292,7 @@ export function UsagePage() {
         )}
       </Section>
       <Section flush className="responsiveSection" title={t('healthTitle')} meta={health?.timeZone}>
-        {health === null ? <LoadingState label={t('loadingHealth')} /> : (
+        {health === null ? loading ? <LoadingState label={t('loadingHealth')} /> : null : (
           <div className="usageHealthMetrics" aria-label={t('healthAria')}>
             <Metric
               label={t('healthMissing')}

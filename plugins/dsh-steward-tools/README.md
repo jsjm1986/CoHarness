@@ -10,12 +10,13 @@ Tool surface for the reserved **steward** maintenance runtime: one audited SQL c
 - Read statements (`SELECT`/`WITH`/`VALUES`/`TABLE`/`SHOW`/`EXPLAIN`) execute directly. Anything else first asks the operator through the session approval channel, then carries the granted approval id to the Gateway, which re-verifies it against `conversation_interaction_responses` before executing.
 - `dry_run` returns the statement's `EXPLAIN` plan without executing — including for writes, which need no approval because nothing is applied.
 - `row_limit` bounds returned read rows and dry-run plan rows. The Gateway's result-size limit can truncate either response earlier; the tool marks truncated plans and read results explicitly.
+- Cancelling the tool stops its Gateway request. The Gateway owns the recorded outcome of any statement it has already accepted.
 - Every attempt — read, denied, failed, applied — is journaled by the Gateway in `harness.steward_query_log`.
 - Registers the `steward:policy` system-prompt section so the model knows it runs in the maintenance channel: audited SQL, read-only transactions, in-conversation write approval, journaling.
 
 ## Boundary (honest limits)
 
-- Statement classification in this package is a UX hint for the approval prompt. The authoritative classification and limits (statement bytes, row cap, result bytes, statement timeout) live in the Gateway executor (`gateway/src/postgres/steward-query.ts`), which reclassifies independently — a mismatch denies, never widens.
+- The tool and Gateway use the same statement classifier. A data-changing CTE or an outer write command enters the approval lane. Read-only CTEs use the read lane. The Gateway classifies the submitted SQL itself and enforces the transaction mode, exact approval binding, and statement limits.
 - The tool cannot create approvals: without a granted in-session approval the write fails closed, and the approval id is bound to the calling session via its `callId`.
 - The steward runtime cannot change its own plugin composition; `steward_query` is mounted by the deployment patch, not through plugin management.
 - Administrative operations outside SQL (release activation, runtime restarts) are not exposed by this package; the operator applies them from the admin surface.
@@ -25,3 +26,5 @@ Tool surface for the reserved **steward** maintenance runtime: one audited SQL c
 `tests/query.spec.ts` covers statement classification and the approval-prompt preview; `tests/composition.spec.ts` covers registration, disposal, and actual dry-run tool execution with and without truncation. The executor contract is covered by Gateway tests beside `steward-query.ts`.
 
 The keyless [steward-query-truncation snapshot](../../snapshots/session/steward-query-truncation/snapshot.yml) loads the source plugin through the shipped headless profile and records the truncated plan as a model-visible tool result. Replay from the repository root with `DSH_EXAMPLE_MODE=src DSH_SNAPSHOT=replay pnpm exec vitest run --config vitest.snapshot.config.ts snapshots/session/headless.snapshot.ts -t steward-query-truncation`.
+
+With `DSH_EXAMPLE_MODE=lib`, the source plugin resolves the built Gateway statement classifier through the root workspace development dependency.

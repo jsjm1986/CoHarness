@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write apps/web/tests/README.md
 document:
-  en: ef1dbfc71d0d7d1f4a36579232cdc478c135e5bb
-  zh: c165b2a62a1e0b362d9003c4b86acaf7e0b46ae6
+  en: b5ca503de4bf7f4e5739cfa2dae1a9f2d1e19044
+  zh: 06de29a04488e683458c53e2df7c8e43bcc5d054
 /apps-web-browser-e2e:
-  en: 11e73e82ea5d4855
-  zh: 6673d11c91311641
+  en: 07f2cc6077f9ef51
+  zh: a9a5e0934a3d546b
 /apps-web-browser-e2e/these-are-host-face-tests:
   en: 1ab7a5ef91395d5d
   zh: b462d0854e3f7170
@@ -16,4 +16,7 @@ document:
   zh: bd0a659387ccef76
 /apps-web-browser-e2e/runtime-scope-and-timed-question-regressions:
   en: 14e0a33f8a953713
-  zh: 361f30568f0d2798
+  zh: 9d5d5fe73b12020b
+/apps-web-browser-e2e/mobile-acceptance:
+  en: 7a765055183af8fb
+  zh: ba697b4f39db67a8

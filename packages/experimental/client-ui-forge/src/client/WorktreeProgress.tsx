@@ -104,11 +104,12 @@ interface CreationView {
 
 /** The running attempt, else the failed or stopped one a message waits after, or undefined without either. */
 function creationOf(worktree: ForgePanelWorktree): CreationView | undefined {
-  const { creation, failure, waiting } = worktree
+  const { request, created, creation, failure, waiting } = worktree
+  if (request === null || created !== null) return undefined
   if (creation !== null) return { ...creation, state: 'running', message: null }
   if (waiting !== 'creation') return undefined
   if (failure !== null) return { ...failure, state: 'failed', held: false }
-  return { state: 'stopped', phase: 'prepare', branch: null, from: worktree.request?.from ?? null, message: null, held: false }
+  return { state: 'stopped', phase: 'prepare', branch: null, from: request.from, message: null, held: false }
 }
 
 function Details({ creation, t }: { readonly creation: CreationView; readonly t: Translate }): ReactNode {

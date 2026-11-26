@@ -220,7 +220,7 @@ export interface PersistenceBackend<TornMarker = unknown> {
    * Durably append a CONTIGUOUS batch, lazily materializing the session first
    * when `!isMaterialized`. The materialize-write and the first event batch MUST
    * commit ATOMICALLY (a crash between them must not leave a materialized-but-
-   * empty session). Returns once the batch is durable.
+   * empty session). Borrow the events read-only. Returns once the batch is durable.
    * The coordinator calls this only after a first batch reaches the declared
    * inherited prefix length.
    */
@@ -931,6 +931,15 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   }
 
   /**
+   * Observe whether this provider has adopted or committed the stored Session.
+   * @param id - Session to check without accessing storage.
+   * @returns true when the tracked Session has a committed artifact.
+   */
+  isMaterialized(id: SessionId): boolean {
+    return this.states.get(id)?.materialized === true
+  }
+
+  /**
    * Storage metadata for a session bound to a live Session through
    * `session/created`, or `undefined` for untracked and detached ids. Awaits
    * any in-flight registration for the id so a concurrent `create` observes
@@ -1051,7 +1060,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     }
 
     if (deferDraft && state.storage.meta.draft === true && !state.materialized && !events.some(materializesSession)) {
-      state.pendingEvents.push(...events.map(event => structuredClone(event)))
+      for (const event of events) state.pendingEvents.push(event)
       return
     }
 
@@ -1604,7 +1613,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       void this.initFor(session)
     })
 
-    // Keep a persistence-owned copy of each frozen event and start its bounded window.
+    // The Session publishes deeply frozen events, so the write queue can borrow them.
     ctx.on('session/event', (session, event) => {
       const live = this.initFor(session)
       live.writes.enqueue(event)
@@ -1680,7 +1689,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       throw new Error(`session "${session.id}" preparation no longer matches its persistence state`)
     }
     // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-    const suffix = session.snapshotEvents(state.cursor).map(event => structuredClone(event))
+    const suffix = session.snapshotEvents(state.cursor)
     this.preparations.attach(reservation)
     state.owner = session
     const live: LiveSessionState = {

@@ -60,3 +60,12 @@
     transition: none;
   }
 }
+
+@media (pointer: coarse) {
+  .root { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
+}
+
+:global([data-viewport='compact']) .root {
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
+}

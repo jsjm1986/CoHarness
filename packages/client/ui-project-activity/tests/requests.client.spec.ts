@@ -12,14 +12,25 @@ describe('project activity account requests', () => {
   it('preserves the exact project allocation and opaque pagination cursor', async () => {
     const signal = new AbortController().signal
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ items: [], nextBefore: 'next' }))
-    await expect(fetchActivity('opaque+/%cursor', signal, target)).resolves.toEqual({ items: [], nextBefore: 'next' })
+    await expect(fetchActivity('opaque+/%cursor', signal, target, 8)).resolves.toEqual({ items: [], nextBefore: 'next' })
     const [request, options] = (fetcher.mock.calls[0] ?? [])
     const query = new URL(requestUrl(request), 'http://dsh.internal').searchParams
     expect(query.get('before')).toBe('opaque+/%cursor')
     expect(query.get('limit')).toBe('50')
+    expect(query.get('member')).toBe('8')
     expect(query.get('dshRuntime')).toBe(target.runtimeId)
     expect(query.get('dshTarget')).toBe('project:9')
     expect(options).toEqual({ credentials: 'same-origin', signal })
+  })
+
+  it('reads a roster from the first page independently of the contributors in it', async () => {
+    const roster = [{ userId: 8, label: 'Zhou' }]
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({ items: [], members: roster }))
+      .mockResolvedValueOnce(Response.json({ items: [], members: [null] }))
+    const signal = new AbortController().signal
+    await expect(fetchActivity(undefined, signal, target)).resolves.toEqual({ items: [], members: roster })
+    await expect(fetchActivity(undefined, signal, target)).rejects.toThrow('invalid roster')
+    expect(fetcher).toHaveBeenCalledTimes(2)
   })
 
   it('keeps standalone reads unqualified and sends personal allocations explicitly', async () => {
@@ -59,14 +70,17 @@ describe('project activity account requests', () => {
   })
 
   it('posts generation to the same allocation and propagates refusal', async () => {
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({ started: false, reason: 'busy' }))
+    const signal = new AbortController().signal
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({ started: false, reason: 'generating' }))
       .mockResolvedValueOnce(new Response(null, { status: 403 }))
-    await expect(generateProgress(target)).resolves.toEqual({ started: false, reason: 'busy' })
+      .mockResolvedValueOnce(Response.json({ started: false }))
+    await expect(generateProgress(target, signal)).resolves.toEqual({ started: false, reason: 'generating' })
     const [request, options] = (fetcher.mock.calls[0] ?? [])
     const query = new URL(requestUrl(request), 'http://dsh.internal').searchParams
     expect(query.get('dshRuntime')).toBe(target.runtimeId)
     expect(query.get('dshTarget')).toBe('project:9')
-    expect(options).toEqual({ method: 'POST', credentials: 'same-origin' })
-    await expect(generateProgress(target)).rejects.toThrow('403')
+    expect(options).toEqual({ method: 'POST', credentials: 'same-origin', signal })
+    await expect(generateProgress(target, signal)).rejects.toThrow('403')
+    await expect(generateProgress(target, signal)).rejects.toThrow('invalid generation result')
   })
 })

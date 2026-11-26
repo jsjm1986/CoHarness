@@ -3,11 +3,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Pool } from 'pg'
 import { z } from 'zod'
 import {
-  RESOURCE_MESSAGE_MAX_BYTES, resourceFinishSchema, resourceRequestSchema, resourceStatusesSchema,
-  type ResourceOrigin, type ResourceStatus,
+  RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_CHANGE_WAIT_TIMING_HEADER,
+  RESOURCE_MESSAGE_MAX_BYTES, RESOURCE_PHASE_TIMING_HEADER, RESOURCE_QUALIFIED_GRANT_HEADER,
+  resourceFinishSchema, resourceRequestSchema, resourceStatusesSchema,
+  type ResourceOrigin, type ResourceStatus, type ResourceWireRequest,
 } from '@deepseek-ai/dsh-resource-budget/wire'
-import { ExecutionIdentityError, type GatewayExecutionIdentity } from './execution-identity.ts'
+import { ExecutionIdentityError, type GatewayExecutionIdentity, type PersonalExecutionWriteFence } from './execution-identity.ts'
 import { NodeResourceBudgetError, type NodeResourceAdmission, type NodeResourceBudget } from './node-resource-budget.ts'
+import { hasOperationTiming, recordResourceQueueDiagnostic, timeOperation } from './operation-timing.ts'
 import type { GatewayPrincipalClaims, GatewayPrincipalSigner } from './principal.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 
@@ -16,6 +19,50 @@ interface Dependencies {
   readonly principals: GatewayPrincipalSigner
   readonly execution: GatewayExecutionIdentity
   readonly budget: NodeResourceBudget
+  readonly personalFence?: PersonalExecutionWriteFence
+  readonly fencedRequest?: ScopedModelRequest
+  readonly waitForQueued?: boolean
+  readonly resourceStatusWaitMs?: number
+  readonly waitSignal?: () => AbortSignal
+  readonly bearerMs?: number
+}
+
+type SessionOrigin = Extract<ResourceOrigin, { kind: 'session' }>
+type ScopedModelRequest = ResourceWireRequest & { kind: 'model'; origin: Required<SessionOrigin> }
+
+function boundedResourcePayload(body: string): unknown {
+  if (Buffer.byteLength(body) > RESOURCE_MESSAGE_MAX_BYTES) return
+  try {
+    const value: unknown = JSON.parse(body)
+    return value
+  } catch (error) {
+    if (error instanceof SyntaxError) return
+    throw error
+  }
+}
+
+/**
+ * Qualify a bounded personal model submission for database-verified admission.
+ * @param body - bounded Runtime API body.
+ * @returns Scoped model metadata; other submissions retain ordinary bearer and write admission.
+ */
+export function scopedModelResourceRequest(body: string): ScopedModelRequest | undefined {
+  const result = resourceRequestSchema.safeParse(boundedResourcePayload(body))
+  if (!result.success) return
+  const { kind, origin } = result.data
+  if (kind === 'model' && origin.kind === 'session' && origin.scopeId !== undefined && Buffer.byteLength(origin.sessionId) <= 256) {
+    return { ...result.data, kind, origin: { ...origin, scopeId: origin.scopeId } }
+  }
+}
+
+/**
+ * Select one exact bounded operation for active model confirmation.
+ * @param body - bounded Runtime API body.
+ * @returns the single operation reference, or undefined for ordinary status admission.
+ */
+export function activeModelStatusOperation(body: string): Pick<ResourceWireRequest, 'sequence' | 'requestId'> | undefined {
+  const result = resourceStatusesSchema.safeParse(boundedResourcePayload(body))
+  if (result.success && result.data.operations.length === 1) return result.data.operations[0]
 }
 
 function assertNeverOrigin(_origin: never): never {
@@ -85,7 +132,7 @@ async function authorizeSession(deps: Dependencies, subject: RuntimeCredentialSu
   if (origin.scopeId === undefined) {
     if (await deps.execution.hasScopes(subject, origin.sessionId)) throw new ExecutionIdentityError(403, 'resource execution requires its immutable scope')
   }
-  return deps.execution.authorize(subject, { sessionId: origin.sessionId, scopeId: origin.scopeId, capability: 'execute' })
+  return deps.execution.authorize(subject, { sessionId: origin.sessionId, scopeId: origin.scopeId, capability: 'execute' }, deps.personalFence)
 }
 
 /** Recheck stored ownership after the node transaction releases its database connection. */
@@ -128,36 +175,102 @@ export async function handleRuntimeResourceApi(
     res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
     res.end(JSON.stringify(value))
   }
+  const round = (ms: number): number => Math.round(ms * 100) / 100
+  const { bearerMs } = deps
+  const timing = bearerMs === undefined ? undefined : (authorityMs: number, transactionMs: number): void => {
+    res.setHeader(RESOURCE_PHASE_TIMING_HEADER, JSON.stringify([round(bearerMs), round(authorityMs), round(transactionMs)]))
+  }
   if (req.method !== 'POST') { send(405, { error: 'resource-method' }); return true }
   if (Buffer.byteLength(body) > RESOURCE_MESSAGE_MAX_BYTES) { send(413, { error: 'resource-message-too-large' }); return true }
   try {
-    const payload: unknown = JSON.parse(body)
+    const payload: unknown = deps.fencedRequest ?? JSON.parse(body)
     switch (pathname.slice('/internal/runtime/resources/'.length)) {
       case 'register':
         z.object({}).strict().parse(payload)
         send(200, await deps.budget.register(subject))
         return true
       case 'request': {
-        const request = resourceRequestSchema.parse(payload)
-        const attribution = await actor(deps, subject, request.origin)
-        send(200, await deps.budget.request(subject, {
+        const request = deps.fencedRequest ?? resourceRequestSchema.parse(payload)
+        const started = timing === undefined ? 0 : performance.now()
+        const fence = deps.fencedRequest === undefined ? undefined : deps.personalFence
+        const scopedModel = request.kind === 'model' && request.origin.kind === 'session' && request.origin.scopeId !== undefined
+        const cursor = deps.waitForQueued === true && (fence !== undefined || scopedModel) ? deps.budget.changeCursor : undefined
+        const attribution = fence === undefined ? await actor(deps, subject, request.origin)
+          : { actorId: subject.target.id, administrative: false }
+        const authorized = timing === undefined ? 0 : performance.now()
+        let status = await deps.budget.request(subject, {
           sequence: request.sequence, requestId: request.requestId, kind: request.kind, ...attribution, origin: request.origin.kind,
           projectId: subject.target.kind === 'project' ? subject.target.id : 0,
           ...(request.origin.kind === 'session' ? { sessionId: request.origin.sessionId, scopeId: request.origin.scopeId } : {}),
-        }))
+        }, fence)
+        const reserved = timing === undefined ? 0 : performance.now()
+        let postAuthorizeMs = 0
+        if (cursor !== undefined && status.state === 'queued') res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
+        if (fence !== undefined && status.state === 'active') {
+          res.setHeader(RESOURCE_QUALIFIED_GRANT_HEADER, '1')
+        } else if (fence === undefined && scopedModel && status.state === 'active' && request.origin.kind === 'session') {
+          // Confirm post-reservation scope authority in-process so project and
+          // node_content model grants avoid a second /resources/statuses HTTP round trip.
+          const postStarted = timing === undefined ? 0 : performance.now()
+          try {
+            await authorizeSession(deps, subject, request.origin)
+            res.setHeader(RESOURCE_QUALIFIED_GRANT_HEADER, '1')
+          } catch (error) {
+            if (error instanceof ExecutionIdentityError && (error.status === 403 || error.status === 404)) {
+              status = { state: 'refused', reason: 'authority-unavailable' }
+            } else {
+              throw error
+            }
+          } finally {
+            if (timing !== undefined) postAuthorizeMs = performance.now() - postStarted
+          }
+        }
+        if (status.state === 'queued' && hasOperationTiming()) recordResourceQueueDiagnostic(deps.budget.queueDiagnostic())
+        timing?.((authorized - started) + postAuthorizeMs, reserved - authorized)
+        send(200, status)
         return true
       }
       case 'statuses': {
         const request = resourceStatusesSchema.parse(payload)
+        const waitMs = deps.resourceStatusWaitMs ?? 0
+        const seen = req.headers?.[RESOURCE_CHANGE_CURSOR_HEADER]
+        let waiting = false
+        let changeWaitMs: number | undefined
+        if (deps.waitForQueued === true && waitMs > 0
+          && req.headers?.[RESOURCE_ACTIVE_MODEL_CHECK_HEADER] === '1'
+          && request.operations.length === 1
+          && typeof seen === 'string' && /^[a-f0-9-]{36}\.\d{1,16}$/u.test(seen)) {
+          const signal = deps.waitSignal?.() ?? new AbortController().signal
+          const startedWait = timing === undefined ? undefined : performance.now()
+          try { waiting = await timeOperation('resourceChangeWait', () => deps.budget.waitForChange(seen, waitMs, signal)) }
+          catch (error) { if (signal.aborted) return true; throw error }
+          if (startedWait !== undefined) changeWaitMs = performance.now() - startedWait
+        }
+        const cursor = waiting ? deps.budget.changeCursor : undefined
+        const started = timing === undefined ? 0 : performance.now()
         const admissions = await deps.budget.admissions(subject, request.operations)
+        const observed = timing === undefined ? 0 : performance.now()
         const statuses: ResourceStatus[] = []
         for (const admission of admissions) statuses.push(await qualifiedStatus(deps, subject, admission))
+        if (cursor !== undefined && statuses.length === 1 && statuses[0]?.state === 'queued') {
+          res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
+        }
+        if (changeWaitMs !== undefined) res.setHeader(RESOURCE_CHANGE_WAIT_TIMING_HEADER, changeWaitMs.toFixed(2))
+        if (statuses.some(item => item.state === 'queued') && hasOperationTiming()) {
+          recordResourceQueueDiagnostic(deps.budget.queueDiagnostic())
+        }
+        timing?.(performance.now() - observed, observed - started)
         send(200, statuses)
         return true
       }
       case 'finish': {
         const request = resourceFinishSchema.parse(payload)
-        await deps.budget.finish(subject, request, request.outcome)
+        const started = timing === undefined ? 0 : performance.now()
+        try {
+          await timeOperation('resourceFinishDatabase', () => deps.budget.finish(subject, request, request.outcome))
+        } finally {
+          timing?.(0, performance.now() - started)
+        }
         send(200, {})
         return true
       }
@@ -166,6 +279,10 @@ export async function handleRuntimeResourceApi(
         return true
     }
   } catch (error) {
+    if (deps.fencedRequest !== undefined && error instanceof Error && 'code' in error) {
+      if (error.code === 'P4101') throw new ExecutionIdentityError(403, 'personal execution is no longer authorized')
+      if (error.code === 'P4104') throw new ExecutionIdentityError(503, 'execution writes are unavailable')
+    }
     if (error instanceof NodeResourceBudgetError) send(error.status, { error: `resource-${error.reason}` })
     else if (error instanceof z.ZodError || error instanceof SyntaxError) send(400, { error: 'resource-message' })
     else throw error

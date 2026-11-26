@@ -1,3 +1,6 @@
 import { clientBundle } from '../tsdown.client.ts'
 
-export default clientBundle('@deepseek-ai/dsh-client-ui-plugin-manager', ['lib/types/index.js'], { hostPhase: true })
+export default clientBundle('@deepseek-ai/dsh-client-ui-plugin-manager', ['lib/types/index.js'], {
+  hostPhase: true,
+  preserveEntrySignatures: 'allow-extension',
+})

@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-client-web/src/boot-page
  */
 import type { LoaderEntryState } from './loader-status.ts'
+import type { StartupDraftView } from './startup-draft.ts'
 import css from './boot-page.module.css'
 
 /** Create a div with one module class and optional text. */
@@ -37,7 +38,7 @@ const MASCOT_SVG = `<svg viewBox="0 0 64 64" width="44" height="44" fill="none" 
 export class BootPage {
   private readonly root: HTMLDivElement
   private readonly card: HTMLDivElement
-  private readonly brand: HTMLDivElement
+  private readonly progress: HTMLDivElement
   private readonly spinner: HTMLDivElement
   private readonly hint: HTMLDivElement
   private readonly states = new Map<string, LoaderEntryState>()
@@ -53,14 +54,16 @@ export class BootPage {
     this.root = div(css.boot)
     this.root.dataset.dshBoot = ''
     this.card = div(css.card)
-    this.brand = div(css.brand)
-    this.brand.innerHTML = MASCOT_SVG
+    const brand = div(css.brand)
+    brand.innerHTML = MASCOT_SVG
     const wordmark = div(css.wordmark, 'COHARNESS')
-    this.brand.append(wordmark)
+    brand.append(wordmark)
+    this.progress = div(css.progress)
     this.spinner = div(css.spinner)
     this.spinner.dataset.dshBootSpinner = ''
     this.hint = div(css.hint, 'Loading plugins…')
-    this.card.append(this.brand, this.spinner, this.hint)
+    this.progress.append(this.spinner, this.hint)
+    this.card.append(brand, this.progress)
     this.root.append(this.card)
     container.append(this.root)
     this.updateProgress()
@@ -96,17 +99,26 @@ export class BootPage {
     this.render()
   }
 
+  /** Remove the loader report when opening the full workspace instead of loading plugins here. */
+  stopProgress(): void { this.progress.remove() }
+
   /** Detach the page before or after the UI renderer takes the mount point. */
   dispose(): void {
     this.root.remove()
   }
 
+  /**
+   * Present the existing draft while the remote workspace is starting or recovering.
+   * @param draft - local input owned by this document's remote-entry bootstrap.
+   */
+  attachDraft(draft: StartupDraftView): void { draft.attach(this.card) }
+
   /** Redraw the state-dependent content below the wordmark. */
   private render(): void {
     const failed = [...this.states].filter(([, state]) => state === 'failed').map(([id]) => id)
     if (this.failure === undefined && failed.length === 0) {
-      if (this.spinner.parentElement !== this.card) {
-        this.card.replaceChildren(this.brand, this.spinner, this.hint)
+      if (this.spinner.parentElement !== this.progress) {
+        this.progress.replaceChildren(this.spinner, this.hint)
       }
       return
     }
@@ -114,7 +126,7 @@ export class BootPage {
     report.append(div(css.failedTitle, 'Failed to load plugins'))
     for (const id of failed) report.append(div(css.failedItem, id))
     if (this.failure !== undefined) report.append(div(css.failedItem, this.failure))
-    this.card.replaceChildren(this.brand, report)
+    this.progress.replaceChildren(report)
   }
 
   /** Grow the rotating arc monotonically as loader entries activate. */

@@ -38,10 +38,47 @@ export class PluginStateError extends Error {
 /** The instance profile directory every managed runtime launches. */
 export const INSTANCE_PROFILE = 'web'
 
-interface InternalOwner { organizationId: string; runtimeId: RuntimeId; userId?: string; projectId?: string; binding?:NodeContentBinding; applied?:string }
+/** The Runtime identity an authenticated subject resolves to, plus its content placement when the project is node-hosted. */
+export interface PluginRuntimeOwner { organizationId: string; runtimeId: RuntimeId; userId?: string; projectId?: string; binding?: NodeContentBinding; applied?: string }
 
-interface Querier {
+type InternalOwner = PluginRuntimeOwner
+
+/** A minimal SQL executor the owner resolvers accept: the shared pool or one transaction client. */
+export interface PluginRuntimeQuerier {
   query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]): Promise<QueryResult<R>>
+}
+
+type Querier = PluginRuntimeQuerier
+
+/**
+ * Resolve the subject's live instance row on this node into its Runtime identity.
+ * The query requires exactly one instance matching the organization, owner,
+ * optional target runtime, and the credential's generation, so a stale process
+ * cannot write under its successor's identity.
+ * @param context - this node's runtime context.
+ * @param subject - authenticated runtime credential fields.
+ * @param querier - executor, a transaction client when the caller holds one.
+ * @param lock - take `FOR UPDATE` on the matched instance row.
+ * @returns the internal owner coordinates the instance row names.
+ */
+export async function resolvePluginRuntimeOwner(
+  context: Pick<PostgresRuntimeContext, 'nodeId'>,
+  subject: { organizationId: string; target?: RuntimeTarget; generation?: number; userInternalId?: string; projectInternalId?: string },
+  querier: Querier,
+  lock = false,
+): Promise<PluginRuntimeOwner> {
+  const column = subject.userInternalId === undefined ? 'project_id' : 'user_id'
+  const id = subject.userInternalId ?? subject.projectInternalId
+  if (id === undefined) throw new PluginStateError(404, 'plugin Runtime owner not found')
+  const result = await querier.query<{ runtime_id: RuntimeId; content: NodeContentBinding | null; applied: string }>(`SELECT runtime_id,applied_policy_revision::text applied,
+      harness.project_content_key(organization_id,project_id) content FROM harness.instances
+    WHERE organization_id=$1 AND assigned_node_id=$2 AND ${column}=$3
+      AND ($4::uuid IS NULL OR runtime_id=$4) AND ($5::bigint IS NULL OR generation=$5)
+    ORDER BY runtime_id LIMIT 2${lock ? ' FOR UPDATE' : ''}`,
+  [subject.organizationId, context.nodeId, id, subject.target?.runtimeId ?? null, subject.generation ?? null])
+  if (result.rows.length !== 1) throw new PluginStateError(409, 'plugin publication requires its current Runtime assignment')
+  return { organizationId: subject.organizationId, runtimeId: result.rows[0]!.runtime_id,
+    ...(column === 'user_id' ? { userId: id } : { projectId: id, ...result.rows[0]!.content ? { binding: result.rows[0]!.content } : {}, applied: result.rows[0]!.applied }) }
 }
 
 function ownerColumn(owner: InternalOwner): 'user_id' | 'project_id' {
@@ -396,23 +433,12 @@ export class PostgresPluginState {
     })
   }
 
-  private async subjectOwner(
+  private subjectOwner(
     subject: { organizationId: string; target?: RuntimeTarget; generation?: number; userInternalId?: string; projectInternalId?: string },
     querier: Querier = this.context.pool,
     lock = false,
   ): Promise<InternalOwner> {
-    const column = subject.userInternalId === undefined ? 'project_id' : 'user_id'
-    const id = subject.userInternalId ?? subject.projectInternalId
-    if (id === undefined) throw new PluginStateError(404, 'plugin Runtime owner not found')
-    const result = await querier.query<{ runtime_id: RuntimeId; content:NodeContentBinding|null;applied:string }>(`SELECT runtime_id,applied_policy_revision::text applied,
-        harness.project_content_key(organization_id,project_id) content FROM harness.instances
-      WHERE organization_id=$1 AND assigned_node_id=$2 AND ${column}=$3
-        AND ($4::uuid IS NULL OR runtime_id=$4) AND ($5::bigint IS NULL OR generation=$5)
-      ORDER BY runtime_id LIMIT 2${lock ? ' FOR UPDATE' : ''}`,
-    [subject.organizationId, this.context.nodeId, id, subject.target?.runtimeId ?? null, subject.generation ?? null])
-    if (result.rows.length !== 1) throw new PluginStateError(409, 'plugin publication requires its current Runtime assignment')
-    return { organizationId: subject.organizationId, runtimeId: result.rows[0]!.runtime_id,
-      ...(column === 'user_id' ? { userId: id } : { projectId: id,...result.rows[0]!.content?{binding:result.rows[0]!.content}:{},applied:result.rows[0]!.applied }) }
+    return resolvePluginRuntimeOwner(this.context, subject, querier, lock)
   }
 
   /**
@@ -560,15 +586,17 @@ export class PostgresPluginState {
    * Record the desired-state revision a launch materialized, so later starts
    * skip re-projecting and the runtime's write-back detects administrator
    * writes that landed after it.
-   * @param target - launched runtime owner.
+   * @param target - launching Runtime owner.
    * @param revision - the projected revision.
+   * @param generation - launch generation that owns the projection. A replaced generation is refused.
    */
-  async markApplied(target: RuntimeTarget, revision: string): Promise<void> {
+  async markApplied(target: RuntimeTarget, revision: string, generation: number): Promise<void> {
     const internal = await this.resolveOwner(target)
-    await this.context.pool.query(
+    const result = await this.context.pool.query(
       `UPDATE harness.instances SET applied_policy_revision=$3,updated_at=now()
-        WHERE organization_id=$1 AND runtime_id=$2 AND assigned_node_id=$4`,
-      [internal.organizationId, internal.runtimeId, revision, this.context.nodeId])
+        WHERE organization_id=$1 AND runtime_id=$2 AND assigned_node_id=$4 AND generation=$5`,
+      [internal.organizationId, internal.runtimeId, revision, this.context.nodeId, generation])
+    if (result.rowCount !== 1) throw new PluginStateError(409, 'plugin projection belongs to another Runtime generation')
   }
 
   /**

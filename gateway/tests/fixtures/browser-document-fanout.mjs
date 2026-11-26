@@ -98,6 +98,7 @@ try {
           return response
         },
         browserDocuments: createBrowserDocumentHandler({ transfer, organizationId: org, origin: 'http://127.0.0.1',
+          overview: catalog,
           locations: new PostgresDocumentLocations(context, { pageSize: 40, maxBytes: 65536 }, node), responseLimit: cfg.upstreamResponseLimitBytes }),
       })
       await new Promise((ready, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', ready) })
@@ -132,6 +133,31 @@ try {
       }
       console.log(JSON.stringify({ scenario, targets: outcomes.length, copied: files.length,
         denied: outcomes.filter(item => item.status === 'failed').length, runtimeStarts: starts }))
+      if (scenario === 'stable-admin') {
+        const address = new URL('/account/api/documents/overview?q=report.txt&limit=1', base)
+        const projectRows = new Map()
+        const seen = new Set()
+        for (let page = 0; page < 5; page++) {
+          const response = await fetch(address, { headers: { cookie, accept: 'application/x-ndjson' } })
+          assert.equal(response.status, 200)
+          assert.equal(response.headers.get('content-type'), 'application/x-ndjson')
+          const frames = (await response.text()).trimEnd().split('\n').map(line => JSON.parse(line))
+          const complete = frames.at(-1)
+          assert.equal(complete.type, 'complete')
+          for (const row of complete.page.documents) {
+            assert.equal(seen.has(row.catalogId), false)
+            seen.add(row.catalogId)
+            if (row.scope.kind === 'project') projectRows.set(row.scope.id, row.name)
+          }
+          if (!complete.page.nextCursor) break
+          assert.ok(page < 4, 'fixture pagination must terminate')
+          address.searchParams.set('cursor', complete.page.nextCursor)
+        }
+        assert.deepEqual([...projectRows.keys()].sort(), targets.map(target => target.scope.projectId).sort())
+        assert.ok([...projectRows.values()].every(name => name === 'report.txt'))
+        assert.equal(starts, 0)
+        console.log(JSON.stringify({ scenario: 'streamed-document-overview', projectRows: projectRows.size, runtimeStarts: starts }))
+      }
     } catch (error) {
       failure = error
       throw error

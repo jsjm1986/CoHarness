@@ -3,15 +3,17 @@
 .surface { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
 .header { display: flex; flex: none; align-items: flex-start; gap: var(--dsw-space-2); padding: var(--dsw-space-3); }
 .heading { flex: 1 1 auto; min-width: 0; }
-.heading h3 { margin: 0; font-size: 13px; font-weight: 500; line-height: 20px; overflow-wrap: anywhere; }
-.heading p { margin: 3px 0 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.heading h3 { margin: 0; font-size: 0.8125rem; font-weight: 500; line-height: 1.25rem; overflow-wrap: anywhere; }
+.heading p { margin: 3px 0 0; color: var(--dsw-alias-label-secondary); font-size: 0.75rem; line-height: 1.125rem; overflow-wrap: anywhere; }
 .close { flex: none; width: 32px; min-height: 32px; padding: 0; margin-top: -4px; }
 .body { --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2); --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2); display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--dsw-space-3); min-height: 0; margin: 0 var(--dsw-space-3) var(--dsw-space-3); padding: var(--dsw-space-3); border-radius: var(--dsw-radius-md); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: var(--dsw-alias-bg-layer-2); }
-.status { margin: auto; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; text-align: center; }
-.download { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 36px; padding: 0 var(--dsw-space-3); border-radius: var(--dsw-radius-control); color: var(--dsw-alias-label-primary); font-size: 13px; text-decoration: none; background: var(--dsw-alias-interactive-bg-hover); }
+.status { margin: auto; color: var(--dsw-alias-label-secondary); font-size: 0.8125rem; line-height: 1.25rem; text-align: center; }
+.download { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 36px; padding: 0 var(--dsw-space-3); border-radius: var(--dsw-radius-control); color: var(--dsw-alias-label-primary); font-size: 0.8125rem; text-decoration: none; background: var(--dsw-alias-interactive-bg-hover); }
 .image { display: block; width: 100%; height: auto; object-fit: contain; }
-.frame { flex: 1 1 auto; width: 100%; min-height: 300px; border: 0; background: var(--dsw-alias-bg-layer-1); }
-.text { overflow: visible; margin: 0; color: var(--dsw-alias-label-primary); font-family: var(--ds-font-family-code); font-size: 12px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.frame, .pdf { flex: 1 1 auto; width: 100%; min-height: 0; height: 100%; border: 0; background: var(--dsw-alias-bg-layer-1); }
+.pdf { display: flex; flex-direction: column; overflow: hidden; }
+.pdf > :first-child { flex: 1 1 auto; min-height: 0; }
+.text { overflow: visible; margin: 0; color: var(--dsw-alias-label-primary); font-family: var(--ds-font-family-code); font-size: 0.75rem; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
 .actions { flex: none; display: flex; flex-direction: column; gap: var(--dsw-space-2); padding: var(--dsw-space-3); border-top: 0.5px solid var(--dsw-alias-border-l2); }
 .loading { display: flex; flex-direction: column; gap: var(--dsw-space-3); padding: var(--dsw-space-3); }
 .loading span { height: 14px; width: 90%; border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-interactive-bg-hover); }
@@ -22,37 +24,33 @@
 @media (max-width: 767px) {
   .dialog.dialog { width: 100%; height: 100%; min-height: 0; max-height: 100%; padding: 0; gap: 0; border-radius: 0; animation: none; }
   .header { min-height: 64px; padding: var(--dsw-space-3); border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
-  .heading h3 { font-size: 14px; line-height: 21px; }
+  .heading h3 { font-size: 0.875rem; line-height: 1.3125rem; }
   .close { width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); margin: -4px 0 0 -4px; }
   .body { margin: var(--dsw-space-3); }
-  .text { font-size: 13px; }
+  .text { font-size: 0.8125rem; }
   .actions { padding-bottom: calc(var(--dsw-space-3) + var(--dsw-safe-bottom)); }
 }
 @media (hover: hover) { .download:hover { background: var(--dsw-alias-interactive-bg-active); } }
 
 .fileTypeIcon { flex: none; margin-top: 1px; }
 
-.body:has(> .frame) { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
-.frame { min-height: 0; height: 100%; }
-@media (max-width: 767px) {
-  .dialog.dialog { width: 100%; height: 100%; min-height: 0; max-height: 100%; padding: 0; gap: 0; border-radius: 0; animation: none; }
-  .header { min-height: 64px; padding: var(--dsw-space-3); border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
-  .heading h3 { font-size: 14px; line-height: 21px; }
-  .close { width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); margin: -4px 0 0 -4px; }
-  .body { margin: var(--dsw-space-3); }
-  .text { font-size: 13px; }
-  .actions { padding-bottom: calc(var(--dsw-space-3) + var(--dsw-safe-bottom)); }
-}
-@media (hover: hover) { .download:hover { background: var(--dsw-alias-interactive-bg-active); } }
-
-.fileTypeIcon { flex: none; margin-top: 1px; }
-
-.body:has(> .frame) { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
-.frame { min-height: 0; height: 100%; }
+.body:has(> .frame, > .pdf) { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
 
 @media (max-width: 767px) {
   .dialog.dialog::before { display: none; }
   .header { box-sizing: border-box; min-height: calc(72px + var(--dsw-safe-top)); padding: calc(10px + var(--dsw-safe-top)) 12px 10px; }
-  .heading h3 { font-size: 15px; line-height: 22px; }
+  .heading h3 { font-size: 0.9375rem; line-height: 1.375rem; }
 }
 @media (pointer: coarse) { .download { min-height: var(--dsw-touch-target); } }
+
+@media (max-width: 1100px) and (max-height: 480px) {
+  .overlay { padding: 0; }
+  .dialog.dialog { width: 100%; height: 100%; min-height: 0; max-height: 100%; border-radius: 0; }
+  .header { position: sticky; inset-block-start: 0; z-index: 1; align-items: center; min-height: 0; padding: var(--dsw-space-1) var(--dsw-space-3); background: var(--dsw-alias-bg-layer-1); }
+  .heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--dsw-space-3); }
+  .heading h3 { min-inline-size: 0; }
+  .heading p { margin: 0; }
+  .surface { overflow-y: auto; overscroll-behavior: contain; }
+  .body { isolation: isolate; flex: 1 1 0; min-block-size: 48px; block-size: auto; }
+  .body:has(> .frame, > .pdf) { flex: 1 0 140px; min-block-size: 140px; }
+}

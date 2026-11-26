@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.md
 document:
-  en: b042bc513a957729051d1d379c9e4b16e2add7a1
-  zh: 58b1f1814f811747f7769d473c683216d13a3cb4
+  en: acd024fc2a028cbfd1bcd8bdbbee5aa4e64c29e9
+  zh: 911b7ba1168c7aea09f5965254fff7e787eba900
 /agent-note-deferred-session-drafts-and-authoritative-content-watermarks:
   en: 8f37310a316ab0ff
   zh: 1c1f69596b74b3c1
@@ -12,17 +12,17 @@ document:
   en: f5a589d2aa23eb5a
   zh: 93a2a0dbca39c55f
 /agent-note-deferred-session-drafts-and-authoritative-content-watermarks/decision:
-  en: f2c85c30f24ff584
-  zh: 16f5e45bcc154563
+  en: 9786fa783e740d94
+  zh: 435fa5ff72ebff21
 /agent-note-deferred-session-drafts-and-authoritative-content-watermarks/alternatives-considered:
-  en: deeecbcbc96b1b0e
-  zh: 76b4eb7d492bda2a
+  en: 18882094a3b3dc2e
+  zh: 46103c43e402d7f4
 /agent-note-deferred-session-drafts-and-authoritative-content-watermarks/consequences:
-  en: 0338f8dda82144a2
-  zh: 273f85f21df8272f
+  en: 8341f4787b81740e
+  zh: 4ff6fc447bc49d68
 /agent-note-deferred-session-drafts-and-authoritative-content-watermarks/verification:
-  en: 025250725310c693
-  zh: 79ca6fc8dbc7b54f
+  en: 5901f44ef3da6e5b
+  zh: 98ba2e9ff0b60e53
 /agent-note-deferred-session-drafts-and-authoritative-content-watermarks/related:
   en: 55966685fe127e74
   zh: 05f341ae6437ac62

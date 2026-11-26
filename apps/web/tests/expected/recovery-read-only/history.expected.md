@@ -1,0 +1,20 @@
+- status: This conversation was restored from backup. History and drafts are retained. Start a new conversation to work; old tasks remain paused.
+- textbox "Restored conversation is read-only" [disabled]: This unsent draft belongs to the restored historical conversation.
+- button "Add images or documents" [disabled]:
+  - img
+- button "Choose from Documents" [disabled]:
+  - img
+- button "Commands" [disabled]:
+  - img
+- 'button "Access mode, current: Workspace write" [disabled]': Workspace write
+- button "Select model, current DeepSeek-V4-Flash" [disabled]:
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turn · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turn · 2 steps{{throughput}} tok/s"
+  - button "16K tok · Cache hit 98%":
+    - img
+    - text: 16K tokCache hit 98%

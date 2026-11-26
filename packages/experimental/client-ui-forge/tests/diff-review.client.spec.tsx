@@ -291,14 +291,14 @@ it('writes a left and a right comment at once, each under its own column of the 
   }
   const left = open('L3')
   const right = open('R3')
-  const row = left.closest<HTMLElement>('[data-forge-notes]')!
-  expect(right.closest('[data-forge-notes]')).toBe(row)
-  const [leftCell, rightCell] = Array.from(row.children)
-  expect(leftCell!.contains(left)).toBe(true)
-  expect(rightCell!.contains(right)).toBe(true)
+  const leftCell = left.closest<HTMLElement>('[data-forge-notes]')!
+  const rightCell = right.closest<HTMLElement>('[data-forge-notes]')!
+  expect(leftCell.dataset.forgeNotes).toBe('L')
+  expect(rightCell.dataset.forgeNotes).toBe('R')
+  expect(leftCell.nextElementSibling).toBe(rightCell)
   // Each cell continues the background of its side's line.
-  expect(leftCell!.className).toContain('del')
-  expect(rightCell!.className).toContain('add')
+  expect(leftCell.className).toContain('del')
+  expect(rightCell.className).toContain('add')
   expect(m.line('L3').getAttribute('aria-pressed')).toBe('false')
   fireEvent.change(within(right).getByRole('textbox'), { target: { value: 'Draft' } })
   open('R3')
@@ -316,14 +316,14 @@ it('places side-by-side records in their columns and keeps an editor whose line 
     for (const side of ['L', 'R'] as const) m.records.recordAgent({ source, comment: { ...selectReviewLines(file, side, 3, 4)!, body: side } })
   })
   const threads = Array.from(m.container.querySelectorAll<HTMLElement>('[data-forge-review-thread]'))
-  expect(threads.map(thread => thread.closest('[data-forge-notes]'))).toEqual([threads[0]!.closest('[data-forge-notes]'), threads[0]!.closest('[data-forge-notes]')])
-  const cells = Array.from(threads[0]!.closest('[data-forge-notes]')!.children)
-  expect(threads.map(thread => cells.findIndex(cell => cell.contains(thread)))).toEqual([0, 1])
+  const cells = threads.map(thread => thread.closest<HTMLElement>('[data-forge-notes]')!)
+  expect(cells.map(cell => cell.dataset.forgeNotes)).toEqual(['L', 'R'])
+  expect(cells[0]!.nextElementSibling).toBe(cells[1])
   // The added blank line has no old line, so the left cell of its row is empty.
   fireEvent.click(m.line('R5'))
   fireEvent.click(m.getByRole('button', { name: 'Add comment' }))
   const editor = m.getByRole('region', { name: 'Comment on R5' })
-  const [emptyCell] = Array.from(editor.closest('[data-forge-notes]')!.children)
+  const emptyCell = editor.closest('[data-forge-notes]')!.previousElementSibling
   expect(emptyCell!.className).toContain('empty')
   expect(emptyCell!.querySelector('[data-forge-comments]')!.childElementCount).toBe(0)
   const shorter = { ...file.hunks[0]!, newLines: 3, lines: file.hunks[0]!.lines.slice(0, -1) }
@@ -333,6 +333,22 @@ it('places side-by-side records in their columns and keeps an editor whose line 
   const moved = m.getByRole('region', { name: 'Comment on R5' })
   expect(moved.parentElement).toBe(code)
   expect(rows.indexOf(moved)).toBeGreaterThan(rows.findLastIndex(row => row.hasAttribute('data-diff-pair')))
+})
+
+it('keeps a draft and its focused textarea mounted across unified and split layouts', () => {
+  const m = mount()
+  fireEvent.click(m.line('R3'))
+  fireEvent.click(m.getByRole('button', { name: 'Add comment' }))
+  const input = m.getByRole('textbox')
+  if (!(input instanceof HTMLTextAreaElement)) throw new Error('Review draft must be a textarea')
+  fireEvent.change(input, { target: { value: 'Keep this draft while rotating the phone.' } })
+  expect(document.activeElement).toBe(input)
+  for (const split of [false, true]) {
+    m.rerender(<DiffFile {...m.props} split={split} />)
+    expect(m.getByRole('textbox')).toBe(input)
+    expect(input.value).toBe('Keep this draft while rotating the phone.')
+    expect(document.activeElement).toBe(input)
+  }
 })
 
 it('labels the plus on the unified row that ends a right-side range', () => {

@@ -1,21 +1,27 @@
 // Real Web composition and transport, with recorded LLM streams for keyless
 // concurrency/approval coverage and measured pane layouts. Workspaces and Sessions are created through
 // their production actions; the workbench receives no fixture-only UI state.
+import { nativeTabKey, responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
 import { mkdir, readFile, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page, Locator, Request } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterEach, describe, expect, it, onTestFailed } from 'vitest'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-workspace'
+import type {} from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
+import type {} from '@deepseek-ai/dsh-userdoc'
 import { pdfResourceFixture } from '../../../packages/client/ui-workbench/tests/pdf-resource-fixture.ts'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   fixtureUserPrompts, launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { saveFailureShot } from './support.ts'
+import { auditWorkflowState, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
+import { auditResponsiveControl } from './responsive-controls.ts'
 
 const APPROVAL = fileURLToPath(new URL('./snapshots/approval-composer/session.jsonl', import.meta.url))
 const REPLY = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl', import.meta.url))
@@ -40,6 +46,33 @@ async function prompt(pane: Locator, text: string): Promise<void> {
   const input = pane.locator('textarea').first()
   await input.fill(text)
   await input.press('Enter')
+}
+
+/** Keep capacity outside the name and action hit areas, including long saved names. */
+async function expectWorkbenchToolbarAllocation(toolbar: Locator): Promise<void> {
+  const metrics = await toolbar.evaluate((node) => {
+    const name = node.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')
+    const capacity = node.querySelector<HTMLElement>('[role="img"]')
+    if (name === null || capacity === null) throw new Error('Workbench name or capacity is missing')
+    const count = capacity.getBoundingClientRect()
+    const trigger = name.getBoundingClientRect()
+    const group = capacity.parentElement?.getBoundingClientRect()
+    if (group === undefined) throw new Error('Workbench name group is missing')
+    const peers = [...node.querySelectorAll<HTMLButtonElement>('button')]
+      .filter(button => button !== name && button.getAttribute('role') !== 'tab')
+      .map(button => button.getBoundingClientRect())
+    return {
+      gap: count.left - trigger.right,
+      capacityOverflow: count.right - group.right,
+      countVisible: count.width > 0 && capacity.clientWidth >= capacity.scrollWidth,
+      overlapsAction: peers.some(box => box.width > 0 && box.height > 0 &&
+        box.left < count.right && box.right > count.left && box.top < count.bottom && box.bottom > count.top),
+    }
+  })
+  expect(metrics.gap).toBeGreaterThanOrEqual(0)
+  expect(metrics.capacityOverflow).toBeLessThanOrEqual(1)
+  expect(metrics.countVisible).toBe(true)
+  expect(metrics.overlapsAction).toBe(false)
 }
 
 /** Observe one private page's tab input without changing focus or event delivery. */
@@ -194,6 +227,89 @@ describe('web: Cordis Workspace workbench', () => {
     if (failures.length > 0) throw new AggregateError(failures, 'Workbench fixture teardown failed')
   })
 
+  it.skipIf(MODE === 'record')('renames a named workbench without changing its pane or cancelling draft edits', async () => {
+    scaffold = await launchWebScaffold({ workbench: true, openInApp: false, replayFixture: PROVIDERS, replayProvidersOnly: true })
+    const runtime = scaffold
+    const path = join(runtime.workspaceCwd, 'rename-owner')
+    await mkdir(path)
+    const workspace = await runtime.ctx.workspaceRegistry.create(path)
+    const session = await seedSession(runtime, await readFile(SEED, 'utf8'), 'workbench-rename-owner', undefined, path)
+    await workspace.attachSession(session)
+    await runtime.ctx.agents.resume({ resumeSessionId: session, setup: ctx => runtime.ctx.agentPresets.mount(ctx).then(() => undefined) })
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
+    const tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'workbench-rename'))
+    await page.goto(runtime.authenticatedUrl, { waitUntil: 'load' })
+    const toolbar = page.locator('[data-workbench-toolbar]')
+    const caption = toolbar.getByRole('button', { name: 'Select workbench', exact: true })
+    const activate = async (control: Locator): Promise<void> => {
+      if (workflowMatrixEnabled) await control.tap()
+      else await control.click()
+    }
+    await activate(caption)
+    await activate(page.getByRole('menuitem', { name: 'New workbench', exact: true }))
+    const create = page.getByRole('dialog', { name: 'New workbench', exact: true })
+    await create.getByRole('textbox', { name: 'Workbench name', exact: true }).fill('Rename baseline')
+    await activate(create.getByRole('button', { name: 'Confirm', exact: true }))
+    await create.waitFor({ state: 'hidden' })
+    await activate(toolbar.getByRole('button', { name: 'Add conversation', exact: true }))
+    const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
+    await activate(picker.getByRole('button').filter({ hasText: 'rename-owner' }).first())
+    await picker.waitFor({ state: 'hidden' })
+    const pane = page.locator('[data-session-pane]')
+    await expect.poll(() => pane.count()).toBe(1)
+    const paneId = await pane.getAttribute('data-session-pane')
+    const draft = pane.locator('textarea:enabled').first()
+    await draft.fill('Keep this pane draft while renaming the workbench.')
+    const rename = page.getByRole('dialog', { name: 'Rename workbench', exact: true })
+    const name = rename.getByRole('textbox', { name: 'Workbench name', exact: true })
+    const confirm = rename.getByRole('button', { name: 'Confirm', exact: true })
+    const openRename = async (): Promise<void> => {
+      await activate(caption)
+      await activate(page.getByRole('menuitem', { name: 'Rename workbench', exact: true }))
+      await rename.waitFor()
+    }
+    await openRename()
+    expect(await name.inputValue()).toBe('Rename baseline')
+    await auditWorkflowState(page, 'workbench-rename', 'populated', rename, [name, confirm])
+    await name.fill('   ')
+    expect(await confirm.isDisabled()).toBe(true)
+    await auditWorkflowState(page, 'workbench-rename', 'empty-disabled-confirm', rename, [name])
+    const longName = 'Release investigation — retain the original pane and its unfinished draft across narrow screens and rotation'
+    await name.fill(longName)
+    await auditWorkflowState(page, 'workbench-rename', 'long-draft', rename, [name, confirm])
+    await activate(rename.getByRole('button', { name: 'Cancel', exact: true }))
+    await rename.waitFor({ state: 'hidden' })
+    expect((await caption.innerText()).trim()).toBe('Rename baseline')
+    expect(await draft.inputValue()).toBe('Keep this pane draft while renaming the workbench.')
+    await openRename()
+    expect(await name.inputValue()).toBe('Rename baseline')
+    await name.fill(longName)
+    await activate(confirm)
+    await rename.waitFor({ state: 'hidden' })
+    await expect.poll(async () => (await caption.innerText()).trim()).toBe(longName)
+    expect(await pane.getAttribute('data-session-pane')).toBe(paneId)
+    expect(await draft.inputValue()).toBe('Keep this pane draft while renaming the workbench.')
+    await expectWorkbenchToolbarAllocation(toolbar)
+    await auditWorkflowState(page, 'workbench-rename', 'saved-long-title', toolbar, [caption], undefined,
+      () => expectWorkbenchToolbarAllocation(toolbar))
+    await activate(caption)
+    await page.getByRole('menuitem', { name: `${longName} · 1/4`, exact: true }).waitFor()
+    await auditWorkflowState(page, 'workbench-rename', 'saved-menu-title', page.getByRole('menu'))
+    await page.keyboard.press('Escape')
+    await page.reload({ waitUntil: 'load' })
+    await expect.poll(async () => (await caption.innerText()).trim()).toBe(longName)
+    await expect.poll(() => pane.getAttribute('data-session-pane')).toBe(paneId)
+    await openRename()
+    expect(await name.inputValue()).toBe(longName)
+    await auditWorkflowState(page, 'workbench-rename', 'restored-name', rename, [name, confirm])
+    await page.keyboard.press('Escape')
+    await rename.waitFor({ state: 'hidden' })
+    expect((await caption.innerText()).trim()).toBe(longName)
+    expect(tripwire.pageErrors).toEqual([])
+  }, workflowMatrixEnabled ? 240_000 : 90_000)
+
   it.skipIf(MODE === 'record').each(TRACK_SCENARIOS)(
     'fills the visible workbench row without changing saved ratios: $name', async (scenario) => {
       scaffold = await launchWebScaffold({
@@ -216,7 +332,7 @@ describe('web: Cordis Workspace workbench', () => {
           setup: agentCtx => runtime.ctx.agentPresets.mount(agentCtx).then(() => undefined),
         })
       }
-      browser = await chromium.launch()
+      browser = await responsiveBrowser.launch()
       page = await browser.newPage({
         viewport: { width: scenario.width, height: 1000 }, locale: 'en-US', reducedMotion: 'reduce',
       })
@@ -320,7 +436,9 @@ describe('web: Cordis Workspace workbench', () => {
       if (scenario.mode === 'preview') {
         await toolbar.getByRole('button', { name: 'Workspace files', exact: true }).click()
         const files = page.getByRole('dialog', { name: 'Workspace files', exact: true })
-        await files.getByRole('treeitem', { name: 'preview.pdf', exact: true }).click()
+        const previewFile = files.getByRole('list').getByRole('button', { name: 'preview.pdf', exact: true })
+        await previewFile.focus()
+        await previewFile.press('Enter')
         await files.waitFor({ state: 'hidden' })
         preview = page.getByRole('region', { name: 'preview.pdf', exact: true })
         const canvas = preview.locator('canvas').first()
@@ -436,7 +554,7 @@ describe('web: Cordis Workspace workbench', () => {
           setup: agentCtx => runtime.ctx.agentPresets.mount(agentCtx).then(() => undefined),
         })
       }
-      browser = await chromium.launch()
+      browser = await responsiveBrowser.launch()
       page = await browser.newPage({ viewport: { width: 1567, height: 1000 }, locale: 'en-US', reducedMotion: 'reduce' })
       const tripwire = watchConsole(page)
       onTestFailed(() => saveFailureShot(page, `workbench-pointer-${scenario}`))
@@ -468,7 +586,7 @@ describe('web: Cordis Workspace workbench', () => {
         await roster.getByRole('listitem').last().getByRole('button').first().click()
         await toolbar.getByRole('button', { name: 'Workspace files', exact: true }).click()
         const files = page.getByRole('dialog', { name: 'Workspace files', exact: true })
-        await files.getByRole('treeitem', { name: 'preview.pdf', exact: true }).click()
+        await files.getByRole('button', { name: 'preview.pdf', exact: true }).click()
         await files.waitFor({ state: 'hidden' })
         const canvas = page.getByRole('region', { name: 'preview.pdf', exact: true }).locator('canvas').first()
         await canvas.waitFor()
@@ -495,7 +613,7 @@ describe('web: Cordis Workspace workbench', () => {
         if (scenario === 'preview-width') {
           await toolbar.getByRole('button', { name: 'Workspace files', exact: true }).click()
           const files = page.getByRole('dialog', { name: 'Workspace files', exact: true })
-          await files.getByRole('treeitem', { name: 'preview.pdf', exact: true }).click()
+          await files.getByRole('button', { name: 'preview.pdf', exact: true }).click()
           await files.waitFor({ state: 'hidden' })
           await trace.mark('file-picker-closed')
           preview = page.getByRole('region', { name: 'preview.pdf', exact: true })
@@ -518,6 +636,35 @@ describe('web: Cordis Workspace workbench', () => {
         await expect.poll(() => panes.first().getAttribute('data-session-pane')).toBe(ids[1])
         await expect.poll(() => panes.first().locator('textarea').first().inputValue()).toBe(drafts[1])
         expect(await toolbar.getByRole('tab').last().getAttribute('aria-selected')).toBe('true')
+        await expectWorkbenchToolbarAllocation(toolbar)
+        if (scenario === 'phone-width') {
+          const header = panes.first().locator('[data-workbench-pane-header]')
+          expect(await header.locator('strong').isVisible()).toBe(false)
+          const more = header.getByRole('button', { name: 'More pane actions', exact: true })
+          const close = header.getByRole('button', { name: 'Close pane', exact: true })
+          const headerBox = await header.boundingBox()
+          const moreBox = await more.boundingBox()
+          const closeBox = await close.boundingBox()
+          if (headerBox === null || moreBox === null || closeBox === null) throw new Error('Pane controls are not visible')
+          expect(headerBox.height).toBeLessThanOrEqual(56)
+          expect(Math.abs(moreBox.y - closeBox.y)).toBeLessThanOrEqual(1)
+          expect(Math.min(moreBox.width, moreBox.height, closeBox.width, closeBox.height)).toBeGreaterThanOrEqual(44)
+          const shots = process.env.DSH_FEATURE_LAYOUT_SCREENSHOTS
+          if (shots !== undefined) {
+            await mkdir(shots, { recursive: true })
+            await page.screenshot({ path: join(shots, 'workbench-phone-width.png') })
+          }
+          await more.click()
+          const menu = page.getByRole('menu')
+          expect(await menu.locator('strong').innerText()).not.toBe('')
+          await menu.getByRole('menuitem', { name: 'Collapse pane', exact: true }).waitFor()
+          if (shots !== undefined) await page.screenshot({ path: join(shots, 'workbench-phone-menu.png') })
+          await menu.getByRole('menuitem', { name: 'Maximize pane', exact: true }).click()
+          await header.getByRole('button', { name: 'More pane actions', exact: true }).click()
+          await page.getByRole('menuitem', { name: 'Restore layout', exact: true }).click()
+          expect(await panes.first().getAttribute('data-session-pane')).toBe(ids[1])
+          expect(await panes.first().locator('textarea').first().inputValue()).toBe(drafts[1])
+        }
         if (scenario === 'preview-width') {
           const foreground = page.locator('[data-sidebar-right-session]:not([data-sidebar-right-panel]):not([hidden])')
           await expect.poll(() => foreground.getAttribute('data-sidebar-right-session')).toBe(ids[1])
@@ -622,7 +769,7 @@ describe('web: Cordis Workspace workbench', () => {
         setup: agentCtx => runtime.ctx.agentPresets.mount(agentCtx).then(() => undefined),
       })
     }
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
     const tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'workbench-selection-reload'))
@@ -705,7 +852,7 @@ describe('web: Cordis Workspace workbench', () => {
         setup: agentCtx => runtime.ctx.agentPresets.mount(agentCtx).then(() => undefined),
       })
     }
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await browser.newPage({ viewport: { width: 1567, height: 1000 }, locale: 'en-US', reducedMotion: 'reduce' })
     const tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'workbench-preview-origin'))
@@ -889,7 +1036,7 @@ describe('web: Cordis Workspace workbench', () => {
     // The inline preview displays mtime, so its private fixture uses a fixed file date.
     const modifiedAt = new Date(Date.UTC(2026, 7, 17, 12))
     await utimes(stored.path, modifiedAt, modifiedAt)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US', timezoneId: 'UTC' })
     const tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'workbench-document-picker'))
@@ -990,7 +1137,7 @@ describe('web: Cordis Workspace workbench', () => {
         await runtime.ctx.agents.resume({ resumeSessionId: id, setup: ctx => runtime.ctx.agentPresets.mount(ctx).then(() => undefined) })
         hostIds.push(id)
       }
-      browser = await chromium.launch()
+      browser = await responsiveBrowser.launch()
       page = await browser.newPage({ viewport: { width: 2160, height: 900 }, locale: 'en-US' })
       const tripwire = watchConsole(page)
       onTestFailed(() => saveFailureShot(page, 'workbench-header-tools'))
@@ -1027,6 +1174,58 @@ describe('web: Cordis Workspace workbench', () => {
       await expect.poll(() => tools.getByRole('tab').count()).toBe(2)
       await compareOrRefreshGolden(join(expectedDir, 'coding-view.expected.md'),
         await captureStableAria(page, '[data-workbench-tools-host]', runtime.workspaceCwd), MODE)
+      await page.setViewportSize({ width: 872, height: 230 })
+      await expect.poll(() => toolbar.evaluate(node => node.getBoundingClientRect().height)).toBeLessThanOrEqual(52)
+      await expectWorkbenchToolbarAllocation(toolbar)
+      const shortControls = [
+        toolbar.getByRole('button', { name: 'Select workbench', exact: true }),
+        tools.getByRole('tab', { name: 'Chat', exact: true }),
+        tools.getByRole('tab', { name: 'Trajectory', exact: true }),
+        toolbar.getByRole('button', { name: 'Layout', exact: true }),
+        toolbar.getByRole('button', { name: 'Add conversation', exact: true }),
+        opener,
+      ]
+      const rows = []
+      for (const control of shortControls) {
+        await auditResponsiveControl(page, control, 'Short workbench toolbar action')
+        const box = (await control.boundingBox())!
+        rows.push(box.y + box.height / 2)
+      }
+      expect(Math.max(...rows) - Math.min(...rows), 'Short workbench toolbar actions share one row').toBeLessThanOrEqual(1)
+      expect(await header.getByText('Current', { exact: true }).isVisible()).toBe(false)
+      expect(await header.locator('[data-workbench-duplicate-title]').isVisible()).toBe(false)
+      console.info('[workbench-short-toolbar]', JSON.stringify({ height: (await toolbar.boundingBox())!.height, centers: rows }))
+      const shortDirectory = process.env.DSH_FEATURE_LAYOUT_SCREENSHOTS
+      if (shortDirectory !== undefined) {
+        await mkdir(shortDirectory, { recursive: true })
+        await page.screenshot({ path: join(shortDirectory, 'workbench-short-toolbar.png'), animations: 'disabled' })
+        await writeFile(join(shortDirectory, 'workbench-short-toolbar.aria.md'), await toolbar.ariaSnapshot() + '\n')
+      }
+      if (responsiveBrowserName === 'chromium') {
+        const cdp = await page.context().newCDPSession(page)
+        try {
+          await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+          await expect.poll(() => page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true)
+          await expect.poll(() => toolbar.evaluate(node => node.getBoundingClientRect().height)).toBeLessThanOrEqual(52)
+          await expectWorkbenchToolbarAllocation(toolbar)
+          const touchRows = []
+          for (const control of shortControls) {
+            await auditResponsiveControl(page, control, 'Short touch workbench toolbar action')
+            const box = (await control.boundingBox())!
+            expect(box.width).toBeGreaterThanOrEqual(44)
+            expect(box.height).toBeGreaterThanOrEqual(44)
+            touchRows.push(box.y + box.height / 2)
+          }
+          expect(Math.max(...touchRows) - Math.min(...touchRows)).toBeLessThanOrEqual(1)
+          if (shortDirectory !== undefined) {
+            await page.screenshot({ path: join(shortDirectory, 'workbench-short-toolbar-coarse.png'), animations: 'disabled' })
+          }
+        } finally {
+          await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false })
+          await cdp.detach()
+        }
+      }
+      await page.setViewportSize({ width: 2160, height: 900 })
       await codingView(false)
       await expect.poll(() => header.count()).toBe(1)
       expect(await panes.locator('[data-slot="conversation.session.header"] > header').count()).toBe(0)
@@ -1152,7 +1351,7 @@ describe('web: Cordis Workspace workbench', () => {
       })
       workspaceIds.push(workspace.id)
     }
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, locale: 'en-US' })
     const sockets: string[] = []
     page.on('websocket', (socket) => { sockets.push(socket.url()) })
@@ -1206,7 +1405,7 @@ describe('web: Cordis Workspace workbench', () => {
     await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).focus()
     await toolbar.hover()
     await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('0')
-    await page.keyboard.press('Tab')
+    await page.keyboard.press(nativeTabKey())
     await expect.poll(() => firstHeader.evaluate(node => node.contains(document.activeElement))).toBe(true)
     await expect.poll(() => firstActions.evaluate(node => getComputedStyle(node).opacity)).toBe('1')
     await firstHeader.getByRole('button', { name: 'More pane actions', exact: true }).click()

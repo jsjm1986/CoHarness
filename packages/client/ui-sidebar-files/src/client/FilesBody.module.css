@@ -150,6 +150,12 @@
   height: 15px;
 }
 
+@media (pointer: coarse) {
+  .header { height: auto; min-height: var(--dsw-touch-target); }
+  .tool { width: var(--dsw-touch-target); height: var(--dsw-touch-target); }
+  .row { min-height: var(--dsw-touch-target); }
+}
+
 .tool:hover {
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-interactive-bg-hover);

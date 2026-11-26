@@ -25,6 +25,7 @@ import { createPostgresPool, runMigrations, migrationPlan } from '../src/postgre
 import { DesktopCoordinator } from '../src/desktop-coordinator.ts'
 import { PostgresDesktopCoordinatorRepository } from '../src/postgres/desktop-coordinator-repository.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
+import { PostgresMaintenanceService } from '../src/postgres/maintenance-service.ts'
 import {
   PostgresModelGovernanceService,
   projectProviderCredentialRef,
@@ -43,6 +44,7 @@ import type { GatewayPrincipalClaims } from '../src/principal.ts'
 import { createRuntimeApiHandler, type RuntimeCredentialSubject } from '../src/runtime-api.ts'
 import { GatewayExecutionIdentity } from '../src/execution-identity.ts'
 import { createUsageIntakeServer } from '../src/usage-intake.ts'
+import { enableFixtureTopology } from './fixtures/topology-fixture.mjs'
 import type { UserRow } from '../src/auth.ts'
 import type { UsageEvent } from '../src/model-governance.ts'
 import * as Password from '../src/password.ts'
@@ -687,10 +689,14 @@ describePg('PostgreSQL baseline', () => {
       credentialRef,
     )).toBeNull()
     await firstGovernance.setUserAccess(first.userId, provider.provider, model.model, true)
-    expect(await firstGovernance.resolveOrganizationCredential(
-      { kind: 'user', id: first.userId },
-      credentialRef,
-    )).toBe('sk-first')
+    const credentialQuery = vi.spyOn(pool, 'query')
+    try {
+      expect(await firstGovernance.resolveOrganizationCredential(
+        { kind: 'user', id: first.userId },
+        credentialRef,
+      )).toBe('sk-first')
+      expect(credentialQuery).toHaveBeenCalledTimes(1)
+    } finally { credentialQuery.mockRestore() }
     await pool.query(`UPDATE harness.projects SET model_access_default_allowed=true
       WHERE organization_id=$1 AND public_id=$2`, [first.context.organizationId, first.projectId])
     expect(await firstGovernance.resolveOrganizationCredential(
@@ -755,6 +761,47 @@ describePg('PostgreSQL baseline', () => {
       { kind: 'user', id: first.userId },
       credentialRef,
     )).toBe('sk-replaced')
+
+    const { organizationId: tenant, nodeId: node } = first.context
+    await enableFixtureTopology(first.context)
+    await pool.query(`INSERT INTO harness.node_agents
+      (organization_id,node_id,credential_hash,connection_id,connection_epoch,lease_expires_at)
+      VALUES($1,$2,$3,$4,1,clock_timestamp()+interval '1 hour')`,
+    [tenant, node, createHash('sha256').update(randomUUID()).digest(), randomUUID()])
+    const instances = new PostgresInstanceRepository(first.context, 49_000)
+    await pool.query(`INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port,storage_layout)
+      SELECT $1,id,$2,49000,'isolated' FROM harness.users WHERE organization_id=$1 AND public_id=$3`, [tenant, node, first.userId])
+    const target = await instances.resolveTarget({ kind: 'user', id: first.userId })
+    const bearer = randomUUID(), fence = { bearer, epoch: 1n }
+    const generation = await instances.beginStart(target, Date.now(), createHash('sha256').update(bearer).digest())
+    await instances.markReady(target, generation)
+    const subject = await instances.authenticateRuntimeToken(bearer, true)
+    expect(subject).not.toBeNull()
+    const fetchCredential = () => firstGovernance.resolvePersonalRuntimeCredential(subject!, credentialRef, fence)
+    const fencedQueries = vi.spyOn(pool, 'query')
+    try {
+      expect(await fetchCredential()).toEqual({ status: 'ok', value: 'sk-replaced' })
+      expect(fencedQueries).toHaveBeenCalledTimes(1)
+    } finally { fencedQueries.mockRestore() }
+    expect(await firstGovernance.resolvePersonalRuntimeCredential({ ...subject!, generation: generation + 1 }, credentialRef, fence))
+      .toEqual({ status: 'invalid-runtime-token' })
+    expect(await secondGovernance.resolvePersonalRuntimeCredential(subject!, credentialRef, fence)).toEqual({ status: 'invalid-runtime-token' })
+    await firstGovernance.setUserAccess(first.userId, provider.provider, model.model, false)
+    expect(await fetchCredential()).toEqual({ status: 'ok', value: null })
+    await firstGovernance.setUserAccess(first.userId, provider.provider, model.model, true)
+    await pool.query(`INSERT INTO harness.cluster_control(organization_id,mode,write_epoch) VALUES($1,'maintenance',1)`, [tenant])
+    expect(await fetchCredential()).toEqual({ status: 'maintenance' })
+    await pool.query("UPDATE harness.cluster_control SET mode='serving',write_epoch=2 WHERE organization_id=$1", [tenant])
+    expect(await fetchCredential()).toEqual({ status: 'stale-epoch' })
+    await pool.query('UPDATE harness.cluster_control SET write_epoch=1 WHERE organization_id=$1', [tenant])
+    await pool.query('UPDATE harness.computer_use_permissions SET enabled=false WHERE organization_id=$1 AND node_id=$2 AND user_id=$3',
+      [tenant, node, subject!.userInternalId])
+    expect(await fetchCredential()).toEqual({ status: 'invalid-runtime-token' })
+    await pool.query('UPDATE harness.computer_use_permissions SET enabled=true WHERE organization_id=$1 AND node_id=$2 AND user_id=$3',
+      [tenant, node, subject!.userInternalId])
+    await pool.query("UPDATE harness.node_agents SET lease_expires_at=clock_timestamp() - interval '1 second' WHERE organization_id=$1 AND node_id=$2",
+      [tenant, node])
+    expect(await fetchCredential()).toEqual({ status: 'invalid-runtime-token' })
 
     await firstGovernance.upsertProvider({ ...provider, status: 'disabled', credential: null })
     expect((await firstGovernance.listProviders())[0]).toMatchObject({ credentialConfigured: false })
@@ -2250,6 +2297,29 @@ describePg('PostgreSQL baseline', () => {
     }
     },
   )
+
+  it('refuses Gateway readiness after the write epoch advances or the computer drains', async () => {
+    const slug = `readiness-${randomUUID()}`
+    const name = 'readiness-node'
+    await pool.query(`WITH organization AS (
+      INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Readiness fixture') RETURNING id
+    ) INSERT INTO harness.compute_nodes(organization_id,name)
+      SELECT id,$2 FROM organization`, [slug, name])
+    try {
+      const context = await resolvePostgresRuntimeContext(pool, slug, name)
+      const maintenance = new PostgresMaintenanceService(context, 30_000)
+      await expect(maintenance.checkGatewayReadiness(1n)).resolves.toBeUndefined()
+      await pool.query('INSERT INTO harness.cluster_control(organization_id,write_epoch) VALUES($1,2)', [context.organizationId])
+      await expect(maintenance.checkGatewayReadiness(1n)).rejects.toThrow('write epoch differs')
+      await expect(maintenance.checkGatewayReadiness(2n)).resolves.toBeUndefined()
+      await pool.query(`UPDATE harness.compute_nodes SET status='draining' WHERE id=$1`, [context.nodeId])
+      await expect(maintenance.checkGatewayReadiness(2n)).rejects.toThrow('organization or compute node is not active')
+    } finally {
+      await pool.query(`DELETE FROM harness.compute_nodes n USING harness.organizations o
+        WHERE n.organization_id=o.id AND o.slug=$1`, [slug])
+      await pool.query('DELETE FROM harness.organizations WHERE slug=$1', [slug])
+    }
+  })
 
   it('runs the complete Gateway control plane against PostgreSQL', async () => {
     const root = await mkdtemp(join(tmpdir(), 'hgw-postgres-runtime-'))

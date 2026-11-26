@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/preset/agent-preset-registry/README.md
 document:
-  en: 338a357737845e49993b43e2b8fc7ee884dceaaa
-  zh: 3f2c2f70bf0e0fed0e5b04a5f81cefffd1d7525e
+  en: e7c464c01fafd36f7cd2ed99639c456e753b5c9c
+  zh: 9d153532fbe843d39dcb90ee16be970f4d552aab
 /:
   en: d5ac01c9c587f150
   zh: 61495d48365178df
@@ -51,8 +51,8 @@ document:
   en: 515d7ac2de3c4de5
   zh: a79b58a0c8da623e
 /dsh-agent-preset-registry/what-a-mount-rejects:
-  en: d59e9ca44967722d
-  zh: 492d593931855ffe
+  en: 6cfcc40d3bda9eef
+  zh: 268ba82bf7b6d59c
 /dsh-agent-preset-registry/a-preset-file-is-an-input-never-a-persistence-target:
   en: 45fb7f549ed28713
   zh: 3304c389f7c59d60

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-02-node-service-http-reuse.md
 document:
-  en: ee44feb4b27102bd9bb35eb405d21cbe790dce27
-  zh: 473e7f20ab6006cf9b4636db6d0dd885da482867
+  en: 7a20dab59ce25aee61e8c2d435989f1ff85f5c87
+  zh: 6473f3e949abeb854941fa10d7a5f84f7d221c41
 /agent-note-node-service-http-connection-reuse:
   en: 1e1bcad40efe8011
   zh: 9e19613d9a85d09f
@@ -12,8 +12,8 @@ document:
   en: 349917245b7f96cb
   zh: f44d15b2da7538d0
 /agent-note-node-service-http-connection-reuse/decision:
-  en: c2b315ab328199e6
-  zh: 3f2850eee8998e5f
+  en: eba50e9295c1be42
+  zh: a56c7b409d993d1d
 /agent-note-node-service-http-connection-reuse/alternatives-considered:
   en: 4376cd5ee59f00a6
   zh: 173402908eab59f5
@@ -21,5 +21,5 @@ document:
   en: a26b18ce9357e4e5
   zh: 4d116a1c7778dd4c
 /agent-note-node-service-http-connection-reuse/verification:
-  en: 0b7b36705a2d7627
-  zh: bb597ab604c408d2
+  en: 273544f5198c2f96
+  zh: 64a0775707acb86b

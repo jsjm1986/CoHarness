@@ -64,3 +64,56 @@ it('retains uncertain capacity when a consumer stops an iterator with no cleanup
   expect(lease.uncertain).toHaveBeenCalledOnce()
   expect(lease.release).not.toHaveBeenCalled()
 })
+
+it.each(['done', 'nonterminal', 'rejected'] as const)('settles a timed-out model close that later becomes %s', async (outcome) => {
+  const ctx = await fixture(), lease = permit()
+  const closing = Promise.withResolvers<IteratorResult<StreamChunk>>()
+  const adapterReturn = vi.fn(() => closing.promise)
+  ctx.provide('resourceBudget', { acquire: async () => lease })
+  const chunk: StreamChunk = { type: 'text-delta', index: 0, text: 'partial' }
+  class Adapter extends LlmAdapter {
+    override stream(): AsyncIterable<StreamChunk> {
+      return { [Symbol.asyncIterator]: () => ({ next: async () => ({ done: false as const, value: chunk }), return: adapterReturn }) }
+    }
+  }
+  ctx.effect(() => ctx.llm.registerAdapter(['delayed-close'], new Adapter()))
+  const iterator = ctx.llm.stream({ provider: 'delayed-close', model: 'm', messages: [] })[Symbol.asyncIterator]()
+  expect((await iterator.next()).done).toBe(false)
+  vi.useFakeTimers()
+  try {
+    const returned = expect(iterator.return?.()).rejects.toMatchObject({ code: 'ADAPTER_CLOSE_TIMEOUT' })
+    await vi.advanceTimersByTimeAsync(1000)
+    await returned
+    expect(adapterReturn).toHaveBeenCalledOnce()
+    expect(lease.uncertain).toHaveBeenCalledOnce()
+    expect(lease.release).not.toHaveBeenCalled()
+    if (outcome === 'rejected') closing.reject(new Error('cleanup failed'))
+    else closing.resolve(outcome === 'done' ? { done: true, value: undefined } : { done: false, value: chunk })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(lease.release).toHaveBeenCalledTimes(outcome === 'done' ? 1 : 0)
+  } finally {
+    closing.resolve({ done: true, value: undefined })
+    vi.useRealTimers()
+  }
+})
+
+it('attaches resourceOperationId to model-attempt-timing only when the resource lease exposes one', async () => {
+  const ctx = await fixture()
+  const samples: Array<Record<string, unknown>> = []
+  ctx.on('llm/model-attempt-timing', (sample) => { samples.push({ ...sample }) })
+  class Adapter extends LlmAdapter {
+    override async *stream(): AsyncIterable<StreamChunk> {
+      yield { type: 'text-delta', index: 0, text: 'ok' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    }
+  }
+  ctx.effect(() => ctx.llm.registerAdapter(['timing-op'], new Adapter()))
+  let currentLease: { operationId?: string; signal: AbortSignal; release: () => Promise<void>; uncertain: () => Promise<void> } = permit()
+  ctx.provide('resourceBudget', { acquire: async () => currentLease as never })
+  for await (const _chunk of ctx.llm.stream({ provider: 'timing-op', model: 'm', messages: [] })) {}
+  currentLease = { ...permit(), operationId: '00000000-0000-4000-8000-000000000042' }
+  for await (const _chunk of ctx.llm.stream({ provider: 'timing-op', model: 'm', messages: [] })) {}
+  expect(samples).toHaveLength(2)
+  expect(samples[0]).not.toHaveProperty('resourceOperationId')
+  expect(samples[1]?.resourceOperationId).toBe('00000000-0000-4000-8000-000000000042')
+})

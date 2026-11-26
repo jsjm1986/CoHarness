@@ -34,6 +34,8 @@ A mounted PDF or spreadsheet preview decodes identical Base64 contents once acro
 
 PDF.js's official TextLayerBuilder owns selection boundaries and copy normalization over the width-fitted canvas, with shared page cleanup and a component-owned resize observer. Responsive sizing uses the CSS `scale` property independently of PDF.js's page rotation and translation transforms. Its end-of-content marker and stacking rules constrain selection in blank regions; line-break highlighting is suppressed. Per-page cancellation uses the builder's cleanup rather than aborting the first page's signal, because the official selection listeners are shared across pages.
 
+Independent HTTP document views reuse the root-scoped `document.pdf.preview` Factory instead of importing another plugin's component. Its JSON input carries the caller-authorized private URL, content identity and byte budget. The reader owns Fetch cancellation and publishes only complete bounded bytes to the existing PDF body. This keeps network cleanup independent of Worker health; giving PDF.js the URL would tie network cancellation to its Worker teardown. Workspace resource reads retain their existing authorization and version prerequisites.
+
 ## Alternatives considered
 
 **Keep initial Office conversion behind the metadata round trip.** The conversion endpoint already performs independent authorization and source checks and returns its source version. Overlapping these requests removes a serial network dependency while metadata still controls publication; a shared content cache or a prepared browser Worker is unnecessary.

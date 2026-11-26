@@ -39,6 +39,6 @@
 - button "Send message" [disabled]
 - group "Session statistics":
   - img
-  - text: 1 turns · 1 steps
+  - text: 1 turn · 1 step
 - separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

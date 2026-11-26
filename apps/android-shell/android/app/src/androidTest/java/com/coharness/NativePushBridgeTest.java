@@ -182,6 +182,7 @@ public class NativePushBridgeTest {
             assertEquals("unifiedpush", payload.getString("provider"));
             assertEquals(endpoint, payload.getString("token"));
             assertEquals("up-arrival-session", payload.getString("sessionId"));
+            assertEquals(runtimeId, payload.getString("runtimeId"));
             assertEquals(77L, payload.getLong("eventSeq"));
             CoHarnessPushService.handleUpMessage(context, "{not-json");
             CoHarnessPushService.handleUpMessage(context, new JSONObject()
@@ -217,6 +218,7 @@ public class NativePushBridgeTest {
             assertEquals("opened", payload.getString("kind"));
             assertEquals("unifiedpush", payload.getString("provider"));
             assertEquals(endpoint, payload.getString("token"));
+            assertEquals("a1b2c3d4-e5f6-7890-abcd-ef1234567890", payload.getString("runtimeId"));
             assertEquals(88L, payload.getLong("eventSeq"));
         } finally {
             PushReceiptReporter.setSink(null);

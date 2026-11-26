@@ -1,8 +1,8 @@
 import { createHash, generateKeyPairSync, createPublicKey, sign } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
 import { GatewayPrincipalSigner } from '../src/principal.ts'
-import { forwardIssuerOf, forwardRequestMatches, verifyGatewayForward } from '../src/forwarded-principal.ts'
+import { createGatewayForwardAuthority, forwardIssuerOf, forwardRequestMatches, verifyGatewayForward } from '../src/forwarded-principal.ts'
 import type { RuntimeNodeId } from '../src/runtime-catalog.ts'
 
 const USER: UserRow = {
@@ -20,6 +20,30 @@ const NODE_A = '11111111-2222-4333-8444-555566667777' as RuntimeNodeId
 const NODE_B = '99999999-8888-4777-8666-555544443333' as RuntimeNodeId
 
 describe('forwarded principal assertions', () => {
+  it('retains consumed nonces at capacity until their admission window expires', () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+    const now = 100_000
+    const signer = new GatewayPrincipalSigner(privateKey, 'acme', 1_000)
+    const pem = publicKey.export({ type: 'spki', format: 'pem' }).toString()
+    const directory = { issuerKey: async () => publicKey, publishedKeyCandidate: () => pem }
+    const authority = createGatewayForwardAuthority(directory, { audienceNode: NODE_B, organization: 'acme' }, 1_000)
+    const issue = (at: number) => signer.issueForward({ issuerNode: NODE_A, audienceNode: NODE_B, user: USER, now: at })
+    const consume = (assertion: string) => authority.forwardedSessionPrincipal(assertion)?.consume()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(now)
+      const original = issue(now)
+      expect(consume(original)).toBe(true)
+      for (let i = 1; i < 4096; i++) expect(consume(issue(now))).toBe(true)
+      expect(consume(issue(now))).toBe(false)
+      expect(consume(original)).toBe(false)
+      vi.setSystemTime(now + 1_000)
+      expect(consume(issue(now + 1_000))).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('round-trips a peer Gateway assertion and exposes its issuer before verification', () => {
     const { privateKey, publicKey } = generateKeyPairSync('ed25519')
     const now = 100_000
@@ -132,5 +156,15 @@ describe('forwarded principal assertions', () => {
     const legacyClaims = verifyGatewayForward(legacy, publicKey, { audienceNode: NODE_B, organization: 'acme', now })
     expect(legacyClaims).not.toBeNull()
     expect(forwardRequestMatches(legacyClaims!, { method: 'POST', path: '/x', sessionToken: 'session-token' })).toBe(false)
+  })
+
+  it('verifies optional numeric accessRevision and rejects malformed values', () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+    const now = 100_000
+    const signer = new GatewayPrincipalSigner(privateKey, 'acme', 1000)
+    const valid = signer.issueForward({ issuerNode: NODE_A, audienceNode: NODE_B, user: USER, now, accessRevision: '42' })
+    expect(verifyGatewayForward(valid, publicKey, { audienceNode: NODE_B, organization: 'acme', now })?.accessRevision).toBe('42')
+    const malformed = signer.issueForward({ issuerNode: NODE_A, audienceNode: NODE_B, user: USER, now, accessRevision: 'not-a-rev' })
+    expect(verifyGatewayForward(malformed, publicKey, { audienceNode: NODE_B, organization: 'acme', now })).toBeNull()
   })
 })

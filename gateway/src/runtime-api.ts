@@ -1,13 +1,17 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { ExecutionIdentityError, GatewayExecutionIdentity, watchExecutionAccess } from './execution-identity.ts'
 import type { GatewayAccessMonitor } from './access-invalidation.ts'
 import { StreamPrincipalRequestError, type StreamPrincipalRenewals, type StreamLeaseRuntime } from './stream-principal-leases.ts'
 import { createRuntimeDocumentStoreStream, type RuntimeDocumentStoreHandler } from './runtime-document-store.ts'
 import type { GatewayRuntimeHandler } from './server.ts'
+import { RESOURCE_ACTIVE_MODEL_CHECK_HEADER, RESOURCE_CHANGE_CURSOR_HEADER, RESOURCE_CHANGE_WAIT_TIMING_HEADER, RESOURCE_GRANT_AGE_HEADER,
+  RESOURCE_PHASE_TIMING_HEADER, isResourceAdmissionRequest } from '@deepseek-ai/dsh-resource-budget/wire'
 import { DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS, DEFAULT_UPSTREAM_TIMEOUT_MS } from './config.ts'
-import { handleRuntimeResourceApi } from './runtime-resource-api.ts'
-import type { NodeResourceBudget } from './node-resource-budget.ts'
+import { activeModelStatusOperation, handleRuntimeResourceApi, scopedModelResourceRequest } from './runtime-resource-api.ts'
+import { hasOperationTiming, recordResourceQueueDiagnostic, timeOperation, timeResourceBearer } from './operation-timing.ts'
+import { NodeResourceBudgetError, type NodeResourceBudget } from './node-resource-budget.ts'
 import { sessionLogicalFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import {
   SESSION_SURFACE_EVENT_TYPES,
@@ -16,6 +20,8 @@ import {
 import { CollaborationDeniedError } from './collaboration.ts'
 import { DesktopCoordinationError, type DesktopCoordinator } from './desktop-coordinator.ts'
 import type { RuntimeTarget } from './instances.ts'
+import { isRuntimeShutdownStorageRequest } from './runtime-shutdown.ts'
+import { isPersonalExecutionWriteRequest, isRuntimeResourceCompletionRequest, isRuntimeStreamControlRequest, RUNTIME_MODEL_CREDENTIAL_PATH } from './runtime-request-path.ts'
 import { NodeContentUnavailable, type NodeContentBinding } from './node-content-store.ts'
 import {
   PRINCIPAL_HEADER,
@@ -34,6 +40,7 @@ import {
   ConversationReadError,
   conversationHistoryIndexFromEvents,
   conversationEventGroupKey,
+  draftModelSelectionSchema,
   decodePageCursor,
   encodePageCursor,
   type ConversationRepository,
@@ -44,6 +51,7 @@ import type { PostgresInstanceRepository } from './postgres/instance-repository.
 import type { PostgresCollaborationService } from './postgres/collaboration-service.ts'
 import { SshTargetError, type PostgresSshTargetService } from './postgres/ssh-target-service.ts'
 import { PluginStateError } from './plugin-state.ts'
+import { PeerBackupError } from './peer-backup-repository.ts'
 import { StewardQueryError } from './postgres/steward-query.ts'
 import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { GatewayPushService } from './push-notifications.ts'
@@ -70,8 +78,9 @@ import {
 /** Required storage operations and optional bounded reads exposed by a Runtime repository. */
 export type RuntimeConversationRepository = Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
   & Partial<Pick<ConversationRepository,
-      'readHeader' | 'readFrom' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
-      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner' | 'hasProjectDraftReservation'>>
+      'readHeader' | 'readFrom' | 'readEvent' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
+      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner' | 'hasProjectDraftReservation'
+      | 'readReservedProjectDraft' | 'saveReservedProjectDraftModel'>>
 
 export interface RuntimeCredentialSubject {
   organizationId: string
@@ -104,6 +113,8 @@ const EVENT_ENVELOPE_KEYS = new Set([
 interface RuntimeApiDependencies {
   /** Renew only socket registrations owned by this Gateway; absent disables private renewal. */
   renewStreamPrincipals?: (runtime: StreamLeaseRuntime, value: unknown, runtimeCurrent: () => Promise<boolean>) => Promise<StreamPrincipalRenewals>
+  /** Fresh exact-bearer and write-epoch authorization reserved for registered stream liveness. */
+  authenticateRuntimeControlToken?: (token: string) => Promise<RuntimeCredentialSubject | null>
   /** Initialized organization invalidations; required for documentStore and streamed as hints to managed runtimes. */
   accessMonitor?: GatewayAccessMonitor
   /** Configured liveness interval for execution-watch connections. */
@@ -112,12 +123,18 @@ interface RuntimeApiDependencies {
   executionWatchAuthorizationTimeoutMs?: number
   context: Pick<PostgresRuntimeContext, 'pool' | 'organizationSlug' | 'nodeId'>
   instances: Pick<PostgresInstanceRepository, 'authenticateRuntimeToken'>
-    & Partial<Pick<PostgresInstanceRepository, 'authenticateRuntimeCleanupToken'>>
+    & Partial<Pick<PostgresInstanceRepository, 'authenticateRuntimeCleanupToken' | 'authenticateRuntimeShutdownToken'>>
   /** Node-wide model/process coordinator; managed launches require this service. */
   resourceBudget?: NodeResourceBudget
+  /** Maximum local wait for a queued personal model. Zero or absent keeps periodic polling. */
+  resourceStatusWaitMs?: number
   /** Node-bound execution and Session witnesses for physically placed projects. */
   nodeContent?: Pick<import('./node-content-store.ts').NodeContentStore, 'read' | 'write'>
   executionIdentity?: GatewayExecutionIdentity
+  /** Started Gateway's write epoch for exact personal execution statements. Standalone callers use the regular transactions. */
+  executionWriteEpoch?: bigint
+  /** Emit phase durations on successful internal resource admission responses. */
+  performanceEnabled?: boolean
   /** Bind every Session operation to the authenticated organization and Runtime. */
   conversations: { forRuntime(scope: ConversationRuntimeScope, subject?: RuntimeCredentialSubject): RuntimeConversationRepository }
   collaboration: Pick<
@@ -131,6 +148,7 @@ interface RuntimeApiDependencies {
   principals: GatewayPrincipalSigner
   governance: Pick<GatewayModelGovernanceService, 'resolveOrganizationCredential'>
     & Partial<Pick<GatewayModelGovernanceService, 'resolveManagedCredential'>>
+    & Partial<Pick<import('./postgres/model-governance-service.ts').PostgresModelGovernanceService, 'resolvePersonalRuntimeCredential' | 'resolveRuntimeCredential'>>
   /** Optional FCM delivery; omitted in keyless/unit-test compositions. */
   push?: Pick<GatewayPushService, 'notifyCompleted'>
   /** Optional cross-scope document broker; absent in standalone test compositions. */
@@ -159,13 +177,18 @@ interface RuntimeApiDependencies {
   sshTargets?: Pick<PostgresSshTargetService, 'resolveForRuntime'>
   /** Optional durable plugin desired-state store; absent in compositions without PostgreSQL. */
   pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'readForSubject' | 'publishForSubject'> & Partial<Pick<import('./plugin-state.ts').PostgresPluginState,'verifyProfileForSubject'>>
+  /** Optional durable plugin inventory store; absent in compositions without PostgreSQL. */
+  pluginInventory?: Pick<import('./plugin-inventory.ts').PostgresPluginInventory, 'report'>
+  /** Recovery configuration is checked again before managed plugin recomposition. */
+  recoveryExecution?: { verifySubject(subject: RuntimeCredentialSubject): Promise<void> }
   /** Optional audited SQL channel for the resident steward runtime. */
   stewardQuery?: Pick<import('./postgres/steward-query.ts').StewardQueryService, 'query' | 'stewardTarget'>
 }
 
 function send(res: ServerResponse, status: number, value: unknown): void {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(value))
+  const body = JSON.stringify(value) ?? ''
+  res.writeHead(status, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) })
+  res.end(body)
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -352,7 +375,12 @@ function assertionHeader(req: IncomingMessage): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
-function authorizationToken(req: IncomingMessage): string | undefined {
+/**
+ * Read the Runtime bearer from an internal request.
+ * @param req - incoming HTTP request.
+ * @returns the bearer, or undefined when the header lacks a nonempty Bearer value.
+ */
+export function runtimeBearerToken(req: IncomingMessage): string | undefined {
   const value = req.headers.authorization
   if (typeof value !== 'string' || !value.startsWith('Bearer ')) return undefined
   const token = value.slice('Bearer '.length)
@@ -456,6 +484,17 @@ function assertionFor(
   return claims
 }
 
+function managedCredentialRef(value: unknown): string {
+  const ref = record(value)?.ref
+  if (typeof ref !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(ref)) throw new Error('invalid managed credential reference')
+  return ref
+}
+
+function sendManagedCredential(res: ServerResponse, value: string | null): void {
+  res.setHeader('cache-control', 'no-store')
+  send(res, 200, value === null ? { configured: false } : { configured: true, value })
+}
+
 function belongsToRuntime(header: ConversationHeader, subject: RuntimeCredentialSubject): boolean {
   if (header.organizationId !== subject.organizationId) return false
   if (subject.target.kind === 'user') {
@@ -489,11 +528,12 @@ export function createRuntimeApiHandler(
   deps: RuntimeApiDependencies,
 ): GatewayRuntimeHandler {
   const execution = deps.executionIdentity ?? new GatewayExecutionIdentity(deps.context.pool, deps.context.nodeId, deps.nodeContent)
-  const authenticate = async (req: IncomingMessage, cleanup: boolean): Promise<RuntimeCredentialSubject | null> => {
-    const token = authorizationToken(req)
+  const authenticate = async (req: IncomingMessage, cleanup: boolean, control = false, fresh = false): Promise<RuntimeCredentialSubject | null> => {
+    const token = runtimeBearerToken(req)
     if (token === undefined) return null
+    if (control && deps.authenticateRuntimeControlToken !== undefined) return deps.authenticateRuntimeControlToken(token)
     return cleanup && deps.instances.authenticateRuntimeCleanupToken !== undefined
-      ? deps.instances.authenticateRuntimeCleanupToken(token) : deps.instances.authenticateRuntimeToken(token)
+      ? deps.instances.authenticateRuntimeCleanupToken(token) : deps.instances.authenticateRuntimeToken(token, fresh)
   }
 
   const currentAssertion = async (req: IncomingMessage, subject: RuntimeCredentialSubject, required: boolean,
@@ -741,14 +781,136 @@ export function createRuntimeApiHandler(
     }
   }
 
-  const handler: GatewayRuntimeHandler = async (req, res, pathname, body) => {
+  const handler: GatewayRuntimeHandler = async (req, res, pathname, body, executionWrite, controlSubject) => {
     if (!pathname.startsWith('/internal/runtime/')) return false
-    const subject = await authenticate(req, pathname === '/internal/runtime/resources/finish' && req.method === 'POST')
-    if (subject === null) {
-      send(res, 401, { error: 'invalid-runtime-token' })
-      return true
-    }
     try {
+      const resourceSubmission = pathname === '/internal/runtime/resources/request'
+      const resourceConfirmation = pathname === '/internal/runtime/resources/statuses'
+        && req.headers[RESOURCE_ACTIVE_MODEL_CHECK_HEADER] === '1'
+      const resourceExchange = resourceSubmission || resourceConfirmation
+      const token = runtimeBearerToken(req)
+      const epoch = deps.executionWriteEpoch
+      const writeFence = token === undefined || epoch === undefined ? undefined : { bearer: token, epoch }
+      const fencedRequest = resourceSubmission && deps.resourceBudget !== undefined && executionWrite !== undefined
+        && token !== undefined && epoch !== undefined
+        && executionWrite.subject.target.kind === 'user' && executionWrite.subject.target.runtimeId !== undefined
+        && executionWrite.subject.contentBinding === undefined ? scopedModelResourceRequest(body) : undefined
+      const executionBody: unknown = executionWrite === undefined || resourceExchange ? undefined : JSON.parse(body)
+      let fencedSubject: RuntimeCredentialSubject | undefined
+      let fencedPrincipal: GatewayPrincipalClaims | undefined
+      let resourceSubject: RuntimeCredentialSubject | undefined
+      let resourceBearerMs: number | undefined
+      let attemptedPersonalEntry = false
+      if (executionWrite !== undefined) {
+        if (pathname === RUNTIME_MODEL_CREDENTIAL_PATH && writeFence !== undefined
+          && (deps.governance.resolveRuntimeCredential !== undefined
+            || (executionWrite.subject.target.kind === 'user' && deps.governance.resolvePersonalRuntimeCredential !== undefined))) {
+          if (!await executionWrite.admit(true)) return true
+          const resolveCredential = deps.governance.resolveRuntimeCredential !== undefined
+            ? deps.governance.resolveRuntimeCredential.bind(deps.governance)
+            : deps.governance.resolvePersonalRuntimeCredential!.bind(deps.governance)
+          const result = await resolveCredential(executionWrite.subject, managedCredentialRef(executionBody), writeFence)
+          if (result.status === 'ok') sendManagedCredential(res, result.value)
+          else send(res, result.status === 'invalid-runtime-token' ? 401 : 503, { error: result.status })
+          return true
+        }
+        if (resourceConfirmation && token !== undefined && epoch !== undefined && deps.resourceBudget !== undefined) {
+          const operation = activeModelStatusOperation(body)
+          if (operation !== undefined) {
+            const budget = deps.resourceBudget
+            const seen = req.headers[RESOURCE_CHANGE_CURSOR_HEADER]
+            const waitMs = deps.resourceStatusWaitMs ?? 0
+            let waiting = false
+            let changeWaitMs: number | undefined
+            if (waitMs > 0 && typeof seen === 'string' && /^[a-f0-9-]{36}\.\d{1,16}$/u.test(seen)) {
+              const signal = requestSignal(req, res)
+              const startedWaiting = deps.performanceEnabled === true ? performance.now() : undefined
+              try { waiting = await timeOperation('resourceChangeWait', () => budget.waitForChange(seen, waitMs, signal)) }
+              catch (error) { if (signal.aborted) return true; throw error }
+              if (startedWaiting !== undefined) changeWaitMs = performance.now() - startedWaiting
+            }
+            if (!await executionWrite.admit(true)) return true
+            const cursor = budget.changeCursor
+            const started = deps.performanceEnabled === true ? performance.now() : undefined
+            const confirmed = await budget.checkPersonalModel(executionWrite.subject, operation, { bearer: token, epoch }, waiting)
+            if (confirmed !== undefined) {
+              if (started !== undefined) {
+                res.setHeader(RESOURCE_PHASE_TIMING_HEADER, JSON.stringify([0, Math.round((performance.now() - started) * 100) / 100, 0]))
+                if (confirmed.queueMs !== null) res.setHeader(RESOURCE_GRANT_AGE_HEADER, String(Math.round(confirmed.queueMs)))
+                if (changeWaitMs !== undefined) res.setHeader(RESOURCE_CHANGE_WAIT_TIMING_HEADER, changeWaitMs.toFixed(2))
+              }
+              if (confirmed.state === 'queued' && waiting) res.setHeader(RESOURCE_CHANGE_CURSOR_HEADER, cursor)
+              if (confirmed.state === 'queued' && hasOperationTiming()) recordResourceQueueDiagnostic(budget.queueDiagnostic())
+              res.setHeader('cache-control', 'no-store')
+              send(res, 200, [{ state: confirmed.state }])
+              return true
+            }
+          }
+        }
+        if (resourceSubmission || (resourceConfirmation && executionWrite.fromCandidate)) {
+          if (fencedRequest !== undefined) fencedSubject = executionWrite.subject
+          else {
+            const started = deps.performanceEnabled === true ? performance.now() : undefined
+            const verified = executionWrite.fromCandidate ? await timeResourceBearer(() => authenticate(req, false, false, true))
+              : executionWrite.subject
+            if (verified === null) { send(res, 401, { error: 'invalid-runtime-token' }); return true }
+            resourceSubject = verified
+            resourceBearerMs = started === undefined ? undefined : performance.now() - started
+          }
+        }
+        const payload = record(executionBody)
+        if (pathname === '/internal/runtime/execution/enter' && payload?.currentScopeId === null
+          && payload.unverifiedHistory !== true && payload.creationAuthorization === undefined && writeFence !== undefined) {
+          if (!await executionWrite.admit(true)) return true
+          attemptedPersonalEntry = true
+          const entered = await execution.tryEnterPersonalRoot(executionWrite.subject, payload, writeFence)
+          if (entered !== undefined) {
+            res.setHeader('cache-control', 'no-store')
+            send(res, 200, entered)
+            return true
+          }
+        }
+        if (payload !== undefined && typeof payload.sessionId === 'string') {
+          if (pathname === '/internal/runtime/execution/register-session' && payload.parentSessionId === undefined
+            && (payload.isSeeded === undefined || payload.isSeeded === false)) fencedSubject = executionWrite.subject
+          if (pathname === '/internal/runtime/execution/authorize' && payload.capability === 'execute' && typeof payload.scopeId === 'string'
+            && (payload.unverifiedHistory === undefined || payload.unverifiedHistory === false)) fencedSubject = executionWrite.subject
+          if (pathname === '/internal/runtime/execution/input' && payload.kind === 'message' && payload.previousInputId === undefined) {
+            const signed = assertionFor(req, deps.principals, executionWrite.subject, true, { allowWebhookDispatch: true })!
+            if (signed.purpose === undefined) {
+              fencedSubject = executionWrite.subject
+              fencedPrincipal = signed
+            }
+          }
+          if (pathname === '/internal/runtime/execution/terminal-authorize') {
+            const signed = assertionFor(req, deps.principals, executionWrite.subject, true)!
+            if (signed.purpose === undefined && signed.user.id === executionWrite.subject.target.id) {
+              fencedSubject = executionWrite.subject
+              fencedPrincipal = signed
+            }
+          }
+        }
+        if (!await executionWrite.admit(fencedSubject !== undefined)) return true
+      }
+      const streamControl = isRuntimeStreamControlRequest(pathname, req.method)
+      const resourceCompletion = isRuntimeResourceCompletionRequest(pathname, req.method)
+      const bearerStarted = deps.performanceEnabled === true
+        && (isResourceAdmissionRequest(pathname, req.method) || resourceCompletion)
+        ? performance.now() : undefined
+      const draftModelWrite = pathname === '/internal/runtime/session/draft/model' && req.method === 'POST'
+      const active = fencedSubject ?? resourceSubject ?? controlSubject ?? await authenticate(req,
+        resourceCompletion, streamControl, draftModelWrite || executionWrite?.fromCandidate)
+      const bearerMs = resourceBearerMs ?? (bearerStarted === undefined ? undefined : performance.now() - bearerStarted)
+      const shutdown = active === null && token !== undefined && isRuntimeShutdownStorageRequest(pathname, req.method)
+        ? await deps.instances.authenticateRuntimeShutdownToken?.(token) : undefined
+      const subject = active ?? shutdown ?? null
+      if (subject === null) {
+        send(res, 401, { error: 'invalid-runtime-token' })
+        return true
+      }
+      const bearer = epoch !== undefined && subject.target.kind === 'user' && subject.target.runtimeId !== undefined
+        ? token : undefined
+      const personalFence = bearer === undefined || epoch === undefined ? undefined : { bearer, epoch }
       if (pathname === '/internal/runtime/workspace/catalog' && req.method === 'POST') {
         if (deps.workspaceCatalog === undefined) { send(res, 503, { error: 'workspace-catalog-unavailable' }); return true }
         await deps.workspaceCatalog.publish(subject, JSON.parse(body))
@@ -757,33 +919,32 @@ export function createRuntimeApiHandler(
       if (pathname.startsWith('/internal/runtime/resources/')) {
         if (deps.resourceBudget === undefined) { send(res, 503, { error: 'resource-unavailable' }); return true }
         return await handleRuntimeResourceApi({ pool: deps.context.pool, principals: deps.principals,
-          execution, budget: deps.resourceBudget }, subject, req, res, pathname, body)
+          execution, budget: deps.resourceBudget, personalFence, fencedRequest, bearerMs,
+          waitForQueued: (deps.resourceStatusWaitMs ?? 0) > 0,
+          resourceStatusWaitMs: deps.resourceStatusWaitMs,
+          waitSignal: () => requestSignal(req, res) }, subject, req, res, pathname, body)
       }
       const url = new URL(req.url ?? '/', 'http://runtime')
+      const runtimeCurrent = async (): Promise<boolean> => {
+        const current = await authenticate(req, false, true)
+        return current !== null && current.organizationId === subject.organizationId
+          && current.target.kind === subject.target.kind && current.target.id === subject.target.id
+          && current.target.runtimeId === subject.target.runtimeId && current.generation === subject.generation
+      }
       if (pathname === '/internal/runtime/stream-principals/renew' && req.method === 'POST') {
         if (deps.renewStreamPrincipals === undefined) { send(res, 503, { error: 'stream-principal-renewal-unavailable' }); return true }
         res.setHeader('cache-control', 'no-store')
-        send(res, 200, await deps.renewStreamPrincipals(subject, JSON.parse(body), async () => {
-          const current = await authenticate(req, false)
-          return current !== null && current.organizationId === subject.organizationId
-            && current.target.kind === subject.target.kind && current.target.id === subject.target.id
-            && current.generation === subject.generation
-        }))
+        send(res, 200, await deps.renewStreamPrincipals(subject, JSON.parse(body), runtimeCurrent))
         return true
       }
       if (pathname === '/internal/runtime/execution/watch' && req.method === 'GET') {
         if (deps.accessMonitor === undefined) { send(res, 503, { error: 'execution-watch-unavailable' }); return true }
         watchExecutionAccess(deps.accessMonitor, res, deps.executionWatchHeartbeatMs ?? DEFAULT_EXECUTION_WATCH_HEARTBEAT_MS,
-          deps.context.nodeId, async () => {
-            const current = await authenticate(req, false)
-            return current !== null && current.organizationId === subject.organizationId
-              && current.target.kind === subject.target.kind && current.target.id === subject.target.id
-              && current.generation === subject.generation
-          }, deps.executionWatchAuthorizationTimeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS)
+          deps.context.nodeId, runtimeCurrent, deps.executionWatchAuthorizationTimeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS)
         return true
       }
       if (pathname.startsWith('/internal/runtime/execution/') && req.method === 'POST') {
-        const value: unknown = JSON.parse(body)
+        const value: unknown = executionWrite === undefined ? JSON.parse(body) : executionBody
         const payload = record(value)
         const action = pathname.slice('/internal/runtime/execution/'.length)
         if (payload === undefined || typeof payload.sessionId !== 'string') throw new ExecutionIdentityError(400, 'invalid execution Session')
@@ -801,7 +962,7 @@ export function createRuntimeApiHandler(
             // the first append materializes its header; it admits a root unseeded Session only.
             header = { id: payload.sessionId }
           }
-          await execution.register(subject, value, header)
+          await execution.register(subject, value, header, personalFence)
           send(res, 200, { registered: true })
         } else if (action === 'capture') {
           send(res, 200, await execution.capture(subject, value))
@@ -812,13 +973,20 @@ export function createRuntimeApiHandler(
           res.writeHead(204)
           res.end()
         } else if (action === 'input' || action === 'question') {
+          if (action === 'input' && personalFence !== undefined && payload.previousInputId === undefined) {
+            const signed = fencedPrincipal ?? assertionFor(req, deps.principals, subject, true, { allowWebhookDispatch: true })!
+            if (signed.purpose === undefined) {
+              send(res, 200, await execution.input(subject, signed, value, personalFence))
+              return true
+            }
+          }
           const principal = (await currentAssertion(req, subject, true,
             action === 'input' ? { allowWebhookDispatch: true } : {}))!
           send(res, 200, action === 'input'
             ? await execution.input(subject, principal, value)
             : await execution.question(subject, principal, value))
         } else if (action === 'enter') {
-          send(res, 200, await execution.enter(subject, value))
+          send(res, 200, await execution.enter(subject, value, attemptedPersonalEntry ? undefined : personalFence))
         } else if (action === 'inherit' || action === 'relay') {
           if (subject.target.kind === 'project') {
             const header = await storedHeader(payload.sessionId, subject, requestSignal(req, res))
@@ -834,6 +1002,13 @@ export function createRuntimeApiHandler(
           }
           send(res, 200, action === 'inherit' ? await execution.inherit(subject, value) : await execution.relay(subject, value))
         } else if (action === 'terminal-authorize') {
+          if (personalFence !== undefined) {
+            const signed = fencedPrincipal ?? assertionFor(req, deps.principals, subject, true)!
+            if (signed.purpose === undefined && signed.user.id === subject.target.id) {
+              send(res, 200, await execution.authorizeTerminal(subject, signed, deps.context.nodeId, value, personalFence))
+              return true
+            }
+          }
           send(res, 200, await execution.authorizeTerminal(subject, (await currentAssertion(req, subject, true))!, deps.context.nodeId, value))
         } else if (action === 'terminal-check') {
           send(res, 200, await execution.checkTerminal(subject, deps.context.nodeId, value))
@@ -845,7 +1020,7 @@ export function createRuntimeApiHandler(
         } else if (action === 'desktop-authorize') {
           send(res, 200, await execution.authorizeDesktop(subject, deps.context.nodeId, value))
         } else if (action === 'authorize') {
-          send(res, 200, await execution.authorize(subject, value))
+          send(res, 200, await execution.authorize(subject, value, personalFence))
         } else return false
         return true
       }
@@ -905,6 +1080,7 @@ export function createRuntimeApiHandler(
         return true
       }
       if (pathname === '/internal/runtime/plugin-state/verify-profile' && req.method === 'POST') {
+        await deps.recoveryExecution?.verifySubject(subject)
         if (subject.contentBinding) {
           if (!deps.pluginState?.verifyProfileForSubject) {send(res,503,{error:'plugin-state-unavailable'});return true}
           await deps.pluginState.verifyProfileForSubject(subject)
@@ -928,6 +1104,13 @@ export function createRuntimeApiHandler(
         else reply(200, { revision: outcome.revision })
         return true
       }
+      if (pathname === '/internal/runtime/plugin-inventory' && req.method === 'POST') {
+        if (deps.pluginInventory === undefined) { send(res, 503, { error: 'plugin-inventory-unavailable' }); return true }
+        const payload = record(JSON.parse(body))
+        if (payload === undefined) throw new PluginStateError(400, 'invalid plugin inventory report')
+        await deps.pluginInventory.report(subject, payload.snapshot)
+        res.writeHead(204, { 'cache-control': 'no-store' }); res.end(); return true
+      }
       if (pathname === '/internal/runtime/ssh/resolve' && req.method === 'POST') {
         const claims = (await currentAssertion(req, subject, true))!
         if (deps.sshTargets === undefined) { send(res, 503, { error: 'ssh-unavailable' }); return true }
@@ -942,17 +1125,12 @@ export function createRuntimeApiHandler(
         send(res, 200, resolved)
         return true
       }
-      if (pathname === '/internal/runtime/model-credential' && req.method === 'POST') {
-        const payload = record(JSON.parse(body))
-        const ref = payload?.ref
-        if (typeof ref !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(ref)) {
-          throw new Error('invalid managed credential reference')
-        }
+      if (pathname === RUNTIME_MODEL_CREDENTIAL_PATH && req.method === 'POST') {
+        const ref = managedCredentialRef(JSON.parse(body))
         const value = deps.governance.resolveManagedCredential !== undefined
           ? await deps.governance.resolveManagedCredential(subject.target, ref)
           : await deps.governance.resolveOrganizationCredential(subject.target, ref)
-        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
-        res.end(JSON.stringify(value === null ? { configured: false } : { configured: true, value }))
+        sendManagedCredential(res, value)
         return true
       }
 
@@ -1189,7 +1367,62 @@ export function createRuntimeApiHandler(
           draftId: reservation.draftId,
           sessionId: reservation.sessionId,
           leaseExpiresAt: reservation.leaseExpiresAt,
+          ...(reservation.modelSelection === undefined ? {} : { modelSelection: reservation.modelSelection }),
         })
+        return true
+      }
+
+      if (draftModelWrite || (pathname === '/internal/runtime/session/draft/recover' && req.method === 'POST')) {
+        const payload = record(JSON.parse(body))
+        if (typeof payload?.sessionId !== 'string' || payload.sessionId === '' || payload.sessionId.length > 256) {
+          throw new Error('invalid draft recovery request')
+        }
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (subject.target.kind !== 'project' || subject.projectInternalId === undefined
+          || claims.scope.kind !== 'project' || claims.scope.mode !== 'rw') {
+          throw new CollaborationDeniedError('forbidden')
+        }
+        const repository = conversations(subject)
+        const userId = await internalUserId(deps.context.pool, subject.organizationId, claims.user.id)
+        if (userId === null) throw new CollaborationDeniedError('forbidden')
+        if (draftModelWrite) {
+          const selection = draftModelSelectionSchema.safeParse(payload.selection)
+          if (typeof payload.draftId !== 'string' || payload.draftId === '' || payload.draftId.length > 256 || !selection.success) {
+            throw new ExecutionIdentityError(400, 'invalid draft model selection')
+          }
+          if (repository.saveReservedProjectDraftModel === undefined) {
+            send(res, 503, { error: 'draft-reservation-unavailable' })
+            return true
+          }
+          const saved = await repository.saveReservedProjectDraftModel({
+            sessionId: payload.sessionId, draftId: payload.draftId, projectId: subject.projectInternalId, userId,
+            nodeId: deps.context.nodeId, generation: subject.generation, selection: selection.data,
+          })
+          if (!saved) throw new CollaborationDeniedError('conversation-not-found')
+          send(res, 200, { saved: true })
+          return true
+        }
+        if (repository.readReservedProjectDraft === undefined) {
+          send(res, 503, { error: 'draft-reservation-unavailable' })
+          return true
+        }
+        const draft = await repository.readReservedProjectDraft(payload.sessionId, subject.projectInternalId, userId)
+        if (draft === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        // Qualify publication after the storage read. A former generation or placement cannot recover a draft.
+        const [live, membership] = await Promise.all([
+          authenticate(req, false, false, true),
+          deps.collaboration.projectForUser(subject.target.id, claims.user.id),
+        ])
+        if (live === null || live.organizationId !== subject.organizationId
+          || live.target.runtimeId !== subject.target.runtimeId || live.generation !== subject.generation
+          || live.projectInternalId !== subject.projectInternalId || !isDeepStrictEqual(live.contentBinding, subject.contentBinding)) {
+          send(res, 401, { error: 'invalid-runtime-token' })
+          return true
+        }
+        if (membership?.mode !== 'rw') throw new CollaborationDeniedError('forbidden')
+        assertionFor(req, deps.principals, live, true)
+        res.setHeader('cache-control', 'no-store')
+        send(res, 200, draft)
         return true
       }
 
@@ -1367,6 +1600,10 @@ export function createRuntimeApiHandler(
         }
         const header = payload.header === undefined ? undefined : sessionHeader(payload.header)
         const creationAuthorization = payload.creationAuthorization
+        if (shutdown !== null && shutdown !== undefined && (header !== undefined || creationAuthorization !== undefined)) {
+          send(res, 409, { error: 'runtime-stop-requires-materialized-session' })
+          return true
+        }
         if ((creationAuthorization !== undefined && (typeof creationAuthorization !== 'string'
           || creationAuthorization === '')) || (header !== undefined && creationAuthorization !== undefined)
           || (header !== undefined && header.id !== payload.sessionId)) {
@@ -1465,6 +1702,23 @@ export function createRuntimeApiHandler(
           header: runtimeHeader(header),
           events,
         })
+        return true
+      }
+
+      if (pathname === '/internal/runtime/session/read-event' && req.method === 'GET') {
+        const repository = conversations(subject)
+        const sessionId = url.searchParams.get('sessionId') ?? ''
+        const seq = Number(url.searchParams.get('seq'))
+        if (url.searchParams.getAll('seq').length !== 1 || url.searchParams.get('seq') !== String(seq)
+          || !safeInteger(seq)) throw new ConversationReadError('protocol', 'invalid conversation event seq')
+        if (repository.readEvent === undefined) throw new ConversationReadError('dependency', 'conversation event read is unavailable')
+        const value = await repository.readEvent(sessionId, seq, requestSignal(req, res))
+        if (value === undefined || value.header.id !== sessionId || !belongsToRuntime(value.header, subject)) {
+          throw new CollaborationDeniedError('conversation-not-found')
+        }
+        const events = value.event === null ? [] : [value.event]
+        validateConversationRange(events, seq)
+        send(res, 200, { header: runtimeHeader(value.header), events })
         return true
       }
 
@@ -1828,6 +2082,14 @@ export function createRuntimeApiHandler(
 
       return false
     } catch (error) {
+      if (executionWrite?.fromCandidate && await authenticate(req, false, false, true) === null) {
+        send(res, 401, { error: 'invalid-runtime-token' })
+        return true
+      }
+      if (error instanceof PeerBackupError) {
+        send(res, error.status, { error: error.code })
+        return true
+      }
       if (error instanceof NodeContentUnavailable) {
         send(res, error.status, { error: error.code, message: error.message })
         return true
@@ -1838,8 +2100,13 @@ export function createRuntimeApiHandler(
       }
       if (error instanceof ExecutionIdentityError) {
         const code = error.status === 403 ? 'execution-forbidden' : error.status === 404 ? 'execution-not-found'
-          : error.status === 409 ? 'execution-conflict' : 'invalid-execution-request'
+          : error.status === 409 ? 'execution-conflict' : error.status === 503 ? 'execution-writes-unavailable' : 'invalid-execution-request'
         send(res, error.status, { error: code, message: error.message })
+        return true
+      }
+      if (error instanceof NodeResourceBudgetError) {
+        res.setHeader('cache-control', 'no-store')
+        send(res, error.status, { error: `resource-${error.reason}` })
         return true
       }
       if (error instanceof DocumentCatalogError) {
@@ -1891,6 +2158,16 @@ export function createRuntimeApiHandler(
       // including error and cancellation paths.
       disposeRequestSignals(res)
     }
+  }
+  handler.defersPersonalExecutionWrite = (subject, pathname, method, activeModelCheck) => {
+    if (deps.executionWriteEpoch === undefined || subject.target.runtimeId === undefined) return false
+    if (!isPersonalExecutionWriteRequest(pathname, method, activeModelCheck)) return false
+    if (pathname === RUNTIME_MODEL_CREDENTIAL_PATH) {
+      if (deps.governance.resolveRuntimeCredential !== undefined) return true
+      return subject.target.kind === 'user' && subject.contentBinding === undefined
+        && deps.governance.resolvePersonalRuntimeCredential !== undefined
+    }
+    return subject.target.kind === 'user' && subject.contentBinding === undefined
   }
   if (deps.documentStore === undefined) return handler
   if (deps.accessMonitor === undefined) throw new Error('Runtime document backend requires a document access monitor.')

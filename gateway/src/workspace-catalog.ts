@@ -240,14 +240,14 @@ export class PostgresWorkspaceCatalog {
   }
 
   /**
-   * Fetch one personal index page at its owner without loading the complete published snapshot over the network.
+   * Read placement and the authorized published page together. A node-local read rechecks placement and access before returning.
    * @param user - authenticated account.
    * @param runtimeId - exact personal allocation.
    * @param page - validated filters and keyset.
    * @returns workspace or conversation rows, with unknown indexing distinguished from an empty publication.
    */
   async personalPage(user: UserRow, runtimeId: RuntimeId, page: RowSelection): Promise<WorkbenchRowsPage> {
-    const authorized = () => this.context.pool.query<{ node_name:string }>(`SELECT n.name::text node_name FROM harness.personal_directory_placement p
+    const placementQuery = `SELECT n.name::text node_name FROM harness.personal_directory_placement p
       JOIN harness.users u ON u.organization_id=p.organization_id AND u.id=p.owner_id
       JOIN harness.compute_nodes n ON n.organization_id=p.organization_id AND n.id=p.node_id
       JOIN harness.runtime_environments e ON e.id=p.runtime_id AND e.organization_id=p.organization_id AND e.retired_at IS NULL
@@ -256,42 +256,45 @@ export class PostgresWorkspaceCatalog {
         AND EXISTS(SELECT FROM harness.memberships m JOIN harness.organizations o ON o.id=m.organization_id AND o.status='active'
           WHERE m.organization_id=p.organization_id AND m.user_id=u.id AND m.status='active')
         AND ($5::uuid IS NULL OR harness.entry_node_visible(p.organization_id,$5,p.node_id))
-        AND harness.computer_use_allowed(p.organization_id,u.id,p.node_id)`, [this.context.organizationId,this.context.nodeId,runtimeId,user.id,this.entryNodeId??null])
-    const placement=await authorized()
-    if (placement.rowCount) {
-      if (this.local === undefined) throw new NodeContentUnavailable()
-      const view = await this.local.page({organizationId:this.context.organizationId,nodeId:this.context.nodeId,runtimeId,userId:user.id},page)
-      if (!(await authorized()).rowCount) throw new CollaborationDeniedError('forbidden')
-      if (view === null) throw new NodeContentUnavailable()
-      const runtime = {kind:'personal' as const,runtimeId,nodeId:this.context.nodeId as RuntimeNodeId,nodeName:placement.rows[0]!.node_name}
-      return { runtimeId, indexed:view.indexed, nextCursor:null,
-        workspaces:page.kind==='workspaces'?z.array(workspace).parse(view.rows):[],
-        items:page.kind==='conversations'?z.array(conversation).parse(view.rows).map(item=>({...item,runtime,visibility:'personal',
-          creatorUserId:user.id,creatorDisplayName:user.displayName || user.username,canWrite:true})):[] }
-    }
+        AND harness.computer_use_allowed(p.organization_id,u.id,p.node_id)`
+    const identity = [this.context.organizationId, this.context.nodeId, runtimeId, user.id, this.entryNodeId ?? null]
     const workspaces = page.kind === 'workspaces'
-    const result = await this.context.pool.query<{ node_id: RuntimeNodeId; node_name: string; indexed: boolean; rows: unknown[] }>(`
-      SELECT n.id node_id,n.name::text node_name,c.runtime_id IS NOT NULL AND ${workspaces ? 'true' : 'c.conversations IS NOT NULL'} indexed,
+    const result = await this.context.pool.query<{ promoted: boolean; node_id: RuntimeNodeId; node_name: string; indexed: boolean; rows: unknown[] }>(`
+      WITH placed AS (${placementQuery})
+      SELECT true promoted,$2::uuid node_id,node_name,false indexed,'[]'::jsonb rows FROM placed
+      UNION ALL
+      SELECT false promoted,n.id node_id,n.name::text node_name,c.runtime_id IS NOT NULL AND ${workspaces ? 'true' : 'c.conversations IS NOT NULL'} indexed,
         COALESCE((SELECT jsonb_agg(entry ORDER BY t DESC,id COLLATE "C") FROM (
           SELECT ${workspaces ? "v - 'sessionIds' || jsonb_build_object('sessionIds','[]'::jsonb)" : 'v'} entry,
             ${workspaces ? '0::numeric' : "(v->>'updatedAt')::numeric"} t, v->>'${workspaces ? 'workspaceId' : 'sessionId'}' id
           FROM jsonb_array_elements(c.${workspaces ? 'items' : 'conversations'}) v
-          WHERE ($4::text='' OR strpos(lower(concat_ws(' ',v->>'title',v->>'${workspaces ? 'path' : 'cwd'}',v->>'${workspaces ? 'workspaceId' : 'sessionId'}')),lower($4))>0)
-            AND (${workspaces ? "$5::text IS NULL OR v->>'workspaceId'=$5" : `$5::text IS NULL OR EXISTS (
-              SELECT 1 FROM jsonb_array_elements(c.items) w WHERE w->>'workspaceId'=$5 AND (w->'sessionIds') ? (v->>'sessionId'))`})
-            AND ($6::numeric IS NULL OR ${workspaces ? "(v->>'workspaceId') COLLATE \"C\" > $7" : `(v->>'updatedAt')::numeric<$6 OR
-              ((v->>'updatedAt')::numeric=$6 AND (v->>'sessionId') COLLATE "C" > $7)`})
-          ORDER BY t DESC,(v->>'${workspaces ? 'workspaceId' : 'sessionId'}') COLLATE "C" LIMIT $8
+          WHERE ($6::text='' OR strpos(lower(concat_ws(' ',v->>'title',v->>'${workspaces ? 'path' : 'cwd'}',v->>'${workspaces ? 'workspaceId' : 'sessionId'}')),lower($6))>0)
+            AND (${workspaces ? "$7::text IS NULL OR v->>'workspaceId'=$7" : `$7::text IS NULL OR EXISTS (
+              SELECT 1 FROM jsonb_array_elements(c.items) w WHERE w->>'workspaceId'=$7 AND (w->'sessionIds') ? (v->>'sessionId'))`})
+            AND ($8::numeric IS NULL OR ${workspaces ? "(v->>'workspaceId') COLLATE \"C\" > $9" : `(v->>'updatedAt')::numeric<$8 OR
+              ((v->>'updatedAt')::numeric=$8 AND (v->>'sessionId') COLLATE "C" > $9)`})
+          ORDER BY t DESC,(v->>'${workspaces ? 'workspaceId' : 'sessionId'}') COLLATE "C" LIMIT $10
         ) selected),'[]'::jsonb) rows
       FROM harness.users u JOIN harness.instances i ON i.organization_id=u.organization_id AND i.user_id=u.id AND i.runtime_id=$3
       JOIN harness.compute_nodes n ON n.organization_id=i.organization_id AND n.id=i.assigned_node_id
       LEFT JOIN harness.runtime_workspace_catalog c ON c.organization_id=i.organization_id AND c.runtime_id=i.runtime_id
         AND NOT EXISTS(SELECT 1 FROM harness.personal_directory_placement p WHERE p.organization_id=i.organization_id AND p.runtime_id=i.runtime_id)
-      WHERE u.organization_id=$1 AND u.public_id=$2 AND u.status='active' AND i.assigned_node_id=$9
+      WHERE NOT EXISTS (SELECT FROM placed) AND u.organization_id=$1 AND u.public_id=$4 AND u.status='active' AND i.assigned_node_id=$2
         AND harness.computer_use_allowed(u.organization_id,u.id,i.assigned_node_id)`,
-      [this.context.organizationId,user.id,runtimeId,page.query,page.workspaceId,page.afterTime,page.afterId,page.limit,this.context.nodeId])
+      [...identity,page.query,page.workspaceId,page.afterTime,page.afterId,page.limit])
     const row = result.rows[0]
     if (row === undefined) throw new CollaborationDeniedError('forbidden')
+    if (row.promoted) {
+      if (this.local === undefined) throw new NodeContentUnavailable()
+      const view = await this.local.page({organizationId:this.context.organizationId,nodeId:this.context.nodeId,runtimeId,userId:user.id},page)
+      if (!(await this.context.pool.query(placementQuery, identity)).rowCount) throw new CollaborationDeniedError('forbidden')
+      if (view === null) throw new NodeContentUnavailable()
+      const runtime = {kind:'personal' as const,runtimeId,nodeId:this.context.nodeId as RuntimeNodeId,nodeName:row.node_name}
+      return { runtimeId, indexed:view.indexed, nextCursor:null,
+        workspaces:page.kind==='workspaces'?z.array(workspace).parse(view.rows):[],
+        items:page.kind==='conversations'?z.array(conversation).parse(view.rows).map(item=>({...item,runtime,visibility:'personal',
+          creatorUserId:user.id,creatorDisplayName:user.displayName || user.username,canWrite:true})):[] }
+    }
     const runtime = { kind: 'personal' as const, runtimeId, nodeId: row.node_id, nodeName: row.node_name }
     return { runtimeId, indexed: row.indexed, nextCursor: null,
       workspaces: workspaces ? z.array(workspace).parse(row.rows) : [],

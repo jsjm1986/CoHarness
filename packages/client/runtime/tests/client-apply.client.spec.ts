@@ -101,20 +101,30 @@ async function flushMicrotasks(): Promise<void> {
 
 describe('runtime client apply', () => {
   it.each([
-    { principalId: 7, runtimeTarget: { kind: 'personal' } as const, suffix: '7.personal', sessionId: 'personal-seven' },
-    { principalId: 7, runtimeTarget: { kind: 'project', projectId: 42 } as const, suffix: '7.project-42', sessionId: 'project-seven' },
-    { principalId: 8, runtimeTarget: { kind: 'personal' } as const, suffix: '8.personal', sessionId: 'personal-eight' },
+    { principalId: 7, runtimeTarget: { kind: 'personal', runtimeId: 'computer-a' as never } as const, suffix: '7.computer-a.personal', sessionId: 'personal-seven-a' },
+    { principalId: 7, runtimeTarget: { kind: 'personal', runtimeId: 'computer-b' as never } as const, suffix: '7.computer-b.personal', sessionId: 'personal-seven-b' },
+    { principalId: 7, runtimeTarget: { kind: 'project', projectId: 42, runtimeId: 'project-a' as never } as const, suffix: '7.project-a.project-42', sessionId: 'project-seven' },
+    { principalId: 8, runtimeTarget: { kind: 'personal', runtimeId: 'computer-c' as never } as const, suffix: '8.computer-c.personal', sessionId: 'personal-eight' },
   ])('restores only account/Runtime $suffix while its baseline is pending', async ({ principalId, runtimeTarget, suffix, sessionId }) => {
     const storage = new Map([
       ['dsh.sessions.current', JSON.stringify({ sessionId: 'legacy-other-space' })],
-      ['dsh.sessions.current.v2.7.personal', JSON.stringify({ sessionId: 'personal-seven' })],
-      ['dsh.sessions.current.v2.7.project-42', JSON.stringify({ sessionId: 'project-seven' })],
-      ['dsh.sessions.current.v2.8.personal', JSON.stringify({ sessionId: 'personal-eight' })],
+      ['dsh.sessions.current.v2.7.personal', JSON.stringify({ sessionId: 'legacy-other-computer' })],
+      ['dsh.sessions.current.v2.7.project-42', JSON.stringify({ sessionId: 'legacy-project' })],
     ])
     const before = new Map(storage)
+    const tabStorage = new Map([
+      ['dsh.sessions.current.v3.7.computer-a.personal', JSON.stringify({ sessionId: 'personal-seven-a' })],
+      ['dsh.sessions.current.v3.7.computer-b.personal', JSON.stringify({ sessionId: 'personal-seven-b' })],
+      ['dsh.sessions.current.v3.7.project-a.project-42', JSON.stringify({ sessionId: 'project-seven' })],
+      ['dsh.sessions.current.v3.8.computer-c.personal', JSON.stringify({ sessionId: 'personal-eight' })],
+    ])
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => { storage.set(key, value) },
+    })
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => tabStorage.get(key) ?? null,
+      setItem: (key: string, value: string) => { tabStorage.set(key, value) },
     })
     let bench: Bench | undefined
     const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
@@ -128,9 +138,8 @@ describe('runtime client apply', () => {
       expect(bench.api.callsOf('session.history')).toEqual([{ sessionId, maxMessages: 50, detail: 'conversation' }])
       expect(bench.api.callsOf('session.list')).toHaveLength(1)
       expect(bench.ctx.get('sessions')!.list.getSnapshot().current).toBeUndefined()
-      for (const [key, value] of before) {
-        if (key !== `dsh.sessions.current.v2.${suffix}`) expect(storage.get(key)).toBe(value)
-      }
+      for (const [key, value] of before) expect(storage.get(key)).toBe(value)
+      expect(tabStorage.get(`dsh.sessions.current.v3.${suffix}`)).toBe(JSON.stringify({ sessionId }))
     } finally {
       list.resolve(ok({ items: [] }))
       history.resolve(ok({ events: [], hasMore: false }))
@@ -139,9 +148,12 @@ describe('runtime client apply', () => {
     }
   })
 
-  it('leaves an unscoped saved selection untouched on the first authenticated space visit', async () => {
+  it.each([
+    { kind: 'personal' as const },
+    { kind: 'personal' as const, runtimeId: 'fresh-runtime' as never },
+  ])('leaves ambiguous saved selections untouched without an exact saved tab record: $runtimeId', async (runtimeTarget) => {
     const saved = JSON.stringify({ sessionId: 'another-space' })
-    const storage = new Map([['dsh.sessions.current', saved]])
+    const storage = new Map([['dsh.sessions.current', saved], ['dsh.sessions.current.v2.7.personal', saved]])
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => { storage.set(key, value) },
@@ -149,14 +161,62 @@ describe('runtime client apply', () => {
     let bench: Bench | undefined
     const list = deferred<Awaited<ReturnType<FakeApiClient['onList']>>>()
     try {
-      bench = await mount({ documentIdentity: { principalId: 7, runtimeTarget: { kind: 'personal' } } })
+      bench = await mount({ documentIdentity: { principalId: 7, runtimeTarget } })
       bench.api.onList = () => list.promise
-      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, runtimeTarget: { kind: 'personal' } })
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, runtimeTarget })
       expect(bench.api.callsOf('session.history')).toHaveLength(0)
       expect(storage.get('dsh.sessions.current')).toBe(saved)
+      expect(storage.get('dsh.sessions.current.v2.7.personal')).toBe(saved)
     } finally {
       list.resolve(ok({ items: [] }))
       try { await bench?.ctx.fiber.dispose() }
+      finally { vi.unstubAllGlobals() }
+    }
+  })
+
+  it('reloads each tab\'s own conversation after another tab selects a different conversation in the same Runtime', async () => {
+    const runtimeTarget = { kind: 'personal', runtimeId: '10000000-0000-4000-8000-000000000001' as never } as const
+    const local = new Map<string, string>()
+    const tabs = [new Map<string, string>(), new Map<string, string>()]
+    const ids = ['first-tab-conversation', 'second-tab-conversation']
+    const benches = new Set<Bench>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => local.get(key) ?? null,
+      setItem: (key: string, value: string) => { local.set(key, value) },
+    })
+    const openTab = async (storage: Map<string, string>): Promise<Bench> => {
+      vi.stubGlobal('sessionStorage', {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => { storage.set(key, value) },
+      })
+      const bench = await mount({ documentIdentity: { principalId: 7, runtimeTarget },
+        onRuntimeTarget: (listener) => { listener(runtimeTarget); return () => {} } })
+      benches.add(bench)
+      bench.api.onList = async () => ok({ items: ids.map(sessionId => ({
+        sessionId: sessionId as never, updatedAt: 1, running: false, blank: false,
+      })) })
+      bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, runtimeTarget })
+      await bench.ctx.get('sessions')!.refresh()
+      return bench
+    }
+    try {
+      for (const [i, storage] of tabs.entries()) {
+        const bench = await openTab(storage)
+        bench.ctx.get('sessions')!.open(clientSessionKey(runtimeTarget, ids[i]! as never))
+        await flushMicrotasks()
+        await bench.ctx.fiber.dispose()
+        benches.delete(bench)
+      }
+      for (const [i, storage] of tabs.entries()) {
+        const bench = await openTab(storage)
+        expect(bench.api.callsOf('session.history')).toEqual([
+          { sessionId: ids[i], maxMessages: 50, detail: 'conversation' },
+        ])
+        expect(bench.ctx.get('sessions')!.list.getSnapshot().current).toBe(clientSessionKey(runtimeTarget, ids[i]! as never))
+      }
+      expect(local.has('dsh.sessions.current.v2.7.personal')).toBe(false)
+    } finally {
+      try { await Promise.all([...benches].map(bench => bench.ctx.fiber.dispose())) }
       finally { vi.unstubAllGlobals() }
     }
   })

@@ -15,6 +15,12 @@ kind: "package-reference"
 
 Source 可以同步发布面包屑头部。目录候选既可以通过 Enter／点击作为原子文件夹引用落定，也可以通过 Tab、行尾箭头或面包屑显式下钻；下钻会替换 token 文本并在新目录重新追踪菜单，同时保留 source 自己的头部。
 
+触摸输入时，候选行、目录箭头和面包屑至少有 44 CSS 像素高，宽屏横向视口也适用。目录箭头和面包屑的最小宽度同样为 44 像素。粗指针设备始终隐藏键盘快捷键提示，包括高亮候选行；目录箭头仍可使用。
+
+紧凑视口的候选行把完整标题放在别名与来源说明上方。长标题自然换行，来源说明独占次级信息行；文件夹下钻保留独立触控区域。
+
+在较矮的横屏窗口中，菜单固定在底部安全区上方，对话滚动区不会裁剪其面包屑或候选项。键入、指针选择与点击外部关闭的行为保持一致。
+
 MenuView 把菜单 store 渲染进 `conversation.input.overlay` slot（列表类，会话 scope），菜单关闭期间渲染 null。键入式 trigger 会 seed 为该 trigger 注册的所有 source；程序化 launcher 只 seed 所请求的 source，并在菜单关闭或重新开始键入式 tracking 前，通过 controller 的 `launcher` 快照 store 发布该 source 名称。分组按可选的 `InputTriggerSource.order` 排序（越小越靠前，默认 0，同值保持注册序），组标题行经 `inputTriggers.menu` locale 命名空间本地化（未知 source 显示其原名）。`showGroupTitle: false` 会在 pending 与 ready 状态全程隐藏该行，ready 且候选项声明了 section 的组则以这些 section 标题行取代 source 标题。列表高度受限于 composer 上方的可用空间，指针落在菜单与所在 composer 卡片之外即关闭菜单。compact 视口会使用共享 `--dsw-mobile-sheet-*` 几何把菜单变成固定手机 Sheet；焦点仍留在 textarea，mousedown 选择和关闭规则不变。该 slot 由 ui-conversation 的组合器条目拥有（锚点、children 声明、生命周期）；其 SlotMap 类型合并放在本包的 `src/client/slots.ts`，因为依赖方向（ui-conversation → ui-input-trigger）不允许反向的类型导入。combobox 模式：焦点始终留在 textarea，行在 mousedown 时完成 pick，高亮由 `aria-activedescendant` 承载。
 
 `/client` 导出接口是插件主体（`apply`／`inject`）、`InputTriggerService`、`MenuViewInjected` 与约定类型。MenuView 本身是内部实现——slot 注册以闭包持有它。

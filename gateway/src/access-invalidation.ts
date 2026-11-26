@@ -1,6 +1,6 @@
 /** Durable, organization-scoped access revocation delivery between Gateways. @module */
 
-import type { PoolClient } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { errorCodeForDiagnostics } from './postgres/database.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { RuntimeNodeId } from './runtime-catalog.ts'
@@ -19,10 +19,55 @@ export interface AccessInvalidationSubject {
 export interface GatewayAccessMonitor {
   /** Initial/reconnect catch-up and disconnect cleanup have settled; fresh admission still calls synchronize. */
   readonly available: boolean
-  /** Read committed changes before admitting a runtime operation. */
-  synchronize(): Promise<void>
+  /**
+   * Apply committed access changes before forwarding or assigning work.
+   * @param purpose - ordinary serving when omitted. Exact administrator stop requests can catch up on a draining node.
+   * @returns after the latest observed invalidations have settled for the requested purpose.
+   */
+  synchronize(purpose?: 'runtime-stop'): Promise<void>
+  /**
+   * Apply a revision supplied by this request's fresh governance query without rereading an already applied revision.
+   * Omitted by adapters that cannot prove revision identity; those adapters cannot admit the optimized asset path.
+   * @param revision - authorization revision read with the current request's account and Runtime checks.
+   * @returns true only while the connected monitor has applied exactly that revision; a newer revision requires a new admission.
+   */
+  synchronizeTo?(revision: bigint): Promise<boolean>
+  /**
+   * Compare the connected monitor's applied revision without querying the database.
+   * @param revision - revision approved by the current primary.
+   * @returns whether the local monitor still admits that exact revision.
+   */
+  matchesRevision?(revision: bigint): boolean
+  /**
+   * Read the connected monitor's current applied revision without querying the database.
+   * @returns applied organization revision while LISTEN is live and caught up, otherwise undefined.
+   */
+  currentRevision?(): bigint | undefined
+  /**
+   * Ensure the local monitor has applied at least `revision`, skipping a database query when already caught up.
+   * @param revision - revision already observed by the forwarding primary.
+   * @returns true while the connected monitor has applied at least `revision`.
+   */
+  ensureAtLeast?(revision: bigint): Promise<boolean>
   /** Register cancellation/projection work, awaited before its revision is acknowledged. */
   subscribe(listener: (subject: AccessInvalidationSubject) => void | Promise<void>): () => void
+}
+
+/** This node is draining, so ordinary Runtime admission is unavailable. */
+export class AccessNodeDrainingError extends Error {
+  readonly status = 503
+  readonly code = 'access-node-draining'
+
+  constructor() {
+    super('This computer is draining for maintenance.')
+    this.name = 'AccessNodeDrainingError'
+  }
+}
+
+interface AccessRevisionRow {
+  access_revision: string
+  access_applied_revision: string
+  node_status: 'active' | 'draining'
 }
 
 /**
@@ -34,7 +79,11 @@ export interface GatewayAccessMonitor {
 export function scopeAccessMonitor(monitor: GatewayAccessMonitor, nodeId: RuntimeNodeId): GatewayAccessMonitor {
   return {
     get available() { return monitor.available },
-    synchronize: () => monitor.synchronize(),
+    synchronize: purpose => monitor.synchronize(purpose),
+    ...(monitor.synchronizeTo === undefined ? {} : { synchronizeTo: (revision: bigint) => monitor.synchronizeTo!(revision) }),
+    ...(monitor.matchesRevision === undefined ? {} : { matchesRevision: (revision: bigint) => monitor.matchesRevision!(revision) }),
+    ...(monitor.currentRevision === undefined ? {} : { currentRevision: () => monitor.currentRevision!() }),
+    ...(monitor.ensureAtLeast === undefined ? {} : { ensureAtLeast: (revision: bigint) => monitor.ensureAtLeast!(revision) }),
     subscribe: listener => monitor.subscribe(subject => subject.nodeId === undefined || subject.nodeId === nodeId ? listener(subject) : undefined),
   }
 }
@@ -62,27 +111,45 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
   private readonly listeners = new Set<(subject: AccessInvalidationSubject) => void | Promise<void>>()
   private client: PoolClient | undefined
   private cursor: bigint | undefined
-  private flight: Promise<void> | undefined
+  private flight: { observed: Promise<void>; applied: Promise<void> } | undefined
+  private pendingApplication = false
+  private applying: { through: bigint; fenced: boolean } | undefined
+  private followUpRead: Promise<boolean> | undefined
+  private wakePending = false
+  private waking: Promise<void> | undefined
   private cancellations: Promise<void> = Promise.resolve()
   private cancelling = false
   private readonly timer: NodeJS.Timeout
   private closed = false
   private unavailable = false
   private caughtUp = false
+  private lastDrainAt = 0
+  private readonly healthyPollMs: number
+  private nodeStatus: AccessRevisionRow['node_status'] | undefined
 
   /**
    * Construct the monitor; call synchronize before accepting traffic.
    * @param context - database and organization owned by this Gateway
-   * @param pollMs - fallback interval for a lost notification and reconnect attempts
+   * @param pollMs - fallback interval for reconnect attempts and unhealthy catch-up
+   * @param listenerPool - reserved listener and outbox connection pool. Omission uses the injected context pool.
+   * @param healthyPollMs - reconciliation interval while LISTEN is live and caught up; defaults to pollMs.
    */
-  constructor(private readonly context: PostgresRuntimeContext, pollMs: number) {
+  constructor(private readonly context: PostgresRuntimeContext, pollMs: number,
+    private readonly listenerPool: Pool = context.pool, healthyPollMs = pollMs) {
     if (!Number.isSafeInteger(pollMs) || pollMs < 1 || pollMs > 2_147_483_647) throw new Error('invalid access invalidation poll interval')
-    this.timer = setInterval(() => { this.wake() }, pollMs)
+    if (!Number.isSafeInteger(healthyPollMs) || healthyPollMs < pollMs || healthyPollMs > 2_147_483_647) {
+      throw new Error('invalid access invalidation healthy poll interval')
+    }
+    this.healthyPollMs = healthyPollMs
+    this.timer = setInterval(() => {
+      if (this.available && performance.now() - this.lastDrainAt < this.healthyPollMs) return
+      this.wake()
+    }, pollMs)
     this.timer.unref()
   }
 
   get available(): boolean {
-    return this.caughtUp && this.client !== undefined && !this.closed && !this.cancelling && !this.unavailable
+    return this.nodeStatus === 'active' && this.caughtUp && this.client !== undefined && !this.closed && !this.cancelling && !this.unavailable
   }
 
   /**
@@ -97,24 +164,86 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
 
   /**
    * Observe a database snapshot taken after this call, including missed notifications.
+   * @param purpose - an exact administrator Runtime stop can synchronize while draining. Ordinary requests require serving status.
    * @returns completion after all observed invalidations have been applied
    */
-  synchronize(): Promise<void> {
-    if (this.closed) return Promise.reject(new Error('access monitor is closed'))
-    const pending = this.flight
-    // Calls arriving during a read share the next read, whose snapshot cannot
-    // precede their admission. Continued traffic cannot postpone earlier callers.
-    return pending === undefined ? this.readFresh() : pending.then(() => this.readFresh())
+  async synchronize(purpose?: 'runtime-stop'): Promise<void> {
+    await this.applyFresh()
+    if (purpose === undefined && this.nodeStatus === 'draining') throw new AccessNodeDrainingError()
   }
 
-  private readFresh(): Promise<void> {
+  private applyFresh(): Promise<void> {
     if (this.closed) return Promise.reject(new Error('access monitor is closed'))
-    this.flight ??= this.drain().catch((error: unknown) => {
+    const pending = this.flight?.applied
+    // Calls arriving during a read share the next read, whose snapshot cannot
+    // precede their admission. Continued traffic cannot postpone earlier callers.
+    return pending === undefined ? this.readFresh().applied : pending.then(() => this.readFresh().applied)
+  }
+
+  /**
+   * Verify that the listener can observe committed changes and dispatch cancellation.
+   * @returns after observation or fencing of newer traffic, independently of Runtime and projection cleanup.
+   */
+  async checkControlReadiness(): Promise<void> {
+    if (this.closed) throw new Error('access monitor is closed')
+    const followUp = this.checkPendingApplication()
+    if (followUp === undefined) await this.readFresh().observed
+    else if (!await followUp) throw new Error('access invalidation listener could not observe current revision')
+    if (this.client === undefined) throw new Error('access invalidation listener disconnected')
+    if (this.nodeStatus === 'draining') throw new AccessNodeDrainingError()
+  }
+
+  /**
+   * Catch up to a fresh authorization snapshot; a newer local revision invalidates that snapshot.
+   * @param revision - revision returned by the request's governance admission.
+   * @returns whether the connected monitor and the admission still describe the same revision.
+   */
+  async synchronizeTo(revision: bigint): Promise<boolean> {
+    const applied = this.currentRevision()
+    if (applied === undefined || applied < revision) await this.synchronize()
+    return this.matchesRevision(revision)
+  }
+
+  /**
+   * @param revision - primary-approved revision.
+   * @returns whether listeners have applied it and the monitor remains available.
+   */
+  matchesRevision(revision: bigint): boolean { return this.currentRevision() === revision }
+
+  /** @returns current applied organization access revision while LISTEN is live and caught up. */
+  currentRevision(): bigint | undefined { return this.available && !this.pendingApplication ? this.cursor : undefined }
+
+  /**
+   * Skip a tunnel database query when the connected LISTEN monitor is already at or beyond `revision`.
+   * @param revision - revision already synchronized on the forwarding primary.
+   * @returns whether the monitor is available and applied through at least `revision`.
+   */
+  async ensureAtLeast(revision: bigint): Promise<boolean> {
+    const applied = this.currentRevision()
+    if (applied !== undefined && applied >= revision) return true
+    await this.synchronize()
+    const current = this.currentRevision()
+    return current !== undefined && current >= revision
+  }
+
+  private readFresh(): NonNullable<PostgresAccessMonitor['flight']> {
+    if (this.closed) throw new Error('access monitor is closed')
+    if (this.flight !== undefined) return this.flight
+    let observe!: () => void
+    let rejectObservation!: (error: unknown) => void
+    const observed = new Promise<void>((resolve, reject) => {
+      observe = resolve
+      rejectObservation = reject
+    })
+    const applied = this.drain(observe).catch((error: unknown) => {
       this.reportFailure(error)
       this.disconnect()
+      rejectObservation(error)
       throw error
     }).finally(() => { this.flight = undefined })
-    return this.flight
+    void observed.catch(() => { /* Admission callers can await only application. */ })
+    void applied.catch(() => { /* Readiness callers can await only observation. */ })
+    return this.flight = { observed, applied }
   }
 
   /** Stop reconnect attempts, release the dedicated listener, and await in-flight work. */
@@ -122,15 +251,55 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
     this.closed = true
     clearInterval(this.timer)
     this.disconnect()
-    await this.flight?.catch(() => { /* shutdown already closed traffic and the database listener */ })
+    await this.flight?.applied.catch(() => { /* shutdown already closed traffic and the database listener */ })
+    await this.followUpRead
+    await this.waking
     await this.cancellations
   }
 
   private wake(): void {
     if (this.closed || this.listeners.size === 0) return
-    void this.synchronize().catch(() => {
-      // Admission remains blocked until a later explicit read/reconnect succeeds.
-      // The connection's error handler and disconnect have already closed traffic.
+    if (this.applying?.fenced !== true) this.checkPendingApplication()
+    this.wakePending = true
+    this.waking ??= Promise.resolve().then(async () => {
+      try {
+        while (this.wakePending && !this.closed) {
+          this.wakePending = false
+          await this.applyFresh().catch(() => {
+            // The failed read closed traffic. A later wake can reconnect.
+          })
+        }
+      } finally {
+        this.waking = undefined
+      }
+    })
+  }
+
+  private checkPendingApplication(): Promise<boolean> | undefined {
+    const application = this.applying, client = this.client
+    if (application === undefined || client === undefined) return
+    return this.followUpRead ??= Promise.resolve().then(async () => {
+      try {
+        const revision = await this.readNodeRevision(client)
+        if (BigInt(revision.access_revision) < application.through) {
+          throw new Error('access invalidation authority changed while applying a revision')
+        }
+        if (this.applying !== application || application.fenced || BigInt(revision.access_revision) === application.through) return true
+        // A later committed revocation must stop admitted traffic even while
+        // physical Runtime cleanup for an earlier revision is still waiting.
+        application.fenced = true
+        this.caughtUp = false
+        this.cancelAdmitted()
+        return true
+      } catch (error) {
+        if (!this.closed && this.client === client) {
+          this.reportFailure(error)
+          this.disconnect()
+        }
+        return false
+      } finally {
+        this.followUpRead = undefined
+      }
     })
   }
 
@@ -152,10 +321,16 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
 
   private disconnect(): void {
     this.caughtUp = false
+    this.pendingApplication = false
+    this.nodeStatus = undefined
     const client = this.client
-    if (client === undefined && this.cancelling) return
     this.client = undefined
     if (client !== undefined) client.release(true)
+    this.cancelAdmitted()
+  }
+
+  private cancelAdmitted(): void {
+    if (this.cancelling) return
     this.cancelling = true
     const pending = (async () => {
       const settled = await Promise.allSettled([this.cancellations, this.notify([{}])])
@@ -172,7 +347,7 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
     await this.cancellations
     if (this.closed) throw new Error('access monitor is closed')
     if (this.client !== undefined) return this.client
-    const client = await this.context.pool.connect()
+    const client = await this.listenerPool.connect()
     if (this.closed) {
       client.release(true)
       throw new Error('access monitor is closed')
@@ -195,20 +370,31 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
     return client
   }
 
-  private async drain(): Promise<void> {
-    const client = await this.connection()
-    const revision = await client.query<{ access_revision: string; access_applied_revision: string; status: string }>(
-      `SELECT o.access_revision::text,n.access_applied_revision::text,o.status FROM harness.organizations o
-       JOIN harness.compute_nodes n ON n.organization_id=o.id AND n.id=$2 AND n.status='active' WHERE o.id=$1`,
+  private async readNodeRevision(client: PoolClient): Promise<AccessRevisionRow> {
+    const revision = await client.query<AccessRevisionRow>(
+      `SELECT o.access_revision::text,n.access_applied_revision::text,n.status AS node_status FROM harness.organizations o
+       JOIN harness.compute_nodes n ON n.organization_id=o.id AND n.id=$2 AND n.status IN ('active','draining')
+       WHERE o.id=$1 AND o.status='active'`,
       [this.context.organizationId, this.context.nodeId],
     )
-    const organization = revision.rows[0]
-    if (organization === undefined || organization.status !== 'active') throw new Error('access organization is not active')
+    if (this.closed || this.client !== client) throw new Error('access invalidation listener disconnected')
+    const current = revision.rows[0]
+    if (current === undefined) throw new Error('access organization is not active')
+    const wasServing = this.nodeStatus === 'active'
+    this.nodeStatus = current.node_status
+    if (wasServing && this.nodeStatus === 'draining') this.cancelAdmitted()
+    return current
+  }
+
+  private async drain(observe: () => void): Promise<void> {
+    const client = await this.connection()
+    const organization = await this.readNodeRevision(client)
     const target = BigInt(organization.access_revision)
     // A cold process has no admitted streams and can resume its node's applied
     // runtime projection. Reconnects always retain this process's own cursor.
     const initial = this.cursor ?? BigInt(organization.access_applied_revision)
     if (initial > target) throw new Error('access invalidation revision moved backwards')
+    this.pendingApplication = initial < target
     let cursor = initial
     const changes = new Map<string, AccessInvalidationSubject>()
     while (cursor < target) {
@@ -231,7 +417,17 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
         cursor = next
       }
     }
-    await this.notify([...changes.values()])
+    if (changes.size > 0) {
+      this.applying = { through: target, fenced: false }
+      try {
+        const cleanup = this.notify([...changes.values()])
+        observe()
+        await cleanup
+      } finally {
+        this.applying = undefined
+      }
+    } else observe()
+    await this.cancellations
     if (this.closed || this.client !== client) throw new Error('access invalidation listener disconnected')
     if (cursor > initial) {
       const acknowledged = await client.query(
@@ -242,6 +438,8 @@ export class PostgresAccessMonitor implements GatewayAccessMonitor {
       if (acknowledged.rowCount !== 1) throw new Error('access invalidation compute node disappeared')
     }
     this.cursor = cursor
+    this.pendingApplication = false
+    this.lastDrainAt = performance.now()
     this.unavailable = false
     this.caughtUp = true
   }

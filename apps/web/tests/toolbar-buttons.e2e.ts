@@ -1,7 +1,8 @@
 /** Shared toolbar geometry and emphasis through the runnable Web application. */
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Locator } from 'playwright'
+import { type Browser, type Locator } from 'playwright'
 import { afterEach, expect, it } from 'vitest'
 import { compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
 
@@ -46,7 +47,7 @@ async function metrics(button: Locator) {
 
 it.skipIf(MODE === 'record')('aligns routine toolbar entries across themes while preserving their actions', async () => {
   scaffold = await launchWebScaffold({ workbench: true, openInApp: false })
-  browser = await chromium.launch()
+  browser = await responsiveBrowser.launch()
   const page = await browser.newPage({ viewport: { width: 1566, height: 900 }, locale: 'en-US' })
   const tripwire = watchConsole(page)
   await page.route(/\/api\/documents(?:\?.*)?$/, async (route) => {

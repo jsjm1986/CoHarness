@@ -12,5 +12,12 @@
 - button "Record again":
   - img
 - button "Select model, current DeepSeek-V4-Flash"
-- button "6% of context used": 6%
 - button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turn · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: 1 turn · 2 steps
+  - button "15.8K tok · Cache hit 99%":
+    - img
+    - text: 15.8K tok
+- button "6% of context used": 6%

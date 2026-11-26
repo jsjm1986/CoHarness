@@ -1,0 +1,4 @@
+Direct Runtime entry discovers the owning computer before the first send.
+While the computer is offline the original queued input stays visible and unconfirmed.
+After the node lease changes, the same browser submission reads its receipt and resumes in the new Runtime generation.
+The owning Runtime records one user input and a complete model reply.

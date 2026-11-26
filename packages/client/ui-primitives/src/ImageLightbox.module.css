@@ -1,6 +1,8 @@
 .backdrop {
+  box-sizing: border-box;
   position: fixed;
   inset: 0;
+  height: var(--dsw-viewport-height, 100%);
   z-index: 1000;
   display: grid;
   place-items: center;
@@ -48,6 +50,13 @@
 .close:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 3px;
+}
+
+@media (pointer: coarse) {
+  .close {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
 }
 
 @media (max-width: 767px) {

@@ -6,6 +6,7 @@ import type { NodeSettingValues } from '../node-config-fields.ts'
 import { nodeSettingsFromConfig, readNodeConfiguration, type NodeConfigurationRecord } from '../node-config-store.ts'
 import { MaintenanceError } from './maintenance-service.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
+import { verifyDeploymentProjectNameKey } from './deployment-name-key.ts'
 
 const STORAGE_FIELDS = [
   'HGW_USERS_ROOT', 'HGW_PROJECT_RUNTIMES_ROOT', 'HGW_DATABASE_URL_FILE', 'HGW_PRINCIPAL_KEY_DIR',
@@ -57,7 +58,7 @@ function sameIdentity(record: NodeConfigurationRecord, context: PostgresRuntimeC
 export async function previewBackupNodeConfiguration(id: string, snapshot: ManagedSnapshot, filesDir: string,
   context: PostgresRuntimeContext, cfg: GatewayConfig, environment: NodeJS.ProcessEnv): Promise<BackupNodeConfigurationView> {
   const path = await configPath(snapshot, cfg), record = await readConfig(snapshot, filesDir, path, environment)
-  const incompatibleFields: string[] = []
+  const incompatibleFields = await verifyDeploymentProjectNameKey(snapshot,filesDir,context,cfg)
   const currentPath = (await normalizeManagedRoots([{ owner: 'gateway', kind: 'file', path: resolve(cfg.nodeConfigFile) }]))[0]!.path
   if (path !== undefined && path !== currentPath) incompatibleFields.push('HGW_NODE_CONFIG_FILE')
   const tunnelKeys = snapshot.roots.filter(root => root.owner === 'gateway-tunnel-credentials')

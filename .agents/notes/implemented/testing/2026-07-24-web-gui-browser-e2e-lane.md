@@ -12,6 +12,8 @@ The web GUI ships as a real assembled chain — chromium page → client plugin 
 
 `pnpm run test:web` carries a keyless, deterministic browser e2e lane under `apps/web/tests/`: recorded session-log fixtures replay through `@deepseek-ai/dsh-llm-replay` against the real in-process web composition, with normalized aria goldens for user-visible states and in-process assertions for durable world state. The supporting product contracts are `dsh-llm-replay` pacing, consumption checks, and validated indexed override patches; cross-package `dsh-llm` failures retain validated provider facts through own data properties; and the shipped web composition mounts `llm-retry` for transient model failures.
 
+The [plugin market browser scenario](../../../../apps/web/tests/plugin-market-responsive.e2e.ts) launches the built CLI in a subprocess. The launcher and HMR share one app-boot module instance, so a registry install can recompose the root Include that started the profile.
+
 ### Scaffold: `apps/web/tests/scaffold.ts`
 
 A plain shared-fixture module (the [testing-policy sanctioned shape](../../../../docs/testing.md)), not a package: the gate-worthy logic — replay derivation, session parsing, log scrubbing, persistence — lives in the gated packages `dsh-llm-replay`, `dsh-acp-snapshot`, and `dsh-session-persistence-jsonl`; what remains is boot wiring and browser glue, and chromium-driving code cannot hold per-file 100% coverage on the browserless coverage runners.

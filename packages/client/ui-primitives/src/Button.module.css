@@ -9,8 +9,8 @@
   border: none;
   border-radius: 18px;
   cursor: pointer;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   color: var(--dsw-alias-label-primary);
   background: transparent;
   padding: 0 14px;
@@ -40,8 +40,8 @@
  * 28x28 is the icon-only form) — geometry is ours. */
 .sm {
   height: 28px;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
   padding: 0 10px;
   border-radius: 14px;
 }
@@ -65,11 +65,17 @@
 .soft:active:not(:disabled) { background: var(--dsw-alias-button-soft-active); }
 
 @media (pointer: coarse), (max-width: 767px) {
-  .toolbarSize { height: var(--dsw-touch-target); min-height: var(--dsw-touch-target); font-size: 14px; line-height: 22px; }
+  .button { min-height: var(--dsw-touch-target); min-width: var(--dsw-touch-target); }
+  .toolbarSize { height: var(--dsw-touch-target); min-height: var(--dsw-touch-target); font-size: 0.875rem; line-height: 1.375rem; }
   .toolbarSize.iconOnly { width: var(--dsw-touch-target); }
 }
 
-:global([data-viewport='compact']) .toolbarSize { height: var(--dsw-touch-target); min-height: var(--dsw-touch-target); font-size: 14px; line-height: 22px; }
+@media (forced-colors: active) {
+  .button { border: 1px solid ButtonText; }
+  .button:disabled { border-color: GrayText; }
+}
+
+:global([data-viewport='compact']) .toolbarSize { height: var(--dsw-touch-target); min-height: var(--dsw-touch-target); font-size: 0.875rem; line-height: 1.375rem; }
 :global([data-viewport='compact']) .toolbarSize.iconOnly { width: var(--dsw-touch-target); }
 
 .primary {

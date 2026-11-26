@@ -130,6 +130,8 @@
 
 .copyButton {
   flex: none;
+  min-width: 24px;
+  min-height: 24px;
   position: sticky;
   top: 0;
   /* Card surface, not transparent: the control is sticky over the banner's
@@ -200,6 +202,15 @@
     margin: var(--dsw-space-3) 0;
   }
 
+  .output,
+  .empty {
+    padding-top: var(--dsw-space-2);
+    padding-bottom: var(--dsw-space-2);
+    padding-right: 10px;
+  }
+}
+
+@media (pointer: coarse), (max-width: 767px) {
   .header {
     min-height: var(--dsw-touch-target);
     padding: 0 10px 0 var(--dsl-terminal-gutter);
@@ -213,10 +224,5 @@
     justify-content: center;
   }
 
-  .output,
-  .empty {
-    padding-top: var(--dsw-space-2);
-    padding-bottom: var(--dsw-space-2);
-    padding-right: 10px;
-  }
+  .expand { min-height: var(--dsw-touch-target); }
 }

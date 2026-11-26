@@ -740,9 +740,8 @@ export function DirectoryBrowser({ open, listDirectory, createDirectory, onOpen,
 
   if (!open) return null
   const twoPane = selected !== null
-  // The nested create dialog owns the interaction while open: Modal has no
-  // focus trap, so every parent control goes inert (Shift-Tab or AT must not
-  // close, adopt, or retarget underneath the child).
+  // The nested create dialog owns the selection until creation finishes;
+  // parent controls cannot adopt or retarget it during that operation.
   const parentInert = busy || folderDraft !== null
   // An uncommitted path draft makes targetPath stale relative to the header:
   // committing actions must not act on the previous selection/listing while
@@ -752,11 +751,8 @@ export function DirectoryBrowser({ open, listDirectory, createDirectory, onOpen,
   return (
     <Modal
       open={open}
-      // Escape and mask reach every mounted Modal's document listener; while
-      // the nested create dialog is up only that topmost dialog may close
-      // (its own guard keeps an in-flight creation open), and an in-flight
-      // adoption pins the flow — dismissing it would leave the owner's
-      // createWorkspace to land after an apparent cancel.
+      // A pending create or adoption keeps the flow open until the owner has
+      // accepted its result, so dismissal never appears to cancel that work.
       onClose={() => { if (folderDraft === null && !busy) onClose() }}
       title={t('browser.title')}
       className={clsx(css.dialog)}
@@ -890,8 +886,11 @@ export function DirectoryBrowser({ open, listDirectory, createDirectory, onOpen,
                   // wrapper above (they must work after focus Tabs onto the
                   // rows); this handler owns only submission.
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !composingRef.current) {
+                    if (event.key === 'Enter') {
                       event.preventDefault()
+                      // Safari can deliver compositionend before the confirming Enter.
+                      if (composingRef.current || event.nativeEvent.isComposing
+                        || Reflect.get(event.nativeEvent, 'keyCode') === 229) return
                       // Trim only detects a blank draft; the Host gets the
                       // original text — a real directory name may end in
                       // whitespace, and trimming would list its sibling.
@@ -1014,8 +1013,10 @@ export function DirectoryBrowser({ open, listDirectory, createDirectory, onOpen,
             onChange={(event) => { setFolderDraft(event.target.value) }}
             {...compositionGuard}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !composingRef.current) {
+              if (event.key === 'Enter') {
                 event.preventDefault()
+                if (composingRef.current || event.nativeEvent.isComposing
+                  || Reflect.get(event.nativeEvent, 'keyCode') === 229) return
                 confirmCreate()
               }
               if (event.key === 'Escape') {

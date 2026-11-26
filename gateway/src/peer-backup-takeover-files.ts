@@ -4,6 +4,10 @@ import { dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 
 import { DatabaseSync } from 'node:sqlite'
 import { restoreDocumentIdentityBackup, type DocumentBackupEntry } from '@deepseek-ai/dsh-userdoc-local'
 import { z } from 'zod'
+import { suspendRecoveredSchedules } from './peer-backup-disaster-schedule.ts'
+import { suspendRecoveredEnvironment } from './peer-runtime-profile.ts'
+import { sealRecoveryEnvironment } from './peer-recovery-environment.ts'
+import { stageRecoveryExecutionTransfer } from './peer-backup-execution-transfer.ts'
 import { logicalPeerFileDigest, replacementFileDigest } from './peer-backup-file-digest.ts'
 import { copyVerifiedFile } from './managed-files.ts'
 import {
@@ -271,6 +275,11 @@ export async function stagePeerProjectFiles(
     db.close()
   }
   await restoreDocumentIdentityBackup(docs, evidence, signal)
+  if (op.recoveryMode === 'disaster') {
+    await suspendRecoveredSchedules(join(layout.runtimeHome,'storages'),limits,signal)
+    await sealRecoveryEnvironment(layout.runtimeHome, await suspendRecoveredEnvironment(layout.runtimeHome, limits.maxBytes), limits.maxBytes)
+  }
+  await stageRecoveryExecutionTransfer(op,join(drill.directory,'project'),layout.runtimeHome,limits)
   const roots = []
   for (const [owner, path] of [
     ['workspace', layout.workspace],

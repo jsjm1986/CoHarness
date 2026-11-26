@@ -1,0 +1,21 @@
+- text: "{{cwd}}"
+- button "Reload":
+  - img
+- list:
+  - listitem:
+    - button ".dsh-home":
+      - img
+      - text: .dsh-home
+  - listitem:
+    - button "empty" [expanded]:
+      - img
+      - text: empty
+    - list:
+      - listitem: Empty directory
+  - listitem:
+    - button "recover" [expanded]:
+      - img
+      - text: recover
+    - list:
+      - listitem:
+        - button "restored.txt"

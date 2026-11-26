@@ -1,16 +1,13 @@
 import { watch } from 'node:fs';
 import { basename, dirname } from 'node:path';
-import { loadPolicy } from "./policy.js";
 /**
  * Reloads an atomically replaced policy file and drains all queued work before
  * disposal. The parent directory is watched so rename-based replacement keeps
  * working after the policy inode changes.
  */
 export class PolicyReloader {
-    filename;
+    refresh;
     target;
-    onValid;
-    onInvalid;
     onWatcherError;
     watcher;
     operations = Promise.resolve();
@@ -20,10 +17,8 @@ export class PolicyReloader {
      * @param options - policy path, lifecycle callbacks, and optional watcher factory.
      */
     constructor(options) {
-        this.filename = options.filename;
+        this.refresh = options.refresh;
         this.target = basename(options.filename);
-        this.onValid = options.onValid;
-        this.onInvalid = options.onInvalid;
         this.onWatcherError = options.onWatcherError;
         const watchDirectory = options.watchDirectory ?? watch;
         this.watcher = watchDirectory(dirname(options.filename), { persistent: false }, (_eventType, filename) => {
@@ -50,19 +45,9 @@ export class PolicyReloader {
         this.reloadQueued = true;
         const task = this.operations.then(() => {
             this.reloadQueued = false;
-            return this.reload();
+            return this.closed ? undefined : this.refresh();
         });
         this.operations = task.then(() => undefined, () => undefined);
         void task.catch(error => { this.onWatcherError(error); });
-    }
-    reload() {
-        if (this.closed)
-            return;
-        try {
-            this.onValid(loadPolicy(this.filename));
-        }
-        catch (error) {
-            this.onInvalid(error);
-        }
     }
 }

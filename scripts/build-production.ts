@@ -2,13 +2,17 @@
 
 import { spawnSync } from 'node:child_process'
 import {
+  accessSync,
+  constants,
   existsSync,
+  readFileSync,
   readdirSync,
   statSync,
 } from 'node:fs'
 import { resolve } from 'node:path'
 import { pnpmInvocation } from './pnpm-invocation.ts'
 import { ensureGatewayRuntimePackages, gatewayRuntimePackageLinksValid } from './gateway-runtime-packages.ts'
+import { verifyReleaseRuntimeDigest, writeReleaseRuntimeDigest } from '../gateway/src/runtime-dependency-fingerprint.ts'
 
 interface BuildStep {
   label: string
@@ -17,6 +21,7 @@ interface BuildStep {
 }
 
 const root = resolve(import.meta.dirname, '..')
+const linuxWitness = 'gateway/libexec/hgw-btrfs-witness'
 function run(step: BuildStep): void {
   console.log(`build-production: ${step.label}`)
   const invocation = pnpmInvocation(step.args)
@@ -43,32 +48,17 @@ function requireAsset(directory: string, suffix: string, failures: string[]): vo
 
 function verifyArtifacts(): void {
   const failures: string[] = []
-  for (const path of [
-    'apps/cli/lib/bin.js',
-    'apps/web/dist/index.html',
-    'gateway/lib/index.js',
-    'gateway/lib/config.js',
-    'gateway/lib/server.js',
-    'gateway/lib/runtime-api.js',
-    'gateway/lib/node-config-cli.js',
-    'gateway/public/admin/index.html',
-    'gateway/deploy/postgres/migrations/003_project_collaboration.sql',
-    'gateway/deploy/postgres/migrations/004_conversation_event_json.sql',
-    'gateway/deploy/postgres/migrations/005_user_owned_projects.sql',
-    'gateway/deploy/postgres/migrations/014_usage_attribution_status.sql',
-    'plugins/dsh-directory-guard/lib/index.js',
-    'plugins/dsh-directory-guard/cordis.patch.yml',
-    'plugins/dsh-directory-guard/cordis.admin.patch.yml',
-    'plugins/dsh-model-governance/lib/index.js',
-    'plugins/dsh-model-governance/lib/outbox.js',
-    'plugins/dsh-model-governance/cordis.patch.yml',
-    'plugins/dsh-steward-tools/lib/index.js',
-    'plugins/dsh-steward-tools/lib/query.js',
-    'plugins/dsh-steward-tools/cordis.patch.yml',
-    'packages/context/archive-gateway/lib/index.js',
-    'native/system/packages/entry/lib/index.js',
-    'native/system/packages/entry/lib/flock.js',
-  ]) requireFile(resolve(root, path), failures)
+  const paths = readFileSync(resolve(root, 'gateway/deploy/required-release-files.txt'), 'utf8').replace(/\n$/u, '').split('\n')
+  if (!paths.includes('gateway/lib/local-runtime-supervisor.js') || paths.some(path =>
+    !/^[A-Za-z0-9_-][A-Za-z0-9_./-]*$/u.test(path) || path.split('/').some(segment => segment === '..' || segment === '.' || segment === ''))) {
+    throw new Error('build-production: invalid Gateway release manifest')
+  }
+  for (const path of paths) requireFile(resolve(root, path), failures)
+  if (process.platform === 'linux') {
+    const witness = resolve(root, linuxWitness)
+    requireFile(witness, failures)
+    if (!failures.includes(witness)) accessSync(witness, constants.X_OK)
+  }
   if (!gatewayRuntimePackageLinksValid(root)) {
     failures.push(resolve(root, 'gateway/node_modules/@deepseek-ai'))
   }
@@ -82,9 +72,10 @@ function verifyArtifacts(): void {
   console.log('build-production: verified Harness, Web, Gateway, Admin UI, and plugin payloads')
 }
 
-if (!process.argv.includes('--verify-only')) {
+const verifyOnly = process.argv.includes('--verify-only')
+if (!verifyOnly) {
   const steps: BuildStep[] = [
-    { label: 'Harness libraries and Web', cwd: root, args: ['run', 'build'] },
+    { label: 'Harness libraries and Web', cwd: root, args: ['run', 'build', '--force-emit'] },
     {
       label: 'directory guard plugin',
       cwd: resolve(root, 'plugins/dsh-directory-guard'),
@@ -101,6 +92,11 @@ if (!process.argv.includes('--verify-only')) {
       args: ['run', 'build'],
     },
     { label: 'Gateway artifact', cwd: resolve(root, 'gateway'), args: ['run', 'build'] },
+    ...(process.platform === 'linux' ? [{
+      label: 'Linux Btrfs witness',
+      cwd: resolve(root, 'gateway'),
+      args: ['run', 'build:btrfs-witness'],
+    }] : []),
     { label: 'Gateway typecheck', cwd: resolve(root, 'gateway'), args: ['run', 'typecheck'] },
     { label: 'Gateway built document authority', cwd: resolve(root, 'gateway'), args: ['run', 'test:built-document-authority'] },
     { label: 'Gateway built document maintenance', cwd: resolve(root, 'gateway'), args: ['run', 'test:built-document-maintenance'] },
@@ -110,6 +106,8 @@ if (!process.argv.includes('--verify-only')) {
     if (step.label === 'Gateway artifact') ensureGatewayRuntimePackages(root)
     run(step)
   }
+  writeReleaseRuntimeDigest(root)
 }
 
 verifyArtifacts()
+if (verifyOnly) verifyReleaseRuntimeDigest(root)

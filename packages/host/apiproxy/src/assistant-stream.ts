@@ -11,7 +11,7 @@ import type { Agent, AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import { AssistantStreamAccumulator } from '@deepseek-ai/dsh-llm/assistant-stream'
 import type { LlmAttemptId } from '@deepseek-ai/dsh-llm/brand'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
-import type { Session, SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent, SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session'
 import type { JsonValue } from '@deepseek-ai/dsh-session/types'
 import type { SessionAssistantStreamBaseline, SessionAssistantStreamFrame } from './api/events.ts'
 
@@ -33,8 +33,7 @@ const EMPTY_BASELINE: SessionAssistantStreamBaseline = { revision: 0 }
 export class SessionAssistantStreamAccumulator {
   private activeAttempt: MutableAttempt | undefined
   private revision = 0
-  private snapshotValue: SessionAssistantStreamBaseline = EMPTY_BASELINE
-  private dirty = false
+  private snapshotValue: SessionAssistantStreamBaseline | undefined = EMPTY_BASELINE
 
   /**
    * Fold one trusted frame from the current attached Agent lifecycle.
@@ -42,6 +41,7 @@ export class SessionAssistantStreamAccumulator {
    * @param durableCursor - last committed Session seq when this frame was observed.
    */
   accept(frame: AssistantStreamFrame, durableCursor: SessionSeqCursor): void {
+    this.snapshotValue = undefined
     if (frame.type === 'start' && frame.revision === 1 && this.revision !== 0) {
       this.activeAttempt = undefined
       this.revision = 0
@@ -49,7 +49,6 @@ export class SessionAssistantStreamAccumulator {
     if (frame.revision !== this.revision + 1) {
       this.activeAttempt = undefined
       this.revision = frame.revision
-      this.dirty = true
       return
     }
     this.revision = frame.revision
@@ -80,7 +79,6 @@ export class SessionAssistantStreamAccumulator {
         this.activeAttempt = undefined
         break
     }
-    this.dirty = true
   }
 
   /**
@@ -88,7 +86,7 @@ export class SessionAssistantStreamAccumulator {
    * @returns the identity-stable baseline for the latest accepted revision.
    */
   snapshot(): SessionAssistantStreamBaseline {
-    if (!this.dirty) return this.snapshotValue
+    if (this.snapshotValue !== undefined) return this.snapshotValue
     this.snapshotValue = {
       revision: this.revision,
       ...this.activeAttempt === undefined ? {} : {
@@ -102,7 +100,6 @@ export class SessionAssistantStreamAccumulator {
         },
       },
     }
-    this.dirty = false
     return this.snapshotValue
   }
 }
@@ -112,14 +109,17 @@ export interface AssistantStreamSnapshot {
   readonly baseline: SessionAssistantStreamBaseline
   /** Number of frames folded so far; frames at or below it are baseline-covered. */
   readonly ordinal: number
+  /** A committed title observed during the retained attempt. */
+  readonly titleEvent?: SessionEvent<'session/title'>
 }
 
 interface SessionStreamState {
   readonly accumulator: SessionAssistantStreamAccumulator
   ordinal: number
+  titleEvent?: SessionEvent<'session/title'>
 }
 
-/** Per-session accumulators owned by the mux domain. */
+/** Per-session accumulators owned by the Host across mux connections. */
 export class AssistantStreamRegistry {
   private readonly streams = new Map<SessionId, SessionStreamState>()
 
@@ -136,9 +136,20 @@ export class AssistantStreamRegistry {
       state = { accumulator: new SessionAssistantStreamAccumulator(), ordinal: 0 }
       this.streams.set(agent.session.id, state)
     }
+    if (frame.type === 'start' || frame.type === 'end') delete state.titleEvent
     state.ordinal += 1
     state.accumulator.accept(frame, cursorBeforeNext(agent.session.seq))
     return state.ordinal
+  }
+
+  /**
+   * Retain the most recent title commit for an attempt's authorized reconnect.
+   * @param sessionId - owner of the live assistant attempt.
+   * @param event - the Session's committed title event.
+   */
+  recordTitle(sessionId: SessionId, event: SessionEvent<'session/title'>): void {
+    const state = this.streams.get(sessionId)
+    if (state !== undefined) state.titleEvent = event
   }
 
   /**
@@ -148,9 +159,12 @@ export class AssistantStreamRegistry {
    */
   snapshot(sessionId: SessionId): AssistantStreamSnapshot {
     const state = this.streams.get(sessionId)
-    return state === undefined
-      ? { baseline: EMPTY_BASELINE, ordinal: 0 }
-      : { baseline: state.accumulator.snapshot(), ordinal: state.ordinal }
+    if (state === undefined) return { baseline: EMPTY_BASELINE, ordinal: 0 }
+    return {
+      baseline: state.accumulator.snapshot(),
+      ordinal: state.ordinal,
+      ...state.titleEvent === undefined ? {} : { titleEvent: state.titleEvent },
+    }
   }
 
   /**

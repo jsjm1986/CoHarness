@@ -9,7 +9,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { AdminLink } from '../admin-navigation.tsx'
 import {
   createUser,
   deleteUser,
@@ -47,7 +47,12 @@ import {
 import { adminLanguage, translateCopy } from '../language.ts'
 import { zh as usersZh, en as usersEn } from './users.copy.ts'
 
-export function UsersPage() {
+/**
+ * Show the computer-scoped user list and its administration actions.
+ * @param props - optional preparation effect for a likely next page, started after the list is ready.
+ * @returns user list, loading and error states, and administration dialogs.
+ */
+export function UsersPage({ prepareNextPage }: { prepareNextPage?: () => (() => void) | undefined }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: usersZh, en: usersEn }), [])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,6 +78,9 @@ export function UsersPage() {
   }, [])
 
   useEffect(() => { void reload(true) }, [reload])
+  useEffect(() => {
+    if (!loading && error === '') return prepareNextPage?.()
+  }, [loading, error, prepareNextPage])
 
   async function run(key: string, action: () => Promise<void>): Promise<boolean> {
     setPending(key)
@@ -124,26 +132,29 @@ export function UsersPage() {
     if (saved) setDeleteTarget(null)
   }
 
+  const openCreate = () => { setActionError(''); setCreateOpen(true) }
   return (
-    <div className="page">
+    <div className="page usersPage">
       <PageHeader
         title={t('pageTitle')}
         description={t('pageDescription')}
         meta={loading || (users.length === 0 && error !== '') ? undefined : t('userCount', { count: String(users.length) })}
-        actions={<Button variant="primary" icon={Plus} onClick={() => { setActionError(''); setCreateOpen(true) }}>{t('createUser')}</Button>}
+        actions={<Button variant="primary" icon={Plus} onClick={openCreate}>{t('createUser')}</Button>}
       />
       <ErrorBanner message={error} />
-      <Section flush className="responsiveSection" title={t('sectionTitle')} meta={loading || (users.length === 0 && error !== '') ? undefined : t('recordCount', { count: String(users.length) })}>
+      <Section flush className="responsiveSection userListSection" title={t('sectionTitle')}
+        meta={loading || (users.length === 0 && error !== '') ? undefined : t('recordCount', { count: String(users.length) })}
+        actions={<Button variant="primary" icon={Plus} onClick={openCreate}>{t('createUser')}</Button>}>
         {loading ? <LoadingState label={t('loadingUsers')} /> : users.length === 0 && error !== '' ? null : users.length === 0 ? (
           <EmptyState
             icon={Users}
             title={t('emptyTitle')}
             detail={t('emptyDetail')}
-            action={<Button variant="primary" icon={Plus} onClick={() => { setActionError(''); setCreateOpen(true) }}>{t('createUser')}</Button>}
+            action={<Button variant="primary" icon={Plus} onClick={openCreate}>{t('createUser')}</Button>}
           />
         ) : (
           <>
-            <div className="tableWrap desktopOnly">
+            <div className="tableWrap desktopOnly" role="region" aria-label={t('sectionTitle')} tabIndex={0}>
               <table className="dataTable">
                 <thead>
                   <tr>
@@ -159,7 +170,7 @@ export function UsersPage() {
                 <tbody>
                   {users.map(user => (
                     <tr key={user.id}>
-                      <td><Link className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></Link></td>
+                      <td><AdminLink className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></AdminLink></td>
                       <td><RoleBadge role={user.role} /></td>
                       <td><AutoReviewBadge eligible={user.autoReviewEligible} /></td>
                       <td><AccountBadge status={user.status} /></td>
@@ -185,7 +196,7 @@ export function UsersPage() {
               {users.map(user => (
                 <article className="mobileItem" key={user.id}>
                   <div className="mobileItemHeader">
-                    <Link className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></Link>
+                    <AdminLink className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></AdminLink>
                     <AccountBadge status={user.status} />
                   </div>
                   <div className="mobileItemBody">
@@ -241,7 +252,7 @@ function UserActions({ user, pending, onEdit, onPassword, onDisable, onDelete, o
   if (mobile) {
     return (
       <div className="mobileActions">
-        <Link className="button button-secondary" to={`/users/${user.id}`}>{t('detail')}</Link>
+        <AdminLink className="button button-secondary" to={`/users/${user.id}`}>{t('detail')}</AdminLink>
         <Button icon={Pencil} onClick={onEdit}>{t('edit')}</Button>
         <Button icon={KeyRound} onClick={onPassword}>{t('password')}</Button>
         <Button
@@ -258,7 +269,7 @@ function UserActions({ user, pending, onEdit, onPassword, onDisable, onDelete, o
   }
   return (
     <div className="rowActions">
-      <Link className="iconButton iconButton-ghost" to={`/users/${user.id}`} aria-label={t('manageDetail')} title={t('manageDetail')}><ChevronRight /></Link>
+      <AdminLink className="iconButton iconButton-ghost" to={`/users/${user.id}`} aria-label={t('manageDetail')} title={t('manageDetail')}><ChevronRight /></AdminLink>
       <IconButton label={t('editUser')} icon={Pencil} onClick={onEdit} />
       <IconButton label={t('resetPassword')} icon={KeyRound} onClick={onPassword} />
       <IconButton

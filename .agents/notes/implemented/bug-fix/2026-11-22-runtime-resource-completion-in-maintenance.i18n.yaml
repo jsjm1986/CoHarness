@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-22-runtime-resource-completion-in-maintenance.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-22-runtime-resource-completion-in-maintenance.md
+document:
+  en: d0c0ea9b586e551796b2801467af801ebbe8c57f
+  zh: e2a3d00c680a788a91aa385186242f3435dbf59d
+/agent-note-runtime-resource-completion-during-maintenance:
+  en: 7f7430928ebc4478
+  zh: 96d61c3f82eaadc7
+/agent-note-runtime-resource-completion-during-maintenance/problem:
+  en: 67f237206d8e5342
+  zh: 7a36a5a588298cb7
+/agent-note-runtime-resource-completion-during-maintenance/decision:
+  en: 5e9054d4ce99129c
+  zh: 42828c1f9c88484a
+/agent-note-runtime-resource-completion-during-maintenance/alternatives-considered:
+  en: 1c371e068a9117c2
+  zh: 0066451a821c052a
+/agent-note-runtime-resource-completion-during-maintenance/consequences:
+  en: cefecf2c95615762
+  zh: e4849dc1b3917714
+/agent-note-runtime-resource-completion-during-maintenance/verification:
+  en: 491a1ff72d2b0446
+  zh: c9fd7ba551a28bdb

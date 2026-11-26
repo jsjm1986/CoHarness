@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react'
 import type { TerminalCloseFailure } from '@deepseek-ai/dsh-api-terminal-controller/client'
 import type { WebTerminalId } from '@deepseek-ai/dsh-api-terminal-controller/types'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from './locales.ts'
@@ -24,6 +25,6 @@ export function TerminalCleanup({ useCloseFailures, retryClose, t }: PropsRuntim
   if (failures.length === 0) return null
   return <div className={css.stack}>{failures.map(failure => <div key={failure.id} className={css.notice} role="alert">
     <span>{t('cleanupFailed', { title: failure.title, message: failure.message })}</span>
-    <button type="button" onClick={() => { retryClose(failure.id) }}>{t('retry')}</button>
+    <Button variant="outline" size="sm" onClick={() => { retryClose(failure.id) }}>{t('retry')}</Button>
   </div>)}</div>
 }

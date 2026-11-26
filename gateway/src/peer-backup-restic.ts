@@ -1,11 +1,12 @@
 /** Source-side encrypted incremental copy and isolated recovery using the restic REST backend. */
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { lstat, mkdtemp, opendir, readFile, readdir, realpath, rm, statfs, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, opendir, readFile, readdir, realpath, rm, statfs } from 'node:fs/promises'
 import { isAbsolute, join, posix, resolve, win32 } from 'node:path'
 import { z } from 'zod'
 import { parseManagedSnapshot, verifyStoredFiles, type ManagedSnapshot } from './managed-files.ts'
 import { privateFileState } from './node-private-file.ts'
+import { PeerBackupSourceSpace, writePeerSourceFile, type PeerSourceWrites } from './peer-backup-source-space.ts'
 import {
   PEER_REPOSITORY_PREFIX,
   PeerBackupError,
@@ -49,9 +50,9 @@ export type PeerCapture = z.infer<typeof peerCaptureSchema>
 
 /** A space owner supplies a consistent database export and pinned file versions under the private destination. */
 export interface PeerBackupExporter {
-  capture(binding: PeerBackupBinding, destination: string, signal: AbortSignal): Promise<PeerCapture>
+  capture(binding: PeerBackupBinding, destination: string, signal: AbortSignal, space?: PeerSourceWrites): Promise<PeerCapture>
   /** Validate session order, document references, plugin state and delivery receipts without starting execution. */
-  validate(binding: PeerBackupBinding, capture: PeerCapture, destination: string, signal: AbortSignal): Promise<void>
+  validate(binding: PeerBackupBinding, capture: PeerCapture, destination: string, signal: AbortSignal, space?: PeerSourceWrites): Promise<void>
 }
 
 /** Only opaque identities, time and byte counts leave the source. */
@@ -153,12 +154,15 @@ export interface PeerBackupDrill {
   directory: string
   checkedAt: string
   recoveryMs: number
+  /** Shares the serving engine's capacity queue with additional private validation and reconstruction writes. */
+  space?: PeerSourceWrites
   /** Remove this candidate and its plaintext export from the isolated recovery directory. */
   dispose(): Promise<void>
 }
 
 /** Runs restic outside the Gateway event loop. Command diagnostics and detailed inventories stay on the owning computer. */
 export class PeerBackupRestic {
+  private readonly sourceSpace: PeerBackupSourceSpace
   constructor(private readonly config: Config) {
     for (const limit of [
       config.uploadKiBps,
@@ -171,7 +175,13 @@ export class PeerBackupRestic {
     }
     if (!isAbsolute(config.stagingDirectory) || !isAbsolute(config.executable))
       throw new Error('peer-backup/absolute-path-required')
+    this.sourceSpace = new PeerBackupSourceSpace(config.reserveBytes)
   }
+
+  /** Share source disk admission with a fresh ownership witness outside a scheduled backup job.
+   * @param signal - witness lifetime. @returns the same write admission used by scheduled captures.
+   */
+  sourceWrites(signal: AbortSignal): PeerSourceWrites { return this.sourceSpace.operation(signal) }
 
   private async run(
     binding: PeerBackupBinding,
@@ -280,25 +290,27 @@ export class PeerBackupRestic {
     z.uuid().parse(operationId)
     const signal = AbortSignal.any([lifetime, AbortSignal.timeout(this.config.timeoutMs)])
     const repo = endpoint(binding, access)
+    const prior = await guardedRequest(new URL('points/' + operationId, repo), access, signal, 'GET')
+    if (prior.ok) {
+      const point = peerPointSchema.parse(await prior.json())
+      if (!sameBinding(point, binding) || point.pointId !== operationId || point.revision !== binding.revision)
+        throw new PeerBackupError(409, 'peer-backup/point-mismatch')
+      return point
+    }
+    await prior.body?.cancel()
+    if (prior.status !== 404) throw new PeerBackupError(503, 'peer-backup/receiver-unavailable')
     await peerPrivateDirectory(this.config.stagingDirectory)
-    const cwd = await mkdtemp(join(this.config.stagingDirectory, 'capture-'))
+    const space = this.sourceSpace.operation(signal)
+    const cwd = await space.write(this.config.stagingDirectory, 0, () => mkdtemp(join(this.config.stagingDirectory, 'capture-')))
     try {
-      const prior = await guardedRequest(new URL('points/' + operationId, repo), access, signal, 'GET')
-      if (prior.ok) {
-        const point = peerPointSchema.parse(await prior.json())
-        if (!sameBinding(point, binding) || point.pointId !== operationId || point.revision !== binding.revision)
-          throw new PeerBackupError(409, 'peer-backup/point-mismatch')
-        return point
-      }
-      await prior.body?.cancel()
-      if (prior.status !== 404) throw new PeerBackupError(503, 'peer-backup/receiver-unavailable')
       progress({ phase: 'capturing', pendingBytes: null })
       const payload = join(cwd, 'payload')
-      await peerPrivateDirectory(payload)
-      const capture = peerCaptureSchema.parse(await exporter.capture(binding, payload, signal))
+      await space.write(cwd, 0, () => peerPrivateDirectory(payload))
+      const capture = peerCaptureSchema.parse(await exporter.capture(binding, payload, signal, space))
+      await space.check(cwd)
       matchesCapture(binding, capture)
       await verifyPayload(payload, this.config.maxRestoreBytes, this.config.maxEntries ?? 100000, signal)
-      await exporter.validate(binding, capture, payload, signal)
+      await exporter.validate(binding, capture, payload, signal, space)
       const coordinates: PeerBackupBinding = {
         organizationId: binding.organizationId,
         scopeId: binding.scopeId,
@@ -308,11 +320,12 @@ export class PeerBackupRestic {
         revision: binding.revision,
       }
       const manifest = Buffer.from(JSON.stringify({ version: 1, binding: coordinates, pointId: operationId, capture }))
-      await writeFile(join(payload, 'checkpoint.json'), manifest, { flag: 'wx', mode: 0o600 })
+      await writePeerSourceFile(join(payload, 'checkpoint.json'), manifest, space)
       const config = await guardedRequest(new URL('config', repo), access, signal, 'HEAD')
       if (config.status === 404) await this.run(binding, access, cwd, ['init', '--repository-version', '2'], signal)
       else if (!config.ok) throw new PeerBackupError(503, 'peer-backup/receiver-unavailable')
       progress({ phase: 'transferring', pendingBytes: null })
+      await space.check(cwd)
       let snapshotId: string | undefined
       await this.run(
         binding,
@@ -349,6 +362,7 @@ export class PeerBackupRestic {
         },
       )
       if (!snapshotId || !/^[0-9a-f]{64}$/u.test(snapshotId)) throw new PeerBackupError(503, 'peer-backup/missing-snapshot')
+      await space.check(cwd)
       progress({ phase: 'checking', pendingBytes: 0 })
       await this.run(binding, access, cwd, ['check', '--no-lock'], signal)
       const storage = await guardedRequest(new URL('usage', repo), access, signal, 'GET')
@@ -448,7 +462,14 @@ export class PeerBackupRestic {
     localRepository?: string,
   ): Promise<PeerBackupDrill> {
     await peerPrivateDirectory(this.config.stagingDirectory)
-    const directory = await mkdtemp(join(this.config.stagingDirectory, 'rehearsal-' + randomUUID() + '-'))
+    const space = this.sourceWrites(signal)
+    const capacityError = (error: unknown): never => {
+      if (error instanceof PeerBackupError && error.code === 'peer-backup/source-capacity')
+        throw new PeerBackupError(507, 'peer-backup/recovery-capacity')
+      throw error
+    }
+    const directory = await space.write(this.config.stagingDirectory, 0,
+      () => mkdtemp(join(this.config.stagingDirectory, 'rehearsal-' + randomUUID() + '-'))).catch(capacityError)
     const dispose = (): Promise<void> => rm(directory, { recursive: true, force: true })
     try {
       let bytes: number | undefined
@@ -473,15 +494,10 @@ export class PeerBackupRestic {
       ) {
         throw new PeerBackupError(507, 'peer-backup/recovery-capacity')
       }
-      await this.run(
-        binding,
-        access,
-        directory,
-        ['restore', point.snapshotId, '--no-lock', '--verify', '--target', directory],
-        signal,
-        undefined,
-        localRepository,
-      )
+      await space.write(directory, bytes, () => this.run(
+        binding, access, directory, ['restore', point.snapshotId, '--no-lock', '--verify', '--target', directory],
+        signal, undefined, localRepository,
+      ))
       const payload = join(directory, 'payload')
       if ((await readdir(directory)).some((entry) => entry !== 'payload') || (await lstat(payload)).isSymbolicLink())
         throw new PeerBackupError(409, 'peer-backup/invalid-export')
@@ -527,11 +543,11 @@ export class PeerBackupRestic {
         capture.gaps.length !== point.gapCount
       )
         throw new PeerBackupError(409, 'peer-backup/corrupt-point')
-      await exporter.validate(binding, capture, payload, signal)
-      return { point, directory: payload, checkedAt: new Date().toISOString(), recoveryMs: Date.now() - started, dispose }
+      await exporter.validate(binding, capture, payload, signal, space)
+      return { point, directory: payload, checkedAt: new Date().toISOString(), recoveryMs: Date.now() - started, space, dispose }
     } catch (error) {
       await dispose()
-      throw error
+      return capacityError(error)
     }
   }
 }

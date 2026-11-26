@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-20-vnc-provider-lifecycle.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-20-vnc-provider-lifecycle.md
+document:
+  en: ee9bea77fb2b1c9f6ba5ed13a0c87b8463ce7634
+  zh: bd929def03667ade98a7abced5780ddb6cd92475
+/agent-note-vnc-provider-owns-startup-and-connection-teardown:
+  en: 0995d858294f3634
+  zh: 32fe33b96ee6d854
+/agent-note-vnc-provider-owns-startup-and-connection-teardown/problem:
+  en: f07cf0fa66cf8186
+  zh: bd1646a8a2458d51
+/agent-note-vnc-provider-owns-startup-and-connection-teardown/decision:
+  en: ca2cf8b415ffc514
+  zh: eae71e87bf5112ec
+/agent-note-vnc-provider-owns-startup-and-connection-teardown/alternatives-considered:
+  en: a890a1f73ca749b3
+  zh: 3660e55c1b6d4d66
+/agent-note-vnc-provider-owns-startup-and-connection-teardown/consequences:
+  en: 1748b2bac3981825
+  zh: 6e6af3b0a7049f46
+/agent-note-vnc-provider-owns-startup-and-connection-teardown/verification:
+  en: 425c496410e4fe93
+  zh: b39f53e55111902d

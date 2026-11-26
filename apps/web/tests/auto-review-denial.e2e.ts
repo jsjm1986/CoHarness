@@ -2,10 +2,11 @@
 // denial without replaying a reviewer or model call.
 // The real persistence reader, shipped Web composition, permission
 // projection, conversation assembler, Tool row, and Trajectory all participate.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, expandTurnProcesses,
@@ -62,7 +63,7 @@ describe.skipIf(MODE === 'record')('web e2e: cold Auto-review denial', () => {
 
     scaffold = await launchWebScaffold(AUTO_REVIEW_FIXTURE)
     await seedSession(scaffold, fixture, SEED_ID)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

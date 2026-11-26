@@ -23,6 +23,3 @@
       - /url: /admin/remote-desktops
     - link "审计":
       - /url: /admin/audit
-  - combobox "界面语言":
-    - option "中文" [selected]
-    - option "English"

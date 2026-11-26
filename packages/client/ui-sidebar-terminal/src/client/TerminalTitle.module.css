@@ -1,2 +1,6 @@
 .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.name { width: 120px; min-width: 48px; max-width: 100%; padding: 0 4px; color: inherit; font: inherit; background: var(--dsw-alias-bg-layer-1); border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 4px; outline: none; }
+.name { box-sizing: border-box; width: 120px; min-width: 48px; max-width: 100%; padding: 0 4px; color: inherit; font: inherit; background: var(--dsw-alias-bg-layer-1); border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 4px; }
+.name:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: -2px; }
+@media (pointer: coarse), (max-width: 767px) {
+  .name { min-height: var(--dsw-touch-target); font-size: 16px; }
+}

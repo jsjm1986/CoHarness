@@ -13,7 +13,10 @@
 import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FiberState, type Context } from '@deepseek-ai/cordis'
+import { Context, FiberState } from '@deepseek-ai/cordis'
+import { installAgentExecutionAdmission } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-agent-loop'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { isJsExpr, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import {
@@ -32,6 +35,8 @@ import {
   PROFILE_PATCH_FILENAME,
   PROFILE_TEMPLATES,
   resolveProfileDir,
+  readRecoveryPolicy,
+  installRecoveryPolicy,
   type ProfileContext,
   type Profile,
   type RuntimeResolution,
@@ -41,6 +46,7 @@ import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
 import { DSH_LAUNCH_ENVIRONMENT_KEY, launchedByGateway, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import { provideCmdline, type AppReady } from '@deepseek-ai/dsh-cmdline'
+import { installManagedProcessShutdown } from './managed-process-shutdown.ts'
 import { createProcessShutdown, type ProcessShutdown } from './process-shutdown.ts'
 
 const NAME = 'dsh'
@@ -333,6 +339,24 @@ export interface RunProfileOptions {
  * @throws after disposing startup resources; cleanup failures retain the original error.
  */
 export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
+  const managed = launchedByGateway(options.environment)
+  const startupStart = managed ? performance.now() : 0
+  const startupMarks: {
+    entryUptimeMs: number
+    proxyInstalledMs?: number
+    profileComposedMs?: number
+    patchesReadMs?: number
+    hostPreparedMs?: number
+    bootSettledMs?: number
+    notifySettled?: () => void
+  } | undefined = managed ? { entryUptimeMs: process.uptime() * 1000 } : undefined
+  const recoveryFile = options.environment.getFrom('HGW_RECOVERY_POLICY_FILE', ['process'])?.value
+  const recoveryDigest = options.environment.getFrom('HGW_RECOVERY_POLICY_SHA256', ['process'])?.value
+  let recoveryPolicy: ReturnType<typeof readRecoveryPolicy> | undefined
+  if (recoveryFile !== undefined || recoveryDigest !== undefined) {
+    if (recoveryFile === undefined || recoveryDigest === undefined) throw new Error('Recovery launch requires its policy file and digest together.')
+    recoveryPolicy = readRecoveryPolicy(recoveryFile, recoveryDigest)
+  }
   // Before the first plugin mounts and before anything can issue a request: Node's fetch ignores the
   // proxy environment on its own, so every profile would otherwise connect directly. Resolving from
   // the launcher's snapshot — not `process.env` — is what lets a proxy declared in a `.env` layer
@@ -341,10 +365,13 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     options.environment,
     (message) => { process.stderr.write(`${NAME}: ${message}\n`) },
   )
+  if (startupMarks !== undefined) startupMarks.proxyInstalledMs = performance.now() - startupStart
 
   const packaged = (process as NodeJS.Process & { pkg?: unknown }).pkg !== undefined
   const resolutionMode = packaged ? 'runtime' : options.resolutionMode ?? 'runtime'
   const app: { current?: Context } = {}
+  const managedStartup = managed ? Promise.withResolvers<Context | undefined>() : undefined
+  const signalShutdown = new AbortController()
   let disposal: Promise<void> | undefined
   const dispose = (): Promise<void> => disposal ??= (async () => {
     const failures: unknown[] = []
@@ -354,24 +381,53 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     if (failures.length === 1) throw failures[0]
     if (failures.length > 1) throw new AggregateError(failures, 'dsh: profile cleanup failed')
   })()
+  const forceManagedStop = managedStartup === undefined ? undefined : installManagedProcessShutdown(async () => {
+    signalShutdown.abort(new Error('managed Runtime is stopping'))
+    const failures = new Set<unknown>()
+    // Cordis logs contained disposer failures. The observer lives beyond root disposal.
+    let stopObserving: (() => Promise<unknown>) | undefined
+    try {
+      const ctx = await managedStartup.promise
+      const loop = ctx?.get('agentLoop')
+      if (ctx === undefined || loop === undefined || ctx.fiber.state !== FiberState.ACTIVE) {
+        throw new Error('managed shutdown could not reach an active Agent loop')
+      }
+      const diagnostics = new Context()
+      diagnostics.logger = ctx.logger
+      stopObserving = diagnostics.logger.exporter({
+        levels: { default: 0 },
+        export: ({ type, fiber, args }) => {
+          if (type === 'error' && fiber?.deref()?.state === FiberState.UNLOADING) failures.add(args[0])
+        },
+      })
+      await loop.stopForShutdown()
+      if (ctx.agents.list().length > 0 || ctx.sessions.list().length > 0) {
+        throw new Error('managed shutdown left live Agents or Sessions outside the loop lifecycle')
+      }
+    } catch (error: unknown) { failures.add(error) }
+    try { await dispose() } catch (error: unknown) { failures.add(error) }
+    await stopObserving?.()
+    if (failures.size === 1) throw failures.values().next().value
+    if (failures.size > 1) throw new AggregateError(failures, 'dsh: managed shutdown and cleanup failed')
+  }, options.environment.getFrom('DSH_GATEWAY_SHUTDOWN_RECEIPT', ['process'])?.value,
+  options.environment.getFrom('DSH_GATEWAY_CREDENTIAL_FILE', ['process'])?.value)
   try {
     const composed = await composeProfile(
       options.profile, options.patchFiles, resolutionMode, options.fromDefaultProfile, options.resolvedProfile,
     )
+    if (startupMarks !== undefined) startupMarks.profileComposedMs = performance.now() - startupStart
     const appReady = createAppReady()
     const shutdown = createProcessShutdown(dispose)
-    const signalShutdown = new AbortController()
     const interrupt = (code: number): void => {
       signalShutdown.abort()
       shutdown.interrupt(code)
     }
     // Signals own teardown throughout the startup window, not only after boot()
     // settles: an inserted provider can publish before sibling rows finish mounting.
-    // SIGTERM is a supervisor's ordinary stop request and exits 0 on every
-    // surface — the launcher does not know whether the app considered its work
-    // complete; SIGINT is a user interrupt and reports 130.
-    process.on('SIGTERM', () => { interrupt(0) })
-    process.on('SIGINT', () => { interrupt(130) })
+    if (!managed) process.on('SIGTERM', () => { interrupt(0) })
+    process.on('SIGINT', () => {
+      if (forceManagedStop?.() !== true) interrupt(130)
+    })
     installFailLoud(NAME, process, async () => {
       await app.current?.fiber.dispose()
     })
@@ -393,8 +449,17 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       },
     }
     const patches = readProfilePatches(NAME, profileContext, composed.profile)
+    if (startupMarks !== undefined) startupMarks.patchesReadMs = performance.now() - startupStart
     const ctx = await boot(NAME, rootConfig, patches, async (hostCtx) => {
       app.current = hostCtx
+      if (startupMarks !== undefined) {
+        hostCtx.effect(() => hostCtx.reflect.provide('runtimeStartupMarks', startupMarks), 'managed launch: startup timing marks')
+      }
+      if (recoveryPolicy !== undefined) {
+        installRecoveryPolicy(hostCtx, recoveryPolicy, (context, ids) => {
+          installAgentExecutionAdmission(context, ids.map(SessionId))
+        })
+      }
       hostCtx.provide('profileContext', profileContext)
       // Before any config-tree entry mounts, so plugins resolve all launch-time
       // environment values from the same immutable launch snapshot.
@@ -405,12 +470,14 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
         get: name => privateParentName(name) ? undefined : options.environment.get(name),
         getFrom: (name, sources) => privateParentName(name) ? undefined : options.environment.getFrom(name, sources),
       } satisfies LaunchEnvironmentSnapshot)
-      if (launchedByGateway(options.environment)) {
+      if (managed) {
+        hostCtx.effect(() => hostCtx.provide('agentShutdownSignal', signalShutdown.signal), 'managed launch: Agent shutdown admission')
         for (const key of ['modelAccessRequired', 'resourceBudgetRequired', 'executionAuthorityRequired'] as const) {
           hostCtx.effect(() => hostCtx.provide(key, true), `managed launch: ${key}`)
         }
       }
       if (parentBootstrap !== undefined) {
+        if (recoveryPolicy !== undefined) throw new Error('Recovery launch does not permit an SDK bootstrap module.')
         delete process.env.DSH_SDK_PARENT_BOOTSTRAP
         const moduleUrl = new URL(parentBootstrap)
         if (moduleUrl.protocol !== 'file:') throw new TypeError('SDK parent bootstrap must be a local module URL.')
@@ -425,18 +492,41 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       // to every app plugin that injects the argument snapshot.
       provideCmdline(hostCtx, {
         args: options.args,
-        exit: code => void shutdown.shutdown(code),
+        exit: (code) => {
+          if (!managed || !signalShutdown.signal.aborted) void shutdown.shutdown(code)
+        },
         ready: appReady.service,
       })
+      if (startupMarks !== undefined) startupMarks.hostPreparedMs = performance.now() - startupStart
     })
+    if (startupMarks !== undefined) {
+      startupMarks.bootSettledMs = performance.now() - startupStart
+      startupMarks.notifySettled?.()
+    }
     app.current = ctx
     if (!signalShutdown.signal.aborted
       && ctx.fiber.state === FiberState.ACTIVE
       && ctx.get('loader') !== undefined) {
       appReady.commit()
     }
+    managedStartup?.resolve(ctx)
     return { ctx, shutdown }
   } catch (error) {
+    if (startupMarks !== undefined) {
+      try {
+        const round = (ms: number): number => Math.round(Math.max(0, ms) * 100) / 100
+        console.info(`[runtime-boot-failed] ${JSON.stringify({
+          entryUptimeMs: round(startupMarks.entryUptimeMs),
+          ...(startupMarks.proxyInstalledMs === undefined ? {} : { proxyInstalledMs: round(startupMarks.proxyInstalledMs) }),
+          ...(startupMarks.profileComposedMs === undefined ? {} : { profileComposedMs: round(startupMarks.profileComposedMs) }),
+          ...(startupMarks.patchesReadMs === undefined ? {} : { patchesReadMs: round(startupMarks.patchesReadMs) }),
+          ...(startupMarks.hostPreparedMs === undefined ? {} : { hostPreparedMs: round(startupMarks.hostPreparedMs) }),
+          failedUptimeMs: round(process.uptime() * 1000),
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        })}`)
+      } catch { /* Startup failure diagnostics cannot replace the original error. */ }
+    }
+    managedStartup?.resolve(undefined)
     try { await dispose() } catch (cleanupError) {
       throw new AggregateError([error, cleanupError], 'dsh: profile startup and cleanup failed')
     }

@@ -39,5 +39,11 @@ export function registerGuard(ctx: Context, getGrants: () => readonly Grant[]): 
   const stopFiles = ctx.on('workspace-files/authorize', (_sessionId, path) => {
     if (classify(getGrants(), path) === 'none') throw new FsError('Workspace path is outside authorized directories', 'FS_PERMISSION_DENIED')
   })
-  return () => { stopTools(); stopFiles() }
+  const stopTargets = ctx.on('fs/authorize-target', (path, access) => {
+    const grant = classify(getGrants(), path)
+    if (grant === 'none' || (access === 'write' && grant !== 'rw')) {
+      throw new FsError('Tool path is outside the granted directories for this operation', 'FS_PERMISSION_DENIED')
+    }
+  })
+  return () => { stopTools(); stopFiles(); stopTargets() }
 }

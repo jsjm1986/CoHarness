@@ -43,7 +43,7 @@ export async function verifySlowConversationRevocation(control:Pool,content:Pool
     }
   }
   let changed=false
-  const watched={read:store.read.bind(store),write:store.write.bind(store),confirmCollaborationRead:async <T>(key:NodeContentBinding,revision:string,work:()=>Promise<T>,generation?:number)=>{
+  const watched={read:store.read.bind(store),write:store.write.bind(store),confirmCollaborationRead:async <T>(key:NodeContentBinding,revision:string,work:(local:import('pg').PoolClient)=>Promise<T>,generation?:number)=>{
     await content.query("UPDATE node_content.conversation_sessions SET visibility='private' WHERE organization_id=$1 AND runtime_id=$2 AND id=$3",[b.organizationId,b.runtimeId,session])
     changed=true
     return store.confirmCollaborationRead(key,revision,work,generation)

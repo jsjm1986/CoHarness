@@ -1,5 +1,5 @@
 /** Same-version PDF.js resources load by kind and decode under the document lifetime. */
-import workerSource from 'pdfjs-dist/build/pdf.worker.min.mjs?raw'
+import workerSource from 'pdfjs-dist/build/pdf.worker.mjs?raw'
 
 export { workerSource }
 

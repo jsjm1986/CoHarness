@@ -6,15 +6,17 @@
 // the pre-projection window fold recounted per loaded page, so 加载更早 grew
 // the counter. Zero model calls; the seed is generated, not recorded, because
 // no line of it is model output.
+import { auditWorkflowState, newWorkflowPage, compareWorkflowGolden } from './workflow-responsive-state.ts'
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  assertFixtureInventory, captureStableAria,
   launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/stats-paged-history', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/stats-paged-history/ui.expected.md', import.meta.url))
@@ -79,8 +81,8 @@ describe('web e2e: whole-session stats survive history paging', () => {
     if (MODE === 'record') throw new Error('stats-paged-history is a keyless assembled snapshot')
     scaffold = await launchWebScaffold({})
     await seedSession(scaffold, buildSeed(TURNS), SEED_ID)
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -129,13 +131,14 @@ describe('web e2e: whole-session stats survive history paging', () => {
     // settled turn — the loaded-window probe the scroll/perf lanes count now
     // that the strip is whole-log-scoped.
     expect(await page.locator('[data-chat-flow-key^="9:turn-tail"]').count()).toBe(TURNS)
+    await auditWorkflowState(page, 'conversation', 'whole-session-statistics-summary', page.locator('[data-composer-stats]'))
   }, 60_000)
 
   it('matches the paged-stats aria golden', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-stats-paged-aria'))
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
-    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(UI_EXPECTED, snapshot, MODE)
   })
 
   it('issued zero model calls and stayed clean', async () => {

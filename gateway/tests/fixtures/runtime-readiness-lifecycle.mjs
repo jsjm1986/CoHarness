@@ -19,9 +19,9 @@ const transcript = []
 const cases = ['healthy', 'wrong-identity', 'frozen-clock', 'probe-budget', 'late-registration', 'cancel-registration', 'late-ready-publication', 'registration-error', 'publication-error']
 assert.ok(selected === 'all' || cases.includes(selected))
 const nativeNow = performance.now.bind(performance)
-async function bounded(pending, timeoutMs) {
+async function bounded(pending, timeoutMs, phase) {
   let timer
-  try { return await Promise.race([pending, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Readiness operation did not settle under its owner')), timeoutMs) })]) }
+  try { return await Promise.race([pending, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Readiness operation did not settle: ${phase}`)), timeoutMs) })]) }
   finally { clearTimeout(timer) }
 }
 async function waitFor(check) {
@@ -38,6 +38,7 @@ async function scenario(name) {
   const sockets = new Set(), originalDate = Date.now, perfDescriptor = Object.getOwnPropertyDescriptor(performance, 'now'), originalTimeout = AbortSignal.timeout
   let manager, db, relay, processOwner, pending, stop, startupSignal, primaryError, relayFailure, frozen = false, offset = 0, recordBudgets = false
   const budgets = [], entered = Promise.withResolvers(), registration = Promise.withResolvers(), publication = Promise.withResolvers()
+  const launched = Promise.withResolvers(), stopRequested = Promise.withResolvers()
   const failure = new PostgresCheckoutQueueFullError(1)
   function clock() {
     Date.now = () => frozen ? 1_700_000_000_000 : originalDate() + offset
@@ -53,6 +54,7 @@ async function scenario(name) {
       HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),
       HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes'), HGW_SYSTEMD_UNIT_DIR: join(root, 'units'),
       HGW_DEFAULT_ENV_FILE: '', HGW_GUARD_PATCH: 'off', HGW_DSH_REPO_ROOT: fileURLToPath(new URL('../../../', import.meta.url)),
+      HGW_PERFORMANCE_ENABLED: 'false', // This fixture reserves stdout for its transcript.
       HGW_READINESS_TIMEOUT_MS: String(timeoutMs) })
     db = openDb(join(root, 'gateway.sqlite'))
     const users = new UserService(db, cfg), actor = await users.create({ username: 'readiness-user', password: 'fixture-pw-12345' })
@@ -76,8 +78,14 @@ async function scenario(name) {
       startupSignal = runtime.signal
       processOwner = await native.start(runtime)
       await waitForJson(marker)
-      if (name === 'frozen-clock') { frozen = true; clock() }
+      if (name === 'frozen-clock') {
+        const terminate = processOwner.terminate.bind(processOwner)
+        processOwner.terminate = (graceMs) => { stopRequested.resolve(); return terminate(graceMs) }
+        frozen = true
+        clock()
+      }
       if (name === 'probe-budget') recordBudgets = true
+      launched.resolve()
       return processOwner
     } }
     const resources = {
@@ -100,19 +108,24 @@ async function scenario(name) {
     }
     AbortSignal.timeout = function (ms) { if (recordBudgets) budgets.push(ms); return Reflect.apply(originalTimeout, AbortSignal, [ms]) }
     pending = manager.ensureRunning(actor, 'explicit').then(value => ({ value }), error => ({ error }))
+    const early = await bounded(Promise.race([launched.promise, pending]), 35_000, name + ' starting the Runtime fixture')
+    if (early !== undefined) throw early.error ?? new Error('Startup completed before the Runtime fixture started')
     if (name === 'probe-budget') {
       await waitForJson(probeMarker)
       assert.ok(budgets.length > 0 && budgets[0] <= timeoutMs, `Readiness request exceeded its remaining budget: ${String(budgets[0])}`)
     }
     if (name === 'late-registration' || name === 'cancel-registration' || name === 'late-ready-publication') {
-      await bounded(entered.promise, 20_000)
+      await bounded(entered.promise, 20_000, name + ' entering registration or publication')
       if (name === 'cancel-registration') {
         stop = manager.stop({ kind: 'user', id: actor.id })
         await waitFor(() => startupSignal.aborted)
       } else { offset = timeoutMs * 2; clock() }
       registration.resolve(); publication.resolve()
     }
-    const result = await bounded(pending, name === 'frozen-clock' ? 3000 : 15_000)
+    if (name === 'frozen-clock') {
+      await bounded(stopRequested.promise, 3_000, name + ' requesting termination')
+    }
+    const result = await bounded(pending, 15_000, name + ' settling startup')
     if (name === 'healthy') {
       assert.ok(result.value)
       assert.equal(await manager.stateOf({ kind: 'user', id: actor.id }), 'ready')

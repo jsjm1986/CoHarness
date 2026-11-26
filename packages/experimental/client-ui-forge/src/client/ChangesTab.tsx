@@ -19,7 +19,7 @@ import {
   Button, IconBranchOutline16, IconChevronDownOutline14, IconChevronsUpDownOutline16, IconSplitPanesOutline16,
   IconInfoOutline16, IconListPenOutline16, IconNowrapFill16, IconRightUpOutline16, IconWorkspaceTreeOutline16,
   IconWrapFill16,
-  Menu, StateDot, Tooltip,
+  Menu, StateDot, Tooltip, useMediaQuery,
   type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
@@ -353,7 +353,7 @@ function ChangeHeader({ url, entry, openLink, commitMenu, reviewCount, reviewDis
   const tone = toneOf(snapshot)
   const href = snapshot === null ? url : snapshot.url
   return (
-    <div className={css.header}>
+    <div className={clsx(css.header, css.changeHeader)}>
       <ChangeRequestGlyph tone={tone} label={t('change.stateAria', { state: t(TONE_LABEL[tone]) })} />
       <span className={css.headerTitle}>{snapshot === null ? url : snapshot.title}</span>
       {number !== null && <span className={css.headerNumber}>{t('change.number', { number })}</span>}
@@ -615,7 +615,9 @@ export function ChangesTab({
   )
   const baseRef = base?.ref ?? null
   const listLocalCommits = useCallback((signal: AbortSignal) => localCommits(baseRef, signal), [localCommits, baseRef])
-  const split = choices?.split ?? true
+  const compact = useMediaQuery('(max-width: 767px)')
+  const [diffWidth, setDiffWidth] = useState<number | null>(null)
+  const split = choices?.split ?? (diffWidth === null ? !compact : diffWidth >= 600)
   const wrap = choices?.wrap ?? true
   const entry = source.kind === 'change' ? state?.changeRequests.find(item => item.url === source.url) : undefined
   // A read starts once the panel state arrives and again when what it describes moves. A change request's read
@@ -723,6 +725,24 @@ export function ChangesTab({
   const attachScrollport = useCallback((element: HTMLDivElement | null) => {
     scrollport.current = element
     reach.attach(element)
+    if (element === null) return
+    let frame: number | undefined
+    const measure = (): void => {
+      frame = undefined
+      const width = element.getBoundingClientRect().width
+      if (width > 0) setDiffWidth(width)
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => {
+      if (frame === undefined) frame = requestAnimationFrame(measure)
+    })
+    observer?.observe(element)
+    return () => {
+      observer?.disconnect()
+      if (frame !== undefined) cancelAnimationFrame(frame)
+      scrollport.current = null
+      reach.attach(null)
+    }
   }, [reach])
   // A short final file cannot align with the viewport top; retain its jump until the reader scrolls away.
   const jumpPosition = useRef<{ readonly data: ChangesData; readonly top: number } | null>(null)
@@ -1146,7 +1166,7 @@ export function ChangesTab({
   const anyExpanded = files.some(isExpanded)
   const expansionLabel = t(anyExpanded ? 'diff.collapseAll' : 'diff.expandAll')
   const toggleExpansion = (): void => { setChosen(Object.fromEntries(files.map(file => [file.path, !anyExpanded]))) }
-  const toggleSplit = (): void => { actions.toggledSplit(tab.id) }
+  const toggleSplit = (): void => { actions.toggledSplit(tab.id, split) }
   const toggleWrap = (): void => { actions.toggledWrap(tab.id) }
   const toggleTests = (): void => { actions.toggledTests(tab.id) }
   const treeAction = t(treePosition === 'left' ? 'diff.moveFileTreeRight' : treePosition === 'right' ? 'diff.hideFileTree' : 'diff.showFileTreeLeft')

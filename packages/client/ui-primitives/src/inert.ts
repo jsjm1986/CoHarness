@@ -1,3 +1,9 @@
+/** Inert ownership belongs to the affected element, not to a process-wide registry. */
+const inertHold = Symbol('dsh-inert-hold')
+interface InertElement extends HTMLElement {
+  [inertHold]?: { count: number; restore: () => void }
+}
+
 /**
  * Hold one element inert for the lifetime of an overlay. Native `inert` is
  * preferred; the fallback also hides the subtree from assistive technology
@@ -6,6 +12,17 @@
  * @returns a disposer that restores the element's prior accessibility state.
  */
 export function holdInert(element: HTMLElement): () => void {
+  const owner = element as InertElement
+  const existing = owner[inertHold]
+  if (existing !== undefined) {
+    existing.count++
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      if (--existing.count === 0) { Reflect.deleteProperty(owner, inertHold); existing.restore() }
+    }
+  }
   const nativeInert = typeof (Reflect.get(element, 'inert') as unknown) === 'boolean'
   const previousInert = (Reflect.get(element, 'inert') as unknown) === true
   const previousAriaHidden = nativeInert ? null : element.getAttribute('aria-hidden')
@@ -22,12 +39,20 @@ export function holdInert(element: HTMLElement): () => void {
     for (const { node } of focusables) node.tabIndex = -1
   }
 
-  return () => {
+  const restore = (): void => {
     element.inert = previousInert
     if (!nativeInert) {
       if (previousAriaHidden === null) element.removeAttribute('aria-hidden')
       else element.setAttribute('aria-hidden', previousAriaHidden)
       for (const { node, tabIndex } of focusables) node.tabIndex = tabIndex
     }
+  }
+  const state = { count: 1, restore }
+  owner[inertHold] = state
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    if (--state.count === 0) { Reflect.deleteProperty(owner, inertHold); restore() }
   }
 }

@@ -94,6 +94,7 @@ export function SegmentedControl<Value extends string>({
   }, [value])
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
+    if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
     if (!isWalkKey(event.key)) return
     event.preventDefault()
     const target = walk(options, selected, event.key)

@@ -1,0 +1,17 @@
+{
+  "exitCode": 1,
+  "timedOut": false,
+  "signal": null,
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/internal/nodes/enroll"
+    }
+  ],
+  "stopped": true,
+  "failure": "node-access/unauthorized",
+  "pendingCredential": true,
+  "pendingTicketPreserved": true,
+  "identityAssigned": false,
+  "secretLogged": false
+}

@@ -1,4 +1,5 @@
 {"operation":"frozen-loop-request","owningRuntime":true,"foreignRuntime":false,"copiedObject":false}
 {"operation":"foreign-request","titleCalls":1,"pendingRevisionPreserved":true}
 {"operation":"local-loop-request","titleCalls":2,"title":"Revision 2","headerUnchanged":true}
+{"operation":"managed-reply-before-title","initialTitle":"Foreground reply first","generatedTitle":"Revision 3","titleCalls":3}
 {"operation":"withdrawn-service","recognized":false,"newMarker":"MODEL_REQUEST_ORIGIN_UNAVAILABLE"}

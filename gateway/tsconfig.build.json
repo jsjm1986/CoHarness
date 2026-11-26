@@ -14,6 +14,8 @@
       "@deepseek-ai/dsh-subprocess": ["../packages/subprocess/subprocess/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-app-boot": ["../packages/boot/app-boot/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session": ["../packages/core/session/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session-persistence": ["../packages/session/session-persistence/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session-persistence-jsonl": ["../packages/session/session-persistence-jsonl/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-llm": ["../packages/llm/llm/lib/types/index.d.ts"],
       "@deepseek-ai/node-addon-system/flock": ["../native/system/packages/entry/lib/flock.d.ts"],
       "@deepseek-ai/dsh-brand": [
@@ -64,6 +66,9 @@
       ],
       "@deepseek-ai/dsh-resource-budget/wire": [
         "../packages/context/resource-budget/lib/types/wire.d.ts"
+      ],
+      "@deepseek-ai/dsh-gateway-runtime/steward-statement": [
+        "../packages/context/gateway-runtime/lib/types/steward-statement.d.ts"
       ],
       "@deepseek-ai/dsh-native-command": [
         "../packages/util/native-command/lib/types/index.d.ts"

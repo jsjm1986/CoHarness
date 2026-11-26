@@ -3,27 +3,29 @@
 // with their marker while user-disabled quadrants stay hidden. A real
 // chromium connects a fresh workspace seeded with all four policy quadrants;
 // no model call is issued, so a stray stream fails loud on the open LLM seam.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
   assertFixtureInventory,
   captureStableAria,
-  compareOrRefreshGolden,
   launchWebScaffold,
   watchConsole,
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
+import { auditWorkflowState, compareWorkflowGolden as compareOrRefreshGolden, newWorkflowPage as newEnglishPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/skill-invocation-policy', import.meta.url))
 const MENU_EXPECTED = join(SNAPSHOT_DIR, 'menu.expected.md')
 const FUZZY_MENU_EXPECTED = join(SNAPSHOT_DIR, 'menu-fuzzy.expected.md')
 const MODE = webSnapshotMode()
+const CATALOG_ROUTE = /\/api\/skill\.list(?:\?.*)?$/
 
 interface SeedSkill {
   name: string
@@ -77,19 +79,35 @@ describe('web e2e: skill invocation policy through the real host', () => {
   let browser: Browser
   let page: Page
   let tripwire: ReturnType<typeof watchConsole>
+  let releaseCatalog: (() => void) | undefined
+  const catalogReads: Promise<void>[] = []
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
     await seedSkills(scaffold.workspaceCwd)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
+    if (workflowMatrixEnabled) {
+      const gate = new Promise<void>((resolve) => { releaseCatalog = resolve })
+      await page.route(CATALOG_ROUTE, (route) => {
+        const read = (async () => {
+          const response = await route.fetch()
+          await gate
+          await route.fulfill({ response })
+        })()
+        catalogReads.push(read)
+        return read
+      })
+    }
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
   }, 120_000)
 
   afterAll(async () => {
+    releaseCatalog?.()
+    await Promise.all(catalogReads)
     await browser?.close()
     await scaffold?.close()
   })
@@ -99,6 +117,19 @@ describe('web e2e: skill invocation policy through the real host', () => {
     const input = page.locator('textarea').first()
     await input.fill('/policy')
     const menu = page.getByRole('listbox', { name: 'Trigger suggestions' })
+    if (workflowMatrixEnabled) {
+      try {
+        const pending = menu.locator('[role="status"][data-source="skill"]')
+        await pending.waitFor()
+        expect(catalogReads.length).toBeGreaterThan(0)
+        await auditWorkflowState(page, 'skill', 'candidate-catalog-loading', page.locator('[data-trigger-menu]'), [], undefined,
+          async () => { expect(await pending.isVisible()).toBe(true) })
+      } finally {
+        releaseCatalog?.()
+        await Promise.all(catalogReads)
+        await page.unroute(CATALOG_ROUTE)
+      }
+    }
     await expect.poll(
       () => menu.getByRole('option', { name: /policy-shared/ }).count(),
       { timeout: 10_000 },
@@ -112,6 +143,7 @@ describe('web e2e: skill invocation policy through the real host', () => {
 
     const snapshot = await captureStableAria(page, '[role="listbox"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(MENU_EXPECTED, snapshot, MODE)
+    await auditWorkflowState(page, 'skill', 'shared-and-user-only-candidates', page.locator('[data-trigger-menu]'))
 
     // Discovery needs no prefix: an in-order subsequence of one skill name
     // ranks that skill alone, through the ranker the command group uses.
@@ -120,6 +152,7 @@ describe('web e2e: skill invocation policy through the real host', () => {
     expect(await menu.getByRole('option', { name: /policy-user-only/ }).count()).toBe(1)
     const fuzzySnapshot = await captureStableAria(page, '[role="listbox"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(FUZZY_MENU_EXPECTED, fuzzySnapshot, MODE)
+    await auditWorkflowState(page, 'skill', 'filtered-user-only-candidate', page.locator('[data-trigger-menu]'))
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['menu-fuzzy.expected.md', 'menu.expected.md'])

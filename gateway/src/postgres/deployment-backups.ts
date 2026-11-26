@@ -14,6 +14,7 @@ import { previewBackupNodeConfiguration, type BackupNodeConfigurationView } from
 import { acquireDeploymentDataLock } from './deployment-lock.ts'
 import { MaintenanceError, PostgresMaintenanceService } from './maintenance-service.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
+import { verifyDeploymentProjectNameKey } from './deployment-name-key.ts'
 
 /** Dump paths and their immutable sibling file snapshots share the same generated basename. */
 export function backupFilesDirectory(dumpPath: string): string {
@@ -69,6 +70,8 @@ export class PostgresDeploymentBackups {
       const roots = await collectDeploymentData(this.context, this.cfg)
       await this.authorize(actor ?? undefined)
       const dump = await this.commands.backup(directory, this.databaseUrl, roots, signal)
+      if((await verifyDeploymentProjectNameKey(dump.managedSnapshot,backupFilesDirectory(dump.dumpPath),this.context,this.cfg)).length)
+        throw new MaintenanceError(409,'backup-project-name-key-location-changed')
       await verifyGatewayDocumentBackup(dump.managedSnapshot, backupFilesDirectory(dump.dumpPath), signal)
       const plan = await migrationPlan(this.context.pool, this.cfg.deployMigrationsDir)
       const record = await this.records.record({ path: dump.dumpPath, migrationVersion: plan.current,

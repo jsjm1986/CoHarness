@@ -31,7 +31,10 @@ kind: "package-reference"
 
 在存在实时 agent 的任何地方挂载 `dsh-agent`：它提供 `ctx.agents` 以及插件、UI、钩子和编排器所面向编程的 `Agent` 句柄。在没有驱动器注册工厂之前，该服务保持惰性——随附驱动器是 `dsh-agent-loop`，因此最小的可用组合需要同时加载两者。
 
+<a id="create-or-resume-an-agent"></a>
 ### 创建或恢复 agent
+
+恢复管理方可在组合 profile 前，在根 Context 安装 `agentExecutionAdmission`。`installAgentExecutionAdmission()` 保留不可变的历史 Session 身份集合。注册表预留、创建、恢复和发布在加载 Preset 或调用工厂前拒绝这些身份及其父级身份；持久历史仍可读取。默认驱动器的直接入口执行相同检查。该进程限制不授予用户、模型或工具权限。
 
 `ctx.agents.create()` 在一个身份下构建全新 agent 与会话；`ctx.agents.resume()` 加载持久化会话并在此基础上重建 agent。两者都委托给已注册工厂，并返回 `AgentHandle`——唯一能拆除该 agent 的对象。在任一操作的 options 中设置 `parentAgent`，可使结果成为运行时子级；省略它则得到运行时根级。`get(id)`、`list()` 与 `roots()` 用于查找实时 agent；`isOwnedBy(id, parent)` 用于检验这项确切的实时所有权关系。
 
@@ -48,7 +51,7 @@ await handle.dispose()   // stops the loop, unregisters, removes the session, un
 
 ### 驱动 agent 的对话
 
-句柄的方法把带标识的 user 角色消息路由进 agent 的收件箱。`followup()` 排队一条普通的下一个轮次提示词并唤醒驱动器；`steer()` 提交下一步输入并唤醒它；`inject()` 添加面向模型的上下文但不唤醒驱动器，因此它落在下一个被接纳的步骤中。`cancel(cause)` 中止当前活动，并在未设置 `keepInbox` 时清除待处理工作；`whenIdle()` 会在整个 agent 达到完全停稳后完成。
+句柄的方法把带标识的 user 角色消息路由进 agent 的收件箱。`followup()` 排队一条普通的下一个轮次提示词并唤醒驱动器；`steer()` 提交下一步输入并唤醒它；`inject()` 添加面向模型的上下文但不唤醒驱动器，因此它落在下一个被接纳的步骤中。支持 `hasPendingUserSteer` 的驱动器会报告下一步队列中是否仍有带唤醒意图的用户输入。`cancel(cause)` 中止当前活动，并在未设置 `keepInbox` 时清除待处理工作；`whenIdle()` 会在整个 agent 达到完全停稳后完成。
 
 ```text
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -89,6 +92,8 @@ await handle.agent.whenIdle()
 该包建立在一项职责分离之上：公开的 `Agent` 接口与注册表位于本包，构造与驱动则位于循环包，并通过已注册工厂提供。消费方因此依赖 `dsh-agent` 而不依赖 `dsh-agent-loop`，从而保持驱动器可替换。第二个理念是发起方作用域：一条 `AsyncLocalStorage` 链把确切的实时 `Agent` 携带经过它启动的异步驱动器工作，使驱动器之下的辅助函数无需逐调用转发 agent 即可归因自己的工作。
 
 ### 步骤准入
+
+受管的步骤前诊断将监听器等待后续调用之外的耗时归到所属插件。启用诊断的步骤沿用 Cordis 解析出的监听器及其执行决定。
 
 `PreStepDecision` 要么是 `{ kind: 'reject' }`，要么是 `{ kind: 'enter', messages, startsRequestSeries? }`。enter 分支包含完整、带标识且冻结的消息批次。接纳不等于提交：组装与 `step/start` 之后，`agent/request` 和 `prepareCall()` 先解析路由，循环随后才提交系统提示词与用户批次。在任一异步阶段取消都不会提交这两者。`startsRequestSeries: true` 声明一个独立的模型消息序列；包装下游 enter 的监听器会保留该声明与批次，除非有意替换其中一项。领取会从 inbox 移除候选消息，领取后插入的消息则等待后续边界。
 

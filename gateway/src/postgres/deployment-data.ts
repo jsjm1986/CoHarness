@@ -9,6 +9,12 @@ import { MaintenanceError, PostgresMaintenanceService } from './maintenance-serv
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 import { personalRuntimeLayout, type PersonalRuntimeStorageLayout } from '../runtime-layout.ts'
 import type { RuntimeId } from '../runtime-catalog.ts'
+import { recoveryExecutionDataRoots } from '../peer-backup-execution-data.ts'
+import { deploymentProjectNameKey } from './deployment-name-key.ts'
+import { resolveGovernanceLocalPaths } from '../governance-rebuild-local-paths.ts'
+import { GovernanceRebuildLocalData } from '../governance-rebuild-local-data.ts'
+import { NodeContentConnection } from '../node-content-connection.ts'
+import type { RuntimeTarget } from '../instances.ts'
 
 interface RuntimeDataOwner {
   runtime: string
@@ -71,17 +77,33 @@ async function runtimeDataOwners(context: PostgresRuntimeContext, cfg: GatewayCo
         AND environment.owner_id=u.id AND environment.node_id=$2
       LEFT JOIN harness.instances i ON i.runtime_id=environment.id AND i.organization_id=u.organization_id
       WHERE u.organization_id=$1`, [context.organizationId, context.nodeId])
-  const projects = await context.pool.query<{ public_id: string; local_path: string; generation: number }>(
-    `SELECT p.public_id::text,m.local_path,COALESCE(i.generation,0) generation FROM harness.projects p
+  const projects = await context.pool.query<{ public_id: string; local_path: string; generation: number; runtime_id: RuntimeId | null }>(
+    `SELECT p.public_id::text,m.local_path,COALESCE(i.generation,0) generation,i.runtime_id FROM harness.projects p
       JOIN harness.project_mounts m ON m.project_id=p.id AND m.organization_id=p.organization_id
       LEFT JOIN harness.instances i ON i.project_id=p.id AND i.organization_id=p.organization_id AND i.assigned_node_id=m.node_id
       WHERE p.organization_id=$1 AND m.node_id=$2`, [context.organizationId, context.nodeId])
-  return [
-    ...users.rows.map(row => ({ runtime: row.storage_layout === 'isolated' ? `runtime:${row.runtime_id}` : `user:${row.public_id}`,
-      dshHome: personalRuntimeLayout(cfg, { username: row.username, ...(row.runtime_id === null ? {} : { runtimeId: row.runtime_id }),
-        storageLayout: row.storage_layout ?? 'legacy' }).dshHome, home: row.home_path, generation: row.generation })),
-    ...projects.rows.map(row => ({ runtime: `project:${row.public_id}`, dshHome: join(cfg.projectRuntimesRoot, row.public_id, 'dsh'), home: row.local_path, generation: row.generation })),
-  ]
+  const schema = (await context.pool.query<{ present: boolean }>("SELECT to_regclass('harness.governance_rebuild_operations') IS NOT NULL present")).rows[0]!.present
+  const recovered = schema && (await context.pool.query('SELECT FROM harness.governance_rebuild_operations WHERE organization_id=$1 LIMIT 1', [context.organizationId])).rowCount !== 0
+  let volume: NodeContentConnection | undefined
+  const local = async (target: RuntimeTarget) => resolveGovernanceLocalPaths(context, { paths: async (id, proof) => {
+    if (target.kind === 'project') volume ??= new NodeContentConnection(cfg, context)
+    return new GovernanceRebuildLocalData(context, cfg, { limits: cfg.recoveryInspection, volume }).paths(id, proof)
+  }, accountHomes: ids => new GovernanceRebuildLocalData(context, cfg, { limits: cfg.recoveryInspection }).accountHomes(ids) }, target)
+  const owners: RuntimeDataOwner[] = []
+  try {
+    for (const row of users.rows) {
+      const bound = !recovered || row.runtime_id === null ? undefined : await local({ kind: 'user', id: Number(row.public_id), runtimeId: row.runtime_id })
+      owners.push({ runtime: row.storage_layout === 'isolated' ? `runtime:${row.runtime_id}` : `user:${row.public_id}`,
+        dshHome: bound?.dshHome ?? personalRuntimeLayout(cfg, { username: row.username, ...(row.runtime_id === null ? {} : { runtimeId: row.runtime_id }),
+          storageLayout: row.storage_layout ?? 'legacy' }).dshHome, home: bound?.homePath ?? row.home_path, generation: row.generation })
+    }
+    for (const row of projects.rows) {
+      const bound = !recovered || row.runtime_id === null ? undefined : await local({ kind: 'project', id: Number(row.public_id), runtimeId: row.runtime_id })
+      owners.push({ runtime: `project:${row.public_id}`, dshHome: bound?.dshHome ?? join(cfg.projectRuntimesRoot, row.public_id, 'dsh'),
+        home: bound?.homePath ?? row.local_path, generation: row.generation })
+    }
+    return owners
+  } finally { await volume?.close() }
 }
 
 async function approvedRoots(cfg: GatewayConfig): Promise<ManagedDataPath[]> {
@@ -217,6 +239,8 @@ export async function collectDeploymentData(context: PostgresRuntimeContext, cfg
   const documents = await documentRoots(cfg)
   const roots: ManagedDataPath[] = [
     ...documents,
+    ...await recoveryExecutionDataRoots(context, cfg.stateRoot),
+    ...await deploymentProjectNameKey(context,cfg),
     { owner: 'gateway-principal', kind: 'directory', path: cfg.principalKeyDir },
     { owner: 'gateway-runtime-credentials', kind: 'directory', path: cfg.runtimeCredentialDir },
     { owner: 'gateway-tunnel-credentials', kind: 'file', path: cfg.tunnelCredentialKeyFile },
@@ -287,7 +311,18 @@ export async function planDeploymentDataRelocation(context: PostgresRuntimeConte
     const to = (await normalizeManagedRoots([{ owner: 'gateway', kind, path: resolve(next[key]) }]))[0]!.path
     return { from, to }
   }))).filter(move => move.from !== move.to)
+  if(current.projectNameKeyFile!==next.projectNameKeyFile) {
+    if(!current.projectNameKeyFile || !next.projectNameKeyFile)throw new MaintenanceError(409,'project-name-key-configuration-change-requires-explicit-migration')
+    const [from,to]=await Promise.all([current.projectNameKeyFile,next.projectNameKeyFile].map(async path=>
+      (await normalizeManagedRoots([{owner:'gateway-project-name-key',kind:'file',path}]))[0]!.path))
+    if(from!==to)controlMoves.push({from:from!,to:to!})
+  }
   movements.push(...controlMoves)
+  if (current.stateRoot !== next.stateRoot) {
+    const move = { from: join(current.stateRoot, 'recovery-execution'), to: join(next.stateRoot, 'recovery-execution') }
+    controlMoves.push(move)
+    movements.push(move)
+  }
   if (movements.some(move => movements.some(other => ancestor(move.from, other.to) || ancestor(other.to, move.from)
     || move !== other && (ancestor(move.to, other.to) || ancestor(other.to, move.to))))) {
     throw new MaintenanceError(409, 'overlapping-data-relocation-requires-coordinated-data-migration')
@@ -317,6 +352,7 @@ export async function planDeploymentDataRelocation(context: PostgresRuntimeConte
   const copies = mapped.flatMap((to, index) => to.path === roots[index]!.path ? [] : [{ from: roots[index]!, to }])
   const configuredSources = ([...keys, 'usersRoot', 'projectRuntimesRoot'] as const)
     .filter(key => current[key] !== next[key]).map(key => resolve(current[key]))
+  if(current.projectNameKeyFile && current.projectNameKeyFile!==next.projectNameKeyFile)configuredSources.push(resolve(current.projectNameKeyFile))
   const runtimeSources = owners.filter(owner => runtimes.some(runtime => runtime.runtime === owner.runtime && runtime.dshHome !== runtime.nextHome))
     .map(owner => resolve(owner.dshHome))
   return { roots: await applicationDataRoots(mapped, [current, next]), copies, inventories, movements, configuredSources, runtimeSources }

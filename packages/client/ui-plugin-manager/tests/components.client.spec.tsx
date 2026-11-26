@@ -12,6 +12,8 @@ import { createSnapshotStore, type ProjectUiPolicySnapshot, type SettingsScopeSn
 import { StrictMode, type ReactNode } from 'react'
 import { createNavigationStore } from '../src/client/navigation-store.ts'
 import { PluginManagerPage } from '../src/client/PluginManagerPage.tsx'
+import { PluginManagerTitle } from '../src/client/PluginManagerTitle.tsx'
+import { createDeferredPluginManagerPage } from '../src/client/DeferredPluginManagerPage.tsx'
 import { PluginRefreshToast } from '../src/client/PluginRefreshToast.tsx'
 import type { PluginManagerPageProps } from '../src/client/index.ts'
 import type { PluginTab } from '../src/client/tab-ledger.ts'
@@ -224,6 +226,30 @@ function renderTab(
 }
 
 describe('PluginManagerPage', () => {
+  it('shares the selected page title with the compact header across detail, tab and locale changes', () => {
+    const bundle = pkg({ rows: [row({ moduleName: 'dsh-sidebar-row' })] })
+    const b = renderTab({ packages: [bundle] }, { items: [{ id: 'memory', label: 'Memory' }] }, {}, {}, [{ id: 'market', label: 'Marketplace' }])
+    const title = render(<PluginManagerTitle {...b.props} />)
+    expect(title.container.textContent).toBe('Plugins')
+    act(() => { b.navigation.actions.setView({ kind: 'item', id: 'memory' }) })
+    expect(title.container.textContent).toBe('Memory')
+    act(() => { b.navigation.actions.setView({ kind: 'more' }) })
+    expect(title.container.textContent).toBe('Optional plugins')
+    act(() => { b.navigation.actions.setView({ kind: 'package', name: bundle.name }) })
+    expect(title.container.textContent).toBe(bundle.name)
+    act(() => { b.navigation.actions.setView({ kind: 'row', name: bundle.name, rowId: 'sidebar' }) })
+    expect(title.container.textContent).toBe('dsh-sidebar-row')
+    act(() => { b.navigation.actions.setTab('market') })
+    expect(title.container.textContent).toBe('Marketplace')
+    b.setTabs([])
+    expect(title.container.textContent).toBe('dsh-sidebar-row')
+    b.set({ packages: [] })
+    expect(title.container.textContent).toBe('Plugins')
+    b.setLanguage(zh)
+    title.rerender(<PluginManagerTitle {...b.props} t={translate(zh)} />)
+    expect(title.container.textContent).toBe('插件')
+  })
+
   it('shows no tabs without contributions, and switches between Installed and a contributed tab', () => {
     const { actions, navigation, setTabs, set } = renderTab({ packages: [pkg()] }, {}, {
       'plugins.tab:discover': (_view, owner) => {
@@ -412,9 +438,17 @@ describe('PluginManagerPage', () => {
     expect(document.querySelector('[data-plugin-detail="dsh-better-sidebar"]')).not.toBeNull()
   })
 
-  it('asks the store once mounted and renders the loading, unavailable, error, and empty states', () => {
-    const { actions, set } = renderTab({ status: 'loading' })
+  it('starts the Host read while it loads the page', async () => {
+    const { actions, props, unmount } = renderTab({ status: 'loading' })
+    unmount()
+    const Page = createDeferredPluginManagerPage()
+    render(<Page {...props} />)
     expect(actions.ensure).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole('button', { name: en.addPlugin })).toBeTruthy()
+  })
+
+  it('renders the loading, unavailable, error, and empty states', () => {
+    const { actions, set } = renderTab({ status: 'loading' })
     const loading = screen.getByRole('status', { name: en.loading })
     expect(loading.querySelectorAll('li')).toHaveLength(4)
     expect(loading.querySelector('ul')?.getAttribute('aria-hidden')).toBe('true')
@@ -693,7 +727,7 @@ describe('PluginManagerPage', () => {
     const { actions, set, setLanguage } = renderTab({ packages: [pkg({ name, meta, description: 'Original metadata.' })] })
     const assertCard = (dict: typeof en) => {
       const card = screen.getByRole('button', { name: dict.openDetail.replace('{name}', title(dict)) })
-      expect(card.textContent).toBe(title(dict))
+      expect(within(card).getByText(title(dict), { exact: true })).toBeTruthy()
       expect(screen.getByText(description(dict))).toBeTruthy()
       expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toBe(description(dict))
       expect(screen.getByRole('switch', { name: dict.enableToggle.replace('{name}', title(dict)) })).toBeTruthy()
@@ -755,15 +789,15 @@ describe('PluginManagerPage', () => {
     expect(detailImage.width).toBe(36)
   })
 
-  it('shows a known bundle preview in its details before activation, follows the UI language, and survives decode failure', () => {
+  it('shows a known bundle preview in its details before activation, follows the UI language, and survives decode failure', async () => {
     const name = '@deepseek-ai/dsh-experimental-badge-skill-bundle'
     const { actions, setLanguage } = renderTab({ packages: [pkg({ name, enabled: false }), pkg()] })
     expect(screen.queryByRole('img')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: `View ${name}` }))
-    const english = screen.getByRole('img', { name: en.previewAlt.replace('{name}', name) }).getAttribute('src')
+    const english = (await screen.findByRole('img', { name: en.previewAlt.replace('{name}', name) })).getAttribute('src')
     expect(english).toMatch(/badge-skill-preview\.svg$/)
     setLanguage(zh)
-    const chinese = screen.getByRole('img', { name: zh.previewAlt.replace('{name}', name) })
+    const chinese = await screen.findByRole('img', { name: zh.previewAlt.replace('{name}', name) })
     expect(chinese.getAttribute('src')).toMatch(/badge-skill-preview\.zh\.svg$/)
     fireEvent.error(chinese)
     expect(screen.queryByRole('img')).toBeNull()
@@ -771,7 +805,7 @@ describe('PluginManagerPage', () => {
     fireEvent.click(screen.getByRole('switch', { name: zh.enableToggle.replace('{name}', name) }))
     expect(actions.setEnabled).toHaveBeenCalledWith(name, true)
     setLanguage(en)
-    expect(screen.getByRole('img').getAttribute('src')).toBe(english)
+    expect((await screen.findByRole('img', { name: en.previewAlt.replace('{name}', name) })).getAttribute('src')).toBe(english)
     expect(screen.queryByRole('status')).toBeNull()
   })
 
@@ -781,19 +815,20 @@ describe('PluginManagerPage', () => {
     expect(screen.queryByRole('img')).toBeNull()
   })
 
-  it('places the new voice illustration after its description and switches the single image with the UI language', () => {
+  it('places the voice illustration after its description and switches the single image with the UI language', async () => {
     const name = '@deepseek-ai/dsh-experimental-voice-input-bundle'
     const description = 'Turn speech into local notes.'
     const { setLanguage } = renderTab({ packages: [pkg({ name, enabled: false, meta: { description }, rows: [row()] })] })
     fireEvent.click(screen.getByRole('button', { name: `View ${name}` }))
-    const image = screen.getByRole('img')
+    const image = await screen.findByRole('img', { name: en.previewAlt.replace('{name}', name) })
     expect(image.getAttribute('src')).toMatch(/voice-input-preview\.svg$/u)
     expect(screen.getByText(description).compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(image.compareDocumentPosition(screen.getByRole('heading', { name: en.partsLabel })) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy()
     setLanguage(zh)
+    const chinese = await screen.findByRole('img', { name: zh.previewAlt.replace('{name}', name) })
     expect(screen.getAllByRole('img')).toHaveLength(1)
-    expect(screen.getByRole('img').getAttribute('src')).toMatch(/voice-input-preview\.zh\.svg$/u)
+    expect(chinese.getAttribute('src')).toMatch(/voice-input-preview\.zh\.svg$/u)
   })
 
   it('shows metadata diagnostics without blocking management or displaying legacy descriptions', () => {
@@ -851,7 +886,7 @@ describe('PluginManagerPage', () => {
     for (const { dict, title, description } of languages) {
       setLanguage(dict)
       const card = screen.getByRole('button', { name: dict.openDetail.replace('{name}', title) })
-      expect(card.textContent).toBe(title)
+      expect(within(card).getByText(title, { exact: true })).toBeTruthy()
       if (description === undefined) {
         expect(card.getAttribute('aria-describedby')).toBeNull()
         expect(screen.queryByText(chineseDescription)).toBeNull()
@@ -1930,6 +1965,8 @@ describe('PluginManagerPage', () => {
     const open = { ...IDLE_INSTALL, open: true, registryOpen: true, registries: REGISTRIES }
     const { actions, set } = renderTab({ install: open })
     const field = screen.getByRole('textbox', { name: en.registryCustom })
+    expect(field.closest('[role="dialog"]')).toBe(screen.getByRole('dialog', { name: en.installTitle }))
+    expect(field.closest('[inert], [aria-hidden="true"]')).toBeNull()
     const label = screen.getByRole('radio', { name: en.registryCustom }).parentElement!
     const area = label.parentElement!
     expect(field).toHaveProperty('disabled', false)
@@ -2022,8 +2059,8 @@ describe('PluginManagerPage', () => {
     expect(radios[0]).toHaveProperty('checked', true)
     // The options carry the host each names; the control does not.
     expect(radios.map(radio => radio.parentElement?.textContent)).toEqual([OFFICIAL_OPTION, MIRROR_OPTION, en.registryCustom])
-    // The options float from the toggle, so the dialog card itself does not grow.
-    expect(screen.getByRole('dialog').contains(screen.getByRole('group', { name: en.registryLegend }))).toBe(false)
+    // The fixed-position options retain their modal's keyboard and inert ownership.
+    expect(screen.getByRole('dialog').contains(screen.getByRole('group', { name: en.registryLegend }))).toBe(true)
     // Escape folds the options without reaching the dialog; a pointer outside them folds them too.
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(actions.toggleRegistryOptions).toHaveBeenCalledTimes(2)
@@ -2243,12 +2280,14 @@ describe('PluginManagerPage', () => {
   })
 
   it('offers the retained installation and keeps its uncertain state cancellable', () => {
-    const { actions } = renderTab({ install: {
-      ...IDLE_INSTALL, open: true, phase: 'unconfirmed', requestId: 'pending-install' as PluginInstallRequestId,
+    const install: InstallState = {
+      ...IDLE_INSTALL, open: false, phase: 'unconfirmed', requestId: 'pending-install' as PluginInstallRequestId,
       failure: { reason: 'offline', uncertainty: 'cancellation' },
-    } })
+    }
+    const { actions, set } = renderTab({ install })
     fireEvent.click(screen.getByRole('button', { name: en.installViewTask }))
     expect(actions.openInstall).toHaveBeenCalledOnce()
+    set({ install: { ...install, open: true } })
     expect(screen.getByRole('status').textContent).toBe(en.installUnconfirmedTitle)
     fireEvent.click(screen.getByRole('button', { name: en.installCancel }))
     expect(actions.cancelInstall).toHaveBeenCalledOnce()

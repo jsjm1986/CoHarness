@@ -23,12 +23,15 @@
   gap: 10px;
   width: 100%;
   max-width: calc(var(--dsh-composer-card-max-width) - 4 * var(--dsh-composer-dock-inset));
-  height: 36px;
+  min-height: 36px;
+  flex-wrap: wrap;
   margin: 0 auto;
   padding: var(--dsw-space-1) 5px var(--dsw-space-1) var(--dsw-space-3);
   border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-lg);
   background: var(--dsw-specific-tip);
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   animation: dsh-goal-bar-in var(--dsw-motion-duration-enter, 0.22s)
     var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
 }
@@ -74,14 +77,33 @@
 }
 
 .error {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
-  overflow: hidden;
-  color: var(--dsw-alias-state-error-primary);
+  color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 80%, var(--dsw-alias-label-primary));
   font-size: 12px;
   line-height: 20px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+.blockedReason {
+  flex-basis: 100%;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.blockedReason > summary {
+  padding-block: var(--dsw-space-1);
+  cursor: pointer;
+}
+
+.reasonBody {
+  max-block-size: min(12rem, 25dvh);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  padding-block: var(--dsw-space-1);
 }
 
 /* ---- Icon actions ---- */
@@ -137,6 +159,12 @@
 }
 
 @media (pointer: coarse) {
+  .blockedReason > summary {
+    box-sizing: border-box;
+    min-block-size: var(--dsw-touch-target);
+    align-content: center;
+  }
+
   .iconBtn {
     width: var(--dsw-touch-target);
     height: var(--dsw-touch-target);

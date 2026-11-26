@@ -16,12 +16,19 @@ export interface NodeDraftKey {
 }
 
 export interface NodeDraftValue { revision: number; text: string }
+/** Exact browser account and selected Session, independent of any tab's editor text. */
+export type NodeDraftSessionKey=Omit<NodeDraftKey,'draftId'>
 export type DraftResult = { status: 200; value: NodeDraftValue & { currentRevision?: number } } | { status: 409 } | { status: 410 }
 export type NodeDraftOperation = { kind: 'read'; revision?: number } | { kind: 'save'; value: NodeDraftValue }
 export interface NodeDraftStorage {
   apply(key: NodeDraftKey, operation: NodeDraftOperation): DraftResult | Promise<DraftResult>
   /** Validate a live HTTP session on the same connections as the owner's commit. */
   applyAuthenticated?(key:NodeDraftKey,operation:NodeDraftOperation,sessionDigest:Buffer):Promise<DraftResult>
+  /** Check an exact creator-owned live project reservation without reading editor text or starting a Runtime.
+   * @param key - verified browser account and exact selected Session. @param sessionDigest - authenticated HTTP cookie hash.
+   * @returns true only while the creator's unmaterialized reservation and current write permissions remain valid.
+   */
+  reservedSessionAuthenticated?(key:NodeDraftSessionKey,sessionDigest:Buffer):Promise<boolean>
 }
 
 /**

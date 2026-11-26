@@ -17,7 +17,7 @@ async function fixture() {
   const store = new NodeConfigurationStore(identity, cfg, env, isolatedNodeConfigurationAuthority)
   await store.initialize()
   const current = await store.view(1)
-  await store.save(identity, 0, { ...current.desired, HGW_PORT: '9334' }, 1)
+  await store.save(identity, 0, { ...current.desired, HGW_PORT: '9334', HGW_REMOTE_DESKTOP: 'off' }, 1)
   await store.requestApply(identity, 1, 7)
   const host: NodeConfigurationApplyHost = {
     signal: new AbortController().signal,
@@ -30,10 +30,12 @@ it('preflights the saved revision and confirms the effective revision before com
   const f = await fixture()
   vi.mocked(f.host.restartAndVerify).mockImplementation(async record => {
     expect(record.operation?.status).toBe('applying')
+    expect(record.applied.HGW_REMOTE_DESKTOP).toBe('off')
     expect(await readNodeConfiguration(f.cfg.nodeConfigFile, f.env)).toMatchObject({ appliedRevision: 1, previous: { revision: 0 } })
   })
   expect(await f.apply()).toMatchObject({ appliedRevision: 1, operation: { status: 'completed' } })
   expect((await f.store.view(1)).effective.HGW_PORT).toBe('8899')
+  expect((await f.store.view(1)).effective.HGW_REMOTE_DESKTOP).toBe('on')
   expect(await f.apply()).toBeUndefined()
 })
 
@@ -51,7 +53,8 @@ it('restores the previous configuration and verifies its service after the candi
     if (record.appliedRevision === 1) throw new Error('candidate-unhealthy')
   })
   expect(await f.apply()).toMatchObject({ appliedRevision: 0, applied: { HGW_PORT: '8899' },
-    desired: { HGW_PORT: '9334' }, operation: { status: 'failed', error: 'candidate-unhealthy; previous-configuration-restored' } })
+    desired: { HGW_PORT: '9334', HGW_REMOTE_DESKTOP: 'off' }, operation: { status: 'failed', error: 'candidate-unhealthy; previous-configuration-restored' } })
+  expect((await readNodeConfiguration(f.cfg.nodeConfigFile, f.env))?.applied.HGW_REMOTE_DESKTOP).toBe('on')
   expect(revisions).toEqual([1, 0])
 })
 

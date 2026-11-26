@@ -1,10 +1,6 @@
 /**
- * Dock strip stylesheet contract, asserted against dockkit.module.css on
- * disk. The strip speaks the segmented-bar language of the conversation
- * header: a hover-fill track with the card corner and 3px padding, 24px
- * segments in the bar's 500/-0.01em type, the selected chip raised on
- * control elevation, and one header hairline under the row. jsdom cannot
- * render, so the visual contract lives here as text assertions.
+ * Static sizing and token checks for the centered dock strip. Browser
+ * fixtures own rendered clearance, touch targets, and control reachability.
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -58,15 +54,12 @@ describe('dock strip segmented-bar language', () => {
     expect(track.get('padding')).toBe('3px')
   })
 
-  it('keeps the 38px row with the 30px band on 8px top margin', () => {
+  it('centers the track with equal block padding and a 50px minimum band', () => {
     const strip = declarationsFor('.tabStrip')
-    expect(strip.get('height')).toBe('30px')
-    // The band's insets are published variables with the design's own
-    // fallbacks: a host beside a taller header raises the block total and
-    // the content's top inset so both header rules draw on one line.
-    expect(strip.get('padding')).toBe(
-      'var(--dsh-dockkit-strip-block-start, 8px) 6px\n    calc(var(--dsh-dockkit-strip-block, 38px) - var(--dsh-dockkit-strip-block-start, 8px) - 30px)\n    var(--dsh-dockkit-strip-inline-start, 10px)',
-    )
+    expect(strip.get('box-sizing')).toBe('border-box')
+    expect(strip.get('align-items')).toBe('center')
+    expect(strip.get('height')).toBe('max(var(--dsh-dockkit-strip-block, 50px), 50px)')
+    expect(strip.get('padding')).toBe('8px 6px 8px var(--dsh-dockkit-strip-inline-start, 10px)')
   })
 
   it('sets chips as 24px segments in the bar type', () => {

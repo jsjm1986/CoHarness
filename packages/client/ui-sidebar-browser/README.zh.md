@@ -7,6 +7,8 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+地址输入位于导航操作之前，阅读顺序与焦点顺序一致。紧凑与粗指针布局让地址独占一行，提供 44px 操作目标和 16px 输入文字，并让本机回环提示换行。地址失焦后「前往」仍然可见，因此点击按钮不自动聚焦的浏览器也能正常提交。较矮的面板允许工具栏、网页和提示共同滚动；iframe 保留以面板高度为上限的可读高度，避免浏览器操作区把访问的网页压缩为零。地址拒绝提示和沙箱警告使用主题语义文字色。
+
 ## 概述
 
 在独立的右侧 Sidebar tab 中浏览 HTTP(S) 页面，包括 loopback 服务。当前 Web 应用使用 iframe 和应用维护的 history。本包不会向被访问内容注入 Electron 或 Node 能力。
@@ -25,7 +27,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-随附的 Web composition 已挂载本包。可以从右侧 Sidebar guide 打开 **浏览器**、输入 HTTP(S) URL，或点击 Assistant Markdown 中的 HTTP(S) 链接。不带 scheme 的主机名会补全为 HTTPS。公共目标与 loopback 目标使用相同的默认 sandbox。每次 guide 操作或消息链接操作都会创建一个新的 Browser tab。
+随附的 Web 组合将浏览器列为必需条目，因此链接打开方式设为侧边栏时，首次点击会话链接也能在侧边栏打开。可以从右侧栏引导页打开 **浏览器**、输入 HTTP(S) URL，或点击助手 Markdown 中的 HTTP(S) 链接。不带协议的主机名会补全为 HTTPS。公共目标与 loopback 目标使用相同的默认沙箱。每次从引导页或消息链接在侧边栏打开时，都会创建一个新的浏览器标签页。
 
 ### 何时选择
 

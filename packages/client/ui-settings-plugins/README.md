@@ -27,6 +27,8 @@ Use the sidebar's **Plugins** page to inspect and manage the plugins this deploy
 <a id="what-appears-here"></a>
 ## What appears here
 
+On touch and narrow screens, fields use at least 16px text; inputs, save/discard actions, reset controls, and help controls have at least 44px targets. Field borders stay inside the form, and footer actions wrap when space is limited.
+
 Credential and provider invalidations come from the bootstrap Runtime whose settings scopes this page binds. Opening another environment in a new tab leaves these unsaved forms mounted.
 
 The Plugins page's Built-in plugin settings group renders the intersection of two ledgers: the `plugins.item` entries composed clients registered, and the settings namespaces the Host serves. A served namespace no item claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and an item whose namespace this deployment does not serve is filtered out, so an uncomposed plugin leaves no empty shell. Cards follow registration order, which is stable for the items one package installs together and not stable across plugins: apply order between packages is unconstrained.

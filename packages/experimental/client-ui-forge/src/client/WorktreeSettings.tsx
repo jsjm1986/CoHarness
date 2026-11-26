@@ -1,4 +1,4 @@
-/** The worktree service's row page on the Plugins page: the archive cleanup switch. */
+/** The Worktree settings card on the Plugins page: the archive cleanup switch. */
 import { useId } from 'react'
 import { Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SettingsForm } from './settings-form/SettingsForm.tsx'
@@ -9,7 +9,7 @@ import type { NS } from './locales.ts'
 import type { WorktreeSettingsInjected } from './worktree-settings-form.ts'
 import css from './WorktreeSettings.module.css'
 
-export type WorktreeSettingsProps = PropsRuntime<'plugins.row.config'> & PropsLocale<typeof NS> & InjectFace<WorktreeSettingsInjected>
+export type WorktreeSettingsProps = PropsRuntime<'plugins.item'> & PropsLocale<typeof NS> & InjectFace<WorktreeSettingsInjected>
 
 function formLabels(t: WorktreeSettingsProps['t']): SettingsFormLabels {
   return {
@@ -19,7 +19,7 @@ function formLabels(t: WorktreeSettingsProps['t']): SettingsFormLabels {
 }
 
 /**
- * Render the worktree row's configuration: one switch that keeps every
+ * Render the Worktree settings: one switch that keeps every
  * checkout when its Session is archived. The summary view names the switch.
  * @param props - the Plugins page view, the staged form, and its actions.
  * @returns the row page's form, or the summary line.

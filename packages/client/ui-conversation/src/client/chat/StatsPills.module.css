@@ -97,3 +97,12 @@ button.pill[aria-expanded='true'] {
 :global([data-viewport='compact']) .detail {
   display: none;
 }
+
+@media (pointer: coarse) {
+  button.pill { min-width: var(--dsw-touch-target); min-height: var(--dsw-touch-target); }
+}
+
+:global([data-viewport='compact']) button.pill {
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
+}

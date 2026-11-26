@@ -292,11 +292,13 @@ describePg('transactional PostgreSQL backup restore', () => {
     await blocker.query('SELECT pg_advisory_lock(hashtext($1))', [barrier])
     const lease = await acquireDeploymentDataLock(pool)
     const wrapped = createDeploymentCommands(pgDump, pgRestore, [process.execPath, proxy])
+    let restoreFailure: unknown
     const restoring = wrapped.restoreDump(dump.dumpPath, databaseUrl!, lease, dump.sha256)
-      .then(() => undefined, (error: unknown) => error)
+      .then(() => undefined, (error: unknown) => { restoreFailure = error; return error })
     let backend: number | undefined
     try {
       await vi.waitFor(async () => {
+        if (restoreFailure !== undefined) throw restoreFailure
         const result = await pool.query<{ pid: number }>(
           "SELECT pid FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'", [marker])
         backend = result.rows[0]?.pid

@@ -127,6 +127,7 @@ The bridge service: loaded mods, their hooks, and the harness listeners that rai
  * @param generation - the drawing the Client saw.
  * @param actionId - the button's action id in that drawing.
  * @returns the snapshot after the press.
+ * @throws the callback's failure after redrawing any state it changed; its effects are not rolled back.
  */
 @Remote pressBand(agent: Agent, generation: number, actionId: string): Promise<SurfaceSnapshot>
 

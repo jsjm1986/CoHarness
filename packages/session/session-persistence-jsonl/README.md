@@ -65,6 +65,8 @@ Historical CoHarness headers and packed streams are decoded by `coharnessJsonlFo
 
 The default artifact is a standard concatenation of independent [Zstandard frames](../../../.agents/notes/implemented/architecture/2026-07-19-zstandard-jsonl-session-logs.md): one checksummed frame containing only the header line, followed by one checksummed frame per durable append batch. The backend uses Node's built-in Zstandard API with its default compression level and exposes no level knob. Listing reads and validates only the header frame. `compression: 'none'` keeps the same logical lines in the original raw representation.
 
+`readRaw()` returns decompressed JSONL with its generation filename ending in `.jsonl`; compression suffixes belong only to storage. Export reads leave the committed generation unchanged.
+
 A root belongs to one encoding. Startup discovery and targeted lookup reject the opposite suffix with an error naming the incompatible artifact and instructing the caller to select the matching mode or a separate root. Flat `<project>/<id>.jsonl*` artifacts are also rejected instead of ignored. Format migration preserves the configured encoding; compression conversion, mixed-root fallback, and dual write remain unsupported.
 
 <a id="durability-and-crash-semantics"></a>
@@ -78,6 +80,8 @@ A root belongs to one encoding. Startup discovery and targeted lookup reject the
 - **Contiguous-seq.** `append` rejects a batch whose first `seq` does not continue the stored log, and rejects non-JSON-serializable `event.data` naming the offending event type.
 - **Targeted metadata.** `readHeader(id, signal?)`, `revision(id, signal?)`, and `readRevision(id, signal?)` use `stat(id, { signal })`: they search project directories for the requested id, validate only its selected generation's header, and return the same pending-creation metadata or `undefined` result as `stat`. Generation, identity, encoding, and header-decoding errors propagate from `stat`; an unsupported highest generation never falls back to a predecessor. Root encoding admission still checks the configured root. No cross-request header cache is retained, and metadata reads do not inspect event bodies. The [storage-identity decision](../../../.agents/notes/implemented/bug-fix/2026-07-20-jsonl-storage-identity.md) explains targeted discovery and refusal.
 - **Lightweight revisions.** Source identity includes device, inode, size, and nanosecond timestamps; historical generations also include the corpus revision, so their lookup still discovers and stats the selected generations across the root. `listSnapshots(signal?)` applies the same identities to every discovered artifact. The identity changes after append, repair, replacement, or store changes. A full-prefix read requires the same identity before and after reading the bytes, and `readStoredRevision()` also uses it to validate retained preparations. Snapshot listing forwards the exact signal through artifact discovery and checks cancellation around every `stat`; because filesystem `stat` is not interruptible, cancellation waits for the active call to settle, then rejects without starting another.
+
+`readCommittedEvent` resolves and validates the current generation once, then returns a detached copy of the requested complete event. A historical generation uses the ordinary read handle. It never publishes a migrated generation or changes the stored prefix.
 
 <a id="write-path"></a>
 ## Write path

@@ -201,6 +201,7 @@ flowchart LR
   pkg_agent_default_model["agent-default-model"]
   svc_agentDefaultModel["ctx.agentDefaultModel<br/>Default Agent model selection"]
   pkg_headless["headless"]
+  svc_agentExecutionAdmission["ctx.agentExecutionAdmission<br/>Session execution admission"]
   svc_agentLoop["ctx.agentLoop<br/>Concrete loop driver"]
   pkg_agent_spine_demo["agent-spine-demo"]
   svc_headlessStartup["ctx.headlessStartup<br/>One-shot headless invocation values"]
@@ -332,6 +333,7 @@ flowchart LR
   svc_forgeSession["ctx.forgeSession<br/>Session-bound change-request bindings"]
   svc_forgePanel["ctx.forgePanel<br/>Forge panel Remote"]
   pkg_acp --> svc_approval
+  pkg_agent --> svc_agentExecutionAdmission
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
   pkg_agent_loop --> svc_agentLoop
@@ -510,6 +512,8 @@ flowchart LR
   pkg_workspace_changes --> svc_workspaceChanges
   svc_agentDefaultModel --> pkg_headless
   svc_agentDefaultModel --> pkg_host_apiproxy
+  svc_agentExecutionAdmission --> pkg_agent_loop
+  svc_agentExecutionAdmission --> pkg_host_apiproxy
   svc_agentLoop --> pkg_agent_spine_demo
   svc_agentTeams --> pkg_tool_agent_team
   svc_agents --> pkg_acp
@@ -770,6 +774,7 @@ flowchart LR
 | `ctx.skills` | `seam` | [`skill`](../packages/skill/skill) | [`sandbox-windows-acl`](../packages/sandbox/sandbox-windows-acl), [`skill-badge`](../packages/skill/skill-badge), [`skill-filesystem`](../packages/skill/skill-filesystem), [`skill-office`](../packages/skill/skill-office) | [`tool-skill`](../packages/skill/tool-skill) | - | Merges provider skill catalogs; tool-skill renders the session-prefix catalog and loads complete skill bodies. |
 | `ctx.agents` | `core` | [`agent`](../packages/core/agent) | - | [`agent-loop`](../packages/core/agent-loop), [`acp`](../packages/acp/acp), `subagent-inprocess` | - | Owns live Agent handles, the create/resume factory seam, and process-local initiator propagation. |
 | `ctx.agentDefaultModel` | `core` | [`agent-default-model`](../packages/core/agent-default-model) | - | [`headless`](../packages/bundle/headless), [`host-apiproxy`](../packages/host/apiproxy) | - | Layers the default ModelSelection through settings so direct and Host-backed Agent entry points share one state owner. |
+| `ctx.agentExecutionAdmission` | `core` | [`agent`](../packages/core/agent) | - | [`agent-loop`](../packages/core/agent-loop), [`host-apiproxy`](../packages/host/apiproxy) | - | Boot-installed restrictions refuse execution of restored Sessions while retaining detached history reads. |
 | `ctx.agentLoop` | `bundle` | [`agent-loop`](../packages/core/agent-loop) | - | [`agent-spine-demo`](../packages/examples/agent-spine-demo) | - | The one concrete loop plugin; extension packages depend on dsh-agent events and services, not on this package. |
 | `ctx.headlessStartup` | `bundle` | [`headless`](../packages/bundle/headless) | - | [`headless`](../packages/bundle/headless) | - | Parses the task, Session identity, permission options, and output mode once; the runner consumes the published values instead of re-reading argv. |
 | `ctx.goals` | `core` | [`goal`](../packages/goal/goal) | - | - | - | Folds revisioned objective state from the session log and keeps live continuation activation process-local. |

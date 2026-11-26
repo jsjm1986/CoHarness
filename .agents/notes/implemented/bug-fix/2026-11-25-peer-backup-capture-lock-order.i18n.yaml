@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-11-25-peer-backup-capture-lock-order.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-25-peer-backup-capture-lock-order.md
+document:
+  en: db75f43d7fc32d31c0feecb81eab9d2e18fe50ac
+  zh: ac105fc9f70744e22d8c7ee17af2becc13e95a4f
+/agent-note-lock-peer-backup-policies-before-scheduled-capture-rows:
+  en: 8ff42896a83ac7c2
+  zh: 4afe6cb91b75ece9
+/agent-note-lock-peer-backup-policies-before-scheduled-capture-rows/problem:
+  en: 1799693029e8fab3
+  zh: 2421947267ce20d9
+/agent-note-lock-peer-backup-policies-before-scheduled-capture-rows/decision:
+  en: e7468add13e86d51
+  zh: 65d1d1c34a6fa03a
+/agent-note-lock-peer-backup-policies-before-scheduled-capture-rows/alternatives-considered:
+  en: 29ee742b39d0dbc2
+  zh: ee5b839aed7cb88f
+/agent-note-lock-peer-backup-policies-before-scheduled-capture-rows/consequences:
+  en: 6d7a9e1de7acc6b4
+  zh: 381af41b6b4c0cff
+/agent-note-lock-peer-backup-policies-before-scheduled-capture-rows/verification:
+  en: e3df60b61ed3a6ce
+  zh: d56bec6ebbb7601a

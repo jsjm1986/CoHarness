@@ -7,6 +7,7 @@
  * an abandoned drag. Environments without the API (jsdom) simply go unhardened.
  */
 import { useEffect, useRef } from 'react'
+import { observeComposition } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /** The three window listeners one gesture installs. */
 export interface PointerFollowers {
@@ -40,9 +41,12 @@ export function followPointer(element: HTMLElement, pointerId: number, followers
   capturePointer(element, pointerId)
   const controller = new AbortController()
   const { signal } = controller
+  const composition = observeComposition(element.ownerDocument)
   element.dataset.dockkitPointer = String(pointerId)
   signal.addEventListener('abort', () => {
     if (element.dataset.dockkitPointer === String(pointerId)) delete element.dataset.dockkitPointer
+    composition.dispose()
+    if (typeof element.hasPointerCapture === 'function' && element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId)
   }, { once: true })
   const own = (event: PointerEvent): boolean => event.pointerId === pointerId
   window.addEventListener('pointermove', (event) => { if (own(event)) followers.move(event) }, { signal })
@@ -56,6 +60,12 @@ export function followPointer(element: HTMLElement, pointerId: number, followers
     controller.abort()
     followers.cancel()
   }, { signal })
+  element.ownerDocument.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || composition.guards(event) || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return
+    event.preventDefault()
+    controller.abort()
+    followers.cancel()
+  }, { signal, capture: true })
   return () => { controller.abort() }
 }
 

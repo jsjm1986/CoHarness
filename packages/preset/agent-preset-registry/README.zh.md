@@ -149,11 +149,13 @@ agent-presets:
 <a id="what-a-mount-rejects"></a>
 ## 挂载会拒绝什么
 
+灾难恢复许可在文件 preset 与代码声明的 preset 导入前都会生效。许可生效期间，文件 preset 使用不可写的内存树；修改文件不能增加执行许可。未批准的行保持禁用，已批准软件包的字节变化会拒绝挂载。[app-boot 恢复检查](../../boot/app-boot/README.zh.md#previewing-the-effective-configuration) 定义密封组合规则。
+
 直接挂载的子树不会出现在 `ctx.loader.entries()` 中，因此没有任何启动审计能覆盖它。`mount()` 因此自行校验结果可用，并拒绝三种情况。
 
 **目标上下文没有 scope。** 挂载到不带 agent scope 的上下文，会把该 preset 的工具注册成全局的，作用于进程内每一个 agent。
 
-**某一行始终未进入可用状态。** 模块导入失败或插件抛错的行，loader 已经会拒绝；剩下的情况是某一行仍在等待该组装从未提供的服务，审计会指名这种情况。
+**某一行始终未进入可用状态。** 审计报告导入、配置和插件激活失败。文件 preset 等待 Host 服务时，先等待 Host Loader 的在途初始化，再次检查各行；初始化后仍缺少的服务会拒绝挂载。初始化期间释放所属 scope 或子树也会拒绝发布。成功的 standing mount 直接复用，不重复这次等待。
 
 **某一行把服务发布进了根 realm。** 这类服务是进程级全局的，因此第二个发布同名服务的 preset 会与第一个相撞，宿主读取方也会把某一个 preset 的实例当成所有会话的。确实需要自带服务的 preset，应把它放在 `isolate` realm 之后——entry 本地 realm 让两个 preset 的同名服务互不相干，正如它从前隔开两个会话——否则该服务应改放进宿主组装。
 

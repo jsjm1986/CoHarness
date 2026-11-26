@@ -21,6 +21,8 @@ Keep the mux transport and port the card model onto it.
 - A closed turn owns a turn-process row even without assistant evidence, so a reply-only turn still folds what it leaves behind; folded members stay mounted under `hidden` instead of leaving the DOM, since a late reply mutates while hidden and must paint complete on reveal.
 - A late answer lands as a `user/message` whose source is `user-question-reply`; the `question-reply` node definition projects it as a read-only review row that reopens the recorded answer batch.
 
+The waterfall bridge returns the response promise to the composer. An accepted transport receipt ends sending, while the Host projection still owns question settlement and draft removal. A failed or refused receipt leaves the same card answerable for explicit retry. A failed timeout stops its local countdown while retaining the answer channel; a late timeout acknowledgement can detach only the exact channel it submitted through. This distinguishes delivery failure from authoritative question completion without a second settlement state.
+
 Late reply admission owns its execution identity. The service attests the exact user message before steering and reserves one reply while that asynchronous check is pending. The Remote routing policy keeps the write permission check and leaves input registration to the service; a temporary request identity cannot identify a reply queued beyond the RPC lifetime. Exact Agent and authority checks prevent delivery after withdrawal or replacement, and pending replies retain their Agent against idle retirement. Durable replies without attestation remain unverified for privileged execution. Gateway admission attaches the signed project caller snapshot to human messages and continued replies; source-provided participant fields cannot replace that identity. Collaboration context accepts both human source kinds and logs the paired model-visible attribution. Restoration retains the original answerer and rechecks current execution permissions.
 
 ## Alternatives considered
@@ -31,6 +33,8 @@ Late reply admission owns its execution identity. The service attests the exact 
 
 **Key question drafts by session id in a global store.** Rejected: the session-scoped draft store is the declared home for remount-surviving state; a second store would duplicate its lifecycle rules.
 
+**Discard the response promise at the waterfall bridge.** The composer would resolve submission before a transport failure could restore its controls, leaving plan approval busy and losing the failure report.
+
 ## Consequences
 
 - `SessionPendingEntry` widens to include plugin-published entries; consumers narrow on `kind` before reading wire fields.
@@ -40,3 +44,5 @@ Late reply admission owns its execution identity. The service attests the exact 
 ## Testing
 
 `browser-plugin.client.spec.ts` drives the port end to end against the mux `PendingWait` — adoption, timed claim anchoring, delayed claim completion and failure after release, reconnect replay, feed departure, and the retain/release contract. `question-composer.e2e.ts` records the late-answer scenario: the reply row mounts folded inside its turn's process disclosure and expands to a read-only answer review. `timed-question-claim.e2e.ts` delays the actual browser claim request while the real timed tool continues, then submits a durable late reply through the Remote path and pins the assembled UI states.
+
+The [bridge tests](../../../../packages/client/ui-user-questions/tests/browser-plugin.client.spec.ts) keep answer and dismissal submissions pending until their receipt, retain refused requests and exercise explicit retry. The [card tests](../../../../packages/client/ui-user-questions/tests/pending-question.client.spec.ts) preserve answerability after a failed timeout and protect a replacement channel from an older timeout acknowledgement.

@@ -41,6 +41,9 @@ export async function exportOfflinePeerRepository(input: {
     db = new DatabaseSync(file, { readOnly: true })
     db.exec('PRAGMA query_only=ON; BEGIN')
     const key = [organizationId, sourceNodeId, targetNodeId, policyId].join('/')
+    if (db.prepare("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='retired_repositories'").get() &&
+      db.prepare('SELECT 1 FROM retired_repositories WHERE repository=?').get(key))
+      throw new PeerBackupError(410, 'peer-backup/repository-retired')
     const encoded = db.prepare('SELECT data,digest FROM points WHERE repository=? AND name=?').get(key, pointId)
     if (
       !encoded ||

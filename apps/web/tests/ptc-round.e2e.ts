@@ -8,17 +8,19 @@
 // (whenTurnSettled); assertion steps run in replay/refresh only.
 // Record: DSH_SNAPSHOT=record rewrites session.jsonl, then a keyless
 // DSH_SNAPSHOT=refresh regenerates ui.expected.md.
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage } from './workflow-responsive-state.ts'
+import { responsiveBrowser } from './responsive-browser.ts'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
-  captureStableAria, collapseTurnProcesses, compareOrRefreshGolden, expandTurnProcesses, fixtureUserPrompts,
+  captureStableAria, collapseTurnProcesses,  expandTurnProcesses, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, saveFailureShot } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('./snapshots/ptc-round/session.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/ptc-round/ui.expected.md', import.meta.url))
@@ -43,8 +45,8 @@ describe('web e2e: PTC round renders nested sub-calls', () => {
       ...(MODE === 'record' ? {} : { replayFixture: FIXTURE, paceMs: 15 }),
     })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
-    browser = await chromium.launch()
-    page = await newEnglishPage(browser)
+    browser = await responsiveBrowser.launch()
+    page = await newWorkflowPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -121,6 +123,7 @@ describe('web e2e: PTC round renders nested sub-calls', () => {
     // The failing read sub-call wears the same error state a native failed
     // row wears (the recorded program tolerates a read of missing.txt).
     expect(await nest.locator('[data-state="error"]').count()).toBeGreaterThanOrEqual(1)
+    await auditWorkflowState(page, 'tool-cards', 'ptc-program-nested-subcalls', codeRow.locator('..'))
   }, 60_000)
 
   it.skipIf(MODE === 'record')('a bash sub-row click leaves the default details panel closed', async () => {
@@ -131,6 +134,7 @@ describe('web e2e: PTC round renders nested sub-calls', () => {
     await nest.locator('[data-sample="bash"]').first().click()
     // Tool rows do not drive layout geometry; the Session's default panel stays closed.
     await expect.poll(() => frame.getAttribute('data-details-collapsed'), { timeout: 5_000 }).toBe('true')
+    await auditWorkflowState(page, 'tool-cards', 'ptc-nested-shell-output', nest)
   })
 
   it.skipIf(MODE === 'record')('matches the conversation aria golden with stable anchors', async () => {
@@ -138,7 +142,7 @@ describe('web e2e: PTC round renders nested sub-calls', () => {
     // The golden is the default settled view, with the turn's process folded.
     await collapseTurnProcesses(page)
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
-    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+    await compareWorkflowGolden(UI_EXPECTED, snapshot, MODE)
   })
 
   it.skipIf(MODE === 'record')('stayed clean: no page errors, no reconnect churn', () => {

@@ -1,4 +1,4 @@
-import { timeOperation } from './operation-timing.ts'
+import { operationPhase, timeOperation } from './operation-timing.ts'
 import { ServerResponse, type IncomingMessage } from 'node:http'
 import { dirname } from 'node:path'
 import { isIP } from 'node:net'
@@ -15,14 +15,18 @@ import type { UserRow, StreamSessionQualification } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
 import type { EffectiveGrant } from './projects.ts'
 import { gateCopy, gateLanguage, stoppedPage, waitingPage, type GatePageLanguage } from './html.ts'
-import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, runtimeTargetOf, type ProjectRuntime, type RuntimeTarget } from './instances.ts'
-import { PRINCIPAL_HEADER, type GatewayPrincipalSigner, type PrincipalScope } from './principal.ts'
-import { isExplicitSessionRequest, runtimeRequestPath } from './runtime-request-path.ts'
+import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, runtimeTargetOf, type ProjectRuntime, type RuntimeTarget, type RuntimePreparationId } from './instances.ts'
+import { PRINCIPAL_HEADER, type GatewayPrincipalClaims, type GatewayPrincipalSigner, type PrincipalScope } from './principal.ts'
+import { isExplicitSessionRequest, isPreparedSessionRequest, isReadyRuntimeRead, isRuntimeAssetRequest, runtimeRequestPath } from './runtime-request-path.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { StreamPrincipalLeases } from './stream-principal-leases.ts'
 import { NODE_SERVICE_TARGET_HEADER } from './node-service-stream.ts'
+import type { ReadySessionOutcome } from './performance-observer.ts'
 import { ComputerAccessError } from './computer-access.ts'
-import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ProxyHandler, type UpgradeHandler } from './server.ts'
+import { BOOTSTRAP_PRELOAD_HEADER, sendDeferredRuntimeBootstrap } from './deferred-runtime-bootstrap.ts'
+import { httpConnectionFields } from './http-connection-fields.ts'
+import { RuntimeAssetUnavailableError, type PostgresRuntimeAssetAdmission } from './runtime-asset-admission.ts'
+import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayHandlers, type GatewayRequestContext, type ReadyEventHandler, type ReadySessionHandler, type ProxyHandler, type UpgradeHandler } from './server.ts'
 
 function wantsHtml(req: IncomingMessage): boolean {
   return (req.headers.accept ?? '').includes('text/html')
@@ -92,10 +96,20 @@ function scrubRuntimeHeaders(req: IncomingMessage): void {
 /** Response media types whose streams may legitimately idle past the upstream timeout. */
 const STREAMING_MEDIA_TYPES = new Set(['text/event-stream', 'application/x-ndjson'])
 
+/**
+ * Own Runtime HTTP and upgraded connections and their authority revocation.
+ * @param deps - Gateway lifecycle and authorization providers.
+ * @param principalSigner - signer for the receiving Runtime's request identity.
+ * @param sessionAdmission - optional fresh authority for Session operations and event connections on a supervised Runtime.
+ * @param localStopGate - process shutdown check required for preparing a personal draft before execution registration.
+ * @returns the Runtime dispatchers and their lifecycle controls.
+ */
 export function createProxyHandlers(
   deps: GatewayDeps,
   principalSigner?: GatewayPrincipalSigner,
-): { proxy: ProxyHandler; upgrade: UpgradeHandler; invalidateAccess: GatewayAccessInvalidation; streamPrincipals?: StreamPrincipalLeases; close(): void } {
+  sessionAdmission?: Pick<PostgresRuntimeAssetAdmission, 'admitSession'>,
+  localStopGate?: GatewayHandlers['runtimePersonalExecutionStopGate'],
+): { proxy: ProxyHandler; readySession: ReadySessionHandler; readyEvent: ReadyEventHandler; upgrade: UpgradeHandler; invalidateAccess: GatewayAccessInvalidation; streamPrincipals?: StreamPrincipalLeases; close(): void } {
   const { cfg, instances, audit, projects } = deps
   const server = httpProxy.createProxyServer({
     xfwd: true,
@@ -105,6 +119,7 @@ export function createProxyHandlers(
     // persists on keep-alive connections and kills any stream that pauses.
     proxyTimeout: cfg.upstreamTimeoutMs,
   })
+  const deferredBootstrap = new WeakSet<ServerResponse>()
   // http-proxy-3 emits a server-level 'error' for failures outside the
   // per-request callback — notably any 'error' on the client socket of an
   // upgraded WebSocket — and rethrows it when the application adds no
@@ -123,13 +138,18 @@ export function createProxyHandlers(
     }
     resOrSocket.destroy()
   })
-  const active = new Set<{ context: GatewayRequestContext; cancel(): void }>()
-  const qualifyStream = async (token: string, context: GatewayRequestContext): Promise<(StreamSessionQualification & { scope: PrincipalScope }) | null> => {
-    const current = await deps.auth.qualifyForStream(token)
+  const active = new Set<{ userId: number; projectId?: number; cancel(): void }>()
+  const qualifyStream = async (token: string, context: GatewayRequestContext, renewal = false): Promise<(StreamSessionQualification & { scope: PrincipalScope }) | null> => {
+    const authority = renewal ? deps.streamPrincipalAuthority : undefined
+    const current = authority !== undefined
+      ? await authority.qualifyForStream(token)
+      : deps.qualifyStreamOnComputer !== undefined
+        ? await deps.qualifyStreamOnComputer(token)
+        : await deps.auth.qualifyForStream(token)
     if (current === null || current.user.id !== context.user.id || current.user.mustChangePassword
       || current.user.homePath !== context.user.homePath) return null
     if (context.scope.kind === 'personal') return { ...current, scope: { kind: 'personal' } }
-    const project = await deps.collaboration?.projectForUser(context.scope.projectId, current.user.id)
+    const project = await (authority ?? deps.collaboration)?.projectForUser(context.scope.projectId, current.user.id)
     if (project === undefined || project === null || 'username' in context.runtime || project.path !== context.runtime.path) return null
     return { ...current, scope: {
       kind: 'project', projectId: project.projectId, projectName: project.name, mode: project.mode,
@@ -146,7 +166,7 @@ export function createProxyHandlers(
       await deps.accessMonitor.synchronize()
       if (!deps.accessMonitor.available) throw new Error('event connection access monitor is unavailable')
     },
-    qualify: qualifyStream,
+    qualify: (token, context) => qualifyStream(token, context, true),
   })
   server.on('proxyReqWs', upstream => {
     if (deps.nodeServiceIdentity === undefined) return
@@ -157,9 +177,8 @@ export function createProxyHandlers(
   const invalidateAccess: GatewayAccessInvalidation = (subject) => {
     if (subject.nodeId !== undefined && deps.nodeServiceIdentity !== undefined && subject.nodeId !== deps.nodeServiceIdentity.nodeId) return
     for (const operation of [...active]) {
-      const { user, scope } = operation.context
-      if (subject.userId !== undefined && subject.userId !== user.id) continue
-      if (subject.projectId !== undefined && (scope.kind !== 'project' || scope.projectId !== subject.projectId)) continue
+      if (subject.userId !== undefined && subject.userId !== operation.userId) continue
+      if (subject.projectId !== undefined && subject.projectId !== operation.projectId) continue
       operation.cancel()
     }
   }
@@ -168,6 +187,7 @@ export function createProxyHandlers(
     invalidateAccess(subject)
     if (subject.restartRuntime !== true) return
     const stopOwned = async (target: RuntimeTarget): Promise<void> => {
+      if (instances.stopForAccessChange !== undefined) return instances.stopForAccessChange(target)
       if (instances.targetsForOwner !== undefined) {
         for (const runtime of await instances.targetsForOwner(target)) await instances.stop(runtime, 'access-change')
         return
@@ -180,7 +200,6 @@ export function createProxyHandlers(
   })
 
   async function revalidate(token: string | undefined, context: GatewayRequestContext): Promise<boolean> {
-    await deps.accessMonitor?.synchronize()
     if (token === undefined) return false
     const user = deps.revalidateOnComputer ? await deps.revalidateOnComputer(token) : await deps.auth.validate(token)
     if (user === null || user.id !== context.user.id || user.mustChangePassword) return false
@@ -204,8 +223,10 @@ export function createProxyHandlers(
     return true
   }
   server.on('proxyRes', (proxyResponse, req, res) => {
-    // Runtime plugins cannot replace the Gateway's authenticated response identity.
+    for (const name of httpConnectionFields(proxyResponse.headers.connection)) delete proxyResponse.headers[name]
+    // Runtime plugins cannot replace the Gateway's response identity or timing ID.
     delete proxyResponse.headers['x-dsh-runtime-id']
+    delete proxyResponse.headers['x-dsh-operation-id']
     const location = proxyResponse.headers.location
     if (typeof location === 'string') {
       const rewritten = publicLocation(location)
@@ -223,38 +244,61 @@ export function createProxyHandlers(
       console.error(`[gateway] proxy response stream error${typeof code === 'string' ? ` (${code})` : ''}: ${req.method} ${req.url}`)
       if (!res.destroyed && !res.writableEnded) res.destroy()
     })
+    if (deferredBootstrap.delete(res)) {
+      void sendDeferredRuntimeBootstrap(proxyResponse, res).catch((error: unknown) => {
+        if (!res.destroyed && !res.writableEnded) res.destroy(error instanceof Error ? error : undefined)
+      })
+    }
   })
 
   // Grants handoff is intrinsic to starting an instance: the manager calls this
   // just before every spawn, so the child always reads the current grants.
-  instances.beforeStart = async (runtime): Promise<void> => {
-    if (runtime.user !== undefined) {
-      writeRuntimeGrantsFile(runtime.dshHome, await runtimeDirectoryGrants(runtime.user, projects), cfg.usersRoot)
-      if (deps.governance !== undefined) await writeModelGovernanceFile(cfg, deps.governance, runtime.user)
-    } else {
-      if (runtime.project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
-      writeRuntimeGrantsFile(runtime.dshHome, projectRuntimeGrants(cfg, runtime.project), cfg.projectRuntimesRoot)
-      if (deps.governance !== undefined) {
-        await writeProjectModelGovernanceFile(cfg, deps.governance, runtime.project)
+  instances.beforeStart = async (runtime, purpose): Promise<void> => {
+    const { governance, pluginState } = deps
+    const { dshHome, user, project } = runtime
+    const retained = runtime.retainedData ? { existingHome: true as const } : undefined
+    const prepareGrants = async (): Promise<void> => {
+      if (user !== undefined) {
+        writeRuntimeGrantsFile(dshHome, await runtimeDirectoryGrants(user, projects), cfg.usersRoot, retained)
+      } else {
+        if (project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
+        writeRuntimeGrantsFile(dshHome, projectRuntimeGrants(cfg, project), cfg.projectRuntimesRoot, retained)
       }
     }
-    if (deps.pluginState !== undefined) {
-      // Desired state is newer than what this instance last applied when the
-      // manager's write-back already carried it: only pending revisions write.
-      const pending = await deps.pluginState.projection(runtime.target)
-      if (pending !== null && pending !== 'current') {
-        await deps.pluginState.project(runtime.dshHome, pending.state)
-        await deps.pluginState.markApplied(runtime.target, pending.revision)
+    const prepareGovernance = async (): Promise<void> => {
+      if (governance === undefined) return
+      if (user !== undefined) await writeModelGovernanceFile(cfg, governance, { ...user, dshHome }, retained)
+      else {
+        if (project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
+        await writeProjectModelGovernanceFile(cfg, governance, project, dshHome, retained)
       }
     }
+    // Launch ownership covers pending policy writes even when another preparation branch fails.
+    const [grants, modelPolicy, projection] = await Promise.allSettled([
+      prepareGrants(),
+      prepareGovernance(),
+      pluginState?.projection(runtime.target),
+    ])
+    if (grants.status === 'rejected') throw grants.reason
+    if (modelPolicy.status === 'rejected') throw modelPolicy.reason
+    if (projection.status === 'rejected') throw projection.reason
+    const pending = projection.value
+    if (pluginState === undefined || pending === undefined || pending === null || pending === 'current') return
+    await pluginState.project(dshHome, pending.state)
+    if (purpose === 'launch') await pluginState.markApplied(runtime.target, pending.revision, runtime.generation)
   }
   instances.beforeUse = async (runtime): Promise<void> => {
     if (deps.governance === undefined) return
     if ('username' in runtime) {
-      await ensureModelGovernanceForUser(cfg, deps.governance, runtime)
+      // Personal policy is re-read by InstanceManager; only a verified recovery
+      // binding supplies its dshHome override, never the incoming request.
+      await ensureModelGovernanceForUser(cfg, deps.governance, runtime,runtime.dshHome===undefined?undefined:{existingHome:true})
       return
     }
-    await ensureModelGovernanceForProject(cfg, deps.governance, runtime)
+    const storage = await instances.storageOf?.(runtimeTargetOf(runtime))
+    await ensureModelGovernanceForProject(cfg, deps.governance,
+      storage === undefined ? runtime : { ...runtime, runtimeId: storage.runtimeId }, storage?.dshHome,
+      storage?.retainedData?{existingHome:true}:undefined)
   }
 
   const targetFor = (context: GatewayRequestContext): RuntimeTarget => runtimeTargetOf(context.runtime)
@@ -288,8 +332,54 @@ export function createProxyHandlers(
         if (res !== null) res.writeHead(400, { 'content-type': 'application/json' }).end('{"error":"invalid-prepare-target"}')
         return null
       }
-      const endpoint = await instances.liveEndpoint(target) ?? await instances.ensureRunning(context.runtime, 'explicit')
       res?.setHeader('x-dsh-runtime-id', context.environment.id)
+      if (selection.pathname === '/api/prepare/v1/session.history' && selection.searchParams.has('dshRestore')) {
+        if (selection.searchParams.getAll('dshRestore').length !== 1 || selection.searchParams.get('dshRestore') !== '1') {
+          res?.writeHead(400, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end('{"error":"invalid-restore-request"}')
+          return null
+        }
+        const ready = await instances.liveEndpoint(target)
+        if (ready !== null) return { ...ready, target }
+        res?.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify({
+          error: { code: 'INSTANCE_UNAVAILABLE', message: 'Restoring history requires a ready Runtime.' },
+        }))
+        return null
+      }
+      if (selection.pathname.startsWith('/api/prepare/v1/')) {
+        const continuation = req.headers['x-dsh-prepare-continuation']
+        delete req.headers['x-dsh-prepare-continuation']
+        if (continuation !== undefined && (typeof continuation !== 'string'
+          || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(continuation))) {
+          res?.writeHead(400, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end('{"error":"invalid-prepare-continuation"}')
+          return null
+        }
+        const waitAbort = new AbortController()
+        const onDisconnect = (): void => { if (res === null || !res.writableFinished) waitAbort.abort() }
+        req.once('aborted', onDisconnect)
+        res?.once('close', onDisconnect)
+        if (req.aborted || res?.destroyed === true) waitAbort.abort()
+        let prepared: Awaited<ReturnType<typeof instances.prepareSessionRuntime>>
+        try {
+          prepared = await instances.prepareSessionRuntime(
+            context.runtime,
+            continuation as RuntimePreparationId | undefined,
+            cfg.runtimePrepareWaitMs,
+            waitAbort.signal,
+          )
+        } finally {
+          req.removeListener('aborted', onDisconnect)
+          res?.removeListener('close', onDisconnect)
+        }
+        if (res?.destroyed === true) return null
+        if (prepared.kind === 'ready') return { ...prepared.endpoint, target }
+        res?.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store', 'retry-after': '1' }).end(JSON.stringify({
+          error: { code: 'INSTANCE_STARTING', message: 'The runtime is starting. Retry shortly.' },
+          preparation: { id: prepared.id, waitMs: Math.min(2_147_483_647, cfg.runtimeCapacity.maxQueueWaitMs + cfg.readinessTimeoutMs) },
+        }))
+        return null
+      }
+      delete req.headers['x-dsh-prepare-continuation']
+      const endpoint = await instances.liveEndpoint(target) ?? await instances.ensureRunning(context.runtime, 'explicit')
       return { ...endpoint, target }
     }
     // Trust the live handle, not the `ready` row: an external kill or crash
@@ -300,6 +390,12 @@ export function createProxyHandlers(
         if (res !== null) refuseStopped(req, res, target, lang)
         return null
       }
+      if (isRuntimeAssetRequest(req.method, selection.pathname)) {
+        res?.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify({
+          error: { code: 'INSTANCE_UNAVAILABLE', message: 'The runtime is unavailable. Open its workbench before retrying.' },
+        }))
+        return null
+      }
       const gate = await deps.maintenanceGate?.()
       if (gate !== undefined && gate !== 'open') {
         if (res !== null) { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: gate })) }
@@ -307,6 +403,9 @@ export function createProxyHandlers(
       }
       const request = instances.startRequest(context.runtime)
       const pending = request.completion
+      if (selection.pathname === '/' && selection.searchParams.get('dshBootstrap') === '1' && !wantsHtml(req)) {
+        return { ...await pending, target }
+      }
       if (res !== null) {
         await request.admission
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
@@ -340,15 +439,25 @@ export function createProxyHandlers(
     }
   }
 
+  const synchronizeAccess = async (forwardedRevision?: bigint): Promise<void> => {
+    const monitor = deps.accessMonitor
+    if (monitor === undefined) return
+    if (forwardedRevision !== undefined && monitor.ensureAtLeast !== undefined) {
+      if (await monitor.ensureAtLeast(forwardedRevision)) return
+    }
+    await monitor.synchronize()
+  }
+
   const proxyRequest: ProxyHandler = async (req, res, context) => {
     const originalUrl = req.url
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     const lang = gateLanguage(req.headers.cookie)
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
-    await deps.accessMonitor?.synchronize()
+    await synchronizeAccess(context.forwardedAccessRevision)
     if (res.destroyed) return
     let ready = await timeOperation('prepare',()=>ensureReady(req, res, context, lang))
+    delete req.headers['x-dsh-prepare-continuation']
     if (ready === null) return
     let operationLease = false
     try {
@@ -362,6 +471,16 @@ export function createProxyHandlers(
       }
     } catch (error) {
       if (!(error instanceof RuntimeLeaseUnavailableError)) throw error
+      if (new URL(req.url ?? '/', 'http://gateway').pathname.startsWith('/api/prepare/v1/')) {
+        res.writeHead(409, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        res.end(JSON.stringify({ error: { code: error.code, message: 'The prepared Runtime is no longer ready. Retry explicitly.' } }))
+        return
+      }
+      if (isRuntimeAssetRequest(req.method, new URL(req.url ?? '/', 'http://gateway').pathname)) {
+        res.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        res.end(JSON.stringify({ error: { code: error.code, message: 'The runtime connection is unavailable. Reopen its workbench to retry.' } }))
+        return
+      }
       // The idle reaper may have won the serialized admission race after the
       // liveness check. Start a fresh generation and retry once; forwarding an
       // old port would turn a recoverable race into a misleading 502.
@@ -402,78 +521,7 @@ export function createProxyHandlers(
         return
       }
       if (res.destroyed) return
-      const principal = principalSigner?.issue({
-        user: context.user,
-        scope: context.scope,
-        runtime: { ...ready.target, generation: ready.generation },
-      })
-      const pathname = new URL(req.url ?? '/', 'http://x').pathname
-      if (pathname.startsWith('/api/') && !isDocumentUploadDataPath(req.method, pathname)) {
-        res.once('finish', () => {
-          // Successful RPC traffic is transport noise; only failures are audit-worthy.
-          if (res.statusCode < 400) return
-          void Promise.resolve(audit.write({
-            userId: context.user.id,
-            action: 'api',
-            methodPath: `${req.method} ${pathname}`,
-            status: res.statusCode,
-            ip: req.socket.remoteAddress ?? '',
-            ...(context.environment === undefined ? {} : { detail: JSON.stringify({
-              runtimeId: context.environment.id, nodeId: context.environment.nodeId, generation: ready.generation,
-            }) }),
-          })).catch(error => { console.error('[gateway] API audit write failed:', error) })
-        })
-      }
-      req.url = runtimeRequestPath(req.url ?? '/')
-      await new Promise<void>((resolve) => {
-        let settled = false
-        const finish = (): void => {
-          if (settled) return
-          settled = true
-          res.removeListener('finish', finish)
-          res.removeListener('close', finish)
-          resolve()
-        }
-        // A client can disconnect between admission and listener setup. Also
-        // release on `finish`: keep-alive sockets may stay open long after the
-        // response has delivered its final byte.
-        if (res.destroyed || res.writableFinished) {
-          finish()
-          return
-        }
-        res.once('finish', finish)
-        res.once('close', finish)
-        // Attribute client disconnects: the public tunnel logs a generic
-        // "context canceled" without the path, so a close before the response
-        // completes gets its own line naming the canceled request.
-        res.once('close', () => {
-          if (!res.writableFinished) {
-            console.error(`[gateway] client disconnected mid-response: ${req.method} ${pathname} -> ${ready.target.kind} ${String(ready.target.id)}`)
-          }
-        })
-        try {
-          server.web(req, res, targetOptions(ready.port, principal), () => {
-            if (!res.destroyed && !res.headersSent) {
-              res.writeHead(502, { 'content-type': 'application/json' })
-              res.end(JSON.stringify({
-                error: { code: 'INSTANCE_UNREACHABLE', message: 'The runtime is unavailable. Retry shortly.' },
-              }))
-            } else if (!res.writableEnded && !res.destroyed) {
-              res.destroy()
-            }
-            if (res.destroyed) finish()
-          })
-        } catch {
-          if (!res.headersSent && !res.destroyed) {
-            res.writeHead(502, { 'content-type': 'application/json' })
-            res.end(JSON.stringify({
-              error: { code: 'INSTANCE_UNREACHABLE', message: 'The runtime is unavailable. Retry shortly.' },
-            }))
-          }
-          if (res.destroyed) finish()
-          else if (!res.writableEnded) res.destroy()
-        }
-      })
+      await forwardRuntime(req, res, context, ready)
     } finally {
       req.url = originalUrl
       if (operationLease) {
@@ -487,14 +535,268 @@ export function createProxyHandlers(
     }
   }
 
+  async function forwardRuntime(req: IncomingMessage, res: ServerResponse,
+    context: Pick<GatewayRequestContext, 'user' | 'scope' | 'environment'>,
+    ready: { port: number; generation: number; target: RuntimeTarget }, deadline?: number,
+    personalDraft?: GatewayPrincipalClaims['personalDraft']): Promise<void> {
+    const now = Date.now()
+    if (deadline !== undefined && deadline <= now) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
+    const principal = principalSigner?.issue({
+      now,
+      user: context.user,
+      scope: context.scope,
+      runtime: { ...ready.target, generation: ready.generation },
+      ...(personalDraft === undefined ? {} : { personalDraft }),
+    }, deadline)
+    const url = new URL(req.url ?? '/', 'http://x')
+    const { pathname } = url
+    const structuredBootstrap = req.method === 'GET' && pathname === '/' && req.headers.accept === 'application/json'
+      && url.searchParams.getAll('dshBootstrap').length === 1 && url.searchParams.get('dshBootstrap') === '1'
+    const stripBootstrapPreloads = structuredBootstrap && req.headers[BOOTSTRAP_PRELOAD_HEADER] !== '1'
+    if (pathname.startsWith('/api/') && !isDocumentUploadDataPath(req.method, pathname)) {
+      res.once('finish', () => {
+        // Successful RPC traffic is transport noise; only failures are audit-worthy.
+        if (res.statusCode < 400) return
+        void Promise.resolve(audit.write({
+          userId: context.user.id,
+          action: 'api',
+          methodPath: `${req.method} ${pathname}`,
+          status: res.statusCode,
+          ip: req.socket.remoteAddress ?? '',
+          ...(context.environment === undefined ? {} : { detail: JSON.stringify({
+            runtimeId: context.environment.id, nodeId: context.environment.nodeId, generation: ready.generation,
+          }) }),
+        })).catch(error => { console.error('[gateway] API audit write failed:', error) })
+      })
+    }
+    req.url = runtimeRequestPath(req.url ?? '/', req.method)
+    await new Promise<void>((resolve) => {
+      let settled = false
+      const finish = (): void => {
+        if (settled) return
+        settled = true
+        res.removeListener('finish', finish)
+        res.removeListener('close', finish)
+        resolve()
+      }
+      // A client can disconnect between admission and listener setup. Also
+      // release on `finish`: keep-alive sockets may stay open long after the
+      // response has delivered its final byte.
+      if (res.destroyed || res.writableFinished) {
+        finish()
+        return
+      }
+      res.once('finish', finish)
+      res.once('close', finish)
+      // Attribute client disconnects: the public tunnel logs a generic
+      // "context canceled" without the path, so a close before the response
+      // completes gets its own line naming the canceled request.
+      res.once('close', () => {
+        if (!res.writableFinished) {
+          console.error(`[gateway] client disconnected mid-response: ${req.method} ${pathname} -> ${ready.target.kind} ${String(ready.target.id)}`)
+        }
+      })
+      try {
+        const options = targetOptions(ready.port, principal)
+        if (stripBootstrapPreloads) deferredBootstrap.add(res)
+        const upstream = stripBootstrapPreloads
+          ? { ...options, selfHandleResponse: true, headers: { ...options.headers, 'accept-encoding': 'identity' } }
+          : options
+        server.web(req, res, upstream, () => {
+          if (!res.destroyed && !res.headersSent) {
+            res.writeHead(502, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({
+              error: { code: 'INSTANCE_UNREACHABLE', message: 'The runtime is unavailable. Retry shortly.' },
+            }))
+          } else if (!res.writableEnded && !res.destroyed) {
+            res.destroy()
+          }
+          if (res.destroyed) finish()
+        })
+      } catch {
+        if (!res.headersSent && !res.destroyed) {
+          res.writeHead(502, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({
+            error: { code: 'INSTANCE_UNREACHABLE', message: 'The runtime is unavailable. Retry shortly.' },
+          }))
+        }
+        if (res.destroyed) finish()
+        else if (!res.writableEnded) res.destroy()
+      }
+    })
+  }
+
+  const readySession: ReadySessionHandler = async (req, res, { actor, forwarded, managedPersonalRead, observe, ...selection }) => {
+    const monitor = deps.accessMonitor
+    const route = forwarded === undefined ? 'ordinary' : 'forwarded'
+    if (sessionAdmission === undefined || principalSigner === undefined || instances.retainReadySession === undefined
+      || monitor?.synchronizeTo === undefined || !monitor.available) {
+      observe?.(route, 'fallbackUnavailable')
+      return false
+    }
+    const target = selection.target === 'personal'
+      ? { kind: 'user' as const, id: actor.id, runtimeId: selection.runtimeId }
+      : { kind: 'project' as const, id: Number(selection.target.slice('project:'.length)), runtimeId: selection.runtimeId }
+    const originalUrl = req.url
+    const url = new URL(originalUrl ?? '/', 'http://gateway')
+    const runtimeRead = isReadyRuntimeRead(req.method, url)
+    const preparePersonalDraft = target.kind === 'user' && req.method === 'POST' && url.pathname === '/api/prepare/v1/session.create'
+    const releaseDraftWriter = preparePersonalDraft && localStopGate !== undefined ? deps.writerSpan?.() : undefined
+    const cancel = (): void => { if (!res.writableFinished) res.destroy() }
+    const operation = { userId: actor.id, ...(target.kind === 'project' ? { projectId: target.id } : {}), cancel }
+    active.add(operation)
+    let release: (() => Promise<void>) | undefined
+    let expiry: NodeJS.Timeout | undefined
+    let observed = false
+    const report = (outcome: ReadySessionOutcome): void => {
+      if (!observed && observe !== undefined) {
+        observed = true
+        observe(route, outcome)
+      }
+    }
+    try {
+      const issuer = forwarded === undefined ? undefined : { nodeId: forwarded.claims.issuerNode, publicKey: forwarded.issuerPublicKey }
+      const approved = managedPersonalRead === true ? forwarded?.claims.context?.personalRead : undefined
+      const delegated = approved !== undefined && approved.expiresAt > Date.now()
+        && monitor.matchesRevision?.(BigInt(approved.accessRevision)) === true ? approved : undefined
+      const projectRead = req.method === 'POST' && (runtimeRead
+        || url.pathname === '/api/prepare/v1/session.history' && !url.searchParams.has('dshRestore'))
+      const recordStartActivity = target.kind === 'project' ? !projectRead
+        : !runtimeRead && !isPreparedSessionRequest(req.method, url.pathname)
+      const retained = await timeOperation('admit', () => instances.retainReadySession!(target, async (generation) => {
+        if (res.destroyed) return null
+        if (delegated === undefined) {
+          return sessionAdmission.admitSession({ ...selection, actorId: actor.id }, generation, issuer, recordStartActivity)
+        }
+        if (delegated.generation !== generation || !monitor.matchesRevision?.(BigInt(delegated.accessRevision))) {
+          return null
+        }
+        const { port, launchStamp, startedAt, ...authority } = delegated
+        operationPhase('nodePreparedRead')()
+        return { ...authority, user: actor, scope: { kind: 'personal' as const },
+          snapshot: { target, port, generation, launchStamp, startedAt, state: 'ready' } }
+      }))
+      release = retained?.release
+      if (res.destroyed) { report('cancelled'); return true }
+      if (retained === null) { report('fallbackNotRetained'); return false }
+      const { user, scope, snapshot, accessRevision } = retained.admission
+      const expiresAt = Math.min(retained.admission.expiresAt, forwarded?.claims.expiresAt ?? Infinity)
+      if (scope.kind === 'personal' && (user.homePath !== actor.homePath || user.role !== actor.role)) {
+        throw new RuntimeAssetUnavailableError(403, 'access-revoked')
+      }
+      const authorityCurrent = delegated === undefined
+        ? await timeOperation('accessSync', () => monitor.synchronizeTo!(BigInt(accessRevision)))
+        : monitor.matchesRevision?.(BigInt(accessRevision)) === true
+      if (!authorityCurrent || expiresAt <= Date.now()) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
+      if (res.destroyed) { report('cancelled'); return true }
+      const localVerdict = releaseDraftWriter === undefined ? undefined : localStopGate?.()
+      if (localVerdict !== undefined && localVerdict !== 'open') throw new RuntimeAssetUnavailableError(503, localVerdict)
+      if (forwarded !== undefined && !forwarded.consume()) throw new RuntimeAssetUnavailableError(409, 'RUNTIME_LEASE_UNAVAILABLE')
+      expiry = setTimeout(cancel, Math.min(2_147_483_647, expiresAt - Date.now()))
+      expiry.unref()
+      delete req.headers[PRINCIPAL_HEADER]
+      scrubRuntimeHeaders(req)
+      res.setHeader('x-dsh-principal-id', String(user.id))
+      res.setHeader('x-dsh-runtime-id', selection.runtimeId)
+      const personalDraft = scope.kind !== 'personal' || delegated !== undefined ? undefined
+        : releaseDraftWriter !== undefined ? 'prepare'
+        : localStopGate !== undefined && req.method === 'POST' && url.pathname === '/api/admit/v1/session.prompt' ? 'admit-input' : undefined
+      report(delegated === undefined ? 'ready' : 'delegated')
+      await forwardRuntime(req, res, { user, scope, environment: { id: selection.runtimeId, nodeId: selection.nodeId } },
+        snapshot, expiresAt, personalDraft)
+      return true
+    } catch (error) {
+      if (res.destroyed) { report('cancelled'); return true }
+      if (error instanceof RuntimeAssetUnavailableError) {
+        if (runtimeRead && req.method === 'GET' && error.code === 'maintenance') {
+          report('fallbackMaintenance')
+          return false
+        }
+        report('refused')
+        req.resume()
+        res.writeHead(error.status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        res.end(JSON.stringify({ error: error.code === 'maintenance' || error.code === 'stale-epoch' ? error.code
+          : error.status === 403 ? 'access-revoked'
+          : { code: 'RUNTIME_LEASE_UNAVAILABLE', message: 'The prepared Runtime is no longer ready. Retry explicitly.' } }))
+        return true
+      }
+      if (error instanceof RuntimeLeaseUnavailableError) { report('fallbackNotRetained'); return false }
+      report('failed')
+      throw error
+    } finally {
+      req.url = originalUrl
+      active.delete(operation)
+      if (expiry !== undefined) clearTimeout(expiry)
+      await release?.().catch((error: unknown) => { console.error('[gateway] HTTP operation lease release failed:', error) })
+      releaseDraftWriter?.()
+    }
+  }
+
+  const forwardUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer, context: GatewayRequestContext,
+    ready: { port: number; generation: number; target: RuntimeTarget }, event: boolean, token?: string, expiresAt?: number): void => {
+    const input = { user: context.user, scope: context.scope, runtime: { ...ready.target, generation: ready.generation } }
+    const principal = event ? principalSigner?.issueStream(input, expiresAt) : principalSigner?.issue(input, expiresAt)
+    if (event && principal !== undefined && token !== undefined && streamPrincipals !== undefined) {
+      const lifetime = new AbortController()
+      const close = (): void => { lifetime.abort() }
+      socket.once('close', close)
+      socket.once('error', close)
+      streamPrincipals.register({ assertion: principal, token, context, signal: lifetime.signal, cancel: () => { socket.destroy() } })
+      if (socket.destroyed) lifetime.abort()
+    }
+    server.ws(req, socket as Duplex & NodeJS.WritableStream, head, targetOptions(ready.port, principal), () => socket.destroy())
+  }
+
+  const readyEvent: ReadyEventHandler = async (req, socket, head, { actor, sessionToken, forwarded, ...selection }) => {
+    const monitor = deps.accessMonitor
+    if (sessionAdmission === undefined || principalSigner === undefined || instances.retainReadySession === undefined
+      || monitor?.synchronizeTo === undefined || !monitor.available) return false
+    const target = { kind: 'user' as const, id: actor.id, runtimeId: selection.runtimeId }
+    const releaseAccess = retainUpgrade(socket, actor.id)
+    let accepted = false
+    try {
+      const issuer = forwarded === undefined ? undefined : { nodeId: forwarded.claims.issuerNode, publicKey: forwarded.issuerPublicKey }
+      const retained = await instances.retainReadySession(target, generation => socket.destroyed ? Promise.resolve(null)
+        : sessionAdmission.admitSession({ ...selection, target: 'personal', sessionToken, actorId: actor.id }, generation, issuer))
+      if (retained === null) return false
+      accepted = true
+      const releaseRuntime = (): void => {
+        void retained.release().catch(error => { console.error('[gateway] WebSocket activity update failed:', error) })
+      }
+      if (socket.destroyed) { releaseRuntime(); return true }
+      socket.once('close', releaseRuntime)
+      const { user, scope, accessRevision, expiresAt, snapshot, placement } = retained.admission
+      if (scope.kind !== 'personal' || user.role !== actor.role || user.homePath !== actor.homePath
+        || !await monitor.synchronizeTo(BigInt(accessRevision)) || expiresAt <= Date.now()
+        || forwarded !== undefined && !forwarded.consume()) socket.destroy()
+      else if (!socket.destroyed) {
+        delete req.headers[PRINCIPAL_HEADER]
+        scrubRuntimeHeaders(req)
+        const environment = placement.environment
+        forwardUpgrade(req, socket, head, { user, scope, runtime: { ...user, runtimeId: selection.runtimeId },
+          environment: { id: environment.id, nodeId: environment.node.id } }, snapshot, true, sessionToken, expiresAt)
+      }
+      return true
+    } catch (error) {
+      if (error instanceof RuntimeLeaseUnavailableError) return false
+      socket.destroy()
+      throw error
+    } finally {
+      if (!accepted || socket.destroyed) releaseAccess()
+    }
+  }
+
   const upgradeRequest: UpgradeHandler = async (req, socket, head, context) => {
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
     const lang = gateLanguage(req.headers.cookie)
     delete req.headers[PRINCIPAL_HEADER]
     scrubRuntimeHeaders(req)
+    const pathname = new URL(req.url ?? '/', 'http://gateway.invalid').pathname
+    const eventConnection = ['/api/events.mux', '/api/events.host'].includes(pathname)
+    const terminalInputConnection = pathname === '/api/terminal/input'
     let ready: { port: number; generation: number; target: RuntimeTarget }
     try {
-      await deps.accessMonitor?.synchronize()
+      await synchronizeAccess(context.forwardedAccessRevision)
       if (socket.destroyed) return
       const resolved = await ensureReady(req, null, context, lang)
       if (resolved === null) throw new Error('runtime did not start')
@@ -533,39 +835,56 @@ export function createProxyHandlers(
       return
     }
     try {
-      if (!await revalidate(token, context) || socket.destroyed) {
-        releaseWebSocketLease()
-        socket.destroy()
-        return
-      }
-      const eventConnection = ['/api/events.mux', '/api/events.host'].includes(new URL(req.url ?? '/', 'http://gateway.invalid').pathname)
       let streamLogin: Awaited<ReturnType<typeof qualifyStream>> | undefined
-      if (eventConnection && principalSigner !== undefined) {
-        streamLogin = token === undefined ? null : await qualifyStream(token, context)
+      if ((eventConnection || terminalInputConnection) && principalSigner !== undefined) {
+        if (token === undefined) {
+          releaseWebSocketLease()
+          socket.destroy()
+          return
+        }
+        let qualified: Awaited<ReturnType<typeof qualifyStream>>
+        let computerAllowed: boolean
+        if (deps.qualifyStreamOnComputer !== undefined) {
+          qualified = await qualifyStream(token, context)
+          computerAllowed = qualified !== null
+        } else {
+          const computerCheck = deps.computerAccess !== undefined
+            ? deps.computerAccess.authorize(context.user.id).then(() => true, (error: unknown) => {
+              if (error instanceof ComputerAccessError) return false
+              throw error
+            })
+            : deps.revalidateOnComputer !== undefined
+              ? deps.revalidateOnComputer(token).then(user => user !== null && user.id === context.user.id
+                && !user.mustChangePassword && user.homePath === context.user.homePath
+                && (context.scope.kind !== 'personal' || user.role === context.user.role))
+              : Promise.resolve(true)
+          ;[qualified, computerAllowed] = await Promise.all([
+            qualifyStream(token, context),
+            computerCheck,
+          ])
+        }
+        streamLogin = qualified
         await deps.accessMonitor?.synchronize()
-        if (streamLogin === null || streamLogin.expiresAt <= Date.now() || socket.destroyed) {
+        if (!computerAllowed || streamLogin === null || streamLogin.expiresAt <= Date.now()
+          || (context.scope.kind === 'personal' && streamLogin.user.role !== context.user.role)
+          || socket.destroyed) {
           releaseWebSocketLease()
           socket.destroy()
           return
         }
         context.user = streamLogin.user
         context.scope = streamLogin.scope
+      } else if (!await revalidate(token, context) || socket.destroyed) {
+        releaseWebSocketLease()
+        socket.destroy()
+        return
       }
-      const principalInput = {
-        user: context.user,
-        scope: context.scope,
-        runtime: { ...ready.target, generation: ready.generation },
+      if (terminalInputConnection && streamLogin !== undefined && streamLogin !== null) {
+        const expiry = setTimeout(() => { socket.destroy() }, Math.min(2_147_483_647, Math.max(0, streamLogin.expiresAt - Date.now())))
+        expiry.unref()
+        socket.once('close', () => { clearTimeout(expiry) })
       }
-      const principal = eventConnection ? principalSigner?.issueStream(principalInput, streamLogin?.expiresAt) : principalSigner?.issue(principalInput)
-      if (eventConnection && principal !== undefined && token !== undefined && streamPrincipals !== undefined) {
-        const lifetime = new AbortController()
-        const close = (): void => { lifetime.abort() }
-        socket.once('close', close)
-        socket.once('error', close)
-        streamPrincipals.register({ assertion: principal, token, context, signal: lifetime.signal, cancel: () => { socket.destroy() } })
-        if (socket.destroyed) lifetime.abort()
-      }
-      server.ws(req, socket as Duplex & NodeJS.WritableStream, head, targetOptions(ready.port, principal), () => socket.destroy())
+      forwardUpgrade(req, socket, head, context, ready, eventConnection, token, streamLogin?.expiresAt)
     } catch (error: unknown) {
       releaseWebSocketLease()
       socket.destroy(error instanceof Error ? error : undefined)
@@ -574,16 +893,25 @@ export function createProxyHandlers(
 
   const proxy: ProxyHandler = async (req, res, context) => {
     await deps.computerAccess?.authorize(context.user.id)
-    const operation = { context, cancel: (): void => { res.destroy() } }
+    const operation = { userId: context.user.id, projectId: context.scope.kind === 'project' ? context.scope.projectId : undefined,
+      cancel: (): void => { res.destroy() } }
     active.add(operation)
     try { await proxyRequest(req, res, context) } finally { active.delete(operation) }
   }
+  function retainUpgrade(socket: Duplex, userId: number, projectId?: number): () => void {
+    const operation = { userId, projectId, cancel: (): void => { socket.destroy() } }
+    active.add(operation)
+    const release = (): void => {
+      socket.removeListener('close', release)
+      active.delete(operation)
+    }
+    socket.once('close', release)
+    return release
+  }
+
   const upgrade: UpgradeHandler = async (req, socket, head, context) => {
     await deps.computerAccess?.authorize(context.user.id)
-    const operation = { context, cancel: (): void => { socket.destroy() } }
-    active.add(operation)
-    const release = (): void => { active.delete(operation) }
-    socket.once('close', release)
+    const release = retainUpgrade(socket, context.user.id, context.scope.kind === 'project' ? context.scope.projectId : undefined)
     try { await upgradeRequest(req, socket, head, context) } catch (error: unknown) {
       release()
       socket.destroy()
@@ -591,7 +919,7 @@ export function createProxyHandlers(
     }
     if (socket.destroyed) release()
   }
-  return { proxy, upgrade, invalidateAccess, streamPrincipals, close: () => {
+  return { proxy, readySession, readyEvent, upgrade, invalidateAccess, streamPrincipals, close: () => {
     streamPrincipals?.close()
     unsubscribeAccess?.()
     invalidateAccess({})

@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto'
 import { chmod, chown, lstat, mkdir, realpath, stat } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { GatewayConfig } from './config.ts'
-import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { documentScopeStorageKey, type DocumentIdentityScope } from './document-scope-storage.ts'
 import { privateDirectoryState, protectedDirectoryState, tightenPrivateFileAcl } from './node-private-file.ts'
 import { runGatewayChildCommand } from './child-command.ts'
@@ -60,8 +59,9 @@ async function privateDirectory(path: string, owner: number | undefined): Promis
  * @param runtimeRoot - the whole user or project directory mounted into the runtime.
  * @param documentRoot - its public documents directory.
  * @param scope - authenticated scope and committed ownership lookup for path-only private stores.
- * @param prepareFilesRoot - optional recovery owner that exclusively creates the private files directory and records its physical identity.
- * @returns locations tied to this canonical runtime and logical scope; storage creation still validates all inodes.
+ * @param prepareFilesRoot - optional recovery owner that creates or defers a new private files directory; absent uses ordinary private-directory creation. Existing prepared roots are only validated.
+ * @returns locations tied to this canonical runtime and logical scope; registered object stores keep their location when ancestor permissions change.
+ * Existing roots must remain private, canonical and protected against substitution. Missing or conflicting registrations require verified repair.
  */
 export async function documentIdentityLocations(
   cfg: Pick<GatewayConfig, 'stateRoot'>, runtimeRoot: string, documentRoot: string, scope: DocumentIdentityScope,
@@ -109,20 +109,33 @@ export async function documentIdentityLocations(
   const legacyKey = createHash('sha256').update(canonicalRuntime).digest('hex')
   const filesBase = join(privateParent, '.hgw-document-files')
   const stateBase = join(stateRoot, 'document-identities')
-  await Promise.all([privateDirectory(filesBase, owner), privateDirectory(stateBase, owner)])
+  await privateDirectory(stateBase, owner)
   const inventory = join(stateRoot, 'document-identity-roots.jsonl')
-  const runtimeHash = await documentScopeStorageKey({ stateBase, filesBase, runtimeRoot: canonicalRuntime,
-    documentRoot: canonicalDocumentRoot, legacyKey, inventory, scope, preparePrivate: path => privateDirectory(path, owner) })
-  const filesRoot = join(filesBase, runtimeHash)
-  const identityStateRoot = join(stateBase, runtimeHash)
-  if (inside(canonicalRuntime, filesRoot) || inside(canonicalRuntime, identityStateRoot)) {
+  const validateFilesRoot = async (filesRoot: string, requireRoot: boolean): Promise<void> => {
+    const base = dirname(filesRoot), parent = dirname(base)
+    if (basename(base) !== '.hgw-document-files' || inside(canonicalRuntime, filesRoot)
+      || await realpath(base) !== base || requireRoot && await realpath(filesRoot) !== filesRoot) {
+      throw new Error('Registered document object storage must be canonical and outside the runtime mount.')
+    }
+    for (const path of requireRoot ? [base, filesRoot] : [base]) {
+      const entry = await directory(path)
+      if (entry.device !== documentDevice || await privateDirectoryState(path, entry.stat) !== 'private') {
+        throw new Error('Registered document object storage must remain owner-private on the document filesystem.')
+      }
+    }
+    const entry = await directory(parent)
+    if (entry.device !== documentDevice || process.platform !== 'win32' && entry.uid !== owner
+      || await protectedDirectoryState(parent, entry.stat) !== 'protected') {
+      throw new Error('The registered document object storage parent is no longer protected.')
+    }
+  }
+  const selected = await documentScopeStorageKey({ stateBase, filesBase, runtimeRoot: canonicalRuntime,
+    documentRoot: canonicalDocumentRoot, legacyKey, inventory, scope, preparePrivate: path => privateDirectory(path, owner),
+    validateFilesRoot, prepareFilesRoot: prepareFilesRoot ?? (path => privateDirectory(path, owner)) })
+  const filesRoot = join(selected.filesBase, selected.key), identityStateRoot = join(stateBase, selected.key)
+  if (inside(canonicalRuntime, identityStateRoot)) {
     throw new Error('Gateway document identity storage must stay outside the runtime bind mount.')
   }
-  for (const [kind, path] of [['public', canonicalDocumentRoot], ['metadata', identityStateRoot], ['files', filesRoot]] as const) {
-    registerManagedDataPath({ owner: `gateway-documents/${runtimeHash}/${kind}`, kind: 'directory', path }, inventory)
-  }
-  if (prepareFilesRoot) await prepareFilesRoot(filesRoot)
-  else await privateDirectory(filesRoot, owner)
   return { root: documentRoot, stateRoot: identityStateRoot, filesRoot }
 }
 

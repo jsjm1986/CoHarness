@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/hooks/hooks-codex/README.md
 document:
-  en: 51760b014a6efc980453928ecb91f15718e592ec
-  zh: 26d66467ea9d73127169788c5ee4acf819e125f8
+  en: 2e23d61884f9beef474690b28234085de265b299
+  zh: 5db61fa0ce4c89d5f0ba624f45b83fc34f03615c
 /:
   en: a5a29a7f0f69ed5a
   zh: 61495d48365178df
@@ -18,8 +18,8 @@ document:
   en: 93e4646f288f7b04
   zh: 2ccbbcb65e14d93a
 /deepseek-ai-dsh-hooks-codex/config:
-  en: be101d5c30434575
-  zh: 51c824d97f52a832
+  en: e37a3aa48c0efabc
+  zh: f197179e3ca8754a
 /deepseek-ai-dsh-hooks-codex/hook-points-typed-decisions:
   en: a12027e4ebef6bbc
   zh: 02002b7950b0d528

@@ -39,7 +39,7 @@ function fixture() {
     calls: { path: string; id: string; account: string | null }[] = []
   vi.stubGlobal('sessionStorage', store)
   vi.stubGlobal('location', new URL('https://harness.invalid'))
-  let state: 'offline' | 'ready' | 'denied' | 'mismatch' | 'older' = 'offline'
+  let state: 'unconfirmed' | 'ready' | 'denied' | 'mismatch' | 'older' = 'unconfirmed'
   vi.stubGlobal('fetch', async (url: URL, opts: RequestInit) => {
     if (typeof opts.body !== 'string') throw new Error('Expected a JSON request body')
     const { rpcId, payload } = JSON.parse(opts.body) as {
@@ -54,10 +54,10 @@ function fixture() {
     let value: unknown
     if (path === 'prompt') {
       committed.set(id, hash([id, hash([payload.mode, payload.clientTimeZone ?? null, payload.content])]))
-      if (state === 'offline') throw new Error('Dropped prompt receipt')
+      if (state === 'unconfirmed') throw new Error('Dropped prompt receipt')
       value = { accepted: true }
     } else {
-      if (state === 'offline') throw new Error('Status cannot reach original computer')
+      if (state === 'unconfirmed') return Response.json({ error: 'node-service/mismatch' }, { status: 409 })
       value = committed.has(id)
         ? {
           state: 'accepted',

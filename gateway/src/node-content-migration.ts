@@ -14,7 +14,7 @@ const relations = {
   conversation_migrations:['id'],conversation_migrated_events:['migration_id','seq'],execution_sessions:['id'],execution_inputs:['id'],
   execution_scopes:['id'],execution_relays:['id'],desktop_session_confirmations:['id'],
   project_journal:['id'],project_journal_state:['project_id'],project_journal_requests:['request_id'],
-  project_journal_materials:['runtime_namespace','receipt'],plugin_states:['runtime_id'],
+  project_journal_materials:['runtime_namespace','receipt'],plugin_states:['runtime_id'],plugin_inventory:['runtime_id'],
   conversation_archive_records:['archive_id'],conversation_archive_search:['session_id','event_seq'],
   conversation_archive_commands:['id'],conversation_archive_file_cleanup:['id'],content_files:['id'],
 } as const

@@ -99,11 +99,15 @@ turn/end
 
 Each LLM service records [requests assembled by its loops](../packages/llm/llm/README.md#understand-the-implementation). External orchestration adapters use `llm/orchestration` for the outer step. Each physical model request inside that turn uses its own model waterfall, authorization, capacity and usage attribution; [LLM streaming](subsystems/llm-streaming.md) defines registration kinds.
 
-Input reaches the driver through one inbox. Some messages wake it immediately; injected context waits in the inbox until another message does.
+Recovery admission belongs to the root composition: the Agent registry and default driver reject historical identities before preset loading, Agent construction or inbox consumption. Read-only history requires no Agent. [The Agent service](../packages/core/agent/README.md#create-or-resume-an-agent) defines this extension point; [recovery composition](../packages/boot/app-boot/README.md) controls which plugins may mount.
+
+Input reaches the driver through one inbox. Some messages wake it immediately, while injected context waits for another message to wake it. A tool waiting for background output can inspect pending user steering delivered with a wake. Releasing the wait leaves the producer running.
 
 `agent/pre-step` decides what the model sees. Listeners may rewrite the claimed messages or reject them outright; a rejected or empty first claim still closes a durable turn that spent no step, so the log records the attempt. Each step reads the prompt sections and tool schemas that plugins registered, and each request-admission attempt refreshes registered runtime context — the accepted assembly's sections, schemas, and variables stay bound while provider-supplied context text is re-evaluated and committed as a fresh snapshot.
 
 Details: the [sequence diagram](agent-lifecycle.md), the [tool pipeline](tool-execution-pipeline.md), and [cancellation and error recovery](subsystems/core.md#the-agent-handle). AgentLoop publication awaits serial `agent/created` initialization within its rollback handler; this is the sole startup initialization event, and setup and publication hold waking input in maintenance until success. Unload retains resources through Agent teardown; [agent-loop](../packages/core/agent-loop/README.md#understand-the-implementation) defines ordering.
+
+Planned process stop runs before profile unload. The launcher closes Agent execution admission and waits for the AgentLoop to drain scoped producers and verify final Session persistence while the storage provider is still mounted. The [managed launch reference](../apps/cli/reference/README.md#managed-launch) defines how the supervisor learns the outcome.
 
 Permanent Session removal preserves the lifecycle owner: reservations fence new work, plugins can veto busy resources, and durable deletion follows confirmed idle release. Ordinary cancellation is unchanged. The [idle purge decision](../.agents/notes/implemented/architecture/2026-09-27-idle-session-purge.md) defines the ordering and failure behavior.
 

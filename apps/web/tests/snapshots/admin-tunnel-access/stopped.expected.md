@@ -15,7 +15,7 @@
 - textbox "域（Zone）":
   - /placeholder: 默认取主机名末两段，如 example.com
 - text: Cloudflare API Token
-- textbox "Cloudflare API Token 需要的权限：Account → Cloudflare Tunnel → 编辑；Zone → DNS → 编辑。":
+- textbox "Cloudflare API Token":
   - /placeholder: 仅首次配置需要；加密存储后可留空
 - text: 需要的权限：Account → Cloudflare Tunnel → 编辑；Zone → DNS → 编辑。
 - button "开启固定域名" [disabled]

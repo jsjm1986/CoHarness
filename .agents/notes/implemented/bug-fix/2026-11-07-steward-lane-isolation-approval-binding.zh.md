@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-读分类语句先过 `READ_LANE_DENY`（[steward-query.ts](../../../../gateway/src/postgres/steward-query.ts)）：在触碰任何连接之前，语句被剥离注释、字符串体、标识符引号与 `pg_catalog.` 限定，凡调用了效果越出 `READ ONLY` 的函数即返回 `steward-statement-forbidden`。语句还改为在独立小池（`dsh-steward-query`，在 [index.ts](../../../../gateway/src/index.ts) 接入）上执行而不再使用共享池，且每个成功连接在归还前执行 `DISCARD ALL` 清理——三层独立防线，漏网条目或会话残留都到不了共享连接。审批校验现在把已声明交互的 `call_id` join 到持久化的 `tool/call` 事件，并要求 `arguments.sql` 与被执行的语句完全相等，因此一次审批只能花在预览过的那条写上；事件缺失或参数畸形一律判负。`dryRun` 的 EXPLAIN 不受影响，因为内部语句不会执行。
+读分类语句先过 `READ_LANE_DENY`（[steward-query.ts](../../../../gateway/src/postgres/steward-query.ts)）：在触碰任何连接之前，共享的单遍 SQL 词法分析器检查注释和字符串字面量之外的标识符 token（并拒绝 `U&"..."` Unicode 转义标识符），凡引用效果越出 `READ ONLY` 的函数即返回 `steward-statement-forbidden`。语句还改为在独立小池（`dsh-steward-query`，在 [index.ts](../../../../gateway/src/index.ts) 接入）上执行而不再使用共享池，且每个成功连接在归还前执行 `DISCARD ALL` 清理——三层独立防线，漏网条目或会话残留都到不了共享连接。审批校验现在把已声明交互的 `call_id` join 到持久化的 `tool/call` 事件，并要求 `arguments.sql` 与被执行的语句完全相等，因此一次审批只能花在预览过的那条写上；事件缺失或参数畸形一律判负。steward 工具和执行器共用分类器，将修改数据的 CTE（含 `SEARCH`/`CYCLE` 子句之后）及执行写入的 `EXPLAIN ANALYZE` 归为写入。执行器仍按精确 SQL 消费审批。dry-run 的 EXPLAIN 只生成计划。
 
 ## 备选方案
 

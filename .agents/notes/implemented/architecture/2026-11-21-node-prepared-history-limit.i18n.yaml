@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-21-node-prepared-history-limit.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-21-node-prepared-history-limit.md
+document:
+  en: e86d48f77be57162082a526b3aa15d0ca15b4f5e
+  zh: dd77bf55ae1db6724f7cb5853c7f027b5b9d51c5
+/agent-note-load-recent-conversation-history-first-on-remote-nodes:
+  en: dac448aa0f35b5bf
+  zh: ada65d739aaf83f4
+/agent-note-load-recent-conversation-history-first-on-remote-nodes/problem:
+  en: a91f0de8c5805ea8
+  zh: d4b0fa8b4529cfcc
+/agent-note-load-recent-conversation-history-first-on-remote-nodes/decision:
+  en: 1635703fc4276f0b
+  zh: f19b96d63ca405b2
+/agent-note-load-recent-conversation-history-first-on-remote-nodes/alternatives-considered:
+  en: 1a05266b4be826b8
+  zh: cfb5789fe43fa8dc
+/agent-note-load-recent-conversation-history-first-on-remote-nodes/consequences:
+  en: 1901b3a10b26cf53
+  zh: 512e8ef82c08a707

@@ -1,9 +1,12 @@
 /** Historical workspace review through the shipped recorder, RPC, and Web consumers. */
+import { nativeTabKey, responsiveBrowser, responsiveBrowserName } from './responsive-browser.ts'
+import { auditWorkflowState, compareWorkflowGolden, newWorkflowPage, workflowMatrixEnabled } from './workflow-responsive-state.ts'
 import { execFileSync } from 'node:child_process'
-import { cp, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Page } from 'playwright'
+import { type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished, vi } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -15,10 +18,46 @@ import {
   launchWebScaffold, watchConsole, captureStableAria, compareOrRefreshGolden, assertFixtureInventory,
   webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { completionBarrier, newEnglishPage, saveFailureShot } from './support.ts'
+import { captureTextContrast, expectTextContrast } from './text-contrast.ts'
 
 const SESSION = SessionId('workspace-review-web')
 const DIRECTORY = fileURLToPath(new URL('./snapshots/workspace-review', import.meta.url))
+
+/** Execute and log real file tools in a private repository, leaving publication to the caller. */
+async function writeRecordedFiles(host: WebScaffold, id: SessionId, names: readonly string[]) {
+  const cwd = join(host.workspaceCwd, id)
+  await mkdir(cwd)
+  execFileSync('git', ['init', '--quiet'], { cwd })
+  for (const name of names) await writeFile(join(cwd, name), `Before ${name}\n`)
+  const created = await host.ctx.apiProxy.sessions.create({ rpcId: RpcId(`${id}-create`), payload: { sessionId: id, cwd } })
+  if (!created.result.ok) throw new Error(created.result.error.message)
+  const agent = host.ctx.agents.get(id)
+  if (agent === undefined) throw new Error('File fixture Session has no Agent')
+  const signal = new AbortController().signal
+  const read = await host.ctx.tools.execute({ agent, signal, calls: names.map((name, index) => ({
+    type: 'tool-call' as const, id: ToolCallId(`${id}-read-${index}`), name: 'read',
+    arguments: JSON.stringify({ file_path: name }),
+  })) })
+  expect(read.results.filter(result => result.result.isError).map(result => result.result.content)).toEqual([])
+  const { session } = agent
+  session.append('turn/start', { turn: 1 })
+  session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'Update the fixture files.' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+  session.append('step/start', { turn: 1, step: 1 })
+  const calls = names.map((name, index) => ({
+    type: 'tool-call' as const, id: ToolCallId(`${id}-write-${index}`), name: 'write',
+    arguments: JSON.stringify({ file_path: name, content: `After ${name}\n` }),
+  }))
+  session.append('assistant/message', { turn: 1, step: 1, stream: [], message: createAssistantMessage({
+    content: calls, source: { provider: 'fixture', model: 'fixture' },
+  }) }, { surfaceOp: 'append' })
+  const written = await host.ctx.tools.execute({ agent, log: { turn: 1, step: 1 }, calls, signal })
+  expect(written.results).toHaveLength(names.length)
+  expect(written.results.filter(result => result.result.isError).map(result => result.result.content)).toEqual([])
+  for (const name of names) expect(await readFile(join(cwd, name), 'utf8')).toBe(`After ${name}\n`)
+  await (await host.ctx.workspaceRegistry.create(cwd)).attachSession(id)
+  return agent
+}
 
 describe('web e2e: delivered files and historical review', () => {
   let scaffold: WebScaffold | undefined
@@ -78,7 +117,7 @@ describe('web e2e: delivered files and historical review', () => {
     await writeFile(join(workspaceCwd, 'review.txt'), 'current file changed later\n')
     const workspace = await ctx.workspaceRegistry.create(workspaceCwd)
     await workspace.attachSession(SESSION)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
   }, 120_000)
 
@@ -159,7 +198,7 @@ describe('web e2e: delivered files and historical review', () => {
     expect(await page.locator('[data-slot-error]').count()).toBe(0)
   }, 60_000)
 
-  it('keeps edge gestures inside either diff column and accepts reverse scrolling', async () => {
+  it.skipIf(responsiveBrowserName !== 'chromium')('keeps CDP edge gestures inside either diff column and accepts reverse scrolling', async () => {
     if (scaffold === undefined) throw new Error('Web scaffold unavailable')
     onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-review-overscroll'))
     const tripwire = watchConsole(page)
@@ -302,7 +341,397 @@ describe('web e2e: delivered files and historical review', () => {
     expect(previewTripwire.pageErrors).toEqual([])
   })
 
-  it('owns only its review golden', async () => { await assertFixtureInventory(DIRECTORY, ['review.expected.md']) })
+  it.skipIf(!workflowMatrixEnabled)('inspects delivery, review loading, failure, split and wrap at every touch viewport', async () => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold unavailable')
+    const touchPage = await newWorkflowPage(browser)
+    const tripwire = watchConsole(touchPage)
+    const release = completionBarrier()
+    const diffRoute = '**/workspaceChanges.diff*'
+    try {
+      await touchPage.route(diffRoute, async (route) => {
+        await release.promise
+        await route.fulfill({ status: 503, body: 'Temporarily unavailable' })
+      })
+      await touchPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+      await touchPage.getByText('The review file is ready.', { exact: true }).waitFor()
+      const delivered = touchPage.locator('[data-presented-file]')
+      await auditWorkflowState(touchPage, 'deliverables', 'presented-file-card', delivered)
+      const changed = touchPage.locator('[data-changed-files]')
+      expectTextContrast(await captureTextContrast(touchPage, [
+        { label: 'added', text: changed.locator('[class*="added"]').first() },
+        { label: 'deleted', text: changed.locator('[class*="deleted"]').first() },
+      ], 'deliverables-changed-counts'))
+      await auditWorkflowState(touchPage, 'deliverables', 'changed-file-list', changed)
+      await changed.getByRole('button').first().tap()
+      const review = touchPage.locator('[data-changes-review]')
+      await review.getByText('Reading changes…', { exact: true }).waitFor()
+      await auditWorkflowState(touchPage, 'deliverables', 'review-loading', review)
+      release.resolve()
+      await review.getByText('Could not read the changes', { exact: true }).waitFor()
+      const retry = review.getByRole('button', { name: 'Retry', exact: true })
+      await auditWorkflowState(touchPage, 'deliverables', 'review-read-failure', review, [retry])
+      await touchPage.unroute(diffRoute)
+      await retry.tap()
+      await expect.poll(() => review.textContent()).toContain('before the turn')
+      const file = review.getByRole('button', { name: 'Choose the file to review', exact: true })
+      expectTextContrast(await captureTextContrast(touchPage, [
+        { label: 'added', text: review.locator('[class*="added"]').first() },
+        { label: 'deleted', text: review.locator('[class*="deleted"]').first() },
+      ], 'deliverables-review-counts'))
+      await auditWorkflowState(touchPage, 'deliverables', 'review-unified', review, [file], async () => {
+        for (const action of [file, ...await review.locator('[data-review-tool]').all()]) {
+          const box = await action.boundingBox()
+          expect(box?.height, await action.getAttribute('aria-label') ?? 'review action').toBeGreaterThanOrEqual(44)
+        }
+      })
+      await file.tap()
+      expectTextContrast(await captureTextContrast(touchPage, [
+        { label: 'added', text: touchPage.getByRole('menu').locator('[class*="added"]').first() },
+        { label: 'deleted', text: touchPage.getByRole('menu').locator('[class*="deleted"]').first() },
+      ], 'deliverables-review-menu-counts'))
+      await auditWorkflowState(touchPage, 'deliverables', 'review-file-chooser', touchPage.getByRole('menu'))
+      await touchPage.getByRole('menuitem').first().tap()
+      const split = review.getByRole('button', { name: 'Split view', exact: true })
+      const wrap = review.getByRole('button', { name: 'Line wrap', exact: true })
+      await split.tap()
+      expect(await split.getAttribute('aria-pressed')).toBe('true')
+      await auditWorkflowState(touchPage, 'deliverables', 'review-split', review, [split, wrap])
+      await wrap.tap()
+      expect(await wrap.getAttribute('aria-pressed')).toBe('true')
+      await auditWorkflowState(touchPage, 'deliverables', 'review-split-wrapped', review, [split, wrap])
+      await review.locator('[data-review-tool="open-file"]').tap()
+      const preview = touchPage.getByRole('region', { name: 'review.txt', exact: true })
+      await preview.getByText('current file changed later', { exact: false }).waitFor()
+      await auditWorkflowState(touchPage, 'deliverables', 'review-current-file-preview', preview)
+      expect(tripwire.pageErrors).toEqual([])
+    } catch (error) { await saveFailureShot(touchPage, 'workspace-review-responsive'); throw error }
+    finally { release.resolve(); await touchPage.unrouteAll({ behavior: 'wait' }); await touchPage.close() }
+  }, 180_000)
+
+  it('expands and folds real multi-file deliveries and changes without losing file selection', async () => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold unavailable')
+    const host = scaffold
+    const id = SessionId('workspace-review-multiple')
+    const names = ['delivery-1.txt', 'delivery-2.txt', 'delivery-3.txt', 'delivery-4.txt', '第五份-完整交付文件.txt']
+    const agent = await writeRecordedFiles(host, id, names)
+    const call = { type: 'tool-call' as const, id: ToolCallId('multiple-present'), name: 'present',
+      arguments: JSON.stringify({ files: names.map(path => ({ path, description: `Delivered ${path}` })) }) }
+    agent.session.append('assistant/message', { turn: 1, step: 1, stream: [], message: createAssistantMessage({
+      content: [call], source: { provider: 'fixture', model: 'fixture' },
+    }) }, { surfaceOp: 'append' })
+    const delivered = await host.ctx.tools.execute({
+      agent, log: { turn: 1, step: 1 }, calls: [call], signal: new AbortController().signal,
+    })
+    expect(delivered.results[0]?.result.isError).toBe(false)
+    await host.ctx.serial('agent/turn-stopping', { agent, turn: 1, signal: new AbortController().signal })
+    agent.session.append('step/end', { turn: 1, step: 1 })
+    agent.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    const announcement = agent.session.snapshotEvents().find(event => event.type === 'workspace/changes')
+    if (announcement === undefined) throw new Error('Multi-file recorder did not publish its review')
+    const summary = await host.ctx.workspaceChanges.summary(id, announcement.seq)
+    expect(summary?.total).toBe(5)
+    expect(summary?.files.map(file => file.path).sort()).toEqual([...names].sort())
+    expect(agent.session.snapshotEvents().find(event => event.type === 'deliverables/presented')?.data.files).toHaveLength(5)
+    const target = await newWorkflowPage(browser)
+    const tripwire = watchConsole(target)
+    await target.addInitScript((sessionId) => {
+      if (window === window.top) localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId }))
+    }, id)
+    try {
+      await target.goto(host.authenticatedUrl, { waitUntil: 'load' })
+      const deliveries = target.locator('[data-presented-files-row]').locator('xpath=..')
+      const cards = deliveries.locator('[data-presented-file]')
+      const changes = target.locator('[data-changed-files]')
+      const rows = changes.locator(':scope > ul > li')
+      await expect.poll(() => cards.count(), { timeout: 30_000 }).toBe(4)
+      await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(4)
+      const expandDeliveries = deliveries.getByRole('button', { name: 'Show all 5 delivered files', exact: true })
+      const expandChanges = changes.getByRole('button', { name: 'Show all 5 changed files', exact: true })
+      await auditWorkflowState(target, 'deliverables', 'multiple-deliveries-collapsed', deliveries, [expandDeliveries])
+      await auditWorkflowState(target, 'deliverables', 'multiple-changes-collapsed', changes, [expandChanges])
+      await expandDeliveries.click()
+      await expandChanges.click()
+      await expect.poll(() => cards.count(), { timeout: 30_000 }).toBe(5)
+      await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(5)
+      const collapseDeliveries = deliveries.getByRole('button', { name: 'Collapse delivered files', exact: true })
+      const collapseChanges = changes.getByRole('button', { name: 'Collapse changed files', exact: true })
+      await auditWorkflowState(target, 'deliverables', 'multiple-deliveries-expanded', deliveries, [collapseDeliveries])
+      await auditWorkflowState(target, 'deliverables', 'multiple-changes-expanded', changes, [collapseChanges])
+      await compareWorkflowGolden(join(DIRECTORY, 'multiple-files.expected.md'),
+        `${await captureStableAria(target, '[data-presented-files-row]', host.workspaceCwd)}\n${await captureStableAria(target, '[data-changed-files]', host.workspaceCwd)}`, webSnapshotMode())
+      await collapseDeliveries.click()
+      await collapseChanges.click()
+      await expect.poll(() => cards.count(), { timeout: 30_000 }).toBe(4)
+      await expect.poll(() => rows.count(), { timeout: 30_000 }).toBe(4)
+      expect(await expandDeliveries.getAttribute('aria-expanded')).toBe('false')
+      expect(await expandChanges.getAttribute('aria-expanded')).toBe('false')
+      await expandChanges.click()
+      await rows.last().getByRole('button').click()
+      const review = target.locator('[data-changes-review]')
+      const last = summary!.files.at(-1)!.path
+      await expect.poll(() => review.locator('[data-review-file]').getAttribute('data-review-file')).toBe(last)
+      await expect.poll(() => review.textContent()).toContain(`After ${last}`)
+      await review.getByRole('button', { name: 'Choose the file to review', exact: true }).click()
+      const chooser = target.getByRole('menu')
+      expect(await chooser.getByRole('menuitem').count()).toBe(5)
+      await auditWorkflowState(target, 'deliverables', 'multiple-file-chooser', chooser)
+      await chooser.getByRole('menuitem').first().click()
+      const first = summary!.files[0]!.path
+      await expect.poll(() => review.locator('[data-review-file]').getAttribute('data-review-file')).toBe(first)
+      await expect.poll(() => review.textContent()).toContain(`After ${first}`)
+      expect(await cards.count()).toBe(4)
+      expect(tripwire.pageErrors).toEqual([])
+    } catch (error) { await saveFailureShot(target, 'workspace-review-multiple'); throw error }
+    finally { await target.close() }
+  }, 180_000)
+
+  it('shows the recorder storage failure without claiming zero changes or removing earlier reviews', async () => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold unavailable')
+    const host = scaffold
+    const id = SessionId('workspace-review-storage-failure')
+    const earlier = host.ctx.sessions.get(SESSION)?.snapshotEvents().find(event => event.type === 'workspace/changes')
+    if (earlier === undefined) throw new Error('Earlier historical review unavailable')
+    const preserved = await host.ctx.workspaceChanges.diff(SESSION, earlier.seq, 0, new AbortController().signal)
+    const agent = await writeRecordedFiles(host, id, ['changed-before-storage-failure.txt'])
+    const root = join(host.harnessHome, 'workspace-reviews')
+    await mkdir(root, { recursive: true })
+    const obstruction = join(root, createHash('sha256').update(id).digest('hex'))
+    await writeFile(obstruction, 'Fixture-owned unavailable Session review directory\n', { flag: 'wx' })
+    const target = await newWorkflowPage(browser)
+    const tripwire = watchConsole(target)
+    try {
+      await expect(host.ctx.serial('agent/turn-stopping', { agent, turn: 1, signal: new AbortController().signal }))
+        .rejects.toThrow('Historical review did not complete')
+      agent.session.append('step/end', { turn: 1, step: 1 })
+      agent.session.append('turn/end', { turn: 1, reason: { kind: 'blocked' } })
+      const announcements = agent.session.snapshotEvents().filter(event => event.type === 'workspace/changes')
+      expect(announcements).toHaveLength(1)
+      expect(announcements[0]!.data).toMatchObject({ turn: 1, incomplete: true })
+      expect(await host.ctx.workspaceChanges.summary(id, announcements[0]!.seq)).toMatchObject({ incomplete: true })
+      expect(await readFile(join(host.workspaceCwd, id, 'changed-before-storage-failure.txt'), 'utf8')).toBe('After changed-before-storage-failure.txt\n')
+      expect(await host.ctx.workspaceChanges.diff(SESSION, earlier.seq, 0, new AbortController().signal)).toEqual(preserved)
+      await target.addInitScript((sessionId) => {
+        if (window === window.top) localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId }))
+      }, id)
+      await target.goto(host.authenticatedUrl, { waitUntil: 'load' })
+      const alert = target.locator('[data-changed-files][role="alert"]')
+      await alert.getByText('This turn’s review did not complete', { exact: true }).waitFor()
+      expect(await alert.textContent()).toContain('File changes may already have occurred.')
+      expect(await alert.getByRole('button').count()).toBe(0)
+      expect(await alert.textContent()).not.toContain('Edited 0 files')
+      expectTextContrast(await captureTextContrast(target, [
+        { label: 'heading', text: alert.locator('strong') }, { label: 'explanation', text: alert.locator('p') },
+      ], 'deliverables-storage-incomplete'))
+      await auditWorkflowState(target, 'deliverables', 'review-storage-incomplete', alert)
+      await compareWorkflowGolden(join(DIRECTORY, 'storage-incomplete.expected.md'),
+        await captureStableAria(target, '[data-changed-files]', host.workspaceCwd), webSnapshotMode())
+      expect(tripwire.pageErrors).toEqual([])
+    } catch (error) { await saveFailureShot(target, 'workspace-review-storage-failure'); throw error }
+    finally { try { await target.close() } finally { await rm(obstruction) } }
+  }, 120_000)
+
+  it('retries an unavailable recorded summary while keeping delivered-file preview usable', async () => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold unavailable')
+    const host = scaffold
+    const target = await newWorkflowPage(browser)
+    const tripwire = watchConsole(target)
+    const summaryRoute = '**/workspaceChanges.summary*'
+    await target.addInitScript((sessionId) => {
+      if (window === window.top) localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId }))
+    }, SESSION)
+    try {
+      await target.route(summaryRoute, route => route.fulfill({ status: 503, body: 'Historical storage temporarily unavailable' }))
+      await target.goto(host.authenticatedUrl, { waitUntil: 'load' })
+      const unavailable = target.locator('[data-review-unavailable]')
+      const retry = unavailable.getByRole('button', { name: 'Retry', exact: true })
+      await retry.waitFor()
+      expect(await unavailable.textContent()).toContain('This turn’s recorded changes are temporarily unavailable.')
+      expect(await target.locator('[data-changed-files]').count()).toBe(0)
+      await auditWorkflowState(target, 'deliverables', 'review-summary-unavailable', unavailable, [retry])
+      await compareWorkflowGolden(join(DIRECTORY, 'summary-unavailable.expected.md'),
+        await captureStableAria(target, '[data-review-unavailable]', host.workspaceCwd), webSnapshotMode())
+      await target.locator('[data-presented-file]').getByRole('button', { name: /Open .* in sidebar/u }).click()
+      const preview = target.getByRole('region', { name: 'review.txt', exact: true })
+      await preview.getByText('current file changed later', { exact: false }).waitFor()
+      await target.unroute(summaryRoute)
+      const [response] = await Promise.all([
+        target.waitForResponse(value => new URL(value.url()).pathname.endsWith('/workspaceChanges.summary')),
+        retry.click(),
+      ])
+      expect(await response.json()).toMatchObject({ result: { ok: true, value: { files: [{ path: 'review.txt' }] } } })
+      await unavailable.waitFor({ state: 'hidden' })
+      await target.locator('[data-changed-files]').waitFor()
+      await preview.getByText('current file changed later', { exact: false }).waitFor()
+      expect(tripwire.pageErrors).toEqual([])
+    } catch (error) { await saveFailureShot(target, 'workspace-review-summary-unavailable'); throw error }
+    finally { try { await target.unrouteAll({ behavior: 'wait' }) } finally { await target.close() } }
+  }, 120_000)
+
+  it('keeps native file action failures retryable without launching an external application', async () => {
+    if (scaffold === undefined || browser === undefined) throw new Error('Web scaffold unavailable')
+    const host = scaffold
+    const target = await newWorkflowPage(browser)
+    const tripwire = watchConsole(target)
+    const appsGate = completionBarrier()
+    const openGate = completionBarrier()
+    const revealGate = completionBarrier()
+    const reviewOpenGate = completionBarrier()
+    const reviewRevealGate = completionBarrier()
+    const describeHost = host.ctx.apiProxy.host.describe.bind(host.ctx.apiProxy.host)
+    const description = vi.spyOn(host.ctx.apiProxy.host, 'describe').mockImplementation(async (request) => {
+      const result = await describeHost(request)
+      if (result.result.ok) {
+        result.result.value.canOpenPath = true
+        result.result.value.fileManager = null
+        result.result.value.executionAuthorityRequired = false
+      }
+      return result
+    })
+    const applications = vi.spyOn(host.ctx.apiProxy.host, 'fileApplications')
+      .mockImplementation(async request => ({ rpcId: request.rpcId, result: { ok: true, value: { applications: [
+        { id: 'fixture.editor', name: 'Fixture Editor', default: true, icon: null },
+      ] } } }))
+      .mockImplementationOnce(async (request) => {
+        await appsGate.promise
+        return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'Associations unavailable', details: {} } } }
+      })
+    const open = vi.spyOn(host.ctx.apiProxy.host, 'openPath')
+      .mockImplementation(async request => ({ rpcId: request.rpcId, result: { ok: true, value: { opened: true as const } } }))
+      .mockImplementationOnce(async (request) => {
+        await openGate.promise
+        return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'Desktop open unavailable', details: {} } } }
+      })
+    try {
+      await target.addInitScript((sessionId) => {
+        if (window === window.top) localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId }))
+      }, SESSION)
+      await target.goto(host.authenticatedUrl, { waitUntil: 'load' })
+      const card = target.locator('[data-presented-file]')
+      const more = card.getByRole('button', { name: /More file actions for /u })
+      const status = card.locator('[role="status"] [class*="secondaryText"]')
+      await more.click()
+      const menu = target.getByRole('menu')
+      await menu.getByText('Loading applications…', { exact: true }).waitFor()
+      await auditWorkflowState(target, 'deliverables', 'native-applications-loading', menu)
+      appsGate.resolve()
+      await menu.getByText('Could not load applications', { exact: true }).waitFor()
+      await auditWorkflowState(target, 'deliverables', 'native-applications-failed', menu)
+      await menu.getByRole('menuitem', { name: 'Open in default app', exact: true }).click()
+      await target.mouse.move(0, 0)
+      await expect.poll(() => status.innerText()).toBe('Opening…')
+      expect(await more.isDisabled()).toBe(true)
+      await auditWorkflowState(target, 'deliverables', 'native-open-pending', card)
+      openGate.resolve()
+      await expect.poll(() => status.innerText()).toBe('Could not open. Click to retry.')
+      expectTextContrast(await captureTextContrast(target, [{ label: 'open-error', text: status, region: card.locator('[role="status"]') }], 'deliverables-native-open-error'))
+      await auditWorkflowState(target, 'deliverables', 'native-open-failed', card)
+      await compareWorkflowGolden(join(DIRECTORY, 'native-open-error.expected.md'),
+        await captureStableAria(target, '[data-presented-file]', host.workspaceCwd), webSnapshotMode())
+      await more.click()
+      await menu.getByRole('menuitem', { name: 'Fixture Editor (default)', exact: true }).waitFor()
+      await auditWorkflowState(target, 'deliverables', 'native-application-chooser', menu)
+      await menu.getByRole('menuitem', { name: 'Fixture Editor (default)', exact: true }).click()
+      await target.mouse.move(0, 0)
+      await expect.poll(() => status.innerText()).toBe('Opened in default app')
+      expect(open.mock.calls.at(-1)?.[0].payload).toEqual({ path: join(host.workspaceCwd, 'review.txt'), action: 'open', application: 'fixture.editor' })
+      await auditWorkflowState(target, 'deliverables', 'native-open-retried', card)
+      open.mockImplementationOnce(async (request) => {
+        await revealGate.promise
+        return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'Directory open unavailable', details: {} } } }
+      })
+      await more.click()
+      await menu.getByRole('menuitem', { name: 'Open containing folder', exact: true }).click()
+      await target.mouse.move(0, 0)
+      await expect.poll(() => status.innerText()).toBe('Opening containing folder…')
+      expect(await more.isDisabled()).toBe(true)
+      await auditWorkflowState(target, 'deliverables', 'native-reveal-pending', card)
+      revealGate.resolve()
+      await expect.poll(() => status.innerText()).toBe('Could not open containing folder. Try again.')
+      expectTextContrast(await captureTextContrast(target, [{ label: 'reveal-error', text: status, region: card.locator('[role="status"]') }], 'deliverables-native-reveal-error'))
+      await auditWorkflowState(target, 'deliverables', 'native-reveal-failed', card)
+      await more.click()
+      await menu.getByRole('menuitem', { name: 'Open containing folder', exact: true }).click()
+      await target.mouse.move(0, 0)
+      await expect.poll(() => status.innerText()).toBe('Requested to open the containing folder')
+      expect(open.mock.calls.at(-1)?.[0].payload).toEqual({ path: join(host.workspaceCwd, 'review.txt'), action: 'reveal' })
+      expect(applications.mock.calls.every(([request]) => request.payload.path === join(host.workspaceCwd, 'review.txt'))).toBe(true)
+      await auditWorkflowState(target, 'deliverables', 'native-reveal-retried', card)
+      expect(open).toHaveBeenCalledTimes(4)
+
+      await target.locator('[data-changed-files]').getByRole('button').first().click()
+      const review = target.locator('[data-changes-review]')
+      await expect.poll(() => review.textContent()).toContain('before the turn')
+      const native = review.locator('[data-review-tool="open-native"]')
+      const nativeMore = review.locator('[data-review-tool="open-native-more"]')
+      const previousControl = nativeTabKey('backward')
+      open.mockImplementationOnce(async (request) => {
+        await reviewOpenGate.promise
+        return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'Review desktop open unavailable', details: {} } } }
+      })
+      await native.click()
+      await expect.poll(() => native.isDisabled()).toBe(true)
+      expect(await nativeMore.isDisabled()).toBe(true)
+      await auditWorkflowState(target, 'deliverables', 'review-native-open-pending', review)
+      reviewOpenGate.resolve()
+      await expect.poll(() => native.getAttribute('data-error')).toBe('true')
+      await nativeMore.focus()
+      await target.keyboard.press(previousControl)
+      expect(await native.evaluate(element => element === document.activeElement)).toBe(true)
+      await target.getByRole('tooltip').getByText('Could not open. Click to retry.', { exact: true }).waitFor()
+      await auditWorkflowState(target, 'deliverables', 'review-native-open-failed', review, [native, nativeMore])
+      const openFailure = await captureStableAria(target, '[data-changes-review]', host.workspaceCwd)
+      await target.keyboard.press('Escape')
+      const [openRetry] = await Promise.all([
+        target.waitForResponse(response => new URL(response.url()).pathname === '/api/host.openPath'),
+        native.click(),
+      ])
+      expect(await openRetry.json()).toMatchObject({ result: { ok: true } })
+      await expect.poll(() => native.getAttribute('data-error')).toBeNull()
+      expect(await review.textContent()).toContain('before the turn')
+      open.mockImplementationOnce(async (request) => {
+        await reviewRevealGate.promise
+        return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'Review reveal unavailable', details: {} } } }
+      })
+      await nativeMore.click()
+      await menu.getByRole('menuitem', { name: 'Open containing folder', exact: true }).click()
+      await expect.poll(() => native.isDisabled()).toBe(true)
+      expect(await nativeMore.isDisabled()).toBe(true)
+      reviewRevealGate.resolve()
+      await expect.poll(() => native.getAttribute('data-error')).toBe('true')
+      await nativeMore.focus()
+      await target.keyboard.press(previousControl)
+      expect(await native.evaluate(element => element === document.activeElement)).toBe(true)
+      await target.getByRole('tooltip').getByText('Could not open containing folder. Try again.', { exact: true }).waitFor()
+      await auditWorkflowState(target, 'deliverables', 'review-native-reveal-failed', review, [native, nativeMore])
+      await compareWorkflowGolden(join(DIRECTORY, 'review-native-errors.expected.md'),
+        `${openFailure}\n${await captureStableAria(target, '[data-changes-review]', host.workspaceCwd)}`, webSnapshotMode())
+      await target.keyboard.press('Escape')
+      await nativeMore.click()
+      const [revealRetry] = await Promise.all([
+        target.waitForResponse(response => new URL(response.url()).pathname === '/api/host.openPath'),
+        menu.getByRole('menuitem', { name: 'Open containing folder', exact: true }).click(),
+      ])
+      expect(await revealRetry.json()).toMatchObject({ result: { ok: true } })
+      await expect.poll(() => native.getAttribute('data-error')).toBeNull()
+      expect(open.mock.calls.slice(4).map(([request]) => request.payload)).toEqual([
+        { path: join(host.workspaceCwd, 'review.txt'), action: 'open' },
+        { path: join(host.workspaceCwd, 'review.txt'), action: 'open' },
+        { path: join(host.workspaceCwd, 'review.txt'), action: 'reveal' },
+        { path: join(host.workspaceCwd, 'review.txt'), action: 'reveal' },
+      ])
+      expect(await review.textContent()).toContain('after the turn')
+      expect(tripwire.pageErrors).toEqual([])
+    } catch (error) { await saveFailureShot(target, 'workspace-review-native-actions'); throw error }
+    finally {
+      appsGate.resolve(); openGate.resolve(); revealGate.resolve(); reviewOpenGate.resolve(); reviewRevealGate.resolve()
+      try { await target.close() } finally { open.mockRestore(); applications.mockRestore(); description.mockRestore() }
+    }
+  }, 180_000)
+
+  it('owns only its review goldens', async () => {
+    await assertFixtureInventory(DIRECTORY, ['review.expected.md', 'native-open-error.expected.md', 'multiple-files.expected.md',
+      'storage-incomplete.expected.md', 'summary-unavailable.expected.md', 'review-native-errors.expected.md'])
+  })
 
   it('reopens the recorded review on an independent Host after the current file is deleted', async () => {
     if (scaffold === undefined) throw new Error('Web scaffold unavailable')

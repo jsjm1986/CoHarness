@@ -1,5 +1,6 @@
+import { responsiveBrowser, responsiveMobileEmulation } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+
 import { expect, it } from 'vitest'
 import {
   ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage,
@@ -75,20 +76,26 @@ function backgroundFixture(): string {
   ].join('\n')
 }
 
-it('expands a background Bash launch to selectable arguments and its original acknowledgement', async () => {
+it.each([false, true])('expands a background Bash launch with selectable arguments (touch: %s)', async (touch) => {
   const scaffold = await launchWebScaffold({})
   try {
     await seedSession(scaffold, backgroundFixture(), 'shell-command-details-browser')
-    const browser = await chromium.launch()
+    const browser = await responsiveBrowser.launch()
     try {
-      const page = await newEnglishPage(browser)
+      const page = touch
+        ? await browser.newPage({ viewport: { width: 390, height: 844 }, locale: 'en-US', hasTouch: true, isMobile: responsiveMobileEmulation })
+        : await newEnglishPage(browser)
       const tripwire = watchConsole(page)
       await page.goto(scaffold.authenticatedUrl)
       await page.locator('[class*="frame"]').waitFor()
+      if (touch) await page.getByRole('button', { name: 'Open sidebar' }).click()
       const group = page.getByRole('treeitem').first()
       await group.waitFor()
       await group.click()
       await page.getByRole('treeitem').nth(1).click()
+      if (touch) {
+        await page.locator('[class*="drawer"][data-open]').waitFor({ state: 'hidden' })
+      }
       const row = page.locator('[data-sample="bash"]').first()
       await expandOwningTurnProcess(page, row)
       await row.waitFor()
@@ -101,10 +108,19 @@ it('expands a background Bash launch to selectable arguments and its original ac
       expect(await card.getByText(OUTPUT, { exact: true }).count()).toBe(1)
       expect(await card.locator('[data-terminal]').count()).toBe(0)
       expect(await card.getByRole('button', { name: 'Inspect', exact: true }).count()).toBe(1)
+      if (touch) {
+        const inspect = card.getByRole('button', { name: 'Inspect', exact: true })
+        await expect.poll(() => inspect.evaluate(element => getComputedStyle(element).opacity)).toBe('1')
+        const target = await inspect.boundingBox()
+        expect(target).not.toBeNull()
+        expect(target!.height).toBeGreaterThanOrEqual(44)
+        expect(target!.x).toBeGreaterThanOrEqual(0)
+        expect(target!.x + target!.width).toBeLessThanOrEqual(390)
+      }
       for (const colorScheme of ['light', 'dark'] as const) {
         await page.emulateMedia({ colorScheme })
         await expect.poll(() => page.locator('body').evaluate(element => element.hasAttribute('data-ds-dark-theme'))).toBe(colorScheme === 'dark')
-        for (const width of ['', '380px']) {
+        for (const width of touch ? ['', '100%'] : ['', '380px']) {
           await card.evaluate((element, value) => { element.style.width = value }, width)
           await input.scrollIntoViewIfNeeded()
           await expectSelectableCommandText(page, input, COMMAND, 'Command arguments')
@@ -119,8 +135,10 @@ it('expands a background Bash launch to selectable arguments and its original ac
         role: element.getAttribute('role'),
         label: element.getAttribute('aria-label'),
       }))).toEqual({ overflow: true, tabIndex: '0', role: 'group', label: 'Command arguments' })
-      await compareOrRefreshGolden(EXPECTED,
-        await captureStableAria(page, '[data-chat-call-id="shell-command-details-background"]', scaffold.workspaceCwd), webSnapshotMode())
+      if (!touch) {
+        await compareOrRefreshGolden(EXPECTED,
+          await captureStableAria(page, '[data-chat-call-id="shell-command-details-background"]', scaffold.workspaceCwd), webSnapshotMode())
+      }
       expect(tripwire.pageErrors).toEqual([])
       expect(tripwire.warnings).toEqual([])
     } finally {

@@ -74,6 +74,7 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
     nodeId?: NonNullable<SessionRuntimeTarget['nodeId']>
     signal: AbortSignal
     intent?: string
+    stop?: () => void
   } | undefined
   let restoredDirectory: { runtimeId: string; rows: readonly SessionSummary[]; paged: boolean } | undefined
   let restoreWork: Promise<void> | undefined
@@ -134,18 +135,40 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
           const draft = intents?.snapshot.getSnapshot().active
           if (transfer !== undefined && (draft?.id !== attempt.intent || draft?.text &&
             ctx.bail('conversation/append-input', { sessionId: saved, text: draft.text }) !== true)) return
+          attempt.stop?.(); delete attempt.stop
           sessions.open(saved)
           transfer?.()
         })
-      }).finally(() => { if (restoreWork === flight) { restoreWork = undefined
+      }).finally(() => { requests.delete(flight); if (restoreWork === flight) { restoreWork = undefined
         if (retryQueued) { retryQueued = false; restoreSelection(true) } } })
+      requests.add(flight)
       restoreWork = flight
       return flight
     }
     if (intents !== undefined) {
       if (attempt.intent === undefined) {
-        attempt.intent = intents.begin({ target, label: showComputer ? target.nodeName ?? '' : '' }, (_intent, editing, transfer) =>
-          open(AbortSignal.any([attempt.signal, editing]), transfer))
+        const owner = accountLifetime.signal
+        const watch = (): void => {
+          attempt.stop?.()
+          const signal = attempt.signal
+          const supersede = (): void => {
+            attempt.stop?.(); delete attempt.stop
+            if (recovery === attempt) recovery = undefined
+            if (intents.snapshot.getSnapshot().active?.id === attempt.intent) intents.hide()
+          }
+          signal.addEventListener('abort', supersede, { once: true })
+          attempt.stop = () => { signal.removeEventListener('abort', supersede) }
+        }
+        watch()
+        attempt.intent = intents.begin({ target, label: showComputer ? target.nodeName ?? '' : '' }, (_intent, editing, transfer) => {
+          if (attempt.signal.aborted || recovery !== attempt) {
+            lifetime.signal.throwIfAborted(); owner.throwIfAborted()
+            attempt.signal = AbortSignal.any([sessions.beginNavigation(), lifetime.signal, owner])
+            recovery = attempt
+            watch()
+          }
+          return open(AbortSignal.any([attempt.signal, editing]), transfer)
+        })
       } else if (intents.snapshot.getSnapshot().active?.id === attempt.intent) intents.resume(attempt.intent)
     } else void open(attempt.signal).catch((error: unknown) => {
       if (!attempt.signal.aborted) console.error('[personal-directory] Selected conversation could not be restored:', error)
@@ -154,6 +177,7 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
   const rememberSelection = (): void => {
     const committed = sessions.committedSelection.getSnapshot()
     if (selection === undefined || committed === undefined) return
+    recovery?.stop?.()
     recovery = undefined
     if (committed.sessionId === undefined) { selection.set({}); return }
     const runtime = parseClientSessionKey(committed.sessionId)?.runtime
@@ -243,12 +267,6 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
         }
         workspaces.setDirectoryState('error')
         console.error('[personal-directory] Metadata refresh failed:', error)
-        // A failed refresh also settles the directory: an armed selection
-        // retry resumes against the last published catalog instead of
-        // waiting for an unrelated trigger to consume it.
-        const retry = selectionRetry
-        selectionRetry = false
-        restoreSelection(retry)
       }
     }).finally(() => {
       clearTimeout(deadline); requests.delete(flight)
@@ -257,7 +275,7 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
     requests.add(flight); work = flight
     return flight
   }
-  workspaces.refreshPersonalDirectory = () => refresh(true)
+  workspaces.refreshPersonalDirectory = () => revisitDirectory()
   workspaces.loadPersonalRows = async (target, more, signal) => {
     const shared = ctx.get('gatewayEntryRequests')
     if (shared === undefined || ctx.deploymentContext.getSnapshot().context?.mode !== 'multi') return refresh()
@@ -304,22 +322,30 @@ export function installPersonalDirectory(ctx: Context, connection: ConnectionHan
   const stopHost = connection.hostDescription.subscribe(() => { void refresh(true) })
   let revisit: Promise<void> | undefined
   let revisitQueued = false
-  const focus = (): void => {
-    if (disposed) return
-    // Coalesce attention events into one deferred pass: a revisit already in
-    // flight predates this event's state change, so dropping it loses the
-    // retry the event exists to trigger.
-    if (revisit !== undefined) { revisitQueued = true; return }
+  function revisitDirectory(): Promise<void> {
+    if (disposed) return Promise.resolve()
+    // A pending refresh predates a later refresh request. Coalesce those
+    // callers into one following read and await its publication as well.
+    if (revisit !== undefined) { revisitQueued = true; return revisit }
     const previous = work, owner = accountLifetime
-    const flight = (async () => {
-      if (previous !== undefined) await previous
-      if (lifetime.signal.aborted || owner.signal.aborted) return
-      ctx.get('gatewayEntryRequests')?.refreshDirectory()
-      await refresh(true)
-    })().finally(() => { if (revisit === flight) revisit = undefined
-      if (revisitQueued) { revisitQueued = false; focus() } })
+    const flight = Promise.resolve().then(async () => {
+      try {
+        if (previous !== undefined) await previous
+        if (lifetime.signal.aborted || owner.signal.aborted) return
+        ctx.get('gatewayEntryRequests')?.refreshDirectory()
+        await refresh(true)
+      } finally {
+        if (revisit === flight) revisit = undefined
+        if (revisitQueued) {
+          revisitQueued = false
+          await revisitDirectory()
+        }
+      }
+    })
     revisit = flight
+    return flight
   }
+  const focus = (): void => { void revisitDirectory() }
   browser.addEventListener?.('focus', focus)
   browser.addEventListener?.('online', focus)
   ctx.effect(() => async () => {

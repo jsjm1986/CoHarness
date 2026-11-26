@@ -38,7 +38,7 @@ function makePayload(): string {
   return payload
 }
 
-async function setup(payload: string) {
+async function setup(payload: string, deferred = false) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-release-assets-'))
   const db = openDb(join(root, 'g.sqlite'))
   const cfg = testConfig(root, {
@@ -48,8 +48,9 @@ async function setup(payload: string) {
   })
   const resolveForAccount = vi.fn(async () => environment)
   const page = { items: [environment], nextCursor: null }
+  const pageForAccount = vi.fn(async () => page)
   const catalog = { resolveForAccount, resolveForOwner: async () => environment, resolveForLanding: async () => environment,
-    pageForAccount: async () => page, pageForAdministrator: async () => page }
+    pageForAccount, pageForAdministrator: async () => page }
   const proxy = vi.fn<ProxyHandler>(async (_req, res) => {
     res.writeHead(200, { 'content-type': 'text/plain' })
     res.end('runtime-path')
@@ -63,6 +64,15 @@ async function setup(payload: string) {
     instances: new InstanceManager(db, cfg),
     runtimeCatalog: catalog,
     releaseAssets: new ReleaseAssets(join(payload, 'dist')),
+  }
+  const forward = vi.fn(async () => false)
+  if (deferred) {
+    const nodeId = '61f22202-1c02-4a3c-8d34-f11222333445' as RuntimeNodeId
+    const read = async () => ({ mode: 'multi', revision: '1', scope: 'organization', role: 'primary',
+      entry: { nodeId, name: 'Primary' }, primary: null, refreshAfterMs: 30000, legacyMigrationRequired: false } as const)
+    deps.nodeServiceIdentity = { nodeId, organizationId: 'test', authorize: vi.fn() }
+    deps.nodeServiceProxy = { http: forward, upgrade: vi.fn() }
+    deps.topology = { read, adminRead: read, save: vi.fn(), preflight: vi.fn(), assertNode: vi.fn(), candidates: vi.fn() }
   }
   deps.runtimeRouter = new GatewayRuntimeRouter(new LocalRuntimeAdapter(deps), {
     localNodeId: environment.node.id,
@@ -92,7 +102,7 @@ async function setup(payload: string) {
   })
   expect(login.status).toBe(302)
   const cookie = (login.headers.get('set-cookie') ?? '').split(';')[0] ?? ''
-  return { base, cookie, proxy, resolveForAccount }
+  return { base, cookie, proxy, resolveForAccount, pageForAccount, forward }
 }
 
 describe('releaseAssetRoot', () => {
@@ -125,6 +135,25 @@ describe('releaseAssetRoot', () => {
 })
 
 describe('center-served release assets', () => {
+  it('serves the shell only after fresh authorization for the exact remote Runtime', async () => {
+    const payload = makePayload()
+    writeFileSync(join(payload, 'dist', 'index.html'), '<html><head><!-- dsh-runtime-bootstrap --></head><body></body></html>')
+    const { base, cookie, forward, pageForAccount } = await setup(payload, true)
+    const url = `${base}/?dshRuntime=${environment.id}&dshNode=${environment.node.id}&dshTarget=personal`
+    const headers = { accept: 'text/html', cookie }
+    const result = await fetch(url, { headers })
+    expect(result.status).toBe(200)
+    expect(result.headers.get('cache-control')).toBe('no-store')
+    expect(await result.text()).toContain(`"principalId":1,"runtimeId":"${environment.id}","nodeId":"${environment.node.id}"`)
+    expect(pageForAccount).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), { ids: environment.id, limit: '1' })
+    expect(forward).not.toHaveBeenCalled()
+    pageForAccount.mockResolvedValueOnce({ items: [], nextCursor: null })
+    const withdrawn = await fetch(url, { headers })
+    expect(withdrawn.status).toBe(404)
+    expect(await withdrawn.text()).not.toContain('dsh-runtime-bootstrap')
+    expect(forward).not.toHaveBeenCalled()
+  })
+
   it('answers content-hashed assets with private immutable caching', async () => {
     const { base, cookie, proxy } = await setup(makePayload())
     const identity = await fetch(`${base}/assets/app-Ab3dEf9h.js`, { headers: { cookie, 'accept-encoding': 'identity' } })

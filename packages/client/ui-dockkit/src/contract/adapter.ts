@@ -39,6 +39,23 @@ export interface DockLabels {
   readonly dockFloat: string
   /** Close a floating panel. */
   readonly closeFloat: string
+  /** Open the selected tab's actions without a secondary press or long press. */
+  readonly tabActions: string
+  readonly moveBefore: string
+  readonly moveAfter: string
+  /** Name a destination by its one-based visual position. */
+  readonly moveToPane: (position: number) => string
+  readonly floatTab: string
+  /** Divider name including the arrow-key resizing instruction. */
+  readonly resizePane: string
+  readonly expandBefore: string
+  readonly expandAfter: string
+  readonly equalPanes: string
+  /** Floating-panel handles include their arrow-key instructions. */
+  readonly moveFloat: string
+  readonly resizeFloat: string
+  /** Single-click alternatives to floating-panel move and resize gestures. */
+  readonly adjustFloat: Readonly<Record<'left' | 'right' | 'up' | 'down' | 'wider' | 'narrower' | 'taller' | 'shorter', string>>
   /** The drop hint's caption for each body zone a dragged tab can land on. */
   readonly dropZone: Readonly<Record<DockZone, string>>
 }

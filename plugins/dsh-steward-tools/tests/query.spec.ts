@@ -8,6 +8,8 @@ describe('isReadOnly', () => {
       '  select id from harness.users',
       '-- comment\nSELECT * FROM t',
       '/* block */ WITH x AS (SELECT 1) SELECT * FROM x',
+      'WITH "update" AS (SELECT $$UPDATE fixture$$) SELECT * FROM "update"',
+      'WITH RECURSIVE t (n) AS (VALUES (1) UNION ALL SELECT n + 1 FROM t WHERE n < 3) SELECT * FROM t',
       'VALUES (1,2)',
       'TABLE harness.projects',
       'SHOW server_version',
@@ -29,6 +31,11 @@ describe('isReadOnly', () => {
       'SET statement_timeout=1',
       'TRUNCATE t',
       'COPY t FROM STDIN',
+      'WITH t AS (SELECT 1) UPDATE fixture SET value = 2',
+      'WITH c AS (INSERT INTO fixture VALUES (1) RETURNING value) SELECT * FROM c',
+      'WITH a AS (SELECT 1), b AS (/* outer /* nested */ comment */ DELETE FROM fixture RETURNING value) SELECT * FROM b',
+      'WITH c (x) AS NOT MATERIALIZED (SELECT 1) DELETE FROM fixture WHERE value IN (SELECT x FROM c)',
+      'WITH c AS (SELECT 1) MERGE INTO fixture USING c ON false WHEN NOT MATCHED THEN INSERT VALUES (1)',
     ]) {
       expect(isReadOnly(sql), sql).toBe(false)
     }

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-20-touch-composer-focus.md (docs/i18n/README.md): the document
+# entry stores whole-file Git blob IDs; per heading section, a hash of its English and Chinese blocks.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-20-touch-composer-focus.md
+document:
+  en: 35ecd4bcb541e0c584d7d8ebdcb34c913c9727c1
+  zh: 4a52865cdfb120f9d72a866ce321b87cce81b5da
+/agent-note-touch-users-control-composer-keyboard-activation:
+  en: 3ab033b4b07bf16b
+  zh: 2c4290fa58449602
+/agent-note-touch-users-control-composer-keyboard-activation/problem:
+  en: 281201be995116df
+  zh: d524dfe7f51a62aa
+/agent-note-touch-users-control-composer-keyboard-activation/decision:
+  en: 7059849c41f049bc
+  zh: 81fccc85af62e3e5
+/agent-note-touch-users-control-composer-keyboard-activation/alternatives-considered:
+  en: 94f1c042437c2f90
+  zh: bce41aebca3d2833
+/agent-note-touch-users-control-composer-keyboard-activation/consequences:
+  en: e9a77eb879c18f87
+  zh: 2b62cd7322306ad7

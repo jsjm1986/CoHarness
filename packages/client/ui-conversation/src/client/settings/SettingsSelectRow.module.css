@@ -74,6 +74,13 @@
   flex: none;
 }
 
+@media (pointer: coarse), (max-height: 480px) {
+  .selector {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+  }
+}
+
 @media (max-width: 767px) {
   .row {
     gap: var(--dsw-space-3);

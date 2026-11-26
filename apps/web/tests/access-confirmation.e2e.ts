@@ -5,7 +5,7 @@
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { chromium } from 'playwright'
+import { chromium, webkit } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
@@ -29,11 +29,12 @@ describe('web e2e: Full access confirmation', () => {
     // scenario at an installed Chromium when the matching browser download
     // is temporarily unavailable.
     const executablePath = process.env.DSH_PLAYWRIGHT_EXECUTABLE_PATH
-    browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
+    const engine = process.env.DSH_RESPONSIVE_BROWSER === 'webkit' ? webkit : chromium
+    browser = await engine.launch(engine === chromium && executablePath !== undefined ? { executablePath } : {})
     // Keep the Chinese surface via {@link ZH_BROWSER_LOCALE}: the golden pins
     // the actual registered dictionary rather than a test-local translation
     // callback.
-    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
+    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE, hasTouch: true })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -43,6 +44,55 @@ describe('web e2e: Full access confirmation', () => {
   afterAll(async () => {
     await browser?.close()
     await scaffold?.close()
+  })
+
+  it('keeps the phone confirmation actions inside the viewport when the keyboard reduces its height', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-full-access-phone-viewport'))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    try {
+      await page.locator('[data-viewport="compact"]').waitFor({ timeout: 5_000 })
+      const access = page.locator('button[aria-label^="访问模式"]').first()
+      await access.tap()
+      const settings = page.locator('[data-session-settings-sheet]')
+      const fullAccess = settings.getByRole('menuitemradio', { name: '完全权限' })
+      await fullAccess.tap()
+      const dialog = page.getByRole('dialog', { name: '确认启用完全权限？' })
+      await dialog.waitFor()
+      // Chromium's mobile emulation has no software keyboard. Drive the same
+      // visualViewport resize event used by the shipped layout plugin.
+      await page.evaluate(() => {
+        const viewport = window.visualViewport!
+        Object.defineProperty(viewport, 'height', { configurable: true, value: 420 })
+        viewport.dispatchEvent(new Event('resize'))
+      })
+      const enable = dialog.getByRole('button', { name: '启用完全权限' })
+      await expect.poll(() => enable.evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(420)
+      const box = await dialog.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.x).toBeGreaterThanOrEqual(0)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(390)
+      const acknowledgement = dialog.getByRole('checkbox', { name: '我已了解风险，并愿意继续' })
+      await acknowledgement.tap()
+      expect(await acknowledgement.isChecked()).toBe(true)
+      expect(await enable.isEnabled()).toBe(true)
+      await dialog.getByRole('button', { name: '取消', exact: true }).tap()
+      await dialog.waitFor({ state: 'detached' })
+      expect(await fullAccess.evaluate(element => element === document.activeElement)).toBe(true)
+      await page.keyboard.press('Escape')
+      await settings.waitFor({ state: 'detached' })
+      expect(await access.evaluate(element => element === document.activeElement)).toBe(true)
+    } finally {
+      if (await page.getByRole('dialog', { name: '确认启用完全权限？' }).isVisible()) await page.keyboard.press('Escape')
+      if (await page.locator('[data-session-settings-sheet]').isVisible()) await page.keyboard.press('Escape')
+      await page.evaluate(() => {
+        const viewport = window.visualViewport!
+        Reflect.deleteProperty(viewport, 'height')
+        viewport.dispatchEvent(new Event('resize'))
+      })
+      await page.setViewportSize({ width: 1680, height: 1000 })
+      await page.emulateMedia({ reducedMotion: 'no-preference' })
+    }
   })
 
   it('requires acknowledgement before the composer picker can enable Full access', async () => {

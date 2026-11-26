@@ -3834,7 +3834,7 @@ describe('Mock detail metrics shared with the task list', () => {
     expect(stylesheet)
       .toMatch(/\.searchField:focus-within\s*\{[^}]*border-color:\s*var\(--dsw-alias-state-business-primary\);/)
     expect(stylesheet).toMatch(/\.searchField > :first-child svg\s*\{[^}]*width:\s*14px;/)
-    expect(stylesheet).toMatch(/\.searchField input::placeholder\s*\{[^}]*color:\s*var\(--dsw-alias-label-caption\);/)
+    expect(stylesheet).toMatch(/\.searchField input::placeholder\s*\{[^}]*color:\s*var\(--dsw-alias-label-secondary\);/)
     expect(stylesheet).toMatch(/\.searchField input::-webkit-search-cancel-button\s*\{[^}]*display:\s*none;/)
     expect(rule('searchClear')).toMatch(/margin-right:\s*-6px;/)
     expect(rule('searchClear')).toMatch(/color:\s*var\(--dsw-alias-label-tertiary\);/)
@@ -3922,6 +3922,32 @@ describe('Mock detail metrics shared with the task list', () => {
     expect(rule('detailTabsBar')).toMatch(/gap:\s*20px;/)
     expect(narrow).toMatch(/\.detailTabsBar\s*\{[^}]*gap:\s*16px;/)
     expect(narrow).toMatch(/\.detailActions\s*\{[^}]*gap:\s*0;/)
+  })
+
+  it("grows the page's bare controls to the coarse-pointer target", () => {
+    const coarse = /@media \(pointer: coarse\)\s*\{([\s\S]*?)\n\}/.exec(stylesheet)?.[1] ?? ''
+    expect(coarse).toMatch(/\.filterTab\s*\{[^}]*min-width:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.filterTab\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.searchField\s*\{[^}]*height:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.searchClear\s*\{[^}]*min-width:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.detailIconButton\s*\{[^}]*min-width:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.ruleInput\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.zoneSearch\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.detailTab\s*\{[^}]*min-width:\s*var\(--dsw-touch-target\);[^}]*min-height:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.editName\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\);/)
+    // The interval stepper takes the settings stepper's coarse shape: a 44px
+    // three-cell grid with the decrease arrow on the left cell and the
+    // increase on the right.
+    expect(coarse).toMatch(/\.ruleIntervalStepper\s*\{[^}]*grid-template-columns:\s*var\(--dsw-touch-target\)/)
+    expect(coarse).toMatch(/\.ruleIntervalStepper\s*\{[^}]*height:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.ruleIntervalArrows\s*\{[^}]*display:\s*contents;/)
+    expect(coarse).toMatch(/\.ruleIntervalArrow\s*\{[^}]*width:\s*var\(--dsw-touch-target\);[^}]*height:\s*var\(--dsw-touch-target\);/)
+    expect(coarse).toMatch(/\.ruleIntervalArrow:first-child\s*\{[^}]*grid-column:\s*3;/)
+    expect(coarse).toMatch(/\.ruleIntervalArrow:last-child\s*\{[^}]*grid-column:\s*1;/)
+  })
+
+  it('shrinks the instruction resting height below the landscape scrollport', () => {
+    expect(stylesheet).toMatch(/@media \(max-height: 480px\)\s*\{\s*\.instruction\s*\{[^}]*min-height:\s*72px;/)
   })
 })
 

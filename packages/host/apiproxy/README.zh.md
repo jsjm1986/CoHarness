@@ -9,7 +9,13 @@ kind: "package-reference"
 
 所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?, coldSummaryCacheMaxEntries?, coldSummaryCacheMaxBytes?, workspaceFileMaxBytes?, workspaceFileMaxLines?, workspaceFileMaxEntries?, workspaceFileMaxResources?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
 
-版本化准备接口接收原生 `session.create` 和 `session.history` 请求。新建可登记 Host 的默认工作区并返回其位置。打开历史要求 Session 可读且未归档。`/api/admit/v1/session.prompt` 要求固定的请求 ID，并在核验收件箱事件落盘后返回成功。核验只读取该序号的已提交事件，允许模型同时追加后续输出。响应丢失后使用原账号、电脑、Runtime、Session 和请求 ID 调用 `/api/admit/v1/session.status`。传入 `confirmInput: true` 时，已确认的回执提供该次操作专用的 `inputProof`，供客户端匹配待确认输入。状态查询不会投递消息。
+版本化准备接口接收原生 `session.create` 和 `session.history` 请求。新建可登记 Host 的默认工作区并返回其位置。打开历史要求 Session 可读且未归档。`/api/admit/v1/session.prompt` 要求固定的请求 ID，并在核验收件箱事件落盘后返回成功。带回执的入队事件与草稿前缀一起落盘，输入仍在排队时即可确认。核验只读取该序号的已提交事件，允许模型同时追加后续输出。响应丢失后使用原账号、电脑、Runtime、Session 和请求 ID 调用 `/api/admit/v1/session.status`。传入 `confirmInput: true` 时，已确认的回执提供该次操作专用的 `inputProof`，供客户端匹配待确认输入。状态查询不会投递消息。当前个人 JSONL 日志的提供方只定位和校验一次已提交前缀，即可读回该回执。
+
+Runtime 换代后，若未落盘项目草稿的创建者仍持有有效预留，回执查询可返回 `unknown`。排队补发按预留的目录、可见性、组合和已保存的模型选择重建同一个 Session。发送准入会检查当前模型政策。如果原模型已被禁用，创建者可重选获准的模型并发送保留的文字。查询回执不会让草稿落盘。
+
+携带版本化操作 UUID 的持久提示请求通过 `x-dsh-host-admission-ms` 报告 Host 受理耗时。字段区分会话授权、Agent 准备、等待 Agent 受理、签注执行身份、收件箱追加、刷盘和核验。`inboxAppend` 内的 `inboxPublish` 截止到发送插入通知，`inboxWake` 衡量该次调用剩余的同步工作。字段值为毫秒。
+
+Mux 实时队列快照可复用相同事件序号下已校验的收件箱投影。初始快照和缺少该投影的组合可以读取 Agent 持有的队列。
 
 `workspaceFiles.*` 在 Session 授权、canonical containment、符号链接检查和已组合的 `workspace-files/authorize` 目录策略通过后，读取 Session 相对文件。冷读取只加载 header。Host 在返回相对元数据、UTF-8 文本页或 Base64 窗口前复核文件身份与权限；可选版本保护拒绝混合版本分页。`host.describe.workspaceFiles` 声明支持情况与配置上限：默认每页／窗口 2 MiB、5,000 行、2,000 个目录项和 512 条 Client 元数据记录。Agent 工具继续拥有写入、CAS 与审计语义。
 
@@ -21,6 +27,8 @@ kind: "package-reference"
 
 现有 Host 流以 `host/workspace-file-changed` 交付已授权的 Agent 观察，不执行 OS 文件监视。该文件 API 不传输 provider 路径或 `FsTargetKey`。`ApiTransportError.status` 保留 HTTP 401/403/429/503 状态，与 RPC 文件错误分开，且不读取错误响应正文。 Fetch 客户端请求取消被拒绝的响应，但不等待取消确认；HTTP 和流开启回调的失败仍是主要错误，传输所有者继续负责关闭连接。
 
+恢复的历史在 Session 摘要和历史页中携带 `executionRestriction: 'recovery-read-only'`，物理历史传输编码也保留该字段。读取不会挂载历史记录的 Preset。针对保留身份的创建、发送和分叉请求返回相同的类型化拒绝；客户端保留目标与草稿，并提供新建对话入口。现有账号和 Session 权限继续生效。
+
 `session.history` 和 `subagent.history` 接受 `toolCallId`，独立读取调用所属的完整轮次。查询复用现有 Session 观察所有者，不激活 Agent 或计算投影；子会话读取保留目录及父子会话授权检查。该参数不能与分页选择或仅对话详情组合。Fetch 传输压缩轮次但不裁掉前缀；客户端响应大小限制仍会拒绝超大响应。调用不存在时返回空结果，授权、持久化与取消失败仍是错误。
 
 `workspaceChanges.summary` 与 `workspaceChanges.diff` 通过相同的 Session 和目录授权读取已记录的轮次差异。读取完成后重新核验权限，通过已加载或持久 Session 的通知定位不可变记录。内容缺失时返回 null；存储损坏仍作为错误返回。已删除的文件仍可审阅，不用当前内容替代历史证据，也不公开私有存储路径或 Git 对象标识。
@@ -29,9 +37,13 @@ kind: "package-reference"
 
 版本化的准备与受理请求在 `x-dsh-operation-id` 中发送 UUID。新建会话使用草稿意图的 UUID，提交提示与查询受理状态共用提交 UUID。其余版本化请求使用 RPC UUID。普通 RPC 省略该请求头。 预留会话的版本化创建请求可通过 `includeInitialHistory` 同时读取首屏对话。Host 核验会话和工作区后，使用同一账号和 Runtime 代次读取活动会话的尾页。尾页放不进历史响应的大小限制时，客户端仍使用同一会话单独读取。
 
+Fetch 载体将 [Connection 历史上限](../../client/connection/README.zh.md#host-configuration) 应用于无游标且采用 `detail: 'conversation'` 的准备页。更早的页面和完整详情继续使用普通历史分页。恢复已保存的个人根会话时，调用方可请求 `restoreSelection: true`。会话处于活动状态、可见且具有工作目录时，Host 可以在有界尾页中附带 `restoredSelection`。
+
+Fetch 载体为带操作 ID 的准备响应附加 `x-dsh-host-prepare-ms`。数值字段记录正文解码、对话处理以及按需读取初始历史的耗时。对话处理包含响应前完成的执行登记。
+
 Host 为 `hostSessionLifecycle` 保存创建、恢复与 fork 句柄。永久清理只释放这些确切的空闲所有者，并将标识预留保持到存储删除和 Gateway 回执完成。忙碌或所有权不明时，在删除前拒绝。
 
-`host.describe.runtimeTarget` 根据受管启动凭据标识 runtime，独立 Host 则声明个人作用域。可在浏览器使用的 API 导出规范 Client Session 地址，以及与 Host 授权共用的显式 Remote Session 路径策略；这些辅助函数不改写任意载荷字符串，也不改变持久 ID。
+`host.describe.runtimeTarget` 根据受管启动凭据标识运行时及凭据中提供的已登记电脑。独立 Host 声明个人作用域。可在浏览器使用的 API 导出规范 Client Session 地址，以及与 Host 授权共用的显式 Remote Session 路径策略；这些辅助函数不改写任意载荷字符串，也不改变持久 ID。
 
 `host.describe.computerUseUnavailableReason` 返回同一已知提供方或环境限制，不创建 Agent，也不读取个人确认。类型化客户端保留此可选字段；缺失表示环境未知。桌面对话框在连接恢复期间使用此信息；明确读取状态仍核验 Session 权限，并可发现新配置的提供方。
 
@@ -68,6 +80,8 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 <a id="contract-layer-api"></a>
 ## 约定层（`/api`）
 
+直接使用 Fetch 的消费方可通过 `readApiResponseJson`、`readApiResponseText` 和 `readApiResponseBytes` 读取 JSON、UTF-8 文本或完整字节。三者都检查声明长度和实际流入字节数，接受取消信号，并共用默认 16 MiB、硬上限 256 MiB 的预算。二进制读取返回自有缓冲区，不进行文本解码；超出预算时取消正文并拒绝，不发布部分内容。消费方自行检查 HTTP 状态并校验解码后的内容。
+
 协议消息组成一个四象限可辨识联合：发起方 × 请求／响应，与物理通道解耦。四种消息分别是 `ClientRequest`（POST `/api/<method>` 的请求体）、`ServerResponse`（该 POST 的响应体）、`ServerRequest`（SSE（Server-Sent Events）帧）和 `ClientResponse`（POST `/api/respond` 的请求体）。响应始终回显对应请求的 `rpcId`，绝不签发新值。方法的参数与返回值结构只存在于领域接口签名（`SessionsApi`、`HostApi`、`EventsApi`）中；`RpcMethodMap` 注册方法，其他所有位置均通过 `RequestPayload<K>`／`ResponseValue<K>` 派生。Zod schema 以 `satisfies z.ZodType<Wire<T>>` 锚定类型，并分两层解析：先解析信封，再解析业务载荷，随后按方法分发。业务错误由 `RpcResult` 的错误分支承载（`RpcErrorDetailsMap` 封闭错误码集合）；HTTP 状态只表达载体层结果。每个 `/api` POST 都必须声明 `application/json` 媒体类型——否则在分发前即以 415 拒绝，因此跨站「简单请求」（浏览器不经 CORS 预检就会发出）永远无法盲目执行有副作用的方法。
 
 分层与协议决策记录在 [GUI 分层与 RPC 协议 RFC](../../../.agents/notes/implemented/architecture/2026-07-19-gui-layering-and-rpc-protocol.zh.md) 中；浏览器侧消费架构记录在 [Web 客户端架构 RFC](../../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.zh.md) 中。
@@ -101,6 +115,8 @@ Mux 与 Host stream 仅合并尚未完成的授权请求。每批发布都会复
 提示准入仅在内容包含图片时读取 `ctx.attachments`，仅在内容包含文档时读取 `ctx.userDocs`。因此，纯文本提示在未挂载这两种存储的组合中仍然有效，纯文档提示也不依赖图片存储。
 
 待处理的 queued 输入属于实时控制平面约定，而非对话历史。网关根据持久 `agent/inbox/spliced` 变更派生完整的 `next-turn` 队列，并在每次变更后及重连时广播权威 `session/queue` 快照；待处理的 `next-step` steering（中途引导）不进入此 Web 投影。在 `next-step` 内，用户来源的消息携带 `steering` placement，而注入上下文（审批通知、任务完成、附加快照）携带 `context`，领取前不对外呈现。面向单条消息的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知仍供生命周期观察方使用，但不用于构建队列视图。`session.updateQueue` 通过 `MessageId` 寻址单个项；编辑和移除经已挂载 Agent 的 `Inbox.splice()` 修改队列。认领操作的纯删除 splice 会在 pre-step 准入前赢得竞态，因此之后的操作返回 `queue-item-not-found`。`session.cancel` 仅中止活动轮次并保留待处理 inbox 工作；取消达到完全停稳且结束中的轮次完成 flush 后，AgentLoop 按 FIFO 顺序认领下一条可唤醒消息，浏览器绝不重发或提升它。队列操作绝不恢复冷会话，客户端也绝不根据轮次或状态事件推断某项已退出队列。
+
+客户端离线期间，Host 仍为每个活跃的 Session 在内存中累积当前助手尝试。通过授权检查的 mux 基线携带已收到的前缀和持久游标。回复仍在进行时，如果最新提交是生命周期回放之外的保留标题事件，Host 会紧随基线回放该游标上的标题。基线和事件通过相同的 Session 读取检查。订阅接收晚于自身基线的助手流更新。Session 销毁后释放内存中的尝试。
 
 后台任务共用经过授权的 mux。组合中有 `ctx.jobs` 时，网关在每次注册、进度变化、进入 stopping、结算或移除后发布完整的 `session/jobs` 名册，并保留生命周期发布顺序。输出追加不刷新该名册；展开的查看器通过 `jobs.output` 读取字节。只有 Session 已有可见任务时才发送订阅基线；缺少基线表示空集，之后清空集合的移除会发送 `[]`。有主变更与基线按 Session id 读取，不恢复冷 Session。无主变更向可读 Session 扇出。线路视图携带展示、状态、时间与输出坐标，所有权、执行作用域及生产者输出上限保留在内部。没有注册表的组合不发送任务帧，一元方法返回 `internal`。`jobs.output({ sessionId?, jobId, from? })` 使用非消费的 `readAt`，返回新鲜视图、保留块、`next` 及丢失信息。带会话作用域的读取要求该 Session 的 `read` 授权，可见其自有与无主任务；未指定会话的读取使用 `captureCollaboration('read')`，仅可见无主任务。未知或越权 id 返回 `job-not-found`。`jobs.kill({ sessionId, jobId })` 要求 Session 的 `write` 授权，转发 `cancelled by the user`，并返回受理结果（`requested` 或 `already-finished`）；名册帧携带最终状态变化。
 
@@ -136,6 +152,8 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-preset-registry`](
 
 <a id="carrier-layer-client--root"></a>
 ## 载体层（`/client` + 根路径）
+
+受保护的 `callUnary` 准备元数据仅接收续等凭据和保留的 RPC ID，不能覆盖操作、路由、媒体类型或身份头。普通载体不重试 HTTP 失败；只有受管准备客户端在核验操作尚未执行的启动响应后负责续等。
 
 `AbstractApiClient` 持有全部协议不变量：签发 rpcId、包装／解包信封、Zod 解析、SSE 帧解码、一元请求超时，以及按微任务批处理的信封观测（`subscribeEnvelopes`）；平台子类只提供 `doFetch` 传输环节。截止时间句柄只在宿主定时器提供 `unref` 时调用它，因此共享客户端同时支持浏览器数字句柄和 Node 超时对象。成功的一元 JSON 响应会在 schema 解析前通过可配置的 16 MiB 字节预算（最高 256 MiB）读取，超限 body 由 `ApiResponseTooLargeError` 标识。相同的有界 reader 也会导出给直接浏览器消费方读取文本响应。SSE reader 会拒绝未终止的分片，并在保留帧超过 8 MiB 时取消；分片 frame 文本每个 frame 只合并一次。Host mux／host 事件队列把积压输出限制为 64 KiB，溢出时发送一条 `internal` stream 错误后结束。`InProcessApiClient` 以 `toFetchHandler(api)` 为基础，仍是同构接点：它运行完整的协议序列化与校验路径而不经过网络，供需要该路径的调用方和载体测试使用。产品的 `dsh --profile headless` 是直连 core 的入口，不挂载本包。
 

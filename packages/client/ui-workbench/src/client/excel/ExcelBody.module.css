@@ -69,6 +69,48 @@
   scrollbar-width: none;
 }
 
+@media (pointer: coarse) {
+  .workbook :global(.fortune-fx-editor) {
+    block-size: 44px;
+  }
+
+  .workbook :global(.fortune-fx-input) {
+    padding-block-start: 15px;
+  }
+
+  .workbook :global(.luckysheet-sheet-area) {
+    block-size: 44px;
+    padding-inline: var(--dsw-space-3);
+  }
+
+  .workbook :global(.luckysheet-sheet-area div.luckysheet-sheets-item) {
+    min-inline-size: 44px;
+    block-size: 44px;
+    padding: 0 8px;
+    line-height: 44px;
+  }
+
+  .workbook :global(.fortune-zoom-button),
+  .workbook :global(.fortune-sheettab-scroll) {
+    justify-content: center;
+    min-inline-size: 44px;
+    block-size: 44px;
+  }
+
+  .workbook :global(.fortune-zoom-ratio-current),
+  .workbook :global(.fortune-zoom-ratio-item) {
+    display: grid;
+    place-items: center;
+    min-block-size: 44px;
+  }
+
+  .workbook :global(.fortune-zoom-ratio-menu) {
+    inset-block-end: 100%;
+    max-block-size: 45dvh;
+    overflow-y: auto;
+  }
+}
+
 .notice {
   display: flex;
   flex: none;

@@ -1,6 +1,6 @@
 /** Node-scoped process reservations restored from real PostgreSQL assignments. @module */
 import { postgresTestDatabaseUrl } from './postgres-test-database.mjs'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -12,7 +12,7 @@ import { computeLaunchStamps } from '../src/launch-stamp.ts'
 import type { UserRow } from '../src/auth.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
-import { resolvePostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
+import { resolvePostgresRuntimeContext, type PostgresRuntimeContext } from '../src/postgres/runtime-context.ts'
 import { testConfig } from './test-config.ts'
 import { LocalLauncher } from '../src/launcher.ts'
 
@@ -31,7 +31,7 @@ describePg('PostgreSQL Runtime capacity restoration', () => {
   })
   afterAll(async () => { await pool?.end() })
 
-  async function withAssignment(operation: (repository: PostgresInstanceRepository, target: RuntimeTarget, root: string) => Promise<void>): Promise<void> {
+  async function withAssignment(operation: (repository: PostgresInstanceRepository, target: RuntimeTarget, root: string, context: PostgresRuntimeContext) => Promise<void>): Promise<void> {
     const root = await mkdtemp(join(tmpdir(), 'hgw-generation-postgres-'))
     const slug = `generation-${randomUUID()}`
     let organizationId: string | undefined
@@ -49,7 +49,7 @@ describePg('PostgreSQL Runtime capacity restoration', () => {
         [organizationId, context.nodeId, user.id])
       const repository = new PostgresInstanceRepository(context, 48000)
       await repository.initialize()
-      await operation(repository, { kind: 'user', id: Number(user.public_id) }, root)
+      await operation(repository, { kind: 'user', id: Number(user.public_id) }, root, context)
     } finally {
       try {
         if (organizationId !== undefined) {
@@ -71,6 +71,99 @@ describePg('PostgreSQL Runtime capacity restoration', () => {
       expect(starts.filter(result => result.status === 'fulfilled')).toHaveLength(1)
       const started = starts.find(result => result.status === 'fulfilled')
       expect(await repository.generationOf(target)).toBe(started?.value)
+    })
+  })
+
+  it('resolves exact Runtime storage in one read while retaining computer and owner isolation', async () => {
+    await withAssignment(async (repository, target, root, context) => {
+      const selected = await repository.resolveTarget(target)
+      const start = vi.fn(async () => { throw new Error('storage reads cannot start a Runtime') })
+      const manager = new InstanceManager(repository, testConfig(root), { instancesOutliveGateway: true, start })
+      try {
+        await manager.inspectUpgradeSurvivors()
+        const query = vi.spyOn(pool, 'query')
+        try {
+          expect(await manager.storageOf(selected)).toMatchObject({ homePath: root, runtimeId: selected.runtimeId })
+          expect(query).toHaveBeenCalledTimes(1)
+        } finally { query.mockRestore() }
+        await expect(manager.storageOf({ ...selected, id: target.id + 1 })).rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE' })
+        await expect(manager.storageOf({ ...selected, runtimeId: randomUUID() as NonNullable<RuntimeTarget['runtimeId']> }))
+          .rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE' })
+        const foreign = new PostgresInstanceRepository({ ...context, nodeId: randomUUID() }, 48000)
+        expect(await foreign.owner(selected)).toBeNull()
+        expect((await manager.storageOf(target)).runtimeId).toBe(selected.runtimeId)
+        expect(start).not.toHaveBeenCalled()
+      } finally { await manager.stopAll(true) }
+    })
+  })
+
+  it.each(['shutdown', 'failed'] as const)('preserves durable recovery intent beyond the activity window after %s', async reason => {
+    await withAssignment(async (repository, target) => {
+      const cutoff = Date.now() - 7 * 24 * 3600 * 1000
+      expect(await repository.warmTargets(cutoff)).toEqual([])
+      const generation = await repository.beginStart(target, cutoff - 60_000, Buffer.alloc(32, 1), 'explicit')
+      await repository.markReady(target, generation)
+      await repository.markStopping(target, generation, reason)
+      await repository.markStopped(target, generation)
+      expect(await repository.warmTargets(cutoff)).toEqual([await repository.resolveTarget(target)])
+      for (const stop of ['idle', 'access-change', 'manual'] as const) {
+        await repository.markStopping(target, generation, stop)
+        await repository.markStopped(target, generation)
+        await repository.markStopping(target, generation, 'failed')
+        await repository.markStopped(target, generation, 'failed')
+        expect(await repository.stopReasonOf(target)).toBe(stop)
+        expect(await repository.warmTargets(0)).toEqual([])
+      }
+    })
+  })
+
+  it('retains an incompatible generation credential for admitted work while revocation still denies work', async () => {
+    await withAssignment(async (repository, target, root) => {
+      const token = randomUUID()
+      const generation = await repository.beginStart(target, Date.now(), createHash('sha256').update(token).digest(), 'explicit', undefined, true, 'previous-release')
+      await repository.markReady(target, generation)
+      const terminate = vi.fn(async () => {})
+      const manager = new InstanceManager(repository, testConfig(root), {
+        instancesOutliveGateway: true,
+        attach: () => ({ hasExited: () => false, isAlive: async () => true, terminate }),
+        start: async () => { throw new Error('a retained generation cannot be replaced') },
+      })
+      try {
+        expect(await manager.inspectUpgradeSurvivors()).toEqual({ compatible: 0, pending: 1 })
+        await manager.reconcile()
+        expect(await manager.liveEndpoint(target)).toBeNull()
+        const authenticated = await repository.authenticateRuntimeToken(token)
+        expect(authenticated?.generation).toBe(generation)
+        expect(terminate).not.toHaveBeenCalled()
+        await pool.query("UPDATE harness.users SET status='disabled' WHERE id=$1", [authenticated!.userInternalId])
+        expect(await repository.authenticateRuntimeToken(token)).toBeNull()
+        expect((await repository.authenticateRuntimeCleanupToken(token))?.generation).toBe(generation)
+      } finally { await manager.stopAll(true) }
+    })
+  })
+
+  it('retains stopping occupation on termination failure and lets revocation clear recovery intent', async () => {
+    await withAssignment(async (repository, target, root) => {
+      const cfg = testConfig(root)
+      const generation = await repository.beginStart(target, Date.now(), Buffer.alloc(32, 1), 'explicit', undefined, true, mintedLaunchStamp(cfg))
+      await repository.markReady(target, generation)
+      let failing = true
+      const manager = new InstanceManager(repository, cfg, {
+        instancesOutliveGateway: true,
+        attach: () => ({ hasExited: () => false, terminate: async () => { if (failing) throw new Error('stop unconfirmed') } }),
+        start: async () => { throw new Error('an occupied generation cannot be replaced') },
+      })
+      try {
+        await expect(manager.stop(target, 'shutdown')).rejects.toThrow('stop unconfirmed')
+        expect(await repository.stateOf(target)).toBe('stopping')
+        expect(manager.capacitySnapshot().resident).toBe(1)
+        expect(await repository.warmTargets(0)).toEqual([])
+        failing = false
+        await manager.stop(target, 'access-change')
+        expect(await repository.stateOf(target)).toBe('stopped')
+        expect(await repository.warmTargets(0)).toEqual([])
+        expect(manager.capacitySnapshot().resident).toBe(0)
+      } finally { await manager.stopAll(true) }
     })
   })
 

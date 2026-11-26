@@ -10,11 +10,12 @@
 // because the host answers `agent-preset-locked` to anything else.
 //
 // Zero model calls: no replay fixture mounts, so a stray stream fails loud.
+import { responsiveBrowser } from './responsive-browser.ts'
 import { fileURLToPath } from 'node:url'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Browser, Locator, Page } from 'playwright'
-import { chromium } from 'playwright'
+
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { MessageId } from '@deepseek-ai/dsh-llm'
 import {
@@ -182,7 +183,7 @@ describe('web e2e: agent-preset selection', () => {
     const seededId = await seedSession(scaffold, seedLog(), SEED_ID, 'minimal')
     await seedSubagent(scaffold, seededId)
     await seedWorkspaceSkill(scaffold.workspaceCwd)
-    browser = await chromium.launch()
+    browser = await responsiveBrowser.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -198,6 +199,7 @@ describe('web e2e: agent-preset selection', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-hero'))
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
 
+    await page.getByRole('button', { name: 'Standard mode', exact: true }).waitFor()
     const snapshot = await captureStableAria(page, '[class*="heroWorkspaceRow"]', scaffold.workspaceCwd)
 
     await compareOrRefreshGolden(HERO_EXPECTED, snapshot, MODE)
@@ -336,6 +338,8 @@ describe('web e2e: agent-preset selection', () => {
       { timeout: 15_000 },
     ).toBe(1)
 
+    const title = page.locator('[class*="titleRow"]')
+    await title.getByText('Minimal mode', { exact: true }).waitFor()
     const snapshot = await captureStableAria(page, '[class*="titleRow"]', scaffold.workspaceCwd)
 
     await compareOrRefreshGolden(HEADER_EXPECTED, snapshot, MODE)

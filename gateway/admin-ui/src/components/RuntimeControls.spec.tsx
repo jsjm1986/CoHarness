@@ -3,13 +3,15 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
+import { PendingEditsProvider } from '../pending-edits.tsx'
 import { RuntimeAllocationPolicyEditor } from './RuntimeAllocationPolicyEditor.tsx'
 import { UserComputerPermissions } from './UserComputerPermissions.tsx'
 import { UserRuntimePanel } from './UserRuntimePanel.tsx'
 import { runtimeFixture, runtimePageFixture } from './runtime-fixture.ts'
 import { deploymentContextSchema } from '../../../src/deployment-protocol.ts'
 
-vi.mock('../api.ts', () => ({
+vi.mock('../api.ts', async importOriginal => ({
+  ...await importOriginal<typeof api>(), adminRequest: vi.fn(),
   getRuntimeAllocationPolicy: vi.fn(), saveRuntimeAllocationPolicy: vi.fn(),
   listUserComputerPermissions: vi.fn(), saveUserComputerPermission: vi.fn(),
   getAdminComputerContext: vi.fn(), listUserRuntimes: vi.fn(), allocateUserRuntime: vi.fn(), operateRuntime: vi.fn(),
@@ -33,6 +35,24 @@ beforeEach(() => {
   vi.mocked(api.listUserRuntimes).mockResolvedValue(runtimePageFixture('user', 1))
   vi.mocked(api.getRuntimeAllocationPolicy).mockResolvedValue({ maxTotal: 8, maxPerNode: 4, revision: '1', source: 'user' })
   vi.mocked(api.listUserComputerPermissions).mockResolvedValue({ items: [computer], nextCursor: null })
+})
+
+it('keeps a personal start pending until the captured allocation reports its next generation ready', async () => {
+  const stopped = { ...runtime, observedState: 'stopped' }
+  const read = Promise.withResolvers<typeof runtime>()
+  vi.mocked(api.listUserRuntimes).mockResolvedValue({ items: [stopped], nextCursor: null })
+  vi.mocked(api.operateRuntime).mockRejectedValueOnce(new api.AdminRequestError(503, 'offline', 'node-service/unavailable'))
+  vi.mocked(api.adminRequest).mockReturnValue(read.promise)
+  render(<UserRuntimePanel userId={1} />)
+  const row = await screen.findByRole('row', { name: new RegExp(runtime.id) })
+  await userEvent.click(within(row).getByRole('button', { name: '启动' }))
+  const dialog = within(screen.getByRole('dialog'))
+  await userEvent.click(dialog.getByRole('button', { name: '启动' }))
+  expect(await dialog.findByRole('status')).toHaveProperty('textContent', '启动请求的回复中断，正在核实所选 Runtime 的状态')
+  expect(dialog.getByRole('button', { name: '启动' })).toHaveProperty('disabled', true)
+  await act(async () => read.resolve({ ...runtime, generation: stopped.generation + 1 }))
+  expect(await screen.findByText('所选 Runtime 已就绪')).toBeTruthy()
+  expect(api.operateRuntime).toHaveBeenCalledTimes(1)
 })
 
 it('keeps local Runtime controls and grants available without computer labels in single mode', async () => {
@@ -129,10 +149,46 @@ it('retains edited limits after an unconfirmed save and requires an explicit ref
   expect(await screen.findByRole('alert')).toHaveProperty('textContent', '保存未确认，请刷新后再修改')
   expect(total).toHaveProperty('value', '12')
   expect(screen.getByRole('button', { name: '保存 Runtime 配额' })).toHaveProperty('disabled', true)
+  vi.mocked(api.getRuntimeAllocationPolicy).mockResolvedValue({ maxTotal: 8, maxPerNode: 5, revision: '2', source: 'user' })
   await userEvent.click(screen.getByRole('button', { name: '刷新配额' }))
   await waitFor(() => expect(total).toHaveProperty('disabled', false))
-  expect(total).toHaveProperty('value', '8')
+  expect(total).toHaveProperty('value', '12')
   expect(api.saveRuntimeAllocationPolicy).toHaveBeenCalledTimes(1)
+  vi.mocked(api.saveRuntimeAllocationPolicy).mockResolvedValue({ maxTotal: 12, maxPerNode: 5, revision: '3', source: 'user' })
+  await userEvent.click(screen.getByRole('button', { name: '保存 Runtime 配额' }))
+  expect(await screen.findByText('配额已保存')).toBeTruthy()
+  expect(api.saveRuntimeAllocationPolicy).toHaveBeenLastCalledWith(1, '2', { maxTotal: 12, maxPerNode: 5 })
+})
+
+it('clears a quota edit when the input returns to an equivalent number', async () => {
+  render(<PendingEditsProvider><RuntimeAllocationPolicyEditor userId={1} /></PendingEditsProvider>)
+  const total = await screen.findByRole('spinbutton', { name: '总配额' })
+  fireEvent.change(total, { target: { value: '9' } })
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(false)
+
+  fireEvent.change(total, { target: { value: '08' } })
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(true)
+  expect(total).toHaveProperty('value', '8')
+  expect(api.saveRuntimeAllocationPolicy).not.toHaveBeenCalled()
+})
+
+it('clears quota drafts that match the refreshed numbers without another write', async () => {
+  const reload = Promise.withResolvers<api.RuntimeAllocationPolicy>()
+  render(<PendingEditsProvider><RuntimeAllocationPolicyEditor userId={1} /></PendingEditsProvider>)
+  const total = await screen.findByRole('spinbutton', { name: '总配额' })
+  const perNode = screen.getByRole('spinbutton', { name: '每台电脑配额' })
+  fireEvent.change(total, { target: { value: '012' } })
+  fireEvent.change(perNode, { target: { value: '5.0' } })
+  vi.mocked(api.getRuntimeAllocationPolicy).mockReturnValueOnce(reload.promise)
+  fireEvent.click(screen.getByRole('button', { name: '刷新配额' }))
+  expect(api.getRuntimeAllocationPolicy).toHaveBeenCalledTimes(2)
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(false)
+
+  await act(async () => { reload.resolve({ maxTotal: 12, maxPerNode: 5, revision: '2', source: 'user' }) })
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(true)
+  expect(total).toHaveProperty('value', '12')
+  expect(perNode).toHaveProperty('value', '5')
+  expect(api.saveRuntimeAllocationPolicy).not.toHaveBeenCalled()
 })
 
 it('associates invalid limits with their inputs and keeps the mutation disabled', async () => {

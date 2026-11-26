@@ -17,7 +17,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AttachmentStore from '@deepseek-ai/dsh-attachment'
-import { collaborationCapabilities } from '@deepseek-ai/dsh-collaboration'
+import { CollaborationError, collaborationCapabilities } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import LlmRuntime, { LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import ModelAccessPolicy from '@deepseek-ai/dsh-model-access'
@@ -28,13 +28,14 @@ import type {
 } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import SessionPersistence, { SessionPersistenceReadError } from '@deepseek-ai/dsh-session-persistence'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '../src/api-proxy.ts'
-import { admittedPrompts } from '../src/prompt-receipts.ts'
+import { admittedPrompts } from '@deepseek-ai/dsh-session/surface'
 
 let nextRpc = 1
 function request<P>(payload: P): RpcRequest<P> {
@@ -790,6 +791,7 @@ it('verifies the exact durable inbox event while later Session events commit, an
     Object.assign(agent, { followup: (message: UserMessage) => { inbox.splice('next-turn', Infinity, 0, [message]) } })
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }), cwd: root })
     const open = ctx.sessionPersistence.open.bind(ctx.sessionPersistence)
+    const readCommittedEvent = ctx.sessionPersistence.readCommittedEvent.bind(ctx.sessionPersistence)
     const otherSession = ctx.sessions.create()
     const otherWriter = await ctx.sessionPersistence.create(otherSession.header)
     ctx.effect(() => () => otherWriter.close())
@@ -810,11 +812,7 @@ it('verifies the exact durable inbox event while later Session events commit, an
           agent.session.append('agent/inbox/spliced', { target: 'next-turn', start: 1, removedCount: 0, inserted: [] })
           await ctx.sessions.flush(agent.session)
         }
-        const [proof] = admittedPrompts(event)
-        if (!proof || mode !== 'key' && mode !== 'digest') return page
-        const changed = { ...proof, [mode]: '0'.repeat(64) }
-        const inserted = event.data.inserted.map(item => ({ ...item, source: { ...item.source, admission: changed } }))
-        return { ...page, events: [{ ...event, data: { ...event.data, inserted } }] }
+        return page
       }
       const close = async (): Promise<void> => {
         await handle.close()
@@ -828,9 +826,27 @@ it('verifies the exact durable inbox event while later Session events commit, an
         },
       })
     })
+    const receiptRead = vi.spyOn(ctx.sessionPersistence, 'readCommittedEvent').mockImplementation(async (...args) => {
+      const event = mode === 'id' || mode === 'close'
+        ? await SessionPersistence.prototype.readCommittedEvent.call(ctx.sessionPersistence, ...args)
+        : await readCommittedEvent(...args)
+      if (event?.type !== 'agent/inbox/spliced') return event
+      if (mode === 'concurrent' && !advanced) {
+        advanced = true
+        agent.session.append('agent/inbox/spliced', { target: 'next-turn', start: 1, removedCount: 0, inserted: [] })
+        await ctx.sessions.flush(agent.session)
+      }
+      const [proof] = admittedPrompts(event)
+      if (!proof || mode !== 'key' && mode !== 'digest') return event
+      const changed = { ...proof, [mode]: '0'.repeat(64) }
+      const inserted = event.data.inserted.map(item => ({ ...item, source: { ...item.source, admission: changed } }))
+      return { ...event, data: { ...event.data, inserted } }
+    })
     const requestId = RpcId('concurrent-operation')
     const payload = { sessionId, requestId, mode: 'queue' as const, durable: true as const, content: [{ type: 'text' as const, text: 'one input' }] }
     expect((await api.sessions.prompt(request(payload))).result).toEqual({ ok: true, value: { accepted: true } })
+    expect(receiptRead).toHaveBeenCalledTimes(1)
+    expect(openOverride).not.toHaveBeenCalled()
     expect(advanced).toBe(true)
     const [marker] = Object.values(ctx.sessionProjections.stateOf(agent.session, 'acceptedPromptReceipts')!)
     advanced = false
@@ -843,6 +859,7 @@ it('verifies the exact durable inbox event while later Session events commit, an
         ok: false, error: { code: 'prompt-durability-unavailable' },
       })
     }
+    receiptRead.mockRestore()
     openOverride.mockRestore()
     const failedFlush = vi.spyOn(ctx.sessions, 'flush').mockRejectedValueOnce(new Error('storage unavailable'))
     expect((await api.sessions.promptStatus(request({ sessionId, requestId }))).result).toMatchObject({
@@ -861,4 +878,50 @@ it('verifies the exact durable inbox event while later Session events commit, an
       })
     } finally { await writeFile(path, bytes) }
   } finally { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }) }
+})
+
+it('maps transient reservedProjectDraft persistence errors to a typed RPC error in session.models', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-models-draft-read-'))
+  let ctx: Context | undefined
+  try {
+    const fixture = await harness(undefined, { persistenceRoot: root })
+    ctx = fixture.ctx
+    const missing = 'missing-draft-session' as SessionId
+    const authority: CollaborationAuthority = {
+      participant: {
+        userId: 7,
+        username: 'alice',
+        displayName: 'Alice',
+        role: 'user',
+        scope: { kind: 'project', projectId: 41, projectName: 'Compiler', mode: 'rw' },
+      },
+      expiresAt: Date.now() + 60_000,
+      signal: new AbortController().signal,
+      capabilities() { return collaborationCapabilities(this.participant) },
+      authorize: () => Promise.reject(new CollaborationError('conversation-not-found')),
+      readableSessionIds: () => Promise.resolve(new Set()),
+      claimInteraction: () => Promise.resolve(true),
+    }
+    ctx.provide('collaboration', {
+      capture: () => authority,
+      currentCreation: () => undefined,
+      withSessionCreation: (_creation: unknown, operation: () => Promise<unknown>) => operation(),
+    } as never)
+    const reservedProjectDraft = vi.spyOn(ctx.sessionPersistence, 'reservedProjectDraft')
+      .mockRejectedValueOnce(new SessionPersistenceReadError('dependency', 'gateway unavailable'))
+      .mockRejectedValueOnce(new Error('unexpected failure'))
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+    const handled = await api.sessions.models(request({ sessionId: missing }))
+    expect(handled.result).toMatchObject({
+      ok: false,
+      error: { code: 'internal', message: 'The project draft could not be recovered for model selection.' },
+    })
+    await expect(api.sessions.models(request({ sessionId: missing }))).rejects.toThrow('unexpected failure')
+    expect(reservedProjectDraft).toHaveBeenCalledTimes(2)
+  } finally {
+    try { await ctx?.fiber.dispose() } finally { await rm(root, { recursive: true, force: true }) }
+  }
 })

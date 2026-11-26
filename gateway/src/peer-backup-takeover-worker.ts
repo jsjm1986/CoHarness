@@ -33,7 +33,7 @@ export async function runPeerRecoveryPhase(deps: PeerTakeoverDependencies, signa
         (r.phase='cancelled' AND r.target_node_id=$2 AND NOT EXISTS(SELECT FROM harness.project_recovery_cleanups c WHERE c.operation_id=r.id))
         OR (r.source_node_id=$2 AND r.phase='retreat')
         OR p.revision=harness.recovery_policy_revision(r.id,r.policy_revision) AND p.enabled AND
-          (r.target_node_id=$2 AND (r.phase='prepared' OR r.phase='published' AND r.target_activated_at IS NULL)
+          (r.target_node_id=$2 AND (r.phase='prepared' AND r.recovery_mode='planned' OR r.phase='preparing' AND r.recovery_mode='disaster' OR r.phase='externally-fenced' OR r.phase='published' AND r.target_activated_at IS NULL)
           OR r.source_node_id=$2 AND r.phase IN('retire-approved','retiring')))
       ORDER BY (r.phase='cancelled') DESC,r.retry_at,r.created_at LIMIT 1`,
         [context.organizationId, context.nodeId],
@@ -53,7 +53,7 @@ export async function runPeerRecoveryPhase(deps: PeerTakeoverDependencies, signa
         await reservations.withdraw()
         await assertReleasedRecoveryPaths(await deps.layout(op))
         await service.acknowledgeCleanup(op)
-      } else if (op.phase === 'prepared' && op.targetNode === context.nodeId) {
+      } else if ((op.phase === 'preparing' || op.phase === 'prepared' || op.phase === 'externally-fenced') && op.targetNode === context.nodeId) {
         const staged = (
           await volume.readVolume(
             async (db) =>
@@ -66,10 +66,10 @@ export async function runPeerRecoveryPhase(deps: PeerTakeoverDependencies, signa
           )
         ).rowCount
         if (!staged) {
-          await service.assertUnpublishedDestination(op,'prepared')
+          await service.assertUnpublishedDestination(op,op.phase as 'preparing'|'prepared'|'externally-fenced')
           const drill = await deps.drill(op, signal)
           try {
-            await service.assertUnpublishedDestination(op,'prepared')
+            await service.assertUnpublishedDestination(op,op.phase as 'preparing'|'prepared'|'externally-fenced')
             await reservations.withdraw()
             const layout = await deps.layout(op)
             const files = await stagePeerProjectFiles(op, drill, layout, deps.limits, signal, reservations)

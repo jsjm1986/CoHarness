@@ -156,9 +156,13 @@ export class StreamPrincipalLeasePool {
       transport = this.options.renew(batch.map(lease => lease.id), signal)
       value = await cancellable(transport, signal)
     } catch {
-      // A transport failure grants no additional time. Each previous signed
-      // deadline remains armed; reconnect performs fresh admission after it.
-      if (!this.lifetime.signal.aborted) this.options.reportUnavailable()
+      if (!this.lifetime.signal.aborted) {
+        const retryAt = Date.now() + Math.min(this.options.config.intervalMs, this.options.config.requestTimeoutMs)
+        for (const lease of batch) {
+          if (this.leases.get(lease.id) === lease && retryAt < lease.current.claims.expiresAt) lease.renewAt = retryAt
+        }
+        this.options.reportUnavailable()
+      }
       return
     } finally {
       clearTimeout(timeout)
