@@ -20,7 +20,11 @@ it('refuses stale Inspector startup and recovers through the real Web compositio
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_MANAGED_DATA_MANIFEST: undefined,
       DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), DSH_TELEMETRY_DISABLED: '1', TMPDIR: root,
       TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
-    } })
+    } }).catch((error: unknown) => {
+      const detail = error as { stdout?: string; stderr?: string; message: string }
+      detail.message += `\nstdout:\n${detail.stdout}\nstderr:\n${detail.stderr}`
+      throw detail
+    })
     await expect(result.stdout).toMatchFileSnapshot(fileURLToPath(new URL('./startup-owner/expected.jsonl', import.meta.url)))
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 150_000)

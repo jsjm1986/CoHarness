@@ -62,7 +62,7 @@ try {
     let replacement, mounted
     const before = workers.length, announcedBefore = announcements
     try {
-      const load = ctx.loader.create({ id: `inspector-${change}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false } })
+      const load = ctx.loader.create({ id: `inspector-${change}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false, startupTimeoutMs: 30_000 } })
       const pending = load.then(async () => {
         mounted = [...ctx.loader.entries()].find(row => row.options.id === `inspector-${change}`)
         assert.ok(mounted?.fiber, 'Inspector did not mount')
@@ -90,7 +90,7 @@ try {
         const fresh = await ctx.plugin(Budget)
         try {
           const retryBefore = workers.length
-          await ctx.loader.create({ id: `retry-${change}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false } })
+          await ctx.loader.create({ id: `retry-${change}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false, startupTimeoutMs: 30_000 } })
           const retry = [...ctx.loader.entries()].find(row => row.options.id === `retry-${change}`)
           assert.ok(retry?.fiber)
           await retry.fiber.await()
@@ -122,7 +122,7 @@ try {
       void ctx.connection.dispatchHttp(request, reply).then(matched => { if (!matched) reply.writeHead(404).end() })
     })
     try {
-      startup = ctx.loader.create({ id: `bootstrap-${clientMode}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false } })
+      startup = ctx.loader.create({ id: `bootstrap-${clientMode}`, name: entry('experimental/inspector'), config: { port: 0, captureFetch: false, startupTimeoutMs: 30_000 } })
         .then(async () => {
           mounted = [...ctx.loader.entries()].find(row => row.options.id === `bootstrap-${clientMode}`)
           assert.ok(mounted?.fiber)

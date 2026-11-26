@@ -24,6 +24,8 @@ Browser goldens that include wall-clock dates pin the browser context's `timezon
 
 Fixtures executed by a sandboxed product process must not live only in the host `/tmp`. Linux bwrap replaces `/tmp` with a private tmpfs even though the host root is read-only visible, so executable helpers and control files needed inside the confined command belong in repository-scoped scratch storage or the writable workspace.
 
+Worker startup ownership fixtures are not tests of the product's default readiness deadline. When a fixture repeatedly starts and stops real Workers only to prove admission, rollback, and quiescent disposal, pass an explicit lifecycle budget instead of the plugin default; otherwise hosted Windows module-load contention can turn every rollback into another physical-thread wait and exhaust the outer example deadline. The example wrapper preserves child stdout and stderr so a timeout reports the last completed ownership phase rather than only the spawn command.
+
 ## Alternatives considered
 
 **Normalize all paths and URIs to POSIX strings.** This would make assertions uniform but would change correct Windows behavior: external paths are native absolute paths, UNC file URIs are valid, and configured homes resolve through the host path rules.

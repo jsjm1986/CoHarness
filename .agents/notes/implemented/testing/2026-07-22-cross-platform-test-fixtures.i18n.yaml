@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-07-22-cross-platform-test-fixtures.md
 document:
-  en: 469507ba0af62ec5cafc954a8f0cea80b57633e6
-  zh: 980ba18623a2e23de4b50ae188b52d1bf00e8d46
+  en: 1c6497b5f7b773597e0b2bfc0073d7ba76b97d53
+  zh: fa1c612e9e98565d801911b13c38cbefffa6099d
 /agent-note-keep-supported-platform-tests-semantic:
   en: f4f206f73de14d14
   zh: ebb8866297933077
@@ -12,8 +12,8 @@ document:
   en: 15308dafce780c18
   zh: 892a43fc721bfb21
 /agent-note-keep-supported-platform-tests-semantic/decision:
-  en: 26f8507f8ce69fee
-  zh: e322ab6fa3185ae5
+  en: cca7be5f02eee619
+  zh: ad199dc0b022b314
 /agent-note-keep-supported-platform-tests-semantic/alternatives-considered:
   en: 05b9fcce63bebb82
   zh: 66db6d7dea6dfb84

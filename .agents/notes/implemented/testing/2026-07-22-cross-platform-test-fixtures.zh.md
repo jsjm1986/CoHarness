@@ -24,6 +24,8 @@ Status: implemented
 
 由带沙盒的产品进程执行的 fixture 不能只放在宿主 `/tmp` 中。即使宿主根目录在 Linux bwrap 中以只读方式可见，bwrap 仍会把 `/tmp` 替换成私有 tmpfs；因此受限命令内需要的可执行辅助程序和控制文件应放在仓库作用域的 scratch 存储或可写 workspace 中。
 
+Worker 启动 ownership fixture 并不是在测试产品默认 readiness 截止时间。若 fixture 只是为了证明 admission、rollback 和静态销毁而反复启动并停止真实 Worker，就必须显式传入生命周期预算，而不是沿用插件默认值；否则 hosted Windows 上的模块加载竞争会让每次 rollback 都额外等待物理线程退出，并耗尽外层示例截止时间。示例包装器会保留子进程 stdout 和 stderr，使超时能报告最后完成的 ownership 阶段，而不是只报告 spawn 命令。
+
 ## 曾考虑的替代方案
 
 **将所有路径和 URI 归一化为 POSIX 字符串。**这会使断言保持一致，但也会改变正确的 Windows 行为：外部路径是原生绝对路径，UNC 文件 URI 有效，而且已配置的主目录会按照宿主路径规则解析。
