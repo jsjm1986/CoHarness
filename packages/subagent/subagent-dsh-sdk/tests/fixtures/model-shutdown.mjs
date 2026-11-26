@@ -13,6 +13,8 @@ const entry = path => path === 'subagent/subagent-dsh-sdk' && artifactRoot !== u
   : new URL(`packages/${path}/${mode === 'src' ? 'src/index.ts' : 'lib/index.js'}`, root).href
 const { boot } = await import(entry('boot/app-boot'))
 const { SessionId } = await import(entry('core/session'))
+const LANE_TEST_TIMEOUT_MS = Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0)
+const STREAM_CLOSE_TIMEOUT_MS = Math.max(30_000, Math.floor(LANE_TEST_TIMEOUT_MS / 2))
 const operations = []
 const coordinator = createServer(async (request, response) => {
   try {
@@ -36,11 +38,12 @@ try {
   const childPatch = join(process.cwd(), 'child.patch.yml')
   await writeFile(childPatch, JSON.stringify([
     { id: 'llm-deepseek', disabled: true }, { id: 'agent-instructions', disabled: true },
+    { id: 'llm', config: { streamCloseTimeoutMs: STREAM_CLOSE_TIMEOUT_MS } },
     { id: 'skill-filesystem', config: { includeDefaultRoots: false } },
     { insert: [{ id: 'shutdown-child', name: new URL('./model-shutdown-child.mjs', import.meta.url).href, config: { record } }] },
   ]))
   const plugins = [
-    ['core/session'], ['core/agent'], ['llm/llm'], ['core/tools'], ['core/system-prompt'],
+    ['core/session'], ['core/agent'], ['llm/llm', { streamCloseTimeoutMs: STREAM_CLOSE_TIMEOUT_MS }], ['core/tools'], ['core/system-prompt'],
     ['core/tool-executor-native'],
     ['session/session-persistence-jsonl', { root: join(process.cwd(), 'sessions'), compression: 'none' }],
     ['session/session-projection'], ['fs/fs-local'], ['session/working-directory'], ['core/agent-loop', { agents: [] }], ['subagent/subagent'],

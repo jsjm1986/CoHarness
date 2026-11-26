@@ -34,7 +34,9 @@ let ctx, unblock
 const STARTUP_TIMEOUT_MS = Math.max(30_000, Math.floor(Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0) / 2))
 const progress = value => { process.stderr.write(`${JSON.stringify({ at: Math.round(performance.now()), ...value })}\n`) }
 try {
+  progress({ phase: 'boot-import-start', startupTimeoutMs: STARTUP_TIMEOUT_MS })
   const { boot } = await import(entry('boot/app-boot'))
+  progress({ phase: 'boot-imported' })
   const { default: ResourceBudget } = await import(entry('context/resource-budget'))
   const config = join(process.cwd(), 'cordis.yml'), home = join(process.cwd(), '.dsh')
   await writeFile(config, JSON.stringify([
@@ -42,7 +44,9 @@ try {
     { name: entry('host/webserver'), config: { host: '127.0.0.1', port: 0 } },
     { name: entry('client/connection') },
   ]))
+  progress({ phase: 'boot-start' })
   ctx = await boot('inspector-startup-owner', config)
+  progress({ phase: 'booted' })
   progress({ phase: 'fixture-start', startupTimeoutMs: STARTUP_TIMEOUT_MS })
   for (const change of ['replaced', 'withdrawn', 'unchanged', 'independent']) {
     progress({ phase: 'change-start', change })

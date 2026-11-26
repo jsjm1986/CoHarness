@@ -7,6 +7,10 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { expect, it } from 'vitest'
 
+const LANE_TEST_TIMEOUT_MS = Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0)
+const CASE_TIMEOUT_MS = Math.max(100_000, LANE_TEST_TIMEOUT_MS)
+const CHILD_TIMEOUT_MS = Math.max(90_000, LANE_TEST_TIMEOUT_MS - 10_000)
+
 it.each([
   ['resource-completion', 'recovers resource completion and upgrades uncertain native cleanup'],
   ['model-shutdown', 'joins a paused model consumer during SDK shutdown'],
@@ -20,7 +24,7 @@ it.each([
       ...(mode === 'src' ? ['--import', import.meta.resolve('tsx/esm')] : []),
       fileURLToPath(new URL(`./fixtures/${fixture}.mjs`, import.meta.url)), mode,
       ...(mode === 'lib' && process.env.DSH_SDK_ARTIFACT_ROOT !== undefined ? [process.env.DSH_SDK_ARTIFACT_ROOT] : []),
-    ], { cwd: root, timeout: 90_000, killSignal: 'SIGKILL', env: { ...process.env,
+    ], { cwd: root, timeout: CHILD_TIMEOUT_MS, killSignal: 'SIGKILL', env: { ...process.env,
       NODE_OPTIONS: undefined, NODE_PATH: undefined, DSH_HOME: join(root, '.dsh'), DSH_AGENTS_HOME: join(root, '.agents'), TMPDIR: root,
       DSH_TELEMETRY_DISABLED: '1', DSH_MANAGED_DATA_MANIFEST: undefined,
       TSX_TSCONFIG_PATH: mode === 'src' ? resolve(import.meta.dirname, '../../../../tsconfig.json') : undefined,
@@ -31,4 +35,4 @@ it.each([
     })
     await expect(result.stdout).toMatchFileSnapshot(resolve(import.meta.dirname, `expected/${fixture}.jsonl`))
   } finally { await rm(root, { recursive: true, force: true }) }
-}, 100_000)
+}, CASE_TIMEOUT_MS)
