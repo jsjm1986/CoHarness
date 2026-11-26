@@ -13,13 +13,29 @@ const root = new URL('../../../../../', import.meta.url)
 const entry = path => path === 'experimental/inspector' && artifactRoot !== undefined
   ? pathToFileURL(resolve(artifactRoot, 'lib/index.js')).href
   : new URL(`packages/${path}/${mode === 'src' ? 'src/index.ts' : 'lib/index.js'}`, root).href
+const STARTUP_TIMEOUT_MS = Math.max(30_000, Math.floor(Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0) / 2))
+const progress = value => { process.stderr.write(`${JSON.stringify({ at: Math.round(performance.now()), ...value })}\n`) }
+const inspectorBoot = value => value !== null && typeof value === 'object'
+  && value.hostSourcePort !== undefined && value.config !== undefined
 const threads = createRequire(import.meta.url)('node:worker_threads')
 const OriginalWorker = threads.Worker, workers = []
 threads.Worker = class extends OriginalWorker {
   constructor(...args) {
     super(...args)
+    const inspector = inspectorBoot(args[1]?.workerData)
+    if (!inspector) {
+      const keys = args[1]?.workerData !== null && typeof args[1]?.workerData === 'object' ? Object.keys(args[1].workerData).sort() : []
+      progress({ phase: 'worker-ignored', workerDataKeys: keys })
+      return
+    }
+    const index = workers.length
     const record = { exited: false, completion: undefined }
-    record.completion = new Promise(ready => this.once('exit', () => { record.exited = true; ready() }))
+    progress({ phase: 'worker-created', worker: index })
+    record.completion = new Promise(ready => this.once('exit', (code) => {
+      record.exited = true
+      progress({ phase: 'worker-exited', worker: index, code })
+      ready()
+    }))
     workers.push(record)
   }
 }
@@ -31,8 +47,6 @@ console.log = (...args) => {
   Reflect.apply(print, console, args)
 }
 let ctx, unblock
-const STARTUP_TIMEOUT_MS = Math.max(30_000, Math.floor(Number(process.env.DSH_COVERAGE_TEST_TIMEOUT_MS ?? 0) / 2))
-const progress = value => { process.stderr.write(`${JSON.stringify({ at: Math.round(performance.now()), ...value })}\n`) }
 try {
   progress({ phase: 'boot-import-start', startupTimeoutMs: STARTUP_TIMEOUT_MS })
   const { boot } = await import(entry('boot/app-boot'))
