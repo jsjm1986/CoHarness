@@ -24,7 +24,7 @@ Status: implemented
 
 由带沙盒的产品进程执行的 fixture 不能只放在宿主 `/tmp` 中。即使宿主根目录在 Linux bwrap 中以只读方式可见，bwrap 仍会把 `/tmp` 替换成私有 tmpfs；因此受限命令内需要的可执行辅助程序和控制文件应放在仓库作用域的 scratch 存储或可写 workspace 中。
 
-Worker 启动 ownership fixture 并不是在测试产品默认 readiness 截止时间。若 fixture 只是为了证明 admission、rollback 和静态销毁而反复启动并停止真实 Worker，就必须显式传入生命周期预算，而不是沿用插件默认值；否则 hosted Windows 上的模块加载竞争会让每次 rollback 都额外等待物理线程退出，并耗尽外层示例截止时间。示例包装器会保留子进程 stdout 和 stderr，使超时能报告最后完成的 ownership 阶段，而不是只报告 spawn 命令。
+Worker 启动 ownership fixture 并不是在测试产品默认 readiness 截止时间。若 fixture 只是为了证明 admission、rollback 和静态销毁而反复启动并停止真实 Worker，就必须显式传入生命周期预算，而不是沿用插件默认值。进程密集型示例可以在 CI 通过 `DSH_COVERAGE_TEST_TIMEOUT_MS` 授予更大 lane budget 时恢复该预算；更低的用例局部预算必须是有意选择，而不能只是意外覆盖。示例包装器会保留子进程 stdout 和 stderr，包括 stderr 上确定性的阶段进度，使超时能报告最后完成的 ownership 阶段，而不是只报告 spawn 命令。只是回显有效 timeout 的真实 shell fixture 在 deadline expiry 并非被测行为时也使用同样的 lane-aware 预算；否则共享 runner 上缓慢的进程启动会被误读为产品超时。
 
 ## 曾考虑的替代方案
 
